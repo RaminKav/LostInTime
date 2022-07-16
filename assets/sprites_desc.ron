@@ -1,0 +1,92 @@
+(
+    map : {
+        //Items
+        Item(None): MyRect(
+            pos: (32., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Grass): MyRect(
+            pos: (48., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Twig): MyRect(
+            pos: (32., 16.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Flint): MyRect(
+            pos: (48., 16.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Wood): MyRect(
+            pos: (32., 48.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Tool(Axe)): MyRect(
+            pos: (32., 64.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Item(Tool(Shovel)): MyRect(
+            pos: (48., 64.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GroundGreen: MyRect(
+            pos: (0., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GroundBrown: MyRect(
+            pos: (16., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+
+        //Other world objects
+        Sapling: MyRect(
+            pos: (96., 0.),
+            size: (32., 32.),
+            anchor: Some((16., 30.)),
+        ),
+        DeadSapling: MyRect(
+            pos: (96., 32.),
+            size: (32., 16.),
+            anchor: Some((16., 14.)),
+        ),
+        Grass: MyRect(
+            pos: (64., 0.),
+            size: (32., 32.),
+            anchor: Some((16., 30.)),
+        ),
+        PluckedGrass: MyRect(
+            pos: (64., 32.),
+            size: (32., 16.),
+            anchor: Some((16., 14.)),
+        ),
+        Tree: MyRect(
+            pos: (160., 0.),
+            size: (32., 48.),
+            anchor: Some((16., 44.)),
+        ),
+        GrowingTree: MyRect(
+            pos: (160., 48.),
+            size: (16., 16.),
+            anchor: Some((8., 14.)),
+        ),
+        Stump: MyRect(
+            pos: (176., 48.),
+            size: (16., 16.),
+            anchor: Some((8., 12.)),
+        ),
+        CampFire: MyRect(
+            pos: (128., 0.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+    }
+)

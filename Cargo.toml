@@ -1,0 +1,22 @@
+[package]
+name = "survival-rouge-like"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+
+[dependencies]
+bevy = { version = "0.7", features = ["dynamic"] }
+bevy-inspector-egui = "0.10.0"
+serde = "1.0.136"
+ron = "0.7.0"
+kayak_ui = { git = "https://github.com/StarArawn/kayak_ui", features = [
+    "bevy_renderer",
+] }
+bevy_asset_loader = "0.11"
