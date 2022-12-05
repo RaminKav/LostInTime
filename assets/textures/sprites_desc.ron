@@ -1,0 +1,29 @@
+(
+    map : {
+        None: MyRect(
+            pos: (32., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Stone: MyRect(
+            pos: (32., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Coal: MyRect(
+            pos: (48., 16.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Grass: MyRect(
+            pos: (0., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Dirt: MyRect(
+            pos: (16., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+    }
+)

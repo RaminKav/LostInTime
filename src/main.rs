@@ -4,22 +4,53 @@
 // - trees/entities to break/mine
 use bevy::{
     prelude::*,
+    render::camera::ScalingMode,
     sprite::collide_aabb::{collide, Collision},
     sprite::MaterialMesh2dBundle,
     time::FixedTimestep,
+    window::PresentMode,
 };
+mod assets;
+mod item;
+use assets::{GameAssetsPlugin, TILE_SIZE};
+use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
+use item::ItemsPlugin;
 
 const PLAYER_MOVE_SPEED: f32 = 300.;
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 3.0;
+const PLAYER_SIZE: f32 = 4.0 / TILE_SIZE;
+pub const HEIGHT: f32 = 900.;
+pub const RESOLUTION: f32 = 16.0 / 9.0;
 
 fn main() {
     App::new()
         .init_resource::<Game>()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    window: WindowDescriptor {
+                        width: HEIGHT * RESOLUTION,
+                        height: HEIGHT,
+                        title: "DST clone".to_string(),
+                        present_mode: PresentMode::Fifo,
+                        resizable: false,
+                        ..Default::default()
+                    },
+                    ..default()
+                }),
+        )
+        .add_plugin(GameAssetsPlugin)
+        .add_plugin(ItemsPlugin)
         .add_startup_system(setup)
+        .add_loading_state(
+            LoadingState::new(GameState::Loading)
+                .continue_to_state(GameState::Main)
+                .with_collection::<ImageAssets>(),
+        )
+        .add_state(GameState::Loading)
         .add_system_set(
-            SystemSet::new()
+            SystemSet::on_update(GameState::Main)
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(animate_sprite)
                 .with_system(move_player),
@@ -30,6 +61,19 @@ fn main() {
 #[derive(Resource, Default)]
 struct Game {
     player: Player,
+    world_size: i128,
+}
+
+#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+pub enum GameState {
+    Loading,
+    Main,
+}
+
+#[derive(Resource, AssetCollection)]
+struct ImageAssets {
+    #[asset(path = "bevy_survival_sprites.png")]
+    pub sprite_sheet: Handle<Image>,
 }
 
 #[derive(Component, Deref, DerefMut)]
@@ -47,7 +91,9 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut game: ResMut<Game>,
 ) {
+    game.world_size = 50;
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     let player_texture_atlas = TextureAtlas::from_grid(
         player_texture_handle,
@@ -59,11 +105,21 @@ fn setup(
     );
     let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
-    commands.spawn(Camera2dBundle::default());
+    let mut camera = Camera2dBundle::default();
+
+    // One unit in world space is one tile
+    camera.projection.left = -HEIGHT / TILE_SIZE / 2.0 * RESOLUTION;
+    camera.projection.right = HEIGHT / TILE_SIZE / 2.0 * RESOLUTION;
+    camera.projection.top = HEIGHT / TILE_SIZE / 2.0;
+    camera.projection.bottom = -HEIGHT / TILE_SIZE / 2.0;
+    camera.projection.scaling_mode = ScalingMode::None;
+    commands.spawn(camera);
+
     commands.spawn((
         SpriteSheetBundle {
             texture_atlas: player_texture_atlas_handle,
-            transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE)),
+            transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
+                .with_translation(Vec3::new(0., 0., 1.)),
             ..default()
         },
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
@@ -96,26 +152,32 @@ fn animate_sprite(
 fn move_player(
     key_input: Res<Input<KeyCode>>,
     mut game: ResMut<Game>,
-    mut query: Query<(&mut Transform, &mut Direction), With<Player>>,
+    mut player_query: Query<(&mut Transform, &mut Direction), (With<Player>, Without<Camera>)>,
+    mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
 ) {
-    let (mut player_transform, mut dir) = query.single_mut();
+    let (mut player_transform, mut dir) = player_query.single_mut();
+    let mut camera_transform = camera_query.single_mut();
 
     let mut dx = 0.0;
     let mut dy = 0.0;
+    let s = 1.0 / TILE_SIZE;
+    println!("{:?}", player_transform.translation.x);
     if key_input.pressed(KeyCode::A) {
-        dx -= 1.0;
+        dx -= s;
         game.player.is_moving = true;
+        player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
     }
     if key_input.pressed(KeyCode::D) {
-        dx += 1.0;
+        dx += s;
         game.player.is_moving = true;
+        player_transform.rotation = Quat::default();
     }
     if key_input.pressed(KeyCode::W) {
-        dy += 1.0;
+        dy += s;
         game.player.is_moving = true;
     }
     if key_input.pressed(KeyCode::S) {
-        dy -= 1.0;
+        dy -= s;
         game.player.is_moving = true;
     }
     if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]) {
@@ -126,11 +188,9 @@ fn move_player(
     let py = player_transform.translation.y + dy * PLAYER_MOVE_SPEED * TIME_STEP;
     player_transform.translation.x = px;
     player_transform.translation.y = py;
-    player_transform.scale = Vec3::new(
-        PLAYER_SIZE * (if dx == 0. { dir.0 } else { dx }),
-        PLAYER_SIZE,
-        PLAYER_SIZE,
-    );
+    camera_transform.translation.x = px;
+    camera_transform.translation.y = py;
+
     if dx != 0. {
         dir.0 = dx;
     }
