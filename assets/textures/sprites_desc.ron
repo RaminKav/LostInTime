@@ -25,5 +25,25 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Stone: MyRect(
+            pos: (32., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Water: MyRect(
+            pos: (48., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Sand: MyRect(
+            pos: (64., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Tree: MyRect(
+            pos: (160., 0.),
+            size: (32., 48.),
+            anchor: Some((16., 44.)),
+        ),
     }
 )

@@ -16,11 +16,12 @@ use assets::{GameAssetsPlugin, TILE_SIZE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use item::ItemsPlugin;
 
-const PLAYER_MOVE_SPEED: f32 = 300.;
+const PLAYER_MOVE_SPEED: f32 = 600.;
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 4.0 / TILE_SIZE;
+const PLAYER_SIZE: f32 = 2.5 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
+pub const WORLD_SIZE: usize = 100;
 
 fn main() {
     App::new()
@@ -61,7 +62,17 @@ fn main() {
 #[derive(Resource, Default)]
 struct Game {
     player: Player,
-    world_size: i128,
+    world_size: usize,
+    world_generation_params: WorldGeneration,
+}
+
+#[derive(Default)]
+pub struct WorldGeneration {
+    water_frequency: f64,
+    sand_frequency: f64,
+    dirt_frequency: f64,
+    stone_frequency: f64,
+    tree_frequency: f64,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -93,7 +104,15 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut game: ResMut<Game>,
 ) {
-    game.world_size = 50;
+    game.world_size = WORLD_SIZE;
+    game.world_generation_params = WorldGeneration {
+        tree_frequency: 0.,
+        stone_frequency: 0.55,
+        dirt_frequency: 0.45,
+        sand_frequency: 0.29,
+        water_frequency: 0.25,
+    };
+
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     let player_texture_atlas = TextureAtlas::from_grid(
         player_texture_handle,
@@ -161,7 +180,6 @@ fn move_player(
     let mut dx = 0.0;
     let mut dy = 0.0;
     let s = 1.0 / TILE_SIZE;
-    println!("{:?}", player_transform.translation.x);
     if key_input.pressed(KeyCode::A) {
         dx -= s;
         game.player.is_moving = true;
