@@ -383,6 +383,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_ecs_tilemap"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ce7f9fa49f364602ac0901d5f181445529b23fb0623e39e791548f8a6e8c2b5"
+dependencies = [
+ "bevy",
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "bevy_encase_derive"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2110,15 +2121,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "noisy_bevy"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e087b597ef1b21694afc6bf1f35c9396eeeffeb8a0809a3314b2d6387441274"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "nom"
 version = "7.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2826,8 +2828,8 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_asset_loader",
+ "bevy_ecs_tilemap",
  "noise",
- "noisy_bevy",
  "rand 0.8.5",
  "ron 0.7.1",
  "serde",

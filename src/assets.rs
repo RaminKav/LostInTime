@@ -11,6 +11,10 @@ use ron::de::from_str;
 
 // use ron::de::from_str;
 
+// pub const PIXEL_SCALE: f32 = 3.;
+pub const SOURCE_TILE_SIZE: f32 = 32.;
+pub const TILE_SIZE: f32 = 3.; //SOURCE_TILE_SIZE * PIXEL_SCALE;
+
 pub struct GameAssetsPlugin;
 
 /// Used to describe the location and styling of sprites on the sprite sheet
@@ -58,17 +62,13 @@ impl Plugin for GameAssetsPlugin {
     }
 }
 
-pub const PIXEL_SCALE: f32 = 3.;
-pub const SOURCE_TILE_SIZE: f32 = 32.;
-pub const TILE_SIZE: f32 = SOURCE_TILE_SIZE * PIXEL_SCALE;
-
 /// The great Graphics Resource, used by everything that needs to create sprites
 /// Contains an image map which is the work around for UI not supporting texture atlas sprites
 #[derive(Resource)]
 
 pub struct Graphics {
     pub texture_atlas: Handle<TextureAtlas>,
-    pub item_map: HashMap<WorldObject, TextureAtlasSprite>,
+    pub item_map: HashMap<WorldObject, (TextureAtlasSprite, usize)>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
@@ -133,17 +133,13 @@ impl GameAssetsPlugin {
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::splat(256.0));
 
         let mut item_map = HashMap::default();
-        // let mut image_map = HashMap::default();
 
         for (item, rect) in sprite_desc.map.iter() {
             println!("Found graphic {:?}", item);
             let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
             //Set the size to be proportional to the source rectangle
-            sprite.custom_size = Some(Vec2::new(
-                rect.size.0 / SOURCE_TILE_SIZE,
-                rect.size.1 / SOURCE_TILE_SIZE,
-            ));
+            sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
 
             //Position the sprite anchor if one is defined
             if let Some(anchor) = rect.anchor {
@@ -153,11 +149,7 @@ impl GameAssetsPlugin {
                 ));
             };
 
-            item_map.insert(*item, sprite);
-            // image_map.insert(
-            //     *item,
-            //     convert_to_image(*rect, image_handle.clone(), &mut image_assets),
-            // );
+            item_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
         }
 
         let atlas_handle = texture_assets.add(atlas);
@@ -167,4 +159,8 @@ impl GameAssetsPlugin {
             item_map,
         });
     }
+}
+
+pub fn get_index_from_pixel_cords(p: MyRect) -> usize {
+    (p.pos.1 + (p.pos.0 / 16.)) as usize
 }

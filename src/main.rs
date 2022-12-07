@@ -12,16 +12,19 @@ use bevy::{
 };
 mod assets;
 mod item;
+mod world_generation;
 use assets::{GameAssetsPlugin, TILE_SIZE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
+use bevy_ecs_tilemap::TilemapPlugin;
 use item::ItemsPlugin;
+use world_generation::WorldGenerationPlugin;
 
-const PLAYER_MOVE_SPEED: f32 = 600.;
+const PLAYER_MOVE_SPEED: f32 = 800.;
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 2.5 / TILE_SIZE;
+const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
-pub const WORLD_SIZE: usize = 100;
+pub const WORLD_SIZE: usize = 300;
 
 fn main() {
     App::new()
@@ -41,8 +44,10 @@ fn main() {
                     ..default()
                 }),
         )
+        .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
+        .add_plugin(WorldGenerationPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -107,10 +112,10 @@ fn setup(
     game.world_size = WORLD_SIZE;
     game.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
-        stone_frequency: 0.55,
-        dirt_frequency: 0.45,
-        sand_frequency: 0.29,
-        water_frequency: 0.25,
+        stone_frequency: 0.0,
+        dirt_frequency: 0.35,
+        sand_frequency: 0.2,
+        water_frequency: 0.12,
     };
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
