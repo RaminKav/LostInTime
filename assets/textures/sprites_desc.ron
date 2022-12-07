@@ -5,11 +5,6 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Stone: MyRect(
-            pos: (32., 0.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         Coal: MyRect(
             pos: (48., 16.),
             size: (16., 16.),
@@ -37,6 +32,21 @@
         ),
         Sand: MyRect(
             pos: (64., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedSand: MyRect(
+            pos: (80., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Mud: MyRect(
+            pos: (96., 96.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DryGrass: MyRect(
+            pos: (112., 96.),
             size: (16., 16.),
             anchor: None,
         ),
