@@ -1,7 +1,9 @@
 use crate::assets::Graphics;
 use crate::item::WorldObject;
-use crate::{Game, GameState, ImageAssets, WORLD_SIZE};
+use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
 use bevy::prelude::*;
+use bevy::time::FixedTimestep;
+use bevy::{math::Vec3Swizzles, utils::HashSet};
 use bevy_ecs_tilemap::prelude::*;
 use noise::{NoiseFn, OpenSimplex, Perlin, Seedable, Simplex};
 use rand::rngs::ThreadRng;
@@ -12,8 +14,11 @@ pub struct WorldGenerationPlugin;
 
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_enter(GameState::Main).with_system(Self::load_terrain), // .with_system(Self::spawn_test_objects.after("graphics")),
+        app.insert_resource(ChunkManager::default()).add_system_set(
+            SystemSet::on_update(GameState::Main)
+                // .with_system(Self::spawn_chunk)
+                .with_system(Self::spawn_chunks_around_camera)
+                .with_system(Self::despawn_outofrange_chunks), // .with_system(Self::spawn_test_objects.after("graphics")),
         );
         //TODO: add updating code
         // .add_system_set(
@@ -22,17 +27,22 @@ impl Plugin for WorldGenerationPlugin {
         // );
     }
 }
+#[derive(Default, Debug, Resource)]
+struct ChunkManager {
+    pub spawned_chunks: HashSet<IVec2>,
+}
 
 impl WorldGenerationPlugin {
-    fn load_terrain(
-        mut commands: Commands,
-        sprite_sheet: Res<ImageAssets>,
-        graphics: Res<Graphics>,
-        game: Res<Game>,
+    fn spawn_chunk(
+        commands: &mut Commands,
+        sprite_sheet: &Res<ImageAssets>,
+        graphics: &Res<Graphics>,
+        game: &Res<Game>,
+        chunk_pos: IVec2,
     ) {
         let tilemap_size = TilemapSize {
-            x: WORLD_SIZE as u32,
-            y: WORLD_SIZE as u32,
+            x: 16 as u32,
+            y: 16 as u32,
         };
         let tile_size = TilemapTileSize { x: 16., y: 16. };
         let grid_size = tile_size.into();
@@ -41,7 +51,7 @@ impl WorldGenerationPlugin {
         let tilemap_entity = commands.spawn_empty().id();
         let mut tile_storage = TileStorage::empty(tilemap_size);
 
-        let mut value = [[0.; WORLD_SIZE]; WORLD_SIZE];
+        let mut value = [[0.; 16]; 16];
         let noise_e = Perlin::new(1);
         let noise_e2 = Perlin::new(2);
         let noise_e3 = Perlin::new(3);
@@ -49,16 +59,16 @@ impl WorldGenerationPlugin {
         let noise_m2 = Simplex::new(5);
         let noise_m3 = Simplex::new(6);
 
-        for y in 0..WORLD_SIZE {
-            for x in 0..WORLD_SIZE {
+        for y in 0..16 {
+            for x in 0..16 {
                 let tile_pos = TilePos {
                     x: x.try_into().unwrap(),
                     y: y.try_into().unwrap(),
                 };
-                let nx = x as f64 / WORLD_SIZE as f64 - 0.5;
-                let ny = y as f64 / WORLD_SIZE as f64 - 0.5;
+                let nx = (x + chunk_pos.x * 16) as f64 / 16. as f64 - 0.5;
+                let ny = (y + chunk_pos.y * 16) as f64 / 16. as f64 - 0.5;
                 // let e = noise_e.get([nx, ny]) + 0.5;
-                let base_oct = 16.;
+                let base_oct = 1.;
                 let e = (noise_e.get([nx * base_oct, ny * base_oct]) + 0.5)
                     + 0.5 * (noise_e2.get([nx * base_oct * 2., ny * base_oct * 2.]) + 0.5)
                     + 0.25 * (noise_e3.get([nx * base_oct * 3., ny * base_oct * 3.]) + 0.5);
@@ -71,32 +81,23 @@ impl WorldGenerationPlugin {
                 // print!("{:?}", e);
                 let m = f64::powf(m, 1.);
                 let block = if e <= game.world_generation_params.water_frequency {
-                    print!(" W, ");
-
                     WorldObject::Water
                 } else if e <= game.world_generation_params.sand_frequency {
-                    print!(" S, ");
-
-                    if m <= 0.4 {
+                    if m <= 0.35 {
                         WorldObject::RedSand
                     } else {
                         WorldObject::Sand
                     }
                 } else if e <= game.world_generation_params.dirt_frequency {
-                    print!(" D, ");
-
-                    if m < 0.4 {
+                    if m < 0.6 {
                         WorldObject::Dirt
                     } else {
                         WorldObject::Mud
                     }
                 } else if e <= game.world_generation_params.stone_frequency {
-                    print!(" S, ");
                     WorldObject::Stone
                 } else {
-                    print!(" G, {:?}", m);
-
-                    if m < 0.4 {
+                    if m < 0.35 {
                         WorldObject::DryGrass
                     } else {
                         WorldObject::Grass
@@ -112,9 +113,16 @@ impl WorldGenerationPlugin {
                         ..Default::default()
                     })
                     .id();
+                commands.entity(tilemap_entity).add_child(tile_entity);
+
                 tile_storage.set(&tile_pos, tile_entity);
             }
         }
+        let transform = Transform::from_translation(Vec3::new(
+            chunk_pos.x as f32 * 16. as f32 * 16.,
+            chunk_pos.y as f32 * 16. as f32 * 16.,
+            0.0,
+        ));
         commands.entity(tilemap_entity).insert(TilemapBundle {
             grid_size,
             map_type,
@@ -122,10 +130,68 @@ impl WorldGenerationPlugin {
             storage: tile_storage,
             texture: TilemapTexture::Single(sprite_sheet.sprite_sheet.clone()),
             tile_size,
-            transform: get_tilemap_center_transform(&tilemap_size, &grid_size, &map_type, 0.0),
+            transform,
             ..Default::default()
         });
     }
+
+    fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
+        let camera_pos = camera_pos.as_ivec2();
+        let chunk_size: IVec2 = IVec2::new(16 as i32, 16 as i32);
+        let tile_size: IVec2 = IVec2::new(16 as i32, 16 as i32);
+        camera_pos / (chunk_size * tile_size)
+    }
+
+    fn spawn_chunks_around_camera(
+        mut commands: Commands,
+        sprite_sheet: Res<ImageAssets>,
+        camera_query: Query<&Transform, With<Camera>>,
+        mut chunk_manager: ResMut<ChunkManager>,
+        graphics: Res<Graphics>,
+        game: Res<Game>,
+    ) {
+        for transform in camera_query.iter() {
+            let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
+            for y in (camera_chunk_pos.y - 2)..(camera_chunk_pos.y + 2) {
+                for x in (camera_chunk_pos.x - 2)..(camera_chunk_pos.x + 2) {
+                    if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
+                        println!("spawning chunk at {:?} {:?}", x, y);
+                        chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
+                        Self::spawn_chunk(
+                            &mut commands,
+                            &sprite_sheet,
+                            &graphics,
+                            &game,
+                            IVec2::new(x, y),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn despawn_outofrange_chunks(
+        mut commands: Commands,
+        camera_query: Query<&Transform, With<Camera>>,
+        chunks_query: Query<(Entity, &Transform)>,
+        mut chunk_manager: ResMut<ChunkManager>,
+    ) {
+        for camera_transform in camera_query.iter() {
+            for (entity, chunk_transform) in chunks_query.iter() {
+                let chunk_pos = chunk_transform.translation.xy();
+                let distance = camera_transform.translation.xy().distance(chunk_pos);
+                //TODO: calculate maximum possible distance for 2x2 chunksa
+                if distance > 1250.0 {
+                    let x = (chunk_pos.x as f32 / (16 as f32 * 16.)).floor() as i32;
+                    let y = (chunk_pos.y as f32 / (16 as f32 * 16.)).floor() as i32;
+                    println!("despawning chunk at {:?} {:?} d === {:?}", x, y, distance);
+                    chunk_manager.spawned_chunks.remove(&IVec2::new(x, y));
+                    commands.entity(entity).despawn_recursive();
+                }
+            }
+        }
+    }
+
     fn spawn_test_objects(mut commands: Commands, graphics: Res<Graphics>) {
         let mut tree_children = Vec::new();
 

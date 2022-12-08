@@ -13,10 +13,10 @@ use bevy::{
 mod assets;
 mod item;
 mod world_generation;
-use assets::{GameAssetsPlugin, TILE_SIZE};
+use assets::{GameAssetsPlugin, Graphics, TILE_SIZE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
-use item::ItemsPlugin;
+use item::{ItemsPlugin, WorldObject};
 use world_generation::WorldGenerationPlugin;
 
 const PLAYER_MOVE_SPEED: f32 = 800.;
@@ -113,9 +113,9 @@ fn setup(
     game.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
         stone_frequency: 0.0,
-        dirt_frequency: 0.35,
-        sand_frequency: 0.2,
-        water_frequency: 0.12,
+        dirt_frequency: 0.42,
+        sand_frequency: 0.25,
+        water_frequency: 0.09,
     };
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
@@ -217,4 +217,11 @@ fn move_player(
     if dx != 0. {
         dir.0 = dx;
     }
+}
+
+fn update_chunks_on_move(
+    mut to_update_query: Query<&mut Transform, (With<Player>, Changed<Transform>)>,
+    graphics: Res<Graphics>,
+) {
+    let player_transform = to_update_query.single();
 }
