@@ -130,7 +130,7 @@ impl GameAssetsPlugin {
             std::process::exit(1);
         });
 
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::splat(256.0));
+        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
 
         let mut item_map = HashMap::default();
 

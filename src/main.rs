@@ -13,11 +13,12 @@ use bevy::{
 mod assets;
 mod item;
 mod world_generation;
-use assets::{GameAssetsPlugin, Graphics, TILE_SIZE};
+use assets::{GameAssetsPlugin, TILE_SIZE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
-use item::{ItemsPlugin, WorldObject};
-use world_generation::WorldGenerationPlugin;
+use bevy_inspector_egui::InspectorPlugin;
+use item::ItemsPlugin;
+use world_generation::{Data, WorldGenerationPlugin};
 
 const PLAYER_MOVE_SPEED: f32 = 800.;
 const TIME_STEP: f32 = 1.0 / 60.0;
@@ -48,6 +49,7 @@ fn main() {
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(WorldGenerationPlugin)
+        .add_plugin(InspectorPlugin::<Data>::new())
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -90,6 +92,8 @@ pub enum GameState {
 struct ImageAssets {
     #[asset(path = "bevy_survival_sprites.png")]
     pub sprite_sheet: Handle<Image>,
+    #[asset(path = "RPGTiles.png")]
+    pub tiles_sheet: Handle<Image>,
 }
 
 #[derive(Component, Deref, DerefMut)]
@@ -114,7 +118,7 @@ fn setup(
         tree_frequency: 0.,
         stone_frequency: 0.0,
         dirt_frequency: 0.42,
-        sand_frequency: 0.25,
+        sand_frequency: 0.22,
         water_frequency: 0.09,
     };
 
@@ -214,14 +218,15 @@ fn move_player(
     camera_transform.translation.x = px;
     camera_transform.translation.y = py;
 
+    // println!(
+    //     "Player is on chunk {:?}",
+    //     WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+    //         player_transform.translation.x,
+    //         player_transform.translation.y
+    //     ))
+    // );
+
     if dx != 0. {
         dir.0 = dx;
     }
-}
-
-fn update_chunks_on_move(
-    mut to_update_query: Query<&mut Transform, (With<Player>, Changed<Transform>)>,
-    graphics: Res<Graphics>,
-) {
-    let player_transform = to_update_query.single();
 }
