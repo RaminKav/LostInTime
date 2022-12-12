@@ -68,8 +68,8 @@ impl WorldGenerationPlugin {
         let tilemap_entity = commands.spawn_empty().id();
         let mut tile_storage = TileStorage::empty(tilemap_size);
 
-        let mut tile_index_grid = [[0 as u32; 16]; 16];
         let mut tile_bit_grid = [[0 as u8; 16]; 16];
+
         for y in 0..16 {
             for x in 0..16 {
                 let tile_entity = commands
@@ -81,12 +81,10 @@ impl WorldGenerationPlugin {
                     })
                     .id();
                 commands.entity(tilemap_entity).add_child(tile_entity);
-                tile_index_grid[x as usize][y as usize] = 0b1111;
                 tile_bit_grid[x as usize][y as usize] = 0b1111;
                 tile_storage.set(&TilePos { x, y }, tile_entity);
             }
         }
-        // let mut value = [[0.; 16]; 16];
 
         let noise_e = Perlin::new(1);
         let noise_e2 = Perlin::new(2);
@@ -171,8 +169,9 @@ impl WorldGenerationPlugin {
                     })
                     .id();
                 commands.entity(tilemap_entity).add_child(tile_entity);
-                tile_index_grid[x as usize][y as usize] = texture_index;
+
                 tile_bit_grid[x as usize][y as usize] = block_bits;
+
                 data.chunk_bits[x as usize][y as usize] = block_bits;
                 tile_storage.set(&tile_pos, tile_entity);
                 tile_bit_grid = Self::update_neighbour_tiles(
@@ -207,7 +206,7 @@ impl WorldGenerationPlugin {
 
         chunk_manager
             .chunk_tile_bit_grid
-            .insert(chunk_pos, tile_bit_grid);
+            .insert(chunk_pos, dbg!(tile_bit_grid));
     }
 
     fn update_neighbour_tiles(
@@ -231,65 +230,79 @@ impl WorldGenerationPlugin {
                     y: (dy + y) as u32,
                 };
                 let mut chunk_tile_bit_grid = tile_bit_grid;
-                let mut skip = false;
+                let mut is_other_chunk_tile = false;
+                let mut skip_x = false;
+                let mut skip_y = false;
+
                 if x + dx < 0 {
-                    println!("1");
-                    skip = true;
+                    skip_x = true;
+                    is_other_chunk_tile = true;
                     if let Some(bit_grid) = chunk_manager.chunk_tile_bit_grid.get(&IVec2 {
                         x: chunk_pos.x - 1,
                         y: chunk_pos.y,
                     }) {
                         chunk_tile_bit_grid = *bit_grid;
                         neighbour_tile_pos.x = 15;
-                        skip = false;
-                        println!("HEEEE {:?}", neighbour_tile_pos.x);
+                        println!(
+                            "1 {:?} {:?} {:?}",
+                            chunk_pos, new_tile_pos, neighbour_tile_pos
+                        );
+                        skip_x = false;
                     }
                 } else if x + dx >= 16 {
-                    println!("2");
-
-                    skip = true;
-
+                    skip_x = true;
+                    is_other_chunk_tile = true;
                     if let Some(bit_grid) = chunk_manager.chunk_tile_bit_grid.get(&IVec2 {
                         x: chunk_pos.x + 1,
                         y: chunk_pos.y,
                     }) {
                         chunk_tile_bit_grid = *bit_grid;
                         neighbour_tile_pos.x = 0;
-                        skip = false;
+                        println!(
+                            "2 {:?} {:?} {:?}",
+                            chunk_pos, new_tile_pos, neighbour_tile_pos
+                        );
+                        skip_x = false;
                     }
                 }
                 if y + dy < 0 {
-                    println!("3");
-
-                    skip = true;
-
+                    skip_y = true;
+                    is_other_chunk_tile = true;
                     if let Some(bit_grid) = chunk_manager.chunk_tile_bit_grid.get(&IVec2 {
                         x: chunk_pos.x,
                         y: chunk_pos.y - 1,
                     }) {
-                        println!("HEEEE2 {:?} {:?}", y, dy);
-
                         chunk_tile_bit_grid = *bit_grid;
                         neighbour_tile_pos.y = 15;
-                        skip = false;
+                        println!(
+                            "3 {:?} {:?} {:?}",
+                            chunk_pos, new_tile_pos, neighbour_tile_pos
+                        );
+                        skip_y = false;
                     }
                 } else if y + dy >= 16 {
-                    println!("4");
-
-                    skip = true;
-
+                    skip_y = true;
+                    is_other_chunk_tile = true;
                     if let Some(bit_grid) = chunk_manager.chunk_tile_bit_grid.get(&IVec2 {
                         x: chunk_pos.x,
                         y: chunk_pos.y + 1,
                     }) {
                         chunk_tile_bit_grid = *bit_grid;
                         neighbour_tile_pos.y = 0;
-                        skip = false;
+                        println!(
+                            "4 {:?} {:?} {:?}",
+                            chunk_pos, new_tile_pos, neighbour_tile_pos
+                        );
+                        skip_y = false;
                     }
                 }
-                if !(dx == 0 && dy == 0) && !skip {
-                    let neighbour_tile_bits = chunk_tile_bit_grid
-                        [dbg!(neighbour_tile_pos.x as usize)][dbg!(neighbour_tile_pos.y as usize)];
+                if !(dx == 0 && dy == 0) && !skip_x && !skip_y {
+                    let neighbour_tile_bits = if is_other_chunk_tile {
+                        chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
+                            [neighbour_tile_pos.y as usize]
+                    } else {
+                        tile_bit_grid[neighbour_tile_pos.x as usize][neighbour_tile_pos.y as usize]
+                    };
                     if (dx + dy) as i8 == 1 || (dx + dy) as i8 == -1 {
                         let updated_bit_index =
                             Self::compute_tile_index(new_tile_bits, neighbour_tile_bits, (dx, dy));
@@ -306,8 +319,15 @@ impl WorldGenerationPlugin {
                         commands
                             .entity(tile_storage.get(&neighbour_tile_pos).unwrap())
                             .insert(TileTextureIndex(updated_bit_index as u32));
-                        chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
-                            [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        if is_other_chunk_tile {
+                            chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
+                                [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        } else {
+                            tile_bit_grid[neighbour_tile_pos.x as usize]
+                                [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        }
+                        // chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
+                        //     [neighbour_tile_pos.y as usize] = updated_bit_index;
 
                         data.chunk_bits[neighbour_tile_pos.x as usize]
                             [neighbour_tile_pos.y as usize] = updated_bit_index;
@@ -330,8 +350,13 @@ impl WorldGenerationPlugin {
                         commands
                             .entity(tile_storage.get(&neighbour_tile_pos).unwrap())
                             .insert(TileTextureIndex(updated_bit_index.into()));
-                        chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
-                            [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        if is_other_chunk_tile {
+                            chunk_tile_bit_grid[neighbour_tile_pos.x as usize]
+                                [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        } else {
+                            tile_bit_grid[neighbour_tile_pos.x as usize]
+                                [neighbour_tile_pos.y as usize] = updated_bit_index;
+                        }
 
                         data.chunk_bits[neighbour_tile_pos.x as usize]
                             [neighbour_tile_pos.y as usize] = updated_bit_index;
@@ -472,36 +497,47 @@ impl WorldGenerationPlugin {
         game: Res<Game>,
         mut data: ResMut<Data>,
     ) {
-        // if !chunk_manager.spawned_chunks.contains(&IVec2::new(0, 0)) {
-        //     chunk_manager.spawned_chunks.insert(IVec2::new(0, 0));
-        //     Self::spawn_chunk(
-        //         &mut commands,
-        //         &sprite_sheet,
-        //         &graphics,
-        //         &game,
-        //         IVec2::new(0, 0),
-        //         &mut data,
-        //     );
-        // }
-        for transform in camera_query.iter() {
-            let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
-            for y in (camera_chunk_pos.y - 2)..(camera_chunk_pos.y + 2) {
-                for x in (camera_chunk_pos.x - 2)..(camera_chunk_pos.x + 2) {
-                    if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
-                        println!("spawning chunk at {:?} {:?}", x, y);
-                        chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
-                        Self::spawn_chunk(
-                            &mut commands,
-                            &sprite_sheet,
-                            &game,
-                            IVec2::new(x, y),
-                            &mut data,
-                            &mut chunk_manager,
-                        );
-                    }
-                }
-            }
+        if !chunk_manager.spawned_chunks.contains(&IVec2::new(0, 0)) {
+            chunk_manager.spawned_chunks.insert(IVec2::new(0, 0));
+            Self::spawn_chunk(
+                &mut commands,
+                &sprite_sheet,
+                &game,
+                IVec2::new(0, 0),
+                &mut data,
+                &mut chunk_manager,
+            );
         }
+        if !chunk_manager.spawned_chunks.contains(&IVec2::new(-1, 0)) {
+            chunk_manager.spawned_chunks.insert(IVec2::new(-1, 0));
+            Self::spawn_chunk(
+                &mut commands,
+                &sprite_sheet,
+                &game,
+                IVec2::new(-1, 0),
+                &mut data,
+                &mut chunk_manager,
+            );
+        }
+        // for transform in camera_query.iter() {
+        //     let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
+        //     for y in (camera_chunk_pos.y - 2)..(camera_chunk_pos.y + 2) {
+        //         for x in (camera_chunk_pos.x - 2)..(camera_chunk_pos.x + 2) {
+        //             if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
+        //                 println!("spawning chunk at {:?} {:?}", x, y);
+        //                 chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
+        //                 Self::spawn_chunk(
+        //                     &mut commands,
+        //                     &sprite_sheet,
+        //                     &game,
+        //                     IVec2::new(x, y),
+        //                     &mut data,
+        //                     &mut chunk_manager,
+        //                 );
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     fn despawn_outofrange_chunks(
