@@ -15,12 +15,14 @@ mod item;
 mod world_generation;
 use assets::{GameAssetsPlugin, TILE_SIZE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
-use bevy_ecs_tilemap::TilemapPlugin;
+use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
 use bevy_inspector_egui::InspectorPlugin;
 use item::ItemsPlugin;
-use world_generation::{Data, WorldGenerationPlugin};
+use world_generation::{ChunkManager, Data, WorldGenerationPlugin};
 
-const PLAYER_MOVE_SPEED: f32 = 800.;
+use crate::world_generation::TileMapPositionData;
+
+const PLAYER_MOVE_SPEED: f32 = 600.;
 const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
@@ -50,6 +52,7 @@ fn main() {
         .add_plugin(ItemsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InspectorPlugin::<Data>::new())
+        .insert_resource(CursorPos(Vec3::new(-100.0, -100.0, 0.0)))
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -61,7 +64,9 @@ fn main() {
             SystemSet::on_update(GameState::Main)
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(animate_sprite)
-                .with_system(move_player),
+                .with_system(move_player)
+                .with_system(update_cursor_pos.after(move_player))
+                .with_system(mouse_click_system),
         )
         .run();
 }
@@ -217,16 +222,93 @@ fn move_player(
     player_transform.translation.y = py;
     camera_transform.translation.x = px;
     camera_transform.translation.y = py;
-
-    // println!(
-    //     "Player is on chunk {:?}",
-    //     WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-    //         player_transform.translation.x,
-    //         player_transform.translation.y
-    //     ))
-    // );
+    if game.player.is_moving == true {
+        // println!(
+        //     "Player is on chunk {:?} at pos: {:?}",
+        //     WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+        //         player_transform.translation.x,
+        //         player_transform.translation.y
+        //     )),
+        //     player_transform.translation
+        // );
+    }
 
     if dx != 0. {
         dir.0 = dx;
+    }
+}
+
+#[derive(Default, Resource)]
+pub struct CursorPos(Vec3);
+
+pub fn update_cursor_pos(
+    windows: Res<Windows>,
+    camera_q: Query<(&Transform, &Camera)>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut cursor_pos: ResMut<CursorPos>,
+) {
+    for cursor_moved in cursor_moved_events.iter() {
+        // To get the mouse's world position, we have to transform its window position by
+        // any transforms on the camera. This is done by projecting the cursor position into
+        // camera space (world space).
+        for (cam_t, cam) in camera_q.iter() {
+            *cursor_pos = CursorPos(cursor_pos_in_world(
+                &windows,
+                cursor_moved.position,
+                cam_t,
+                cam,
+            ));
+        }
+    }
+}
+// Converts the cursor position into a world position, taking into account any transforms applied
+// the camera.
+pub fn cursor_pos_in_world(
+    windows: &Windows,
+    cursor_pos: Vec2,
+    cam_t: &Transform,
+    cam: &Camera,
+) -> Vec3 {
+    let window = windows.primary();
+
+    let window_size = Vec2::new(window.width(), window.height());
+
+    // Convert screen position [0..resolution] to ndc [-1..1]
+    // (ndc = normalized device coordinates)
+    let ndc_to_world = cam_t.compute_matrix() * cam.projection_matrix().inverse();
+    let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
+    ndc_to_world.project_point3(ndc.extend(0.0))
+}
+
+fn mouse_click_system(
+    mouse_button_input: Res<Input<MouseButton>>,
+    cursor_pos: Res<CursorPos>,
+    chunk_manager: Res<ChunkManager>,
+) {
+    if mouse_button_input.just_released(MouseButton::Left) {
+        let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            cursor_pos.0.x,
+            cursor_pos.0.y,
+        ));
+        let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            cursor_pos.0.x,
+            cursor_pos.0.y,
+        ));
+
+        let data = chunk_manager
+            .chunk_tile_entity_data
+            .get(&TileMapPositionData {
+                chunk_pos,
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+            });
+        println!(
+            "tile: {:?} | chunk {:?} | index {:?}",
+            tile_pos,
+            chunk_pos,
+            (cursor_pos.0.x, cursor_pos.0.y)
+        );
     }
 }
