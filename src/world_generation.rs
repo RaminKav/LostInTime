@@ -40,16 +40,15 @@ pub struct ChunkManager {
     pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Inspectable)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 pub struct TileMapPositionData {
-    chunk_pos: IVec2,
-    #[inspectable(ignore)]
-    tile_pos: TilePos,
+    pub chunk_pos: IVec2,
+    pub tile_pos: TilePos,
 }
-#[derive(Eq, Hash, PartialEq, Debug, Inspectable)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 pub struct TileEntityData {
-    entity: Entity,
-    tile_bit_index: u8,
+    pub entity: Entity,
+    pub tile_bit_index: u8,
 }
 
 impl ChunkManager {
@@ -220,6 +219,7 @@ impl WorldGenerationPlugin {
             chunk_pos.y as f32 * 16. as f32 * 32.,
             0.0,
         ));
+
         commands.entity(tilemap_entity).insert(TilemapBundle {
             grid_size,
             map_type,
@@ -469,16 +469,40 @@ impl WorldGenerationPlugin {
     }
 
     pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
-        let camera_pos = camera_pos.as_ivec2();
         let chunk_size: IVec2 = IVec2::new(16 as i32, 16 as i32);
         let tile_size: IVec2 = IVec2::new(32 as i32, 32 as i32);
-        camera_pos / (chunk_size * tile_size)
+        // do this bc we want bottom left of the block to be 0,0 instead of centre
+        let camera_pos = Vec2::new(
+            camera_pos.x + (tile_size.x / 2) as f32,
+            camera_pos.y + (tile_size.y / 2) as f32,
+        );
+        IVec2::new(
+            (camera_pos.x / (chunk_size.x * tile_size.x) as f32).floor() as i32,
+            (camera_pos.y / (chunk_size.y * tile_size.y) as f32).floor() as i32,
+        )
     }
     pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> IVec2 {
-        let camera_pos = camera_pos.as_ivec2();
         let chunk_size: IVec2 = IVec2::new(16 as i32, 16 as i32);
         let tile_size: IVec2 = IVec2::new(32 as i32, 32 as i32);
-        camera_pos / (chunk_size * tile_size)
+        let camera_pos = Vec2::new(
+            camera_pos.x + (tile_size.x / 2) as f32,
+            camera_pos.y + (tile_size.y / 2) as f32,
+        );
+        let mut block_pos = IVec2::new(
+            ((camera_pos.x % (chunk_size.x * tile_size.x) as f32) / tile_size.x as f32).floor()
+                as i32,
+            ((camera_pos.y % (chunk_size.y * tile_size.y) as f32) / tile_size.y as f32).floor()
+                as i32,
+        );
+        // do this bc bottom left is 0,0
+        if block_pos.x < 0 {
+            block_pos.x += 16
+        }
+        if block_pos.y < 0 {
+            block_pos.y += 16;
+        }
+
+        block_pos
     }
 
     fn spawn_chunks_around_camera(
@@ -489,12 +513,7 @@ impl WorldGenerationPlugin {
         game: Res<Game>,
         mut data: ResMut<Data>,
     ) {
-        // let test_chunks = vec![
-        //     IVec2::new(-1, -1),
-        //     IVec2::new(0, -1),
-        //     IVec2::new(-1, -2),
-        //     IVec2::new(0, -2),
-        // ];
+        // let test_chunks = vec![IVec2::new(0, 0)];
         // for c in test_chunks {
         //     if !chunk_manager.spawned_chunks.contains(&c) {
         //         chunk_manager.spawned_chunks.insert(c);
