@@ -38,6 +38,14 @@ pub struct Data {
 pub struct ChunkManager {
     pub spawned_chunks: HashSet<IVec2>,
     pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
+    pub state: ChunkLoadingState,
+}
+
+#[derive(Debug)]
+pub enum ChunkLoadingState {
+    Spawning,
+    Despawning,
+    None,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug)]
@@ -56,6 +64,7 @@ impl ChunkManager {
         Self {
             spawned_chunks: HashSet::default(),
             chunk_tile_entity_data: HashMap::new(),
+            state: ChunkLoadingState::Spawning,
         }
     }
 }
@@ -534,6 +543,7 @@ impl WorldGenerationPlugin {
                 for x in (camera_chunk_pos.x - 2)..(camera_chunk_pos.x + 2) {
                     if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
                         println!("spawning chunk at {:?} {:?}", x, y);
+                        chunk_manager.state = ChunkLoadingState::Spawning;
                         chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
                         Self::spawn_chunk(
                             &mut commands,
@@ -547,6 +557,7 @@ impl WorldGenerationPlugin {
                 }
             }
         }
+        chunk_manager.state = ChunkLoadingState::None;
     }
 
     fn despawn_outofrange_chunks(
@@ -564,11 +575,13 @@ impl WorldGenerationPlugin {
                     let x = (chunk_pos.x as f32 / (16 as f32 * 32.)).floor() as i32;
                     let y = (chunk_pos.y as f32 / (16 as f32 * 32.)).floor() as i32;
                     println!("despawning chunk at {:?} {:?} d === {:?}", x, y, distance);
+                    chunk_manager.state = ChunkLoadingState::Despawning;
                     chunk_manager.spawned_chunks.remove(&IVec2::new(x, y));
                     commands.entity(entity).despawn_recursive();
                 }
             }
         }
+        chunk_manager.state = ChunkLoadingState::None;
     }
 
     fn spawn_test_objects(mut commands: Commands, graphics: Res<Graphics>) {
