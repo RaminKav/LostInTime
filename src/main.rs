@@ -18,12 +18,12 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
 use bevy_inspector_egui::InspectorPlugin;
 use item::ItemsPlugin;
-use world_generation::{ChunkManager, Data, WorldGenerationPlugin};
+use world_generation::{ChunkManager, WorldGenerationPlugin};
 
 use crate::world_generation::TileMapPositionData;
 
 const PLAYER_MOVE_SPEED: f32 = 600.;
-const TIME_STEP: f32 = 1.0 / 60.0;
+const TIME_STEP: f32 = 1.0 / 120.0;
 const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
@@ -51,7 +51,6 @@ fn main() {
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(WorldGenerationPlugin)
-        .add_plugin(InspectorPlugin::<Data>::new())
         .insert_resource(CursorPos(Vec3::new(-100.0, -100.0, 0.0)))
         .add_startup_system(setup)
         .add_loading_state(
@@ -89,6 +88,11 @@ pub struct WorldGeneration {
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
 pub enum GameState {
+    Loading,
+    Main,
+}
+#[derive(Clone, Eq, PartialEq, Debug, Hash, SystemLabel)]
+pub enum GameSystems {
     Loading,
     Main,
 }
@@ -304,11 +308,9 @@ fn mouse_click_system(
                     y: tile_pos.y as u32,
                 },
             });
-        println!(
-            "tile: {:?} | chunk {:?} | index {:?}",
-            tile_pos,
-            chunk_pos,
-            (cursor_pos.0.x, cursor_pos.0.y)
-        );
+        // println!(
+        //     "tile: {:?} | chunk {:?} | index {:?}",
+        //     tile_pos, chunk_pos, data
+        // );
     }
 }
