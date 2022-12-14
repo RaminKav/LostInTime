@@ -15,6 +15,8 @@ use serde::Deserialize;
 pub struct WorldGenerationPlugin;
 const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 const CHUNK_SIZE: u32 = 64;
+const CHUNK_CACHE_AMOUNT: i32 = 3;
+const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
@@ -620,11 +622,14 @@ impl WorldGenerationPlugin {
         mut chunk_manager: ResMut<ChunkManager>,
         game: Res<Game>,
     ) {
-        let cache_size = 3;
         for transform in camera_query.iter() {
             let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
-            for y in (camera_chunk_pos.y - cache_size)..(camera_chunk_pos.y + cache_size) {
-                for x in (camera_chunk_pos.x - cache_size)..(camera_chunk_pos.x + cache_size) {
+            for y in
+                (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
+            {
+                for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)
+                    ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
+                {
                     if !chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
                         println!("Caching chunk at {:?} {:?}", x, y);
                         chunk_manager.state = ChunkLoadingState::Spawning;
@@ -665,9 +670,12 @@ impl WorldGenerationPlugin {
         // }
         for transform in camera_query.iter() {
             let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
-            let chunk_size = 2;
-            for y in (camera_chunk_pos.y - chunk_size)..(camera_chunk_pos.y + chunk_size) {
-                for x in (camera_chunk_pos.x - chunk_size)..(camera_chunk_pos.x + chunk_size) {
+            for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
+                ..(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
+            {
+                for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
+                    ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
+                {
                     if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
                         println!("spawning chunk at {:?} {:?}", x, y);
                         chunk_manager.state = ChunkLoadingState::Spawning;
@@ -703,7 +711,7 @@ impl WorldGenerationPlugin {
                 //TODO: calculate maximum possible distance for 2x2 chunksa
                 let x = (chunk_pos.x as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
                 let y = (chunk_pos.y as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;
-                if distance > max_distance * 4.
+                if distance > max_distance * 2.
                     && chunk_manager.spawned_chunks.contains(&IVec2::new(x, y))
                 {
                     println!("despawning chunk at {:?} {:?} d === {:?}", x, y, distance);

@@ -23,7 +23,7 @@ use world_generation::{ChunkManager, WorldGenerationPlugin};
 use crate::world_generation::TileMapPositionData;
 
 const PLAYER_MOVE_SPEED: f32 = 600.;
-const TIME_STEP: f32 = 1.0 / 120.0;
+const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
