@@ -127,7 +127,7 @@ fn setup(
         tree_frequency: 0.,
         stone_frequency: 0.0,
         dirt_frequency: 0.42,
-        sand_frequency: 0.22,
+        sand_frequency: 0.32,
         water_frequency: 0.09,
     };
 
@@ -308,9 +308,9 @@ fn mouse_click_system(
                     y: tile_pos.y as u32,
                 },
             });
-        // println!(
-        //     "tile: {:?} | chunk {:?} | index {:?}",
-        //     tile_pos, chunk_pos, data
-        // );
+        println!(
+            "tile: {:?} | chunk {:?} | index {:?}",
+            tile_pos, chunk_pos, data
+        );
     }
 }

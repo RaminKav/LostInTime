@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use crate::assets::Graphics;
 use crate::item::WorldObject;
 use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
@@ -14,8 +16,8 @@ use serde::Deserialize;
 
 pub struct WorldGenerationPlugin;
 const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
-const CHUNK_SIZE: u32 = 64;
-const CHUNK_CACHE_AMOUNT: i32 = 3;
+const CHUNK_SIZE: u32 = 6;
+const CHUNK_CACHE_AMOUNT: i32 = 1;
 const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
 impl Plugin for WorldGenerationPlugin {
@@ -64,6 +66,8 @@ pub struct TileMapPositionData {
 pub struct TileEntityData {
     pub entity: Option<Entity>,
     pub tile_bit_index: u8,
+    pub block_type: [WorldObject; 4],
+    pub block_offset: u8,
 }
 
 impl ChunkManager {
@@ -97,7 +101,9 @@ impl WorldGenerationPlugin {
                     },
                     TileEntityData {
                         entity: None,
-                        tile_bit_index: 0b1111,
+                        tile_bit_index: 0b0000,
+                        block_type: [WorldObject::Sand; 4],
+                        block_offset: 0,
                     },
                 );
             }
@@ -106,7 +112,18 @@ impl WorldGenerationPlugin {
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
                 let tile_pos = TilePos { x, y };
-                let block_bits = Self::get_tile_from_perlin_noise(game, chunk_pos, tile_pos);
+                let mut raw_tile_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
+                    [[[0; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+                let (bits, index_shift, blocks) =
+                    Self::get_tile_from_perlin_noise(game, chunk_pos, tile_pos);
+                raw_tile_bits[x as usize][y as usize] = bits;
+                let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
+
+                // let block_offset = if block_type == WorldObject::Grass {
+                //     16
+                // } else {
+                //     0
+                // };
                 // let tile_entity = commands.spawn_empty().id();
                 chunk_manager.chunk_tile_entity_data.insert(
                     TileMapPositionData {
@@ -116,15 +133,37 @@ impl WorldGenerationPlugin {
                     TileEntityData {
                         entity: None,
                         tile_bit_index: block_bits,
+                        block_type: blocks,
+                        block_offset: index_shift,
                     },
                 );
-                Self::update_neighbour_tiles(
-                    tile_pos,
-                    block_bits,
-                    commands,
-                    chunk_manager,
-                    chunk_pos,
-                );
+                // if blocks.contains(&WorldObject::Grass) {
+                // Self::update_neighbour_tiles(
+                //     TilePos { x, y },
+                //     block_bits,
+                //     if blocks.contains(&WorldObject::Grass) {
+                //         16
+                //     } else {
+                //         0
+                //     },
+                //     commands,
+                //     chunk_manager,
+                //     chunk_pos,
+                //     if blocks.contains(&WorldObject::Grass) {
+                //         true
+                //     } else {
+                //         false
+                //     },
+                // );
+                // }
+                // Self::z(
+                //     tile_pos,
+                //     block_bits,
+                //     block_offset,
+                //     commands,
+                //     chunk_manager,
+                //     chunk_pos,
+                // );
             }
         }
     }
@@ -161,11 +200,15 @@ impl WorldGenerationPlugin {
                             tile_pos,
                         })
                         .unwrap();
+
                     let tile_entity = commands
                         .spawn(TileBundle {
                             position: tile_pos,
                             tilemap_id: TilemapId(tilemap_entity),
-                            texture_index: TileTextureIndex(tile_entity_data.tile_bit_index.into()),
+                            texture_index: TileTextureIndex(
+                                (tile_entity_data.tile_bit_index + tile_entity_data.block_offset)
+                                    .into(),
+                            ),
                             ..Default::default()
                         })
                         .id();
@@ -207,7 +250,7 @@ impl WorldGenerationPlugin {
                     .spawn(TileBundle {
                         position: tile_pos,
                         tilemap_id: TilemapId(tilemap_entity),
-                        texture_index: TileTextureIndex(0b1111),
+                        texture_index: TileTextureIndex(0b0000),
                         ..Default::default()
                     })
                     .id();
@@ -220,7 +263,9 @@ impl WorldGenerationPlugin {
                     },
                     TileEntityData {
                         entity: Some(tile_entity),
-                        tile_bit_index: 0b1111,
+                        tile_bit_index: 0b0000,
+                        block_type: [WorldObject::Sand; 4],
+                        block_offset: 0,
                     },
                 );
             }
@@ -232,13 +277,18 @@ impl WorldGenerationPlugin {
                     x: x.try_into().unwrap(),
                     y: y.try_into().unwrap(),
                 };
-                let block_bits = Self::get_tile_from_perlin_noise(game, chunk_pos, tile_pos);
-                // let texture_index = (graphics.item_map.get(&block).unwrap().1) as u32;
+                let mut raw_tile_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
+                    [[[0; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+                let (bits, index_shift, blocks) =
+                    Self::get_tile_from_perlin_noise(game, chunk_pos, tile_pos);
+                raw_tile_bits[x as usize][y as usize] = bits;
+                let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
+
                 let tile_entity = commands
                     .spawn(TileBundle {
                         position: tile_pos,
                         tilemap_id: TilemapId(tilemap_entity),
-                        texture_index: TileTextureIndex(block_bits.into()),
+                        texture_index: TileTextureIndex((block_bits + index_shift).into()),
                         ..Default::default()
                     })
                     .id();
@@ -252,16 +302,19 @@ impl WorldGenerationPlugin {
                     },
                     TileEntityData {
                         entity: Some(tile_entity),
-                        tile_bit_index: block_bits,
+                        tile_bit_index: block_bits + index_shift,
+                        block_type: blocks,
+                        block_offset: index_shift,
                     },
                 );
-                Self::update_neighbour_tiles(
-                    tile_pos,
-                    block_bits,
-                    commands,
-                    chunk_manager,
-                    chunk_pos,
-                );
+                // Self::update_neighbour_tiles(
+                //     tile_pos,
+                //     block_bits,
+                //     block_offset,
+                //     commands,
+                //     chunk_manager,
+                //     chunk_pos,
+                // );
             }
         }
         // Self::smooth_terrain(5, &mut tile_storage, tile_index_grid, commands);
@@ -283,7 +336,11 @@ impl WorldGenerationPlugin {
             ..Default::default()
         });
     }
-    fn get_tile_from_perlin_noise(game: &Res<Game>, chunk_pos: IVec2, tile_pos: TilePos) -> u8 {
+    fn get_tile_from_perlin_noise(
+        game: &Res<Game>,
+        chunk_pos: IVec2,
+        tile_pos: TilePos,
+    ) -> ([u8; 4], u8, [WorldObject; 4]) {
         let noise_e = Perlin::new(1);
         let noise_e2 = Perlin::new(2);
         let noise_e3 = Perlin::new(3);
@@ -292,182 +349,474 @@ impl WorldGenerationPlugin {
         let noise_m2 = Simplex::new(5);
         let noise_m3 = Simplex::new(6);
 
-        let x = tile_pos.x;
-        let y = tile_pos.y;
+        let x = tile_pos.x as f64;
+        let y = tile_pos.y as f64;
         //TODO: figure out what this 16. is for
-        let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64 / 16. as f64 - 0.5;
-        let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64 / 16. as f64 - 0.5;
-        // let e = noise_e.get([nx, ny]) + 0.5;
-        let base_oct = 1. / 10.;
-        let e1 = (noise_e.get([nx * base_oct, ny * base_oct]));
-        let e2 = (noise_e2.get([nx * base_oct * 4., ny * base_oct * 4.]));
-        let e3 = (noise_e3.get([nx * base_oct * 16., ny * base_oct * 16.]));
+        let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64; // as f64 / 16. as f64 - 0.5;
+        let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64; // as f64 / 16. as f64 - 0.5;
+                                                                      // let e = noise_e.get([nx, ny]) + 0.5;
+        let mut bits = [0, 0, 0, 0];
+        let mut blocks = [
+            WorldObject::Sand,
+            WorldObject::Sand,
+            WorldObject::Sand,
+            WorldObject::Sand,
+        ];
+        let sample = |x: f64, y: f64| -> (u8, WorldObject) {
+            let base_oct = 1. / 10.;
 
-        let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
-        let m = (noise_m.get([nx * base_oct, ny * base_oct]) + 0.5)
-            + 0.5 * (noise_m2.get([nx * base_oct * 2., ny * base_oct * 2.]) + 0.5)
-            + 0.25 * (noise_m3.get([nx * base_oct * 3., ny * base_oct * 3.]) + 0.5);
+            let e1 = (noise_e.get([x * base_oct, y * base_oct]));
+            let e2 = (noise_e2.get([x * base_oct * 4., y * base_oct * 4.]));
+            let e3 = (noise_e3.get([x * base_oct * 8., y * base_oct * 8.]));
 
-        // let e = f64::powf(e / (1. + 0.5 + 0.25), 1.);
-        let m = f64::powf(m / (1. + 0.5 + 0.25), 1.);
-        // print!("{:?}", e);
-        let m = f64::powf(m, 1.);
-        let mut block = if e <= game.world_generation_params.water_frequency {
-            WorldObject::Water
-        }
-        // else if e <= game.world_generation_params.sand_frequency {
-        //     if m <= 0.35 {
-        //         WorldObject::RedSand
-        //     } else {
-        //         WorldObject::Sand
-        //     }
-        // } else if e <= game.world_generation_params.dirt_frequency {
-        //     if m > 0.6 {
-        //         WorldObject::Dirt
-        //     } else {
-        //         WorldObject::Grass
-        //     }
-        // } else if e <= game.world_generation_params.stone_frequency {
-        //     WorldObject::Stone
-        // }
-        else {
-            // if m > 0.75 {
-            //     WorldObject::DryGrass
-            // } else if m > 0.45 {
-            //     WorldObject::Grass
-            // } else {
-            WorldObject::Grass
+            let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
+            // let m = (noise_m.get([x * base_oct, ny * base_oct]) + 0.5)
+            //     + 0.5 * (noise_m2.get([x * base_oct * 2., ny * base_oct * 2.]) + 0.5)
+            //     + 0.25 * (noise_m3.get([x * base_oct * 3., ny * base_oct * 3.]) + 0.5);
+
+            // let e = f64::powf(e / (1. + 0.5 + 0.25), 1.);
+            // let m = f64::powf(m / (1. + 0.5 + 0.25), 1.);
+            // print!("{:?}", e);
+            // let m = f64::powf(m, 1.);
+            let block = if e <= game.world_generation_params.water_frequency {
+                WorldObject::Water
+            } else if e <= game.world_generation_params.sand_frequency {
+                WorldObject::Sand
+            }
+            // else if e <= game.world_generation_params.dirt_frequency {
+            //     if m > 0.6 {
+            //         WorldObject::Dirt
+            //     } else {
+            //         WorldObject::Grass
+            //     }
+            // } else if e <= game.world_generation_params.stone_frequency {
+            //     WorldObject::Stone
             // }
+            else {
+                // if m > 0.75 {
+                //     WorldObject::DryGrass
+                // } else if m > 0.45 {
+                //     WorldObject::Grass
+                // } else {
+                WorldObject::Grass
+                // }
+            };
+            // if chunk_pos.x == 0 && chunk_pos.y == 0 {
+            //     if y <= 8 {
+            //         block = WorldObject::Grass
+            //     } else {
+            //         block = WorldObject::Dirt
+            //     }
+            // }
+            let block_bits: u8 = if block == WorldObject::Sand || block == WorldObject::Grass {
+                0
+            } else {
+                // println!("WATER BLOCK HERE: {:?}", tile_pos);
+                1
+            };
+            (block_bits, block)
         };
-        // if chunk_pos.x == 0 && chunk_pos.y == 0 {
-        //     if y <= 8 {
-        //         block = WorldObject::Grass
-        //     } else {
-        //         block = WorldObject::Dirt
-        //     }
-        // }
-        let block_bits: u8 = if block == WorldObject::Grass {
-            0b0000
-        } else {
-            // println!("WATER BLOCK HERE: {:?}", tile_pos);
-            0b1111
-        };
-        block_bits
+        let mut index_shift = 0;
+
+        // let tl = sample(nx - 0.25, ny + 0.25); // top left
+        // let tr = sample(nx + 0.25, ny + 0.25); // top right
+        // let bl = sample(nx - 0.25, ny - 0.25); // bot left
+        // let br = sample(nx + 0.25, ny - 0.25); // bot right
+        let tl = sample(nx - 0.5, ny + 0.5); // top left
+        let tr = sample(nx + 0.5, ny + 0.5); // top right
+        let bl = sample(nx - 0.5, ny - 0.5); // bot left
+        let br = sample(nx + 0.5, ny - 0.5); // bot right
+        bits[0] = tl.0;
+        bits[1] = tr.0;
+        bits[2] = bl.0;
+        bits[3] = br.0;
+        blocks[0] = tl.1;
+        blocks[1] = tr.1;
+        blocks[2] = bl.1;
+        blocks[3] = br.1;
+
+        // if there is grass and water in the same tile, turn the grass to sand
+        if blocks.contains(&WorldObject::Grass) && blocks.contains(&WorldObject::Water) {
+            // if ny == 1. && nx == 1. {
+            //     println!(
+            //         "bits: {:?} blocks: {:?} shift: {:?} ",
+            //         bits, blocks, index_shift,
+            //     );
+            // }
+            if nx == 0. && ny == 1. {
+                println!("yoooo: bits: {:?} blocks: {:?}", bits, blocks,);
+                // println!("{:?} {:?} {:?}", sample(nx, ny))
+            }
+            for b in 0..4 {
+                if blocks[b] == WorldObject::Grass {
+                    blocks[b] = WorldObject::Sand;
+                }
+            }
+        }
+        // for grass/sand blocks, turn sand bits to 1, since grass bits are 0
+        if blocks.contains(&WorldObject::Grass) {
+            index_shift = 16;
+
+            for b in 0..4 {
+                if blocks[b] == WorldObject::Sand {
+                    bits[b] = 1;
+                }
+                // else {
+                //     // for each grass bit, check to see if at least on neighbourint tile has
+                //     // a touching tile (4 sides) that is sand. if so, change that bit to sand too
+                //     if nx == 0. && ny == 1. {
+                //         println!("PRE: bits: {:?} blocks: {:?}", bits, blocks,);
+                //     }
+                //     match b {
+                //         // top left corner
+                //         0 => {
+                //             let bit = sample(nx - 0.75, ny + 0.25); //one left
+                //             if bit.1 == WorldObject::Sand {
+                //                 bits[b] = 1;
+                //                 blocks[b] = WorldObject::Sand;
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "UPDATE tl -> l: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //             }
+                //             // if first isnt sand, check second neighbour
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx - 0.75, ny + 0.75); //top left corner
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE tl -> tl: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx - 0.25, ny + 0.75); //one above
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE tl -> a: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         // top right corner
+                //         1 => {
+                //             let bit = sample(nx + 0.25, ny + 0.75); //one above
+                //             if bit.1 == WorldObject::Sand {
+                //                 bits[b] = 1;
+                //                 blocks[b] = WorldObject::Sand;
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "UPDATE tr -> a: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //             }
+                //             // if first isnt sand, check second neighbour
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx + 0.75, ny + 0.75); //one top right
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE tr -> tr: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx + 0.75, ny + 0.25); //one right
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE tr -> r: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         // bottom left corner
+                //         2 => {
+                //             let bit = sample(nx - 0.75, ny - 0.25); //one left
+                //             if nx == 0. && ny == 1. {
+                //                 println!(
+                //                     "check l: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                     bits, blocks, bit,
+                //                 );
+                //             }
+                //             if bit.1 == WorldObject::Sand {
+                //                 bits[b] = 1;
+                //                 blocks[b] = WorldObject::Sand;
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "UPDATE bl -> l: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //             }
+                //             // if first isnt sand, check second neighbour
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx - 0.75, ny - 0.75); //one lower left
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "check bl: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE bl -> bl: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx - 0.25, ny - 0.75); //one bellow
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "check b: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE bl -> b: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         // bottom right corner
+                //         3 => {
+                //             let bit = sample(nx + 0.75, ny - 0.25); //one right
+                //             if bit.1 == WorldObject::Sand {
+                //                 bits[b] = 1;
+                //                 blocks[b] = WorldObject::Sand;
+                //                 if nx == 0. && ny == 1. {
+                //                     println!(
+                //                         "UPDATE br -> r: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                         bits, blocks, bit,
+                //                     );
+                //                 }
+                //             }
+                //             // if first isnt sand, check second neighbour
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx + 0.75, ny - 0.75); //one lower right
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE br -> br: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //             if blocks[b] != WorldObject::Sand {
+                //                 let bit = sample(nx + 0.25, ny - 0.75); //one below
+                //                 if bit.1 == WorldObject::Sand {
+                //                     bits[b] = 1;
+                //                     blocks[b] = WorldObject::Sand;
+                //                     if nx == 0. && ny == 1. {
+                //                         println!(
+                //                             "UPDATE br -> b: bits: {:?} blocks: {:?} newbit: {:?}",
+                //                             bits, blocks, bit,
+                //                         );
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         _ => {}
+                //     };
+                // }
+            }
+        }
+
+        if nx == 0. && ny == 1. {
+            println!(
+                "bits: {:?} blocks: {:?} shift: {:?} | f: {:?}",
+                bits,
+                blocks,
+                index_shift,
+                bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8
+            );
+        }
+        (bits, index_shift, blocks)
     }
     fn update_neighbour_tiles(
         new_tile_pos: TilePos,
         new_tile_bits: u8,
+        new_tile_index_offset: u8,
         commands: &mut Commands,
         chunk_manager: &mut ResMut<ChunkManager>,
         chunk_pos: IVec2,
+        change_self_instead_of_neighbours: bool,
     ) {
+        // return;
         let x = new_tile_pos.x as i8;
         let y = new_tile_pos.y as i8;
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
+                // only use neighbours that have at least one water bitt
                 let mut neighbour_tile_pos = TilePos {
                     x: (dx + x) as u32,
                     y: (dy + y) as u32,
                 };
-                let mut chunk_pos = chunk_pos;
+                let mut adjusted_chunk_pos = chunk_pos;
 
                 if x + dx < 0 {
-                    chunk_pos.x = chunk_pos.x - 1;
+                    adjusted_chunk_pos.x = chunk_pos.x - 1;
                     neighbour_tile_pos.x = CHUNK_SIZE - 1;
                 } else if x + dx >= CHUNK_SIZE.try_into().unwrap() {
-                    chunk_pos.x = chunk_pos.x + 1;
+                    adjusted_chunk_pos.x = chunk_pos.x + 1;
                     neighbour_tile_pos.x = 0;
                 }
                 if y + dy < 0 {
-                    chunk_pos.y = chunk_pos.y - 1;
+                    adjusted_chunk_pos.y = chunk_pos.y - 1;
                     neighbour_tile_pos.y = CHUNK_SIZE - 1;
                 } else if y + dy >= CHUNK_SIZE.try_into().unwrap() {
-                    chunk_pos.y = chunk_pos.y + 1;
+                    adjusted_chunk_pos.y = chunk_pos.y + 1;
                     neighbour_tile_pos.y = 0;
                 }
                 if !(dx == 0 && dy == 0) {
-                    let mut neighbour_tile_bits = 0b1111;
+                    let mut neighbour_tile_bits = 0b0000;
+                    let mut neighbour_tile_offset = 0;
 
                     if !chunk_manager.cached_chunks.contains(&chunk_pos) {
                         continue;
                     }
-                    let neighbour_tile_entity_data =
+                    let mut neighbour_tile_entity_data =
                         chunk_manager
                             .chunk_tile_entity_data
                             .get(&TileMapPositionData {
-                                chunk_pos: chunk_pos,
+                                chunk_pos: adjusted_chunk_pos,
                                 tile_pos: neighbour_tile_pos,
                             });
                     if let Some(neighbour_tile_entity_data) = neighbour_tile_entity_data {
                         neighbour_tile_bits = neighbour_tile_entity_data.tile_bit_index;
+                        neighbour_tile_offset = neighbour_tile_entity_data.block_offset;
                     } else {
                         continue;
                     }
-                    if (dx + dy) as i8 == 1 || (dx + dy) as i8 == -1 {
-                        let updated_bit_index =
-                            Self::compute_tile_index(new_tile_bits, neighbour_tile_bits, (dx, dy));
+                    // only continue for tiles with water
+                    // if neighbour_tile_bits == 0b0000 {
+                    //     continue;
+                    // }
+                    let mut updated_bit_index = if change_self_instead_of_neighbours {
+                        Self::compute_tile_index(neighbour_tile_bits, new_tile_bits, (dx, dy))
+                    } else {
+                        Self::compute_tile_index(new_tile_bits, 0b1111, (dx, dy))
+                    };
+                    // let mut override_water = false;
+                    // if change_self_instead_of_neighbours && neighbour_tile_bits == 0b1111 {
+                    //     updated_bit_index = 0b0000;
+                    //     override_water = true;
+                    // }
 
-                        let neighbour_entity = neighbour_tile_entity_data.unwrap().entity;
-                        if let Some(e) = neighbour_entity {
-                            if let Some(mut entity_commands) = commands.get_entity(e) {
-                                entity_commands.insert(TileTextureIndex(updated_bit_index as u32));
-                                chunk_manager.chunk_tile_entity_data.insert(
-                                    TileMapPositionData {
-                                        chunk_pos,
-                                        tile_pos: neighbour_tile_pos,
-                                    },
-                                    TileEntityData {
-                                        entity: neighbour_entity,
-                                        tile_bit_index: updated_bit_index,
-                                    },
-                                );
-                            }
-                        } else {
+                    if change_self_instead_of_neighbours {
+                        neighbour_tile_entity_data =
+                            chunk_manager
+                                .chunk_tile_entity_data
+                                .get(&TileMapPositionData {
+                                    chunk_pos,
+                                    tile_pos: new_tile_pos,
+                                })
+                    };
+                    if !change_self_instead_of_neighbours && neighbour_tile_offset != 16 {
+                        continue;
+                    }
+                    println!(
+                        "{:?} {:?} | {:?} {:?} | {:?} {:?} | {:?} {:?}",
+                        new_tile_pos,
+                        neighbour_tile_pos,
+                        new_tile_index_offset,
+                        neighbour_tile_offset,
+                        new_tile_bits,
+                        neighbour_tile_bits,
+                        (dx, dy),
+                        updated_bit_index
+                    );
+
+                    let neighbour_entity = neighbour_tile_entity_data.unwrap().entity;
+                    let neighbour_block_type = neighbour_tile_entity_data.unwrap().block_type;
+                    if let Some(e) = neighbour_entity {
+                        if let Some(mut entity_commands) = commands.get_entity(e) {
+                            entity_commands.insert(TileTextureIndex(updated_bit_index as u32));
                             chunk_manager.chunk_tile_entity_data.insert(
                                 TileMapPositionData {
-                                    chunk_pos,
-                                    tile_pos: neighbour_tile_pos,
+                                    chunk_pos: if change_self_instead_of_neighbours {
+                                        chunk_pos
+                                    } else {
+                                        adjusted_chunk_pos
+                                    },
+                                    tile_pos: if change_self_instead_of_neighbours {
+                                        new_tile_pos
+                                    } else {
+                                        neighbour_tile_pos
+                                    },
                                 },
                                 TileEntityData {
-                                    entity: None,
+                                    entity: Some(e),
                                     tile_bit_index: updated_bit_index,
+                                    block_type: neighbour_block_type,
+                                    block_offset: if change_self_instead_of_neighbours {
+                                        new_tile_index_offset
+                                    } else {
+                                        neighbour_tile_offset
+                                    },
                                 },
                             );
                         }
                     } else {
-                        let updated_bit_index = Self::compute_corner_index(
-                            new_tile_bits,
-                            neighbour_tile_bits,
-                            (dx, dy),
+                        chunk_manager.chunk_tile_entity_data.insert(
+                            TileMapPositionData {
+                                chunk_pos: if change_self_instead_of_neighbours {
+                                    chunk_pos
+                                } else {
+                                    adjusted_chunk_pos
+                                },
+                                tile_pos: if change_self_instead_of_neighbours {
+                                    new_tile_pos
+                                } else {
+                                    neighbour_tile_pos
+                                },
+                            },
+                            TileEntityData {
+                                entity: None,
+                                tile_bit_index: updated_bit_index,
+                                block_type: neighbour_block_type,
+                                block_offset: if change_self_instead_of_neighbours {
+                                    new_tile_index_offset
+                                } else {
+                                    neighbour_tile_offset
+                                },
+                            },
                         );
-
-                        let neighbour_entity = neighbour_tile_entity_data.unwrap().entity;
-                        if let Some(e) = neighbour_entity {
-                            if let Some(mut entity_commands) = commands.get_entity(e) {
-                                entity_commands.insert(TileTextureIndex(updated_bit_index as u32));
-                                chunk_manager.chunk_tile_entity_data.insert(
-                                    TileMapPositionData {
-                                        chunk_pos,
-                                        tile_pos: neighbour_tile_pos,
-                                    },
-                                    TileEntityData {
-                                        entity: neighbour_entity,
-                                        tile_bit_index: updated_bit_index,
-                                    },
-                                );
-                            }
-                        } else {
-                            chunk_manager.chunk_tile_entity_data.insert(
-                                TileMapPositionData {
-                                    chunk_pos,
-                                    tile_pos: neighbour_tile_pos,
-                                },
-                                TileEntityData {
-                                    entity: None,
-                                    tile_bit_index: updated_bit_index,
-                                },
-                            );
-                        }
                     }
                 }
             }
@@ -493,28 +842,28 @@ impl WorldGenerationPlugin {
             // Left edge
             index |= (new_tile_bits & 0b1010);
             index |= (neighbour_bits & 0b0101);
+        } else if edge == (-1, 1) {
+            // Top-left corner
+            index |= new_tile_bits & 0b1000;
+            index |= neighbour_bits & 0b0111;
+        } else if edge == (1, 1) {
+            // Top-right corner
+            index |= new_tile_bits & 0b0100;
+            index |= neighbour_bits & 0b1011;
+        } else if edge == (-1, -1) {
+            // Bottom-left corner
+            index |= new_tile_bits & 0b0010;
+            index |= neighbour_bits & 0b1101;
+        } else if edge == (1, -1) {
+            // Bottom-right corner
+            index |= new_tile_bits & 0b0001;
+            index |= neighbour_bits & 0b1110;
         }
         index
     }
     fn compute_corner_index(new_tile_bits: u8, neighbour_bits: u8, corner: (i8, i8)) -> u8 {
         let mut index = 0;
-        if corner == (-1, 1) {
-            // Top-left corner
-            index |= new_tile_bits & 0b1000;
-            index |= neighbour_bits & 0b0111;
-        } else if corner == (1, 1) {
-            // Top-right corner
-            index |= new_tile_bits & 0b0100;
-            index |= neighbour_bits & 0b1011;
-        } else if corner == (-1, -1) {
-            // Bottom-left corner
-            index |= new_tile_bits & 0b0010;
-            index |= neighbour_bits & 0b1101;
-        } else if corner == (1, -1) {
-            // Bottom-right corner
-            index |= new_tile_bits & 0b0001;
-            index |= neighbour_bits & 0b1110;
-        }
+
         index
     }
 
