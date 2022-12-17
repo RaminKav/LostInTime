@@ -22,7 +22,7 @@ use world_generation::{ChunkManager, WorldGenerationPlugin};
 
 use crate::world_generation::TileMapPositionData;
 
-const PLAYER_MOVE_SPEED: f32 = 600.;
+const PLAYER_MOVE_SPEED: f32 = 450.;
 const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
 pub const HEIGHT: f32 = 900.;
@@ -287,7 +287,8 @@ pub fn cursor_pos_in_world(
 fn mouse_click_system(
     mouse_button_input: Res<Input<MouseButton>>,
     cursor_pos: Res<CursorPos>,
-    chunk_manager: Res<ChunkManager>,
+    mut chunk_manager: ResMut<ChunkManager>,
+    mut commands: Commands,
 ) {
     if mouse_button_input.just_released(MouseButton::Left) {
         let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -299,18 +300,29 @@ fn mouse_click_system(
             cursor_pos.0.y,
         ));
 
-        let data = chunk_manager
-            .chunk_tile_entity_data
-            .get(&TileMapPositionData {
-                chunk_pos,
-                tile_pos: TilePos {
-                    x: tile_pos.x as u32,
-                    y: tile_pos.y as u32,
-                },
-            });
-        println!(
-            "tile: {:?} | chunk {:?} | index {:?}",
-            tile_pos, chunk_pos, data
+        // let data = chunk_manager
+        //     .chunk_tile_entity_data
+        //     .get(&TileMapPositionData {
+        //         chunk_pos,
+        //         tile_pos: TilePos {
+        //             x: tile_pos.x as u32,
+        //             y: tile_pos.y as u32,
+        //         },
+        //     });
+        WorldGenerationPlugin::change_tile_and_update_neighbours(
+            TilePos {
+                x: tile_pos.x as u32,
+                y: tile_pos.y as u32,
+            },
+            chunk_pos,
+            0b0000,
+            0,
+            chunk_manager,
+            commands,
         );
+        // println!(
+        //     "tile: {:?} | chunk {:?} | index {:?}",
+        //     tile_pos, chunk_pos, data
+        // );
     }
 }
