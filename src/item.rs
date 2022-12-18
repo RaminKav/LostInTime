@@ -17,14 +17,11 @@ pub struct Breakable {
 pub enum WorldObject {
     None,
     Grass,
-    Dirt,
-    Stone,
+    StoneHalf,
+    StoneFull,
+    StoneTop,
     Water,
     Sand,
-    RedSand,
-    Mud,
-    DryGrass,
-    Coal,
     Tree,
 }
 
@@ -52,9 +49,9 @@ impl WorldObject {
             .insert(self)
             .id();
 
-        if let Some(breakable) = self.as_breakable() {
-            commands.entity(item).insert(breakable);
-        }
+        // if let Some(breakable) = self.as_breakable() {
+        //     commands.entity(item).insert(breakable);
+        // }
 
         // if let Some(pickup) = self.as_pickup() {
         //     commands.entity(item).insert(pickup);
@@ -68,19 +65,19 @@ impl WorldObject {
 
         item
     }
-    pub fn as_breakable(&self) -> Option<Breakable> {
-        match self {
-            WorldObject::Grass => Some(Breakable {
-                object: WorldObject::Grass,
-                turnsInto: Some(WorldObject::Dirt),
-            }),
-            WorldObject::Stone => Some(Breakable {
-                object: WorldObject::Stone,
-                turnsInto: Some(WorldObject::Coal),
-            }),
-            _ => None,
-        }
-    }
+    // pub fn as_breakable(&self) -> Option<Breakable> {
+    //     match self {
+    //         WorldObject::Grass => Some(Breakable {
+    //             object: WorldObject::Grass,
+    //             turnsInto: Some(WorldObject::Dirt),
+    //         }),
+    //         WorldObject::Stone => Some(Breakable {
+    //             object: WorldObject::Stone,
+    //             turnsInto: Some(WorldObject::Coal),
+    //         }),
+    //         _ => None,
+    //     }
+    // }
 }
 
 impl Default for WorldObject {
