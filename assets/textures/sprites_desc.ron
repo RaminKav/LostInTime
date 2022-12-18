@@ -5,49 +5,19 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Coal: MyRect(
-            pos: (48., 16.),
-            size: (16., 16.),
+         StoneHalf: MyRect(
+            pos: (0., 112.),
+            size: (32., 64.),
             anchor: None,
         ),
-        Grass: MyRect(
-            pos: (0., 96.),
-            size: (16., 16.),
+         StoneFull: MyRect(
+            pos: (32., 112.),
+            size: (32., 64.),
             anchor: None,
         ),
-        Dirt: MyRect(
-            pos: (16., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        Stone: MyRect(
-            pos: (32., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        Water: MyRect(
-            pos: (48., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        Sand: MyRect(
-            pos: (64., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        RedSand: MyRect(
-            pos: (80., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        Mud: MyRect(
-            pos: (96., 96.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        DryGrass: MyRect(
-            pos: (112., 96.),
-            size: (16., 16.),
+         StoneTop: MyRect(
+            pos: (64., 112.),
+            size: (32., 32.),
             anchor: None,
         ),
         Tree: MyRect(
