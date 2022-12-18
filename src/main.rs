@@ -13,7 +13,7 @@ use bevy::{
 mod assets;
 mod item;
 mod world_generation;
-use assets::{GameAssetsPlugin, TILE_SIZE};
+use assets::{GameAssetsPlugin, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
 use bevy_inspector_egui::InspectorPlugin;
@@ -24,7 +24,7 @@ use crate::world_generation::TileMapPositionData;
 
 const PLAYER_MOVE_SPEED: f32 = 450.;
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 3.2 / TILE_SIZE;
+const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
@@ -126,9 +126,9 @@ fn setup(
     game.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
         stone_frequency: 0.0,
-        dirt_frequency: 0.42,
-        sand_frequency: 0.32,
-        water_frequency: 0.09,
+        dirt_frequency: 0.52,
+        sand_frequency: 0.22,
+        water_frequency: 0.05,
     };
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
@@ -145,10 +145,10 @@ fn setup(
     let mut camera = Camera2dBundle::default();
 
     // One unit in world space is one tile
-    camera.projection.left = -HEIGHT / TILE_SIZE / 2.0 * RESOLUTION;
-    camera.projection.right = HEIGHT / TILE_SIZE / 2.0 * RESOLUTION;
-    camera.projection.top = HEIGHT / TILE_SIZE / 2.0;
-    camera.projection.bottom = -HEIGHT / TILE_SIZE / 2.0;
+    camera.projection.left = -HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
+    camera.projection.right = HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
+    camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
+    camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
     camera.projection.scaling_mode = ScalingMode::None;
     commands.spawn(camera);
 
@@ -197,7 +197,7 @@ fn move_player(
 
     let mut dx = 0.0;
     let mut dy = 0.0;
-    let s = 1.0 / TILE_SIZE;
+    let s = 1.0 / WORLD_SCALE;
     if key_input.pressed(KeyCode::A) {
         dx -= s;
         game.player.is_moving = true;
@@ -300,15 +300,6 @@ fn mouse_click_system(
             cursor_pos.0.y,
         ));
 
-        // let data = chunk_manager
-        //     .chunk_tile_entity_data
-        //     .get(&TileMapPositionData {
-        //         chunk_pos,
-        //         tile_pos: TilePos {
-        //             x: tile_pos.x as u32,
-        //             y: tile_pos.y as u32,
-        //         },
-        //     });
         WorldGenerationPlugin::change_tile_and_update_neighbours(
             TilePos {
                 x: tile_pos.x as u32,
@@ -317,12 +308,30 @@ fn mouse_click_system(
             chunk_pos,
             0b0000,
             0,
-            chunk_manager,
-            commands,
+            &mut chunk_manager,
+            &mut commands,
         );
-        // println!(
-        //     "tile: {:?} | chunk {:?} | index {:?}",
-        //     tile_pos, chunk_pos, data
-        // );
+    }
+    if mouse_button_input.just_released(MouseButton::Right) {
+        let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            cursor_pos.0.x,
+            cursor_pos.0.y,
+        ));
+        let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            cursor_pos.0.x,
+            cursor_pos.0.y,
+        ));
+
+        WorldGenerationPlugin::change_tile_and_update_neighbours(
+            TilePos {
+                x: tile_pos.x as u32,
+                y: tile_pos.y as u32,
+            },
+            chunk_pos,
+            0b0000,
+            16,
+            &mut chunk_manager,
+            &mut commands,
+        );
     }
 }
