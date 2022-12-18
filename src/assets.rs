@@ -116,7 +116,7 @@ pub struct Graphics {
 impl GameAssetsPlugin {
     /// Startup system that runs after images are loaded, indexes all loaded images
     /// and creates the graphics resource
-    fn load_graphics(
+    pub fn load_graphics(
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
