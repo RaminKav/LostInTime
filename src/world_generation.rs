@@ -17,7 +17,7 @@ use serde::Deserialize;
 
 pub struct WorldGenerationPlugin;
 const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
-const CHUNK_SIZE: u32 = 64;
+pub const CHUNK_SIZE: u32 = 64;
 const CHUNK_CACHE_AMOUNT: i32 = 3;
 const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
@@ -32,6 +32,9 @@ impl Plugin for WorldGenerationPlugin {
                     // .with_system(Self::spawn_chunk)
                     .with_system(Self::spawn_chunks_around_camera)
                     .with_system(Self::despawn_outofrange_chunks),
+            )
+            .add_system_set(
+                SystemSet::on_enter(GameState::Main).with_system(Self::spawn_test_objects),
             );
     }
 }
@@ -284,11 +287,11 @@ impl WorldGenerationPlugin {
             WorldObject::Sand,
         ];
         let sample = |x: f64, y: f64| -> (u8, WorldObject) {
-            let base_oct = 1. / 10.;
+            let base_oct = 1. / 10. / 8.;
 
             let e1 = (noise_e.get([x * base_oct, y * base_oct]));
-            let e2 = (noise_e2.get([x * base_oct * 4., y * base_oct * 4.]));
-            let e3 = (noise_e3.get([x * base_oct * 8., y * base_oct * 8.]));
+            let e2 = (noise_e2.get([x * base_oct * 8., y * base_oct * 8.]));
+            let e3 = (noise_e3.get([x * base_oct * 16., y * base_oct * 16.]));
 
             let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
             // let m = (noise_m.get([x * base_oct, ny * base_oct]) + 0.5)
@@ -303,13 +306,9 @@ impl WorldGenerationPlugin {
                 WorldObject::Water
             } else if e <= game.world_generation_params.sand_frequency {
                 WorldObject::Sand
+            } else if e <= game.world_generation_params.dirt_frequency {
+                WorldObject::Grass
             }
-            // else if e <= game.world_generation_params.dirt_frequency {
-            //     if m > 0.6 {
-            //         WorldObject::Dirt
-            //     } else {
-            //         WorldObject::Grass
-            //     }
             // } else if e <= game.world_generation_params.stone_frequency {
             //     WorldObject::Stone
             // }
@@ -370,199 +369,6 @@ impl WorldGenerationPlugin {
                 if blocks[b] == WorldObject::Sand {
                     bits[b] = 1;
                 }
-                // else {
-                //     // for each grass bit, check to see if at least on neighbourint tile has
-                //     // a touching tile (4 sides) that is sand. if so, change that bit to sand too
-                //     if nx == 0. && ny == 1. {
-                //         println!("PRE: bits: {:?} blocks: {:?}", bits, blocks,);
-                //     }
-                //     match b {
-                //         // top left corner
-                //         0 => {
-                //             let bit = sample(nx - 0.75, ny + 0.25); //one left
-                //             if bit.1 == WorldObject::Sand {
-                //                 bits[b] = 1;
-                //                 blocks[b] = WorldObject::Sand;
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "UPDATE tl -> l: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //             }
-                //             // if first isnt sand, check second neighbour
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx - 0.75, ny + 0.75); //top left corner
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE tl -> tl: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx - 0.25, ny + 0.75); //one above
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE tl -> a: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //         // top right corner
-                //         1 => {
-                //             let bit = sample(nx + 0.25, ny + 0.75); //one above
-                //             if bit.1 == WorldObject::Sand {
-                //                 bits[b] = 1;
-                //                 blocks[b] = WorldObject::Sand;
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "UPDATE tr -> a: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //             }
-                //             // if first isnt sand, check second neighbour
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx + 0.75, ny + 0.75); //one top right
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE tr -> tr: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx + 0.75, ny + 0.25); //one right
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE tr -> r: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //         // bottom left corner
-                //         2 => {
-                //             let bit = sample(nx - 0.75, ny - 0.25); //one left
-                //             if nx == 0. && ny == 1. {
-                //                 println!(
-                //                     "check l: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                     bits, blocks, bit,
-                //                 );
-                //             }
-                //             if bit.1 == WorldObject::Sand {
-                //                 bits[b] = 1;
-                //                 blocks[b] = WorldObject::Sand;
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "UPDATE bl -> l: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //             }
-                //             // if first isnt sand, check second neighbour
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx - 0.75, ny - 0.75); //one lower left
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "check bl: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE bl -> bl: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx - 0.25, ny - 0.75); //one bellow
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "check b: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE bl -> b: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //         // bottom right corner
-                //         3 => {
-                //             let bit = sample(nx + 0.75, ny - 0.25); //one right
-                //             if bit.1 == WorldObject::Sand {
-                //                 bits[b] = 1;
-                //                 blocks[b] = WorldObject::Sand;
-                //                 if nx == 0. && ny == 1. {
-                //                     println!(
-                //                         "UPDATE br -> r: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                         bits, blocks, bit,
-                //                     );
-                //                 }
-                //             }
-                //             // if first isnt sand, check second neighbour
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx + 0.75, ny - 0.75); //one lower right
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE br -> br: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //             if blocks[b] != WorldObject::Sand {
-                //                 let bit = sample(nx + 0.25, ny - 0.75); //one below
-                //                 if bit.1 == WorldObject::Sand {
-                //                     bits[b] = 1;
-                //                     blocks[b] = WorldObject::Sand;
-                //                     if nx == 0. && ny == 1. {
-                //                         println!(
-                //                             "UPDATE br -> b: bits: {:?} blocks: {:?} newbit: {:?}",
-                //                             bits, blocks, bit,
-                //                         );
-                //                     }
-                //                 }
-                //             }
-                //         }
-                //         _ => {}
-                //     };
-                // }
             }
         }
 
@@ -1141,8 +947,8 @@ impl WorldGenerationPlugin {
         chunk_pos: IVec2,
         bits: u8,
         offset: u8,
-        mut chunk_manager: ResMut<ChunkManager>,
-        mut commands: Commands,
+        chunk_manager: &mut ResMut<ChunkManager>,
+        commands: &mut Commands,
     ) {
         let block_type = Self::get_block_type_from_bits(bits, offset);
 
@@ -1157,13 +963,7 @@ impl WorldGenerationPlugin {
             if let Some(mut e_commands) = commands.get_entity(tile_entity_data.entity.unwrap()) {
                 e_commands.insert(TileTextureIndex((bits + offset).into()));
                 tile_entity_data.block_type = block_type;
-                Self::update_neighbour_tiles(
-                    tile_pos,
-                    &mut commands,
-                    &mut chunk_manager,
-                    chunk_pos,
-                    true,
-                );
+                Self::update_neighbour_tiles(tile_pos, commands, chunk_manager, chunk_pos, true);
             }
         }
     }

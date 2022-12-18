@@ -13,7 +13,7 @@ use ron::de::from_str;
 
 // pub const PIXEL_SCALE: f32 = 3.;
 pub const SOURCE_TILE_SIZE: f32 = 32.;
-pub const TILE_SIZE: f32 = 3.; //SOURCE_TILE_SIZE * PIXEL_SCALE;
+pub const WORLD_SCALE: f32 = 3.5; //SOURCE_TILE_SIZE * PIXEL_SCALE;
 
 pub struct GameAssetsPlugin;
 
