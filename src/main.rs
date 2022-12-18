@@ -27,7 +27,7 @@ use crate::world_generation::TileMapPositionData;
 const PLAYER_MOVE_SPEED: f32 = 450.;
 const PLAYER_DASH_SPEED: f32 = 1250.;
 const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 4.2 / WORLD_SCALE;
+const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
@@ -138,7 +138,7 @@ fn setup(
         water_frequency: 0.05,
     };
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
+    game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     let player_texture_atlas = TextureAtlas::from_grid(
@@ -191,8 +191,8 @@ fn animate_sprite(
         let d = time.delta();
         timer.tick(if game.player.is_dashing {
             Duration::new(
-                (d.as_secs() as f32 * 3.) as u64,
-                (d.subsec_nanos() as f32 * 3.) as u32,
+                (d.as_secs() as f32 * 4.) as u64,
+                (d.subsec_nanos() as f32 * 4.) as u32,
             )
         } else {
             d

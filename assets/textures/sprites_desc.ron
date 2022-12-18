@@ -21,9 +21,9 @@
             anchor: None,
         ),
         Tree: MyRect(
-            pos: (160., 0.),
-            size: (32., 48.),
-            anchor: Some((16., 44.)),
+            pos: (96., 112.),
+            size: (32., 40.),
+            anchor: None,
         ),
     }
 )
