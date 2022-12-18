@@ -971,12 +971,23 @@ impl WorldGenerationPlugin {
     fn spawn_test_objects(mut commands: Commands, graphics: Res<Graphics>) {
         let mut tree_children = Vec::new();
 
-        let tree_points = poisson_disk_sampling(4., 30, rand::thread_rng());
+        let tree_points = poisson_disk_sampling(1. * TILE_SIZE.x as f64, 30, rand::thread_rng());
         for tp in tree_points {
+            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&tp);
+            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&tp);
+            // Vec3::new(
+            //     (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
+            //     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
+            //     0.1,
+            // )
             tree_children.push(WorldObject::Tree.spawn(
                 &mut commands,
                 &graphics,
-                Vec3::new((tp.x as f32) * 16., (tp.y as f32) * 16., 0.1),
+                Vec3::new(
+                    (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
+                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
+                    0.1,
+                ),
             ));
         }
         commands
