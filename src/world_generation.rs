@@ -10,10 +10,11 @@ use bevy::{math::Vec3Swizzles, utils::HashSet};
 use bevy_ecs_tilemap::helpers::square_grid::neighbors::Neighbors;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_inspector_egui::Inspectable;
+use bevy_pkv::PkvStore;
 use noise::{NoiseFn, Perlin, Seedable, Simplex};
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub struct WorldGenerationPlugin;
 const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
@@ -46,6 +47,11 @@ pub struct ChunkManager {
     pub raw_chunk_data: HashMap<IVec2, RawChunkData>,
     pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
     pub state: ChunkLoadingState,
+}
+#[derive(Serialize, Deserialize)]
+pub struct WorldObjectData {
+    data: String,
+    name: String,
 }
 
 #[derive(Debug)]
@@ -968,10 +974,26 @@ impl WorldGenerationPlugin {
         }
     }
 
-    fn spawn_test_objects(mut commands: Commands, graphics: Res<Graphics>) {
+    fn spawn_test_objects(
+        mut commands: Commands,
+        graphics: Res<Graphics>,
+        mut pkv: ResMut<PkvStore>,
+    ) {
+        let tree_points;
         let mut tree_children = Vec::new();
-
-        let tree_points = poisson_disk_sampling(1. * TILE_SIZE.x as f64, 30, rand::thread_rng());
+        if let Ok(data) = pkv.get::<WorldObjectData>("data") {
+            println!("LOADING OLD DATA@@@@@@@@@@@@@@");
+            info!("Welcome back {}", data.name);
+            tree_points = serde_json::from_str(&data.data).unwrap();
+        } else {
+            println!("STORING NEW DATA@@@@@@@@@@@@@@");
+            tree_points = poisson_disk_sampling(1. * TILE_SIZE.x as f64, 30, rand::thread_rng());
+            let data = WorldObjectData {
+                data: serde_json::to_string(&tree_points).unwrap(),
+                name: "RAMIN".to_string(),
+            };
+            pkv.set("data", &data).expect("failed to store data");
+        }
         for tp in tree_points {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&tp);
             let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&tp);
