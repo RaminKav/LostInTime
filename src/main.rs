@@ -50,7 +50,6 @@ fn main() {
                     ..default()
                 }),
         )
-        .add_state(GameState::Loading)
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -62,14 +61,14 @@ fn main() {
                 .continue_to_state(GameState::Main)
                 .with_collection::<ImageAssets>(),
         )
+        .add_state(GameState::Loading)
         .add_system_set(
             SystemSet::on_update(GameState::Main)
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                 .with_system(animate_sprite)
                 .with_system(move_player)
                 .with_system(update_cursor_pos.after(move_player))
-                .with_system(mouse_click_system)
-                .after(GameAssetsPlugin::load_graphics),
+                .with_system(mouse_click_system),
         )
         .run();
 }

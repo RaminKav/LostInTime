@@ -55,7 +55,11 @@ pub struct GraphicsDesc {
 
 impl Plugin for GameAssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
+        app.insert_resource(Graphics {
+            texture_atlas: None,
+            item_map: None,
+        })
+        .add_system_set(
             SystemSet::on_exit(GameState::Loading)
                 .with_system(Self::load_graphics.label("graphics")),
         );
@@ -67,8 +71,8 @@ impl Plugin for GameAssetsPlugin {
 #[derive(Resource)]
 
 pub struct Graphics {
-    pub texture_atlas: Handle<TextureAtlas>,
-    pub item_map: HashMap<WorldObject, (TextureAtlasSprite, usize)>,
+    pub texture_atlas: Option<Handle<TextureAtlas>>,
+    pub item_map: Option<HashMap<WorldObject, (TextureAtlasSprite, usize)>>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
@@ -117,7 +121,7 @@ impl GameAssetsPlugin {
     /// Startup system that runs after images are loaded, indexes all loaded images
     /// and creates the graphics resource
     pub fn load_graphics(
-        mut commands: Commands,
+        mut graphics: ResMut<Graphics>,
         sprite_sheet: Res<ImageAssets>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
     ) {
@@ -154,10 +158,10 @@ impl GameAssetsPlugin {
 
         let atlas_handle = texture_assets.add(atlas);
 
-        commands.insert_resource(Graphics {
-            texture_atlas: atlas_handle,
-            item_map,
-        });
+        *graphics = Graphics {
+            texture_atlas: Some(atlas_handle),
+            item_map: Some(item_map),
+        };
     }
 }
 

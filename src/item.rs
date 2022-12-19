@@ -28,8 +28,14 @@ pub enum WorldObject {
 impl WorldObject {
     pub fn spawn(self, commands: &mut Commands, graphics: &Graphics, position: Vec3) -> Entity {
         // println!("I SPAWNED A TREE AT {:?}", position);
+        let item_map = &graphics.item_map;
+        if let None = item_map {
+            panic!("graphics not loaded");
+        }
         let sprite = graphics
             .item_map
+            .as_ref()
+            .unwrap()
             .get(&self)
             .expect(&format!("No graphic for object {:?}", self))
             .0
@@ -38,7 +44,7 @@ impl WorldObject {
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
-                texture_atlas: graphics.texture_atlas.clone(),
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                 transform: Transform {
                     translation: position,
                     ..Default::default()
@@ -48,6 +54,7 @@ impl WorldObject {
             .insert(Name::new("GroundItem"))
             .insert(self)
             .id();
+        return item;
 
         // if let Some(breakable) = self.as_breakable() {
         //     commands.entity(item).insert(breakable);
@@ -62,8 +69,6 @@ impl WorldObject {
         //         timer: Timer::from_seconds(3.0, false),
         //     });
         // }
-
-        item
     }
     // pub fn as_breakable(&self) -> Option<Breakable> {
     //     match self {
@@ -103,14 +108,16 @@ impl ItemsPlugin {
         mut to_update_query: Query<(&mut TextureAtlasSprite, &WorldObject), Changed<WorldObject>>,
         graphics: Res<Graphics>,
     ) {
-        for (mut sprite, world_object) in to_update_query.iter_mut() {
-            sprite.clone_from(
-                &graphics
-                    .item_map
-                    .get(world_object)
-                    .expect(&format!("No graphic for object {:?}", world_object))
-                    .0,
-            );
+        let item_map = &&graphics.item_map;
+        if let Some(item_map) = item_map {
+            for (mut sprite, world_object) in to_update_query.iter_mut() {
+                sprite.clone_from(
+                    &item_map
+                        .get(world_object)
+                        .expect(&format!("No graphic for object {:?}", world_object))
+                        .0,
+                );
+            }
         }
     }
 }
