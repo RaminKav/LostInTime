@@ -5,8 +5,12 @@ use std::time::Duration;
 // - set up tilemap or world generation
 // - trees/entities to break/mine
 use bevy::{
+    core_pipeline::bloom::BloomSettings,
     prelude::*,
-    render::camera::ScalingMode,
+    render::{
+        camera::{RenderTarget, ScalingMode},
+        render_resource::{FilterMode, SamplerDescriptor},
+    },
     sprite::collide_aabb::{collide, Collision},
     sprite::MaterialMesh2dBundle,
     time::FixedTimestep,
@@ -14,6 +18,7 @@ use bevy::{
 };
 mod animations;
 mod assets;
+mod gi;
 mod inputs;
 mod item;
 mod world_generation;
@@ -21,45 +26,73 @@ use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
+use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_pkv::PkvStore;
+use gi::{
+    gi_component::{AmbientMask, GiAmbientLight},
+    gi_post_processing::{setup_post_processing_camera, PostProcessingTarget},
+    LightOccluder, LightSource,
+};
 use inputs::{Direction, InputsPlugin};
 use item::{ItemsPlugin, WorldObject};
 use world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE};
 
-const PLAYER_MOVE_SPEED: f32 = 450.;
+const PLAYER_MOVE_SPEED: f32 = 550.;
 const PLAYER_DASH_SPEED: f32 = 1250.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
 pub const HEIGHT: f32 = 900.;
 pub const RESOLUTION: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
+#[derive(Component)]
+pub struct MainCamera;
 
+pub const SCREEN_SIZE: (usize, usize) = ((HEIGHT * RESOLUTION) as usize, HEIGHT as usize);
 fn main() {
     App::new()
         .init_resource::<Game>()
+        .insert_resource(ClearColor(Color::rgb_u8(0, 0, 0)))
         .add_plugins(
             DefaultPlugins
-                .set(ImagePlugin::default_nearest())
+                .set(AssetPlugin {
+                    // Tell the asset server to watch for asset changes on disk:
+                    watch_for_changes: true,
+                    ..default()
+                })
                 .set(WindowPlugin {
                     window: WindowDescriptor {
-                        width: HEIGHT * RESOLUTION,
-                        height: HEIGHT,
+                        width: SCREEN_SIZE.0 as f32,
+                        height: SCREEN_SIZE.1 as f32,
                         title: "DST clone".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
                         ..Default::default()
                     },
                     ..default()
+                })
+                .set(ImagePlugin {
+                    default_sampler: SamplerDescriptor {
+                        mag_filter: FilterMode::Nearest,
+                        min_filter: FilterMode::Nearest,
+                        ..Default::default()
+                    },
                 }),
         )
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
+        .add_plugin(gi::GiComputePlugin)
+        .add_plugin(WorldInspectorPlugin::new())
+        .register_inspectable::<LightOccluder>()
+        .register_inspectable::<LightSource>()
+        .register_inspectable::<AmbientMask>()
+        .register_inspectable::<GiAmbientLight>()
+        .register_type::<BloomSettings>()
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
-        .add_startup_system(setup)
+        .add_startup_system(setup.after(setup_post_processing_camera))
         .add_loading_state(
             LoadingState::new(GameState::Loading)
                 .continue_to_state(GameState::Main)
@@ -119,6 +152,9 @@ fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    post_processing_target: Res<PostProcessingTarget>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
     mut game: ResMut<Game>,
 ) {
     game.world_size = WORLD_SIZE;
@@ -130,7 +166,7 @@ fn setup(
         water_frequency: 0.05,
     };
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
+    game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     let player_texture_atlas = TextureAtlas::from_grid(
@@ -143,28 +179,89 @@ fn setup(
     );
     let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
-    let mut camera = Camera2dBundle::default();
+    commands
+        .spawn((
+            SpriteSheetBundle {
+                texture_atlas: player_texture_atlas_handle,
+                transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
+                    .with_translation(Vec3::new(0., 0., 1.)),
+                ..default()
+            },
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            Player {
+                is_moving: false,
+                is_dashing: false,
+            },
+            Direction(1.0),
+        ))
+        .insert(Name::new("Player"));
+    // let block_mesh = meshes.add(Mesh::from(shape::Circle::default()));
+
+    // // Add roof.
+    // commands
+    //     .spawn(SpatialBundle {
+    //         transform: Transform {
+    //             translation: Vec3::new(0.0, 0.0, 0.0),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .insert(Name::new("ambient_mask"))
+    //     .insert(AmbientMask {
+    //         h_size: Vec2::new(0., 0.),
+    //     });
+    commands.spawn((
+        GiAmbientLight {
+            color: Color::rgb_u8(93, 158, 179),
+            intensity: 0.04,
+        },
+        Name::new("ambient_light"),
+    ));
+    // commands
+    //     .spawn(MaterialMesh2dBundle {
+    //         mesh: block_mesh.clone().into(),
+    //         material: materials.add(ColorMaterial::from(Color::YELLOW)).into(),
+    //         transform: Transform {
+    //             scale: Vec3::splat(8.0),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .insert(Name::new("cursor_light"))
+    //     .insert(LightSource {
+    //         intensity: 10.0,
+    //         radius: 3.0,
+    //         color: Color::rgb_u8(219, 104, 72),
+    //         falloff: Vec3::new(6.0, 3.0, 0.05),
+    //         ..default()
+    //     });
+    let render_target = post_processing_target
+        .handle
+        .clone()
+        .expect("No post processing target");
+    let mut camera = Camera2dBundle {
+        camera: Camera {
+            hdr: true,
+            priority: 0,
+            target: RenderTarget::Image(render_target),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     // One unit in world space is one tile
     camera.projection.left = -HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
     camera.projection.right = HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
     camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
     camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
-    camera.projection.scaling_mode = ScalingMode::None;
-    commands.spawn(camera);
-
-    commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: player_texture_atlas_handle,
-            transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
-                .with_translation(Vec3::new(0., 0., 1.)),
+    camera.projection.scale = 0.25;
+    // camera.projection.scaling_mode = ScalingMode::None;
+    commands
+        .spawn(camera)
+        .insert(MainCamera)
+        .insert(Name::new("MainCamera"))
+        .insert(UiCameraConfig {
+            show_ui: false,
             ..default()
-        },
-        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player {
-            is_moving: false,
-            is_dashing: false,
-        },
-        Direction(1.0),
-    ));
+        });
 }

@@ -1,6 +1,7 @@
 use std::ops::Index;
 
 use crate::assets::Graphics;
+use crate::gi::LightOccluder;
 use crate::item::WorldObject;
 use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
 use bevy::prelude::*;
@@ -982,11 +983,11 @@ impl WorldGenerationPlugin {
         let tree_points;
         let mut tree_children = Vec::new();
         if let Ok(data) = pkv.get::<WorldObjectData>("data") {
-            println!("LOADING OLD DATA@@@@@@@@@@@@@@");
+            println!("LOADING OLD DATA");
             info!("Welcome back {}", data.name);
             tree_points = serde_json::from_str(&data.data).unwrap();
         } else {
-            println!("STORING NEW DATA@@@@@@@@@@@@@@");
+            println!("STORING NEW DATA");
             tree_points = poisson_disk_sampling(1. * TILE_SIZE.x as f64, 30, rand::thread_rng());
             let data = WorldObjectData {
                 data: serde_json::to_string(&tree_points).unwrap(),
@@ -1002,7 +1003,7 @@ impl WorldGenerationPlugin {
             //     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
             //     0.1,
             // )
-            tree_children.push(WorldObject::Tree.spawn(
+            let tree_entity = WorldObject::Tree.spawn(
                 &mut commands,
                 &graphics,
                 Vec3::new(
@@ -1010,7 +1011,11 @@ impl WorldGenerationPlugin {
                     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
                     0.1,
                 ),
-            ));
+            );
+            commands.entity(tree_entity).insert(LightOccluder {
+                h_size: Vec2::new(16., 16.),
+            });
+            tree_children.push(tree_entity);
         }
         commands
             .spawn(SpatialBundle::default())
