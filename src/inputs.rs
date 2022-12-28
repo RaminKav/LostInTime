@@ -78,6 +78,10 @@ impl InputsPlugin {
             game.player.is_moving = false;
             // key_input.release_all();
         }
+        if dx != 0. && dy != 0. {
+            dx = if dx == -s { -(s * 0.66) } else { s * 0.66 };
+            dy = if dy == -s { -(s * 0.66) } else { s * 0.66 };
+        }
 
         let mut px = player_transform.translation.x + dx * PLAYER_MOVE_SPEED * TIME_STEP;
         let mut py = player_transform.translation.y + dy * PLAYER_MOVE_SPEED * TIME_STEP;

@@ -130,7 +130,7 @@ fn setup(
         water_frequency: 0.05,
     };
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
+    game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
 
     let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     let player_texture_atlas = TextureAtlas::from_grid(
