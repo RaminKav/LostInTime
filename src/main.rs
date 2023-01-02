@@ -14,6 +14,7 @@ use bevy::{
 };
 mod animations;
 mod assets;
+mod collision;
 mod inputs;
 mod item;
 mod world_generation;
@@ -22,6 +23,7 @@ use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
+use collision::CollisionPlugin;
 use inputs::{Direction, InputsPlugin};
 use item::{ItemsPlugin, WorldObject};
 use world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE};
@@ -59,6 +61,7 @@ fn main() {
         .add_plugin(AnimationsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
+        .add_plugin(CollisionPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -110,7 +113,7 @@ pub struct ImageAssets {
 struct AnimationTimer(Timer);
 
 #[derive(Component, Default)]
-struct Player {
+pub struct Player {
     is_moving: bool,
     is_dashing: bool,
 }

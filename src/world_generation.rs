@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use crate::assets::Graphics;
-use crate::item::WorldObject;
+use crate::item::{Collider, WorldObject};
 use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
 use bevy::prelude::*;
 use bevy::ui::update;
@@ -17,7 +17,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 pub struct WorldGenerationPlugin;
-const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
+pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 64;
 const CHUNK_CACHE_AMOUNT: i32 = 3;
 const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
@@ -994,6 +994,7 @@ impl WorldGenerationPlugin {
             };
             pkv.set("data", &data).expect("failed to store data");
         }
+        let tree_points = vec![Vec2::new(0., 0.)];
         for tp in tree_points {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&tp);
             let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&tp);
@@ -1002,7 +1003,7 @@ impl WorldGenerationPlugin {
             //     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
             //     0.1,
             // )
-            tree_children.push(WorldObject::Tree.spawn(
+            let tree = WorldObject::Tree.spawn_with_collider(
                 &mut commands,
                 &graphics,
                 Vec3::new(
@@ -1010,7 +1011,9 @@ impl WorldGenerationPlugin {
                     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
                     0.1,
                 ),
-            ));
+                Vec2::new(32., 32.),
+            );
+            tree_children.push(tree);
         }
         commands
             .spawn(SpatialBundle::default())

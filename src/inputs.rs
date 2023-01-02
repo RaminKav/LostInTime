@@ -1,13 +1,14 @@
 use std::time::Duration;
 
-use bevy::prelude::*;
 use bevy::time::FixedTimestep;
+use bevy::{prelude::*, sprite::collide_aabb::Collision};
 
 use crate::{
     assets::{Graphics, WORLD_SCALE},
+    collision::{CollisionEvent, CollisionPlugin},
     item::WorldObject,
     world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE},
-    AnimationTimer, Game, GameState, Player, PLAYER_DASH_SPEED, PLAYER_MOVE_SPEED, TIME_STEP,
+    Game, GameState, Player, PLAYER_DASH_SPEED, PLAYER_MOVE_SPEED, TIME_STEP,
 };
 
 #[derive(Default, Resource)]
@@ -24,7 +25,7 @@ impl Plugin for InputsPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::move_player)
+                    .with_system(Self::move_player.before(CollisionPlugin::check_for_collisions))
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
                     .with_system(Self::mouse_click_system),
             );
@@ -38,31 +39,52 @@ impl InputsPlugin {
         mut player_query: Query<(&mut Transform, &mut Direction), (With<Player>, Without<Camera>)>,
         mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
+        mut collision_events: EventReader<CollisionEvent>,
     ) {
         let (mut player_transform, mut dir) = player_query.single_mut();
         let mut camera_transform = camera_query.single_mut();
 
         let mut dx = 0.0;
         let mut dy = 0.0;
+        let mut collision_dirs: Vec<_> = vec![]; //TODO: iter through them and use .contains
         let s = 1.0 / WORLD_SCALE;
-
+        if !collision_events.is_empty() {
+            collision_dirs = collision_events.iter().collect();
+            println!("Found Collision Event: {:?}", collision_dirs);
+        }
         if key_input.pressed(KeyCode::A) {
-            dx -= s;
-            game.player.is_moving = true;
-            player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
+            if collision_dirs.len() == 0
+                || !collision_dirs.contains(&&CollisionEvent(Collision::Right))
+            {
+                dx -= s;
+                game.player.is_moving = true;
+                player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
+            }
         }
         if key_input.pressed(KeyCode::D) {
-            dx += s;
-            game.player.is_moving = true;
-            player_transform.rotation = Quat::default();
+            if collision_dirs.len() == 0
+                || !collision_dirs.contains(&&CollisionEvent(Collision::Left))
+            {
+                dx += s;
+                game.player.is_moving = true;
+                player_transform.rotation = Quat::default();
+            }
         }
         if key_input.pressed(KeyCode::W) {
-            dy += s;
-            game.player.is_moving = true;
+            if collision_dirs.len() == 0
+                || !collision_dirs.contains(&&CollisionEvent(Collision::Bottom))
+            {
+                dy += s;
+                game.player.is_moving = true;
+            }
         }
         if key_input.pressed(KeyCode::S) {
-            dy -= s;
-            game.player.is_moving = true;
+            if collision_dirs.len() == 0
+                || !collision_dirs.contains(&&CollisionEvent(Collision::Top))
+            {
+                dy -= s;
+                game.player.is_moving = true;
+            }
         }
         if game.player_dash_cooldown.tick(time.delta()).finished() {
             if key_input.pressed(KeyCode::Space) {
@@ -112,6 +134,9 @@ impl InputsPlugin {
 
         if dx != 0. {
             dir.0 = dx;
+        }
+        if !collision_events.is_empty() {
+            collision_events.clear();
         }
     }
 
@@ -170,14 +195,15 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneHalf.spawn(
+            let stone = WorldObject::StoneHalf.spawn_with_collider(
                 &mut commands,
                 &graphics,
                 Vec3::new(
                     (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-                    (tile_pos.y * 32 + 16 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
+                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
                     0.1,
                 ),
+                Vec2::new(32., 48.),
             );
             commands
                 .spawn(SpatialBundle::default())
@@ -205,7 +231,7 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             )));
-            let stone = WorldObject::StoneTop.spawn(
+            let stone = WorldObject::StoneTop.spawn_with_collider(
                 &mut commands,
                 &graphics,
                 Vec3::new(
@@ -213,6 +239,7 @@ impl InputsPlugin {
                     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
                     0.1,
                 ),
+                Vec2::new(32., 32.),
             );
             commands
                 .spawn(SpatialBundle::default())
