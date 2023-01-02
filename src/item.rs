@@ -1,6 +1,7 @@
 use crate::assets::Graphics;
 use crate::{Game, GameState, WORLD_SIZE};
 use bevy::prelude::*;
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use noise::{NoiseFn, Seedable, Simplex};
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -44,7 +45,11 @@ impl WorldObject {
             .expect(&format!("No graphic for object {:?}", self))
             .0
             .clone();
-
+        //TODO: WIP FADING OUT ITEMS SHADER
+        // let item = commands.spawn(MaterialMesh2dBundle {mesh: Mesh2dHandle(meshes.add(Mesh::from(shape::Quad { size: Vec2::new(32.,32.), flip: false }))),
+        //  material:,
+        //  transform:,
+        //  ..Default::Default()});
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
