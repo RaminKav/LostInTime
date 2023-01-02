@@ -12,6 +12,10 @@ pub struct Breakable {
     pub turnsInto: Option<WorldObject>,
 }
 
+#[derive(Component)]
+pub struct Collider;
+#[derive(Component)]
+pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Deserialize, Component)]
 pub enum WorldObject {
@@ -69,6 +73,19 @@ impl WorldObject {
         //         timer: Timer::from_seconds(3.0, false),
         //     });
         // }
+    }
+    pub fn spawn_with_collider(
+        self,
+        commands: &mut Commands,
+        graphics: &Graphics,
+        position: Vec3,
+        size: Vec2,
+    ) -> Entity {
+        // println!("I SPAWNED A TREE AT {:?}", position);
+        let item = self.spawn(commands, graphics, position);
+        commands.entity(item).insert(Collider);
+        commands.entity(item).insert(Size(size));
+        return item;
     }
     // pub fn as_breakable(&self) -> Option<Breakable> {
     //     match self {

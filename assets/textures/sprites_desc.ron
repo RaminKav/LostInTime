@@ -6,14 +6,14 @@
             anchor: None,
         ),
          StoneHalf: MyRect(
-            pos: (0., 112.),
-            size: (32., 64.),
-            anchor: None,
+            pos: (0., 128.),
+            size: (32., 48.),
+            anchor: Some((16., 32.)),
         ),
          StoneFull: MyRect(
             pos: (32., 112.),
             size: (32., 64.),
-            anchor: None,
+            anchor: Some((16., 48.)),
         ),
          StoneTop: MyRect(
             pos: (64., 112.),
