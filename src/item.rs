@@ -1,17 +1,18 @@
 use crate::assets::Graphics;
+use crate::world_generation::{
+    ChunkManager, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
+};
 use crate::{Game, GameState, WORLD_SIZE};
 use bevy::prelude::*;
 use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::utils::HashMap;
+use bevy_ecs_tilemap::tiles::TilePos;
 use noise::{NoiseFn, Seedable, Simplex};
-use rand::rngs::ThreadRng;
-use rand::Rng;
+
 use serde::Deserialize;
 
 #[derive(Component)]
-pub struct Breakable {
-    object: WorldObject,
-    pub turnsInto: Option<WorldObject>,
-}
+pub struct Breakable(pub Option<WorldObject>);
 
 #[derive(Component)]
 pub struct Collider;
@@ -29,9 +30,27 @@ pub enum WorldObject {
     Sand,
     Tree,
 }
-
+#[derive(Debug, Resource)]
+pub struct WorldObjectBreakData(HashMap<WorldObject, Option<WorldObject>>);
+impl WorldObjectBreakData {
+    fn new() -> Self {
+        let mut m = HashMap::new();
+        m.insert(WorldObject::StoneFull, Some(WorldObject::StoneHalf));
+        m.insert(WorldObject::Tree, None);
+        m.insert(WorldObject::StoneHalf, None);
+        Self(m)
+    }
+}
 impl WorldObject {
-    pub fn spawn(self, commands: &mut Commands, graphics: &Graphics, position: Vec3) -> Entity {
+    pub fn spawn(
+        self,
+        commands: &mut Commands,
+        break_data: &WorldObjectBreakData,
+        graphics: &Graphics,
+        chunk_manager: &mut ChunkManager,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
+    ) -> Entity {
         // println!("I SPAWNED A TREE AT {:?}", position);
         let item_map = &graphics.item_map;
         if let None = item_map {
@@ -50,6 +69,11 @@ impl WorldObject {
         //  material:,
         //  transform:,
         //  ..Default::Default()});
+        let position = Vec3::new(
+            (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
+            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
+            0.1,
+        );
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
@@ -63,6 +87,22 @@ impl WorldObject {
             .insert(Name::new("GroundItem"))
             .insert(self)
             .id();
+        if let Some(b) = break_data.0.get(&self) {
+            commands.entity(item).insert(Breakable(*b));
+        }
+        chunk_manager.chunk_generation_data.insert(
+            TileMapPositionData {
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+                chunk_pos,
+            },
+            WorldObjectEntityData {
+                object: self,
+                entity: item,
+            },
+        );
         return item;
 
         // if let Some(breakable) = self.as_breakable() {
@@ -82,15 +122,87 @@ impl WorldObject {
     pub fn spawn_with_collider(
         self,
         commands: &mut Commands,
+        break_data: &WorldObjectBreakData,
         graphics: &Graphics,
-        position: Vec3,
+        chunk_manager: &mut ChunkManager,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
         size: Vec2,
     ) -> Entity {
         // println!("I SPAWNED A TREE AT {:?}", position);
-        let item = self.spawn(commands, graphics, position);
+        let item = self.spawn(
+            commands,
+            break_data,
+            graphics,
+            chunk_manager,
+            tile_pos,
+            chunk_pos,
+        );
         commands.entity(item).insert(Collider);
         commands.entity(item).insert(Size(size));
         return item;
+    }
+    pub fn break_item(
+        self,
+        commands: &mut Commands,
+        break_data: &WorldObjectBreakData,
+        graphics: &Graphics,
+        chunk_manager: &mut ChunkManager,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
+    ) {
+        // println!("I SPAWNED A TREE AT {:?}", position);
+        let obj_data = chunk_manager
+            .chunk_generation_data
+            .get(&TileMapPositionData {
+                chunk_pos,
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+            })
+            .unwrap();
+
+        if let Some(breaks_into_option) = break_data.0.get(&self) {
+            commands.entity(obj_data.entity).despawn();
+            if let Some(breaks_into) = breaks_into_option {
+                let item = breaks_into.spawn_with_collider(
+                    commands,
+                    &break_data,
+                    &graphics,
+                    chunk_manager,
+                    tile_pos,
+                    chunk_pos,
+                    Vec2::new(32., 48.), //TODO: add size to gen data
+                );
+                if let Some(b) = break_data.0.get(breaks_into) {
+                    commands.entity(item).insert(Breakable(*b));
+                }
+                chunk_manager.chunk_generation_data.insert(
+                    TileMapPositionData {
+                        chunk_pos,
+                        tile_pos: TilePos {
+                            x: tile_pos.x as u32,
+                            y: tile_pos.y as u32,
+                        },
+                    },
+                    WorldObjectEntityData {
+                        object: *breaks_into,
+                        entity: item,
+                    },
+                );
+            } else {
+                chunk_manager
+                    .chunk_generation_data
+                    .remove(&TileMapPositionData {
+                        chunk_pos,
+                        tile_pos: TilePos {
+                            x: tile_pos.x as u32,
+                            y: tile_pos.y as u32,
+                        },
+                    });
+            }
+        }
     }
     // pub fn as_breakable(&self) -> Option<Breakable> {
     //     match self {
@@ -117,10 +229,11 @@ pub struct ItemsPlugin;
 
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::Main).with_system(Self::update_graphics),
-            // .with_system(Self::world_object_growth),
-        );
+        app.insert_resource(WorldObjectBreakData::new())
+            .add_system_set(
+                SystemSet::on_update(GameState::Main).with_system(Self::update_graphics),
+                // .with_system(Self::world_object_growth),
+            );
     }
 }
 

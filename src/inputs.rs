@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, sprite::collide_aabb::Collision};
+use bevy_ecs_tilemap::tiles::TilePos;
 
+use crate::item::{Breakable, WorldObjectBreakData};
+use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
     collision::{CollisionEvent, CollisionPlugin},
@@ -184,7 +187,9 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         mut chunk_manager: ResMut<ChunkManager>,
         mut commands: Commands,
+        mut breakable_query: Query<&Breakable, With<WorldObject>>,
         graphics: Res<Graphics>,
+        break_data: Res<WorldObjectBreakData>,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -195,21 +200,64 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneHalf.spawn_with_collider(
-                &mut commands,
-                &graphics,
-                Vec3::new(
-                    (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-                    0.1,
-                ),
-                Vec2::new(32., 48.),
-            );
-            commands
-                .spawn(SpatialBundle::default())
+            if chunk_manager
+                .chunk_generation_data
+                .contains_key(&TileMapPositionData {
+                    chunk_pos,
+                    tile_pos: TilePos {
+                        x: tile_pos.x as u32,
+                        y: tile_pos.y as u32,
+                    },
+                })
+            {
+                let obj_data = chunk_manager
+                    .chunk_generation_data
+                    .get(&TileMapPositionData {
+                        chunk_pos,
+                        tile_pos: TilePos {
+                            x: tile_pos.x as u32,
+                            y: tile_pos.y as u32,
+                        },
+                    })
+                    .unwrap();
+                obj_data.object.break_item(
+                    &mut commands,
+                    &break_data,
+                    &graphics,
+                    &mut chunk_manager,
+                    tile_pos,
+                    chunk_pos,
+                );
+            } else {
+                let stone = WorldObject::StoneFull.spawn_with_collider(
+                    &mut commands,
+                    &break_data,
+                    &graphics,
+                    &mut chunk_manager,
+                    tile_pos,
+                    chunk_pos,
+                    Vec2::new(32., 64.),
+                );
+                commands
+                    .entity(stone)
+                    .insert(Breakable(Some(WorldObject::StoneHalf)));
+                // commands.spawn(stone);
                 // .insert(Name::new("Test Objects"))
                 // .push_children(&children)
-                .push_children(&[stone]);
+                chunk_manager.chunk_generation_data.insert(
+                    TileMapPositionData {
+                        chunk_pos,
+                        tile_pos: TilePos {
+                            x: tile_pos.x as u32,
+                            y: tile_pos.y as u32,
+                        },
+                    },
+                    WorldObjectEntityData {
+                        object: WorldObject::StoneFull,
+                        entity: stone,
+                    },
+                );
+            }
             // WorldGenerationPlugin::change_tile_and_update_neighbours(
             //     TilePos {
             //         x: tile_pos.x as u32,
@@ -233,12 +281,11 @@ impl InputsPlugin {
             )));
             let stone = WorldObject::StoneTop.spawn_with_collider(
                 &mut commands,
+                &break_data,
                 &graphics,
-                Vec3::new(
-                    (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-                    0.1,
-                ),
+                &mut chunk_manager,
+                tile_pos,
+                chunk_pos,
                 Vec2::new(32., 32.),
             );
             commands
@@ -269,12 +316,11 @@ impl InputsPlugin {
             )));
             let stone = WorldObject::StoneFull.spawn(
                 &mut commands,
+                &break_data,
                 &graphics,
-                Vec3::new(
-                    (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-                    0.1,
-                ),
+                &mut chunk_manager,
+                tile_pos,
+                chunk_pos,
             );
             commands
                 .spawn(SpatialBundle::default())

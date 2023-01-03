@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use crate::assets::Graphics;
-use crate::item::{Collider, WorldObject};
+use crate::item::{Collider, WorldObject, WorldObjectBreakData};
 use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
 use bevy::prelude::*;
 use bevy::ui::update;
@@ -46,6 +46,7 @@ pub struct ChunkManager {
     pub cached_chunks: HashSet<IVec2>,
     pub raw_chunk_data: HashMap<IVec2, RawChunkData>,
     pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
+    pub chunk_generation_data: HashMap<TileMapPositionData, WorldObjectEntityData>,
     pub state: ChunkLoadingState,
 }
 #[derive(Serialize, Deserialize)]
@@ -79,6 +80,12 @@ pub struct TileEntityData {
     pub block_type: [WorldObject; 4],
     pub block_offset: u8,
 }
+#[derive(Eq, Hash, PartialEq, Debug)]
+
+pub struct WorldObjectEntityData {
+    pub object: WorldObject,
+    pub entity: Entity,
+}
 
 impl ChunkManager {
     fn new() -> Self {
@@ -88,6 +95,7 @@ impl ChunkManager {
             chunk_tile_entity_data: HashMap::new(),
             raw_chunk_data: HashMap::new(),
             state: ChunkLoadingState::Spawning,
+            chunk_generation_data: HashMap::new(),
         }
     }
 }
@@ -977,6 +985,8 @@ impl WorldGenerationPlugin {
     fn spawn_test_objects(
         mut commands: Commands,
         graphics: Res<Graphics>,
+        break_data: Res<WorldObjectBreakData>,
+        mut chunk_manager: ResMut<ChunkManager>,
         mut pkv: ResMut<PkvStore>,
     ) {
         let tree_points;
@@ -994,7 +1004,6 @@ impl WorldGenerationPlugin {
             };
             pkv.set("data", &data).expect("failed to store data");
         }
-        let tree_points = vec![Vec2::new(0., 0.)];
         for tp in tree_points {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&tp);
             let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&tp);
@@ -1005,12 +1014,11 @@ impl WorldGenerationPlugin {
             // )
             let tree = WorldObject::Tree.spawn_with_collider(
                 &mut commands,
+                &break_data,
                 &graphics,
-                Vec3::new(
-                    (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-                    (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-                    0.1,
-                ),
+                &mut chunk_manager,
+                tile_pos,
+                chunk_pos,
                 Vec2::new(32., 32.),
             );
             tree_children.push(tree);
