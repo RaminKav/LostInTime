@@ -5,7 +5,7 @@ use bevy::sprite::Anchor;
 use bevy::utils::HashMap;
 use serde::Deserialize;
 
-use crate::item::WorldObject;
+use crate::item::{WorldObject, WorldObjectData, WorldObjectResource};
 use crate::{GameState, ImageAssets};
 use ron::de::from_str;
 
@@ -18,11 +18,14 @@ pub const WORLD_SCALE: f32 = 3.5; //SOURCE_TILE_SIZE * PIXEL_SCALE;
 pub struct GameAssetsPlugin;
 
 /// Used to describe the location and styling of sprites on the sprite sheet
-#[derive(Default, Clone, Copy, Debug, Reflect, Deserialize)]
+#[derive(Default, Clone, Copy, Debug, Deserialize)]
 pub struct MyRect {
     pub pos: (f32, f32),
     pub size: (f32, f32),
-    pub anchor: Option<(f32, f32)>,
+    pub anchor: Option<Vec2>,
+    pub collider: bool,
+    pub breakable: bool,
+    pub breaks_into: Option<WorldObject>,
 }
 
 impl MyRect {
@@ -31,6 +34,9 @@ impl MyRect {
             pos,
             size,
             anchor: None,
+            collider: false,
+            breakable: false,
+            breaks_into: None,
         }
     }
 
@@ -124,6 +130,7 @@ impl GameAssetsPlugin {
         mut graphics: ResMut<Graphics>,
         sprite_sheet: Res<ImageAssets>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
+        mut world_obj_data: ResMut<WorldObjectResource>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -146,12 +153,22 @@ impl GameAssetsPlugin {
             sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
 
             //Position the sprite anchor if one is defined
-            if let Some(anchor) = rect.anchor {
-                sprite.anchor = Anchor::Custom(Vec2::new(
-                    anchor.0 / rect.size.0 - 0.5,
-                    0.5 - anchor.1 / rect.size.1,
-                ));
-            };
+            // if let Some(anchor) = rect.anchor {
+            //     sprite.anchor = Anchor::Custom(Vec2::new(
+            //         anchor.0 / rect.size.0 - 0.5,
+            //         0.5 - anchor.1 / rect.size.1,
+            //     ));
+            // };
+            world_obj_data.data.insert(
+                *item,
+                WorldObjectData {
+                    size: Vec2::new(rect.size.0, rect.size.1),
+                    anchor: rect.anchor,
+                    collider: rect.collider,
+                    breakable: rect.breakable,
+                    breaks_into: rect.breaks_into,
+                },
+            );
 
             item_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
         }

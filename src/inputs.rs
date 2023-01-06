@@ -1,14 +1,15 @@
-use std::time::Duration;
-
+use bevy::prelude::*;
 use bevy::time::FixedTimestep;
-use bevy::{prelude::*, sprite::collide_aabb::Collision};
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_rapier2d::prelude::{
+    Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
+    QueryFilter, QueryFilterFlags, RapierContext,
+};
 
-use crate::item::{Breakable, WorldObjectBreakData};
+use crate::item::{Breakable, WorldObjectResource};
 use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
-    collision::{CollisionEvent, CollisionPlugin},
     item::WorldObject,
     world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE},
     Game, GameState, Player, PLAYER_DASH_SPEED, PLAYER_MOVE_SPEED, TIME_STEP,
@@ -28,7 +29,7 @@ impl Plugin for InputsPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::move_player.before(CollisionPlugin::check_for_collisions))
+                    .with_system(Self::move_player)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
                     .with_system(Self::mouse_click_system),
             );
@@ -39,55 +40,41 @@ impl InputsPlugin {
     fn move_player(
         mut key_input: ResMut<Input<KeyCode>>,
         mut game: ResMut<Game>,
-        mut player_query: Query<(&mut Transform, &mut Direction), (With<Player>, Without<Camera>)>,
+        mut player_query: Query<
+            (Entity, &mut Transform, &Collider, &mut Direction),
+            (With<Player>, Without<Camera>),
+        >,
         mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
-        mut collision_events: EventReader<CollisionEvent>,
+        mut controlers: Query<&mut KinematicCharacterController>,
+        controlers_output: Query<&mut KinematicCharacterControllerOutput>,
+        mut context: ResMut<RapierContext>,
     ) {
-        let (mut player_transform, mut dir) = player_query.single_mut();
+        let (ent, mut player_transform, player_collider, mut dir) = player_query.single_mut();
         let mut camera_transform = camera_query.single_mut();
 
         let mut dx = 0.0;
         let mut dy = 0.0;
-        let mut collision_dirs: Vec<_> = vec![]; //TODO: iter through them and use .contains
-        let s = 1.0 / WORLD_SCALE;
-        if !collision_events.is_empty() {
-            collision_dirs = collision_events.iter().collect();
-            println!("Found Collision Event: {:?}", collision_dirs);
-        }
+        let s = 10.0 / WORLD_SCALE;
+
         if key_input.pressed(KeyCode::A) {
-            if collision_dirs.len() == 0
-                || !collision_dirs.contains(&&CollisionEvent(Collision::Right))
-            {
-                dx -= s;
-                game.player.is_moving = true;
-                player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
-            }
+            dx -= s;
+            game.player.is_moving = true;
+            player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
         }
         if key_input.pressed(KeyCode::D) {
-            if collision_dirs.len() == 0
-                || !collision_dirs.contains(&&CollisionEvent(Collision::Left))
-            {
-                dx += s;
-                game.player.is_moving = true;
-                player_transform.rotation = Quat::default();
-            }
+            dx += s;
+            println!("D: {:?}", dx);
+            game.player.is_moving = true;
+            player_transform.rotation = Quat::default();
         }
         if key_input.pressed(KeyCode::W) {
-            if collision_dirs.len() == 0
-                || !collision_dirs.contains(&&CollisionEvent(Collision::Bottom))
-            {
-                dy += s;
-                game.player.is_moving = true;
-            }
+            dy += s;
+            game.player.is_moving = true;
         }
         if key_input.pressed(KeyCode::S) {
-            if collision_dirs.len() == 0
-                || !collision_dirs.contains(&&CollisionEvent(Collision::Top))
-            {
-                dy -= s;
-                game.player.is_moving = true;
-            }
+            dy -= s;
+            game.player.is_moving = true;
         }
         if game.player_dash_cooldown.tick(time.delta()).finished() {
             if key_input.pressed(KeyCode::Space) {
@@ -108,22 +95,104 @@ impl InputsPlugin {
             dy = if dy == -s { -(s * 0.66) } else { s * 0.66 };
         }
 
-        let mut px = player_transform.translation.x + dx * PLAYER_MOVE_SPEED * TIME_STEP;
-        let mut py = player_transform.translation.y + dy * PLAYER_MOVE_SPEED * TIME_STEP;
-
         if game.player.is_dashing {
             game.player_dash_duration.tick(time.delta());
 
-            px += dx * PLAYER_DASH_SPEED * TIME_STEP;
-            py += dy * PLAYER_DASH_SPEED * TIME_STEP;
+            dx += dx * PLAYER_DASH_SPEED * TIME_STEP;
+            dy += dy * PLAYER_DASH_SPEED * TIME_STEP;
             if game.player_dash_duration.just_finished() {
                 game.player.is_dashing = false;
             }
         }
-        player_transform.translation.x = px;
-        player_transform.translation.y = py;
-        camera_transform.translation.x = px;
-        camera_transform.translation.y = py;
+        let cx = player_transform.translation.x + dx;
+        let cy = player_transform.translation.y + dy;
+
+        let output_ws = context.move_shape(
+            Vec2::new(0., dy),
+            player_collider,
+            player_transform.translation.truncate(),
+            0.,
+            0.,
+            &MoveShapeOptions::default(),
+            QueryFilter {
+                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                exclude_collider: Some(ent),
+                ..default()
+            },
+            |_| {},
+        );
+
+        let output_ad = context.move_shape(
+            Vec2::new(dbg!(dx), 0.),
+            player_collider,
+            player_transform.translation.truncate(),
+            0.,
+            0.,
+            &MoveShapeOptions::default(),
+            QueryFilter {
+                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                exclude_collider: Some(ent),
+                ..default()
+            },
+            |_| {},
+        );
+        player_transform.translation +=
+            output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
+        camera_transform.translation.x = cx;
+        camera_transform.translation.y = cy;
+        // for mut c in controlers.iter_mut() {
+        //     // player_transform.translation.x = px;
+        //     // player_transform.translation.y = py;
+        //     c.translation = Some(Vec2::new(dx, dy));
+
+        //     camera_transform.translation.x = cx;
+        //     camera_transform.translation.y = cy;
+        //     if let Ok(output) = controlers_output.get_single() {
+        //         // println!("{:?}", output.collisions);
+
+        //         if output.collisions.len() != 0 {
+        //             let up_or_down_collisions = output
+        //                 .collisions
+        //                 .iter()
+        //                 .filter(|c| c.toi.normal1.y != 0.)
+        //                 .collect::<Vec<_>>();
+        //             let left_or_right_collisions = output
+        //                 .collisions
+        //                 .iter()
+        //                 .filter(|c| c.toi.normal1.x != 0.)
+        //                 .collect::<Vec<_>>();
+
+        //             if left_or_right_collisions.len() > 0
+        //                 && up_or_down_collisions.len() == 0
+        //                 && dy != 0.
+        //             {
+        //                 // pressing A/D
+        //                 println!("GOING UP");
+
+        //                 player_transform.translation += output.effective_translation.extend(0.);
+        //             } else if up_or_down_collisions.len() > 0
+        //                 && left_or_right_collisions.len() == 0
+        //                 && dx != 0.
+        //             {
+        //                 // pressing W/D
+        //                 println!("GOING LEft");
+        //                 let output = context.move_shape(
+        //                     Vec2::new(dx, 0.),
+        //                     player_collider,
+        //                     player_transform.translation.truncate(),
+        //                     0.,
+        //                     0.,
+        //                     &MoveShapeOptions::default(),
+        //                     QueryFilter::default(),
+        //                     |_| {},
+        //                 );
+        //                 player_transform.translation +=
+        //                     dbg!(output.effective_translation.extend(0.));
+        //             }
+        //         }
+        //     }
+        // }
+
         if game.player.is_moving == true {
             // println!(
             //     "Player is on chunk {:?} at pos: {:?}",
@@ -137,9 +206,6 @@ impl InputsPlugin {
 
         if dx != 0. {
             dir.0 = dx;
-        }
-        if !collision_events.is_empty() {
-            collision_events.clear();
         }
     }
 
@@ -189,7 +255,7 @@ impl InputsPlugin {
         mut commands: Commands,
         mut breakable_query: Query<&Breakable, With<WorldObject>>,
         graphics: Res<Graphics>,
-        break_data: Res<WorldObjectBreakData>,
+        world_obj_data: Res<WorldObjectResource>,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -222,7 +288,7 @@ impl InputsPlugin {
                     .unwrap();
                 obj_data.object.break_item(
                     &mut commands,
-                    &break_data,
+                    &world_obj_data,
                     &graphics,
                     &mut chunk_manager,
                     tile_pos,
@@ -231,7 +297,7 @@ impl InputsPlugin {
             } else {
                 let stone = WorldObject::StoneFull.spawn_with_collider(
                     &mut commands,
-                    &break_data,
+                    &world_obj_data,
                     &graphics,
                     &mut chunk_manager,
                     tile_pos,
@@ -281,7 +347,7 @@ impl InputsPlugin {
             )));
             let stone = WorldObject::StoneTop.spawn_with_collider(
                 &mut commands,
-                &break_data,
+                &world_obj_data,
                 &graphics,
                 &mut chunk_manager,
                 tile_pos,
@@ -316,7 +382,7 @@ impl InputsPlugin {
             )));
             let stone = WorldObject::StoneFull.spawn(
                 &mut commands,
-                &break_data,
+                &world_obj_data,
                 &graphics,
                 &mut chunk_manager,
                 tile_pos,
