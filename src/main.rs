@@ -12,9 +12,9 @@ use bevy::{
     time::FixedTimestep,
     window::PresentMode,
 };
+use bevy_rapier2d::{prelude::*, rapier::prelude::RigidBodyActivation};
 mod animations;
 mod assets;
-mod collision;
 mod inputs;
 mod item;
 mod world_generation;
@@ -23,13 +23,12 @@ use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use collision::CollisionPlugin;
 use inputs::{Direction, InputsPlugin};
 use item::{ItemsPlugin, WorldObject};
 use world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE};
 
 const PLAYER_MOVE_SPEED: f32 = 450.;
-const PLAYER_DASH_SPEED: f32 = 1250.;
+const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
 pub const HEIGHT: f32 = 900.;
@@ -55,13 +54,14 @@ fn main() {
                 }),
         )
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
-        .add_plugin(CollisionPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -154,7 +154,11 @@ fn setup(
     camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
     camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
     camera.projection.scaling_mode = ScalingMode::None;
-    commands.spawn(camera);
+    commands.spawn((
+        camera,
+        // KinematicCharacterController::default(),
+        // RigidBody::KinematicPositionBased,
+    ));
 
     commands.spawn((
         SpriteSheetBundle {
@@ -169,5 +173,7 @@ fn setup(
             is_dashing: false,
         },
         Direction(1.0),
+        KinematicCharacterController::default(),
+        Collider::cuboid(8., 11.),
     ));
 }

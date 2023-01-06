@@ -1,7 +1,7 @@
 use std::ops::Index;
 
 use crate::assets::Graphics;
-use crate::item::{Collider, WorldObject, WorldObjectBreakData};
+use crate::item::{WorldObject, WorldObjectResource};
 use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
 use bevy::prelude::*;
 use bevy::ui::update;
@@ -985,7 +985,7 @@ impl WorldGenerationPlugin {
     fn spawn_test_objects(
         mut commands: Commands,
         graphics: Res<Graphics>,
-        break_data: Res<WorldObjectBreakData>,
+        world_obj_data: Res<WorldObjectResource>,
         mut chunk_manager: ResMut<ChunkManager>,
         mut pkv: ResMut<PkvStore>,
     ) {
@@ -1014,7 +1014,7 @@ impl WorldGenerationPlugin {
             // )
             let tree = WorldObject::Tree.spawn_with_collider(
                 &mut commands,
-                &break_data,
+                &world_obj_data,
                 &graphics,
                 &mut chunk_manager,
                 tile_pos,
