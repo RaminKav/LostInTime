@@ -1,21 +1,16 @@
-use std::ops::Index;
-
 use crate::assets::Graphics;
 use crate::item::{WorldObject, WorldObjectResource};
-use crate::{Game, GameState, ImageAssets, Player, WORLD_SIZE};
+use crate::{Game, GameState, ImageAssets};
+use bevy::app::AppExit;
 use bevy::prelude::*;
-use bevy::ui::update;
 use bevy::utils::HashMap;
 use bevy::{math::Vec3Swizzles, utils::HashSet};
-use bevy_ecs_tilemap::helpers::square_grid::neighbors::Neighbors;
 use bevy_ecs_tilemap::prelude::*;
-use bevy_inspector_egui::Inspectable;
 use bevy_pkv::PkvStore;
-use noise::{NoiseFn, Perlin, Seedable, Simplex};
+use noise::{NoiseFn, Perlin, Simplex};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-
 pub struct WorldGenerationPlugin;
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 64;
@@ -25,6 +20,7 @@ const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ChunkManager::new())
+            .add_startup_system(load_game_data)
             .add_system_set(
                 SystemSet::on_enter(GameState::Main).with_system(Self::spawn_and_cache_init_chunks),
             )
@@ -34,9 +30,7 @@ impl Plugin for WorldGenerationPlugin {
                     .with_system(Self::spawn_chunks_around_camera)
                     .with_system(Self::despawn_outofrange_chunks),
             )
-            .add_system_set(
-                SystemSet::on_enter(GameState::Main).with_system(Self::spawn_test_objects),
-            );
+            .add_system_to_stage(CoreStage::PostUpdate, exit_system);
     }
 }
 
@@ -49,11 +43,40 @@ pub struct ChunkManager {
     pub chunk_generation_data: HashMap<TileMapPositionData, WorldObjectEntityData>,
     pub state: ChunkLoadingState,
 }
-#[derive(Serialize, Deserialize)]
-pub struct WorldObjectData {
-    data: String,
-    name: String,
+pub mod vectorize {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::iter::FromIterator;
+
+    pub fn serialize<'a, T, K, V, S>(target: T, ser: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: IntoIterator<Item = (&'a K, &'a V)>,
+        K: Serialize + 'a,
+        V: Serialize + 'a,
+    {
+        let container: Vec<_> = target.into_iter().collect();
+        serde::Serialize::serialize(&container, ser)
+    }
+
+    pub fn deserialize<'de, T, K, V, D>(des: D) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: FromIterator<(K, V)>,
+        K: Deserialize<'de>,
+        V: Deserialize<'de>,
+    {
+        let container: Vec<_> = serde::Deserialize::deserialize(des)?;
+        Ok(T::from_iter(container.into_iter()))
+    }
 }
+#[derive(Resource)]
+pub struct GameData {
+    pub data: HashMap<(i32, i32), ChunkObjectData>,
+    pub name: String,
+}
+#[derive(Serialize, Deserialize)]
+
+pub struct ChunkObjectData(pub Vec<(f32, f32)>);
 
 #[derive(Debug)]
 pub enum ChunkLoadingState {
@@ -193,9 +216,12 @@ impl WorldGenerationPlugin {
     fn spawn_chunk(
         commands: &mut Commands,
         sprite_sheet: &Res<ImageAssets>,
-        game: &Res<Game>,
         chunk_pos: IVec2,
         chunk_manager: &mut ResMut<ChunkManager>,
+        graphics: &Graphics,
+        world_obj_data: &WorldObjectResource,
+        game_data: &mut GameData,
+        pkv: &mut PkvStore,
     ) {
         let tilemap_size = TilemapSize {
             x: CHUNK_SIZE as u32,
@@ -223,12 +249,6 @@ impl WorldGenerationPlugin {
                             tile_pos,
                         })
                         .unwrap();
-                    if tile_pos.x == 0 && tile_pos.y == 0 && chunk_pos.x == 2 && chunk_pos.y == -2 {
-                        println!(
-                            "YETTIDY: {:?} {:?}",
-                            tile_entity_data.tile_bit_index, tile_entity_data.block_offset
-                        );
-                    }
                     let tile_entity = commands
                         .spawn(TileBundle {
                             position: tile_pos,
@@ -270,6 +290,15 @@ impl WorldGenerationPlugin {
                 transform,
                 ..Default::default()
             });
+            Self::spawn_objects(
+                commands,
+                &graphics,
+                &world_obj_data,
+                chunk_manager,
+                game_data,
+                pkv,
+                chunk_pos,
+            );
             return;
         }
         println!("WARNING: chunk {:?} not in CACHE!", chunk_pos);
@@ -883,6 +912,10 @@ impl WorldGenerationPlugin {
         camera_query: Query<&Transform, With<Camera>>,
         mut chunk_manager: ResMut<ChunkManager>,
         game: Res<Game>,
+        graphics: Res<Graphics>,
+        world_obj_data: Res<WorldObjectResource>,
+        mut game_data: ResMut<GameData>,
+        mut pkv: ResMut<PkvStore>,
     ) {
         for transform in camera_query.iter() {
             let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
@@ -916,9 +949,12 @@ impl WorldGenerationPlugin {
                         Self::spawn_chunk(
                             &mut commands,
                             &sprite_sheet,
-                            &game,
                             IVec2::new(x, y),
                             &mut chunk_manager,
+                            &graphics,
+                            &world_obj_data,
+                            &mut game_data,
+                            &mut pkv,
                         );
                     }
                 }
@@ -981,87 +1017,123 @@ impl WorldGenerationPlugin {
             }
         }
     }
-
-    fn spawn_test_objects(
-        mut commands: Commands,
-        graphics: Res<Graphics>,
-        world_obj_data: Res<WorldObjectResource>,
-        mut chunk_manager: ResMut<ChunkManager>,
-        mut pkv: ResMut<PkvStore>,
+    //todo: do the same shit w graphcis resource loading, but w GameData and pkvStore
+    fn spawn_objects(
+        commands: &mut Commands,
+        graphics: &Graphics,
+        world_obj_data: &WorldObjectResource,
+        chunk_manager: &mut ChunkManager,
+        game_data: &mut GameData,
+        pkv: &mut PkvStore,
+        chunk_pos: IVec2,
     ) {
-        let tree_points;
         let mut tree_children = Vec::new();
-        if let Ok(data) = pkv.get::<WorldObjectData>("data") {
-            println!("LOADING OLD DATA@@@@@@@@@@@@@@");
-            info!("Welcome back {}", data.name);
-            tree_points = serde_json::from_str(&data.data).unwrap();
+        let tree_points;
+
+        if let Ok(data) = pkv.get::<ChunkObjectData>(&format!(
+            "{} {}",
+            chunk_pos.x.to_string(),
+            chunk_pos.y.to_string()
+        )) {
+            tree_points = data.0;
+            info!(
+                "LOADING OLD CHUNK OBJECT DATA FOR CHUNK {:?} TREES: {:?}",
+                (chunk_pos.x, chunk_pos.y),
+                tree_points.len()
+            );
         } else {
-            println!("STORING NEW DATA@@@@@@@@@@@@@@");
-            tree_points = poisson_disk_sampling(1. * TILE_SIZE.x as f64, 30, rand::thread_rng());
-            let data = WorldObjectData {
-                data: serde_json::to_string(&tree_points).unwrap(),
-                name: "RAMIN".to_string(),
-            };
-            pkv.set("data", &data).expect("failed to store data");
+            println!("GENERATING AND STORING NEW CHUNK OBJECT DATA");
+            let raw_tree_points =
+                poisson_disk_sampling(1.5 * TILE_SIZE.x as f64, 30, rand::thread_rng());
+            tree_points = raw_tree_points
+                .iter()
+                .map(|tp| {
+                    let tp_vec = Vec2::new(
+                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x as f32),
+                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x as f32),
+                    );
+                    let relative_tp = WorldGenerationPlugin::camera_pos_to_block_pos(&tp_vec);
+                    (relative_tp.x as f32, relative_tp.y as f32)
+                })
+                .filter(|tp| {
+                    let tile = chunk_manager
+                        .chunk_tile_entity_data
+                        .get(&TileMapPositionData {
+                            chunk_pos,
+                            tile_pos: TilePos {
+                                x: tp.0 as u32,
+                                y: tp.1 as u32,
+                            },
+                        })
+                        .unwrap()
+                        .block_type;
+                    if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
+                        return false;
+                    }
+                    return true;
+                })
+                .collect::<Vec<(f32, f32)>>();
         }
-        for tp in tree_points {
-            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&tp);
-            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&tp);
-            // Vec3::new(
-            //     (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-            //     (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-            //     0.1,
-            // )
-            let tree = WorldObject::Tree.spawn_with_collider(
-                &mut commands,
+
+        for tp in tree_points.as_slice() {
+            let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
+
+            let tree = WorldObject::Tree.spawn(
+                commands,
                 &world_obj_data,
                 &graphics,
-                &mut chunk_manager,
+                chunk_manager,
                 tile_pos,
                 chunk_pos,
-                Vec2::new(32., 32.),
             );
             tree_children.push(tree);
         }
+
+        game_data.data.insert(
+            (chunk_pos.x, chunk_pos.y),
+            ChunkObjectData(tree_points.to_vec()),
+        );
+
         commands
             .spawn(SpatialBundle::default())
-            // .insert(Name::new("Test Objects"))
-            // .push_children(&children)
             .push_children(&tree_children);
     }
 }
 
-fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<Vec2> {
+fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<(f32, f32)> {
     // TODO: fix this to work w 4 quadrants -/+
     let n = 2.;
+    let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32;
     // the final set of points to return
-    let mut points: Vec<Vec2> = vec![];
+    let mut points: Vec<(f32, f32)> = vec![];
     // the currently "Active" set of points
-    let mut active: Vec<Vec2> = vec![];
-    let p0 = Vec2::new(
-        rng.gen_range(0..WORLD_SIZE) as f32,
-        rng.gen_range(0..WORLD_SIZE) as f32,
+    let mut active: Vec<(f32, f32)> = vec![];
+    let p0 = (
+        rng.gen_range(0..chunk_pixel_size) as f32,
+        rng.gen_range(0..chunk_pixel_size) as f32,
     );
 
     let cell_size = f64::floor(r / f64::sqrt(n));
-    let num_cell: usize = (f64::ceil(WORLD_SIZE as f64 / cell_size) + 1.) as usize;
-    let mut grid: Vec<Vec<Option<Vec2>>> = vec![vec![None; num_cell]; num_cell];
+    let num_cell: usize =
+        (f64::ceil(CHUNK_SIZE as f64 * TILE_SIZE.x as f64 / cell_size) + 1.) as usize;
+    println!("{:?}, {:?}", cell_size, num_cell);
+    let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
-    let insert_point = |g: &mut Vec<Vec<Option<Vec2>>>, p: Vec2| {
-        let xi: usize = f64::floor(p.x as f64 / cell_size) as usize;
-        let yi: usize = f64::floor(p.y as f64 / cell_size) as usize;
+    let insert_point = |g: &mut Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| {
+        let xi: usize = f64::floor(p.0 as f64 / cell_size) as usize;
+        let yi: usize = f64::floor(p.1 as f64 / cell_size) as usize;
         g[xi][yi] = Some(p);
     };
 
-    let is_valid_point = move |g: &Vec<Vec<Option<Vec2>>>, p: Vec2| -> bool {
-        // make sure p is on screen
-        if p.x < 0. || p.x > WORLD_SIZE as f32 || p.y < 0. || p.y > WORLD_SIZE as f32 {
+    let is_valid_point = move |g: &Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| -> bool {
+        // make sure p is in the chunk
+        if p.0 < 0. || p.0 > chunk_pixel_size as f32 || p.1 < 0. || p.1 > chunk_pixel_size as f32 {
             return false;
         }
 
         // check neighboring eight cells
-        let xi: f64 = f64::floor(p.x as f64 / cell_size);
-        let yi: f64 = f64::floor(p.y as f64 / cell_size);
+        let xi: f64 = f64::floor(p.0 as f64 / cell_size);
+        let yi: f64 = f64::floor(p.1 as f64 / cell_size);
         let i0 = usize::max((xi - 1.) as usize, 0);
         let i1 = usize::min((xi + 1.) as usize, num_cell - 1. as usize);
         let j0 = usize::max((yi - 1.) as usize, 0);
@@ -1070,7 +1142,9 @@ fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<Vec2> {
         for i in i0..=i1 {
             for j in j0..=j1 {
                 if let Some(sample_point) = g[i][j] {
-                    if sample_point.distance(p) < r as f32 {
+                    let sample_point_vec = Vec2::new(sample_point.0, sample_point.1);
+                    let p_vec = Vec2::new(p.0, p.1);
+                    if sample_point_vec.distance(p_vec) < r as f32 {
                         return false;
                     }
                 }
@@ -1093,9 +1167,9 @@ fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<Vec2> {
             let new_r = rng.gen_range(r..(2. * r));
 
             // create new point from randodm angle r distance away from p
-            let new_px = p.x as f64 + new_r * theta.to_radians().cos();
-            let new_py = p.y as f64 + new_r * theta.to_radians().sin();
-            let new_p = Vec2::new(new_px as f32, new_py as f32);
+            let new_px = p.0 as f64 + new_r * theta.to_radians().cos();
+            let new_py = p.1 as f64 + new_r * theta.to_radians().sin();
+            let new_p = (new_px as f32, new_py as f32);
 
             if !is_valid_point(&grid, new_p) {
                 continue;
@@ -1115,6 +1189,31 @@ fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<Vec2> {
     }
 
     points
+}
+
+fn exit_system(
+    mut pkv: ResMut<PkvStore>,
+    mut events: EventReader<AppExit>,
+    game_data: Res<GameData>,
+) {
+    if events.iter().count() > 0 {
+        info!("SAVING GAME DATA...");
+
+        for (chunk_pos, data) in game_data.data.iter() {
+            pkv.set(
+                &format!("{} {}", chunk_pos.0.to_string(), chunk_pos.1.to_string()),
+                data,
+            )
+            .expect("failed to store data");
+        }
+    }
+}
+fn load_game_data(mut commands: Commands) {
+    //TODO: just instanciates GameData resource for now...
+    commands.insert_resource(GameData {
+        data: HashMap::new(),
+        name: "".to_string(),
+    })
 }
 
 //TODO: figure out why spawning chunks causes it to lag/glitch
