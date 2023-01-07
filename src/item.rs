@@ -1,6 +1,8 @@
+use std::ops::Index;
+
 use crate::assets::Graphics;
 use crate::world_generation::{
-    ChunkManager, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
+    ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
 use crate::{Game, GameState, WORLD_SIZE};
 use bevy::core_pipeline::core_2d::graph;
@@ -60,7 +62,6 @@ impl WorldObject {
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) -> Entity {
-        // println!("I SPAWNED A TREE AT {:?}", position);
         let item_map = &graphics.item_map;
         if let None = item_map {
             panic!("graphics not loaded");
@@ -107,9 +108,10 @@ impl WorldObject {
         }
 
         if obj_data.collider {
-            commands
-                .entity(item)
-                .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.));
+            commands.entity(item).insert(Collider::cuboid(
+                obj_data.size.x / 3.5,
+                obj_data.size.y / 4.5,
+            ));
         }
         chunk_manager.chunk_generation_data.insert(
             TileMapPositionData {
@@ -124,33 +126,18 @@ impl WorldObject {
                 entity: item,
             },
         );
-        return item;
-
-        // if let Some(breakable) = self.as_breakable() {
-        //     commands.entity(item).insert(breakable);
-        // }
-
-        // if let Some(pickup) = self.as_pickup() {
-        //     commands.entity(item).insert(pickup);
-        // }
-
-        // if self.grows_into().is_some() {
-        //     commands.entity(item).insert(GrowthTimer {
-        //         timer: Timer::from_seconds(3.0, false),
-        //     });
-        // }
+        item
     }
-    pub fn spawn_with_collider(
+    pub fn spawn_and_save(
         self,
         commands: &mut Commands,
         world_obj_res: &WorldObjectResource,
         graphics: &Graphics,
         chunk_manager: &mut ChunkManager,
+        game_data: &mut GameData,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-        size: Vec2,
     ) -> Entity {
-        // println!("I SPAWNED A TREE AT {:?}", position);
         let item = self.spawn(
             commands,
             world_obj_res,
@@ -159,9 +146,42 @@ impl WorldObject {
             tile_pos,
             chunk_pos,
         );
-        commands
-            .entity(item)
-            .insert(Collider::cuboid(size.x / 2., size.y / 2.));
+
+        let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y));
+        print!("{:?} ", old_points.is_some());
+        if let Some(old_points) = old_points {
+            old_points
+                .0
+                .clone()
+                .push((tile_pos.x as f32, tile_pos.y as f32));
+            game_data.data.insert(
+                (chunk_pos.x, chunk_pos.y),
+                ChunkObjectData(old_points.0.clone()),
+            );
+        }
+
+        return item;
+    }
+    pub fn spawn_with_collider(
+        self,
+        commands: &mut Commands,
+        world_obj_res: &WorldObjectResource,
+        graphics: &Graphics,
+        chunk_manager: &mut ChunkManager,
+        game_data: &mut GameData,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
+        size: Vec2,
+    ) -> Entity {
+        let item = self.spawn(
+            commands,
+            world_obj_res,
+            graphics,
+            chunk_manager,
+            tile_pos,
+            chunk_pos,
+        );
+
         commands.entity(item).insert(Size(size));
         return item;
     }
@@ -171,10 +191,10 @@ impl WorldObject {
         world_obj_res: &WorldObjectResource,
         graphics: &Graphics,
         chunk_manager: &mut ChunkManager,
+        game_data: &mut GameData,
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) {
-        // println!("I SPAWNED A TREE AT {:?}", position);
         let obj_data = chunk_manager
             .chunk_generation_data
             .get(&TileMapPositionData {
@@ -189,14 +209,15 @@ impl WorldObject {
         if let Some(breaks_into_option) = world_obj_res.data.get(&self) {
             commands.entity(obj_data.entity).despawn();
             if let Some(breaks_into) = breaks_into_option.breaks_into {
-                let item = breaks_into.spawn_with_collider(
+                let item = breaks_into.spawn_and_save(
                     commands,
                     &world_obj_res,
                     &graphics,
                     chunk_manager,
+                    game_data,
                     tile_pos,
                     chunk_pos,
-                    Vec2::new(32., 48.), //TODO: add size to gen data
+                    //TODO: add size to gen data
                 );
                 if let Some(b) = world_obj_res.data.get(&breaks_into) {
                     commands.entity(item).insert(Breakable(b.breaks_into));
@@ -214,6 +235,7 @@ impl WorldObject {
                         entity: item,
                     },
                 );
+                //TODO: store appropriate block data.
             } else {
                 chunk_manager
                     .chunk_generation_data
@@ -224,22 +246,25 @@ impl WorldObject {
                             y: tile_pos.y as u32,
                         },
                     });
+                let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y)).unwrap();
+                let updated_old_points = old_points
+                    .0
+                    .clone()
+                    .iter()
+                    .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32))
+                    .map(|p| *p)
+                    .collect::<Vec<(f32, f32)>>();
+                info!(
+                    "DELETING BLOCK {:?}",
+                    (tile_pos.x as f32, tile_pos.y as f32),
+                );
+                game_data.data.insert(
+                    (chunk_pos.x, chunk_pos.y),
+                    ChunkObjectData(updated_old_points.to_vec()),
+                );
             }
         }
     }
-    // pub fn as_breakable(&self) -> Option<Breakable> {
-    //     match self {
-    //         WorldObject::Grass => Some(Breakable {
-    //             object: WorldObject::Grass,
-    //             turnsInto: Some(WorldObject::Dirt),
-    //         }),
-    //         WorldObject::Stone => Some(Breakable {
-    //             object: WorldObject::Stone,
-    //             turnsInto: Some(WorldObject::Coal),
-    //         }),
-    //         _ => None,
-    //     }
-    // }
 }
 
 impl Default for WorldObject {

@@ -17,6 +17,7 @@ mod animations;
 mod assets;
 mod inputs;
 mod item;
+mod vectorize;
 mod world_generation;
 use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
@@ -174,6 +175,6 @@ fn setup(
         },
         Direction(1.0),
         KinematicCharacterController::default(),
-        Collider::cuboid(8., 11.),
+        Collider::cuboid(7., 10.),
     ));
 }

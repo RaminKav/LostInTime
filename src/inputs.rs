@@ -1,5 +1,7 @@
+use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
+use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{
     Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
@@ -7,7 +9,7 @@ use bevy_rapier2d::prelude::{
 };
 
 use crate::item::{Breakable, WorldObjectResource};
-use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
+use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
     item::WorldObject,
@@ -32,7 +34,8 @@ impl Plugin for InputsPlugin {
                     .with_system(Self::move_player)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
                     .with_system(Self::mouse_click_system),
-            );
+            )
+            .add_system(Self::close_on_esc);
     }
 }
 
@@ -64,7 +67,6 @@ impl InputsPlugin {
         }
         if key_input.pressed(KeyCode::D) {
             dx += s;
-            println!("D: {:?}", dx);
             game.player.is_moving = true;
             player_transform.rotation = Quat::default();
         }
@@ -104,8 +106,6 @@ impl InputsPlugin {
                 game.player.is_dashing = false;
             }
         }
-        let cx = player_transform.translation.x + dx;
-        let cy = player_transform.translation.y + dy;
 
         let output_ws = context.move_shape(
             Vec2::new(0., dy),
@@ -123,7 +123,7 @@ impl InputsPlugin {
         );
 
         let output_ad = context.move_shape(
-            Vec2::new(dbg!(dx), 0.),
+            Vec2::new(dx, 0.),
             player_collider,
             player_transform.translation.truncate(),
             0.,
@@ -136,6 +136,8 @@ impl InputsPlugin {
             },
             |_| {},
         );
+        let cx = player_transform.translation.x + output_ad.effective_translation.x;
+        let cy = player_transform.translation.y + output_ws.effective_translation.y;
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
         camera_transform.translation.x = cx;
@@ -253,9 +255,9 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         mut chunk_manager: ResMut<ChunkManager>,
         mut commands: Commands,
-        mut breakable_query: Query<&Breakable, With<WorldObject>>,
         graphics: Res<Graphics>,
         world_obj_data: Res<WorldObjectResource>,
+        mut game_data: ResMut<GameData>,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -291,18 +293,19 @@ impl InputsPlugin {
                     &world_obj_data,
                     &graphics,
                     &mut chunk_manager,
+                    &mut game_data,
                     tile_pos,
                     chunk_pos,
                 );
             } else {
-                let stone = WorldObject::StoneFull.spawn_with_collider(
+                let stone = WorldObject::StoneFull.spawn_and_save(
                     &mut commands,
                     &world_obj_data,
                     &graphics,
                     &mut chunk_manager,
+                    &mut game_data,
                     tile_pos,
                     chunk_pos,
-                    Vec2::new(32., 64.),
                 );
                 commands
                     .entity(stone)
@@ -341,18 +344,18 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let tile_pos = dbg!(WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
                 cursor_pos.0.x,
                 cursor_pos.0.y,
-            )));
-            let stone = WorldObject::StoneTop.spawn_with_collider(
+            ));
+            let stone = WorldObject::StoneTop.spawn_and_save(
                 &mut commands,
                 &world_obj_data,
                 &graphics,
                 &mut chunk_manager,
+                &mut game_data,
                 tile_pos,
                 chunk_pos,
-                Vec2::new(32., 32.),
             );
             commands
                 .spawn(SpatialBundle::default())
@@ -376,15 +379,16 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let tile_pos = dbg!(WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
                 cursor_pos.0.x,
                 cursor_pos.0.y,
-            )));
-            let stone = WorldObject::StoneFull.spawn(
+            ));
+            let stone = WorldObject::StoneFull.spawn_and_save(
                 &mut commands,
                 &world_obj_data,
                 &graphics,
                 &mut chunk_manager,
+                &mut game_data,
                 tile_pos,
                 chunk_pos,
             );
@@ -404,6 +408,27 @@ impl InputsPlugin {
             //     &mut chunk_manager,
             //     &mut commands,
             // );
+        }
+    }
+    pub fn close_on_esc(
+        mut focused: Local<Option<WindowId>>,
+        mut focused_events: EventReader<WindowFocused>,
+        mut exit: EventWriter<AppExit>,
+        mut windows: ResMut<Windows>,
+        input: Res<Input<KeyCode>>,
+    ) {
+        // TODO: Track this in e.g. a resource to ensure consistent behaviour across similar systems
+        for event in focused_events.iter() {
+            *focused = event.focused.then_some(event.id);
+        }
+
+        if let Some(focused) = &*focused {
+            if input.just_pressed(KeyCode::Escape) {
+                if let Some(window) = windows.get_mut(*focused) {
+                    exit.send(AppExit);
+                    window.close();
+                }
+            }
         }
     }
 }
