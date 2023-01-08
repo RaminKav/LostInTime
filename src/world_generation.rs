@@ -43,32 +43,6 @@ pub struct ChunkManager {
     pub chunk_generation_data: HashMap<TileMapPositionData, WorldObjectEntityData>,
     pub state: ChunkLoadingState,
 }
-pub mod vectorize {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::iter::FromIterator;
-
-    pub fn serialize<'a, T, K, V, S>(target: T, ser: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: IntoIterator<Item = (&'a K, &'a V)>,
-        K: Serialize + 'a,
-        V: Serialize + 'a,
-    {
-        let container: Vec<_> = target.into_iter().collect();
-        serde::Serialize::serialize(&container, ser)
-    }
-
-    pub fn deserialize<'de, T, K, V, D>(des: D) -> Result<T, D::Error>
-    where
-        D: Deserializer<'de>,
-        T: FromIterator<(K, V)>,
-        K: Deserialize<'de>,
-        V: Deserialize<'de>,
-    {
-        let container: Vec<_> = serde::Deserialize::deserialize(des)?;
-        Ok(T::from_iter(container.into_iter()))
-    }
-}
 #[derive(Resource)]
 pub struct GameData {
     pub data: HashMap<(i32, i32), ChunkObjectData>,
@@ -76,7 +50,7 @@ pub struct GameData {
 }
 #[derive(Serialize, Deserialize)]
 
-pub struct ChunkObjectData(pub Vec<(f32, f32)>);
+pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
 #[derive(Debug)]
 pub enum ChunkLoadingState {
@@ -202,13 +176,7 @@ impl WorldGenerationPlugin {
                         false,
                     );
                 } else if raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Grass) {
-                    Self::update_this_tile(
-                        TilePos { x, y },
-                        16,
-                        commands,
-                        chunk_manager,
-                        chunk_pos,
-                    );
+                    Self::update_this_tile(TilePos { x, y }, 16, chunk_manager, chunk_pos);
                 }
             }
         }
@@ -544,7 +512,6 @@ impl WorldGenerationPlugin {
     fn update_this_tile(
         tile_pos: TilePos,
         mut tile_index_offset: u8,
-        commands: &mut Commands,
         chunk_manager: &mut ResMut<ChunkManager>,
         chunk_pos: IVec2,
     ) {
@@ -1053,7 +1020,11 @@ impl WorldGenerationPlugin {
                         tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x as f32),
                     );
                     let relative_tp = WorldGenerationPlugin::camera_pos_to_block_pos(&tp_vec);
-                    (relative_tp.x as f32, relative_tp.y as f32)
+                    (
+                        relative_tp.x as f32,
+                        relative_tp.y as f32,
+                        WorldObject::Tree,
+                    )
                 })
                 .filter(|tp| {
                     let tile = chunk_manager
@@ -1072,13 +1043,13 @@ impl WorldGenerationPlugin {
                     }
                     return true;
                 })
-                .collect::<Vec<(f32, f32)>>();
+                .collect::<Vec<(f32, f32, WorldObject)>>();
         }
 
         for tp in tree_points.as_slice() {
             let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
 
-            let tree = WorldObject::Tree.spawn(
+            let tree = tp.2.spawn(
                 commands,
                 &world_obj_data,
                 &graphics,

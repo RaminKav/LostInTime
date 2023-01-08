@@ -13,7 +13,7 @@ use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::Collider;
 use noise::{NoiseFn, Seedable, Simplex};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Component)]
 pub struct Breakable(pub Option<WorldObject>);
@@ -21,7 +21,7 @@ pub struct Breakable(pub Option<WorldObject>);
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Deserialize, Component)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
 pub enum WorldObject {
     None,
     Grass,
@@ -126,6 +126,7 @@ impl WorldObject {
                 entity: item,
             },
         );
+
         item
     }
     pub fn spawn_and_save(
@@ -148,16 +149,15 @@ impl WorldObject {
         );
 
         let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y));
-        print!("{:?} ", old_points.is_some());
+
         if let Some(old_points) = old_points {
-            old_points
-                .0
-                .clone()
-                .push((tile_pos.x as f32, tile_pos.y as f32));
-            game_data.data.insert(
-                (chunk_pos.x, chunk_pos.y),
-                ChunkObjectData(old_points.0.clone()),
-            );
+            println!("SAVING NEW OBJ {:?} {:?}", self, tile_pos);
+            let mut new_points = old_points.0.clone();
+            new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
+
+            game_data
+                .data
+                .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
         }
 
         return item;
@@ -209,7 +209,25 @@ impl WorldObject {
         if let Some(breaks_into_option) = world_obj_res.data.get(&self) {
             commands.entity(obj_data.entity).despawn();
             if let Some(breaks_into) = breaks_into_option.breaks_into {
-                let item = breaks_into.spawn_and_save(
+                let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y)).unwrap();
+                let updated_old_points = old_points
+                    .0
+                    .clone()
+                    .iter()
+                    .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32, self))
+                    .map(|p| *p)
+                    .collect::<Vec<(f32, f32, Self)>>();
+                info!(
+                    "DELETING BLOCK {:?} {:?} {:?}",
+                    (tile_pos.x as f32, tile_pos.y as f32, self),
+                    updated_old_points.len(),
+                    old_points.0.len()
+                );
+                game_data.data.insert(
+                    (chunk_pos.x, chunk_pos.y),
+                    ChunkObjectData(updated_old_points.to_vec()),
+                );
+                breaks_into.spawn_and_save(
                     commands,
                     &world_obj_res,
                     &graphics,
@@ -218,22 +236,6 @@ impl WorldObject {
                     tile_pos,
                     chunk_pos,
                     //TODO: add size to gen data
-                );
-                if let Some(b) = world_obj_res.data.get(&breaks_into) {
-                    commands.entity(item).insert(Breakable(b.breaks_into));
-                }
-                chunk_manager.chunk_generation_data.insert(
-                    TileMapPositionData {
-                        chunk_pos,
-                        tile_pos: TilePos {
-                            x: tile_pos.x as u32,
-                            y: tile_pos.y as u32,
-                        },
-                    },
-                    WorldObjectEntityData {
-                        object: breaks_into,
-                        entity: item,
-                    },
                 );
                 //TODO: store appropriate block data.
             } else {
@@ -251,12 +253,14 @@ impl WorldObject {
                     .0
                     .clone()
                     .iter()
-                    .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32))
+                    .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32, self))
                     .map(|p| *p)
-                    .collect::<Vec<(f32, f32)>>();
+                    .collect::<Vec<(f32, f32, Self)>>();
                 info!(
-                    "DELETING BLOCK {:?}",
-                    (tile_pos.x as f32, tile_pos.y as f32),
+                    "DELETING BLOCK {:?} {:?} {:?}",
+                    (tile_pos.x as f32, tile_pos.y as f32, self),
+                    updated_old_points.len(),
+                    old_points.0.len()
                 );
                 game_data.data.insert(
                     (chunk_pos.x, chunk_pos.y),
