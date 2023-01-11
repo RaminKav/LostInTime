@@ -26,6 +26,7 @@ pub struct MyRect {
     pub collider: bool,
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
+    pub equip_slot: Option<usize>,
 }
 
 impl MyRect {
@@ -37,6 +38,7 @@ impl MyRect {
             collider: false,
             breakable: false,
             breaks_into: None,
+            equip_slot: None,
         }
     }
 
@@ -167,6 +169,7 @@ impl GameAssetsPlugin {
                     collider: rect.collider,
                     breakable: rect.breakable,
                     breaks_into: rect.breaks_into,
+                    equip_slot: rect.equip_slot,
                 },
             );
 

@@ -4,7 +4,7 @@ use crate::assets::Graphics;
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{Game, GameState, WORLD_SIZE};
+use crate::{Game, GameState, Player, WORLD_SIZE};
 use bevy::core_pipeline::core_2d::graph;
 use bevy::prelude::*;
 use bevy::sprite::{Anchor, MaterialMesh2dBundle, Mesh2dHandle};
@@ -31,7 +31,10 @@ pub enum WorldObject {
     Water,
     Sand,
     Tree,
+    Sword,
 }
+
+pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-3., -5.); 1];
 
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
@@ -45,6 +48,7 @@ pub struct WorldObjectData {
     pub collider: bool,
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
+    pub equip_slot: Option<usize>,
 }
 impl WorldObjectResource {
     fn new() -> Self {
@@ -168,7 +172,6 @@ impl WorldObject {
         world_obj_res: &WorldObjectResource,
         graphics: &Graphics,
         chunk_manager: &mut ChunkManager,
-        game_data: &mut GameData,
         tile_pos: IVec2,
         chunk_pos: IVec2,
         size: Vec2,
@@ -184,6 +187,66 @@ impl WorldObject {
 
         commands.entity(item).insert(Size(size));
         return item;
+    }
+    pub fn spawn_equipment_on_player(
+        self,
+        player_entity: Entity,
+        commands: &mut Commands,
+        world_obj_res: &WorldObjectResource,
+        graphics: &Graphics,
+        chunk_manager: &mut ChunkManager,
+    ) -> Entity {
+        let item_map = &graphics.item_map;
+        if let None = item_map {
+            panic!("graphics not loaded");
+        }
+        let sprite = graphics
+            .item_map
+            .as_ref()
+            .unwrap()
+            .get(&self)
+            .expect(&format!("No graphic for object {:?}", self))
+            .0
+            .clone();
+
+        let obj_data = world_obj_res.data.get(&self).unwrap();
+        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let position;
+        if let Some(slot) = obj_data.equip_slot {
+            position = Vec3::new(
+                PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
+                PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
+                0.5,
+            );
+        } else {
+            panic!("No slot found for equipment");
+        }
+        let item = commands
+            .spawn(SpriteSheetBundle {
+                sprite,
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: position,
+                    scale: Vec3::new(1., 1., 1.),
+                    // rotation: Quat::from_rotation_x(0.1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(Name::new("EquipItem"))
+            .insert(self)
+            .id();
+
+        if obj_data.collider {
+            commands.entity(item).insert(Collider::cuboid(
+                obj_data.size.x / 3.5,
+                obj_data.size.y / 4.5,
+            ));
+        }
+
+        commands.entity(item).set_parent(player_entity);
+
+        item
     }
     pub fn break_item(
         self,

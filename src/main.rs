@@ -12,6 +12,7 @@ use bevy::{
     time::FixedTimestep,
     window::PresentMode,
 };
+use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier2d::{prelude::*, rapier::prelude::RigidBodyActivation};
 mod animations;
 mod assets;
@@ -56,6 +57,7 @@ fn main() {
         )
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
+        .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
@@ -117,6 +119,7 @@ struct AnimationTimer(Timer);
 pub struct Player {
     is_moving: bool,
     is_dashing: bool,
+    is_attacking: bool,
 }
 
 fn setup(
@@ -172,9 +175,11 @@ fn setup(
         Player {
             is_moving: false,
             is_dashing: false,
+            is_attacking: false,
         },
         Direction(1.0),
         KinematicCharacterController::default(),
         Collider::cuboid(7., 10.),
+        Name::new("Player"),
     ));
 }
