@@ -7,6 +7,7 @@
             collider: false,
             breakable: false,
             breaks_into: None,
+            equip_slot: None,
         ),
          StoneHalf: MyRect(
             pos: (0., 128.),
@@ -15,6 +16,7 @@
             collider: true,
             breakable: true,
             breaks_into: None,
+            equip_slot: None,
         ),
          StoneFull: MyRect(
             pos: (32., 112.),
@@ -23,6 +25,7 @@
             collider: true,
             breakable: true,
             breaks_into: Some(StoneHalf),
+            equip_slot: None,
         ),
          StoneTop: MyRect(
             pos: (64., 112.),
@@ -31,6 +34,8 @@
             collider: true,
             breakable: true,
             breaks_into: None,
+            equip_slot: None,
+
         ),
         Tree: MyRect(
             pos: (96., 112.),
@@ -39,6 +44,17 @@
             collider: true,
             breakable: true,
             breaks_into: None,
+            equip_slot: None,
+        ),
+        Sword: MyRect(
+            pos: (64., 64.),
+            size: (16., 16.),
+            anchor: Some((0.25, 0.25)),
+            collider: false,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(0),
+
         ),
     }
 )
