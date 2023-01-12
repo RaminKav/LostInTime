@@ -1,8 +1,9 @@
+use crate::animations::AnimationPosTracker;
 use crate::assets::Graphics;
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{GameState, Player};
+use crate::{AnimationTimer, GameState, Player};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -15,6 +16,8 @@ pub struct Breakable(pub Option<WorldObject>);
 
 #[derive(Component)]
 pub struct Equipment;
+#[derive(Component)]
+pub struct DropItem;
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
@@ -29,6 +32,8 @@ pub enum WorldObject {
     Sand,
     Tree,
     Sword,
+    Log,
+    Flint,
 }
 
 pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-3., -5.); 1];
@@ -38,7 +43,7 @@ pub struct WorldObjectResource {
     pub data: HashMap<WorldObject, WorldObjectData>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WorldObjectData {
     pub size: Vec2,
     pub anchor: Option<Vec2>,
@@ -247,6 +252,66 @@ impl WorldObject {
 
         item
     }
+    pub fn spawn_item_drop(
+        self,
+        commands: &mut Commands,
+        world_obj_res: &WorldObjectResource,
+        graphics: &Graphics,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
+    ) -> Entity {
+        let item_map = &graphics.item_map;
+        if let None = item_map {
+            panic!("graphics not loaded");
+        }
+        let sprite = graphics
+            .item_map
+            .as_ref()
+            .unwrap()
+            .get(&self)
+            .expect(&format!("No graphic for object {:?}", self))
+            .0
+            .clone();
+        let obj_data = world_obj_res.data.get(&self).unwrap();
+        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let position = Vec3::new(
+            (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.x * obj_data.size.x,
+            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.y * obj_data.size.y,
+            0.1,
+        );
+        let item = commands
+            .spawn(SpriteSheetBundle {
+                sprite,
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: position,
+                    scale: Vec3::new(0.5, 0.5, 0.5),
+                    // rotation: Quat::from_rotation_x(0.1),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(Name::new("DropItem"))
+            .insert(DropItem)
+            .insert(AnimationTimer(Timer::from_seconds(
+                0.1,
+                TimerMode::Repeating,
+            )))
+            .insert(AnimationPosTracker(0., 0., 0.3))
+            .insert(self)
+            .id();
+
+        if obj_data.collider {
+            commands.entity(item).insert(Collider::cuboid(
+                obj_data.size.x / 3.5,
+                obj_data.size.y / 4.5,
+            ));
+        }
+
+        item
+    }
     pub fn attempt_to_break_item(
         self,
         commands: &mut Commands,
@@ -315,15 +380,12 @@ impl WorldObject {
                     (chunk_pos.x, chunk_pos.y),
                     ChunkObjectData(updated_old_points.to_vec()),
                 );
-                breaks_into.spawn_and_save(
+                breaks_into.spawn_item_drop(
                     commands,
                     &world_obj_res,
                     &graphics,
-                    chunk_manager,
-                    game_data,
                     tile_pos,
                     chunk_pos,
-                    //TODO: add size to gen data
                 );
                 //TODO: store appropriate block data.
             } else {
