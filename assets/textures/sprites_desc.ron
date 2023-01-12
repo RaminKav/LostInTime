@@ -10,13 +10,33 @@
             equip_slot: None,
             breaks_with: None
         ),
+         Flint: MyRect(
+            pos: (48., 16.),
+            size: (16., 16.),
+            anchor: None,
+            collider: false,
+            breakable: false,
+            breaks_into: None,
+            equip_slot: None,
+            breaks_with: None
+        ),
+        Log: MyRect(
+            pos: (32., 48.),
+            size: (16., 16.),
+            anchor: None,
+            collider: false,
+            breakable: false,
+            breaks_into: None,
+            equip_slot: None,
+            breaks_with: None
+        ),
          StoneHalf: MyRect(
             pos: (0., 128.),
             size: (32., 48.),
             anchor: Some((0., 0.166666666667)),
             collider: true,
             breakable: true,
-            breaks_into: None,
+            breaks_into: Some(Flint),
             equip_slot: None,
             breaks_with: None
         ),
@@ -26,7 +46,7 @@
             anchor: Some((0., 0.25)),
             collider: true,
             breakable: true,
-            breaks_into: Some(StoneHalf),
+            breaks_into: Some(Flint),
             equip_slot: None,
             breaks_with: None
         ),
@@ -47,7 +67,7 @@
             anchor: None,
             collider: true,
             breakable: true,
-            breaks_into: None,
+            breaks_into: Some(Log),
             equip_slot: None,
             breaks_with: Some(Sword)
         ),

@@ -338,7 +338,7 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneTop.spawn_and_save(
+            let stone = WorldObject::StoneFull.spawn_and_save(
                 &mut commands,
                 &world_obj_data,
                 &graphics,
