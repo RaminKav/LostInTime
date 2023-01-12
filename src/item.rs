@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub struct Breakable(pub Option<WorldObject>);
 
 #[derive(Component)]
+pub struct Equipment;
+#[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
@@ -48,6 +50,7 @@ pub struct WorldObjectData {
     pub collider: bool,
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
+    pub breaks_with: Option<WorldObject>,
     pub equip_slot: Option<usize>,
 }
 impl WorldObjectResource {
@@ -190,11 +193,10 @@ impl WorldObject {
     }
     pub fn spawn_equipment_on_player(
         self,
-        player_entity: Entity,
+        mut player_query: Query<(Entity, &mut Player)>,
         commands: &mut Commands,
         world_obj_res: &WorldObjectResource,
         graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
     ) -> Entity {
         let item_map = &graphics.item_map;
         if let None = item_map {
@@ -208,7 +210,7 @@ impl WorldObject {
             .expect(&format!("No graphic for object {:?}", self))
             .0
             .clone();
-
+        let player_data = &mut player_query.single_mut();
         let obj_data = world_obj_res.data.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
@@ -216,8 +218,9 @@ impl WorldObject {
             position = Vec3::new(
                 PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
                 PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
-                0.5,
+                0.1,
             );
+            player_data.1.main_hand_slot = Some(self)
         } else {
             panic!("No slot found for equipment");
         }
@@ -227,12 +230,13 @@ impl WorldObject {
                 texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                 transform: Transform {
                     translation: position,
-                    scale: Vec3::new(1., 1., 1.),
+                    scale: Vec3::new(0.8, 0.8, 0.8),
                     // rotation: Quat::from_rotation_x(0.1),
                     ..Default::default()
                 },
                 ..Default::default()
             })
+            .insert(Equipment)
             .insert(Name::new("EquipItem"))
             .insert(self)
             .id();
@@ -244,9 +248,35 @@ impl WorldObject {
             ));
         }
 
-        commands.entity(item).set_parent(player_entity);
+        commands.entity(item).set_parent(player_data.0);
 
         item
+    }
+    pub fn attempt_to_break_item(
+        self,
+        commands: &mut Commands,
+        world_obj_res: &WorldObjectResource,
+        graphics: &Graphics,
+        chunk_manager: &mut ChunkManager,
+        game_data: &mut GameData,
+        tile_pos: IVec2,
+        chunk_pos: IVec2,
+        with_item: Option<WorldObject>,
+    ) {
+        if let Some(data) = world_obj_res.data.get(&self) {
+            if with_item == data.breaks_with {
+                Self::break_item(
+                    self,
+                    commands,
+                    world_obj_res,
+                    graphics,
+                    chunk_manager,
+                    game_data,
+                    tile_pos,
+                    chunk_pos,
+                )
+            }
+        }
     }
     pub fn break_item(
         self,

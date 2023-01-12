@@ -12,7 +12,7 @@ use bevy::{
     time::FixedTimestep,
     window::PresentMode,
 };
-use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
 use bevy_rapier2d::{prelude::*, rapier::prelude::RigidBodyActivation};
 mod animations;
 mod assets;
@@ -120,6 +120,7 @@ pub struct Player {
     is_moving: bool,
     is_dashing: bool,
     is_attacking: bool,
+    main_hand_slot: Option<WorldObject>,
 }
 
 fn setup(
@@ -176,6 +177,7 @@ fn setup(
             is_moving: false,
             is_dashing: false,
             is_attacking: false,
+            main_hand_slot: None,
         },
         Direction(1.0),
         KinematicCharacterController::default(),
