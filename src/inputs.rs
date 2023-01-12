@@ -8,7 +8,7 @@ use bevy_rapier2d::prelude::{
     QueryFilter, QueryFilterFlags, RapierContext,
 };
 
-use crate::item::{Breakable, WorldObjectResource};
+use crate::item::{Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
@@ -41,19 +41,25 @@ impl Plugin for InputsPlugin {
 
 impl InputsPlugin {
     fn move_player(
-        mut key_input: ResMut<Input<KeyCode>>,
+        key_input: ResMut<Input<KeyCode>>,
         mut game: ResMut<Game>,
         mut player_query: Query<
-            (Entity, &mut Transform, &Collider, &mut Direction),
+            (
+                Entity,
+                &mut Transform,
+                &Collider,
+                &mut Direction,
+                Option<&Children>,
+            ),
             (With<Player>, Without<Camera>),
         >,
+        mut eqp_query: Query<&mut Transform, (With<Equipment>, Without<Camera>, Without<Player>)>,
         mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
-        mut controlers: Query<&mut KinematicCharacterController>,
-        controlers_output: Query<&mut KinematicCharacterControllerOutput>,
         mut context: ResMut<RapierContext>,
     ) {
-        let (ent, mut player_transform, player_collider, mut dir) = player_query.single_mut();
+        let (ent, mut player_transform, player_collider, mut dir, children) =
+            player_query.single_mut();
         let mut camera_transform = camera_query.single_mut();
 
         let mut dx = 0.0;
@@ -64,11 +70,25 @@ impl InputsPlugin {
             dx -= s;
             game.player.is_moving = true;
             player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
+            if let Some(c) = children {
+                for item in c.iter() {
+                    if let Ok(mut e) = eqp_query.get_mut(*item) {
+                        e.translation.z = -0.1
+                    }
+                }
+            }
         }
         if key_input.pressed(KeyCode::D) {
             dx += s;
             game.player.is_moving = true;
             player_transform.rotation = Quat::default();
+            if let Some(c) = children {
+                for item in c.iter() {
+                    if let Ok(mut e) = eqp_query.get_mut(*item) {
+                        e.translation.z = 0.1
+                    }
+                }
+            }
         }
         if key_input.pressed(KeyCode::W) {
             dy += s;
@@ -106,7 +126,6 @@ impl InputsPlugin {
                 game.player.is_dashing = false;
             }
         }
-
         let output_ws = context.move_shape(
             Vec2::new(0., dy),
             player_collider,
@@ -117,6 +136,13 @@ impl InputsPlugin {
             QueryFilter {
                 flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 exclude_collider: Some(ent),
+                predicate: Some(&|e| {
+                    if let Some(c) = children {
+                        c.iter().find(|cc| **cc == e).is_none()
+                    } else {
+                        true
+                    }
+                }),
                 ..default()
             },
             |_| {},
@@ -132,6 +158,13 @@ impl InputsPlugin {
             QueryFilter {
                 flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 exclude_collider: Some(ent),
+                predicate: Some(&|e| {
+                    if let Some(c) = children {
+                        c.iter().find(|cc| **cc == e).is_none()
+                    } else {
+                        true
+                    }
+                }),
                 ..default()
             },
             |_| {},
@@ -142,58 +175,6 @@ impl InputsPlugin {
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
         camera_transform.translation.x = cx;
         camera_transform.translation.y = cy;
-        // for mut c in controlers.iter_mut() {
-        //     // player_transform.translation.x = px;
-        //     // player_transform.translation.y = py;
-        //     c.translation = Some(Vec2::new(dx, dy));
-
-        //     camera_transform.translation.x = cx;
-        //     camera_transform.translation.y = cy;
-        //     if let Ok(output) = controlers_output.get_single() {
-        //         // println!("{:?}", output.collisions);
-
-        //         if output.collisions.len() != 0 {
-        //             let up_or_down_collisions = output
-        //                 .collisions
-        //                 .iter()
-        //                 .filter(|c| c.toi.normal1.y != 0.)
-        //                 .collect::<Vec<_>>();
-        //             let left_or_right_collisions = output
-        //                 .collisions
-        //                 .iter()
-        //                 .filter(|c| c.toi.normal1.x != 0.)
-        //                 .collect::<Vec<_>>();
-
-        //             if left_or_right_collisions.len() > 0
-        //                 && up_or_down_collisions.len() == 0
-        //                 && dy != 0.
-        //             {
-        //                 // pressing A/D
-        //                 println!("GOING UP");
-
-        //                 player_transform.translation += output.effective_translation.extend(0.);
-        //             } else if up_or_down_collisions.len() > 0
-        //                 && left_or_right_collisions.len() == 0
-        //                 && dx != 0.
-        //             {
-        //                 // pressing W/D
-        //                 println!("GOING LEft");
-        //                 let output = context.move_shape(
-        //                     Vec2::new(dx, 0.),
-        //                     player_collider,
-        //                     player_transform.translation.truncate(),
-        //                     0.,
-        //                     0.,
-        //                     &MoveShapeOptions::default(),
-        //                     QueryFilter::default(),
-        //                     |_| {},
-        //                 );
-        //                 player_transform.translation +=
-        //                     dbg!(output.effective_translation.extend(0.));
-        //             }
-        //         }
-        //     }
-        // }
 
         if game.player.is_moving == true {
             // println!(
@@ -257,6 +238,7 @@ impl InputsPlugin {
         mut commands: Commands,
         graphics: Res<Graphics>,
         world_obj_data: Res<WorldObjectResource>,
+        player_query: Query<(Entity, &mut Player)>,
         mut game_data: ResMut<GameData>,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
@@ -288,7 +270,8 @@ impl InputsPlugin {
                         },
                     })
                     .unwrap();
-                obj_data.object.break_item(
+                let main_hand_tool = player_query.single().1.main_hand_slot;
+                obj_data.object.attempt_to_break_item(
                     &mut commands,
                     &world_obj_data,
                     &graphics,
@@ -296,6 +279,7 @@ impl InputsPlugin {
                     &mut game_data,
                     tile_pos,
                     chunk_pos,
+                    main_hand_tool,
                 );
             } else {
                 let stone = WorldObject::StoneFull.spawn_and_save(
@@ -340,6 +324,12 @@ impl InputsPlugin {
             // );
         }
         if mouse_button_input.just_released(MouseButton::Right) {
+            WorldObject::Sword.spawn_equipment_on_player(
+                player_query,
+                &mut commands,
+                &world_obj_data,
+                &graphics,
+            );
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.0.x,
                 cursor_pos.0.y,
