@@ -1,17 +1,12 @@
-use std::ops::Index;
-
 use crate::assets::Graphics;
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{Game, GameState, Player, WORLD_SIZE};
-use bevy::core_pipeline::core_2d::graph;
+use crate::{GameState, Player};
 use bevy::prelude::*;
-use bevy::sprite::{Anchor, MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::Collider;
-use noise::{NoiseFn, Seedable, Simplex};
 
 use serde::{Deserialize, Serialize};
 

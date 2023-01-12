@@ -4,16 +4,9 @@ use std::time::Duration;
 // - get player movement
 // - set up tilemap or world generation
 // - trees/entities to break/mine
-use bevy::{
-    prelude::*,
-    render::camera::ScalingMode,
-    sprite::collide_aabb::{collide, Collision},
-    sprite::MaterialMesh2dBundle,
-    time::FixedTimestep,
-    window::PresentMode,
-};
-use bevy_inspector_egui::{RegisterInspectable, WorldInspectorPlugin};
-use bevy_rapier2d::{prelude::*, rapier::prelude::RigidBodyActivation};
+use bevy::{prelude::*, render::camera::ScalingMode, window::PresentMode};
+use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_rapier2d::prelude::*;
 mod animations;
 mod assets;
 mod inputs;
@@ -21,15 +14,15 @@ mod item;
 mod vectorize;
 mod world_generation;
 use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
+use assets::{GameAssetsPlugin, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use inputs::{Direction, InputsPlugin};
 use item::{ItemsPlugin, WorldObject};
-use world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE};
+use world_generation::WorldGenerationPlugin;
 
-const PLAYER_MOVE_SPEED: f32 = 450.;
+const PLAYER_MOVE_SPEED: f32 = 10.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;

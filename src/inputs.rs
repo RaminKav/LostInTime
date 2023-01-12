@@ -4,17 +4,17 @@ use bevy::time::FixedTimestep;
 use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
-    QueryFilter, QueryFilterFlags, RapierContext,
+    Collider, MoveShapeOptions, QueryFilter, QueryFilterFlags, RapierContext,
 };
 
 use crate::item::{Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
+use crate::PLAYER_MOVE_SPEED;
 use crate::{
     assets::{Graphics, WORLD_SCALE},
     item::WorldObject,
-    world_generation::{ChunkManager, WorldGenerationPlugin, CHUNK_SIZE},
-    Game, GameState, Player, PLAYER_DASH_SPEED, PLAYER_MOVE_SPEED, TIME_STEP,
+    world_generation::{ChunkManager, WorldGenerationPlugin},
+    Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
 
 #[derive(Default, Resource)]
@@ -64,7 +64,7 @@ impl InputsPlugin {
 
         let mut dx = 0.0;
         let mut dy = 0.0;
-        let s = 10.0 / WORLD_SCALE;
+        let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
 
         if key_input.pressed(KeyCode::A) {
             dx -= s;
