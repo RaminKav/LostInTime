@@ -4,7 +4,7 @@ use std::time::Duration;
 // - get player movement
 // - set up tilemap or world generation
 // - trees/entities to break/mine
-use bevy::{prelude::*, render::camera::ScalingMode, window::PresentMode};
+use bevy::{prelude::*, render::camera::ScalingMode, utils::HashSet, window::PresentMode};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod animations;
@@ -113,8 +113,11 @@ pub struct Player {
     is_moving: bool,
     is_dashing: bool,
     is_attacking: bool,
+    inventory: Vec<ItemStack>,
     main_hand_slot: Option<WorldObject>,
 }
+#[derive(Debug, PartialEq)]
+pub struct ItemStack(WorldObject, u8);
 
 fn setup(
     mut commands: Commands,
@@ -170,6 +173,7 @@ fn setup(
             is_moving: false,
             is_dashing: false,
             is_attacking: false,
+            inventory: Vec::new(),
             main_hand_slot: None,
         },
         Direction(1.0),

@@ -1,21 +1,24 @@
 use bevy::app::AppExit;
+use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
+use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{
-    Collider, MoveShapeOptions, QueryFilter, QueryFilterFlags, RapierContext,
+    Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
+    QueryFilter, QueryFilterFlags, RapierContext,
 };
 
-use crate::item::{Breakable, Equipment, WorldObjectResource};
+use crate::item::{Breakable, DropItem, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
-use crate::PLAYER_MOVE_SPEED;
 use crate::{
     assets::{Graphics, WORLD_SCALE},
     item::WorldObject,
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
+use crate::{ItemStack, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource)]
 pub struct CursorPos(Vec3);
@@ -47,21 +50,34 @@ impl InputsPlugin {
             (
                 Entity,
                 &mut Transform,
+                &mut KinematicCharacterController,
                 &Collider,
                 &mut Direction,
                 Option<&Children>,
+                Option<&mut KinematicCharacterControllerOutput>,
             ),
             (With<Player>, Without<Camera>),
         >,
         mut eqp_query: Query<&mut Transform, (With<Equipment>, Without<Camera>, Without<Player>)>,
+        drops_query: Query<
+            (Entity, &WorldObject),
+            (With<DropItem>, Without<Camera>, Without<Player>),
+        >,
         mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
         mut context: ResMut<RapierContext>,
+        mut commands: Commands,
     ) {
-        let (ent, mut player_transform, player_collider, mut dir, children) =
-            player_query.single_mut();
+        let (
+            ent,
+            mut player_transform,
+            mut player_kin_controller,
+            player_collider,
+            mut dir,
+            children,
+            mut output,
+        ) = player_query.single_mut();
         let mut camera_transform = camera_query.single_mut();
-
         let mut dx = 0.0;
         let mut dy = 0.0;
         let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
@@ -126,6 +142,8 @@ impl InputsPlugin {
                 game.player.is_dashing = false;
             }
         }
+        let mut collected_drops = HashSet::new();
+
         let output_ws = context.move_shape(
             Vec2::new(0., dy),
             player_collider,
@@ -134,7 +152,7 @@ impl InputsPlugin {
             0.,
             &MoveShapeOptions::default(),
             QueryFilter {
-                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                // flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 exclude_collider: Some(ent),
                 predicate: Some(&|e| {
                     if let Some(c) = children {
@@ -145,7 +163,31 @@ impl InputsPlugin {
                 }),
                 ..default()
             },
-            |_| {},
+            |col| {
+                for (drop, obj) in drops_query.iter() {
+                    if col.entity == drop && !collected_drops.contains(&col.entity) {
+                        if let Some(mut ec) = commands.get_entity(drop) {
+                            ec.despawn();
+                            if let Some(stack) = game.player.inventory.iter().find(|i| i.0 == *obj)
+                            {
+                                // safe to unwrap, we check for it above
+                                let index = game
+                                    .player
+                                    .inventory
+                                    .iter()
+                                    .position(|i| i == stack)
+                                    .unwrap();
+                                let stack = game.player.inventory.get_mut(index).unwrap();
+                                stack.1 += 1;
+                            } else {
+                                game.player.inventory.push(ItemStack(*obj, 1));
+                            }
+                            collected_drops.insert(col.entity);
+                            info!("{:?} | {:?}", drop, game.player.inventory);
+                        }
+                    }
+                }
+            },
         );
 
         let output_ad = context.move_shape(
@@ -156,7 +198,7 @@ impl InputsPlugin {
             0.,
             &MoveShapeOptions::default(),
             QueryFilter {
-                flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                // flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 exclude_collider: Some(ent),
                 predicate: Some(&|e| {
                     if let Some(c) = children {
@@ -167,10 +209,36 @@ impl InputsPlugin {
                 }),
                 ..default()
             },
-            |_| {},
+            |col| {
+                for (drop, obj) in drops_query.iter() {
+                    if col.entity == drop && !collected_drops.contains(&col.entity) {
+                        if let Some(mut ec) = commands.get_entity(drop) {
+                            ec.despawn();
+                            if let Some(stack) = game.player.inventory.iter().find(|i| i.0 == *obj)
+                            {
+                                // safe to unwrap, we check for it above
+                                let index = game
+                                    .player
+                                    .inventory
+                                    .iter()
+                                    .position(|i| i == stack)
+                                    .unwrap();
+                                let stack = game.player.inventory.get_mut(index).unwrap();
+                                stack.1 += 1;
+                            } else {
+                                game.player.inventory.push(ItemStack(*obj, 1));
+                            }
+                            collected_drops.insert(col.entity);
+                            info!("{:?} | {:?}", drop, game.player.inventory);
+                        }
+                    }
+                }
+            },
         );
+
         let cx = player_transform.translation.x + output_ad.effective_translation.x;
         let cy = player_transform.translation.y + output_ws.effective_translation.y;
+        // player_kin_controller.translation =
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
         camera_transform.translation.x = cx;
