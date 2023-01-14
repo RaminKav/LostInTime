@@ -158,7 +158,7 @@ impl GameAssetsPlugin {
             //         0.5 - anchor.1 / rect.size.1,
             //     ));
             // };
-            world_obj_data.data.insert(
+            world_obj_data.properties.insert(
                 *item,
                 WorldObjectData {
                     size: Vec2::new(rect.size.0, rect.size.1),

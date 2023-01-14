@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
-use crate::{item::DropItem, AnimationTimer, Game, GameState, Player, TIME_STEP};
+use crate::{item::ItemStack, AnimationTimer, Game, GameState, Player, TIME_STEP};
 
 pub struct AnimationsPlugin;
 
@@ -63,7 +63,7 @@ impl AnimationsPlugin {
                 &mut AnimationTimer,
                 &mut AnimationPosTracker,
             ),
-            &DropItem,
+            &ItemStack,
         >,
     ) {
         for (mut transform, mut timer, mut tracker) in &mut drop_query {

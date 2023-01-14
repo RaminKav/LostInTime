@@ -10,7 +10,7 @@ use bevy_rapier2d::prelude::{
     QueryFilter, QueryFilterFlags, RapierContext,
 };
 
-use crate::item::{Breakable, DropItem, Equipment, WorldObjectResource};
+use crate::item::{Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
@@ -46,6 +46,7 @@ impl InputsPlugin {
     fn move_player(
         key_input: ResMut<Input<KeyCode>>,
         mut game: ResMut<Game>,
+        mut world_obj_res: ResMut<WorldObjectResource>,
         mut player_query: Query<
             (
                 Entity,
@@ -59,10 +60,7 @@ impl InputsPlugin {
             (With<Player>, Without<Camera>),
         >,
         mut eqp_query: Query<&mut Transform, (With<Equipment>, Without<Camera>, Without<Player>)>,
-        drops_query: Query<
-            (Entity, &WorldObject),
-            (With<DropItem>, Without<Camera>, Without<Player>),
-        >,
+        drops_query: Query<(Entity, &ItemStack)>,
         mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
         mut context: ResMut<RapierContext>,
@@ -143,7 +141,6 @@ impl InputsPlugin {
             }
         }
         let mut collected_drops = HashSet::new();
-
         let output_ws = context.move_shape(
             Vec2::new(0., dy),
             player_collider,
@@ -164,11 +161,14 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, obj) in drops_query.iter() {
+                for (drop, item_stack) in drops_query.iter() {
                     if col.entity == drop && !collected_drops.contains(&col.entity) {
                         if let Some(mut ec) = commands.get_entity(drop) {
                             ec.despawn();
-                            if let Some(stack) = game.player.inventory.iter().find(|i| i.0 == *obj)
+                            world_obj_res.drop_entities.remove(&drop);
+
+                            if let Some(stack) =
+                                game.player.inventory.iter().find(|i| i.0 == item_stack.0)
                             {
                                 // safe to unwrap, we check for it above
                                 let index = game
@@ -178,9 +178,9 @@ impl InputsPlugin {
                                     .position(|i| i == stack)
                                     .unwrap();
                                 let stack = game.player.inventory.get_mut(index).unwrap();
-                                stack.1 += 1;
+                                stack.1 += item_stack.1;
                             } else {
-                                game.player.inventory.push(ItemStack(*obj, 1));
+                                game.player.inventory.push(*item_stack);
                             }
                             collected_drops.insert(col.entity);
                             info!("{:?} | {:?}", drop, game.player.inventory);
@@ -210,11 +210,14 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, obj) in drops_query.iter() {
+                for (drop, item_stack) in drops_query.iter() {
                     if col.entity == drop && !collected_drops.contains(&col.entity) {
                         if let Some(mut ec) = commands.get_entity(drop) {
                             ec.despawn();
-                            if let Some(stack) = game.player.inventory.iter().find(|i| i.0 == *obj)
+                            world_obj_res.drop_entities.remove(&drop);
+
+                            if let Some(stack) =
+                                game.player.inventory.iter().find(|i| i.0 == item_stack.0)
                             {
                                 // safe to unwrap, we check for it above
                                 let index = game
@@ -224,9 +227,9 @@ impl InputsPlugin {
                                     .position(|i| i == stack)
                                     .unwrap();
                                 let stack = game.player.inventory.get_mut(index).unwrap();
-                                stack.1 += 1;
+                                stack.1 += item_stack.1;
                             } else {
-                                game.player.inventory.push(ItemStack(*obj, 1));
+                                game.player.inventory.push(*item_stack);
                             }
                             collected_drops.insert(col.entity);
                             info!("{:?} | {:?}", drop, game.player.inventory);
@@ -305,7 +308,7 @@ impl InputsPlugin {
         mut chunk_manager: ResMut<ChunkManager>,
         mut commands: Commands,
         graphics: Res<Graphics>,
-        world_obj_data: Res<WorldObjectResource>,
+        mut world_obj_data: ResMut<WorldObjectResource>,
         player_query: Query<(Entity, &mut Player)>,
         mut game_data: ResMut<GameData>,
     ) {
@@ -341,7 +344,7 @@ impl InputsPlugin {
                 let main_hand_tool = player_query.single().1.main_hand_slot;
                 obj_data.object.attempt_to_break_item(
                     &mut commands,
-                    &world_obj_data,
+                    &mut world_obj_data,
                     &graphics,
                     &mut chunk_manager,
                     &mut game_data,
