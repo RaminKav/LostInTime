@@ -19,7 +19,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use inputs::{Direction, InputsPlugin};
-use item::{ItemsPlugin, WorldObject};
+use item::{ItemStack, ItemsPlugin, WorldObject};
 use world_generation::WorldGenerationPlugin;
 
 const PLAYER_MOVE_SPEED: f32 = 10.;
@@ -116,8 +116,6 @@ pub struct Player {
     inventory: Vec<ItemStack>,
     main_hand_slot: Option<WorldObject>,
 }
-#[derive(Debug, PartialEq)]
-pub struct ItemStack(WorldObject, u8);
 
 fn setup(
     mut commands: Commands,

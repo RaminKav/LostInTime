@@ -9,6 +9,7 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 #[derive(Component)]
@@ -16,8 +17,8 @@ pub struct Breakable(pub Option<WorldObject>);
 
 #[derive(Component)]
 pub struct Equipment;
-#[derive(Component)]
-pub struct DropItem;
+#[derive(Component, Debug, PartialEq, Copy, Clone)]
+pub struct ItemStack(pub WorldObject, pub u8);
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
@@ -40,7 +41,8 @@ pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-3., -5.); 1];
 
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
-    pub data: HashMap<WorldObject, WorldObjectData>,
+    pub properties: HashMap<WorldObject, WorldObjectData>,
+    pub drop_entities: HashMap<Entity, (ItemStack, Transform)>,
 }
 
 #[derive(Debug, Default)]
@@ -55,8 +57,10 @@ pub struct WorldObjectData {
 }
 impl WorldObjectResource {
     fn new() -> Self {
-        let m = HashMap::new();
-        Self { data: m }
+        Self {
+            properties: HashMap::new(),
+            drop_entities: HashMap::new(),
+        }
     }
 }
 impl WorldObject {
@@ -86,7 +90,7 @@ impl WorldObject {
         //  material:,
         //  transform:,
         //  ..Default::Default()});
-        let obj_data = world_obj_res.data.get(&self).unwrap();
+        let obj_data = world_obj_res.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
             (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
@@ -211,7 +215,7 @@ impl WorldObject {
             .0
             .clone();
         let player_data = &mut player_query.single_mut();
-        let obj_data = world_obj_res.data.get(&self).unwrap();
+        let obj_data = world_obj_res.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
         if let Some(slot) = obj_data.equip_slot {
@@ -259,7 +263,7 @@ impl WorldObject {
     pub fn spawn_item_drop(
         self,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
+        world_obj_res: &mut WorldObjectResource,
         graphics: &Graphics,
         tile_pos: IVec2,
         chunk_pos: IVec2,
@@ -276,29 +280,36 @@ impl WorldObject {
             .expect(&format!("No graphic for object {:?}", self))
             .0
             .clone();
-        let obj_data = world_obj_res.data.get(&self).unwrap();
+        let obj_data = world_obj_res.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let mut rng = rand::thread_rng();
+
         let position = Vec3::new(
             (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.x * obj_data.size.x,
+                + anchor.x * obj_data.size.x
+                + rng.gen_range(-10. ..10.),
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y,
+                + anchor.y * obj_data.size.y
+                + rng.gen_range(-10. ..10.),
             0.1,
         );
+        let stack = ItemStack(self, rng.gen_range(1..4));
+        let transform = Transform {
+            translation: position,
+            scale: Vec3::new(0.5, 0.5, 0.5),
+            // rotation: Quat::from_rotation_x(0.1),
+            ..Default::default()
+        };
+
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
                 texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: position,
-                    scale: Vec3::new(0.5, 0.5, 0.5),
-                    // rotation: Quat::from_rotation_x(0.1),
-                    ..Default::default()
-                },
+                transform,
                 ..Default::default()
             })
             .insert(Name::new("DropItem"))
-            .insert(DropItem)
+            .insert(stack)
             .insert(Collider::cuboid(8., 8.))
             .insert(Sensor)
             .insert(AnimationTimer(Timer::from_seconds(
@@ -315,13 +326,13 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
-
+        world_obj_res.drop_entities.insert(item, (stack, transform));
         item
     }
     pub fn attempt_to_break_item(
         self,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
+        world_obj_res: &mut WorldObjectResource,
         graphics: &Graphics,
         chunk_manager: &mut ChunkManager,
         game_data: &mut GameData,
@@ -329,7 +340,7 @@ impl WorldObject {
         chunk_pos: IVec2,
         with_item: Option<WorldObject>,
     ) {
-        if let Some(data) = world_obj_res.data.get(&self) {
+        if let Some(data) = world_obj_res.properties.get(&self) {
             if with_item == data.breaks_with {
                 Self::break_item(
                     self,
@@ -347,7 +358,7 @@ impl WorldObject {
     pub fn break_item(
         self,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
+        world_obj_res: &mut WorldObjectResource,
         graphics: &Graphics,
         chunk_manager: &mut ChunkManager,
         game_data: &mut GameData,
@@ -370,35 +381,16 @@ impl WorldObject {
             (tile_pos.x as f32, tile_pos.y as f32, self),
         );
 
-        if let Some(breaks_into_option) = world_obj_res.data.get(&self) {
+        if let Some(breaks_into_option) = world_obj_res.properties.get(&self) {
             commands.entity(obj_data.entity).despawn();
             if let Some(breaks_into) = breaks_into_option.breaks_into {
-                // let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y)).unwrap();
-                // let updated_old_points = old_points
-                //     .0
-                //     .clone()
-                //     .iter()
-                //     .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32, self))
-                //     .map(|p| *p)
-                //     .collect::<Vec<(f32, f32, Self)>>();
-                // info!(
-                //     "DELETING BLOCK {:?} {:?} {:?}",
-                //     (tile_pos.x as f32, tile_pos.y as f32, self),
-                //     updated_old_points.len(),
-                //     old_points.0.len()
-                // );
-                // game_data.data.insert(
-                //     (chunk_pos.x, chunk_pos.y),
-                //     ChunkObjectData(updated_old_points.to_vec()),
-                // );
                 breaks_into.spawn_item_drop(
                     commands,
-                    &world_obj_res,
+                    world_obj_res,
                     &graphics,
                     tile_pos,
                     chunk_pos,
                 );
-                //TODO: store appropriate block data.
             }
             chunk_manager
                 .chunk_generation_data
