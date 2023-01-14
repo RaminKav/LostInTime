@@ -10,7 +10,8 @@ use bevy_rapier2d::prelude::{
     QueryFilter, QueryFilterFlags, RapierContext,
 };
 
-use crate::item::{Breakable, Equipment, WorldObjectResource};
+use crate::attributes::Health;
+use crate::item::{Block, Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
 use crate::{
     assets::{Graphics, WORLD_SCALE},
@@ -18,7 +19,7 @@ use crate::{
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{ItemStack, PLAYER_MOVE_SPEED};
+use crate::{main, ItemStack, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource)]
 pub struct CursorPos(Vec3);
@@ -310,6 +311,7 @@ impl InputsPlugin {
         graphics: Res<Graphics>,
         mut world_obj_data: ResMut<WorldObjectResource>,
         player_query: Query<(Entity, &mut Player)>,
+        mut block_query: Query<(Entity, &mut Health), With<Block>>,
         mut game_data: ResMut<GameData>,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
@@ -341,19 +343,25 @@ impl InputsPlugin {
                         },
                     })
                     .unwrap();
-                let main_hand_tool = player_query.single().1.main_hand_slot;
-                obj_data.object.attempt_to_break_item(
-                    &mut commands,
-                    &mut world_obj_data,
-                    &graphics,
-                    &mut chunk_manager,
-                    &mut game_data,
-                    tile_pos,
-                    chunk_pos,
-                    main_hand_tool,
-                );
+                let main_hand_tool = &player_query.single().1.main_hand_slot;
+                println!("{:?}", block_query.iter().len());
+                if block_query.contains(obj_data.entity) {
+                    println!("CONTAIONS");
+                    let mut b = block_query.get_mut(obj_data.entity).unwrap();
+                    obj_data.object.attempt_to_break_item(
+                        &mut commands,
+                        &mut world_obj_data,
+                        &graphics,
+                        &mut chunk_manager,
+                        &mut game_data,
+                        tile_pos,
+                        chunk_pos,
+                        main_hand_tool,
+                        (b.0, &mut b.1),
+                    );
+                }
             } else {
-                let stone = WorldObject::StoneFull.spawn_and_save(
+                let stone = WorldObject::StoneFull.spawn_and_save_block(
                     &mut commands,
                     &world_obj_data,
                     &graphics,
@@ -409,7 +417,7 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneFull.spawn_and_save(
+            let stone = WorldObject::StoneFull.spawn_and_save_block(
                 &mut commands,
                 &world_obj_data,
                 &graphics,
@@ -444,7 +452,7 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneFull.spawn_and_save(
+            let stone = WorldObject::StoneFull.spawn_and_save_block(
                 &mut commands,
                 &world_obj_data,
                 &graphics,

@@ -1,5 +1,6 @@
 use crate::animations::AnimationPosTracker;
 use crate::assets::Graphics;
+use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
@@ -16,9 +17,18 @@ use serde::{Deserialize, Serialize};
 pub struct Breakable(pub Option<WorldObject>);
 
 #[derive(Component)]
+pub struct Block;
+#[derive(Component)]
 pub struct Equipment;
 #[derive(Component, Debug, PartialEq, Copy, Clone)]
 pub struct ItemStack(pub WorldObject, pub u8);
+
+pub struct EquipmentMetaData {
+    entity: Entity,
+    obj: WorldObject,
+    health: Health,
+    attack: Attack,
+}
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
@@ -110,6 +120,10 @@ impl WorldObject {
                 ..Default::default()
             })
             .insert(Name::new("GroundItem"))
+            .insert(BlockAttributeBundle {
+                health: Health(100),
+            })
+            .insert(Block)
             .insert(self)
             .id();
         if obj_data.breakable {
@@ -140,7 +154,7 @@ impl WorldObject {
 
         item
     }
-    pub fn spawn_and_save(
+    pub fn spawn_and_save_block(
         self,
         commands: &mut Commands,
         world_obj_res: &WorldObjectResource,
@@ -173,28 +187,6 @@ impl WorldObject {
 
         return item;
     }
-    pub fn spawn_with_collider(
-        self,
-        commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
-        graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
-        tile_pos: IVec2,
-        chunk_pos: IVec2,
-        size: Vec2,
-    ) -> Entity {
-        let item = self.spawn(
-            commands,
-            world_obj_res,
-            graphics,
-            chunk_manager,
-            tile_pos,
-            chunk_pos,
-        );
-
-        commands.entity(item).insert(Size(size));
-        return item;
-    }
     pub fn spawn_equipment_on_player(
         self,
         mut player_query: Query<(Entity, &mut Player)>,
@@ -218,47 +210,56 @@ impl WorldObject {
         let obj_data = world_obj_res.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
+        let health = Health(100);
+        let attack = Attack(20);
         if let Some(slot) = obj_data.equip_slot {
             position = Vec3::new(
                 PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
                 PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
                 0.1,
             );
-            player_data.1.main_hand_slot = Some(self)
+            let item = commands
+                .spawn(SpriteSheetBundle {
+                    sprite,
+                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                    transform: Transform {
+                        translation: position,
+                        scale: Vec3::new(0.8, 0.8, 0.8),
+                        // rotation: Quat::from_rotation_x(0.1),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(EquipmentAttributeBundle { health, attack })
+                .insert(Equipment)
+                .insert(Name::new("EquipItem"))
+                .insert(self)
+                .id();
+
+            player_data.1.main_hand_slot = Some(EquipmentMetaData {
+                obj: self,
+                entity: item,
+                health,
+                attack,
+            });
+
+            if obj_data.collider {
+                println!("Add collider");
+                commands
+                    .entity(item)
+                    .insert(Collider::cuboid(
+                        obj_data.size.x / 3.5,
+                        obj_data.size.y / 4.5,
+                    ))
+                    .insert(Sensor);
+            }
+
+            commands.entity(item).set_parent(player_data.0);
+
+            item
         } else {
             panic!("No slot found for equipment");
         }
-        let item = commands
-            .spawn(SpriteSheetBundle {
-                sprite,
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: position,
-                    scale: Vec3::new(0.8, 0.8, 0.8),
-                    // rotation: Quat::from_rotation_x(0.1),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(Equipment)
-            .insert(Name::new("EquipItem"))
-            .insert(self)
-            .id();
-
-        if obj_data.collider {
-            println!("Add collider");
-            commands
-                .entity(item)
-                .insert(Collider::cuboid(
-                    obj_data.size.x / 3.5,
-                    obj_data.size.y / 4.5,
-                ))
-                .insert(Sensor);
-        }
-
-        commands.entity(item).set_parent(player_data.0);
-
-        item
     }
     pub fn spawn_item_drop(
         self,
@@ -338,10 +339,41 @@ impl WorldObject {
         game_data: &mut GameData,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-        with_item: Option<WorldObject>,
+        with_item: &Option<EquipmentMetaData>,
+        block_entity_data: (Entity, &mut Health),
     ) {
         if let Some(data) = world_obj_res.properties.get(&self) {
-            if with_item == data.breaks_with {
+            print!("1");
+            if let Some(breaks_with) = data.breaks_with {
+                print!("2");
+
+                if let Some(with_item) = with_item {
+                    print!("3");
+
+                    if with_item.obj == breaks_with {
+                        print!("4");
+
+                        let mut h = block_entity_data.1;
+                        h.0 -= with_item.attack.0;
+                        info!(
+                            "BLOCK HEALTH: {:?}, TOOL ATT: {:?}",
+                            h.0, with_item.attack.0
+                        );
+                        if h.0 <= 0 {
+                            Self::break_item(
+                                self,
+                                commands,
+                                world_obj_res,
+                                graphics,
+                                chunk_manager,
+                                game_data,
+                                tile_pos,
+                                chunk_pos,
+                            )
+                        }
+                    }
+                }
+            } else {
                 Self::break_item(
                     self,
                     commands,
