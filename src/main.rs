@@ -9,6 +9,7 @@ use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod animations;
 mod assets;
+mod attributes;
 mod inputs;
 mod item;
 mod vectorize;
@@ -19,7 +20,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use inputs::{Direction, InputsPlugin};
-use item::{ItemStack, ItemsPlugin, WorldObject};
+use item::{EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject};
 use world_generation::WorldGenerationPlugin;
 
 const PLAYER_MOVE_SPEED: f32 = 10.;
@@ -114,7 +115,7 @@ pub struct Player {
     is_dashing: bool,
     is_attacking: bool,
     inventory: Vec<ItemStack>,
-    main_hand_slot: Option<WorldObject>,
+    main_hand_slot: Option<EquipmentMetaData>,
 }
 
 fn setup(
