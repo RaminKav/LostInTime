@@ -19,7 +19,7 @@ use crate::{
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{main, ItemStack, PLAYER_MOVE_SPEED};
+use crate::{main, GameParam, ItemStack, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource)]
 pub struct CursorPos(Vec3);
@@ -45,45 +45,34 @@ impl Plugin for InputsPlugin {
 
 impl InputsPlugin {
     fn move_player(
-        key_input: ResMut<Input<KeyCode>>,
-        mut game: ResMut<Game>,
-        mut world_obj_res: ResMut<WorldObjectResource>,
+        mut commands: Commands,
+        mut game: GameParam,
         mut player_query: Query<
             (
                 Entity,
                 &mut Transform,
-                &mut KinematicCharacterController,
                 &Collider,
                 &mut Direction,
                 Option<&Children>,
-                Option<&mut KinematicCharacterControllerOutput>,
             ),
-            (With<Player>, Without<Camera>),
+            (With<Player>, Without<Camera>, Without<Equipment>),
         >,
         mut eqp_query: Query<&mut Transform, (With<Equipment>, Without<Camera>, Without<Player>)>,
-        drops_query: Query<(Entity, &ItemStack)>,
-        mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
+        // mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
+        key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
-        mut commands: Commands,
     ) {
-        let (
-            ent,
-            mut player_transform,
-            mut player_kin_controller,
-            player_collider,
-            mut dir,
-            children,
-            mut output,
-        ) = player_query.single_mut();
-        let mut camera_transform = camera_query.single_mut();
+        let (ent, mut player_transform, player_collider, mut dir, children) =
+            player_query.single_mut();
+        let mut camera_transform = game.camera_query.single_mut();
         let mut dx = 0.0;
         let mut dy = 0.0;
         let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
 
         if key_input.pressed(KeyCode::A) {
             dx -= s;
-            game.player.is_moving = true;
+            game.game.player.is_moving = true;
             player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
             if let Some(c) = children {
                 for item in c.iter() {
@@ -95,7 +84,7 @@ impl InputsPlugin {
         }
         if key_input.pressed(KeyCode::D) {
             dx += s;
-            game.player.is_moving = true;
+            game.game.player.is_moving = true;
             player_transform.rotation = Quat::default();
             if let Some(c) = children {
                 for item in c.iter() {
@@ -107,38 +96,37 @@ impl InputsPlugin {
         }
         if key_input.pressed(KeyCode::W) {
             dy += s;
-            game.player.is_moving = true;
+            game.game.player.is_moving = true;
         }
         if key_input.pressed(KeyCode::S) {
             dy -= s;
-            game.player.is_moving = true;
+            game.game.player.is_moving = true;
         }
-        if game.player_dash_cooldown.tick(time.delta()).finished() {
+        if game.game.player_dash_cooldown.tick(time.delta()).finished() {
             if key_input.pressed(KeyCode::Space) {
-                game.player.is_dashing = true;
+                game.game.player.is_dashing = true;
 
-                game.player_dash_cooldown.reset();
-                game.player_dash_duration.reset();
+                game.game.player_dash_cooldown.reset();
+                game.game.player_dash_duration.reset();
             }
         }
         if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
             || (dx == 0. && dy == 0.)
         {
-            game.player.is_moving = false;
-            // key_input.release_all();
+            game.game.player.is_moving = false;
         }
         if dx != 0. && dy != 0. {
             dx = if dx == -s { -(s * 0.66) } else { s * 0.66 };
             dy = if dy == -s { -(s * 0.66) } else { s * 0.66 };
         }
 
-        if game.player.is_dashing {
-            game.player_dash_duration.tick(time.delta());
+        if game.game.player.is_dashing {
+            game.game.player_dash_duration.tick(time.delta());
 
             dx += dx * PLAYER_DASH_SPEED * TIME_STEP;
             dy += dy * PLAYER_DASH_SPEED * TIME_STEP;
-            if game.player_dash_duration.just_finished() {
-                game.player.is_dashing = false;
+            if game.game.player_dash_duration.just_finished() {
+                game.game.player.is_dashing = false;
             }
         }
         let mut collected_drops = HashSet::new();
@@ -162,29 +150,34 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, item_stack) in drops_query.iter() {
+                for (drop, _, item_stack) in game.items_query.iter() {
                     if col.entity == drop && !collected_drops.contains(&col.entity) {
                         if let Some(mut ec) = commands.get_entity(drop) {
                             ec.despawn();
-                            world_obj_res.drop_entities.remove(&drop);
+                            game.world_obj_data.drop_entities.remove(&drop);
 
-                            if let Some(stack) =
-                                game.player.inventory.iter().find(|i| i.0 == item_stack.0)
+                            if let Some(stack) = game
+                                .game
+                                .player
+                                .inventory
+                                .iter()
+                                .find(|i| i.0 == item_stack.0)
                             {
                                 // safe to unwrap, we check for it above
                                 let index = game
+                                    .game
                                     .player
                                     .inventory
                                     .iter()
                                     .position(|i| i == stack)
                                     .unwrap();
-                                let stack = game.player.inventory.get_mut(index).unwrap();
+                                let stack = game.game.player.inventory.get_mut(index).unwrap();
                                 stack.1 += item_stack.1;
                             } else {
-                                game.player.inventory.push(*item_stack);
+                                game.game.player.inventory.push(*item_stack);
                             }
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", drop, game.player.inventory);
+                            info!("{:?} | {:?}", drop, game.game.player.inventory);
                         }
                     }
                 }
@@ -211,29 +204,34 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, item_stack) in drops_query.iter() {
+                for (drop, _, item_stack) in game.items_query.iter() {
                     if col.entity == drop && !collected_drops.contains(&col.entity) {
                         if let Some(mut ec) = commands.get_entity(drop) {
                             ec.despawn();
-                            world_obj_res.drop_entities.remove(&drop);
+                            game.world_obj_data.drop_entities.remove(&drop);
 
-                            if let Some(stack) =
-                                game.player.inventory.iter().find(|i| i.0 == item_stack.0)
+                            if let Some(stack) = game
+                                .game
+                                .player
+                                .inventory
+                                .iter()
+                                .find(|i| i.0 == item_stack.0)
                             {
                                 // safe to unwrap, we check for it above
                                 let index = game
+                                    .game
                                     .player
                                     .inventory
                                     .iter()
                                     .position(|i| i == stack)
                                     .unwrap();
-                                let stack = game.player.inventory.get_mut(index).unwrap();
+                                let stack = game.game.player.inventory.get_mut(index).unwrap();
                                 stack.1 += item_stack.1;
                             } else {
-                                game.player.inventory.push(*item_stack);
+                                game.game.player.inventory.push(*item_stack);
                             }
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", drop, game.player.inventory);
+                            info!("{:?} | {:?}", drop, game.game.player.inventory);
                         }
                     }
                 }
@@ -247,17 +245,6 @@ impl InputsPlugin {
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
         camera_transform.translation.x = cx;
         camera_transform.translation.y = cy;
-
-        if game.player.is_moving == true {
-            // println!(
-            //     "Player is on chunk {:?} at pos: {:?}",
-            //     WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-            //         player_transform.translation.x,
-            //         player_transform.translation.y
-            //     )),
-            //     player_transform.translation
-            // );
-        }
 
         if dx != 0. {
             dir.0 = dx;
@@ -304,15 +291,10 @@ impl InputsPlugin {
     }
 
     fn mouse_click_system(
+        mut commands: Commands,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
-        mut chunk_manager: ResMut<ChunkManager>,
-        mut commands: Commands,
-        graphics: Res<Graphics>,
-        mut world_obj_data: ResMut<WorldObjectResource>,
-        player_query: Query<(Entity, &mut Player)>,
-        mut block_query: Query<(Entity, &mut Health), With<Block>>,
-        mut game_data: ResMut<GameData>,
+        mut game: GameParam,
     ) {
         if mouse_button_input.just_released(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -323,7 +305,8 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            if chunk_manager
+            if game
+                .chunk_manager
                 .chunk_generation_data
                 .contains_key(&TileMapPositionData {
                     chunk_pos,
@@ -333,7 +316,8 @@ impl InputsPlugin {
                     },
                 })
             {
-                let obj_data = chunk_manager
+                let obj_data = game
+                    .chunk_manager
                     .chunk_generation_data
                     .get(&TileMapPositionData {
                         chunk_pos,
@@ -343,40 +327,25 @@ impl InputsPlugin {
                         },
                     })
                     .unwrap();
-                let main_hand_tool = &player_query.single().1.main_hand_slot;
-                println!("{:?}", block_query.iter().len());
-                if block_query.contains(obj_data.entity) {
-                    println!("CONTAIONS");
-                    let mut b = block_query.get_mut(obj_data.entity).unwrap();
+                if game.block_query.contains(obj_data.entity) {
                     obj_data.object.attempt_to_break_item(
                         &mut commands,
-                        &mut world_obj_data,
-                        &graphics,
-                        &mut chunk_manager,
-                        &mut game_data,
+                        &mut game,
                         tile_pos,
                         chunk_pos,
-                        main_hand_tool,
-                        (b.0, &mut b.1),
                     );
                 }
             } else {
                 let stone = WorldObject::StoneFull.spawn_and_save_block(
                     &mut commands,
-                    &world_obj_data,
-                    &graphics,
-                    &mut chunk_manager,
-                    &mut game_data,
+                    &mut game,
                     tile_pos,
                     chunk_pos,
                 );
                 commands
                     .entity(stone)
                     .insert(Breakable(Some(WorldObject::StoneHalf)));
-                // commands.spawn(stone);
-                // .insert(Name::new("Test Objects"))
-                // .push_children(&children)
-                chunk_manager.chunk_generation_data.insert(
+                game.chunk_manager.chunk_generation_data.insert(
                     TileMapPositionData {
                         chunk_pos,
                         tile_pos: TilePos {
@@ -390,25 +359,9 @@ impl InputsPlugin {
                     },
                 );
             }
-            // WorldGenerationPlugin::change_tile_and_update_neighbours(
-            //     TilePos {
-            //         x: tile_pos.x as u32,
-            //         y: tile_pos.y as u32,
-            //     },
-            //     chunk_pos,
-            //     0b0000,
-            //     0,
-            //     &mut chunk_manager,
-            //     &mut commands,
-            // );
         }
         if mouse_button_input.just_released(MouseButton::Right) {
-            WorldObject::Sword.spawn_equipment_on_player(
-                player_query,
-                &mut commands,
-                &world_obj_data,
-                &graphics,
-            );
+            WorldObject::Sword.spawn_equipment_on_player(&mut commands, &mut game);
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.0.x,
                 cursor_pos.0.y,
@@ -419,29 +372,13 @@ impl InputsPlugin {
             ));
             let stone = WorldObject::StoneFull.spawn_and_save_block(
                 &mut commands,
-                &world_obj_data,
-                &graphics,
-                &mut chunk_manager,
-                &mut game_data,
+                &mut game,
                 tile_pos,
                 chunk_pos,
             );
             commands
                 .spawn(SpatialBundle::default())
-                // .insert(Name::new("Test Objects"))
-                // .push_children(&children)
                 .push_children(&[stone]);
-            // WorldGenerationPlugin::change_tile_and_update_neighbours(
-            //     TilePos {
-            //         x: tile_pos.x as u32,
-            //         y: tile_pos.y as u32,
-            //     },
-            //     chunk_pos,
-            //     0b0000,
-            //     16,
-            //     &mut chunk_manager,
-            //     &mut commands,
-            // );
         }
         if mouse_button_input.just_released(MouseButton::Middle) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
@@ -454,29 +391,13 @@ impl InputsPlugin {
             ));
             let stone = WorldObject::StoneFull.spawn_and_save_block(
                 &mut commands,
-                &world_obj_data,
-                &graphics,
-                &mut chunk_manager,
-                &mut game_data,
+                &mut game,
                 tile_pos,
                 chunk_pos,
             );
             commands
                 .spawn(SpatialBundle::default())
-                // .insert(Name::new("Test Objects"))
-                // .push_children(&children)
                 .push_children(&[stone]);
-            // WorldGenerationPlugin::change_tile_and_update_neighbours(
-            //     TilePos {
-            //         x: tile_pos.x as u32,
-            //         y: tile_pos.y as u32,
-            //     },
-            //     chunk_pos,
-            //     0b0000,
-            //     16,
-            //     &mut chunk_manager,
-            //     &mut commands,
-            // );
         }
     }
     pub fn close_on_esc(

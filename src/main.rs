@@ -1,10 +1,14 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
+use attributes::Health;
 //TODO:
 // - get player movement
 // - set up tilemap or world generation
 // - trees/entities to break/mine
-use bevy::{prelude::*, render::camera::ScalingMode, utils::HashSet, window::PresentMode};
+use bevy::{
+    ecs::system::SystemParam, prelude::*, render::camera::ScalingMode, utils::HashSet,
+    window::PresentMode,
+};
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod animations;
@@ -14,14 +18,16 @@ mod inputs;
 mod item;
 mod vectorize;
 mod world_generation;
-use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, WORLD_SCALE};
+use animations::{AnimationTimer, AnimationsPlugin};
+use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use inputs::{Direction, InputsPlugin};
-use item::{EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject};
-use world_generation::WorldGenerationPlugin;
+use item::{
+    Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
+};
+use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
 const PLAYER_MOVE_SPEED: f32 = 10.;
 const PLAYER_DASH_SPEED: f32 = 125.;
@@ -106,9 +112,29 @@ pub struct ImageAssets {
     pub tiles_sheet: Handle<Image>,
 }
 
-#[derive(Component, Deref, DerefMut)]
-struct AnimationTimer(Timer);
+#[derive(SystemParam)]
+pub struct GameParam<'w, 's> {
+    pub game: ResMut<'w, Game>,
+    pub graphics: Res<'w, Graphics>,
+    pub chunk_manager: ResMut<'w, ChunkManager>,
+    pub world_obj_data: ResMut<'w, WorldObjectResource>,
+    pub game_data: ResMut<'w, GameData>,
 
+    pub block_query: Query<'w, 's, (Entity, &'static mut Health), With<Block>>,
+    pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
+    pub items_query: Query<
+        'w,
+        's,
+        (Entity, &'static Transform, &'static ItemStack),
+        (Without<Player>, Without<Equipment>),
+    >,
+    pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
+    pub camera_query:
+        Query<'w, 's, &'static mut Transform, (With<Camera>, Without<Player>, Without<ItemStack>)>,
+
+    #[system_param(ignore)]
+    marker: PhantomData<&'s ()>,
+}
 #[derive(Component, Default)]
 pub struct Player {
     is_moving: bool,
@@ -135,15 +161,10 @@ fn setup(
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
     game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
 
-    let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
-    let player_texture_atlas = TextureAtlas::from_grid(
-        player_texture_handle,
-        Vec2::new(24.0, 24.0),
-        7,
-        1,
-        None,
-        None,
-    );
+    // let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
+    let player_texture_handle = asset_server.load("textures/player-run-down.png");
+    let player_texture_atlas =
+        TextureAtlas::from_grid(player_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
     let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
     let mut camera = Camera2dBundle::default();
