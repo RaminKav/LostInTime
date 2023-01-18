@@ -1,15 +1,18 @@
-use std::time::Duration;
+use std::{cmp::max, time::Duration};
 
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
-use crate::{item::ItemStack, AnimationTimer, Game, GameState, Player, TIME_STEP};
+use crate::{item::ItemStack, Game, GameState, Player, TIME_STEP};
 
 pub struct AnimationsPlugin;
 
 #[derive(Component, Inspectable)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
+
+#[derive(Component, Deref, DerefMut)]
+pub struct AnimationTimer(pub Timer);
 
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
@@ -49,7 +52,7 @@ impl AnimationsPlugin {
             });
             if timer.just_finished() && game.player.is_moving {
                 let texture_atlas = texture_atlases.get(handle).unwrap();
-                sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
+                sprite.index = max((sprite.index + 1) % texture_atlas.textures.len(), 1);
             } else if !game.player.is_moving {
                 sprite.index = 0
             }

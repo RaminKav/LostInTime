@@ -1,6 +1,6 @@
 use crate::assets::Graphics;
 use crate::item::{WorldObject, WorldObjectResource};
-use crate::{Game, GameState, ImageAssets};
+use crate::{Game, GameParam, GameState, ImageAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -100,7 +100,7 @@ impl ChunkManager {
 impl WorldGenerationPlugin {
     fn cache_chunk(
         commands: &mut Commands,
-        game: &Res<Game>,
+        game: &ResMut<Game>,
         chunk_pos: IVec2,
         chunk_manager: &mut ResMut<ChunkManager>,
     ) {
@@ -185,10 +185,7 @@ impl WorldGenerationPlugin {
         commands: &mut Commands,
         sprite_sheet: &Res<ImageAssets>,
         chunk_pos: IVec2,
-        chunk_manager: &mut ResMut<ChunkManager>,
-        graphics: &Graphics,
-        world_obj_data: &WorldObjectResource,
-        game_data: &mut GameData,
+        game: &mut GameParam,
         pkv: &mut PkvStore,
     ) {
         let tilemap_size = TilemapSize {
@@ -204,13 +201,14 @@ impl WorldGenerationPlugin {
 
         let tilemap_entity = commands.spawn_empty().id();
         let mut tile_storage = TileStorage::empty(tilemap_size);
-        if chunk_manager.cached_chunks.contains(&chunk_pos) {
+        if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
             println!("Loading chunk {:?} from CACHE!", chunk_pos);
 
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
-                    let tile_entity_data = chunk_manager
+                    let tile_entity_data = game
+                        .chunk_manager
                         .chunk_tile_entity_data
                         .get(&TileMapPositionData {
                             chunk_pos,
@@ -229,7 +227,7 @@ impl WorldGenerationPlugin {
                         })
                         .id();
 
-                    chunk_manager
+                    game.chunk_manager
                         .chunk_tile_entity_data
                         .get_mut(&TileMapPositionData {
                             chunk_pos,
@@ -258,21 +256,13 @@ impl WorldGenerationPlugin {
                 transform,
                 ..Default::default()
             });
-            Self::spawn_objects(
-                commands,
-                &graphics,
-                &world_obj_data,
-                chunk_manager,
-                game_data,
-                pkv,
-                chunk_pos,
-            );
+            Self::spawn_objects(commands, game, pkv, chunk_pos);
             return;
         }
         println!("WARNING: chunk {:?} not in CACHE!", chunk_pos);
     }
     fn get_tile_from_perlin_noise(
-        game: &Res<Game>,
+        game: &ResMut<Game>,
         chunk_pos: IVec2,
         tile_pos: TilePos,
     ) -> ([u8; 4], u8, [WorldObject; 4]) {
@@ -842,13 +832,8 @@ impl WorldGenerationPlugin {
 
         block_pos
     }
-    fn spawn_and_cache_init_chunks(
-        mut commands: Commands,
-        camera_query: Query<&Transform, With<Camera>>,
-        mut chunk_manager: ResMut<ChunkManager>,
-        game: Res<Game>,
-    ) {
-        for transform in camera_query.iter() {
+    fn spawn_and_cache_init_chunks(mut commands: Commands, mut game: GameParam) {
+        for transform in game.camera_query.iter() {
             let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
             for y in
                 (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
@@ -856,78 +841,79 @@ impl WorldGenerationPlugin {
                 for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)
                     ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
                 {
-                    if !chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
+                    if !game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
                         println!("Caching chunk at {:?} {:?}", x, y);
-                        chunk_manager.state = ChunkLoadingState::Spawning;
-                        // chunk_manager.cached_chunks.insert(IVec2::new(x, y));
+                        game.chunk_manager.state = ChunkLoadingState::Spawning;
+                        // game.chunk_manager.cached_chunks.insert(IVec2::new(x, y));
                         Self::cache_chunk(
                             &mut commands,
-                            &game,
+                            &game.game,
                             IVec2::new(x, y),
-                            &mut chunk_manager,
+                            &mut game.chunk_manager,
                         );
                     }
                 }
             }
         }
-        chunk_manager.state = ChunkLoadingState::None;
+        game.chunk_manager.state = ChunkLoadingState::None;
     }
 
     fn spawn_chunks_around_camera(
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
-        camera_query: Query<&Transform, With<Camera>>,
-        mut chunk_manager: ResMut<ChunkManager>,
-        game: Res<Game>,
-        graphics: Res<Graphics>,
-        world_obj_data: Res<WorldObjectResource>,
-        mut game_data: ResMut<GameData>,
+        mut game: GameParam,
         mut pkv: ResMut<PkvStore>,
     ) {
-        for transform in camera_query.iter() {
-            let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
-            for y in
-                (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
+        let transform = game.camera_query.single_mut();
+        // for transform in game.camera_query.iter() {
+        let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
+        for y in
+            (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
+        {
+            for x in
+                (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
             {
-                for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)
-                    ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
+                if !game
+                    .chunk_manager
+                    .spawned_chunks
+                    .contains(&IVec2::new(x, y))
                 {
-                    if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
-                        chunk_manager.state = ChunkLoadingState::Caching;
-                        Self::cache_chunk(
-                            &mut commands,
-                            &game,
-                            IVec2::new(x, y),
-                            &mut chunk_manager,
-                        );
-                    }
-                }
-            }
-            for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
-                ..(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
-            {
-                for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
-                    ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
-                {
-                    if !chunk_manager.spawned_chunks.contains(&IVec2::new(x, y)) {
-                        println!("spawning chunk at {:?} {:?}", x, y);
-                        chunk_manager.state = ChunkLoadingState::Spawning;
-                        chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
-                        Self::spawn_chunk(
-                            &mut commands,
-                            &sprite_sheet,
-                            IVec2::new(x, y),
-                            &mut chunk_manager,
-                            &graphics,
-                            &world_obj_data,
-                            &mut game_data,
-                            &mut pkv,
-                        );
-                    }
+                    game.chunk_manager.state = ChunkLoadingState::Caching;
+                    Self::cache_chunk(
+                        &mut commands,
+                        &game.game,
+                        IVec2::new(x, y),
+                        &mut game.chunk_manager,
+                    );
                 }
             }
         }
-        chunk_manager.state = ChunkLoadingState::None;
+        for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
+            ..(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
+        {
+            for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
+                ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
+            {
+                if !game
+                    .chunk_manager
+                    .spawned_chunks
+                    .contains(&IVec2::new(x, y))
+                {
+                    println!("spawning chunk at {:?} {:?}", x, y);
+                    game.chunk_manager.state = ChunkLoadingState::Spawning;
+                    game.chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
+                    Self::spawn_chunk(
+                        &mut commands,
+                        &sprite_sheet,
+                        IVec2::new(x, y),
+                        &mut game,
+                        &mut pkv,
+                    );
+                }
+            }
+        }
+        // }
+        game.chunk_manager.state = ChunkLoadingState::None;
     }
 
     fn despawn_outofrange_chunks(
@@ -987,10 +973,7 @@ impl WorldGenerationPlugin {
     //todo: do the same shit w graphcis resource loading, but w GameData and pkvStore
     fn spawn_objects(
         commands: &mut Commands,
-        graphics: &Graphics,
-        world_obj_data: &WorldObjectResource,
-        chunk_manager: &mut ChunkManager,
-        game_data: &mut GameData,
+        game: &mut GameParam,
         pkv: &mut PkvStore,
         chunk_pos: IVec2,
     ) {
@@ -1027,7 +1010,8 @@ impl WorldGenerationPlugin {
                     )
                 })
                 .filter(|tp| {
-                    let tile = chunk_manager
+                    let tile = game
+                        .chunk_manager
                         .chunk_tile_entity_data
                         .get(&TileMapPositionData {
                             chunk_pos,
@@ -1049,18 +1033,11 @@ impl WorldGenerationPlugin {
         for tp in tree_points.as_slice() {
             let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
 
-            let tree = tp.2.spawn(
-                commands,
-                &world_obj_data,
-                &graphics,
-                chunk_manager,
-                tile_pos,
-                chunk_pos,
-            );
+            let tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
             tree_children.push(tree);
         }
 
-        game_data.data.insert(
+        game.game_data.data.insert(
             (chunk_pos.x, chunk_pos.y),
             ChunkObjectData(tree_points.to_vec()),
         );

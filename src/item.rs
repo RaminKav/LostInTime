@@ -4,7 +4,7 @@ use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, 
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{AnimationTimer, GameState, Player};
+use crate::{AnimationTimer, GameParam, GameState, Player};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -77,17 +77,16 @@ impl WorldObject {
     pub fn spawn(
         self,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
-        graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
+        game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) -> Entity {
-        let item_map = &graphics.item_map;
+        let item_map = &game.graphics.item_map;
         if let None = item_map {
             panic!("graphics not loaded");
         }
-        let sprite = graphics
+        let sprite = game
+            .graphics
             .item_map
             .as_ref()
             .unwrap()
@@ -100,7 +99,7 @@ impl WorldObject {
         //  material:,
         //  transform:,
         //  ..Default::Default()});
-        let obj_data = world_obj_res.properties.get(&self).unwrap();
+        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
             (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
@@ -112,7 +111,7 @@ impl WorldObject {
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                 transform: Transform {
                     translation: position,
                     ..Default::default()
@@ -138,7 +137,7 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
-        chunk_manager.chunk_generation_data.insert(
+        game.chunk_manager.chunk_generation_data.insert(
             TileMapPositionData {
                 tile_pos: TilePos {
                     x: tile_pos.x as u32,
@@ -157,30 +156,20 @@ impl WorldObject {
     pub fn spawn_and_save_block(
         self,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
-        graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
-        game_data: &mut GameData,
+        game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) -> Entity {
-        let item = self.spawn(
-            commands,
-            world_obj_res,
-            graphics,
-            chunk_manager,
-            tile_pos,
-            chunk_pos,
-        );
+        let item = self.spawn(commands, game, tile_pos, chunk_pos);
 
-        let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y));
+        let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
 
         if let Some(old_points) = old_points {
             println!("SAVING NEW OBJ {:?} {:?}", self, tile_pos);
             let mut new_points = old_points.0.clone();
             new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
 
-            game_data
+            game.game_data
                 .data
                 .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
         }
@@ -189,16 +178,15 @@ impl WorldObject {
     }
     pub fn spawn_equipment_on_player(
         self,
-        mut player_query: Query<(Entity, &mut Player)>,
         commands: &mut Commands,
-        world_obj_res: &WorldObjectResource,
-        graphics: &Graphics,
+        game: &mut GameParam,
     ) -> Entity {
-        let item_map = &graphics.item_map;
+        let item_map = &game.graphics.item_map;
         if let None = item_map {
             panic!("graphics not loaded");
         }
-        let sprite = graphics
+        let sprite = game
+            .graphics
             .item_map
             .as_ref()
             .unwrap()
@@ -206,8 +194,8 @@ impl WorldObject {
             .expect(&format!("No graphic for object {:?}", self))
             .0
             .clone();
-        let player_data = &mut player_query.single_mut();
-        let obj_data = world_obj_res.properties.get(&self).unwrap();
+        let player_data = &mut game.player_query.single_mut();
+        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
         let health = Health(100);
@@ -221,7 +209,7 @@ impl WorldObject {
             let item = commands
                 .spawn(SpriteSheetBundle {
                     sprite,
-                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                    texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                     transform: Transform {
                         translation: position,
                         scale: Vec3::new(0.8, 0.8, 0.8),
@@ -264,16 +252,16 @@ impl WorldObject {
     pub fn spawn_item_drop(
         self,
         commands: &mut Commands,
-        world_obj_res: &mut WorldObjectResource,
-        graphics: &Graphics,
+        game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) -> Entity {
-        let item_map = &graphics.item_map;
+        let item_map = &game.graphics.item_map;
         if let None = item_map {
             panic!("graphics not loaded");
         }
-        let sprite = graphics
+        let sprite = game
+            .graphics
             .item_map
             .as_ref()
             .unwrap()
@@ -281,7 +269,7 @@ impl WorldObject {
             .expect(&format!("No graphic for object {:?}", self))
             .0
             .clone();
-        let obj_data = world_obj_res.properties.get(&self).unwrap();
+        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let mut rng = rand::thread_rng();
 
@@ -305,7 +293,7 @@ impl WorldObject {
         let item = commands
             .spawn(SpriteSheetBundle {
                 sprite,
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                 transform,
                 ..Default::default()
             })
@@ -327,77 +315,58 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
-        world_obj_res.drop_entities.insert(item, (stack, transform));
+        game.world_obj_data
+            .drop_entities
+            .insert(item, (stack, transform));
         item
     }
     pub fn attempt_to_break_item(
         self,
         commands: &mut Commands,
-        world_obj_res: &mut WorldObjectResource,
-        graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
-        game_data: &mut GameData,
+        game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-        with_item: &Option<EquipmentMetaData>,
-        block_entity_data: (Entity, &mut Health),
     ) {
-        if let Some(data) = world_obj_res.properties.get(&self) {
-            print!("1");
+        let obj_data = game
+            .chunk_manager
+            .chunk_generation_data
+            .get(&TileMapPositionData {
+                chunk_pos,
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+            })
+            .unwrap();
+
+        let main_hand_tool = &game.player_query.single().1.main_hand_slot;
+        let b_data = game.block_query.get_mut(obj_data.entity).unwrap();
+
+        if let Some(data) = game.world_obj_data.properties.get(&self) {
             if let Some(breaks_with) = data.breaks_with {
-                print!("2");
-
-                if let Some(with_item) = with_item {
-                    print!("3");
-
-                    if with_item.obj == breaks_with {
-                        print!("4");
-
-                        let mut h = block_entity_data.1;
-                        h.0 -= with_item.attack.0;
-                        info!(
-                            "BLOCK HEALTH: {:?}, TOOL ATT: {:?}",
-                            h.0, with_item.attack.0
-                        );
+                if let Some(main_hand_tool) = main_hand_tool {
+                    if main_hand_tool.obj == breaks_with {
+                        let mut h = b_data.1;
+                        h.0 -= main_hand_tool.attack.0;
                         if h.0 <= 0 {
-                            Self::break_item(
-                                self,
-                                commands,
-                                world_obj_res,
-                                graphics,
-                                chunk_manager,
-                                game_data,
-                                tile_pos,
-                                chunk_pos,
-                            )
+                            Self::break_item(self, commands, game, tile_pos, chunk_pos)
                         }
                     }
                 }
             } else {
-                Self::break_item(
-                    self,
-                    commands,
-                    world_obj_res,
-                    graphics,
-                    chunk_manager,
-                    game_data,
-                    tile_pos,
-                    chunk_pos,
-                )
+                Self::break_item(self, commands, game, tile_pos, chunk_pos)
             }
         }
     }
     pub fn break_item(
         self,
         commands: &mut Commands,
-        world_obj_res: &mut WorldObjectResource,
-        graphics: &Graphics,
-        chunk_manager: &mut ChunkManager,
-        game_data: &mut GameData,
+        game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) {
-        let obj_data = chunk_manager
+        let obj_data = game
+            .chunk_manager
             .chunk_generation_data
             .get(&TileMapPositionData {
                 chunk_pos,
@@ -413,18 +382,12 @@ impl WorldObject {
             (tile_pos.x as f32, tile_pos.y as f32, self),
         );
 
-        if let Some(breaks_into_option) = world_obj_res.properties.get(&self) {
+        if let Some(breaks_into_option) = game.world_obj_data.properties.get(&self) {
             commands.entity(obj_data.entity).despawn();
             if let Some(breaks_into) = breaks_into_option.breaks_into {
-                breaks_into.spawn_item_drop(
-                    commands,
-                    world_obj_res,
-                    &graphics,
-                    tile_pos,
-                    chunk_pos,
-                );
+                breaks_into.spawn_item_drop(commands, game, tile_pos, chunk_pos);
             }
-            chunk_manager
+            game.chunk_manager
                 .chunk_generation_data
                 .remove(&TileMapPositionData {
                     chunk_pos,
@@ -433,7 +396,11 @@ impl WorldObject {
                         y: tile_pos.y as u32,
                     },
                 });
-            let old_points = game_data.data.get(&(chunk_pos.x, chunk_pos.y)).unwrap();
+            let old_points = game
+                .game_data
+                .data
+                .get(&(chunk_pos.x, chunk_pos.y))
+                .unwrap();
             let updated_old_points = old_points
                 .0
                 .clone()
@@ -447,7 +414,7 @@ impl WorldObject {
                 updated_old_points.len(),
                 old_points.0.len()
             );
-            game_data.data.insert(
+            game.game_data.data.insert(
                 (chunk_pos.x, chunk_pos.y),
                 ChunkObjectData(updated_old_points.to_vec()),
             );
