@@ -74,25 +74,25 @@ impl InputsPlugin {
             dx -= s;
             game.game.player.is_moving = true;
             player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
-            if let Some(c) = children {
-                for item in c.iter() {
-                    if let Ok(mut e) = eqp_query.get_mut(*item) {
-                        e.translation.z = -0.1
-                    }
-                }
-            }
+            // if let Some(c) = children {
+            //     for item in c.iter() {
+            //         if let Ok(mut e) = eqp_query.get_mut(*item) {
+            //             e.translation.z = -0.1
+            //         }
+            //     }
+            // }
         }
         if key_input.pressed(KeyCode::D) {
             dx += s;
             game.game.player.is_moving = true;
             player_transform.rotation = Quat::default();
-            if let Some(c) = children {
-                for item in c.iter() {
-                    if let Ok(mut e) = eqp_query.get_mut(*item) {
-                        e.translation.z = 0.1
-                    }
-                }
-            }
+            // if let Some(c) = children {
+            //     for item in c.iter() {
+            //         if let Ok(mut e) = eqp_query.get_mut(*item) {
+            //             e.translation.z = 0.1
+            //         }
+            //     }
+            // }
         }
         if key_input.pressed(KeyCode::W) {
             dy += s;
@@ -243,6 +243,7 @@ impl InputsPlugin {
         // player_kin_controller.translation =
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
+        player_transform.translation.z = player_transform.translation.y;
         camera_transform.translation.x = cx;
         camera_transform.translation.y = cy;
 

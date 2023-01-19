@@ -243,7 +243,7 @@ impl WorldGenerationPlugin {
             let transform = Transform::from_translation(Vec3::new(
                 chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
                 chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y,
-                0.0,
+                0.,
             ));
 
             commands.entity(tilemap_entity).insert(TilemapBundle {

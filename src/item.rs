@@ -47,7 +47,7 @@ pub enum WorldObject {
     Flint,
 }
 
-pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-3., -5.); 1];
+pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-9., -7.); 1];
 
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
@@ -106,7 +106,8 @@ impl WorldObject {
                 + anchor.x * obj_data.size.x,
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y,
-            0.1,
+            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.y * obj_data.size.y,
         );
         let item = commands
             .spawn(SpriteSheetBundle {
@@ -204,7 +205,7 @@ impl WorldObject {
             position = Vec3::new(
                 PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
                 PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
-                0.1,
+                0.5,
             );
             let item = commands
                 .spawn(SpriteSheetBundle {
@@ -212,8 +213,8 @@ impl WorldObject {
                     texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                     transform: Transform {
                         translation: position,
-                        scale: Vec3::new(0.8, 0.8, 0.8),
-                        // rotation: Quat::from_rotation_x(0.1),
+                        scale: Vec3::new(0.55, 0.55, 0.55),
+                        rotation: Quat::from_rotation_z(0.8),
                         ..Default::default()
                     },
                     ..Default::default()
@@ -280,7 +281,9 @@ impl WorldObject {
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
                 + rng.gen_range(-10. ..10.),
-            0.1,
+            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.y * obj_data.size.y
+                + rng.gen_range(-10. ..10.),
         );
         let stack = ItemStack(self, rng.gen_range(1..4));
         let transform = Transform {

@@ -27,6 +27,8 @@ use inputs::{Direction, InputsPlugin};
 use item::{
     Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
 };
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
 const PLAYER_MOVE_SPEED: f32 = 10.;
@@ -58,7 +60,7 @@ fn main() {
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
-        .add_plugin(RapierDebugRenderPlugin::default())
+        // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -143,6 +145,13 @@ pub struct Player {
     inventory: Vec<ItemStack>,
     main_hand_slot: Option<EquipmentMetaData>,
 }
+#[derive(EnumIter, Display, PartialEq)]
+pub enum Limb {
+    Head,
+    Torso,
+    Hands,
+    Legs,
+}
 
 fn setup(
     mut commands: Commands,
@@ -162,10 +171,10 @@ fn setup(
     game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
 
     // let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
-    let player_texture_handle = asset_server.load("textures/player-run-down.png");
-    let player_texture_atlas =
-        TextureAtlas::from_grid(player_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
-    let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
+    // let player_texture_handle = asset_server.load("textures/player-run-down.png");
+    // let player_texture_atlas =
+    //     TextureAtlas::from_grid(player_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
+    // let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
     let mut camera = Camera2dBundle::default();
 
@@ -181,24 +190,64 @@ fn setup(
         // RigidBody::KinematicPositionBased,
     ));
 
-    commands.spawn((
-        SpriteSheetBundle {
-            texture_atlas: player_texture_atlas_handle,
-            transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
-                .with_translation(Vec3::new(0., 0., 1.)),
+    let mut limb_children: Vec<Entity> = vec![];
+    for l in Limb::iter() {
+        let limb_texture_handle = asset_server.load(format!(
+            "textures/player-{}-run-down.png",
+            l.to_string().to_lowercase()
+        ));
+        let limb_texture_atlas =
+            TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
+
+        let limb_texture_atlas_handle = texture_atlases.add(limb_texture_atlas);
+        let transform = if l == Limb::Hands {
+            Transform::from_translation(Vec3::new(0., 0., 0.))
+        } else {
+            Transform::default()
+        };
+        let limb = commands
+            .spawn(SpriteSheetBundle {
+                texture_atlas: limb_texture_atlas_handle,
+                transform,
+                ..default()
+            })
+            .id();
+        limb_children.push(limb);
+    }
+    //player shadow
+    let shadow_texture_handle = asset_server.load("textures/player-shadow.png");
+    let shadow_texture_atlas =
+        TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
+    let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
+
+    let shadow = commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: shadow_texture_atlas_handle,
             ..default()
-        },
-        AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player {
-            is_moving: false,
-            is_dashing: false,
-            is_attacking: false,
-            inventory: Vec::new(),
-            main_hand_slot: None,
-        },
-        Direction(1.0),
-        KinematicCharacterController::default(),
-        Collider::cuboid(7., 10.),
-        Name::new("Player"),
-    ));
+        })
+        .id();
+    limb_children.push(shadow);
+
+    //spawn player entity with limb spritesheets as children
+    commands
+        .spawn((
+            SpatialBundle {
+                transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
+                    .with_translation(Vec3::new(0., 0., 1.)),
+                ..Default::default()
+            },
+            AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
+            Player {
+                is_moving: false,
+                is_dashing: false,
+                is_attacking: false,
+                inventory: Vec::new(),
+                main_hand_slot: None,
+            },
+            Direction(1.0),
+            KinematicCharacterController::default(),
+            Collider::cuboid(7., 10.),
+            Name::new("Player"),
+        ))
+        .push_children(&limb_children);
 }
