@@ -4,7 +4,10 @@ use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
-use crate::{item::ItemStack, Game, GameState, Player, TIME_STEP};
+use crate::{
+    item::{Equipment, ItemStack},
+    Game, GameState, Player, TIME_STEP,
+};
 
 pub struct AnimationsPlugin;
 
@@ -31,16 +34,10 @@ impl AnimationsPlugin {
         time: Res<Time>,
         texture_atlases: Res<Assets<TextureAtlas>>,
         game: Res<Game>,
-        mut query: Query<
-            (
-                &mut AnimationTimer,
-                &mut TextureAtlasSprite,
-                &Handle<TextureAtlas>,
-            ),
-            With<Player>,
-        >,
+        mut query: Query<(&mut AnimationTimer, &Children), With<Player>>,
+        mut limb_query: Query<(&mut TextureAtlasSprite, &Handle<TextureAtlas>), Without<Equipment>>,
     ) {
-        for (mut timer, mut sprite, handle) in &mut query {
+        for (mut timer, limb_children) in &mut query {
             let d = time.delta();
             timer.tick(if game.player.is_dashing {
                 Duration::new(
@@ -51,10 +48,21 @@ impl AnimationsPlugin {
                 d
             });
             if timer.just_finished() && game.player.is_moving {
-                let texture_atlas = texture_atlases.get(handle).unwrap();
-                sprite.index = max((sprite.index + 1) % texture_atlas.textures.len(), 1);
+                for l in limb_children {
+                    if let Ok((mut limb_sprite, limb_handle)) = limb_query.get_mut(*l) {
+                        let texture_atlas = texture_atlases.get(limb_handle).unwrap();
+                        if texture_atlas.textures.len() > 1 {
+                            limb_sprite.index =
+                                max((limb_sprite.index + 1) % texture_atlas.textures.len(), 1);
+                        }
+                    }
+                }
             } else if !game.player.is_moving {
-                sprite.index = 0
+                for l in limb_children {
+                    if let Ok((mut limb_sprite, _)) = limb_query.get_mut(*l) {
+                        limb_sprite.index = 0
+                    }
+                }
             }
         }
     }
