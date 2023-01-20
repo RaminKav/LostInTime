@@ -74,6 +74,7 @@ fn main() {
                 .with_collection::<ImageAssets>(),
         )
         .add_state(GameState::Loading)
+        .add_system(y_sort)
         .run();
 }
 
@@ -112,6 +113,15 @@ pub struct ImageAssets {
     pub sprite_sheet: Handle<Image>,
     #[asset(path = "RPGTiles.png")]
     pub tiles_sheet: Handle<Image>,
+}
+
+#[derive(Component)]
+pub struct YSort;
+
+fn y_sort(mut q: Query<&mut Transform, With<YSort>>) {
+    for mut tf in q.iter_mut() {
+        tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
+    }
 }
 
 #[derive(SystemParam)]
@@ -247,6 +257,7 @@ fn setup(
             Direction(1.0),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
+            YSort,
             Name::new("Player"),
         ))
         .push_children(&limb_children);

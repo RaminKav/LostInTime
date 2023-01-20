@@ -36,6 +36,7 @@ impl AnimationsPlugin {
         game: Res<Game>,
         mut query: Query<(&mut AnimationTimer, &Children), With<Player>>,
         mut limb_query: Query<(&mut TextureAtlasSprite, &Handle<TextureAtlas>), Without<Equipment>>,
+        mut eq_query: Query<&mut Transform, With<Equipment>>,
     ) {
         for (mut timer, limb_children) in &mut query {
             let d = time.delta();
@@ -55,12 +56,18 @@ impl AnimationsPlugin {
                             limb_sprite.index =
                                 max((limb_sprite.index + 1) % texture_atlas.textures.len(), 1);
                         }
+                    } else if let Ok(mut t) = eq_query.get_mut(*l) {
+                        // t.translation.y = (t.translation.y + 1.) % 2.;
+                        // t.translation.x = (t.translation.y + 1.) % 2.;
                     }
                 }
             } else if !game.player.is_moving {
                 for l in limb_children {
                     if let Ok((mut limb_sprite, _)) = limb_query.get_mut(*l) {
                         limb_sprite.index = 0
+                    } else if let Ok(mut t) = eq_query.get_mut(*l) {
+                        // t.translation.y = -1.;
+                        // t.translation.x = 0.;
                     }
                 }
             }
