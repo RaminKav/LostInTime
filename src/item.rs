@@ -4,7 +4,7 @@ use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, 
 use crate::world_generation::{
     ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{AnimationTimer, GameParam, GameState, Player};
+use crate::{AnimationTimer, GameParam, GameState, Player, YSort};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -47,7 +47,7 @@ pub enum WorldObject {
     Flint,
 }
 
-pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-9., -7.); 1];
+pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-9., -5.); 1];
 
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
@@ -106,8 +106,7 @@ impl WorldObject {
                 + anchor.x * obj_data.size.x,
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y,
-            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y,
+            0.,
         );
         let item = commands
             .spawn(SpriteSheetBundle {
@@ -124,6 +123,7 @@ impl WorldObject {
                 health: Health(100),
             })
             .insert(Block)
+            .insert(YSort)
             .insert(self)
             .id();
         if obj_data.breakable {
@@ -205,15 +205,16 @@ impl WorldObject {
             position = Vec3::new(
                 PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
                 PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
-                0.5,
+                500. - (PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y) * 0.1,
             );
+            info!("{:?}", position);
             let item = commands
                 .spawn(SpriteSheetBundle {
                     sprite,
                     texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                     transform: Transform {
                         translation: position,
-                        scale: Vec3::new(0.55, 0.55, 0.55),
+                        scale: Vec3::new(0.7, 0.7, 0.7),
                         rotation: Quat::from_rotation_z(0.8),
                         ..Default::default()
                     },
@@ -222,6 +223,7 @@ impl WorldObject {
                 .insert(EquipmentAttributeBundle { health, attack })
                 .insert(Equipment)
                 .insert(Name::new("EquipItem"))
+                .insert(YSort)
                 .insert(self)
                 .id();
 
@@ -281,9 +283,10 @@ impl WorldObject {
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
                 + rng.gen_range(-10. ..10.),
-            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+            500. - ((tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
-                + rng.gen_range(-10. ..10.),
+                + rng.gen_range(-10. ..10.))
+                * 0.1,
         );
         let stack = ItemStack(self, rng.gen_range(1..4));
         let transform = Transform {
@@ -309,6 +312,7 @@ impl WorldObject {
                 TimerMode::Repeating,
             )))
             .insert(AnimationPosTracker(0., 0., 0.3))
+            .insert(YSort)
             .insert(self)
             .id();
 
