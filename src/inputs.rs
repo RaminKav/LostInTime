@@ -10,6 +10,7 @@ use bevy_rapier2d::prelude::{
     QueryFilter, QueryFilterFlags, RapierContext,
 };
 
+use crate::animations::{AnimatedTextureMaterial, AnimationFrameTracker};
 use crate::attributes::Health;
 use crate::item::{Block, Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
@@ -19,7 +20,7 @@ use crate::{
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{main, GameParam, ItemStack, PLAYER_MOVE_SPEED};
+use crate::{main, GameParam, ItemStack, Limb, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource)]
 pub struct CursorPos(Vec3);
@@ -57,7 +58,17 @@ impl InputsPlugin {
             ),
             (With<Player>, Without<Camera>, Without<Equipment>),
         >,
-        mut eqp_query: Query<&mut Transform, (With<Equipment>, Without<Camera>, Without<Player>)>,
+        mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+        mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
+        // mut eqp_query: Query<
+        //     &mut Transform,
+        //     (
+        //         With<Limb>,
+        //         Without<ItemStack>,
+        //         Without<Camera>,
+        //         Without<Player>,
+        //     ),
+        // >,
         // mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
@@ -73,23 +84,28 @@ impl InputsPlugin {
         if key_input.pressed(KeyCode::A) {
             dx -= s;
             game.game.player.is_moving = true;
-            player_transform.rotation = Quat::from_rotation_y(std::f32::consts::PI);
             if let Some(c) = children {
-                for item in c.iter() {
-                    if let Ok(mut e) = eqp_query.get_mut(*item) {
-                        e.translation.z = -0.1
+                for l in c.iter() {
+                    if let Ok(limb_handle) = limb_query.get_mut(*l) {
+                        let limb_material = materials.get_mut(limb_handle);
+                        if let Some(mat) = limb_material {
+                            mat.flip = 1.;
+                        }
                     }
                 }
             }
         }
+
         if key_input.pressed(KeyCode::D) {
             dx += s;
             game.game.player.is_moving = true;
-            player_transform.rotation = Quat::default();
             if let Some(c) = children {
-                for item in c.iter() {
-                    if let Ok(mut e) = eqp_query.get_mut(*item) {
-                        e.translation.z = 0.1
+                for l in c.iter() {
+                    if let Ok(limb_handle) = limb_query.get_mut(*l) {
+                        let limb_material = materials.get_mut(limb_handle);
+                        if let Some(mat) = limb_material {
+                            mat.flip = 0.;
+                        }
                     }
                 }
             }
@@ -243,7 +259,6 @@ impl InputsPlugin {
         // player_kin_controller.translation =
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
-        player_transform.translation.z = 500. - player_transform.translation.y * 0.1;
         camera_transform.translation.x = cx;
         camera_transform.translation.y = cy;
 
