@@ -6,8 +6,8 @@ use attributes::Health;
 // - set up tilemap or world generation
 // - trees/entities to break/mine
 use bevy::{
-    ecs::system::SystemParam, prelude::*, render::camera::ScalingMode, utils::HashSet,
-    window::PresentMode,
+    ecs::system::SystemParam, prelude::*, render::camera::ScalingMode,
+    sprite::MaterialMesh2dBundle, utils::HashSet, window::PresentMode,
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
@@ -18,7 +18,10 @@ mod inputs;
 mod item;
 mod vectorize;
 mod world_generation;
-use animations::{AnimationTimer, AnimationsPlugin};
+use animations::{
+    AnimatedTextureMaterial, AnimationFrameTracker, AnimationPosTracker, AnimationTimer,
+    AnimationsPlugin,
+};
 use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
@@ -155,18 +158,20 @@ pub struct Player {
     inventory: Vec<ItemStack>,
     main_hand_slot: Option<EquipmentMetaData>,
 }
-#[derive(EnumIter, Display, PartialEq)]
+#[derive(Component, EnumIter, Display, PartialEq)]
 pub enum Limb {
-    Head,
     Torso,
     Hands,
     Legs,
+    Head,
 }
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
     mut game: ResMut<Game>,
 ) {
     game.world_size = WORLD_SIZE;
@@ -201,31 +206,8 @@ fn setup(
     ));
 
     let mut limb_children: Vec<Entity> = vec![];
-    for l in Limb::iter() {
-        let limb_texture_handle = asset_server.load(format!(
-            "textures/player-{}-run-down.png",
-            l.to_string().to_lowercase()
-        ));
-        let limb_texture_atlas =
-            TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
-
-        let limb_texture_atlas_handle = texture_atlases.add(limb_texture_atlas);
-        let transform = if l == Limb::Hands {
-            Transform::from_translation(Vec3::new(0., 0., 0.))
-        } else {
-            Transform::default()
-        };
-        let limb = commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: limb_texture_atlas_handle,
-                transform,
-                ..default()
-            })
-            .id();
-        limb_children.push(limb);
-    }
     //player shadow
-    let shadow_texture_handle = asset_server.load("textures/player-shadow.png");
+    let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
     let shadow_texture_atlas =
         TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
     let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
@@ -233,10 +215,63 @@ fn setup(
     let shadow = commands
         .spawn(SpriteSheetBundle {
             texture_atlas: shadow_texture_atlas_handle,
+            transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
             ..default()
         })
         .id();
     limb_children.push(shadow);
+
+    //player
+    for l in Limb::iter() {
+        let limb_source_handle = asset_server.load(format!(
+            "textures/player/player-run-down/player-{}-run-down-source-1.png",
+            l.to_string().to_lowercase()
+        ));
+        let limb_texture_handle = asset_server.load(format!(
+            "textures/player/player-texture-{}.png",
+            l.to_string().to_lowercase()
+        ));
+        // let limb_texture_atlas =
+        //     TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
+
+        // let limb_texture_atlas_handle = texture_atlases.add(limb_texture_atlas);
+        let transform = if l == Limb::Head {
+            Transform::from_translation(Vec3::new(0., 0., 0.))
+        } else {
+            Transform::default()
+        };
+        let limb = commands
+            .spawn((
+                MaterialMesh2dBundle {
+                    mesh: meshes
+                        .add(
+                            shape::Quad {
+                                size: Vec2::new(32., 32.),
+                                ..Default::default()
+                            }
+                            .into(),
+                        )
+                        .into(),
+                    transform,
+                    material: materials.add(AnimatedTextureMaterial {
+                        source_texture: Some(limb_source_handle),
+                        lookup_texture: Some(limb_texture_handle),
+                        flip: 1.,
+                    }),
+                    ..default()
+                },
+                l,
+                AnimationFrameTracker(0, 5),
+            ))
+            .id();
+        // .spawn(SpriteSheetBundle {
+        //     texture_atlas: limb_texture_atlas_handle,
+        //     transform,
+        //     ..default()
+        // })
+        // .id();
+        limb_children.push(limb);
+    }
 
     //spawn player entity with limb spritesheets as children
     commands
