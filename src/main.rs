@@ -10,6 +10,7 @@ use bevy::{
     sprite::MaterialMesh2dBundle, utils::HashSet, window::PresentMode,
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
+use bevy_pixel_camera::{PixelCameraBundle, PixelCameraPlugin};
 use bevy_rapier2d::prelude::*;
 mod animations;
 mod assets;
@@ -26,6 +27,10 @@ use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
+use bevy_tweening::{
+    lens::{TransformPositionLens, TransformScaleLens},
+    Animator, AnimatorState, EaseFunction, Tween, TweeningPlugin,
+};
 use inputs::{Direction, InputsPlugin};
 use item::{
     Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
@@ -34,7 +39,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
-const PLAYER_MOVE_SPEED: f32 = 10.;
+const PLAYER_MOVE_SPEED: f32 = 6.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
@@ -61,6 +66,7 @@ fn main() {
                 }),
         )
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
+        .add_plugin(PixelCameraPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
         // .add_plugin(RapierDebugRenderPlugin::default())
@@ -70,6 +76,7 @@ fn main() {
         .add_plugin(AnimationsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
+        .add_plugin(TweeningPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -166,6 +173,9 @@ pub enum Limb {
     Head,
 }
 
+#[derive(Component, Default)]
+pub struct CameraDirty(bool, bool);
+
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -183,7 +193,7 @@ fn setup(
         water_frequency: 0.05,
     };
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_dash_duration = Timer::from_seconds(0.15, TimerMode::Once);
+    game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
     // let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
     // let player_texture_handle = asset_server.load("textures/player-run-down.png");
@@ -191,18 +201,29 @@ fn setup(
     //     TextureAtlas::from_grid(player_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
     // let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
-    let mut camera = Camera2dBundle::default();
+    // let tween_scale = Tween::new(
+    //     EaseFunction::QuadraticIn,
+    //     Duration::from_secs(1),
+    //     TransformPositionLens {
+    //         start: Vec3::ONE,
+    //         end: Vec3::ONE,
+    //     },
+    // );
+    // let a = Animator::new(tween_scale);
+
+    // let mut camera = Camera2dBundle::default();
+    let camera = PixelCameraBundle::from_resolution(240, 180);
 
     // One unit in world space is one tile
-    camera.projection.left = -HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
-    camera.projection.right = HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
-    camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
-    camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
-    camera.projection.scaling_mode = ScalingMode::None;
+    // camera.projection.left = -HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
+    // camera.projection.right = HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
+    // camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
+    // camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
+    // camera.projection.scaling_mode = ScalingMode::None;
     commands.spawn((
         camera,
-        // KinematicCharacterController::default(),
-        // RigidBody::KinematicPositionBased,
+        CameraDirty(false, false),
+        AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
     ));
 
     let mut limb_children: Vec<Entity> = vec![];

@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::app::AppExit;
 use bevy::ecs::system::Despawn;
 use bevy::prelude::*;
@@ -9,8 +11,11 @@ use bevy_rapier2d::prelude::{
     Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
     QueryFilter, QueryFilterFlags, RapierContext,
 };
+use bevy_tweening::lens::{TransformPositionLens, TransformScaleLens};
+use bevy_tweening::{Animator, AnimatorState, EaseFunction, Tween};
+use interpolation::{lerp, Ease};
 
-use crate::animations::{AnimatedTextureMaterial, AnimationFrameTracker};
+use crate::animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer};
 use crate::attributes::Health;
 use crate::item::{Block, Breakable, Equipment, WorldObjectResource};
 use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
@@ -20,7 +25,7 @@ use crate::{
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{main, GameParam, ItemStack, Limb, PLAYER_MOVE_SPEED};
+use crate::{main, CameraDirty, GameParam, ItemStack, Limb, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource)]
 pub struct CursorPos(Vec3);
@@ -33,16 +38,21 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos(Vec3::new(-100.0, -100.0, 0.0)))
+            .add_event::<PlayerMoveEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::move_player)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
+                    .with_system(Self::move_camera_with_player.after(Self::move_player))
                     .with_system(Self::mouse_click_system),
             )
             .add_system(Self::close_on_esc);
     }
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct PlayerMoveEvent(bool);
 
 impl InputsPlugin {
     fn move_player(
@@ -73,10 +83,10 @@ impl InputsPlugin {
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
+        mut move_event: EventWriter<PlayerMoveEvent>,
     ) {
         let (ent, mut player_transform, player_collider, mut dir, children) =
             player_query.single_mut();
-        let mut camera_transform = game.camera_query.single_mut();
         let mut dx = 0.0;
         let mut dy = 0.0;
         let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
@@ -126,10 +136,12 @@ impl InputsPlugin {
                 game.game.player_dash_duration.reset();
             }
         }
-        if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
-            || (dx == 0. && dy == 0.)
+        if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]) &&
+        // || (dx == 0. && dy == 0.)
+        !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
         {
             game.game.player.is_moving = false;
+            move_event.send(PlayerMoveEvent(true));
         }
         if dx != 0. && dy != 0. {
             dx = if dx == -s { -(s * 0.66) } else { s * 0.66 };
@@ -254,13 +266,12 @@ impl InputsPlugin {
             },
         );
 
-        let cx = player_transform.translation.x + output_ad.effective_translation.x;
-        let cy = player_transform.translation.y + output_ws.effective_translation.y;
-        // player_kin_controller.translation =
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
-        camera_transform.translation.x = cx;
-        camera_transform.translation.y = cy;
+
+        if dx != 0. || dy != 0. {
+            move_event.send(PlayerMoveEvent(false));
+        }
 
         if dx != 0. {
             dir.0 = dx;
@@ -434,6 +445,83 @@ impl InputsPlugin {
                     exit.send(AppExit);
                     window.close();
                 }
+            }
+        }
+    }
+    pub fn move_camera_with_player(
+        mut move_events: EventReader<PlayerMoveEvent>,
+        mut player_query: Query<&Transform, (With<Player>, Without<Camera>)>,
+        mut camera: Query<(&mut Transform, &mut AnimationTimer, &mut CameraDirty), With<Camera>>,
+        time: Res<Time>,
+    ) {
+        let mut s = PLAYER_MOVE_SPEED / WORLD_SCALE / 1.5;
+
+        let (mut tf, mut at, mut dirty) = camera.single_mut();
+        let move_events = move_events.iter().cloned();
+        for e in move_events {
+            dirty.0 = true;
+            if e.0 {
+                dirty.1 = true;
+            } else {
+                dirty.1 = false;
+                at.0.reset();
+            }
+        }
+        if dirty.0 && !dirty.1 {
+            let pt = player_query.single_mut().translation;
+            let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
+            if delta.x.abs() + delta.y.abs() >= 20. {
+                s = PLAYER_MOVE_SPEED / WORLD_SCALE;
+            }
+            if delta.x != 0. && delta.y != 0. {
+                s = s * 0.66;
+            }
+
+            if delta.x > 0. && delta.x - s >= 0. {
+                tf.translation.x += s;
+            } else if delta.x < 0. && delta.x + s <= 0. {
+                tf.translation.x -= s;
+            } else {
+                tf.translation.x += delta.x
+            }
+
+            if delta.y > 0. && delta.y - s >= 0. {
+                tf.translation.y += s;
+            } else if delta.y < 0. && delta.y + s <= 0. {
+                tf.translation.y -= s;
+            } else {
+                tf.translation.y += delta.y
+            }
+
+            if delta.x == 0. && delta.y == 0. {
+                dirty.0 = false;
+            }
+        } else if dirty.1 {
+            let pt = player_query.single_mut().translation;
+            let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
+            at.0.tick(time.delta());
+            let e = at.0.elapsed().as_millis();
+            let t = at.0.duration().as_millis();
+            let l = e as f32 / t as f32;
+            let l = Ease::quadratic_out(l);
+
+            let amount_x = lerp(&0., &delta.x, &l) as f32;
+            let amount_y = lerp(&0., &delta.y, &l) as f32;
+
+            tf.translation.x += if delta.x.abs() < 0.1 {
+                delta.x
+            } else {
+                amount_x
+            };
+            tf.translation.y += if delta.y.abs() < 0.1 {
+                delta.y
+            } else {
+                amount_y
+            };
+
+            if delta.x == 0. && delta.y == 0. {
+                at.0.reset();
+                dirty.1 = false;
             }
         }
     }

@@ -17,6 +17,10 @@ pub struct AnimationsPlugin;
 
 #[derive(Component, Inspectable)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
+
+// #[derive(Component, Inspectable)]
+// pub struct CameraOffsetTracker(Vec2, Vec2);
+
 #[derive(Component, Inspectable)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
