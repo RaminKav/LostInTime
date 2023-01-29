@@ -1,3 +1,4 @@
+use std::f32::consts::PI;
 use std::time::Duration;
 
 use bevy::app::AppExit;
@@ -87,12 +88,11 @@ impl InputsPlugin {
     ) {
         let (ent, mut player_transform, player_collider, mut dir, children) =
             player_query.single_mut();
-        let mut dx = 0.0;
-        let mut dy = 0.0;
+        let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
 
         if key_input.pressed(KeyCode::A) {
-            dx -= s;
+            d.x -= 1.;
             game.game.player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
@@ -107,7 +107,7 @@ impl InputsPlugin {
         }
 
         if key_input.pressed(KeyCode::D) {
-            dx += s;
+            d.x += 1.;
             game.game.player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
@@ -121,11 +121,11 @@ impl InputsPlugin {
             }
         }
         if key_input.pressed(KeyCode::W) {
-            dy += s;
+            d.y += 1.;
             game.game.player.is_moving = true;
         }
         if key_input.pressed(KeyCode::S) {
-            dy -= s;
+            d.y -= 1.;
             game.game.player.is_moving = true;
         }
         if game.game.player_dash_cooldown.tick(time.delta()).finished() {
@@ -143,23 +143,20 @@ impl InputsPlugin {
             game.game.player.is_moving = false;
             move_event.send(PlayerMoveEvent(true));
         }
-        if dx != 0. && dy != 0. {
-            dx = if dx == -s { -(s * 0.66) } else { s * 0.66 };
-            dy = if dy == -s { -(s * 0.66) } else { s * 0.66 };
-        }
+        d = d.normalize() * s;
 
         if game.game.player.is_dashing {
             game.game.player_dash_duration.tick(time.delta());
 
-            dx += dx * PLAYER_DASH_SPEED * TIME_STEP;
-            dy += dy * PLAYER_DASH_SPEED * TIME_STEP;
+            d.x += d.x * PLAYER_DASH_SPEED * TIME_STEP;
+            d.y += d.y * PLAYER_DASH_SPEED * TIME_STEP;
             if game.game.player_dash_duration.just_finished() {
                 game.game.player.is_dashing = false;
             }
         }
         let mut collected_drops = HashSet::new();
         let output_ws = context.move_shape(
-            Vec2::new(0., dy),
+            Vec2::new(0., d.y),
             player_collider,
             player_transform.translation.truncate(),
             0.,
@@ -213,7 +210,7 @@ impl InputsPlugin {
         );
 
         let output_ad = context.move_shape(
-            Vec2::new(dx, 0.),
+            Vec2::new(d.x, 0.),
             player_collider,
             player_transform.translation.truncate(),
             0.,
@@ -269,12 +266,12 @@ impl InputsPlugin {
         player_transform.translation +=
             output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
 
-        if dx != 0. || dy != 0. {
+        if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
         }
 
-        if dx != 0. {
-            dir.0 = dx;
+        if d.x != 0. {
+            dir.0 = d.x;
         }
     }
 
@@ -454,8 +451,6 @@ impl InputsPlugin {
         mut camera: Query<(&mut Transform, &mut AnimationTimer, &mut CameraDirty), With<Camera>>,
         time: Res<Time>,
     ) {
-        let mut s = PLAYER_MOVE_SPEED / WORLD_SCALE / 1.5;
-
         let (mut tf, mut at, mut dirty) = camera.single_mut();
         let move_events = move_events.iter().cloned();
         for e in move_events {
@@ -470,40 +465,16 @@ impl InputsPlugin {
         if dirty.0 && !dirty.1 {
             let pt = player_query.single_mut().translation;
             let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
-            if delta.x.abs() + delta.y.abs() >= 20. {
-                s = PLAYER_MOVE_SPEED / WORLD_SCALE;
-            }
-            if delta.x != 0. && delta.y != 0. {
-                s = s * 0.66;
-            }
-
-            if delta.x > 0. && delta.x - s >= 0. {
-                tf.translation.x += s;
-            } else if delta.x < 0. && delta.x + s <= 0. {
-                tf.translation.x -= s;
-            } else {
-                tf.translation.x += delta.x
-            }
-
-            if delta.y > 0. && delta.y - s >= 0. {
-                tf.translation.y += s;
-            } else if delta.y < 0. && delta.y + s <= 0. {
-                tf.translation.y -= s;
-            } else {
-                tf.translation.y += delta.y
-            }
-
-            if delta.x == 0. && delta.y == 0. {
-                dirty.0 = false;
-            }
+            let d = delta.length();
+            tf.translation.x = lerp(&tf.translation.x, &pt.x, &0.1);
+            tf.translation.y = lerp(&tf.translation.y, &pt.y, &0.1);
         } else if dirty.1 {
             let pt = player_query.single_mut().translation;
             let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
             at.0.tick(time.delta());
             let e = at.0.elapsed().as_millis();
             let t = at.0.duration().as_millis();
-            let l = e as f32 / t as f32;
-            let l = Ease::quadratic_out(l);
+            let l = Ease::quadratic_out(e as f32 / t as f32);
 
             let amount_x = lerp(&0., &delta.x, &l) as f32;
             let amount_y = lerp(&0., &delta.y, &l) as f32;
