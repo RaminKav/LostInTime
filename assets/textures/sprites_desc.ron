@@ -61,7 +61,7 @@
             breaks_with: None
 
         ),
-        Tree: MyRect(
+        Foliage(Tree): MyRect(
             pos: (96., 112.),
             size: (32., 40.),
             anchor: None,

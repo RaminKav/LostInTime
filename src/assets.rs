@@ -1,6 +1,9 @@
 use std::fs;
 
 use bevy::prelude::*;
+use bevy::reflect::TypeUuid;
+use bevy::render::render_resource::{AsBindGroup, ShaderRef};
+use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
 use serde::Deserialize;
 
@@ -60,24 +63,59 @@ pub struct GraphicsDesc {
 
 impl Plugin for GameAssetsPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(Graphics {
-            texture_atlas: None,
-            item_map: None,
-        })
-        .add_system_set(
-            SystemSet::on_exit(GameState::Loading)
-                .with_system(Self::load_graphics.label("graphics")),
-        );
+        app.add_plugin(Material2dPlugin::<FoliageMaterial>::default())
+            .insert_resource(Graphics {
+                texture_atlas: None,
+                spritesheet_map: None,
+                image_handle_map: None,
+            })
+            .add_system_set(
+                SystemSet::on_exit(GameState::Loading)
+                    .with_system(Self::load_graphics.label("graphics")),
+            );
     }
 }
 
-/// The great Graphics Resource, used by everything that needs to create sprites
-/// Contains an image map which is the work around for UI not supporting texture atlas sprites
+impl Material2d for FoliageMaterial {
+    fn vertex_shader() -> ShaderRef {
+        "shaders/test_wind.wgsl".into()
+    }
+    fn fragment_shader() -> ShaderRef {
+        "shaders/test_wind.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[uuid = "9600d1e3-1911-4286-9810-e9bd9ff685e1"]
+pub struct FoliageMaterial {
+    #[uniform(0)]
+    speed: f32,
+    #[uniform(1)]
+    minStrength: f32,
+    #[uniform(2)]
+    maxStrength: f32,
+    #[uniform(3)]
+    strengthScale: f32,
+    #[uniform(4)]
+    interval: f32,
+    #[uniform(5)]
+    detail: f32,
+    #[uniform(6)]
+    distortion: f32,
+    #[uniform(7)]
+    heightOffset: f32,
+    #[uniform(8)]
+    offset: f32,
+    #[texture(9)]
+    #[sampler(10)]
+    pub source_texture: Option<Handle<Image>>,
+}
 #[derive(Resource)]
 
 pub struct Graphics {
     pub texture_atlas: Option<Handle<TextureAtlas>>,
-    pub item_map: Option<HashMap<WorldObject, (TextureAtlasSprite, usize)>>,
+    pub spritesheet_map: Option<HashMap<WorldObject, (TextureAtlasSprite, usize)>>,
+    pub image_handle_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
@@ -130,6 +168,8 @@ impl GameAssetsPlugin {
         sprite_sheet: Res<ImageAssets>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
+        mut materials: ResMut<Assets<FoliageMaterial>>,
+        asset_server: Res<AssetServer>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -142,14 +182,39 @@ impl GameAssetsPlugin {
 
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
 
-        let mut item_map = HashMap::default();
+        let mut spritesheet_map = HashMap::default();
+        let mut image_handle_map = HashMap::default();
 
         for (item, rect) in sprite_desc.map.iter() {
             println!("Found graphic {:?}", item);
-            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+            match item {
+                WorldObject::Foliage(f) => {
+                    let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
+                    let foliage_material = materials.add(FoliageMaterial {
+                        source_texture: Some(handle),
+                        speed: 0.3,
+                        minStrength: 0.001,
+                        maxStrength: 0.003,
+                        strengthScale: 15.,
+                        interval: 3.5,
+                        detail: 1.,
+                        distortion: 1.,
+                        heightOffset: 0.4,
+                        offset: 0.,
+                        // alpha_mode: AlphaMode::Blend,
+                    });
+                    image_handle_map
+                        .insert(*item, (foliage_material, get_index_from_pixel_cords(*rect)));
+                }
+                _ => {
+                    let mut sprite =
+                        TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
-            //Set the size to be proportional to the source rectangle
-            sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
+                    //Set the size to be proportional to the source rectangle
+                    sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
+                    spritesheet_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
+                }
+            }
 
             //Position the sprite anchor if one is defined
             // if let Some(anchor) = rect.anchor {
@@ -170,15 +235,14 @@ impl GameAssetsPlugin {
                     breaks_with: rect.breaks_with,
                 },
             );
-
-            item_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
         }
 
         let atlas_handle = texture_assets.add(atlas);
 
         *graphics = Graphics {
             texture_atlas: Some(atlas_handle),
-            item_map: Some(item_map),
+            spritesheet_map: Some(spritesheet_map),
+            image_handle_map: Some(image_handle_map),
         };
     }
 }
