@@ -1,4 +1,4 @@
-use crate::assets::Graphics;
+use crate::assets::{FoliageMaterial, Graphics};
 use crate::item::{Foliage, WorldObject, WorldObjectResource};
 use crate::{Game, GameParam, GameState, ImageAssets};
 use bevy::app::AppExit;
@@ -28,7 +28,8 @@ impl Plugin for WorldGenerationPlugin {
                 SystemSet::on_update(GameState::Main)
                     // .with_system(Self::spawn_chunk)
                     .with_system(Self::spawn_chunks_around_camera)
-                    .with_system(Self::despawn_outofrange_chunks),
+                    .with_system(Self::despawn_outofrange_chunks)
+                    .with_system(Self::toggle_on_screen_mesh_visibility),
             )
             .add_system_to_stage(CoreStage::PostUpdate, exit_system);
     }
@@ -932,6 +933,30 @@ impl WorldGenerationPlugin {
         }
         chunk_manager.state = ChunkLoadingState::None;
     }
+    fn toggle_on_screen_mesh_visibility(
+        camera_query: Query<&Transform, With<Camera>>,
+        mut foliage_query: Query<(&mut Visibility, &Transform, &Handle<FoliageMaterial>)>,
+        mut chunk_manager: ResMut<ChunkManager>,
+    ) {
+        for camera_transform in camera_query.iter() {
+            let max_distance = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
+            for (mut v, ft, _) in foliage_query.iter_mut() {
+                let foliage_pos = ft.translation.xy();
+                let distance = camera_transform.translation.xy().distance(foliage_pos);
+                //TODO: calculate maximum possible distance for 2x2 chunksa
+                // let x = (foliage_pos.x as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
+                // let y = (foliage_pos.y as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;
+                if v.is_visible && distance > (max_distance * 2 as u32) as f32 {
+                    println!("Invisible Tree at d === {:?} {:?}", distance, v.is_visible);
+                    v.is_visible = false; // = &Visibility::INVISIBLE;
+                } else if !v.is_visible && distance <= (max_distance * 2 as u32) as f32 {
+                    println!("VISIBLE Tree at d === {:?} {:?}", distance, v.is_visible);
+                    v.is_visible = true; //Visibility::VISIBLE;
+                }
+            }
+        }
+        chunk_manager.state = ChunkLoadingState::None;
+    }
     pub fn change_tile_and_update_neighbours(
         tile_pos: TilePos,
         chunk_pos: IVec2,
@@ -1018,9 +1043,6 @@ impl WorldGenerationPlugin {
         }
 
         for tp in tree_points.as_slice() {
-            if chunk_pos.x != 0 || chunk_pos.y != 0 {
-                return;
-            }
             let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
             let tree;
             match tp.2 {
