@@ -192,10 +192,10 @@ impl GameAssetsPlugin {
                     let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
                     let foliage_material = materials.add(FoliageMaterial {
                         source_texture: Some(handle),
-                        speed: 0.3,
+                        speed: 0.5,
                         minStrength: 0.001,
                         maxStrength: 0.003,
-                        strengthScale: 15.,
+                        strengthScale: 20.,
                         interval: 3.5,
                         detail: 1.,
                         distortion: 1.,
