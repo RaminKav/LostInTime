@@ -69,7 +69,7 @@ fn main() {
         .add_plugin(PixelCameraPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
-        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -141,6 +141,7 @@ pub struct GameParam<'w, 's> {
     pub chunk_manager: ResMut<'w, ChunkManager>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     pub game_data: ResMut<'w, GameData>,
+    pub meshes: ResMut<'w, Assets<Mesh>>,
 
     pub block_query: Query<'w, 's, (Entity, &'static mut Health), With<Block>>,
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,

@@ -1,5 +1,5 @@
 use crate::assets::Graphics;
-use crate::item::{WorldObject, WorldObjectResource};
+use crate::item::{Foliage, WorldObject, WorldObjectResource};
 use crate::{Game, GameParam, GameState, ImageAssets};
 use bevy::app::AppExit;
 use bevy::prelude::*;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 pub struct WorldGenerationPlugin;
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 64;
-const CHUNK_CACHE_AMOUNT: i32 = 3;
+const CHUNK_CACHE_AMOUNT: i32 = 2;
 const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
 impl Plugin for WorldGenerationPlugin {
@@ -48,7 +48,7 @@ pub struct GameData {
     pub data: HashMap<(i32, i32), ChunkObjectData>,
     pub name: String,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
@@ -353,9 +353,6 @@ impl WorldGenerationPlugin {
 
         // if there is grass and water in the same tile, turn the grass to sand
         if blocks.contains(&WorldObject::Grass) && blocks.contains(&WorldObject::Water) {
-            if nx == 0. && ny == 1. {
-                println!("yoooo: bits: {:?} blocks: {:?}", bits, blocks,);
-            }
             for b in 0..4 {
                 if blocks[b] == WorldObject::Grass {
                     blocks[b] = WorldObject::Sand;
@@ -371,16 +368,6 @@ impl WorldGenerationPlugin {
                     bits[b] = 1;
                 }
             }
-        }
-
-        if nx == 0. && ny == 1. {
-            println!(
-                "bits: {:?} blocks: {:?} shift: {:?} | f: {:?}",
-                bits,
-                blocks,
-                index_shift,
-                bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8
-            );
         }
         (bits, index_shift, blocks)
     }
@@ -1006,7 +993,7 @@ impl WorldGenerationPlugin {
                     (
                         relative_tp.x as f32,
                         relative_tp.y as f32,
-                        WorldObject::Tree,
+                        WorldObject::Foliage(Foliage::Tree),
                     )
                 })
                 .filter(|tp| {
@@ -1031,9 +1018,19 @@ impl WorldGenerationPlugin {
         }
 
         for tp in tree_points.as_slice() {
+            if chunk_pos.x != 0 || chunk_pos.y != 0 {
+                return;
+            }
             let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
-
-            let tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
+            let tree;
+            match tp.2 {
+                WorldObject::Foliage(_) => {
+                    tree = tp.2.spawn_foliage(commands, game, tile_pos, chunk_pos);
+                }
+                _ => {
+                    tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
+                }
+            }
             tree_children.push(tree);
         }
 
@@ -1064,7 +1061,6 @@ fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<(f32, f32)> {
     let cell_size = f64::floor(r / f64::sqrt(n));
     let num_cell: usize =
         (f64::ceil(CHUNK_SIZE as f64 * TILE_SIZE.x as f64 / cell_size) + 1.) as usize;
-    println!("{:?}, {:?}", cell_size, num_cell);
     let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
     let insert_point = |g: &mut Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| {
