@@ -462,16 +462,36 @@ impl InputsPlugin {
             (&mut Transform, &mut RawPosition),
             (Without<MainCamera>, With<TextureCamera>),
         >,
+        mut game_camera: Query<(&mut Transform), (With<MainCamera>, Without<TextureCamera>)>,
+        mut img_query: Query<
+            (&mut Transform),
+            (
+                With<TextureTarget>,
+                Without<TextureCamera>,
+                Without<MainCamera>,
+                Without<Player>,
+            ),
+        >,
     ) {
         let (mut camera_tf, mut raw_tf) = tex_camera.single_mut();
+        let mut game_tf = game_camera.single_mut();
+        let mut img_tf = img_query.single_mut();
 
         let (pt, mv) = player_query.single_mut();
 
         let raw_x = lerp(&raw_tf.0, &(mv.0), &0.08);
         let raw_y = lerp(&raw_tf.1, &(mv.1), &0.08);
 
+        let frac_x = (pt.translation.x - raw_x * 15.).fract();
+        let frac_y = (pt.translation.y - raw_y * 15.).fract();
+
         raw_tf.0 = raw_x;
         raw_tf.1 = raw_y;
+
+        game_tf.translation.x = frac_x;
+        game_tf.translation.y = frac_y;
+        img_tf.translation.x = frac_x;
+        img_tf.translation.y = frac_y;
 
         camera_tf.translation.x = (pt.translation.x - raw_x * 15.).round();
         camera_tf.translation.y = (pt.translation.y - raw_y * 15.).round();

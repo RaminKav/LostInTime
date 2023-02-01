@@ -294,13 +294,7 @@ fn setup(
         .id();
 
     // The main pass camera.
-    commands.spawn((
-        Camera2dBundle::default(),
-        MainCamera,
-        CameraDirty(false, false),
-        AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
-        first_pass_layer,
-    ));
+    commands.spawn((Camera2dBundle::default(), MainCamera, first_pass_layer));
     // .push_children(&vec![texture_image]);
 
     // let camera = PixelCameraBundle::from_resolution(240, 180);
