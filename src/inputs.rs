@@ -26,13 +26,16 @@ use crate::{
     world_generation::{ChunkManager, WorldGenerationPlugin},
     Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{main, CameraDirty, GameParam, ItemStack, Limb, PLAYER_MOVE_SPEED};
+use crate::{
+    main, CameraDirty, GameParam, ItemStack, Limb, MainCamera, RawPosition, TextureCamera,
+    TextureTarget, PLAYER_MOVE_SPEED,
+};
 
-#[derive(Default, Resource)]
+#[derive(Default, Resource, Debug)]
 pub struct CursorPos(Vec3);
 
 #[derive(Component)]
-pub struct Direction(pub f32);
+pub struct MovementVector(pub f32, pub f32);
 
 pub struct InputsPlugin;
 
@@ -63,11 +66,12 @@ impl InputsPlugin {
             (
                 Entity,
                 &mut Transform,
+                &mut RawPosition,
                 &Collider,
-                &mut Direction,
+                &mut MovementVector,
                 Option<&Children>,
             ),
-            (With<Player>, Without<Camera>, Without<Equipment>),
+            (With<Player>, Without<MainCamera>, Without<Equipment>),
         >,
         mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
         mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
@@ -86,10 +90,10 @@ impl InputsPlugin {
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
     ) {
-        let (ent, mut player_transform, player_collider, mut dir, children) =
+        let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
             player_query.single_mut();
         let mut d = Vec2::ZERO;
-        let s = PLAYER_MOVE_SPEED / WORLD_SCALE;
+        let s = PLAYER_MOVE_SPEED;
 
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;
@@ -143,7 +147,9 @@ impl InputsPlugin {
             game.game.player.is_moving = false;
             move_event.send(PlayerMoveEvent(true));
         }
-        d = d.normalize() * s;
+        if d.x != 0. || d.y != 0. {
+            d = d.normalize() * s;
+        }
 
         if game.game.player.is_dashing {
             game.game.player_dash_duration.tick(time.delta());
@@ -158,7 +164,7 @@ impl InputsPlugin {
         let output_ws = context.move_shape(
             Vec2::new(0., d.y),
             player_collider,
-            player_transform.translation.truncate(),
+            Vec2::new(raw_pos.0, raw_pos.1),
             0.,
             0.,
             &MoveShapeOptions::default(),
@@ -212,7 +218,7 @@ impl InputsPlugin {
         let output_ad = context.move_shape(
             Vec2::new(d.x, 0.),
             player_collider,
-            player_transform.translation.truncate(),
+            Vec2::new(raw_pos.0, raw_pos.1),
             0.,
             0.,
             &MoveShapeOptions::default(),
@@ -262,22 +268,22 @@ impl InputsPlugin {
                 }
             },
         );
+        mv.0 = d.x;
+        mv.1 = d.y;
+        raw_pos.0 += output_ad.effective_translation.x;
+        raw_pos.1 += output_ws.effective_translation.y;
 
-        player_transform.translation +=
-            output_ws.effective_translation.extend(0.) + output_ad.effective_translation.extend(0.);
+        player_transform.translation.x = raw_pos.0.round();
+        player_transform.translation.y = raw_pos.1.round();
 
         if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
-        }
-
-        if d.x != 0. {
-            dir.0 = d.x;
         }
     }
 
     pub fn update_cursor_pos(
         windows: Res<Windows>,
-        camera_q: Query<(&Transform, &Camera)>,
+        camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
         mut cursor_moved_events: EventReader<CursorMoved>,
         mut cursor_pos: ResMut<CursorPos>,
     ) {
@@ -292,6 +298,7 @@ impl InputsPlugin {
                     cam_t,
                     cam,
                 ));
+                println!("Cursor at: {:?}", cursor_pos);
             }
         }
     }
@@ -329,6 +336,7 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
+            info!("POS {:?}", tile_pos);
             if game
                 .chunk_manager
                 .chunk_generation_data
@@ -360,7 +368,7 @@ impl InputsPlugin {
                     );
                 }
             } else {
-                let stone = WorldObject::StoneFull.spawn_and_save_block(
+                let stone = WorldObject::StoneHalf.spawn_and_save_block(
                     &mut commands,
                     &mut game,
                     tile_pos,
@@ -446,54 +454,26 @@ impl InputsPlugin {
         }
     }
     pub fn move_camera_with_player(
-        mut move_events: EventReader<PlayerMoveEvent>,
-        mut player_query: Query<&Transform, (With<Player>, Without<Camera>)>,
-        mut camera: Query<(&mut Transform, &mut AnimationTimer, &mut CameraDirty), With<Camera>>,
-        time: Res<Time>,
+        mut player_query: Query<
+            (&Transform, &MovementVector),
+            (With<Player>, Without<MainCamera>, Without<TextureCamera>),
+        >,
+        mut tex_camera: Query<
+            (&mut Transform, &mut RawPosition),
+            (Without<MainCamera>, With<TextureCamera>),
+        >,
     ) {
-        let (mut tf, mut at, mut dirty) = camera.single_mut();
-        let move_events = move_events.iter().cloned();
-        for e in move_events {
-            dirty.0 = true;
-            if e.0 {
-                dirty.1 = true;
-            } else {
-                dirty.1 = false;
-                at.0.reset();
-            }
-        }
-        if dirty.0 && !dirty.1 {
-            let pt = player_query.single_mut().translation;
-            let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
-            let d = delta.length();
-            tf.translation.x = lerp(&tf.translation.x, &pt.x, &0.1);
-            tf.translation.y = lerp(&tf.translation.y, &pt.y, &0.1);
-        } else if dirty.1 {
-            let pt = player_query.single_mut().translation;
-            let delta = Vec2::new(pt.x - tf.translation.x, pt.y - tf.translation.y);
-            at.0.tick(time.delta());
-            let e = at.0.elapsed().as_millis();
-            let t = at.0.duration().as_millis();
-            let l = Ease::quadratic_out(e as f32 / t as f32);
+        let (mut camera_tf, mut raw_tf) = tex_camera.single_mut();
 
-            let amount_x = lerp(&0., &delta.x, &l) as f32;
-            let amount_y = lerp(&0., &delta.y, &l) as f32;
+        let (pt, mv) = player_query.single_mut();
 
-            tf.translation.x += if delta.x.abs() < 0.1 {
-                delta.x
-            } else {
-                amount_x
-            };
-            tf.translation.y += if delta.y.abs() < 0.1 {
-                delta.y
-            } else {
-                amount_y
-            };
+        let raw_x = lerp(&raw_tf.0, &(mv.0), &0.08);
+        let raw_y = lerp(&raw_tf.1, &(mv.1), &0.08);
 
-            if delta.x == 0. && delta.y == 0. {
-                at.0.reset();
-                dirty.1 = false;
-            }
-        }
+        raw_tf.0 = raw_x;
+        raw_tf.1 = raw_y;
+
+        camera_tf.translation.x = (pt.translation.x - raw_x * 15.).round();
+        camera_tf.translation.y = (pt.translation.y - raw_y * 15.).round();
     }
 }

@@ -168,6 +168,7 @@ fn vertex(
     // let time: f32 = globals.time * speed + offset;
     let time: f32 = globals.time * speed + pos.y +pos.z ;// not working when moving...
     out.clip_position.x += getWind(v.uv, time);
+
     let pix: f32 = 32.;
     out.uv *= vec2<f32>(pix,pix);
     out.uv = vec2<f32>(trunc(out.uv.x),trunc(out.uv.y));

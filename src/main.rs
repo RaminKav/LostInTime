@@ -6,8 +6,18 @@ use attributes::Health;
 // - set up tilemap or world generation
 // - trees/entities to break/mine
 use bevy::{
-    ecs::system::SystemParam, prelude::*, render::camera::ScalingMode,
-    sprite::MaterialMesh2dBundle, utils::HashSet, window::PresentMode,
+    ecs::system::SystemParam,
+    prelude::*,
+    render::{
+        camera::{RenderTarget, ScalingMode},
+        render_resource::{
+            Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+        },
+        view::RenderLayers,
+    },
+    sprite::MaterialMesh2dBundle,
+    utils::HashSet,
+    window::PresentMode,
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
 use bevy_pixel_camera::{PixelCameraBundle, PixelCameraPlugin};
@@ -31,7 +41,7 @@ use bevy_tweening::{
     lens::{TransformPositionLens, TransformScaleLens},
     Animator, AnimatorState, EaseFunction, Tween, TweeningPlugin,
 };
-use inputs::{Direction, InputsPlugin};
+use inputs::{InputsPlugin, MovementVector};
 use item::{
     Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
 };
@@ -39,12 +49,11 @@ use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
-const PLAYER_MOVE_SPEED: f32 = 6.;
+const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-const PLAYER_SIZE: f32 = 3.2 / WORLD_SCALE;
-pub const HEIGHT: f32 = 900.;
-pub const RESOLUTION: f32 = 16.0 / 9.0;
+pub const HEIGHT: f32 = 1920.;
+pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
 
 fn main() {
@@ -55,9 +64,11 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     window: WindowDescriptor {
-                        width: HEIGHT * RESOLUTION,
+                        width: HEIGHT * ASPECT_RATIO,
                         height: HEIGHT,
-                        title: "DST clone".to_string(),
+                        scale_factor_override: Some(1.0),
+                        // mode: WindowMode::BorderlessFullscreen,
+                        title: "Survival Game".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
                         ..Default::default()
@@ -65,8 +76,9 @@ fn main() {
                     ..default()
                 }),
         )
+        .insert_resource(Msaa { samples: 1 })
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
-        .add_plugin(PixelCameraPlugin)
+        // .add_plugin(PixelCameraPlugin)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
         // .add_plugin(RapierDebugRenderPlugin::default())
@@ -152,8 +164,12 @@ pub struct GameParam<'w, 's> {
         (Without<Player>, Without<Equipment>),
     >,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
-    pub camera_query:
-        Query<'w, 's, &'static mut Transform, (With<Camera>, Without<Player>, Without<ItemStack>)>,
+    pub camera_query: Query<
+        'w,
+        's,
+        &'static mut Transform,
+        (With<MainCamera>, Without<Player>, Without<ItemStack>),
+    >,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -176,6 +192,14 @@ pub enum Limb {
 
 #[derive(Component, Default)]
 pub struct CameraDirty(bool, bool);
+#[derive(Component, Default)]
+pub struct MainCamera;
+#[derive(Component, Default)]
+pub struct TextureCamera;
+#[derive(Component, Default)]
+pub struct TextureTarget;
+#[derive(Component, Default)]
+pub struct RawPosition(f32, f32);
 
 fn setup(
     mut commands: Commands,
@@ -183,7 +207,10 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+    mut render_materials: ResMut<Assets<ColorMaterial>>,
+
     mut game: ResMut<Game>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     game.world_size = WORLD_SIZE;
     game.world_generation_params = WorldGeneration {
@@ -196,36 +223,93 @@ fn setup(
     game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
     game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
-    // let player_texture_handle = asset_server.load("textures/gabe-idle-run.png");
-    // let player_texture_handle = asset_server.load("textures/player-run-down.png");
-    // let player_texture_atlas =
-    //     TextureAtlas::from_grid(player_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
-    // let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
+    let img_size = Extent3d {
+        width: 320,
+        height: 180,
+        ..default()
+    };
+    let game_size = Vec2::new((HEIGHT * ASPECT_RATIO) as f32, (HEIGHT) as f32);
 
-    // let tween_scale = Tween::new(
-    //     EaseFunction::QuadraticIn,
-    //     Duration::from_secs(1),
-    //     TransformPositionLens {
-    //         start: Vec3::ONE,
-    //         end: Vec3::ONE,
-    //     },
-    // );
-    // let a = Animator::new(tween_scale);
+    // This is the texture that will be rendered to.
+    let mut image = Image {
+        texture_descriptor: TextureDescriptor {
+            label: None,
+            size: img_size,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Bgra8UnormSrgb,
+            mip_level_count: 1,
+            sample_count: 1,
+            usage: TextureUsages::TEXTURE_BINDING
+                | TextureUsages::COPY_DST
+                | TextureUsages::RENDER_ATTACHMENT,
+        },
+        ..default()
+    };
 
-    // let mut camera = Camera2dBundle::default();
-    let camera = PixelCameraBundle::from_resolution(240, 180);
+    // fill image.data with zeroes
+    image.resize(img_size);
 
-    // One unit in world space is one tile
-    // camera.projection.left = -HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
-    // camera.projection.right = HEIGHT / WORLD_SCALE / 2.0 * RESOLUTION;
-    // camera.projection.top = HEIGHT / WORLD_SCALE / 2.0;
-    // camera.projection.bottom = -HEIGHT / WORLD_SCALE / 2.0;
-    // camera.projection.scaling_mode = ScalingMode::None;
+    let image_handle = images.add(image);
+
+    // This specifies the layer used for the first pass, which will be attached to the first pass camera and cube.
+    let first_pass_layer = RenderLayers::layer(1);
+
     commands.spawn((
-        camera,
+        Camera2dBundle {
+            camera: Camera {
+                // render before the "main pass" camera
+                priority: -1,
+                target: RenderTarget::Image(image_handle.clone()),
+                ..default()
+            },
+            ..default()
+        },
+        TextureCamera,
+        RawPosition(0., 0.),
+    ));
+
+    // This material has the texture that has been rendered.
+    let render_material_handle = render_materials.add(ColorMaterial::from(image_handle));
+
+    // Main pass cube, with material containing the rendered first pass texture.
+    let texture_image = commands
+        .spawn((
+            MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(
+                        shape::Quad {
+                            size: Vec2::new(game_size.x as f32, game_size.y as f32),
+                            ..Default::default()
+                        }
+                        .into(),
+                    )
+                    .into(),
+                transform: Transform::from_scale(Vec3::new(1., 1., 1.)),
+                material: render_material_handle,
+                ..default()
+            },
+            TextureTarget,
+            first_pass_layer,
+        ))
+        .id();
+
+    // The main pass camera.
+    commands.spawn((
+        Camera2dBundle::default(),
+        MainCamera,
         CameraDirty(false, false),
         AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
+        first_pass_layer,
     ));
+    // .push_children(&vec![texture_image]);
+
+    // let camera = PixelCameraBundle::from_resolution(240, 180);
+
+    // commands.spawn((
+    //     camera,
+    //     CameraDirty(false, false),
+    //     AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
+    // ));
 
     let mut limb_children: Vec<Entity> = vec![];
     //player shadow
@@ -299,8 +383,7 @@ fn setup(
     commands
         .spawn((
             SpatialBundle {
-                transform: Transform::from_scale(Vec3::splat(PLAYER_SIZE))
-                    .with_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..Default::default()
             },
             AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
@@ -311,11 +394,12 @@ fn setup(
                 inventory: Vec::new(),
                 main_hand_slot: None,
             },
-            Direction(1.0),
+            MovementVector(0., 0.),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
             YSort,
             Name::new("Player"),
+            RawPosition(0., 0.),
         ))
         .push_children(&limb_children);
 }
