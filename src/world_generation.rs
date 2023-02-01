@@ -1,6 +1,6 @@
 use crate::assets::{FoliageMaterial, Graphics};
 use crate::item::{Foliage, WorldObject, WorldObjectResource};
-use crate::{Game, GameParam, GameState, ImageAssets};
+use crate::{Game, GameParam, GameState, ImageAssets, MainCamera};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -804,6 +804,7 @@ impl WorldGenerationPlugin {
             camera_pos.x + (TILE_SIZE.x / 2.) as f32,
             camera_pos.y + (TILE_SIZE.y / 2.) as f32,
         );
+
         let mut block_pos = IVec2::new(
             ((camera_pos.x % (CHUNK_SIZE as f32 * TILE_SIZE.x) as f32) / TILE_SIZE.x as f32).floor()
                 as i32,
@@ -817,6 +818,7 @@ impl WorldGenerationPlugin {
         if block_pos.y < 0 {
             block_pos.y += CHUNK_SIZE as i32;
         }
+        println!("BLOCK: {:?} {:?}", camera_pos, block_pos);
 
         block_pos
     }
@@ -906,7 +908,7 @@ impl WorldGenerationPlugin {
 
     fn despawn_outofrange_chunks(
         mut commands: Commands,
-        camera_query: Query<&Transform, With<Camera>>,
+        camera_query: Query<&Transform, With<MainCamera>>,
         chunks_query: Query<(Entity, &Transform)>,
         mut chunk_manager: ResMut<ChunkManager>,
     ) {
@@ -934,7 +936,7 @@ impl WorldGenerationPlugin {
         chunk_manager.state = ChunkLoadingState::None;
     }
     fn toggle_on_screen_mesh_visibility(
-        camera_query: Query<&Transform, With<Camera>>,
+        camera_query: Query<&Transform, With<MainCamera>>,
         mut foliage_query: Query<(&mut Visibility, &Transform, &Handle<FoliageMaterial>)>,
         mut chunk_manager: ResMut<ChunkManager>,
     ) {
@@ -943,15 +945,11 @@ impl WorldGenerationPlugin {
             for (mut v, ft, _) in foliage_query.iter_mut() {
                 let foliage_pos = ft.translation.xy();
                 let distance = camera_transform.translation.xy().distance(foliage_pos);
-                //TODO: calculate maximum possible distance for 2x2 chunksa
-                // let x = (foliage_pos.x as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
-                // let y = (foliage_pos.y as f32 / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;
+
                 if v.is_visible && distance > (max_distance * 2 as u32) as f32 {
-                    println!("Invisible Tree at d === {:?} {:?}", distance, v.is_visible);
-                    v.is_visible = false; // = &Visibility::INVISIBLE;
+                    v.is_visible = false;
                 } else if !v.is_visible && distance <= (max_distance * 2 as u32) as f32 {
-                    println!("VISIBLE Tree at d === {:?} {:?}", distance, v.is_visible);
-                    v.is_visible = true; //Visibility::VISIBLE;
+                    v.is_visible = true;
                 }
             }
         }
