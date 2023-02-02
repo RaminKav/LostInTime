@@ -295,8 +295,8 @@ impl WorldObject {
                     texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
                     transform: Transform {
                         translation: position,
-                        scale: Vec3::new(0.7, 0.7, 0.7),
-                        rotation: Quat::from_rotation_z(0.8),
+                        scale: Vec3::new(1., 1., 1.),
+                        // rotation: Quat::from_rotation_z(0.8),
                         ..Default::default()
                     },
                     ..Default::default()
@@ -372,8 +372,7 @@ impl WorldObject {
         let stack = ItemStack(self, rng.gen_range(1..4));
         let transform = Transform {
             translation: position,
-            scale: Vec3::new(0.5, 0.5, 0.5),
-            // rotation: Quat::from_rotation_x(0.1),
+            scale: Vec3::new(1., 1., 1.), // rotation: Quat::from_rotation_x(0.1),
             ..Default::default()
         };
 
