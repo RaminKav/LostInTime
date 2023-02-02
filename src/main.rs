@@ -52,7 +52,7 @@ use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1920.;
+pub const HEIGHT: f32 = 1080.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
 
@@ -229,6 +229,7 @@ fn setup(
         ..default()
     };
     let game_size = Vec2::new((HEIGHT * ASPECT_RATIO) as f32, (HEIGHT) as f32);
+    // let game_size = Vec2::new((img_size.width) as f32, (img_size.height) as f32);
 
     // This is the texture that will be rendered to.
     let mut image = Image {
@@ -294,13 +295,7 @@ fn setup(
         .id();
 
     // The main pass camera.
-    commands.spawn((
-        Camera2dBundle::default(),
-        MainCamera,
-        CameraDirty(false, false),
-        AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
-        first_pass_layer,
-    ));
+    commands.spawn((Camera2dBundle::default(), MainCamera, first_pass_layer));
     // .push_children(&vec![texture_image]);
 
     // let camera = PixelCameraBundle::from_resolution(240, 180);
