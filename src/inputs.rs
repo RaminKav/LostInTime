@@ -7,8 +7,6 @@ use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
-use interpolation::lerp;
-
 use crate::animations::AnimatedTextureMaterial;
 
 use crate::item::{Breakable, Equipment};
@@ -17,13 +15,13 @@ use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
     PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{GameParam, MainCamera, RawPosition, TextureCamera, TextureTarget, PLAYER_MOVE_SPEED};
+use crate::{GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource, Debug)]
 pub struct CursorPos(Vec3);
 
-#[derive(Component)]
-pub struct MovementVector(pub f32, pub f32);
+#[derive(Component, Default)]
+pub struct MovementVector(pub Vec2);
 
 pub struct InputsPlugin;
 
@@ -152,7 +150,7 @@ impl InputsPlugin {
         let output_ws = context.move_shape(
             Vec2::new(0., d.y),
             player_collider,
-            Vec2::new(raw_pos.0, raw_pos.1),
+            raw_pos.0,
             0.,
             0.,
             &MoveShapeOptions::default(),
@@ -206,7 +204,7 @@ impl InputsPlugin {
         let output_ad = context.move_shape(
             Vec2::new(d.x, 0.),
             player_collider,
-            Vec2::new(raw_pos.0, raw_pos.1),
+            raw_pos.0,
             0.,
             0.,
             &MoveShapeOptions::default(),
@@ -256,13 +254,12 @@ impl InputsPlugin {
                 }
             },
         );
-        mv.0 = d.x;
-        mv.1 = d.y;
-        raw_pos.0 += output_ad.effective_translation.x;
-        raw_pos.1 += output_ws.effective_translation.y;
+        mv.0 = d;
+        raw_pos.x += output_ad.effective_translation.x;
+        raw_pos.y += output_ws.effective_translation.y;
 
-        player_transform.translation.x = raw_pos.0.round();
-        player_transform.translation.y = raw_pos.1.round();
+        player_transform.translation.x = raw_pos.x.round();
+        player_transform.translation.y = raw_pos.y.round();
 
         if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
@@ -446,42 +443,32 @@ impl InputsPlugin {
             (&Transform, &MovementVector),
             (With<Player>, Without<MainCamera>, Without<TextureCamera>),
         >,
-        mut tex_camera: Query<
+        mut game_camera: Query<
             (&mut Transform, &mut RawPosition),
             (Without<MainCamera>, With<TextureCamera>),
         >,
-        mut game_camera: Query<&mut Transform, (With<MainCamera>, Without<TextureCamera>)>,
-        mut img_query: Query<
-            &mut Transform,
-            (
-                With<TextureTarget>,
-                Without<TextureCamera>,
-                Without<MainCamera>,
-                Without<Player>,
-            ),
+        mut screen_camera: Query<
+            (&mut Transform, &GameUpscale),
+            (With<MainCamera>, Without<TextureCamera>),
         >,
     ) {
-        let (mut camera_tf, mut raw_tf) = tex_camera.single_mut();
-        let mut game_tf = game_camera.single_mut();
-        let mut img_tf = img_query.single_mut();
+        let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
 
-        let (pt, mv) = player_query.single_mut();
+        let (player_pos, player_movement_vec) = player_query.single_mut();
 
-        let raw_x = lerp(&raw_tf.0, &(mv.0), &0.08);
-        let raw_y = lerp(&raw_tf.1, &(mv.1), &0.08);
+        let camera_lookahead_scale = 15.0;
+        raw_camera_pos.0 = raw_camera_pos
+            .0
+            .lerp(player_movement_vec.0 * camera_lookahead_scale, 0.08);
 
-        let frac_x = (pt.translation.x - raw_x * 15.).fract();
-        let frac_y = (pt.translation.y - raw_y * 15.).fract();
-
-        raw_tf.0 = raw_x;
-        raw_tf.1 = raw_y;
-
-        game_tf.translation.x = frac_x;
-        game_tf.translation.y = frac_y;
-        img_tf.translation.x = frac_x;
-        img_tf.translation.y = frac_y;
-
-        camera_tf.translation.x = (pt.translation.x - raw_x * 15.).round();
-        camera_tf.translation.y = (pt.translation.y - raw_y * 15.).round();
+        let camera_final_pos = Vec2::new(
+            player_pos.translation.x - raw_camera_pos.x,
+            player_pos.translation.y - raw_camera_pos.y,
+        );
+        game_camera_transform.translation.x = camera_final_pos.x.trunc();
+        game_camera_transform.translation.y = camera_final_pos.y.trunc();
+        let (mut screen_camera_transform, game_upscale) = screen_camera.single_mut();
+        screen_camera_transform.translation.x = camera_final_pos.x.fract() * game_upscale.0;
+        screen_camera_transform.translation.y = camera_final_pos.y.fract() * game_upscale.0;
     }
 }
