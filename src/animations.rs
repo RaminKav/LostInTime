@@ -8,10 +8,7 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::Limb;
-use crate::{
-    item::{Equipment, ItemStack},
-    Game, GameState, Player, TIME_STEP,
-};
+use crate::{item::ItemStack, Game, GameState, Player, TIME_STEP};
 
 pub struct AnimationsPlugin;
 
