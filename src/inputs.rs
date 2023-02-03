@@ -1,35 +1,23 @@
-use std::f32::consts::PI;
-use std::time::Duration;
-
 use bevy::app::AppExit;
-use bevy::ecs::system::Despawn;
+
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, KinematicCharacterControllerOutput, MoveShapeOptions,
-    QueryFilter, QueryFilterFlags, RapierContext,
-};
-use bevy_tweening::lens::{TransformPositionLens, TransformScaleLens};
-use bevy_tweening::{Animator, AnimatorState, EaseFunction, Tween};
-use interpolation::{lerp, Ease};
+use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
-use crate::animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer};
-use crate::attributes::Health;
-use crate::item::{Block, Breakable, Equipment, WorldObjectResource};
-use crate::world_generation::{GameData, TileMapPositionData, WorldObjectEntityData};
+use interpolation::lerp;
+
+use crate::animations::AnimatedTextureMaterial;
+
+use crate::item::{Breakable, Equipment};
+use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
 use crate::{
-    assets::{Graphics, WORLD_SCALE},
-    item::WorldObject,
-    world_generation::{ChunkManager, WorldGenerationPlugin},
-    Game, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP,
+    item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
+    PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{
-    main, CameraDirty, GameParam, ItemStack, Limb, MainCamera, RawPosition, TextureCamera,
-    TextureTarget, PLAYER_MOVE_SPEED,
-};
+use crate::{GameParam, MainCamera, RawPosition, TextureCamera, TextureTarget, PLAYER_MOVE_SPEED};
 
 #[derive(Default, Resource, Debug)]
 pub struct CursorPos(Vec3);
@@ -132,13 +120,13 @@ impl InputsPlugin {
             d.y -= 1.;
             game.game.player.is_moving = true;
         }
-        if game.game.player_dash_cooldown.tick(time.delta()).finished() {
-            if key_input.pressed(KeyCode::Space) {
-                game.game.player.is_dashing = true;
+        if game.game.player_dash_cooldown.tick(time.delta()).finished()
+            && key_input.pressed(KeyCode::Space)
+        {
+            game.game.player.is_dashing = true;
 
-                game.game.player_dash_cooldown.reset();
-                game.game.player_dash_duration.reset();
-            }
+            game.game.player_dash_cooldown.reset();
+            game.game.player_dash_duration.reset();
         }
         if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]) &&
         // || (dx == 0. && dy == 0.)
@@ -173,7 +161,7 @@ impl InputsPlugin {
                 exclude_collider: Some(ent),
                 predicate: Some(&|e| {
                     if let Some(c) = children {
-                        c.iter().find(|cc| **cc == e).is_none()
+                        !c.iter().any(|cc| *cc == e)
                     } else {
                         true
                     }
@@ -227,7 +215,7 @@ impl InputsPlugin {
                 exclude_collider: Some(ent),
                 predicate: Some(&|e| {
                     if let Some(c) = children {
-                        c.iter().find(|cc| **cc == e).is_none()
+                        !c.iter().any(|cc| *cc == e)
                     } else {
                         true
                     }
@@ -298,7 +286,7 @@ impl InputsPlugin {
                     cam_t,
                     cam,
                 ));
-                println!("Cursor at: {:?}", cursor_pos);
+                println!("Cursor at: {cursor_pos:?}");
             }
         }
     }
@@ -462,9 +450,9 @@ impl InputsPlugin {
             (&mut Transform, &mut RawPosition),
             (Without<MainCamera>, With<TextureCamera>),
         >,
-        mut game_camera: Query<(&mut Transform), (With<MainCamera>, Without<TextureCamera>)>,
+        mut game_camera: Query<&mut Transform, (With<MainCamera>, Without<TextureCamera>)>,
         mut img_query: Query<
-            (&mut Transform),
+            &mut Transform,
             (
                 With<TextureTarget>,
                 Without<TextureCamera>,
