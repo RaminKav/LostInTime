@@ -1,4 +1,7 @@
-use std::{marker::PhantomData, time::Duration};
+use std::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
 use attributes::Health;
 //TODO:
@@ -9,18 +12,17 @@ use bevy::{
     ecs::system::SystemParam,
     prelude::*,
     render::{
-        camera::{RenderTarget, ScalingMode},
+        camera::RenderTarget,
         render_resource::{
             Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
         },
         view::RenderLayers,
     },
     sprite::MaterialMesh2dBundle,
-    utils::HashSet,
     window::PresentMode,
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
-use bevy_pixel_camera::{PixelCameraBundle, PixelCameraPlugin};
+
 use bevy_rapier2d::prelude::*;
 mod animations;
 mod assets;
@@ -30,21 +32,15 @@ mod item;
 mod vectorize;
 mod world_generation;
 use animations::{
-    AnimatedTextureMaterial, AnimationFrameTracker, AnimationPosTracker, AnimationTimer,
-    AnimationsPlugin,
+    AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer, AnimationsPlugin,
 };
-use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
+use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use bevy_tweening::{
-    lens::{TransformPositionLens, TransformScaleLens},
-    Animator, AnimatorState, EaseFunction, Tween, TweeningPlugin,
-};
+use bevy_tweening::TweeningPlugin;
 use inputs::{InputsPlugin, MovementVector};
-use item::{
-    Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
-};
+use item::{Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObjectResource};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
@@ -52,7 +48,7 @@ use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1080.;
+pub const HEIGHT: f32 = 1920.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const WORLD_SIZE: usize = 300;
 
@@ -199,7 +195,23 @@ pub struct TextureCamera;
 #[derive(Component, Default)]
 pub struct TextureTarget;
 #[derive(Component, Default)]
-pub struct RawPosition(f32, f32);
+pub struct RawPosition(Vec2);
+
+#[derive(Component)]
+pub struct GameUpscale(pub f32);
+
+impl Deref for RawPosition {
+    type Target = Vec2;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RawPosition {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 fn setup(
     mut commands: Commands,
@@ -228,8 +240,7 @@ fn setup(
         height: 180,
         ..default()
     };
-    let game_size = Vec2::new((HEIGHT * ASPECT_RATIO) as f32, (HEIGHT) as f32);
-    // let game_size = Vec2::new((img_size.width) as f32, (img_size.height) as f32);
+    let game_size = Vec2::new(HEIGHT * ASPECT_RATIO, HEIGHT);
 
     // This is the texture that will be rendered to.
     let mut image = Image {
@@ -266,20 +277,20 @@ fn setup(
             ..default()
         },
         TextureCamera,
-        RawPosition(0., 0.),
+        RawPosition::default(),
     ));
 
     // This material has the texture that has been rendered.
     let render_material_handle = render_materials.add(ColorMaterial::from(image_handle));
 
     // Main pass cube, with material containing the rendered first pass texture.
-    let texture_image = commands
+    let _texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
                     .add(
                         shape::Quad {
-                            size: Vec2::new(game_size.x as f32, game_size.y as f32),
+                            size: Vec2::new(game_size.x, game_size.y),
                             ..Default::default()
                         }
                         .into(),
@@ -295,16 +306,12 @@ fn setup(
         .id();
 
     // The main pass camera.
-    commands.spawn((Camera2dBundle::default(), MainCamera, first_pass_layer));
-    // .push_children(&vec![texture_image]);
-
-    // let camera = PixelCameraBundle::from_resolution(240, 180);
-
-    // commands.spawn((
-    //     camera,
-    //     CameraDirty(false, false),
-    //     AnimationTimer(Timer::from_seconds(4., TimerMode::Once)),
-    // ));
+    commands.spawn((
+        Camera2dBundle::default(),
+        MainCamera,
+        GameUpscale(HEIGHT / img_size.height as f32),
+        first_pass_layer,
+    ));
 
     let mut limb_children: Vec<Entity> = vec![];
     //player shadow
@@ -389,12 +396,12 @@ fn setup(
                 inventory: Vec::new(),
                 main_hand_slot: None,
             },
-            MovementVector(0., 0.),
+            MovementVector::default(),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
             YSort,
             Name::new("Player"),
-            RawPosition(0., 0.),
+            RawPosition::default(),
         ))
         .push_children(&limb_children);
 }

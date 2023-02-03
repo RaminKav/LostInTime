@@ -176,17 +176,17 @@ impl GameAssetsPlugin {
         let sprite_desc = fs::read_to_string("assets/textures/sprites_desc.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
-            println!("Failed to load config for graphics: {}", e);
+            println!("Failed to load config for graphics: {e}");
             std::process::exit(1);
         });
 
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
+        let mut atlas = TextureAtlas::new_empty(image_handle, Vec2::new(256., 32.));
 
         let mut spritesheet_map = HashMap::default();
         let mut image_handle_map = HashMap::default();
 
         for (item, rect) in sprite_desc.map.iter() {
-            println!("Found graphic {:?}", item);
+            println!("Found graphic {item:?}");
             match item {
                 WorldObject::Foliage(f) => {
                     let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
