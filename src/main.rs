@@ -1,4 +1,7 @@
-use std::marker::PhantomData;
+use std::{
+    marker::PhantomData,
+    ops::{Deref, DerefMut},
+};
 
 use attributes::Health;
 //TODO:
@@ -192,7 +195,23 @@ pub struct TextureCamera;
 #[derive(Component, Default)]
 pub struct TextureTarget;
 #[derive(Component, Default)]
-pub struct RawPosition(f32, f32);
+pub struct RawPosition(Vec2);
+
+#[derive(Component)]
+pub struct GameUpscale(pub f32);
+
+impl Deref for RawPosition {
+    type Target = Vec2;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for RawPosition {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 fn setup(
     mut commands: Commands,
@@ -258,7 +277,7 @@ fn setup(
             ..default()
         },
         TextureCamera,
-        RawPosition(0., 0.),
+        RawPosition::default(),
     ));
 
     // This material has the texture that has been rendered.
@@ -287,7 +306,12 @@ fn setup(
         .id();
 
     // The main pass camera.
-    commands.spawn((Camera2dBundle::default(), MainCamera, first_pass_layer));
+    commands.spawn((
+        Camera2dBundle::default(),
+        MainCamera,
+        GameUpscale(HEIGHT / img_size.height as f32),
+        first_pass_layer,
+    ));
     // .push_children(&vec![texture_image]);
 
     // let camera = PixelCameraBundle::from_resolution(240, 180);
@@ -381,12 +405,12 @@ fn setup(
                 inventory: Vec::new(),
                 main_hand_slot: None,
             },
-            MovementVector(0., 0.),
+            MovementVector::default(),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
             YSort,
             Name::new("Player"),
-            RawPosition(0., 0.),
+            RawPosition::default(),
         ))
         .push_children(&limb_children);
 }
