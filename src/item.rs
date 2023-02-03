@@ -1,10 +1,10 @@
 use crate::animations::AnimationPosTracker;
-use crate::assets::{FoliageMaterial, Graphics};
+use crate::assets::Graphics;
 use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
 use crate::world_generation::{
-    ChunkManager, ChunkObjectData, GameData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
+    ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{AnimationTimer, GameParam, GameState, Player, YSort};
+use crate::{AnimationTimer, GameParam, GameState, YSort};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
@@ -88,7 +88,7 @@ impl WorldObject {
         chunk_pos: IVec2,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
-        if let None = item_map {
+        if item_map.is_none() {
             panic!("graphics not loaded");
         }
         let sprite = game
@@ -97,7 +97,7 @@ impl WorldObject {
             .as_ref()
             .unwrap()
             .get(&self)
-            .expect(&format!("No graphic for object {:?}", self))
+            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
         //TODO: WIP FADING OUT ITEMS SHADER
@@ -168,7 +168,7 @@ impl WorldObject {
         chunk_pos: IVec2,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
-        if let None = item_map {
+        if item_map.is_none() {
             panic!("graphics not loaded");
         }
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
@@ -248,7 +248,7 @@ impl WorldObject {
         let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
 
         if let Some(old_points) = old_points {
-            println!("SAVING NEW OBJ {:?} {:?}", self, tile_pos);
+            println!("SAVING NEW OBJ {self:?} {tile_pos:?}");
             let mut new_points = old_points.0.clone();
             new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
 
@@ -257,7 +257,7 @@ impl WorldObject {
                 .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
         }
 
-        return item;
+        item
     }
     pub fn spawn_equipment_on_player(
         self,
@@ -265,7 +265,7 @@ impl WorldObject {
         game: &mut GameParam,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
-        if let None = item_map {
+        if item_map.is_none() {
             panic!("graphics not loaded");
         }
         let sprite = game
@@ -274,7 +274,7 @@ impl WorldObject {
             .as_ref()
             .unwrap()
             .get(&self)
-            .expect(&format!("No graphic for object {:?}", self))
+            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
         let player_data = &mut game.player_query.single_mut();
@@ -341,7 +341,7 @@ impl WorldObject {
         chunk_pos: IVec2,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
-        if let None = item_map {
+        if item_map.is_none() {
             panic!("graphics not loaded");
         }
         let sprite = game
@@ -350,7 +350,7 @@ impl WorldObject {
             .as_ref()
             .unwrap()
             .get(&self)
-            .expect(&format!("No graphic for object {:?}", self))
+            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
@@ -493,7 +493,7 @@ impl WorldObject {
                 .clone()
                 .iter()
                 .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32, self))
-                .map(|p| *p)
+                .copied()
                 .collect::<Vec<(f32, f32, Self)>>();
             info!(
                 "DELETING BLOCK {:?} {:?} {:?}",
@@ -539,7 +539,7 @@ impl ItemsPlugin {
                 sprite.clone_from(
                     &item_map
                         .get(world_object)
-                        .expect(&format!("No graphic for object {:?}", world_object))
+                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
                         .0,
                 );
             }
