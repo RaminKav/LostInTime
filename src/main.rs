@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, time::Duration};
+use std::marker::PhantomData;
 
 use attributes::Health;
 //TODO:
@@ -9,18 +9,17 @@ use bevy::{
     ecs::system::SystemParam,
     prelude::*,
     render::{
-        camera::{RenderTarget, ScalingMode},
+        camera::RenderTarget,
         render_resource::{
             Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
         },
         view::RenderLayers,
     },
     sprite::MaterialMesh2dBundle,
-    utils::HashSet,
     window::PresentMode,
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
-use bevy_pixel_camera::{PixelCameraBundle, PixelCameraPlugin};
+
 use bevy_rapier2d::prelude::*;
 mod animations;
 mod assets;
@@ -30,21 +29,15 @@ mod item;
 mod vectorize;
 mod world_generation;
 use animations::{
-    AnimatedTextureMaterial, AnimationFrameTracker, AnimationPosTracker, AnimationTimer,
-    AnimationsPlugin,
+    AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer, AnimationsPlugin,
 };
-use assets::{GameAssetsPlugin, Graphics, WORLD_SCALE};
+use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use bevy_tweening::{
-    lens::{TransformPositionLens, TransformScaleLens},
-    Animator, AnimatorState, EaseFunction, Tween, TweeningPlugin,
-};
+use bevy_tweening::TweeningPlugin;
 use inputs::{InputsPlugin, MovementVector};
-use item::{
-    Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObject, WorldObjectResource,
-};
+use item::{Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObjectResource};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
@@ -228,7 +221,7 @@ fn setup(
         height: 180,
         ..default()
     };
-    let game_size = Vec2::new((HEIGHT * ASPECT_RATIO) as f32, (HEIGHT) as f32);
+    let game_size = Vec2::new(HEIGHT * ASPECT_RATIO, HEIGHT);
 
     // This is the texture that will be rendered to.
     let mut image = Image {
@@ -272,13 +265,13 @@ fn setup(
     let render_material_handle = render_materials.add(ColorMaterial::from(image_handle));
 
     // Main pass cube, with material containing the rendered first pass texture.
-    let texture_image = commands
+    let _texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
                     .add(
                         shape::Quad {
-                            size: Vec2::new(game_size.x as f32, game_size.y as f32),
+                            size: Vec2::new(game_size.x, game_size.y),
                             ..Default::default()
                         }
                         .into(),
