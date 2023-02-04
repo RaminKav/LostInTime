@@ -1,6 +1,6 @@
 (
     map : {
-        None: MyRect(
+        None: WorldItemMetadata(
             pos: (32., 0.),
             size: (16., 16.),
             anchor: None,
@@ -10,7 +10,7 @@
             equip_slot: None,
             breaks_with: None
         ),
-         Flint: MyRect(
+         Flint: WorldItemMetadata(
             pos: (48., 16.),
             size: (16., 16.),
             anchor: None,
@@ -20,7 +20,7 @@
             equip_slot: None,
             breaks_with: None
         ),
-        Log: MyRect(
+        Log: WorldItemMetadata(
             pos: (32., 48.),
             size: (16., 16.),
             anchor: None,
@@ -30,7 +30,7 @@
             equip_slot: None,
             breaks_with: None
         ),
-         StoneHalf: MyRect(
+         StoneHalf: WorldItemMetadata(
             pos: (0., 128.),
             size: (32., 48.),
             anchor: Some((0., 0.166666666667)),
@@ -40,7 +40,7 @@
             equip_slot: None,
             breaks_with: None
         ),
-         StoneFull: MyRect(
+         StoneFull: WorldItemMetadata(
             pos: (32., 112.),
             size: (32., 64.),
             anchor: Some((0., 0.25)),
@@ -50,7 +50,7 @@
             equip_slot: None,
             breaks_with: None
         ),
-         StoneTop: MyRect(
+         StoneTop: WorldItemMetadata(
             pos: (64., 112.),
             size: (32., 32.),
             anchor: None,
@@ -61,7 +61,7 @@
             breaks_with: None
 
         ),
-        Foliage(Tree): MyRect(
+        Foliage(Tree): WorldItemMetadata(
             pos: (96., 112.),
             size: (32., 40.),
             anchor: None,
@@ -71,14 +71,14 @@
             equip_slot: None,
             breaks_with: Some(Sword)
         ),
-        Sword: MyRect(
+        Sword: WorldItemMetadata(
             pos: (64., 64.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
             collider: true,
             breakable: true,
             breaks_into: None,
-            equip_slot: Some(0),
+            equip_slot: Some(Hands),
             breaks_with: None
 
         ),

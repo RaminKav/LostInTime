@@ -1,12 +1,18 @@
+use std::f32::consts::PI;
 use std::{cmp::max, time::Duration};
 
+use bevy::input::InputPlugin;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
+use bevy_tweening::Lerp;
+use interpolation::lerp;
 
+use crate::inputs::InputsPlugin;
+use crate::item::Equipment;
 use crate::Limb;
 use crate::{item::ItemStack, Game, GameState, Player, TIME_STEP};
 
@@ -23,7 +29,11 @@ pub struct AnimationFrameTracker(pub i32, pub i32);
 
 #[derive(Component, Deref, DerefMut)]
 pub struct AnimationTimer(pub Timer);
+#[derive(Component, Debug)]
+pub struct AttackAnimationTimer(pub Timer, pub f32);
 
+#[derive(Debug, Clone, Default)]
+pub struct AttackEvent;
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056f0"]
 pub struct AnimatedTextureMaterial {
@@ -54,14 +64,16 @@ impl Plugin for AnimationsPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::animate_sprite)
-                    .with_system(Self::animate_dropped_items),
+                    .with_system(Self::animate_limbs)
+                    .with_system(Self::animate_dropped_items)
+                    .with_system(Self::animate_attack)
+                    .after(InputsPlugin::mouse_click_system),
             );
     }
 }
 
 impl AnimationsPlugin {
-    fn animate_sprite(
+    fn animate_limbs(
         time: Res<Time>,
         game: Res<Game>,
         asset_server: Res<AssetServer>,
@@ -140,6 +152,32 @@ impl AnimationsPlugin {
 
                 if tracker.1 <= -2. || tracker.1 >= 2. {
                     tracker.2 *= -1.;
+                }
+            }
+        }
+    }
+    fn animate_attack(
+        time: Res<Time>,
+        mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
+        mut attack_event: EventReader<AttackEvent>,
+    ) {
+        if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
+            if attack_event.iter().count() > 0 || !at.0.elapsed().is_zero() {
+                let d = time.delta();
+                at.0.tick(d);
+                if !at.0.just_finished() {
+                    at.1 = lerp(
+                        &0.,
+                        &PI,
+                        &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
+                    );
+                    t.rotation = Quat::from_rotation_z(-at.1);
+                    t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
+                } else {
+                    at.0.reset();
+                    at.1 = 0.;
+                    t.rotation = Quat::from_rotation_z(-at.1);
+                    t.translation.x = -5.;
                 }
             }
         }
