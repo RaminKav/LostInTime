@@ -41,6 +41,7 @@ use bevy_pkv::PkvStore;
 use bevy_tweening::TweeningPlugin;
 use inputs::{InputsPlugin, MovementVector};
 use item::{Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObjectResource};
+use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
@@ -178,7 +179,7 @@ pub struct Player {
     inventory: Vec<ItemStack>,
     main_hand_slot: Option<EquipmentMetaData>,
 }
-#[derive(Component, EnumIter, Display, PartialEq)]
+#[derive(Component, EnumIter, Display, Debug, Hash, Copy, Clone, PartialEq, Eq, Deserialize)]
 pub enum Limb {
     Torso,
     Hands,

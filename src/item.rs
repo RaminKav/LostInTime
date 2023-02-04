@@ -1,15 +1,18 @@
-use crate::animations::AnimationPosTracker;
+use std::iter::Map;
+
+use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
 use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
-use crate::{AnimationTimer, GameParam, GameState, YSort};
+use crate::{AnimationTimer, GameParam, GameState, Limb, YSort};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, Sensor};
+use lazy_static::lazy_static;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -21,7 +24,7 @@ pub struct Breakable(pub Option<WorldObject>);
 #[derive(Component)]
 pub struct Block;
 #[derive(Component)]
-pub struct Equipment;
+pub struct Equipment(Limb);
 #[derive(Component, Debug, PartialEq, Copy, Clone)]
 pub struct ItemStack(pub WorldObject, pub u8);
 
@@ -53,7 +56,10 @@ pub enum Foliage {
     Tree,
 }
 
-pub const PLAYER_EQUIPMENT_POSITIONS: [(f32, f32); 1] = [(-9., -5.); 1];
+lazy_static! {
+    pub static ref PLAYER_EQUIPMENT_POSITIONS: HashMap<Limb, Vec2> =
+        HashMap::from([(Limb::Hands, Vec2::new(-9., -5.))]);
+}
 
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
@@ -69,7 +75,8 @@ pub struct WorldObjectData {
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
     pub breaks_with: Option<WorldObject>,
-    pub equip_slot: Option<usize>,
+    /// 0 = main hand, 1 = head, 2 = chest, 3 = legs
+    pub equip_slot: Option<Limb>,
 }
 impl WorldObjectResource {
     fn new() -> Self {
@@ -86,10 +93,25 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-    ) -> Entity {
+    ) -> Option<Entity> {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
             panic!("graphics not loaded");
+        }
+        if game
+            .chunk_manager
+            .chunk_generation_data
+            .get(&TileMapPositionData {
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+                chunk_pos,
+            })
+            .is_some()
+        {
+            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
+            return None;
         }
         let sprite = game
             .graphics
@@ -100,11 +122,6 @@ impl WorldObject {
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
-        //TODO: WIP FADING OUT ITEMS SHADER
-        // let item = commands.spawn(MaterialMesh2dBundle {mesh: Mesh2dHandle(meshes.add(Mesh::from(shape::Quad { size: Vec2::new(32.,32.), flip: false }))),
-        //  material:,
-        //  transform:,
-        //  ..Default::Default()});
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
@@ -144,6 +161,9 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
+        if self == WorldObject::StoneHalf {
+            println!("STONE: {:?} {:?}", tile_pos, chunk_pos);
+        }
         game.chunk_manager.chunk_generation_data.insert(
             TileMapPositionData {
                 tile_pos: TilePos {
@@ -158,7 +178,7 @@ impl WorldObject {
             },
         );
 
-        item
+        Some(item)
     }
     pub fn spawn_foliage(
         self,
@@ -166,11 +186,28 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-    ) -> Entity {
+    ) -> Option<Entity> {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
             panic!("graphics not loaded");
         }
+
+        if game
+            .chunk_manager
+            .chunk_generation_data
+            .get(&TileMapPositionData {
+                tile_pos: TilePos {
+                    x: tile_pos.x as u32,
+                    y: tile_pos.y as u32,
+                },
+                chunk_pos,
+            })
+            .is_some()
+        {
+            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
+            return None;
+        }
+
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
@@ -234,7 +271,7 @@ impl WorldObject {
             },
         );
 
-        item
+        Some(item)
     }
     pub fn spawn_and_save_block(
         self,
@@ -242,22 +279,24 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
-    ) -> Entity {
+    ) -> Option<Entity> {
         let item = self.spawn(commands, game, tile_pos, chunk_pos);
+        if let Some(item) = item {
+            let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
 
-        let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
+            if let Some(old_points) = old_points {
+                println!("SAVING NEW OBJ {self:?} {tile_pos:?}");
+                let mut new_points = old_points.0.clone();
+                new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
 
-        if let Some(old_points) = old_points {
-            println!("SAVING NEW OBJ {self:?} {tile_pos:?}");
-            let mut new_points = old_points.0.clone();
-            new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
+                game.game_data
+                    .data
+                    .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
+            }
 
-            game.game_data
-                .data
-                .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
+            return Some(item);
         }
-
-        item
+        None
     }
     pub fn spawn_equipment_on_player(
         self,
@@ -283,11 +322,11 @@ impl WorldObject {
         let position;
         let health = Health(100);
         let attack = Attack(20);
-        if let Some(slot) = obj_data.equip_slot {
+        if let Some(limb) = obj_data.equip_slot {
             position = Vec3::new(
-                PLAYER_EQUIPMENT_POSITIONS[slot].0 + anchor.x * obj_data.size.x,
-                PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y,
-                500. - (PLAYER_EQUIPMENT_POSITIONS[slot].1 + anchor.y * obj_data.size.y) * 0.1,
+                PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
+                PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y,
+                500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
             );
             let item = commands
                 .spawn(SpriteSheetBundle {
@@ -302,7 +341,7 @@ impl WorldObject {
                     ..Default::default()
                 })
                 .insert(EquipmentAttributeBundle { health, attack })
-                .insert(Equipment)
+                .insert(Equipment(limb))
                 .insert(Name::new("EquipItem"))
                 .insert(YSort)
                 .insert(self)
@@ -314,19 +353,22 @@ impl WorldObject {
                 health,
                 attack,
             });
-
+            let mut item_entity = commands.entity(item);
             if obj_data.collider {
-                println!("Add collider");
-                commands
-                    .entity(item)
+                item_entity
                     .insert(Collider::cuboid(
                         obj_data.size.x / 3.5,
                         obj_data.size.y / 4.5,
                     ))
                     .insert(Sensor);
             }
-
-            commands.entity(item).set_parent(player_data.0);
+            if limb == Limb::Hands {
+                item_entity.insert(AttackAnimationTimer(
+                    Timer::from_seconds(0.2, TimerMode::Once),
+                    0.,
+                ));
+            }
+            item_entity.set_parent(player_data.0);
 
             item
         } else {

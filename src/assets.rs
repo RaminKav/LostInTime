@@ -8,7 +8,7 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 
 use crate::item::{WorldObject, WorldObjectData, WorldObjectResource};
-use crate::{GameState, ImageAssets};
+use crate::{GameState, ImageAssets, Limb};
 use ron::de::from_str;
 
 pub const WORLD_SCALE: f32 = 3.5; //SOURCE_TILE_SIZE * PIXEL_SCALE;
@@ -17,18 +17,18 @@ pub struct GameAssetsPlugin;
 
 /// Used to describe the location and styling of sprites on the sprite sheet
 #[derive(Default, Clone, Copy, Debug, Deserialize)]
-pub struct MyRect {
+pub struct WorldItemMetadata {
     pub pos: (f32, f32),
     pub size: (f32, f32),
     pub anchor: Option<Vec2>,
     pub collider: bool,
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
-    pub equip_slot: Option<usize>,
+    pub equip_slot: Option<Limb>,
     pub breaks_with: Option<WorldObject>,
 }
 
-impl MyRect {
+impl WorldItemMetadata {
     pub fn new(pos: (f32, f32), size: (f32, f32)) -> Self {
         Self {
             pos,
@@ -58,7 +58,7 @@ impl MyRect {
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
 #[derive(Deserialize)]
 pub struct GraphicsDesc {
-    map: HashMap<WorldObject, MyRect>,
+    map: HashMap<WorldObject, WorldItemMetadata>,
 }
 
 impl Plugin for GameAssetsPlugin {
@@ -247,6 +247,6 @@ impl GameAssetsPlugin {
     }
 }
 
-pub fn get_index_from_pixel_cords(p: MyRect) -> usize {
+pub fn get_index_from_pixel_cords(p: WorldItemMetadata) -> usize {
     (p.pos.1 + (p.pos.0 / 16.)) as usize
 }

@@ -1044,7 +1044,9 @@ impl WorldGenerationPlugin {
                     tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
                 }
             }
-            tree_children.push(tree);
+            if let Some(tree) = tree {
+                tree_children.push(tree);
+            }
         }
 
         game.game_data.data.insert(

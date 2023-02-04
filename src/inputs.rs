@@ -7,7 +7,7 @@ use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
-use crate::animations::AnimatedTextureMaterial;
+use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::item::{Breakable, Equipment};
 use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
@@ -29,15 +29,16 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos(Vec3::new(-100.0, -100.0, 0.0)))
             .add_event::<PlayerMoveEvent>()
+            .add_event::<AttackEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::move_player)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
-                    .with_system(Self::move_camera_with_player.after(Self::move_player))
-                    .with_system(Self::mouse_click_system),
+                    .with_system(Self::move_camera_with_player.after(Self::move_player)),
             )
-            .add_system(Self::close_on_esc);
+            .add_system(Self::close_on_esc)
+            .add_system(Self::mouse_click_system);
     }
 }
 
@@ -283,7 +284,6 @@ impl InputsPlugin {
                     cam_t,
                     cam,
                 ));
-                println!("Cursor at: {cursor_pos:?}");
             }
         }
     }
@@ -306,13 +306,14 @@ impl InputsPlugin {
         ndc_to_world.project_point3(ndc.extend(0.0))
     }
 
-    fn mouse_click_system(
+    pub fn mouse_click_system(
         mut commands: Commands,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
+        mut attack_event: EventWriter<AttackEvent>,
     ) {
-        if mouse_button_input.just_released(MouseButton::Left) {
+        if mouse_button_input.just_pressed(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.0.x,
                 cursor_pos.0.y,
@@ -321,7 +322,6 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            info!("POS {:?}", tile_pos);
             if game
                 .chunk_manager
                 .chunk_generation_data
@@ -333,6 +333,8 @@ impl InputsPlugin {
                     },
                 })
             {
+                info!("POS {:?}", tile_pos);
+
                 let obj_data = game
                     .chunk_manager
                     .chunk_generation_data
@@ -353,31 +355,16 @@ impl InputsPlugin {
                     );
                 }
             } else {
-                let stone = WorldObject::StoneHalf.spawn_and_save_block(
+                WorldObject::StoneHalf.spawn_and_save_block(
                     &mut commands,
                     &mut game,
                     tile_pos,
                     chunk_pos,
                 );
-                commands
-                    .entity(stone)
-                    .insert(Breakable(Some(WorldObject::StoneHalf)));
-                game.chunk_manager.chunk_generation_data.insert(
-                    TileMapPositionData {
-                        chunk_pos,
-                        tile_pos: TilePos {
-                            x: tile_pos.x as u32,
-                            y: tile_pos.y as u32,
-                        },
-                    },
-                    WorldObjectEntityData {
-                        object: WorldObject::StoneFull,
-                        entity: stone,
-                    },
-                );
             }
+            attack_event.send(AttackEvent);
         }
-        if mouse_button_input.just_released(MouseButton::Right) {
+        if mouse_button_input.just_pressed(MouseButton::Right) {
             WorldObject::Sword.spawn_equipment_on_player(&mut commands, &mut game);
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.0.x,
@@ -387,34 +374,6 @@ impl InputsPlugin {
                 cursor_pos.0.x,
                 cursor_pos.0.y,
             ));
-            let stone = WorldObject::StoneFull.spawn_and_save_block(
-                &mut commands,
-                &mut game,
-                tile_pos,
-                chunk_pos,
-            );
-            commands
-                .spawn(SpatialBundle::default())
-                .push_children(&[stone]);
-        }
-        if mouse_button_input.just_released(MouseButton::Middle) {
-            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
-            ));
-            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
-            ));
-            let stone = WorldObject::StoneFull.spawn_and_save_block(
-                &mut commands,
-                &mut game,
-                tile_pos,
-                chunk_pos,
-            );
-            commands
-                .spawn(SpatialBundle::default())
-                .push_children(&[stone]);
         }
     }
     pub fn close_on_esc(
