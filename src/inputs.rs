@@ -62,16 +62,6 @@ impl InputsPlugin {
         >,
         mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
         mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
-        // mut eqp_query: Query<
-        //     &mut Transform,
-        //     (
-        //         With<Limb>,
-        //         Without<ItemStack>,
-        //         Without<Camera>,
-        //         Without<Player>,
-        //     ),
-        // >,
-        // mut camera_query: Query<&mut Transform, (With<Camera>, Without<Player>)>,
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,

@@ -364,7 +364,7 @@ impl WorldObject {
             }
             if limb == Limb::Hands {
                 item_entity.insert(AttackAnimationTimer(
-                    Timer::from_seconds(0.2, TimerMode::Once),
+                    Timer::from_seconds(0.125, TimerMode::Once),
                     0.,
                 ));
             }
