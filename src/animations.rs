@@ -166,18 +166,26 @@ impl AnimationsPlugin {
                 let d = time.delta();
                 at.0.tick(d);
                 if !at.0.just_finished() {
-                    at.1 = lerp(
-                        &0.,
-                        &PI,
+                    at.1 = PI / 2.;
+                    // at.1 = lerp(
+                    //     &0.,
+                    //     &PI,
+                    //     &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
+                    // );
+                    t.rotation = Quat::from_rotation_z(-at.1);
+                    // t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
+                    t.translation.y = -4.;
+                    t.translation.x = lerp(
+                        &-5.,
+                        &15.,
                         &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     );
-                    t.rotation = Quat::from_rotation_z(-at.1);
-                    t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
                 } else {
                     at.0.reset();
                     at.1 = 0.;
                     t.rotation = Quat::from_rotation_z(-at.1);
                     t.translation.x = -5.;
+                    t.translation.y = -1.;
                 }
             }
         }
