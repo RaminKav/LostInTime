@@ -661,15 +661,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_pixel_camera"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "909788182141bd26ec0a2eca270b8323b80bf2d60af67b60cc729af3b2038a85"
-dependencies = [
- "bevy",
-]
-
-[[package]]
 name = "bevy_pkv"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -902,16 +893,6 @@ dependencies = [
  "bevy_hierarchy",
  "bevy_math",
  "bevy_reflect",
-]
-
-[[package]]
-name = "bevy_tweening"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d38b2abf5518df10c3c32ee57a54b9ba7067f3bd1c137b912e286d573962145"
-dependencies = [
- "bevy",
- "interpolation",
 ]
 
 [[package]]
@@ -3767,10 +3748,8 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_asset_loader",
  "bevy_ecs_tilemap",
- "bevy_pixel_camera",
  "bevy_pkv",
  "bevy_rapier2d",
- "bevy_tweening",
  "interpolation",
  "lazy_static",
  "noise",

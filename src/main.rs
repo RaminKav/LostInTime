@@ -9,17 +9,20 @@ use attributes::Health;
 // - set up tilemap or world generation
 // - trees/entities to break/mine
 use bevy::{
+    core_pipeline::clear_color::ClearColorConfig,
     ecs::system::SystemParam,
     prelude::*,
+    reflect::TypeUuid,
     render::{
         camera::RenderTarget,
         render_resource::{
-            Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+            AsBindGroup, Extent3d, ShaderRef, TextureDescriptor, TextureDimension, TextureFormat,
+            TextureUsages,
         },
         view::RenderLayers,
     },
-    sprite::MaterialMesh2dBundle,
-    window::PresentMode,
+    sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
+    window::{CompositeAlphaMode, PresentMode},
 };
 use bevy_inspector_egui::WorldInspectorPlugin;
 
@@ -28,7 +31,9 @@ mod animations;
 mod assets;
 mod attributes;
 mod inputs;
+mod inventory;
 mod item;
+mod ui;
 mod vectorize;
 mod world_generation;
 use animations::{
@@ -38,20 +43,20 @@ use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use bevy_tweening::TweeningPlugin;
 use inputs::{InputsPlugin, MovementVector};
-use item::{Block, Equipment, EquipmentMetaData, ItemStack, ItemsPlugin, WorldObjectResource};
+use inventory::{InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_SIZE};
+use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use ui::UIPlugin;
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
 const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1920.;
+pub const HEIGHT: f32 = 1600.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
-pub const WORLD_SIZE: usize = 300;
 
 fn main() {
     App::new()
@@ -68,14 +73,22 @@ fn main() {
                         title: "Survival Game".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
+                        transparent: true,
+                        alpha_mode: CompositeAlphaMode::PostMultiplied,
                         ..Default::default()
                     },
                     ..default()
                 }),
+            // .set(LogPlugin {
+            //     level: Level::TRACE,
+            //     filter: "kayak_ui::context=trace".to_string(),
+            //     ..Default::default()
+            // }),
         )
         .insert_resource(Msaa { samples: 1 })
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
         // .add_plugin(PixelCameraPlugin)
+        .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
         // .add_plugin(RapierDebugRenderPlugin::default())
@@ -85,7 +98,8 @@ fn main() {
         .add_plugin(AnimationsPlugin)
         .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
-        .add_plugin(TweeningPlugin)
+        .add_plugin(InventoryPlugin)
+        .add_plugin(UIPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -100,7 +114,6 @@ fn main() {
 #[derive(Resource, Default)]
 pub struct Game {
     player: Player,
-    world_size: usize,
     world_generation_params: WorldGeneration,
     player_dash_cooldown: Timer,
     player_dash_duration: Timer,
@@ -142,7 +155,6 @@ fn y_sort(mut q: Query<&mut Transform, With<YSort>>) {
         tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
     }
 }
-
 #[derive(SystemParam)]
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
@@ -176,7 +188,7 @@ pub struct Player {
     is_moving: bool,
     is_dashing: bool,
     is_attacking: bool,
-    inventory: Vec<ItemStack>,
+    inventory: [Option<InventoryItemStack>; INVENTORY_SIZE],
     main_hand_slot: Option<EquipmentMetaData>,
 }
 #[derive(Component, EnumIter, Display, Debug, Hash, Copy, Clone, PartialEq, Eq, Deserialize)]
@@ -193,6 +205,8 @@ pub struct CameraDirty(bool, bool);
 pub struct MainCamera;
 #[derive(Component, Default)]
 pub struct TextureCamera;
+#[derive(Component, Default)]
+pub struct UICamera;
 #[derive(Component, Default)]
 pub struct TextureTarget;
 #[derive(Component, Default)]
@@ -213,6 +227,19 @@ impl DerefMut for RawPosition {
         &mut self.0
     }
 }
+impl Material2d for UITextureMaterial {
+    fn fragment_shader() -> ShaderRef {
+        "shaders/ui_texture.wgsl".into()
+    }
+}
+
+#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[uuid = "9600f1e5-1911-4286-9810-e9bd9ff685e2"]
+pub struct UITextureMaterial {
+    #[texture(0)]
+    #[sampler(1)]
+    pub source_texture: Option<Handle<Image>>,
+}
 
 fn setup(
     mut commands: Commands,
@@ -220,12 +247,12 @@ fn setup(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-    mut render_materials: ResMut<Assets<ColorMaterial>>,
+    mut game_render_materials: ResMut<Assets<ColorMaterial>>,
+    mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
 
     mut game: ResMut<Game>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    game.world_size = WORLD_SIZE;
     game.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
         stone_frequency: 0.0,
@@ -244,7 +271,21 @@ fn setup(
     let game_size = Vec2::new(HEIGHT * ASPECT_RATIO, HEIGHT);
 
     // This is the texture that will be rendered to.
-    let mut image = Image {
+    let mut game_image = Image {
+        texture_descriptor: TextureDescriptor {
+            label: None,
+            size: img_size,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Bgra8UnormSrgb,
+            mip_level_count: 1,
+            sample_count: 1,
+            usage: TextureUsages::TEXTURE_BINDING
+                | TextureUsages::COPY_DST
+                | TextureUsages::RENDER_ATTACHMENT,
+        },
+        ..default()
+    };
+    let mut ui_image = Image {
         texture_descriptor: TextureDescriptor {
             label: None,
             size: img_size,
@@ -260,19 +301,22 @@ fn setup(
     };
 
     // fill image.data with zeroes
-    image.resize(img_size);
+    game_image.resize(img_size);
+    ui_image.resize(img_size);
 
-    let image_handle = images.add(image);
+    let game_image_handle = images.add(game_image);
+    let ui_image_handle = images.add(ui_image);
 
     // This specifies the layer used for the first pass, which will be attached to the first pass camera and cube.
     let first_pass_layer = RenderLayers::layer(1);
+    let second_pass_layer = RenderLayers::layer(2);
 
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
                 // render before the "main pass" camera
-                priority: -1,
-                target: RenderTarget::Image(image_handle.clone()),
+                priority: -2,
+                target: RenderTarget::Image(game_image_handle.clone()),
                 ..default()
             },
             ..default()
@@ -280,12 +324,31 @@ fn setup(
         TextureCamera,
         RawPosition::default(),
     ));
+    commands.spawn((
+        Camera2dBundle {
+            camera: Camera {
+                // render before the "main pass" camera
+                priority: -1,
+                target: RenderTarget::Image(ui_image_handle.clone()),
+                ..default()
+            },
+            camera_2d: Camera2d {
+                clear_color: ClearColorConfig::Custom(Color::rgba(0., 0., 0., 0.)),
+            },
+            ..default()
+        },
+        RenderLayers::from_layers(&[3]),
+    ));
 
     // This material has the texture that has been rendered.
-    let render_material_handle = render_materials.add(ColorMaterial::from(image_handle));
+    let game_render_material_handle =
+        game_render_materials.add(ColorMaterial::from(game_image_handle));
+    let ui_render_material_handle = ui_render_materials.add(UITextureMaterial {
+        source_texture: Some(ui_image_handle),
+    });
 
     // Main pass cube, with material containing the rendered first pass texture.
-    let _texture_image = commands
+    let _game_texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
@@ -298,20 +361,68 @@ fn setup(
                     )
                     .into(),
                 transform: Transform::from_scale(Vec3::new(1., 1., 1.)),
-                material: render_material_handle,
+                material: game_render_material_handle,
                 ..default()
             },
             TextureTarget,
             first_pass_layer,
         ))
         .id();
+    let _ui_texture_image = commands
+        .spawn((
+            MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(
+                        shape::Quad {
+                            size: Vec2::new(game_size.x, game_size.y),
+                            ..Default::default()
+                        }
+                        .into(),
+                    )
+                    .into(),
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..default()
+                },
+                material: ui_render_material_handle,
+                ..default()
+            },
+            // TextureTarget,
+            second_pass_layer,
+        ))
+        .id();
 
     // The main pass camera.
     commands.spawn((
-        Camera2dBundle::default(),
+        Camera2dBundle {
+            camera: Camera {
+                priority: 0,
+                ..default()
+            },
+            camera_2d: Camera2d {
+                clear_color: ClearColorConfig::None,
+            },
+            ..default()
+        },
         MainCamera,
         GameUpscale(HEIGHT / img_size.height as f32),
         first_pass_layer,
+    ));
+    commands.spawn((
+        Camera2dBundle {
+            camera: Camera {
+                priority: 1,
+                ..default()
+            },
+            camera_2d: Camera2d {
+                clear_color: ClearColorConfig::None,
+            },
+            ..default()
+        },
+        UICamera,
+        GameUpscale(HEIGHT / img_size.height as f32),
+        second_pass_layer,
     ));
 
     let mut limb_children: Vec<Entity> = vec![];
@@ -394,7 +505,7 @@ fn setup(
                 is_moving: false,
                 is_dashing: false,
                 is_attacking: false,
-                inventory: Vec::new(),
+                inventory: [None; INVENTORY_SIZE],
                 main_hand_slot: None,
             },
             MovementVector::default(),

@@ -9,16 +9,26 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::item::{Breakable, Equipment};
-use crate::world_generation::{TileMapPositionData, WorldObjectEntityData};
+use crate::item::{Equipment};
+use crate::ui::{
+    toggle_inv_visibility, InventorySlotState, InventoryState,
+};
+use crate::world_generation::{TileMapPositionData};
 use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
     PLAYER_DASH_SPEED, TIME_STEP,
 };
-use crate::{GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, PLAYER_MOVE_SPEED};
+use crate::{
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera,
+    PLAYER_MOVE_SPEED,
+};
 
 #[derive(Default, Resource, Debug)]
-pub struct CursorPos(Vec3);
+pub struct CursorPos {
+    pub world_coords: Vec3,
+    pub screen_coords: Vec3,
+    pub ui_coords: Vec3,
+}
 
 #[derive(Component, Default)]
 pub struct MovementVector(pub Vec2);
@@ -27,7 +37,7 @@ pub struct InputsPlugin;
 
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(CursorPos(Vec3::new(-100.0, -100.0, 0.0)))
+        app.insert_resource(CursorPos::default())
             .add_event::<PlayerMoveEvent>()
             .add_event::<AttackEvent>()
             .add_system_set(
@@ -38,6 +48,7 @@ impl Plugin for InputsPlugin {
                     .with_system(Self::move_camera_with_player.after(Self::move_player)),
             )
             .add_system(Self::close_on_esc)
+            .add_system(Self::toggle_inventory)
             .add_system(Self::mouse_click_system);
     }
 }
@@ -66,6 +77,7 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
+        mut inv_slots: Query<&mut InventorySlotState>,
     ) {
         let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
             player_query.single_mut();
@@ -85,6 +97,9 @@ impl InputsPlugin {
                     }
                 }
             }
+        }
+        if key_input.pressed(KeyCode::Q) {
+            game.game.player.inventory[0] = None;
         }
 
         if key_input.pressed(KeyCode::D) {
@@ -158,34 +173,16 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, _, item_stack) in game.items_query.iter() {
-                    if col.entity == drop && !collected_drops.contains(&col.entity) {
-                        if let Some(mut ec) = commands.get_entity(drop) {
+                for (item_stack_entity, _, item_stack) in game.items_query.iter() {
+                    if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
+                        if let Some(mut ec) = commands.get_entity(item_stack_entity) {
                             ec.despawn();
-                            game.world_obj_data.drop_entities.remove(&drop);
+                            game.world_obj_data.drop_entities.remove(&item_stack_entity);
 
-                            if let Some(stack) = game
-                                .game
-                                .player
-                                .inventory
-                                .iter()
-                                .find(|i| i.0 == item_stack.0)
-                            {
-                                // safe to unwrap, we check for it above
-                                let index = game
-                                    .game
-                                    .player
-                                    .inventory
-                                    .iter()
-                                    .position(|i| i == stack)
-                                    .unwrap();
-                                let stack = game.game.player.inventory.get_mut(index).unwrap();
-                                stack.1 += item_stack.1;
-                            } else {
-                                game.game.player.inventory.push(*item_stack);
-                            }
+                            item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
+
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", drop, game.game.player.inventory);
+                            info!("{:?} | {:?}", item_stack_entity, game.game.player.inventory);
                         }
                     }
                 }
@@ -212,34 +209,16 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (drop, _, item_stack) in game.items_query.iter() {
-                    if col.entity == drop && !collected_drops.contains(&col.entity) {
-                        if let Some(mut ec) = commands.get_entity(drop) {
+                for (item_stack_entity, _, item_stack) in game.items_query.iter() {
+                    if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
+                        if let Some(mut ec) = commands.get_entity(item_stack_entity) {
                             ec.despawn();
-                            game.world_obj_data.drop_entities.remove(&drop);
+                            game.world_obj_data.drop_entities.remove(&item_stack_entity);
 
-                            if let Some(stack) = game
-                                .game
-                                .player
-                                .inventory
-                                .iter()
-                                .find(|i| i.0 == item_stack.0)
-                            {
-                                // safe to unwrap, we check for it above
-                                let index = game
-                                    .game
-                                    .player
-                                    .inventory
-                                    .iter()
-                                    .position(|i| i == stack)
-                                    .unwrap();
-                                let stack = game.game.player.inventory.get_mut(index).unwrap();
-                                stack.1 += item_stack.1;
-                            } else {
-                                game.game.player.inventory.push(*item_stack);
-                            }
+                            item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
+
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", drop, game.game.player.inventory);
+                            info!("{:?} | {:?}", item_stack_entity, game.game.player.inventory);
                         }
                     }
                 }
@@ -256,6 +235,14 @@ impl InputsPlugin {
             move_event.send(PlayerMoveEvent(false));
         }
     }
+    pub fn toggle_inventory(
+        key_input: ResMut<Input<KeyCode>>,
+        inv_query: Query<(&mut Visibility, &mut InventoryState)>,
+    ) {
+        if key_input.just_pressed(KeyCode::I) {
+            toggle_inv_visibility(inv_query);
+        }
+    }
 
     pub fn update_cursor_pos(
         windows: Res<Windows>,
@@ -268,12 +255,16 @@ impl InputsPlugin {
             // any transforms on the camera. This is done by projecting the cursor position into
             // camera space (world space).
             for (cam_t, cam) in camera_q.iter() {
-                *cursor_pos = CursorPos(Self::cursor_pos_in_world(
-                    &windows,
-                    cursor_moved.position,
-                    cam_t,
-                    cam,
-                ));
+                *cursor_pos = CursorPos {
+                    world_coords: Self::cursor_pos_in_world(
+                        &windows,
+                        cursor_moved.position,
+                        cam_t,
+                        cam,
+                    ),
+                    ui_coords: Self::cursor_pos_in_ui(&windows, cursor_moved.position, cam),
+                    screen_coords: cursor_moved.position.extend(0.),
+                };
             }
         }
     }
@@ -295,6 +286,18 @@ impl InputsPlugin {
         let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
         ndc_to_world.project_point3(ndc.extend(0.0))
     }
+    pub fn cursor_pos_in_ui(windows: &Windows, cursor_pos: Vec2, cam: &Camera) -> Vec3 {
+        let window = windows.primary();
+
+        let window_size = Vec2::new(window.width(), window.height());
+
+        // Convert screen position [0..resolution] to ndc [-1..1]
+        // (ndc = normalized device coordinates)
+        let t = Transform::from_translation(Vec3::new(0., 0., 0.));
+        let ndc_to_world = t.compute_matrix() * cam.projection_matrix().inverse();
+        let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
+        ndc_to_world.project_point3(ndc.extend(0.0))
+    }
 
     pub fn mouse_click_system(
         mut commands: Commands,
@@ -302,15 +305,22 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
         mut attack_event: EventWriter<AttackEvent>,
+        inv_query: Query<&mut Visibility, With<InventoryState>>,
     ) {
+        if let Ok(inv_state) = inv_query.get_single() {
+            if inv_state.is_visible {
+                return;
+            }
+        }
+
         if mouse_button_input.just_pressed(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
             ));
             let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
             ));
             if game
                 .chunk_manager
@@ -356,13 +366,13 @@ impl InputsPlugin {
         }
         if mouse_button_input.just_pressed(MouseButton::Right) {
             WorldObject::Sword.spawn_equipment_on_player(&mut commands, &mut game);
-            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
+            let _chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
             ));
-            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
-                cursor_pos.0.x,
-                cursor_pos.0.y,
+            let _tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
             ));
         }
     }
@@ -390,15 +400,20 @@ impl InputsPlugin {
     pub fn move_camera_with_player(
         mut player_query: Query<
             (&Transform, &MovementVector),
-            (With<Player>, Without<MainCamera>, Without<TextureCamera>),
+            (
+                With<Player>,
+                Without<MainCamera>,
+                Without<TextureCamera>,
+                Without<UICamera>,
+            ),
         >,
         mut game_camera: Query<
             (&mut Transform, &mut RawPosition),
-            (Without<MainCamera>, With<TextureCamera>),
+            (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
         >,
         mut screen_camera: Query<
             (&mut Transform, &GameUpscale),
-            (With<MainCamera>, Without<TextureCamera>),
+            (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
         >,
     ) {
         let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
