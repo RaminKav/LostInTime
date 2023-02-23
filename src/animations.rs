@@ -1,20 +1,19 @@
 use std::f32::consts::PI;
 use std::{cmp::max, time::Duration};
 
-use bevy::input::InputPlugin;
+
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
-use bevy_tweening::Lerp;
 use interpolation::lerp;
 
 use crate::inputs::InputsPlugin;
 use crate::item::Equipment;
 use crate::Limb;
-use crate::{item::ItemStack, Game, GameState, Player, TIME_STEP};
+use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
 
 pub struct AnimationsPlugin;
 

@@ -1,8 +1,7 @@
-use std::iter::Map;
-
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
 use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
+use crate::inventory::ItemStack;
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
@@ -11,6 +10,7 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_inspector_egui::Inspectable;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use lazy_static::lazy_static;
 
@@ -25,8 +25,6 @@ pub struct Breakable(pub Option<WorldObject>);
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
-#[derive(Component, Debug, PartialEq, Copy, Clone)]
-pub struct ItemStack(pub WorldObject, pub u8);
 
 pub struct EquipmentMetaData {
     entity: Entity,
@@ -37,7 +35,9 @@ pub struct EquipmentMetaData {
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
+#[derive(
+    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
+)]
 pub enum WorldObject {
     None,
     Grass,
@@ -51,11 +51,17 @@ pub enum WorldObject {
     Log,
     Flint,
 }
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display)]
+#[derive(
+    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display,
+)]
 pub enum Foliage {
     Tree,
 }
-
+impl Default for Foliage {
+    fn default() -> Self {
+        Self::Tree
+    }
+}
 lazy_static! {
     pub static ref PLAYER_EQUIPMENT_POSITIONS: HashMap<Limb, Vec2> =
         HashMap::from([(Limb::Hands, Vec2::new(-9., -5.))]);
@@ -161,9 +167,6 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
-        if self == WorldObject::StoneHalf {
-            println!("STONE: {:?} {:?}", tile_pos, chunk_pos);
-        }
         game.chunk_manager.chunk_generation_data.insert(
             TileMapPositionData {
                 tile_pos: TilePos {
@@ -219,7 +222,7 @@ impl WorldObject {
         );
         let foliage_material = game
             .graphics
-            .image_handle_map
+            .foliage_material_map
             .as_ref()
             .unwrap()
             .get(&self)
@@ -411,10 +414,13 @@ impl WorldObject {
                 + rng.gen_range(-10. ..10.))
                 * 0.1,
         );
-        let stack = ItemStack(self, rng.gen_range(1..4));
+        let stack = ItemStack {
+            obj_type: self,
+            count: rng.gen_range(1..4),
+        };
         let transform = Transform {
             translation: position,
-            scale: Vec3::new(1., 1., 1.), // rotation: Quat::from_rotation_x(0.1),
+            scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         };
 
@@ -476,7 +482,7 @@ impl WorldObject {
                 if let Some(main_hand_tool) = main_hand_tool {
                     if main_hand_tool.obj == breaks_with {
                         let mut h = b_data.1;
-                        h.0 -= main_hand_tool.attack.0;
+                        h.0 -= main_hand_tool.attack.0 as i8;
                         if h.0 <= 0 {
                             Self::break_item(self, commands, game, tile_pos, chunk_pos)
                         }
