@@ -14,7 +14,7 @@ pub struct EquipmentAttributeBundle {
 }
 
 #[derive(Component, Inspectable, Clone, Copy)]
-pub struct Health(pub u8);
+pub struct Health(pub i8);
 #[derive(Component, Inspectable, Clone, Copy)]
 pub struct Attack(pub u8);
 

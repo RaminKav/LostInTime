@@ -308,9 +308,10 @@ impl WorldGenerationPlugin {
                 WorldObject::Water
             } else if e <= game.world_generation_params.sand_frequency {
                 WorldObject::Sand
-            } else if e <= game.world_generation_params.dirt_frequency {
-                WorldObject::Grass
             }
+            // else if e <= game.world_generation_params.dirt_frequency {
+            //     WorldObject::Grass
+            // }
             // } else if e <= game.world_generation_params.stone_frequency {
             //     WorldObject::Stone
             // }

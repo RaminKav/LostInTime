@@ -2,12 +2,16 @@ use std::fs;
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::{AsBindGroup, ShaderRef};
+use bevy::render::render_resource::{
+    AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat,
+};
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
 use serde::Deserialize;
+use strum::IntoEnumIterator;
 
 use crate::item::{WorldObject, WorldObjectData, WorldObjectResource};
+use crate::ui::UIElement;
 use crate::{GameState, ImageAssets, Limb};
 use ron::de::from_str;
 
@@ -67,7 +71,9 @@ impl Plugin for GameAssetsPlugin {
             .insert_resource(Graphics {
                 texture_atlas: None,
                 spritesheet_map: None,
-                image_handle_map: None,
+                foliage_material_map: None,
+                world_obj_image_handles: None,
+                ui_image_handles: None,
             })
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
@@ -115,50 +121,52 @@ pub struct FoliageMaterial {
 pub struct Graphics {
     pub texture_atlas: Option<Handle<TextureAtlas>>,
     pub spritesheet_map: Option<HashMap<WorldObject, (TextureAtlasSprite, usize)>>,
-    pub image_handle_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
+    pub foliage_material_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
+    pub world_obj_image_handles: Option<HashMap<WorldObject, Handle<Image>>>,
+    pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
 /// Copies sprite data pixel by pixel, needed to render things in UI
-// fn convert_to_image(
-//     sprite_desc: MyRect,
-//     original_image: Handle<Image>,
-//     assets: &mut ResMut<Assets<Image>>,
-// ) -> Handle<Image> {
-//     //TODO convert if mismatch
-//     let original_image = assets.get(original_image).unwrap();
-//     assert!(original_image.texture_descriptor.format == TextureFormat::Rgba8UnormSrgb);
+fn convert_to_image(
+    sprite_desc: WorldItemMetadata,
+    original_image: Handle<Image>,
+    assets: &mut ResMut<Assets<Image>>,
+) -> Handle<Image> {
+    //TODO convert if mismatch
+    let original_image = assets.get(&original_image).unwrap();
+    assert!(original_image.texture_descriptor.format == TextureFormat::Rgba8UnormSrgb);
 
-//     let mut data = Vec::default();
-//     //Every pixel is 4 entries in image.data
-//     let mut starting_index =
-//         (sprite_desc.pos.0 + original_image.size().x * sprite_desc.pos.1) as usize;
-//     for _y in 0..sprite_desc.size.1 as usize {
-//         for x in 0..sprite_desc.size.0 as usize {
-//             let index = starting_index + x;
-//             //Copy 1 pixel at index
-//             data.push(original_image.data[index * 4]);
-//             data.push(original_image.data[index * 4 + 1]);
-//             data.push(original_image.data[index * 4 + 2]);
-//             data.push(original_image.data[index * 4 + 3]);
-//         }
-//         starting_index += original_image.size().y as usize;
-//     }
+    let mut data = Vec::default();
+    //Every pixel is 4 entries in image.data
+    let mut starting_index =
+        (sprite_desc.pos.0 + original_image.size().x * sprite_desc.pos.1) as usize;
+    for _y in 0..sprite_desc.size.1 as usize {
+        for x in 0..sprite_desc.size.0 as usize {
+            let index = starting_index + x;
+            //Copy 1 pixel at index
+            data.push(original_image.data[index * 4]);
+            data.push(original_image.data[index * 4 + 1]);
+            data.push(original_image.data[index * 4 + 2]);
+            data.push(original_image.data[index * 4 + 3]);
+        }
+        starting_index += original_image.size().y as usize;
+    }
 
-//     let size = Extent3d {
-//         width: sprite_desc.size.0 as u32,
-//         height: sprite_desc.size.1 as u32,
-//         depth_or_array_layers: 1,
-//     };
-//     let image = Image::new(
-//         size,
-//         TextureDimension::D2,
-//         data,
-//         //FIXME
-//         TextureFormat::Rgba8UnormSrgb,
-//     );
-//     assets.add(image)
-// }
+    let size = Extent3d {
+        width: sprite_desc.size.0 as u32,
+        height: sprite_desc.size.1 as u32,
+        depth_or_array_layers: 1,
+    };
+    let image = Image::new(
+        size,
+        TextureDimension::D2,
+        data,
+        //FIXME
+        TextureFormat::Rgba8UnormSrgb,
+    );
+    assets.add(image)
+}
 
 impl GameAssetsPlugin {
     /// Startup system that runs after images are loaded, indexes all loaded images
@@ -166,6 +174,7 @@ impl GameAssetsPlugin {
     pub fn load_graphics(
         mut graphics: ResMut<Graphics>,
         sprite_sheet: Res<ImageAssets>,
+        mut image_assets: ResMut<Assets<Image>>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
         mut materials: ResMut<Assets<FoliageMaterial>>,
@@ -180,10 +189,12 @@ impl GameAssetsPlugin {
             std::process::exit(1);
         });
 
-        let mut atlas = TextureAtlas::new_empty(image_handle, Vec2::new(256., 32.));
+        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
 
         let mut spritesheet_map = HashMap::default();
-        let mut image_handle_map = HashMap::default();
+        let mut world_obj_image_handles = HashMap::default();
+        let mut ui_image_handles = HashMap::default();
+        let mut foliage_material_map = HashMap::default();
 
         for (item, rect) in sprite_desc.map.iter() {
             println!("Found graphic {item:?}");
@@ -203,7 +214,7 @@ impl GameAssetsPlugin {
                         offset: 0.,
                         // alpha_mode: AlphaMode::Blend,
                     });
-                    image_handle_map
+                    foliage_material_map
                         .insert(*item, (foliage_material, get_index_from_pixel_cords(*rect)));
                 }
                 _ => {
@@ -213,6 +224,10 @@ impl GameAssetsPlugin {
                     //Set the size to be proportional to the source rectangle
                     sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
                     spritesheet_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
+                    world_obj_image_handles.insert(
+                        *item,
+                        convert_to_image(*rect, image_handle.clone(), &mut image_assets),
+                    );
                 }
             }
 
@@ -237,12 +252,21 @@ impl GameAssetsPlugin {
             );
         }
 
+        // load UI
+        for u in UIElement::iter() {
+            println!("LOADED UI ASSET {:?}", u.to_string());
+            let handle = asset_server.load(format!("ui/{u}.png"));
+            ui_image_handles.insert(u, handle);
+        }
+
         let atlas_handle = texture_assets.add(atlas);
 
         *graphics = Graphics {
             texture_atlas: Some(atlas_handle),
             spritesheet_map: Some(spritesheet_map),
-            image_handle_map: Some(image_handle_map),
+            foliage_material_map: Some(foliage_material_map),
+            world_obj_image_handles: Some(world_obj_image_handles),
+            ui_image_handles: Some(ui_image_handles),
         };
     }
 }
