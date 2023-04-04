@@ -1,23 +1,10 @@
-// stop clicks through UI
+# Inventory TODO
 
-```fn set_active_tile_target(
-    mut tile: Query<&mut ActiveTile>,
-    cursor: Res<Input<MouseButton>>,
-    event_context: Query<&EventDispatcher, With<GameUI>>,
-    camera_transform: Query<&GlobalTransform, With<WorldCamera>>,
-    windows: Res<Windows>,
-) {
-if !cursor.just_pressed(MouseButton::Left) {
-// Only run this system when the mouse button is clicked
-return;
-}
-
-    if event_context.single().contains_cursor() {
-        // This is the important bit:
-        // If the cursor is over a part of the UI, then we should not allow clicks to pass through to the world
-        return;
-    }
-```
+- Add hotbar
+- Update assets
+<!-- - hotbar fades/greys when inventory is open, or add a faint overlay -->
+- Allow dragging out of inv to drop (use timer comp)
+- Add double click to colelct all items of same type to a stack
 
 # Components for UI
 

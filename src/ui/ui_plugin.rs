@@ -386,7 +386,24 @@ fn handle_cursor_update(
     // if so, match on that entitis current interaction type, and update acordingly
 }
 pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
-    commands
+    let overlay = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
+                custom_size: Some(Vec2::new(320.0, 180.0)),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., 0., 9.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("overlay"))
+        .id();
+    let inv = commands
         .spawn(SpriteBundle {
             texture: graphics
                 .ui_image_handles
@@ -410,7 +427,9 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
         })
         .insert(InventoryState { open: false })
         .insert(Name::new("INVENTORY"))
-        .insert(RenderLayers::from_layers(&[3]));
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+    commands.entity(inv).push_children(&[overlay]);
 }
 pub fn setup_inv_slots_ui(
     mut commands: Commands,
