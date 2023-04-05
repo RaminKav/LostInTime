@@ -190,6 +190,7 @@ pub struct Player {
     is_attacking: bool,
     inventory: [Option<InventoryItemStack>; INVENTORY_SIZE],
     main_hand_slot: Option<EquipmentMetaData>,
+    position: Vec3,
 }
 #[derive(Component, EnumIter, Display, Debug, Hash, Copy, Clone, PartialEq, Eq, Deserialize)]
 pub enum Limb {
@@ -507,6 +508,7 @@ fn setup(
                 is_attacking: false,
                 inventory: [None; INVENTORY_SIZE],
                 main_hand_slot: None,
+                position: Vec3::ZERO,
             },
             MovementVector::default(),
             KinematicCharacterController::default(),

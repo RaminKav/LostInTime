@@ -384,6 +384,7 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
+        count: usize,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
@@ -401,22 +402,23 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let mut rng = rand::thread_rng();
+        let drop_spread = 10.;
 
         let position = Vec3::new(
             (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.x * obj_data.size.x
-                + rng.gen_range(-10. ..10.),
+                + rng.gen_range(-drop_spread..drop_spread),
             (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
-                + rng.gen_range(-10. ..10.),
+                + rng.gen_range(-drop_spread..drop_spread),
             500. - ((tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
-                + rng.gen_range(-10. ..10.))
+                + rng.gen_range(-drop_spread..drop_spread))
                 * 0.1,
         );
         let stack = ItemStack {
             obj_type: self,
-            count: rng.gen_range(1..4),
+            count,
         };
         let transform = Transform {
             translation: position,
@@ -511,16 +513,18 @@ impl WorldObject {
                 },
             })
             .unwrap();
-        println!(
-            "{:?} {:?}",
-            obj_data,
-            (tile_pos.x as f32, tile_pos.y as f32, self),
-        );
 
         if let Some(breaks_into_option) = game.world_obj_data.properties.get(&self) {
             commands.entity(obj_data.entity).despawn();
             if let Some(breaks_into) = breaks_into_option.breaks_into {
-                breaks_into.spawn_item_drop(commands, game, tile_pos, chunk_pos);
+                let mut rng = rand::thread_rng();
+                breaks_into.spawn_item_drop(
+                    commands,
+                    game,
+                    tile_pos,
+                    chunk_pos,
+                    rng.gen_range(1..4),
+                );
             }
             game.chunk_manager
                 .chunk_generation_data
@@ -543,12 +547,7 @@ impl WorldObject {
                 .filter(|p| **p != (tile_pos.x as f32, tile_pos.y as f32, self))
                 .copied()
                 .collect::<Vec<(f32, f32, Self)>>();
-            info!(
-                "DELETING BLOCK {:?} {:?} {:?}",
-                (tile_pos.x as f32, tile_pos.y as f32, self),
-                updated_old_points.len(),
-                old_points.0.len()
-            );
+
             game.game_data.data.insert(
                 (chunk_pos.x, chunk_pos.y),
                 ChunkObjectData(updated_old_points.to_vec()),
