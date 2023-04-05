@@ -7,7 +7,7 @@ use crate::{
     inputs::CursorPos,
     inventory::{InventoryPlugin, ItemStack},
     item::WorldObject,
-    Game, GameState,
+    Game, GameParam, GameState,
 };
 
 use super::ui_helpers;
@@ -23,6 +23,7 @@ pub enum UIElement {
 pub struct InventorySlotState {
     pub slot_index: usize,
     pub item: Option<Entity>,
+    pub count: Option<usize>,
     pub obj_type: Option<WorldObject>,
     pub dirty: bool,
 }
@@ -77,10 +78,18 @@ pub struct DraggedItem;
 
 #[derive(Debug, Clone)]
 
-pub struct DropEvent {
+pub struct DropOnSlotEvent {
     dropped_entity: Entity,
     dropped_item_stack: ItemStack,
     drop_target_slot_state: InventorySlotState,
+    parent_interactable_entity: Entity,
+    stack_empty: bool,
+}
+#[derive(Debug, Clone)]
+
+pub struct DropInWorldEvent {
+    dropped_entity: Entity,
+    dropped_item_stack: ItemStack,
     parent_interactable_entity: Entity,
     stack_empty: bool,
 }
@@ -94,7 +103,8 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LastHoveredSlot { slot: None })
-            .add_event::<DropEvent>()
+            .add_event::<DropOnSlotEvent>()
+            .add_event::<DropInWorldEvent>()
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
                     .with_system(setup_inv_ui.after(GameAssetsPlugin::load_graphics)),
@@ -105,14 +115,42 @@ impl Plugin for UIPlugin {
                     .with_system(handle_item_drop_clicks)
                     .with_system(handle_dragging)
                     .with_system(handle_hovering)
-                    .with_system(handle_drop_events.after(handle_item_drop_clicks))
+                    .with_system(handle_drop_on_slot_events.after(handle_item_drop_clicks))
+                    .with_system(handle_drop_in_world_events.after(handle_item_drop_clicks))
                     .with_system(handle_cursor_update.before(handle_item_drop_clicks))
                     .with_system(sync_inventory_ui.after(handle_hovering)),
             );
     }
 }
-fn handle_drop_events(
-    mut events: EventReader<DropEvent>,
+fn handle_drop_in_world_events(
+    mut events: EventReader<DropInWorldEvent>,
+    mut game_param: GameParam,
+    mut commands: Commands,
+    mut interactables: Query<(Entity, &UIElement, &mut Interactable)>,
+) {
+    for drop_event in events.iter() {
+        let p = ui_helpers::get_player_chunk_tile_coords(&mut game_param.game);
+        drop_event.dropped_item_stack.obj_type.spawn_item_drop(
+            &mut commands,
+            &mut game_param,
+            p.1,
+            p.0,
+            drop_event.dropped_item_stack.count,
+        );
+        if drop_event.stack_empty {
+            commands
+                .entity(drop_event.dropped_entity)
+                .despawn_recursive();
+            if let Ok(mut parent_interactable) =
+                interactables.get_mut(drop_event.parent_interactable_entity)
+            {
+                parent_interactable.2.change(Interaction::None);
+            }
+        }
+    }
+}
+fn handle_drop_on_slot_events(
+    mut events: EventReader<DropOnSlotEvent>,
     mut game: ResMut<Game>,
     mut commands: Commands,
     mut interactables: Query<(Entity, &UIElement, &mut Interactable)>,
@@ -154,6 +192,7 @@ fn handle_drop_events(
             no_more_dragging = drop_event.stack_empty;
         }
         // set parant slot entity to dirty
+        //TODO: might not be needed?
         let parent_e = interactables.get_mut(drop_event.parent_interactable_entity);
         if let Ok(parent_e) = parent_e {
             slot_states.get_mut(parent_e.0).unwrap().dirty = true;
@@ -248,15 +287,22 @@ fn handle_item_drop_clicks(
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_states: Query<&mut InventorySlotState>,
+    inv_stat: Query<&InventoryState>,
 
-    mut events: EventWriter<DropEvent>,
+    mut slot_drop_events: EventWriter<DropOnSlotEvent>,
+    mut world_drop_events: EventWriter<DropInWorldEvent>,
+
     mut item_stack_query: Query<&mut ItemStack>,
     mut interactables: Query<(Entity, &mut Interactable)>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
-    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
-
+    let inv_open = inv_stat.single().open;
+    let hit_test = if inv_open {
+        ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
+    } else {
+        None
+    };
     for (e, interactable) in interactables.iter_mut() {
         // reset dragged interactables when mouse released
         if let Interaction::Dragging { item } = interactable.current() {
@@ -264,7 +310,7 @@ fn handle_item_drop_clicks(
                 if let Some(drop_target) = hit_test {
                     if let Ok(state) = slot_states.get(drop_target.0) {
                         if left_mouse_pressed {
-                            events.send(DropEvent {
+                            slot_drop_events.send(DropOnSlotEvent {
                                 dropped_entity: *item,
                                 dropped_item_stack: *item_stack,
                                 drop_target_slot_state: state.clone(),
@@ -284,7 +330,7 @@ fn handle_item_drop_clicks(
                                     count: 1,
                                 };
                                 item_stack.modify_count(-1);
-                                events.send(DropEvent {
+                                slot_drop_events.send(DropOnSlotEvent {
                                     dropped_entity: *item,
                                     dropped_item_stack: lonely_item_stack,
                                     parent_interactable_entity: e,
@@ -293,6 +339,28 @@ fn handle_item_drop_clicks(
                                 });
                             }
                         }
+                    }
+                } else {
+                    // we did not click on a slot, so send drop out of inv event
+                    if left_mouse_pressed {
+                        world_drop_events.send(DropInWorldEvent {
+                            dropped_entity: *item,
+                            dropped_item_stack: *item_stack,
+                            parent_interactable_entity: e,
+                            stack_empty: true,
+                        });
+                    } else if right_mouse_pressed {
+                        let lonely_item_stack: ItemStack = ItemStack {
+                            obj_type: item_stack.obj_type,
+                            count: 1,
+                        };
+                        item_stack.modify_count(-1);
+                        world_drop_events.send(DropInWorldEvent {
+                            dropped_entity: *item,
+                            dropped_item_stack: lonely_item_stack,
+                            parent_interactable_entity: e,
+                            stack_empty: item_stack.count == 0,
+                        });
                     }
                 }
             }
@@ -394,7 +462,7 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., 9.),
+                translation: Vec3::new(0., 0., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -481,11 +549,13 @@ pub fn spawn_inv_slot(
 
     let mut item_icon_option = None;
     let mut item_type_option = None;
+    let mut item_count_option = None;
     // check if we need to spawn an item icon for this slot
     if let Some(Some(item)) = game.player.inventory.get(slot_index) {
         // player has item in this slot
         let obj_type = item.item_stack.obj_type;
         item_type_option = Some(obj_type);
+        item_count_option = Some(item.item_stack.count);
         item_icon_option = Some(spawn_item_stack_icon(
             commands,
             graphics,
@@ -522,6 +592,7 @@ pub fn spawn_inv_slot(
             slot_index,
             item: item_icon_option,
             obj_type: item_type_option,
+            count: item_count_option,
             dirty: false,
         })
         .insert(UIElement::InventorySlot);
@@ -593,7 +664,14 @@ pub fn sync_inventory_ui(
     for (e, interactable, state) in ui_elements.iter_mut() {
         // check current inventory state against the slot's state
         // if they do not match, delete and respawn
-        if state.dirty {
+
+        let real_count: Option<usize> = if let Some(item) = game.player.inventory[state.slot_index]
+        {
+            Some(item.item_stack.count)
+        } else {
+            None
+        };
+        if state.dirty || state.count != real_count {
             commands.entity(e).despawn_recursive();
             spawn_inv_slot(
                 &mut commands,

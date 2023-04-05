@@ -9,18 +9,15 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::item::{Equipment};
-use crate::ui::{
-    toggle_inv_visibility, InventorySlotState, InventoryState,
-};
-use crate::world_generation::{TileMapPositionData};
+use crate::item::Equipment;
+use crate::ui::{toggle_inv_visibility, InventorySlotState, InventoryState};
+use crate::world_generation::TileMapPositionData;
 use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
     PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera,
-    PLAYER_MOVE_SPEED,
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
 #[derive(Default, Resource, Debug)]
@@ -182,7 +179,7 @@ impl InputsPlugin {
                             item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
 
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", item_stack_entity, game.game.player.inventory);
+                            info!("{:?} | {:?}", item_stack, game.game.player.inventory);
                         }
                     }
                 }
@@ -218,7 +215,7 @@ impl InputsPlugin {
                             item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
 
                             collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", item_stack_entity, game.game.player.inventory);
+                            info!("{:?} | {:?}", item_stack, game.game.player.inventory);
                         }
                     }
                 }
@@ -230,6 +227,7 @@ impl InputsPlugin {
 
         player_transform.translation.x = raw_pos.x.round();
         player_transform.translation.y = raw_pos.y.round();
+        game.game.player.position = player_transform.translation;
 
         if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
@@ -333,8 +331,6 @@ impl InputsPlugin {
                     },
                 })
             {
-                info!("POS {:?}", tile_pos);
-
                 let obj_data = game
                     .chunk_manager
                     .chunk_generation_data
