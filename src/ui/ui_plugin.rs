@@ -7,7 +7,7 @@ use crate::{
     inputs::CursorPos,
     inventory::{InventoryPlugin, ItemStack},
     item::WorldObject,
-    Game, GameParam, GameState,
+    Game, GameParam, GameState, GAME_HEIGHT,
 };
 
 use super::ui_helpers;
@@ -25,11 +25,12 @@ pub struct InventorySlotState {
     pub item: Option<Entity>,
     pub count: Option<usize>,
     pub obj_type: Option<WorldObject>,
+    pub is_hotbar: bool,
     pub dirty: bool,
 }
 #[derive(Component, Debug)]
 pub struct InventoryState {
-    open: bool,
+    pub open: bool,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -112,6 +113,7 @@ impl Plugin for UIPlugin {
             .add_system_set(SystemSet::on_enter(GameState::Main).with_system(setup_inv_slots_ui))
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
+                    .with_system(toggle_inv_visibility)
                     .with_system(handle_item_drop_clicks)
                     .with_system(handle_dragging)
                     .with_system(handle_hovering)
@@ -122,6 +124,7 @@ impl Plugin for UIPlugin {
             );
     }
 }
+
 fn handle_drop_in_world_events(
     mut events: EventReader<DropInWorldEvent>,
     mut game_param: GameParam,
@@ -515,14 +518,44 @@ pub fn setup_inv_slots_ui(
             Interaction::None,
             &inv_query,
             &asset_server,
+            false,
         );
+        if slot_index <= 5 {
+            spawn_inv_slot(
+                &mut commands,
+                &graphics,
+                &game,
+                slot_index,
+                Interaction::None,
+                &inv_query,
+                &asset_server,
+                true,
+            );
+        }
     }
 }
-pub fn toggle_inv_visibility(mut inv_query: Query<(&mut Visibility, &mut InventoryState)>) {
-    let (mut v, mut state) = inv_query.single_mut();
-    state.open = !state.open;
-    v.is_visible = !v.is_visible;
+
+pub fn toggle_inv_visibility(
+    mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
+    mut hotbar_slots: Query<
+        &mut Visibility,
+        (
+            Without<Interactable>,
+            Without<InventoryState>,
+            With<InventorySlotState>,
+        ),
+    >,
+) {
+    let (mut v, state) = inv_query.single_mut();
+    if v.is_visible == state.open {
+        return;
+    }
+    v.is_visible = state.open;
+    for mut hbv in hotbar_slots.iter_mut() {
+        hbv.is_visible = !v.is_visible;
+    }
 }
+
 pub fn spawn_inv_slot(
     commands: &mut Commands,
     graphics: &Graphics,
@@ -531,6 +564,7 @@ pub fn spawn_inv_slot(
     interactable_state: Interaction,
     inv_query: &Query<(Entity, &InventoryState, &Sprite)>,
     asset_server: &AssetServer,
+    is_hotbar_slot: bool,
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
@@ -542,7 +576,9 @@ pub fn spawn_inv_slot(
         + 6.
         + 26. / 2.;
 
-    if ((slot_index / 6) as f32).trunc() == 0. {
+    if is_hotbar_slot {
+        y = -GAME_HEIGHT / 2. + 22.;
+    } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
     let translation = Vec3::new(x, y, 1.);
@@ -585,8 +621,6 @@ pub fn spawn_inv_slot(
         ..Default::default()
     });
     slot_entity
-        .set_parent(inv_e)
-        .insert(Interactable::from_state(interactable_state))
         .insert(RenderLayers::from_layers(&[3]))
         .insert(InventorySlotState {
             slot_index,
@@ -594,10 +628,17 @@ pub fn spawn_inv_slot(
             obj_type: item_type_option,
             count: item_count_option,
             dirty: false,
+            is_hotbar: is_hotbar_slot,
         })
-        .insert(UIElement::InventorySlot);
+        .insert(UIElement::InventorySlot)
+        .insert(Name::new("SLOT"));
     if let Some(i) = item_icon_option {
         slot_entity.push_children(&[i]);
+    }
+    if !is_hotbar_slot {
+        slot_entity
+            .set_parent(inv_e)
+            .insert(Interactable::from_state(interactable_state));
     }
     slot_entity.id()
 }
@@ -657,20 +698,29 @@ pub fn sync_inventory_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     game: Res<Game>,
-    mut ui_elements: Query<(Entity, &Interactable, &InventorySlotState)>,
+    mut ui_elements: Query<(Entity, &InventorySlotState)>,
+    interactables: Query<&Interactable>,
     inv_query: Query<(Entity, &InventoryState, &Sprite)>,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, interactable, state) in ui_elements.iter_mut() {
-        // check current inventory state against the slot's state
+    for (e, state) in ui_elements.iter_mut() {
+        // check current inventory state against that slot's state
         // if they do not match, delete and respawn
 
-        let real_count: Option<usize> = if let Some(item) = game.player.inventory[state.slot_index]
-        {
+        // hotbars are hidden when inventory is open, so defer update
+        // untile inv is closed again.
+        let inv_open = inv_query.get_single().unwrap().1.open;
+        if inv_open && state.is_hotbar {
+            continue;
+        }
+
+        let interactable_option = interactables.get(e);
+        let real_count = if let Some(item) = game.player.inventory[state.slot_index] {
             Some(item.item_stack.count)
         } else {
             None
         };
+
         if state.dirty || state.count != real_count {
             commands.entity(e).despawn_recursive();
             spawn_inv_slot(
@@ -678,9 +728,14 @@ pub fn sync_inventory_ui(
                 &graphics,
                 &game,
                 state.slot_index,
-                interactable.current().clone(),
+                if let Ok(i) = interactable_option {
+                    i.current().clone()
+                } else {
+                    Interaction::None
+                },
                 &inv_query,
                 &asset_server,
+                state.is_hotbar,
             );
         }
     }

@@ -235,10 +235,11 @@ impl InputsPlugin {
     }
     pub fn toggle_inventory(
         key_input: ResMut<Input<KeyCode>>,
-        inv_query: Query<(&mut Visibility, &mut InventoryState)>,
+        mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
-            toggle_inv_visibility(inv_query);
+            let mut inv_state = inv_query.single_mut().1;
+            inv_state.open = !inv_state.open;
         }
     }
 

@@ -56,6 +56,8 @@ const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
+pub const GAME_HEIGHT: f32 = 180.;
+pub const GAME_WIDTH: f32 = 320.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 
 fn main() {
@@ -265,8 +267,8 @@ fn setup(
     game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
     let img_size = Extent3d {
-        width: 320,
-        height: 180,
+        width: GAME_WIDTH as u32,
+        height: GAME_HEIGHT as u32,
         ..default()
     };
     let game_size = Vec2::new(HEIGHT * ASPECT_RATIO, HEIGHT);
