@@ -120,7 +120,7 @@ impl Plugin for UIPlugin {
                     .with_system(handle_drop_on_slot_events.after(handle_item_drop_clicks))
                     .with_system(handle_drop_in_world_events.after(handle_item_drop_clicks))
                     .with_system(handle_cursor_update.before(handle_item_drop_clicks))
-                    .with_system(sync_inventory_ui.after(handle_hovering)),
+                    .with_system(update_inventory_ui.after(handle_hovering)),
             );
     }
 }
@@ -130,6 +130,9 @@ fn handle_drop_in_world_events(
     mut game_param: GameParam,
     mut commands: Commands,
     mut interactables: Query<(Entity, &UIElement, &mut Interactable)>,
+    item_stacks: Query<&ItemStack>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
 ) {
     for drop_event in events.iter() {
         let p = ui_helpers::get_player_chunk_tile_coords(&mut game_param.game);
@@ -140,14 +143,32 @@ fn handle_drop_in_world_events(
             p.0,
             drop_event.dropped_item_stack.count,
         );
-        if drop_event.stack_empty {
-            commands
-                .entity(drop_event.dropped_entity)
-                .despawn_recursive();
-            if let Ok(mut parent_interactable) =
-                interactables.get_mut(drop_event.parent_interactable_entity)
-            {
+
+        commands
+            .entity(drop_event.dropped_entity)
+            .despawn_recursive();
+
+        if let Ok(mut parent_interactable) =
+            interactables.get_mut(drop_event.parent_interactable_entity)
+        {
+            if drop_event.stack_empty {
+                commands
+                    .entity(drop_event.dropped_entity)
+                    .despawn_recursive();
+
                 parent_interactable.2.change(Interaction::None);
+            } else {
+                let new_drag_icon_entity = spawn_item_stack_icon(
+                    &mut commands,
+                    &graphics,
+                    item_stacks.get(drop_event.dropped_entity).unwrap(),
+                    &asset_server,
+                );
+
+                commands.entity(new_drag_icon_entity).insert(DraggedItem);
+                parent_interactable.2.change(Interaction::Dragging {
+                    item: new_drag_icon_entity,
+                });
             }
         }
     }
@@ -157,60 +178,52 @@ fn handle_drop_on_slot_events(
     mut game: ResMut<Game>,
     mut commands: Commands,
     mut interactables: Query<(Entity, &UIElement, &mut Interactable)>,
+    item_stacks: Query<&ItemStack>,
     mut slot_states: Query<&mut InventorySlotState>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
-        let mut no_more_dragging = false;
+        let no_more_dragging: bool;
         let return_item = InventoryPlugin::drop_item_on_slot(
             &mut game,
             drop_event.dropped_item_stack,
             drop_event.drop_target_slot_state.slot_index,
             &mut slot_states,
         );
-
+        let updated_drag_item;
         if let Some(return_item) = return_item {
-            let new_drag_icon_entity = spawn_item_stack_icon(
-                &mut commands,
-                &graphics,
-                &return_item.obj_type,
-                &return_item,
-                &asset_server,
-            );
-            if let Ok(mut parent_interactable) =
-                interactables.get_mut(drop_event.parent_interactable_entity)
-            {
-                commands
-                    .entity(drop_event.dropped_entity)
-                    .despawn_recursive();
-                commands.entity(new_drag_icon_entity).insert(DraggedItem);
-                parent_interactable.2.change(Interaction::Dragging {
-                    item: new_drag_icon_entity,
-                })
-            }
+            updated_drag_item = return_item;
             no_more_dragging = false;
         } else {
+            updated_drag_item = *item_stacks.get(drop_event.dropped_entity).unwrap();
             no_more_dragging = drop_event.stack_empty;
-        }
-        // set parant slot entity to dirty
-        //TODO: might not be needed?
-        let parent_e = interactables.get_mut(drop_event.parent_interactable_entity);
-        if let Ok(parent_e) = parent_e {
-            slot_states.get_mut(parent_e.0).unwrap().dirty = true;
         }
 
         // if nothing left on cursor and dragging is done
         // despawn parent stack icon entity, set parent slot to no dragging
-        if no_more_dragging {
-            commands
-                .entity(drop_event.dropped_entity)
-                .despawn_recursive();
-            if let Ok(mut parent_interactable) =
-                interactables.get_mut(drop_event.parent_interactable_entity)
-            {
+        commands
+            .entity(drop_event.dropped_entity)
+            .despawn_recursive();
+        if let Ok(mut parent_interactable) =
+            interactables.get_mut(drop_event.parent_interactable_entity)
+        {
+            if no_more_dragging {
                 parent_interactable.2.change(Interaction::None);
+            } else {
+                println!("RESETTING DRAG ITEM");
+                let new_drag_icon_entity = spawn_item_stack_icon(
+                    &mut commands,
+                    &graphics,
+                    &updated_drag_item,
+                    &asset_server,
+                );
+
+                commands.entity(new_drag_icon_entity).insert(DraggedItem);
+                parent_interactable.2.change(Interaction::Dragging {
+                    item: new_drag_icon_entity,
+                });
             }
         }
     }
@@ -430,7 +443,6 @@ fn handle_cursor_update(
                                 let e = spawn_item_stack_icon(
                                     &mut commands,
                                     &graphics,
-                                    obj_type,
                                     &split_stack,
                                     &asset_server,
                                 );
@@ -595,7 +607,6 @@ pub fn spawn_inv_slot(
         item_icon_option = Some(spawn_item_stack_icon(
             commands,
             graphics,
-            &obj_type,
             &item.item_stack,
             asset_server,
         ));
@@ -645,7 +656,6 @@ pub fn spawn_inv_slot(
 pub fn spawn_item_stack_icon(
     commands: &mut Commands,
     graphics: &Graphics,
-    obj_type: &WorldObject,
     item_stack: &ItemStack,
     asset_server: &AssetServer,
 ) -> Entity {
@@ -655,7 +665,7 @@ pub fn spawn_item_stack_icon(
                 .world_obj_image_handles
                 .as_ref()
                 .unwrap()
-                .get(obj_type)
+                .get(&item_stack.obj_type)
                 .unwrap()
                 .clone(),
             transform: Transform {
@@ -694,7 +704,7 @@ pub fn spawn_item_stack_icon(
     commands.entity(item).push_children(&[text]);
     item
 }
-pub fn sync_inventory_ui(
+pub fn update_inventory_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     game: Res<Game>,
