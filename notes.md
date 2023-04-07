@@ -1,10 +1,12 @@
 # Inventory TODO
 
-- Add hotbar
+<!-- - Add hotbar -->
 <!-- - Bug: can lose an item if you pick up 2 very fast? -->
+
 - Update assets
   <!-- - hotbar fades/greys when inventory is open, or add a faint overlay -->
   <!-- - Allow dragging out of inv to drop (use timer comp) -->
+  - Bug: updating while draging item stack doesnt update text.
 - Add double click to colelct all items of same type to a stack
 
 # Components for UI
