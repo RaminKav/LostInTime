@@ -30,6 +30,7 @@ pub struct WorldItemMetadata {
     pub breaks_into: Option<WorldObject>,
     pub equip_slot: Option<Limb>,
     pub breaks_with: Option<WorldObject>,
+    pub places_into: Option<WorldObject>,
 }
 
 impl WorldItemMetadata {
@@ -43,6 +44,7 @@ impl WorldItemMetadata {
             breaks_into: None,
             equip_slot: None,
             breaks_with: None,
+            places_into: None,
         }
     }
 
@@ -248,6 +250,7 @@ impl GameAssetsPlugin {
                     breaks_into: rect.breaks_into,
                     equip_slot: rect.equip_slot,
                     breaks_with: rect.breaks_with,
+                    places_into: rect.places_into,
                 },
             );
         }

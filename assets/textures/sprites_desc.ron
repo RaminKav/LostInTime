@@ -8,9 +8,10 @@
             breakable: false,
             breaks_into: None,
             equip_slot: None,
-            breaks_with: None
+            breaks_with: None,
+            places_into: None
         ),
-         Flint: WorldItemMetadata(
+        Placeable(Flint): WorldItemMetadata(
             pos: (48., 16.),
             size: (16., 16.),
             anchor: None,
@@ -18,9 +19,10 @@
             breakable: false,
             breaks_into: None,
             equip_slot: None,
-            breaks_with: None
+            breaks_with: None,
+            places_into: Some(StoneFull)
         ),
-        Log: WorldItemMetadata(
+        Placeable(Log): WorldItemMetadata(
             pos: (32., 48.),
             size: (16., 16.),
             anchor: None,
@@ -28,7 +30,8 @@
             breakable: false,
             breaks_into: None,
             equip_slot: None,
-            breaks_with: None
+            breaks_with: None,
+            places_into: Some(Foliage(Tree))
         ),
          StoneHalf: WorldItemMetadata(
             pos: (0., 128.),
@@ -36,9 +39,10 @@
             anchor: Some((0., 0.166666666667)),
             collider: true,
             breakable: true,
-            breaks_into: Some(Flint),
+            breaks_into: Some(Placeable(Flint)),
             equip_slot: None,
-            breaks_with: None
+            breaks_with: None,
+            places_into: None
         ),
          StoneFull: WorldItemMetadata(
             pos: (32., 112.),
@@ -46,9 +50,10 @@
             anchor: Some((0., 0.25)),
             collider: true,
             breakable: true,
-            breaks_into: Some(Flint),
+            breaks_into: Some(Placeable(Flint)),
             equip_slot: None,
-            breaks_with: None
+            breaks_with: None,
+            places_into: None
         ),
          StoneTop: WorldItemMetadata(
             pos: (64., 112.),
@@ -58,8 +63,8 @@
             breakable: true,
             breaks_into: None,
             equip_slot: None,
-            breaks_with: None
-
+            breaks_with: None,
+            places_into: None
         ),
         Foliage(Tree): WorldItemMetadata(
             pos: (96., 112.),
@@ -67,9 +72,10 @@
             anchor: None,
             collider: true,
             breakable: true,
-            breaks_into: Some(Log),
+            breaks_into: Some(Placeable(Log)),
             equip_slot: None,
-            breaks_with: Some(Sword)
+            breaks_with: Some(Sword),
+            places_into: None
         ),
         Sword: WorldItemMetadata(
             pos: (64., 64.),
@@ -79,8 +85,8 @@
             breakable: true,
             breaks_into: None,
             equip_slot: Some(Hands),
-            breaks_with: None
-
+            breaks_with: None,
+            places_into: None
         ),
     }
 )
