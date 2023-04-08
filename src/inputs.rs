@@ -9,7 +9,7 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::inventory::ItemStack;
+use crate::inventory::{InventoryItemStack, InventoryPlugin, ItemStack};
 use crate::item::Equipment;
 use crate::ui::{change_hotbar_slot, InventorySlotState, InventoryState, UIPlugin};
 use crate::world_generation::TileMapPositionData;
@@ -243,12 +243,20 @@ impl InputsPlugin {
         }
     }
     pub fn toggle_inventory(
+        mut game: GameParam,
         key_input: ResMut<Input<KeyCode>>,
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
             inv_state.open = !inv_state.open;
+        }
+        if key_input.just_pressed(KeyCode::E) {
+            let sword_stack = ItemStack {
+                obj_type: WorldObject::Sword,
+                count: 1,
+            };
+            sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
         }
     }
     fn handle_hotbar_key_input(
@@ -324,14 +332,15 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
         mut attack_event: EventWriter<AttackEvent>,
-        inv_query: Query<&mut Visibility, With<InventoryState>>,
+        inv_query: Query<(&mut Visibility, &InventoryState)>,
     ) {
-        if let Ok(inv_state) = inv_query.get_single() {
-            if inv_state.is_visible {
+        let inv_state = inv_query.get_single();
+        if let Ok(inv_state) = inv_state {
+            if inv_state.0.is_visible {
                 return;
             }
         }
-
+        // Hit Item, send attack event
         if mouse_button_input.just_pressed(MouseButton::Left) {
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
@@ -371,22 +380,12 @@ impl InputsPlugin {
                         chunk_pos,
                     );
                 }
-            } else {
-                WorldObject::StoneHalf.spawn_and_save_block(
-                    &mut commands,
-                    &mut game,
-                    tile_pos,
-                    chunk_pos,
-                );
             }
             attack_event.send(AttackEvent);
         }
+        // Attempt to place block in hand
+        // TODO: Interact
         if mouse_button_input.just_pressed(MouseButton::Right) {
-            let sword_stack = ItemStack {
-                obj_type: WorldObject::Sword,
-                count: 1,
-            };
-            sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
@@ -395,12 +394,26 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            WorldObject::StoneFull.spawn_and_save_block(
-                &mut commands,
-                &mut game,
-                tile_pos,
-                chunk_pos,
-            );
+            let hotbar_slot = inv_state.unwrap().1.active_hotbar_slot;
+            let held_item_option = game.game.player.inventory[hotbar_slot];
+            if let Some(mut held_item) = held_item_option {
+                if let Some(places_into_item) = game
+                    .world_obj_data
+                    .properties
+                    .get(&held_item.item_stack.obj_type)
+                    .unwrap()
+                    .places_into
+                {
+                    if let Some(_able_to_spawn) = places_into_item.spawn_and_save_block(
+                        &mut commands,
+                        &mut game,
+                        tile_pos,
+                        chunk_pos,
+                    ) {
+                        game.game.player.inventory[hotbar_slot] = held_item.modify_count(-1);
+                    }
+                }
+            }
         }
     }
     pub fn close_on_esc(

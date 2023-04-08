@@ -39,8 +39,12 @@ impl InventoryItemStack {
     pub fn remove_from_inventory(self, game: &mut Game) {
         game.player.inventory[self.slot] = None
     }
-    pub fn modify_count(&mut self, amount: i8) {
+    pub fn modify_count(&mut self, amount: i8) -> Option<Self> {
         self.item_stack.modify_count(amount);
+        if self.item_stack.count == 0 {
+            return None;
+        }
+        Some(*self)
     }
 }
 impl ItemStack {
@@ -122,12 +126,13 @@ impl ItemStack {
         let split_count = self.count / 2;
         (self.count - split_count, split_count)
     }
-    pub fn modify_count(&mut self, amount: i8) {
+    pub fn modify_count(&mut self, amount: i8) -> Self {
         if (self.count as i8) + amount <= 0 {
             self.count = 0;
         } else {
             self.count = ((self.count as i8) + amount) as usize;
         }
+        *self
     }
 }
 
