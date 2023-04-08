@@ -9,8 +9,9 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
+use crate::inventory::ItemStack;
 use crate::item::Equipment;
-use crate::ui::{toggle_inv_visibility, InventorySlotState, InventoryState};
+use crate::ui::{change_hotbar_slot, InventorySlotState, InventoryState, UIPlugin};
 use crate::world_generation::TileMapPositionData;
 use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
@@ -20,6 +21,14 @@ use crate::{
     GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
+const HOTBAR_KEYCODES: [KeyCode; 6] = [
+    KeyCode::Key1,
+    KeyCode::Key2,
+    KeyCode::Key3,
+    KeyCode::Key4,
+    KeyCode::Key5,
+    KeyCode::Key6,
+];
 #[derive(Default, Resource, Debug)]
 pub struct CursorPos {
     pub world_coords: Vec3,
@@ -41,6 +50,7 @@ impl Plugin for InputsPlugin {
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::move_player)
+                    .with_system(Self::handle_hotbar_key_input)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
                     .with_system(Self::move_camera_with_player.after(Self::move_player)),
             )
@@ -74,7 +84,6 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
-        mut inv_slots: Query<&mut InventorySlotState>,
     ) {
         let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
             player_query.single_mut();
@@ -176,7 +185,7 @@ impl InputsPlugin {
                             ec.despawn();
                             game.world_obj_data.drop_entities.remove(&item_stack_entity);
 
-                            item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
+                            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
 
                             collected_drops.insert(col.entity);
                             info!("{:?} | {:?}", item_stack, game.game.player.inventory);
@@ -212,7 +221,7 @@ impl InputsPlugin {
                             ec.despawn();
                             game.world_obj_data.drop_entities.remove(&item_stack_entity);
 
-                            item_stack.add_to_inventory(&mut game.game, &mut inv_slots);
+                            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
 
                             collected_drops.insert(col.entity);
                             info!("{:?} | {:?}", item_stack, game.game.player.inventory);
@@ -242,7 +251,18 @@ impl InputsPlugin {
             inv_state.open = !inv_state.open;
         }
     }
-
+    fn handle_hotbar_key_input(
+        mut game: GameParam,
+        mut key_input: ResMut<Input<KeyCode>>,
+        mut inv_state: Query<&mut InventoryState>,
+    ) {
+        for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
+            if key_input.just_pressed(*key) {
+                change_hotbar_slot(&mut game, slot, &mut inv_state);
+                key_input.clear();
+            }
+        }
+    }
     pub fn update_cursor_pos(
         windows: Res<Windows>,
         camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
@@ -362,15 +382,25 @@ impl InputsPlugin {
             attack_event.send(AttackEvent);
         }
         if mouse_button_input.just_pressed(MouseButton::Right) {
-            WorldObject::Sword.spawn_equipment_on_player(&mut commands, &mut game);
-            let _chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            let sword_stack = ItemStack {
+                obj_type: WorldObject::Sword,
+                count: 1,
+            };
+            sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
+            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            let _tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
+            WorldObject::StoneFull.spawn_and_save_block(
+                &mut commands,
+                &mut game,
+                tile_pos,
+                chunk_pos,
+            );
         }
     }
     pub fn close_on_esc(

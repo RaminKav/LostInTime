@@ -2,6 +2,7 @@ use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
 use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
 use crate::inventory::ItemStack;
+use crate::ui::{InventorySlotState, InventoryState};
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
@@ -26,6 +27,7 @@ pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
 
+#[derive(Debug)]
 pub struct EquipmentMetaData {
     entity: Entity,
     obj: WorldObject,
@@ -288,7 +290,6 @@ impl WorldObject {
             let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
 
             if let Some(old_points) = old_points {
-                println!("SAVING NEW OBJ {self:?} {tile_pos:?}");
                 let mut new_points = old_points.0.clone();
                 new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
 
@@ -377,6 +378,79 @@ impl WorldObject {
         } else {
             panic!("No slot found for equipment");
         }
+    }
+    pub fn spawn_item_on_hand(self, commands: &mut Commands, game: &mut GameParam) -> Entity {
+        let item_map = &game.graphics.spritesheet_map;
+        if item_map.is_none() {
+            panic!("graphics not loaded");
+        }
+        let sprite = game
+            .graphics
+            .spritesheet_map
+            .as_ref()
+            .unwrap()
+            .get(&self)
+            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
+            .0
+            .clone();
+        let player_data = &mut game.player_query.single_mut();
+        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
+        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let position;
+        let health = Health(100);
+        let attack = Attack(20);
+        let limb = Limb::Hands;
+        position = Vec3::new(
+            PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
+            PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y,
+            500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
+        );
+        //despawn old item if one exists
+        if let Some(main_hand_data) = &player_data.1.main_hand_slot {
+            commands.entity(main_hand_data.entity).despawn();
+        }
+        //spawn new item entity
+        let item = commands
+            .spawn(SpriteSheetBundle {
+                sprite,
+                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: position,
+                    scale: Vec3::new(1., 1., 1.),
+                    // rotation: Quat::from_rotation_z(0.8),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(EquipmentAttributeBundle { health, attack })
+            .insert(Equipment(limb))
+            .insert(Name::new("EquipItem"))
+            .insert(YSort)
+            .insert(self)
+            .id();
+
+        player_data.1.main_hand_slot = Some(EquipmentMetaData {
+            obj: self,
+            entity: item,
+            health,
+            attack,
+        });
+        let mut item_entity = commands.entity(item);
+        if obj_data.collider {
+            item_entity
+                .insert(Collider::cuboid(
+                    obj_data.size.x / 3.5,
+                    obj_data.size.y / 4.5,
+                ))
+                .insert(Sensor);
+        }
+        item_entity.insert(AttackAnimationTimer(
+            Timer::from_seconds(0.125, TimerMode::Once),
+            0.,
+        ));
+        item_entity.set_parent(player_data.0);
+
+        item
     }
     pub fn spawn_item_drop(
         self,
@@ -568,8 +642,9 @@ impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
             .add_system_set(
-                SystemSet::on_update(GameState::Main).with_system(Self::update_graphics),
-                // .with_system(Self::world_object_growth),
+                SystemSet::on_update(GameState::Main)
+                    .with_system(Self::update_graphics)
+                    .with_system(Self::update_help_hotbar_item),
             );
     }
 }
@@ -590,6 +665,29 @@ impl ItemsPlugin {
                         .0,
                 );
             }
+        }
+    }
+    fn update_help_hotbar_item(
+        mut commands: Commands,
+        mut game_param: GameParam,
+        inv_state: Query<&mut InventoryState>,
+    ) {
+        let active_hotbar_slot = inv_state.single().active_hotbar_slot;
+        let active_hotbar_item = game_param.game.player.inventory[active_hotbar_slot];
+        let player_data = &mut game_param.player_query.single_mut().1;
+        let current_held_item_data = &player_data.main_hand_slot;
+        if let Some(new_item) = active_hotbar_item {
+            let new_item = new_item.item_stack.obj_type;
+            if let Some(current_item) = current_held_item_data {
+                if current_item.obj != new_item {
+                    new_item.spawn_item_on_hand(&mut commands, &mut game_param);
+                }
+            } else {
+                new_item.spawn_item_on_hand(&mut commands, &mut game_param);
+            }
+        } else if let Some(current_item) = current_held_item_data {
+            commands.entity(current_item.entity).despawn();
+            player_data.main_hand_slot = None;
         }
     }
 }

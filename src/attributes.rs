@@ -13,9 +13,9 @@ pub struct EquipmentAttributeBundle {
     pub attack: Attack,
 }
 
-#[derive(Component, Inspectable, Clone, Copy)]
+#[derive(Component, Inspectable, Clone, Debug, Copy)]
 pub struct Health(pub i8);
-#[derive(Component, Inspectable, Clone, Copy)]
+#[derive(Component, Inspectable, Clone, Debug, Copy)]
 pub struct Attack(pub u8);
 
 impl Plugin for AttributesPlugin {

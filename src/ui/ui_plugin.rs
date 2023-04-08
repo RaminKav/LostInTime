@@ -31,6 +31,8 @@ pub struct InventorySlotState {
 #[derive(Component, Debug)]
 pub struct InventoryState {
     pub open: bool,
+    pub active_hotbar_slot: usize,
+    pub hotbar_dirty: bool,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -303,7 +305,7 @@ fn handle_item_drop_clicks(
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_states: Query<&mut InventorySlotState>,
-    inv_stat: Query<&InventoryState>,
+    inv_state: Query<&InventoryState>,
 
     mut slot_drop_events: EventWriter<DropOnSlotEvent>,
     mut world_drop_events: EventWriter<DropInWorldEvent>,
@@ -313,7 +315,7 @@ fn handle_item_drop_clicks(
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
-    let inv_open = inv_stat.single().open;
+    let inv_open = inv_state.single().open;
     let hit_test = if inv_open {
         ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
     } else {
@@ -508,7 +510,11 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
             visibility: Visibility { is_visible: false },
             ..Default::default()
         })
-        .insert(InventoryState { open: false })
+        .insert(InventoryState {
+            open: false,
+            active_hotbar_slot: 0,
+            hotbar_dirty: true,
+        })
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
@@ -519,6 +525,7 @@ pub fn setup_inv_slots_ui(
     game: Res<Game>,
     graphics: Res<Graphics>,
     inv_query: Query<(Entity, &InventoryState, &Sprite)>,
+    mut inv_slot_state: Query<&mut InventorySlotState>,
     asset_server: Res<AssetServer>,
 ) {
     for (slot_index, _item) in game.player.inventory.iter().enumerate() {
@@ -580,7 +587,7 @@ pub fn spawn_inv_slot(
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
-    let (inv_e, _inv_state, inv_sprite) = inv_query.single();
+    let (inv_e, inv_state, inv_sprite) = inv_query.single();
 
     let x =
         ((slot_index % 6) as f32 * 26.) - (inv_sprite.custom_size.unwrap().x) / 2. + 26. / 2. + 3.;
@@ -617,7 +624,13 @@ pub fn spawn_inv_slot(
             .ui_image_handles
             .as_ref()
             .unwrap()
-            .get(&UIElement::InventorySlot)
+            .get(
+                if is_hotbar_slot && inv_state.active_hotbar_slot == slot_index {
+                    &UIElement::InventorySlotHover
+                } else {
+                    &UIElement::InventorySlot
+                },
+            )
             .unwrap()
             .clone(),
         transform: Transform {
@@ -704,6 +717,18 @@ pub fn spawn_item_stack_icon(
     commands.entity(item).push_children(&[text]);
     item
 }
+
+pub fn change_hotbar_slot(
+    game: &mut GameParam,
+    slot: usize,
+    inv_state: &mut Query<&mut InventoryState>,
+) {
+    let mut inv_state = inv_state.single_mut();
+
+    InventoryPlugin::mark_slot_dirty(inv_state.active_hotbar_slot, &mut game.inv_slot_query);
+    inv_state.active_hotbar_slot = slot;
+    InventoryPlugin::mark_slot_dirty(slot, &mut game.inv_slot_query);
+}
 pub fn update_inventory_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -719,8 +744,8 @@ pub fn update_inventory_ui(
 
         // hotbars are hidden when inventory is open, so defer update
         // untile inv is closed again.
-        let inv_open = inv_query.get_single().unwrap().1.open;
-        if inv_open && state.is_hotbar {
+        let inv_state = inv_query.get_single().unwrap().1;
+        if inv_state.open && state.is_hotbar {
             continue;
         }
 
