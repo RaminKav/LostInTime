@@ -1,7 +1,11 @@
 use core::panic;
 use std::cmp::min;
 
-use crate::{item::WorldObject, ui::InventorySlotState, Game, GameState, TIME_STEP};
+use crate::{
+    item::WorldObject,
+    ui::{InventorySlotState, InventoryState},
+    Game, GameState, TIME_STEP,
+};
 use bevy::{prelude::*, time::FixedTimestep};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
@@ -200,20 +204,19 @@ impl InventoryPlugin {
         game: &mut Game,
         item: ItemStack,
         drop_slot: usize,
-        inv_slots: &mut Query<&mut InventorySlotState>,
+        inv_slot_state: &mut Query<&mut InventorySlotState>,
     ) -> Option<ItemStack> {
         let obj_type = item.obj_type;
         let target_item_option = game.player.inventory[drop_slot];
-
         if let Some(target_item) = target_item_option {
             if target_item.item_stack.obj_type == obj_type {
-                Self::mark_slot_dirty(drop_slot, inv_slots);
+                Self::mark_slot_dirty(drop_slot, inv_slot_state);
                 return Self::merge_item_stacks(game, item, target_item);
             } else {
-                return Some(Self::swap_items(game, item, drop_slot, inv_slots));
+                return Some(Self::swap_items(game, item, drop_slot, inv_slot_state));
             }
         } else if item
-            .try_add_to_target_inventory_slot(game, drop_slot, inv_slots)
+            .try_add_to_target_inventory_slot(game, drop_slot, inv_slot_state)
             .is_err()
         {
             panic!("Failed to drop item on stot");
@@ -250,6 +253,8 @@ impl InventoryPlugin {
             count: amount_split,
         }
     }
+    //TODO: Maybe make a resource to instead store slot indexs, and then mark them all dirty in a system?
+    // benefit: dont need to pass in the inv slot query anymore
     pub fn mark_slot_dirty(slot_index: usize, inv_slots: &mut Query<&mut InventorySlotState>) {
         for mut state in inv_slots.iter_mut() {
             if state.slot_index == slot_index {

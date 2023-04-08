@@ -49,7 +49,7 @@ use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use ui::UIPlugin;
+use ui::{InventorySlotState, UIPlugin};
 use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
 
 const PLAYER_MOVE_SPEED: f32 = 2.;
@@ -181,6 +181,7 @@ pub struct GameParam<'w, 's> {
         &'static mut Transform,
         (With<MainCamera>, Without<Player>, Without<ItemStack>),
     >,
+    pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
