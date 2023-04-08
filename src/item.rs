@@ -49,9 +49,8 @@ pub enum WorldObject {
     Water,
     Sand,
     Foliage(Foliage),
+    Placeable(Placeable),
     Sword,
-    Log,
-    Flint,
 }
 #[derive(
     Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display,
@@ -62,6 +61,18 @@ pub enum Foliage {
 impl Default for Foliage {
     fn default() -> Self {
         Self::Tree
+    }
+}
+#[derive(
+    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display,
+)]
+pub enum Placeable {
+    Log,
+    Flint,
+}
+impl Default for Placeable {
+    fn default() -> Self {
+        Self::Flint
     }
 }
 lazy_static! {
@@ -75,6 +86,7 @@ pub struct WorldObjectResource {
     pub drop_entities: HashMap<Entity, (ItemStack, Transform)>,
 }
 
+//TODO: delete this and unify with WorldItemMetadata...
 #[derive(Debug, Default)]
 pub struct WorldObjectData {
     pub size: Vec2,
@@ -85,6 +97,7 @@ pub struct WorldObjectData {
     pub breaks_with: Option<WorldObject>,
     /// 0 = main hand, 1 = head, 2 = chest, 3 = legs
     pub equip_slot: Option<Limb>,
+    pub places_into: Option<WorldObject>,
 }
 impl WorldObjectResource {
     fn new() -> Self {
@@ -285,7 +298,10 @@ impl WorldObject {
         tile_pos: IVec2,
         chunk_pos: IVec2,
     ) -> Option<Entity> {
-        let item = self.spawn(commands, game, tile_pos, chunk_pos);
+        let item = match self {
+            WorldObject::Foliage(_) => self.spawn_foliage(commands, game, tile_pos, chunk_pos),
+            _ => self.spawn(commands, game, tile_pos, chunk_pos),
+        };
         if let Some(item) = item {
             let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
 
