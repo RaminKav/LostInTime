@@ -1,5 +1,6 @@
 use bevy::app::AppExit;
 
+use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
@@ -39,6 +40,16 @@ pub struct CursorPos {
 #[derive(Component, Default)]
 pub struct MovementVector(pub Vec2);
 
+#[derive(Component)]
+
+pub struct LastDirectionInput(pub KeyCode);
+
+impl Default for LastDirectionInput {
+    fn default() -> Self {
+        Self(KeyCode::Numpad0)
+    }
+}
+
 pub struct InputsPlugin;
 
 impl Plugin for InputsPlugin {
@@ -74,6 +85,7 @@ impl InputsPlugin {
                 &mut RawPosition,
                 &Collider,
                 &mut MovementVector,
+                &mut LastDirectionInput,
                 Option<&Children>,
             ),
             (With<Player>, Without<MainCamera>, Without<Equipment>),
@@ -85,13 +97,25 @@ impl InputsPlugin {
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
     ) {
-        let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
-            player_query.single_mut();
+        let (
+            ent,
+            mut player_transform,
+            mut raw_pos,
+            player_collider,
+            mut mv,
+            mut dir_inp,
+            children,
+        ) = player_query.single_mut();
+        let player = game.player_query.single().1;
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED;
 
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;
+
+            if !player.is_attacking {
+                dir_inp.0 = KeyCode::A;
+            }
             game.game.player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
@@ -110,6 +134,9 @@ impl InputsPlugin {
 
         if key_input.pressed(KeyCode::D) {
             d.x += 1.;
+            if !player.is_attacking {
+                dir_inp.0 = KeyCode::D;
+            }
             game.game.player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
