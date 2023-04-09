@@ -43,7 +43,7 @@ use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use inputs::{InputsPlugin, MovementVector};
+use inputs::{InputsPlugin, LastDirectionInput, MovementVector};
 use inventory::{InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_SIZE};
 use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource};
 use serde::Deserialize;
@@ -514,6 +514,7 @@ fn setup(
                 position: Vec3::ZERO,
             },
             MovementVector::default(),
+            LastDirectionInput::default(),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
             YSort,
