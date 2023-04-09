@@ -513,6 +513,7 @@ fn setup(
                 main_hand_slot: None,
                 position: Vec3::ZERO,
             },
+            Health(100),
             MovementVector::default(),
             LastDirectionInput::default(),
             KinematicCharacterController::default(),

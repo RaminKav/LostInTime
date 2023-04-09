@@ -1,13 +1,14 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use strum_macros::{Display, EnumIter};
 
 use crate::{
     assets::{GameAssetsPlugin, Graphics},
+    attributes::Health,
     inputs::CursorPos,
     inventory::{InventoryPlugin, ItemStack},
     item::WorldObject,
-    Game, GameParam, GameState, GAME_HEIGHT,
+    Game, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::ui_helpers;
@@ -17,6 +18,7 @@ pub enum UIElement {
     Inventory,
     InventorySlot,
     InventorySlotHover,
+    HealthBarFrame,
 }
 
 #[derive(Component, Clone, Debug)]
@@ -100,6 +102,8 @@ pub struct DropInWorldEvent {
 pub struct LastHoveredSlot {
     pub slot: Option<usize>,
 }
+#[derive(Component)]
+pub struct HealthBar;
 
 pub struct UIPlugin;
 
@@ -110,7 +114,8 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
-                    .with_system(setup_inv_ui.after(GameAssetsPlugin::load_graphics)),
+                    .with_system(setup_inv_ui.after(GameAssetsPlugin::load_graphics))
+                    .with_system(setup_healthbar_ui.after(GameAssetsPlugin::load_graphics)),
             )
             .add_system_set(SystemSet::on_enter(GameState::Main).with_system(setup_inv_slots_ui))
             .add_system_set(
@@ -122,7 +127,8 @@ impl Plugin for UIPlugin {
                     .with_system(handle_drop_on_slot_events.after(handle_item_drop_clicks))
                     .with_system(handle_drop_in_world_events.after(handle_item_drop_clicks))
                     .with_system(handle_cursor_update.before(handle_item_drop_clicks))
-                    .with_system(update_inventory_ui.after(handle_hovering)),
+                    .with_system(update_inventory_ui.after(handle_hovering))
+                    .with_system(update_healthbar),
             );
     }
 }
@@ -435,7 +441,6 @@ fn handle_cursor_update(
                     } else if right_mouse_pressed && !currently_dragging {
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
-                                let obj_type = &item_icon.2.obj_type;
                                 let split_stack = InventoryPlugin::split_stack(
                                     &mut game,
                                     *item_icon.2,
@@ -520,12 +525,62 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
         .id();
     commands.entity(inv).push_children(&[overlay]);
 }
+pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
+    let inner_health = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(121. / 255., 68. / 255., 74. / 255., 1.),
+                custom_size: Some(Vec2::new(62.0, 7.0)),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-62. / 2., 0., -1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(HealthBar)
+        .insert(Name::new("inner health bar"))
+        .id();
+    let health_bar_frame = commands
+        .spawn(SpriteBundle {
+            texture: graphics
+                .ui_image_handles
+                .as_ref()
+                .unwrap()
+                .get(&UIElement::HealthBarFrame)
+                .unwrap()
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(64., 9.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    (-GAME_WIDTH + 68.) / 2.,
+                    (GAME_HEIGHT - 11.) / 2. - 2.,
+                    10.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Name::new("HEALTH BAR"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+    commands
+        .entity(health_bar_frame)
+        .push_children(&[inner_health]);
+}
 pub fn setup_inv_slots_ui(
     mut commands: Commands,
     game: Res<Game>,
     graphics: Res<Graphics>,
     inv_query: Query<(Entity, &InventoryState, &Sprite)>,
-    mut inv_slot_state: Query<&mut InventorySlotState>,
     asset_server: Res<AssetServer>,
 ) {
     for (slot_index, _item) in game.player.inventory.iter().enumerate() {
@@ -774,4 +829,14 @@ pub fn update_inventory_ui(
             );
         }
     }
+}
+fn update_healthbar(
+    player_health_query: Query<&Health, With<Player>>,
+    mut health_bar_query: Query<&mut Sprite, With<HealthBar>>,
+) {
+    let player_health = player_health_query.single();
+    health_bar_query.single_mut().custom_size = Some(Vec2 {
+        x: 62. * player_health.0 as f32 / 100.,
+        y: 7.,
+    });
 }
