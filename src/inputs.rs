@@ -10,6 +10,7 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
+use crate::attributes::Health;
 use crate::inventory::{InventoryItemStack, InventoryPlugin, ItemStack};
 use crate::item::Equipment;
 use crate::ui::{change_hotbar_slot, InventorySlotState, InventoryState, UIPlugin};
@@ -62,6 +63,7 @@ impl Plugin for InputsPlugin {
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::move_player)
                     .with_system(Self::handle_hotbar_key_input)
+                    .with_system(Self::test_take_damage)
                     .with_system(Self::update_cursor_pos.after(Self::move_player))
                     .with_system(Self::move_camera_with_player.after(Self::move_player)),
             )
@@ -284,6 +286,17 @@ impl InputsPlugin {
                 count: 1,
             };
             sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
+        }
+    }
+    pub fn test_take_damage(
+        mut player_health_query: Query<&mut Health, With<Player>>,
+        key_input: ResMut<Input<KeyCode>>,
+    ) {
+        if key_input.just_pressed(KeyCode::X) {
+            player_health_query.single_mut().0 -= 20;
+        }
+        if key_input.just_pressed(KeyCode::Z) {
+            player_health_query.single_mut().0 += 20;
         }
     }
     fn handle_hotbar_key_input(
