@@ -1,7 +1,6 @@
 use std::f32::consts::PI;
 use std::{cmp::max, time::Duration};
 
-
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
@@ -10,7 +9,7 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use interpolation::lerp;
 
-use crate::inputs::InputsPlugin;
+use crate::inputs::{InputsPlugin, LastDirectionInput, MovementVector};
 use crate::item::Equipment;
 use crate::Limb;
 use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
@@ -159,8 +158,16 @@ impl AnimationsPlugin {
         time: Res<Time>,
         mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
         mut attack_event: EventReader<AttackEvent>,
+        mut player_dir: Query<(&LastDirectionInput, &mut Player)>,
     ) {
         if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
+            let mut player_query = player_dir.single_mut();
+            player_query.1.is_attacking = true;
+            let is_facing_left = if player_query.0 .0 == KeyCode::A {
+                1.
+            } else {
+                -1.
+            };
             if attack_event.iter().count() > 0 || !at.0.elapsed().is_zero() {
                 let d = time.delta();
                 at.0.tick(d);
@@ -171,12 +178,12 @@ impl AnimationsPlugin {
                     //     &PI,
                     //     &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     // );
-                    t.rotation = Quat::from_rotation_z(-at.1);
+                    t.rotation = Quat::from_rotation_z(is_facing_left * at.1);
                     // t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
                     t.translation.y = -4.;
                     t.translation.x = lerp(
-                        &-5.,
-                        &15.,
+                        &(5. * is_facing_left),
+                        &(-15. * is_facing_left),
                         &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     );
                 } else {
@@ -186,6 +193,8 @@ impl AnimationsPlugin {
                     t.translation.x = -5.;
                     t.translation.y = -1.;
                 }
+            } else {
+                player_query.1.is_attacking = false;
             }
         }
     }
