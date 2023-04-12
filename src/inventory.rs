@@ -33,11 +33,11 @@ pub enum InventoryError {
 }
 impl InventoryItemStack {
     pub fn add_to_inventory(self, game: &mut Game, inv_slots: &mut Query<&mut InventorySlotState>) {
-        game.player.inventory[self.slot] = Some(self);
+        game.player_state.inventory[self.slot] = Some(self);
         InventoryPlugin::mark_slot_dirty(self.slot, inv_slots);
     }
     pub fn remove_from_inventory(self, game: &mut Game) {
-        game.player.inventory[self.slot] = None
+        game.player_state.inventory[self.slot] = None
     }
     pub fn modify_count(&mut self, amount: i8) -> Option<Self> {
         self.item_stack.modify_count(amount);
@@ -52,7 +52,7 @@ impl ItemStack {
         // if stack of that item exists, add to it, otherwise push as new stack.
         // TODO: add max stack size, and create new stack if reached.
         // TODO: abstract direct access of .obj_type behind a getter
-        if let Some(stack) = game.player.inventory.iter().find(|i| match i {
+        if let Some(stack) = game.player_state.inventory.iter().find(|i| match i {
             Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => {
                 ii.item_stack.obj_type == self.obj_type
             }
@@ -60,9 +60,9 @@ impl ItemStack {
         }) {
             // safe to unwrap, we check for it above
             let slot = stack.unwrap().slot;
-            let pre_stack_size = game.player.inventory[slot].unwrap().item_stack.count;
+            let pre_stack_size = game.player_state.inventory[slot].unwrap().item_stack.count;
 
-            game.player.inventory[slot] = Some(InventoryItemStack {
+            game.player_state.inventory[slot] = Some(InventoryItemStack {
                 item_stack: ItemStack {
                     obj_type: self.obj_type,
                     count: min(self.count + pre_stack_size, MAX_STACK_SIZE),
@@ -105,7 +105,7 @@ impl ItemStack {
         slot: usize,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) -> Result<(), InventoryError> {
-        if let Some(mut existing_stack) = game.player.inventory[slot] {
+        if let Some(mut existing_stack) = game.player_state.inventory[slot] {
             if existing_stack.item_stack.obj_type == self.obj_type {
                 existing_stack.modify_count(self.count as i8);
                 return Ok(());
@@ -151,7 +151,7 @@ impl InventoryPlugin {
     pub fn get_first_empty_slot(game: &Game) -> Option<usize> {
         //TODO: add game param const for this
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..game.player.inventory.len()).find(|&i| game.player.inventory[i].is_none())
+        (0..game.player_state.inventory.len()).find(|&i| game.player_state.inventory[i].is_none())
     }
     /// Attempt to merge item at slot a into b. Panics if
     /// either slot is empty, or not matching WorldObject types.
@@ -170,7 +170,7 @@ impl InventoryPlugin {
         let item_b_count = merge_into.item_stack.count;
         let combined_size = item_a_count + item_b_count;
 
-        game.player.inventory[merge_into.slot] = Some(InventoryItemStack {
+        game.player_state.inventory[merge_into.slot] = Some(InventoryItemStack {
             item_stack: ItemStack {
                 obj_type: item_type,
                 count: min(combined_size, MAX_STACK_SIZE),
@@ -194,9 +194,9 @@ impl InventoryPlugin {
         target_slot: usize,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) -> ItemStack {
-        let target_item_option = game.player.inventory[target_slot];
+        let target_item_option = game.player_state.inventory[target_slot];
         if let Some(target_item_stack) = target_item_option {
-            game.player.inventory[target_slot] = Some(InventoryItemStack {
+            game.player_state.inventory[target_slot] = Some(InventoryItemStack {
                 item_stack: item,
                 slot: target_item_stack.slot,
             });
@@ -212,7 +212,7 @@ impl InventoryPlugin {
         inv_slot_state: &mut Query<&mut InventorySlotState>,
     ) -> Option<ItemStack> {
         let obj_type = item.obj_type;
-        let target_item_option = game.player.inventory[drop_slot];
+        let target_item_option = game.player_state.inventory[drop_slot];
         if let Some(target_item) = target_item_option {
             if target_item.item_stack.obj_type == obj_type {
                 Self::mark_slot_dirty(drop_slot, inv_slot_state);
@@ -241,7 +241,7 @@ impl InventoryPlugin {
         item_slot_state: &mut InventorySlotState,
     ) -> ItemStack {
         let (amount_split, remainder_left) = item_stack.split();
-        game.player.inventory[item_slot] = if remainder_left > 0 {
+        game.player_state.inventory[item_slot] = if remainder_left > 0 {
             Some(InventoryItemStack {
                 item_stack: ItemStack {
                     obj_type: item_stack.obj_type,

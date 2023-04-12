@@ -86,7 +86,7 @@ impl AnimationsPlugin {
     ) {
         for (mut timer, limb_children) in &mut player_query {
             let d = time.delta();
-            timer.tick(if game.player.is_dashing {
+            timer.tick(if game.player_state.is_dashing {
                 Duration::new(
                     (d.as_secs() as f32 * 4.) as u64,
                     (d.subsec_nanos() as f32 * 4.) as u32,
@@ -99,9 +99,9 @@ impl AnimationsPlugin {
                 if let Ok((mut tracker, limb_handle, limb)) = limb_query.get_mut(*l) {
                     let limb_material = materials.get_mut(limb_handle);
                     if let Some(mat) = limb_material {
-                        if timer.just_finished() && game.player.is_moving {
+                        if timer.just_finished() && game.player_state.is_moving {
                             tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
-                        } else if !game.player.is_moving {
+                        } else if !game.player_state.is_moving {
                             tracker.0 = 0;
                         }
                         mat.source_texture = Some(asset_server.load(format!(
@@ -155,15 +155,15 @@ impl AnimationsPlugin {
         }
     }
     fn animate_attack(
+        mut game: ResMut<Game>,
         time: Res<Time>,
         mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
         mut attack_event: EventReader<AttackEvent>,
         mut player_dir: Query<(&LastDirectionInput, &mut Player)>,
     ) {
         if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
-            let mut player_query = player_dir.single_mut();
-            player_query.1.is_attacking = true;
-            let is_facing_left = if player_query.0 .0 == KeyCode::A {
+            game.player_state.is_attacking = true;
+            let is_facing_left = if player_dir.single().0 .0 == KeyCode::A {
                 1.
             } else {
                 -1.
@@ -194,7 +194,7 @@ impl AnimationsPlugin {
                     t.translation.y = -1.;
                 }
             } else {
-                player_query.1.is_attacking = false;
+                game.player_state.is_attacking = false;
             }
         }
     }

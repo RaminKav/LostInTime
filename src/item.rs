@@ -336,7 +336,8 @@ impl WorldObject {
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
-        let player_data = &mut game.player_query.single_mut();
+        let player_state = &mut game.game.player_state;
+        let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
@@ -367,7 +368,7 @@ impl WorldObject {
                 .insert(self)
                 .id();
 
-            player_data.1.main_hand_slot = Some(EquipmentMetaData {
+            player_state.main_hand_slot = Some(EquipmentMetaData {
                 obj: self,
                 entity: item,
                 health,
@@ -388,7 +389,7 @@ impl WorldObject {
                     0.,
                 ));
             }
-            item_entity.set_parent(player_data.0);
+            item_entity.set_parent(player_e);
 
             item
         } else {
@@ -409,7 +410,8 @@ impl WorldObject {
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
-        let player_data = &mut game.player_query.single_mut();
+        let player_state = &mut game.game.player_state;
+        let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
@@ -422,7 +424,7 @@ impl WorldObject {
             500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
         );
         //despawn old item if one exists
-        if let Some(main_hand_data) = &player_data.1.main_hand_slot {
+        if let Some(main_hand_data) = &player_state.main_hand_slot {
             commands.entity(main_hand_data.entity).despawn();
         }
         //spawn new item entity
@@ -445,7 +447,7 @@ impl WorldObject {
             .insert(self)
             .id();
 
-        player_data.1.main_hand_slot = Some(EquipmentMetaData {
+        player_state.main_hand_slot = Some(EquipmentMetaData {
             obj: self,
             entity: item,
             health,
@@ -464,7 +466,7 @@ impl WorldObject {
             Timer::from_seconds(0.125, TimerMode::Once),
             0.,
         ));
-        item_entity.set_parent(player_data.0);
+        item_entity.set_parent(player_e);
 
         item
     }
@@ -566,7 +568,7 @@ impl WorldObject {
             })
             .unwrap();
 
-        let main_hand_tool = &game.player_query.single().1.main_hand_slot;
+        let main_hand_tool = &game.game.player_state.main_hand_slot;
         let b_data = game.block_query.get_mut(obj_data.entity).unwrap();
 
         if let Some(data) = game.world_obj_data.properties.get(&self) {
@@ -689,8 +691,8 @@ impl ItemsPlugin {
         inv_state: Query<&mut InventoryState>,
     ) {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
-        let active_hotbar_item = game_param.game.player.inventory[active_hotbar_slot];
-        let player_data = &mut game_param.player_query.single_mut().1;
+        let active_hotbar_item = game_param.game.player_state.inventory[active_hotbar_slot];
+        let player_data = &mut game_param.game.player_state;
         let current_held_item_data = &player_data.main_hand_slot;
         if let Some(new_item) = active_hotbar_item {
             let new_item = new_item.item_stack.obj_type;

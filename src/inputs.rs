@@ -108,7 +108,7 @@ impl InputsPlugin {
             mut dir_inp,
             children,
         ) = player_query.single_mut();
-        let player = game.player_query.single().1;
+        let player = &mut game.game.player_state;
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED;
 
@@ -118,7 +118,7 @@ impl InputsPlugin {
             if !player.is_attacking {
                 dir_inp.0 = KeyCode::A;
             }
-            game.game.player.is_moving = true;
+            player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
                     if let Ok(limb_handle) = limb_query.get_mut(*l) {
@@ -130,16 +130,12 @@ impl InputsPlugin {
                 }
             }
         }
-        if key_input.pressed(KeyCode::Q) {
-            game.game.player.inventory[0] = None;
-        }
-
         if key_input.pressed(KeyCode::D) {
             d.x += 1.;
             if !player.is_attacking {
                 dir_inp.0 = KeyCode::D;
             }
-            game.game.player.is_moving = true;
+            player.is_moving = true;
             if let Some(c) = children {
                 for l in c.iter() {
                     if let Ok(limb_handle) = limb_query.get_mut(*l) {
@@ -153,38 +149,38 @@ impl InputsPlugin {
         }
         if key_input.pressed(KeyCode::W) {
             d.y += 1.;
-            game.game.player.is_moving = true;
+            player.is_moving = true;
         }
         if key_input.pressed(KeyCode::S) {
             d.y -= 1.;
-            game.game.player.is_moving = true;
+            player.is_moving = true;
         }
-        if game.game.player_dash_cooldown.tick(time.delta()).finished()
+        if player.player_dash_cooldown.tick(time.delta()).finished()
             && key_input.pressed(KeyCode::Space)
         {
-            game.game.player.is_dashing = true;
+            player.is_dashing = true;
 
-            game.game.player_dash_cooldown.reset();
-            game.game.player_dash_duration.reset();
+            player.player_dash_cooldown.reset();
+            player.player_dash_duration.reset();
         }
         if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]) &&
         // || (dx == 0. && dy == 0.)
         !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
         {
-            game.game.player.is_moving = false;
+            player.is_moving = false;
             move_event.send(PlayerMoveEvent(true));
         }
         if d.x != 0. || d.y != 0. {
             d = d.normalize() * s;
         }
 
-        if game.game.player.is_dashing {
-            game.game.player_dash_duration.tick(time.delta());
+        if player.is_dashing {
+            player.player_dash_duration.tick(time.delta());
 
             d.x += d.x * PLAYER_DASH_SPEED * TIME_STEP;
             d.y += d.y * PLAYER_DASH_SPEED * TIME_STEP;
-            if game.game.player_dash_duration.just_finished() {
-                game.game.player.is_dashing = false;
+            if player.player_dash_duration.just_finished() {
+                player.is_dashing = false;
             }
         }
         let mut collected_drops = HashSet::new();
@@ -208,17 +204,9 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (item_stack_entity, _, item_stack) in game.items_query.iter() {
+                for (item_stack_entity, _, _) in game.items_query.iter() {
                     if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
-                        if let Some(mut ec) = commands.get_entity(item_stack_entity) {
-                            ec.despawn();
-                            game.world_obj_data.drop_entities.remove(&item_stack_entity);
-
-                            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
-
-                            collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", item_stack, game.game.player.inventory);
-                        }
+                        collected_drops.insert(col.entity);
                     }
                 }
             },
@@ -244,17 +232,9 @@ impl InputsPlugin {
                 ..default()
             },
             |col| {
-                for (item_stack_entity, _, item_stack) in game.items_query.iter() {
+                for (item_stack_entity, _, _) in game.items_query.iter() {
                     if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
-                        if let Some(mut ec) = commands.get_entity(item_stack_entity) {
-                            ec.despawn();
-                            game.world_obj_data.drop_entities.remove(&item_stack_entity);
-
-                            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
-
-                            collected_drops.insert(col.entity);
-                            info!("{:?} | {:?}", item_stack, game.game.player.inventory);
-                        }
+                        collected_drops.insert(col.entity);
                     }
                 }
             },
@@ -265,10 +245,17 @@ impl InputsPlugin {
 
         player_transform.translation.x = raw_pos.x.round();
         player_transform.translation.y = raw_pos.y.round();
-        game.game.player.position = player_transform.translation;
+        player.position = player_transform.translation;
 
         if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
+        }
+        for drop in collected_drops.iter() {
+            let item_stack = game.items_query.get(*drop).unwrap().2;
+            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
+
+            game.world_obj_data.drop_entities.remove(&drop);
+            commands.entity(*drop).despawn();
         }
     }
     pub fn toggle_inventory(
@@ -382,22 +369,40 @@ impl InputsPlugin {
         }
         // Hit Item, send attack event
         if mouse_button_input.just_pressed(MouseButton::Left) {
-            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            attack_event.send(AttackEvent);
+
+            let player_pos = game.game.player_state.position;
+            println!(
+                "{:?} {:?}",
+                player_pos
+                    .truncate()
+                    .distance(cursor_pos.world_coords.truncate()),
+                (game.game.player_state.reach_distance * 32) as f32
+            );
+            if player_pos
+                .truncate()
+                .distance(cursor_pos.world_coords.truncate())
+                > (game.game.player_state.reach_distance * 32) as f32
+            {
+                return;
+            }
+            let cursor_chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            let cursor_tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
+
             if game
                 .chunk_manager
                 .chunk_generation_data
                 .contains_key(&TileMapPositionData {
-                    chunk_pos,
+                    chunk_pos: cursor_chunk_pos,
                     tile_pos: TilePos {
-                        x: tile_pos.x as u32,
-                        y: tile_pos.y as u32,
+                        x: cursor_tile_pos.x as u32,
+                        y: cursor_tile_pos.y as u32,
                     },
                 })
             {
@@ -405,10 +410,10 @@ impl InputsPlugin {
                     .chunk_manager
                     .chunk_generation_data
                     .get(&TileMapPositionData {
-                        chunk_pos,
+                        chunk_pos: cursor_chunk_pos,
                         tile_pos: TilePos {
-                            x: tile_pos.x as u32,
-                            y: tile_pos.y as u32,
+                            x: cursor_tile_pos.x as u32,
+                            y: cursor_tile_pos.y as u32,
                         },
                     })
                     .unwrap();
@@ -416,12 +421,11 @@ impl InputsPlugin {
                     obj_data.object.attempt_to_break_item(
                         &mut commands,
                         &mut game,
-                        tile_pos,
-                        chunk_pos,
+                        cursor_tile_pos,
+                        cursor_chunk_pos,
                     );
                 }
             }
-            attack_event.send(AttackEvent);
         }
         // Attempt to place block in hand
         // TODO: Interact
@@ -435,7 +439,7 @@ impl InputsPlugin {
                 cursor_pos.world_coords.y,
             ));
             let hotbar_slot = inv_state.unwrap().1.active_hotbar_slot;
-            let held_item_option = game.game.player.inventory[hotbar_slot];
+            let held_item_option = game.game.player_state.inventory[hotbar_slot];
             if let Some(mut held_item) = held_item_option {
                 if let Some(places_into_item) = game
                     .world_obj_data
@@ -450,7 +454,7 @@ impl InputsPlugin {
                         tile_pos,
                         chunk_pos,
                     ) {
-                        game.game.player.inventory[hotbar_slot] = held_item.modify_count(-1);
+                        game.game.player_state.inventory[hotbar_slot] = held_item.modify_count(-1);
                     }
                 }
             }
