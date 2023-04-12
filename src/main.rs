@@ -115,10 +115,8 @@ fn main() {
 
 #[derive(Resource, Default)]
 pub struct Game {
-    player: Player,
+    player_state: PlayerState,
     world_generation_params: WorldGeneration,
-    player_dash_cooldown: Timer,
-    player_dash_duration: Timer,
 }
 
 #[derive(Default)]
@@ -186,14 +184,35 @@ pub struct GameParam<'w, 's> {
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
 }
-#[derive(Component, Default)]
-pub struct Player {
+#[derive(Component, Debug)]
+pub struct Player;
+#[derive(Debug)]
+pub struct PlayerState {
     is_moving: bool,
     is_dashing: bool,
     is_attacking: bool,
     inventory: [Option<InventoryItemStack>; INVENTORY_SIZE],
     main_hand_slot: Option<EquipmentMetaData>,
     position: Vec3,
+    reach_distance: u8,
+    player_dash_cooldown: Timer,
+    player_dash_duration: Timer,
+}
+
+impl Default for PlayerState {
+    fn default() -> Self {
+        Self {
+            is_moving: false,
+            is_dashing: false,
+            is_attacking: false,
+            inventory: [None; INVENTORY_SIZE],
+            main_hand_slot: None,
+            position: Vec3::ZERO,
+            reach_distance: 2,
+            player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.05, TimerMode::Once),
+        }
+    }
 }
 #[derive(Component, EnumIter, Display, Debug, Hash, Copy, Clone, PartialEq, Eq, Deserialize)]
 pub enum Limb {
@@ -264,8 +283,8 @@ fn setup(
         sand_frequency: 0.22,
         water_frequency: 0.05,
     };
-    game.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
+    game.player_state.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
+    game.player_state.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
     let img_size = Extent3d {
         width: GAME_WIDTH as u32,
@@ -505,14 +524,7 @@ fn setup(
                 ..Default::default()
             },
             AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
-            Player {
-                is_moving: false,
-                is_dashing: false,
-                is_attacking: false,
-                inventory: [None; INVENTORY_SIZE],
-                main_hand_slot: None,
-                position: Vec3::ZERO,
-            },
+            Player,
             Health(100),
             MovementVector::default(),
             LastDirectionInput::default(),

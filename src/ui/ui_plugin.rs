@@ -433,7 +433,7 @@ fn handle_cursor_update(
                                     .insert(DraggedItem);
 
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
-                                game.player.inventory[state.slot_index] = None;
+                                game.player_state.inventory[state.slot_index] = None;
                                 state.dirty = true;
                                 mouse_input.clear();
                             }
@@ -583,7 +583,7 @@ pub fn setup_inv_slots_ui(
     inv_query: Query<(Entity, &InventoryState, &Sprite)>,
     asset_server: Res<AssetServer>,
 ) {
-    for (slot_index, _item) in game.player.inventory.iter().enumerate() {
+    for (slot_index, _item) in game.player_state.inventory.iter().enumerate() {
         spawn_inv_slot(
             &mut commands,
             &graphics,
@@ -661,7 +661,7 @@ pub fn spawn_inv_slot(
     let mut item_type_option = None;
     let mut item_count_option = None;
     // check if we need to spawn an item icon for this slot
-    if let Some(Some(item)) = game.player.inventory.get(slot_index) {
+    if let Some(Some(item)) = game.player_state.inventory.get(slot_index) {
         // player has item in this slot
         let obj_type = item.item_stack.obj_type;
         item_type_option = Some(obj_type);
@@ -805,7 +805,7 @@ pub fn update_inventory_ui(
         }
 
         let interactable_option = interactables.get(e);
-        let real_count = if let Some(item) = game.player.inventory[state.slot_index] {
+        let real_count = if let Some(item) = game.player_state.inventory[state.slot_index] {
             Some(item.item_stack.count)
         } else {
             None
