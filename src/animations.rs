@@ -9,10 +9,10 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use interpolation::lerp;
 
-use crate::inputs::{InputsPlugin, LastDirectionInput, MovementVector};
+use crate::inputs::{InputsPlugin, LastDirectionInput};
 use crate::item::Equipment;
-use crate::Limb;
 use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
+use crate::{Limb, PLAYER_MOVE_SPEED};
 
 pub struct AnimationsPlugin;
 
@@ -25,7 +25,7 @@ pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
 #[derive(Component, Inspectable)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
-#[derive(Component, Deref, DerefMut)]
+#[derive(Component, Clone, Deref, DerefMut)]
 pub struct AnimationTimer(pub Timer);
 #[derive(Component, Debug)]
 pub struct AttackAnimationTimer(pub Timer, pub f32);
@@ -65,6 +65,7 @@ impl Plugin for AnimationsPlugin {
                     .with_system(Self::animate_limbs)
                     .with_system(Self::animate_dropped_items)
                     .with_system(Self::animate_attack)
+                    .with_system(Self::animate_spritesheet_animations)
                     .after(InputsPlugin::mouse_click_system),
             );
     }
@@ -159,7 +160,7 @@ impl AnimationsPlugin {
         time: Res<Time>,
         mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
         mut attack_event: EventReader<AttackEvent>,
-        mut player_dir: Query<(&LastDirectionInput, &mut Player)>,
+        player_dir: Query<(&LastDirectionInput, &mut Player)>,
     ) {
         if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
             game.player_state.is_attacking = true;
@@ -195,6 +196,26 @@ impl AnimationsPlugin {
                 }
             } else {
                 game.player_state.is_attacking = false;
+            }
+        }
+    }
+    fn animate_spritesheet_animations(
+        time: Res<Time>,
+        texture_atlases: Res<Assets<TextureAtlas>>,
+        mut query: Query<
+            (
+                &mut AnimationTimer,
+                &mut TextureAtlasSprite,
+                &Handle<TextureAtlas>,
+            ),
+            Without<ItemStack>,
+        >,
+    ) {
+        for (mut timer, mut sprite, texture_atlas_handle) in &mut query {
+            timer.tick(time.delta());
+            if timer.just_finished() {
+                let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
+                sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
             }
         }
     }

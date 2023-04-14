@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use ai::AIPlugin;
 use attributes::Health;
 //TODO:
 // - get player movement
@@ -27,6 +28,7 @@ use bevy::{
 use bevy_inspector_egui::WorldInspectorPlugin;
 
 use bevy_rapier2d::prelude::*;
+mod ai;
 mod animations;
 mod assets;
 mod attributes;
@@ -102,6 +104,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
+        .add_plugin(AIPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -467,7 +470,7 @@ fn setup(
     //player
     for l in Limb::iter() {
         let limb_source_handle = asset_server.load(format!(
-            "textures/player/player-run-down/player-{}-run-down-source-1.png",
+            "textures/player/player-run-down/player-{}-run-down-source-0.png",
             l.to_string().to_lowercase()
         ));
         let limb_texture_handle = asset_server.load(format!(

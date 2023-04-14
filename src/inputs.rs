@@ -1,26 +1,31 @@
 use bevy::app::AppExit;
 
-use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
+use bevy_rapier2d::prelude::{
+    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, RapierContext, RigidBody,
+};
+use bevy_rapier2d::rapier::prelude::RigidBodyType;
+use seldom_state::prelude::{NotTrigger, StateMachine};
 
-use crate::animations::{AnimatedTextureMaterial, AttackEvent};
+use crate::ai::{Attack, AttackDistance, Follow, Idle, LineOfSight, WalkingDirection};
+use crate::animations::{AnimatedTextureMaterial, AnimationTimer, AttackEvent};
 
 use crate::attributes::Health;
-use crate::inventory::{InventoryItemStack, InventoryPlugin, ItemStack};
+use crate::inventory::ItemStack;
 use crate::item::Equipment;
-use crate::ui::{change_hotbar_slot, InventorySlotState, InventoryState, UIPlugin};
+use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world_generation::TileMapPositionData;
 use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
     PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
+    PLAYER_MOVE_SPEED,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -262,6 +267,10 @@ impl InputsPlugin {
         mut game: GameParam,
         key_input: ResMut<Input<KeyCode>>,
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
+        mut commands: Commands,
+        player: Query<Entity, With<Player>>,
+        asset_server: Res<AssetServer>,
+        mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -273,6 +282,75 @@ impl InputsPlugin {
                 count: 1,
             };
             sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
+        }
+        if key_input.just_pressed(KeyCode::L) {
+            let player_e = player.single();
+            let texture_handle = asset_server.load("textures/slime/slime-move.png");
+            let texture_atlas =
+                TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
+            let texture_atlas_handle = texture_atlases.add(texture_atlas);
+
+            commands.spawn((
+                SpriteSheetBundle {
+                    texture_atlas: texture_atlas_handle,
+                    ..default()
+                },
+                AnimationTimer(Timer::from_seconds(0.20, TimerMode::Repeating)),
+                Health(100),
+                KinematicCharacterController::default(),
+                Collider::cuboid(10., 6.),
+                YSort,
+                StateMachine::new(Idle {
+                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                    direction: WalkingDirection::new_rand_dir(rand::thread_rng()),
+                    speed: 0.5,
+                })
+                .trans::<Idle>(
+                    LineOfSight {
+                        target: player_e,
+                        range: 100.,
+                    },
+                    Follow {
+                        target: player_e,
+                        speed: 0.7,
+                    },
+                )
+                .trans::<Follow>(
+                    AttackDistance {
+                        target: player_e,
+                        range: 50.,
+                    },
+                    Attack {
+                        target: player_e,
+                        attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                        attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
+                        speed: 1.4,
+                        damage: 10,
+                    },
+                )
+                .trans::<Follow>(
+                    NotTrigger(LineOfSight {
+                        target: player_e,
+                        range: 100.,
+                    }),
+                    Idle {
+                        walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                        direction: WalkingDirection::new_rand_dir(rand::thread_rng()),
+                        speed: 0.5,
+                    },
+                )
+                .trans::<Attack>(
+                    NotTrigger(AttackDistance {
+                        target: player_e,
+                        range: 50.,
+                    }),
+                    Follow {
+                        target: player_e,
+                        speed: 0.7,
+                    },
+                ),
+                Name::new("Slime"),
+            ));
         }
     }
     pub fn test_take_damage(
