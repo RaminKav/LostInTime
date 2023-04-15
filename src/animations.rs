@@ -9,10 +9,12 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use interpolation::lerp;
 
-use crate::inputs::{InputsPlugin, LastDirectionInput};
+use crate::attributes::AttackCooldown;
+use crate::combat::{AttackTimer, HitMarker};
+use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
 use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
-use crate::{Limb, PLAYER_MOVE_SPEED};
+use crate::{Limb, RawPosition};
 
 pub struct AnimationsPlugin;
 
@@ -27,6 +29,13 @@ pub struct AnimationFrameTracker(pub i32, pub i32);
 
 #[derive(Component, Clone, Deref, DerefMut)]
 pub struct AnimationTimer(pub Timer);
+#[derive(Component, Clone)]
+pub struct HitAnimationTracker {
+    pub timer: Timer,
+    pub knockback: f32,
+    pub dir: Vec2,
+}
+
 #[derive(Component, Debug)]
 pub struct AttackAnimationTimer(pub Timer, pub f32);
 
@@ -43,6 +52,8 @@ pub struct AnimatedTextureMaterial {
     pub lookup_texture: Option<Handle<Image>>,
     #[uniform(4)]
     pub flip: f32,
+    #[uniform(5)]
+    pub opacity: f32,
 }
 
 impl Material2d for AnimatedTextureMaterial {
@@ -65,6 +76,7 @@ impl Plugin for AnimationsPlugin {
                     .with_system(Self::animate_limbs)
                     .with_system(Self::animate_dropped_items)
                     .with_system(Self::animate_attack)
+                    .with_system(Self::animate_hit)
                     .with_system(Self::animate_spritesheet_animations)
                     .after(InputsPlugin::mouse_click_system),
             );
@@ -78,6 +90,7 @@ impl AnimationsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
         mut player_query: Query<(&mut AnimationTimer, &Children), With<Player>>,
+        is_hit: Query<&HitAnimationTracker, With<Player>>,
         mut limb_query: Query<(
             &mut AnimationFrameTracker,
             &Handle<AnimatedTextureMaterial>,
@@ -110,6 +123,7 @@ impl AnimationsPlugin {
                             limb.to_string().to_lowercase(),
                             tracker.0
                         )));
+                        mat.opacity = if is_hit.get_single().is_ok() { 0.5 } else { 1. };
                     }
                 }
                 // else if let Ok(mut t) = eq_query.get_mut(*l) {
@@ -155,21 +169,80 @@ impl AnimationsPlugin {
             }
         }
     }
+    fn animate_hit(
+        mut commands: Commands,
+        mut transforms: Query<&mut Transform>,
+        mut hit_tracker: Query<(Entity, &mut HitAnimationTracker)>,
+        mut player: Query<(Entity, &mut RawPosition, &mut MovementVector), With<Player>>,
+        time: Res<Time>,
+    ) {
+        let (p_e, mut p_rp, mut mv) = player.single_mut();
+        for (e, mut hit) in hit_tracker.iter_mut() {
+            hit.timer.tick(time.delta());
+
+            if hit.timer.percent() <= 0.25 {
+                if e == p_e {
+                    let d = hit.dir * hit.knockback * TIME_STEP;
+                    p_rp.x += d.x;
+                    p_rp.y += d.y;
+                    mv.0 = d;
+                } else {
+                    if let Ok(mut hit_t) = transforms.get_mut(e) {
+                        hit_t.translation += hit.dir.extend(0.) * hit.knockback * TIME_STEP;
+                    }
+                }
+            }
+
+            if hit.timer.finished() {
+                commands.entity(e).remove::<HitAnimationTracker>();
+            }
+        }
+        //TODO: move to hit_handler fn
+    }
     fn animate_attack(
+        mut commands: Commands,
         mut game: ResMut<Game>,
         time: Res<Time>,
-        mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
+        mut tool_query: Query<
+            (
+                Entity,
+                &mut Transform,
+                &mut AttackAnimationTimer,
+                &AttackCooldown,
+                Option<&mut AttackTimer>,
+            ),
+            With<Equipment>,
+        >,
         mut attack_event: EventReader<AttackEvent>,
-        player_dir: Query<(&LastDirectionInput, &mut Player)>,
+        player_dir: Query<&FacingDirection, With<Player>>,
     ) {
-        if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
-            game.player_state.is_attacking = true;
-            let is_facing_left = if player_dir.single().0 .0 == KeyCode::A {
+        if let Ok((e, mut t, mut at, cooldown, mut timer_option)) = tool_query.get_single_mut() {
+            let is_facing_left = if *player_dir.single() == FacingDirection::Left {
                 1.
             } else {
                 -1.
             };
-            if attack_event.iter().count() > 0 || !at.0.elapsed().is_zero() {
+            let on_cooldown = timer_option.is_some();
+            if on_cooldown {
+                let mut t = timer_option.unwrap();
+                t.0.tick(time.delta());
+                if t.0.finished() {
+                    commands
+                        .entity(e)
+                        .remove::<AttackTimer>()
+                        .remove::<HitMarker>();
+                }
+            }
+
+            if (attack_event.iter().count() > 0 || !at.0.elapsed().is_zero()) {
+                if !game.player_state.is_attacking {
+                    let mut attack_cd_timer =
+                        AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
+                    attack_cd_timer.0.tick(time.delta());
+                    commands.entity(e).insert(attack_cd_timer);
+                }
+                game.player_state.is_attacking = true;
+
                 let d = time.delta();
                 at.0.tick(d);
                 if !at.0.just_finished() {

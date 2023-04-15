@@ -10,13 +10,8 @@ use bevy_rapier2d::{
 use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
 
-use crate::{inventory::ItemStack, Player};
+use crate::{combat::HitEvent, inventory::ItemStack, Player};
 
-#[derive(Debug, Clone)]
-pub struct HitEvent {
-    hit_entity: Entity,
-    damage: u8,
-}
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
 pub struct LineOfSight {
@@ -75,17 +70,17 @@ impl Trigger for AttackDistance {
 #[component(storage = "SparseSet")]
 pub struct Idle {
     pub walk_timer: Timer,
-    pub direction: WalkingDirection,
+    pub direction: MoveDirection,
     pub speed: f32,
 }
-#[derive(Clone, Copy, Reflect, PartialEq, Eq)]
-pub enum WalkingDirection {
+#[derive(Clone, Copy, Debug, Reflect, PartialEq, Eq)]
+pub enum MoveDirection {
     Left,
     Right,
     Up,
     Down,
 }
-impl WalkingDirection {
+impl MoveDirection {
     fn get_next_rand_dir(self, mut rng: ThreadRng) -> Self {
         let mut new_dir = self;
         while new_dir == self {
@@ -117,6 +112,9 @@ impl WalkingDirection {
         }
         new_dir
     }
+    // pub fn from_translation(t: Vec2) -> Self {
+
+    // }
 }
 
 // Entities in the `Follow` state should move towards the given entity at the given speed
@@ -147,7 +145,6 @@ pub fn follow(
         let target_translation = transforms.get(follow.target).unwrap().translation;
         let follow_transform = &mut transforms.get_mut(entity).unwrap();
         let follow_translation = follow_transform.translation;
-        println!("FOLLOWING...");
         // Find the direction from the follower to the target and go that way
         mover.get_mut(entity).unwrap().translation = Some(
             (target_translation - follow_translation)
@@ -197,43 +194,33 @@ pub fn attack(
                     ..default()
                 },
                 |col| {
-                    println!("HIT SOMETHING");
                     let p_e = player_query.single();
-                    if col.entity == p_e {
-                        //send hit event
+                    if col.entity == p_e && !hit {
                         hit = true;
+
+                        //send hit event
                         hit_event.send(HitEvent {
                             hit_entity: p_e,
                             damage: attack.damage,
-                        })
+                            dir: delta.normalize_or_zero().truncate(),
+                        });
                     }
                 },
             );
             attack_transform.translation += output.effective_translation.extend(0.);
             attack.attack_cooldown_timer.tick(time.delta());
-            println!(
-                "MOVING {:?} {:?}",
-                delta.normalize_or_zero().truncate() * attack.speed,
-                output.effective_translation
-            );
         }
+
+        if attack.attack_cooldown_timer.finished() || hit {
+            attack.attack_cooldown_timer.reset();
+            attack.attack_startup_timer.reset();
+        }
+
         if hit || attack.attack_cooldown_timer.percent() != 0. {
             //start attack cooldown timer
             attack.attack_cooldown_timer.tick(time.delta());
         } else {
             attack.attack_startup_timer.tick(time.delta());
-        }
-        println!(
-            "timer: {:?} {:?} ||| {:?} {:?}",
-            delta,
-            hit,
-            attack.attack_cooldown_timer.elapsed(),
-            attack.attack_startup_timer.elapsed()
-        );
-        if attack.attack_cooldown_timer.finished() {
-            println!("FINISHED COOLDOWN");
-            attack.attack_cooldown_timer.reset();
-            attack.attack_startup_timer.reset();
         }
     }
 }
@@ -249,10 +236,10 @@ pub fn idle(
 
         let s = idle.speed; //* time.delta_seconds();
         match idle.direction {
-            WalkingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
-            WalkingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
-            WalkingDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
-            WalkingDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
+            MoveDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
+            MoveDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
+            MoveDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
+            MoveDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
         }
 
         if idle.walk_timer.just_finished() {

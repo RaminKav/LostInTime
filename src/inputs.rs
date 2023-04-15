@@ -11,10 +11,11 @@ use bevy_rapier2d::prelude::{
 use bevy_rapier2d::rapier::prelude::RigidBodyType;
 use seldom_state::prelude::{NotTrigger, StateMachine};
 
-use crate::ai::{Attack, AttackDistance, Follow, Idle, LineOfSight, WalkingDirection};
+use crate::ai::{Attack, AttackDistance, Follow, Idle, LineOfSight, MoveDirection};
 use crate::animations::{AnimatedTextureMaterial, AnimationTimer, AttackEvent};
 
 use crate::attributes::Health;
+use crate::combat::{AttackTimer, HitEvent};
 use crate::inventory::ItemStack;
 use crate::item::Equipment;
 use crate::ui::{change_hotbar_slot, InventoryState};
@@ -24,8 +25,8 @@ use crate::{
     PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
-    PLAYER_MOVE_SPEED,
+    Game, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
+    PLAYER_MOVE_SPEED, WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -46,13 +47,18 @@ pub struct CursorPos {
 #[derive(Component, Default)]
 pub struct MovementVector(pub Vec2);
 
-#[derive(Component)]
+#[derive(Component, Clone, PartialEq, Eq)]
 
-pub struct LastDirectionInput(pub KeyCode);
+pub enum FacingDirection {
+    Left,
+    Right,
+    Up,
+    Down,
+}
 
-impl Default for LastDirectionInput {
+impl Default for FacingDirection {
     fn default() -> Self {
-        Self(KeyCode::Numpad0)
+        Self::Right
     }
 }
 
@@ -66,6 +72,7 @@ impl Plugin for InputsPlugin {
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
+                    .with_system(Self::turn_player)
                     .with_system(Self::move_player)
                     .with_system(Self::handle_hotbar_key_input)
                     .with_system(Self::test_take_damage)
@@ -82,6 +89,31 @@ impl Plugin for InputsPlugin {
 pub struct PlayerMoveEvent(bool);
 
 impl InputsPlugin {
+    fn turn_player(
+        mut commands: Commands,
+        mut player_query: Query<(Entity, Option<&Children>), With<Player>>,
+        mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+        mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
+        cursor_pos: Res<CursorPos>,
+    ) {
+        let (e, children) = player_query.single_mut();
+        let (flip, dir) = if cursor_pos.screen_coords.x > WIDTH / 2. {
+            (0., FacingDirection::Right)
+        } else {
+            (1., FacingDirection::Left)
+        };
+        //TODO: make center point based on player pos on screen?
+        //TODO: add some way for attack to know dir
+        if let Some(c) = children {
+            for l in c.iter() {
+                if let Ok(limb_handle) = limb_query.get_mut(*l) {
+                    let limb_material = materials.get_mut(limb_handle).unwrap();
+                    limb_material.flip = flip;
+                    commands.entity(e).insert(dir.clone());
+                }
+            }
+        }
+    }
     fn move_player(
         mut commands: Commands,
         mut game: GameParam,
@@ -92,27 +124,17 @@ impl InputsPlugin {
                 &mut RawPosition,
                 &Collider,
                 &mut MovementVector,
-                &mut LastDirectionInput,
                 Option<&Children>,
             ),
             (With<Player>, Without<MainCamera>, Without<Equipment>),
         >,
-        mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-        mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
     ) {
-        let (
-            ent,
-            mut player_transform,
-            mut raw_pos,
-            player_collider,
-            mut mv,
-            mut dir_inp,
-            children,
-        ) = player_query.single_mut();
+        let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
+            player_query.single_mut();
         let player = &mut game.game.player_state;
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED;
@@ -120,37 +142,11 @@ impl InputsPlugin {
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;
 
-            if !player.is_attacking {
-                dir_inp.0 = KeyCode::A;
-            }
             player.is_moving = true;
-            if let Some(c) = children {
-                for l in c.iter() {
-                    if let Ok(limb_handle) = limb_query.get_mut(*l) {
-                        let limb_material = materials.get_mut(limb_handle);
-                        if let Some(mat) = limb_material {
-                            mat.flip = 1.;
-                        }
-                    }
-                }
-            }
         }
         if key_input.pressed(KeyCode::D) {
             d.x += 1.;
-            if !player.is_attacking {
-                dir_inp.0 = KeyCode::D;
-            }
             player.is_moving = true;
-            if let Some(c) = children {
-                for l in c.iter() {
-                    if let Ok(limb_handle) = limb_query.get_mut(*l) {
-                        let limb_material = materials.get_mut(limb_handle);
-                        if let Some(mat) = limb_material {
-                            mat.flip = 0.;
-                        }
-                    }
-                }
-            }
         }
         if key_input.pressed(KeyCode::W) {
             d.y += 1.;
@@ -271,6 +267,8 @@ impl InputsPlugin {
         player: Query<Entity, With<Player>>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+        mut hit_event: EventWriter<HitEvent>,
+        slime: Query<Entity, With<Idle>>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -283,6 +281,7 @@ impl InputsPlugin {
             };
             sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
         }
+
         if key_input.just_pressed(KeyCode::L) {
             let player_e = player.single();
             let texture_handle = asset_server.load("textures/slime/slime-move.png");
@@ -302,7 +301,7 @@ impl InputsPlugin {
                 YSort,
                 StateMachine::new(Idle {
                     walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                    direction: WalkingDirection::new_rand_dir(rand::thread_rng()),
+                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
                     speed: 0.5,
                 })
                 .trans::<Idle>(
@@ -335,7 +334,7 @@ impl InputsPlugin {
                     }),
                     Idle {
                         walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                        direction: WalkingDirection::new_rand_dir(rand::thread_rng()),
+                        direction: MoveDirection::new_rand_dir(rand::thread_rng()),
                         speed: 0.5,
                     },
                 )
@@ -351,6 +350,13 @@ impl InputsPlugin {
                 ),
                 Name::new("Slime"),
             ));
+        }
+        if key_input.just_pressed(KeyCode::K) {
+            hit_event.send(HitEvent {
+                hit_entity: slime.single(),
+                damage: 10,
+                dir: Vec2::new(-1., 0.),
+            })
         }
     }
     pub fn test_take_damage(
@@ -438,6 +444,7 @@ impl InputsPlugin {
         mut game: GameParam,
         mut attack_event: EventWriter<AttackEvent>,
         inv_query: Query<(&mut Visibility, &InventoryState)>,
+        tool_query: Query<(Entity, Option<&AttackTimer>), With<Equipment>>,
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
@@ -447,16 +454,15 @@ impl InputsPlugin {
         }
         // Hit Item, send attack event
         if mouse_button_input.just_pressed(MouseButton::Left) {
+            if let Some(tool) = &game.game.player_state.main_hand_slot {
+                if tool_query.get(tool.entity).unwrap().1.is_some() {
+                    return;
+                }
+            }
+
             attack_event.send(AttackEvent);
 
             let player_pos = game.game.player_state.position;
-            println!(
-                "{:?} {:?}",
-                player_pos
-                    .truncate()
-                    .distance(cursor_pos.world_coords.truncate()),
-                (game.game.player_state.reach_distance * 32) as f32
-            );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
@@ -586,7 +592,6 @@ impl InputsPlugin {
         raw_camera_pos.0 = raw_camera_pos
             .0
             .lerp(player_movement_vec.0 * camera_lookahead_scale, 0.08);
-
         let camera_final_pos = Vec2::new(
             player_pos.translation.x - raw_camera_pos.x,
             player_pos.translation.y - raw_camera_pos.y,

@@ -1,6 +1,6 @@
 mod enemy_basic;
 
-use crate::{GameState, Plugin, TIME_STEP};
+use crate::{combat::HitEvent, GameState, Plugin, TIME_STEP};
 
 use bevy::{
     prelude::{App, SystemSet},
