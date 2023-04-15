@@ -4,7 +4,7 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::Health;
+use attributes::{AttributesPlugin, Health};
 //TODO:
 // - get player movement
 // - set up tilemap or world generation
@@ -32,6 +32,7 @@ mod ai;
 mod animations;
 mod assets;
 mod attributes;
+mod combat;
 mod inputs;
 mod inventory;
 mod item;
@@ -45,7 +46,8 @@ use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
-use inputs::{InputsPlugin, LastDirectionInput, MovementVector};
+use combat::CombatPlugin;
+use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_SIZE};
 use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource};
 use serde::Deserialize;
@@ -58,6 +60,7 @@ const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
+pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 180.;
 pub const GAME_WIDTH: f32 = 320.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
@@ -70,7 +73,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     window: WindowDescriptor {
-                        width: HEIGHT * ASPECT_RATIO,
+                        width: WIDTH,
                         height: HEIGHT,
                         scale_factor_override: Some(1.0),
                         // mode: WindowMode::BorderlessFullscreen,
@@ -105,6 +108,8 @@ fn main() {
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(AIPlugin)
+        .add_plugin(AttributesPlugin)
+        .add_plugin(CombatPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -502,6 +507,7 @@ fn setup(
                     material: materials.add(AnimatedTextureMaterial {
                         source_texture: Some(limb_source_handle),
                         lookup_texture: Some(limb_texture_handle),
+                        opacity: 1.,
                         flip: 1.,
                     }),
                     ..default()
@@ -530,7 +536,7 @@ fn setup(
             Player,
             Health(100),
             MovementVector::default(),
-            LastDirectionInput::default(),
+            FacingDirection::default(),
             KinematicCharacterController::default(),
             Collider::cuboid(7., 10.),
             YSort,

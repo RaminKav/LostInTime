@@ -1,6 +1,8 @@
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
-use crate::attributes::{Attack, BlockAttributeBundle, EquipmentAttributeBundle, Health};
+use crate::attributes::{
+    Attack, AttackCooldown, BlockAttributeBundle, EquipmentAttributeBundle, Health,
+};
 use crate::inventory::ItemStack;
 use crate::ui::{InventorySlotState, InventoryState};
 use crate::world_generation::{
@@ -29,10 +31,10 @@ pub struct Equipment(Limb);
 
 #[derive(Debug)]
 pub struct EquipmentMetaData {
-    entity: Entity,
-    obj: WorldObject,
-    health: Health,
-    attack: Attack,
+    pub entity: Entity,
+    pub obj: WorldObject,
+    pub health: Health,
+    pub attack: Attack,
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -343,6 +345,8 @@ impl WorldObject {
         let position;
         let health = Health(100);
         let attack = Attack(20);
+        let attack_cooldown = AttackCooldown(0.4);
+
         if let Some(limb) = obj_data.equip_slot {
             position = Vec3::new(
                 PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
@@ -361,7 +365,11 @@ impl WorldObject {
                     },
                     ..Default::default()
                 })
-                .insert(EquipmentAttributeBundle { health, attack })
+                .insert(EquipmentAttributeBundle {
+                    health,
+                    attack,
+                    attack_cooldown,
+                })
                 .insert(Equipment(limb))
                 .insert(Name::new("EquipItem"))
                 .insert(YSort)
@@ -417,6 +425,7 @@ impl WorldObject {
         let position;
         let health = Health(100);
         let attack = Attack(20);
+        let attack_cooldown = AttackCooldown(0.4);
         let limb = Limb::Hands;
         position = Vec3::new(
             PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
@@ -440,7 +449,11 @@ impl WorldObject {
                 },
                 ..Default::default()
             })
-            .insert(EquipmentAttributeBundle { health, attack })
+            .insert(EquipmentAttributeBundle {
+                health,
+                attack,
+                attack_cooldown,
+            })
             .insert(Equipment(limb))
             .insert(Name::new("EquipItem"))
             .insert(YSort)
@@ -458,7 +471,7 @@ impl WorldObject {
             item_entity
                 .insert(Collider::cuboid(
                     obj_data.size.x / 3.5,
-                    obj_data.size.y / 4.5,
+                    obj_data.size.y / 2.,
                 ))
                 .insert(Sensor);
         }
@@ -572,11 +585,11 @@ impl WorldObject {
         let b_data = game.block_query.get_mut(obj_data.entity).unwrap();
 
         if let Some(data) = game.world_obj_data.properties.get(&self) {
+            //TODO: maybe move this logic to combat.rs? or move the hp loss from combat to here?
             if let Some(breaks_with) = data.breaks_with {
                 if let Some(main_hand_tool) = main_hand_tool {
                     if main_hand_tool.obj == breaks_with {
-                        let mut h = b_data.1;
-                        h.0 -= main_hand_tool.attack.0 as i8;
+                        let h = b_data.1;
                         if h.0 <= 0 {
                             Self::break_item(self, commands, game, tile_pos, chunk_pos)
                         }

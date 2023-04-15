@@ -11,6 +11,8 @@ var lookup_color_texture: texture_2d<f32>;
 var lookup_texture_sampler: sampler;
 @group(1) @binding(4)
 var<uniform> flip: f32;
+@group(1) @binding(5)
+var<uniform> opacity: f32;
 
 
 @fragment
@@ -50,6 +52,10 @@ fn fragment(
     } else {
      v = (1.055 * pow(uv_map.g, 1./2.4)) - 0.055;
     }
+    var a = uv_map.a;
+    if uv_map.a > 0. {
+        a = opacity;
+    }
  
     let palette_uv = vec2<f32>(u*255f + 0.5, v*255f + 0.5) / palette_dims;
 
@@ -60,5 +66,5 @@ fn fragment(
         palette_uv  
     );
 
-    return vec4<f32>(color.rgb,uv_map.a);
+    return vec4<f32>(color.rgb,a);
 }
