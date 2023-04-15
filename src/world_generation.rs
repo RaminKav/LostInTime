@@ -817,7 +817,6 @@ impl WorldGenerationPlugin {
         if block_pos.y < 0 {
             block_pos.y += CHUNK_SIZE as i32;
         }
-        println!("BLOCK: {camera_pos:?} {block_pos:?}");
 
         block_pos
     }
