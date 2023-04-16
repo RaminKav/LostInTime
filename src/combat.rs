@@ -4,8 +4,9 @@ use bevy_rapier2d::prelude::RapierContext;
 use crate::{
     animations::HitAnimationTracker,
     attributes::{Attack, Health},
-    item::WorldObject,
-    GameState, TIME_STEP,
+    item::{Placeable, WorldObject},
+    world_generation::WorldGenerationPlugin,
+    GameParam, GameState, Player, TIME_STEP,
 };
 
 #[derive(Debug, Clone)]
@@ -19,6 +20,7 @@ pub struct HitEvent {
 
 pub struct EnemyDeathEvent {
     pub entity: Entity,
+    pub enemy_pos: Vec2,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -37,27 +39,45 @@ impl Plugin for CombatPlugin {
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::handle_hits)
-                    .with_system(Self::handle_enemy_death)
+                    .with_system(Self::handle_enemy_death.after(Self::handle_hits))
                     .with_system(Self::check_hit_collisions),
             );
     }
 }
 
 impl CombatPlugin {
-    fn handle_enemy_death(mut commands: Commands, mut death_events: EventReader<EnemyDeathEvent>) {
+    fn handle_enemy_death(
+        mut commands: Commands,
+        mut game: GameParam,
+        mut death_events: EventReader<EnemyDeathEvent>,
+    ) {
         for death_event in death_events.iter() {
+            let t = death_event.enemy_pos;
             commands.entity(death_event.entity).despawn();
+            let enemy_chunk_pos =
+                WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
+            let enemy_tile_pos =
+                WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
+
+            WorldObject::Placeable(Placeable::Flint).spawn_item_drop(
+                &mut commands,
+                &mut game,
+                enemy_tile_pos,
+                enemy_chunk_pos,
+                2,
+            );
         }
     }
 
     fn handle_hits(
         mut commands: Commands,
-        mut health: Query<(Entity, &mut Health, Option<&WorldObject>)>,
+        mut health: Query<(Entity, &mut Health, &Transform, Option<&WorldObject>)>,
         mut hit_events: EventReader<HitEvent>,
         mut death_events: EventWriter<EnemyDeathEvent>,
+        player: Query<Entity, With<Player>>,
     ) {
         for hit in hit_events.iter() {
-            if let Ok((e, mut hit_health, obj_option)) = health.get_mut(hit.hit_entity) {
+            if let Ok((e, mut hit_health, t, obj_option)) = health.get_mut(hit.hit_entity) {
                 if obj_option.is_none() {
                     commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                         timer: Timer::from_seconds(0.2, TimerMode::Once),
@@ -67,8 +87,11 @@ impl CombatPlugin {
                 }
 
                 hit_health.0 -= hit.damage as i8;
-                if hit_health.0 <= 0 {
-                    death_events.send(EnemyDeathEvent { entity: e })
+                if hit_health.0 <= 0 && player.single() != e {
+                    death_events.send(EnemyDeathEvent {
+                        entity: e,
+                        enemy_pos: t.translation.truncate(),
+                    })
                 }
             }
         }
