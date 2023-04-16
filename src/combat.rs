@@ -15,6 +15,12 @@ pub struct HitEvent {
     pub dir: Vec2,
 }
 
+#[derive(Debug, Clone)]
+
+pub struct EnemyDeathEvent {
+    pub entity: Entity,
+}
+
 #[derive(Component, Debug, Clone)]
 pub struct AttackTimer(pub Timer);
 
@@ -25,23 +31,33 @@ pub struct HitMarker;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::Main)
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                .with_system(Self::handle_hits)
-                .with_system(Self::check_hit_collisions),
-        );
+        app.add_event::<HitEvent>()
+            .add_event::<EnemyDeathEvent>()
+            .add_system_set(
+                SystemSet::on_update(GameState::Main)
+                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
+                    .with_system(Self::handle_hits)
+                    .with_system(Self::handle_enemy_death)
+                    .with_system(Self::check_hit_collisions),
+            );
     }
 }
 
 impl CombatPlugin {
+    fn handle_enemy_death(mut commands: Commands, mut death_events: EventReader<EnemyDeathEvent>) {
+        for death_event in death_events.iter() {
+            commands.entity(death_event.entity).despawn();
+        }
+    }
+
     fn handle_hits(
         mut commands: Commands,
-        mut health: Query<(&mut Health, Option<&WorldObject>)>,
+        mut health: Query<(Entity, &mut Health, Option<&WorldObject>)>,
         mut hit_events: EventReader<HitEvent>,
+        mut death_events: EventWriter<EnemyDeathEvent>,
     ) {
         for hit in hit_events.iter() {
-            if let Ok((mut hit_health, obj_option)) = health.get_mut(hit.hit_entity) {
+            if let Ok((e, mut hit_health, obj_option)) = health.get_mut(hit.hit_entity) {
                 if obj_option.is_none() {
                     commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                         timer: Timer::from_seconds(0.2, TimerMode::Once),
@@ -51,6 +67,9 @@ impl CombatPlugin {
                 }
 
                 hit_health.0 -= hit.damage as i8;
+                if hit_health.0 <= 0 {
+                    death_events.send(EnemyDeathEvent { entity: e })
+                }
             }
         }
     }
