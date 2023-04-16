@@ -216,7 +216,7 @@ impl AnimationsPlugin {
         mut attack_event: EventReader<AttackEvent>,
         player_dir: Query<&FacingDirection, With<Player>>,
     ) {
-        if let Ok((e, mut t, mut at, cooldown, mut timer_option)) = tool_query.get_single_mut() {
+        if let Ok((e, mut t, mut at, cooldown, timer_option)) = tool_query.get_single_mut() {
             let is_facing_left = if *player_dir.single() == FacingDirection::Left {
                 1.
             } else {
