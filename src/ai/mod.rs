@@ -1,6 +1,6 @@
 mod enemy_basic;
 
-use crate::{combat::HitEvent, GameState, Plugin, TIME_STEP};
+use crate::{GameState, Plugin, TIME_STEP};
 
 use bevy::{
     prelude::{App, SystemSet},
@@ -14,7 +14,6 @@ pub struct AIPlugin;
 impl Plugin for AIPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(StateMachinePlugin)
-            .add_event::<HitEvent>()
             .add_plugin(TriggerPlugin::<LineOfSight>::default())
             .add_plugin(TriggerPlugin::<AttackDistance>::default())
             .add_system_set(
