@@ -453,7 +453,8 @@ impl InputsPlugin {
             }
         }
         // Hit Item, send attack event
-        if mouse_button_input.just_pressed(MouseButton::Left) {
+        if mouse_button_input.pressed(MouseButton::Left) {
+            // if it has AttackTimer, the action is on cooldown, so we abort.
             if let Some(tool) = &game.game.player_state.main_hand_slot {
                 if tool_query.get(tool.entity).unwrap().1.is_some() {
                     return;
