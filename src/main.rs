@@ -33,6 +33,7 @@ mod animations;
 mod assets;
 mod attributes;
 mod combat;
+mod enemy;
 mod inputs;
 mod inventory;
 mod item;
@@ -47,6 +48,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
+use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_SIZE};
 use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource};
@@ -110,6 +112,7 @@ fn main() {
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
+        .add_plugin(EnemyPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -121,10 +124,20 @@ fn main() {
         .run();
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct Game {
     player_state: PlayerState,
+    player: Entity,
     world_generation_params: WorldGeneration,
+}
+impl Default for Game {
+    fn default() -> Self {
+        Self {
+            player_state: PlayerState::default(),
+            player: Entity::from_raw(0),
+            world_generation_params: WorldGeneration::default(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -526,7 +539,7 @@ fn setup(
     }
 
     //spawn player entity with limb spritesheets as children
-    commands
+    let p = commands
         .spawn((
             SpatialBundle {
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
@@ -544,5 +557,8 @@ fn setup(
             Name::new("Player"),
             RawPosition::default(),
         ))
-        .push_children(&limb_children);
+        .push_children(&limb_children)
+        .id();
+
+    game.player = p;
 }

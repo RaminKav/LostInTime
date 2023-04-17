@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, RapierContext,
+    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, QueryFilterFlags,
+    RapierContext,
 };
 use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
@@ -40,7 +41,10 @@ pub struct AttackDistance {
 }
 
 impl Trigger for AttackDistance {
-    type Param<'w, 's> = (Query<'w, 's, &'static Transform>, Res<'w, Time>);
+    type Param<'w, 's> = (
+        Query<'w, 's, (&'static Transform, Option<&'static AttackState>)>,
+        Res<'w, Time>,
+    );
     type Ok = f32;
     type Err = f32;
 
@@ -50,8 +54,18 @@ impl Trigger for AttackDistance {
         entity: Entity,
         (transforms, _time): &Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        let delta = transforms.get(self.target).unwrap().translation.truncate()
-            - transforms.get(entity).unwrap().translation.truncate();
+        if let Some(attack) = transforms.get(entity).unwrap().1 {
+            if !attack.attack_cooldown_timer.finished() {
+                return Ok(0.);
+            }
+        }
+        let delta = transforms
+            .get(self.target)
+            .unwrap()
+            .0
+            .translation
+            .truncate()
+            - transforms.get(entity).unwrap().0.translation.truncate();
 
         let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
         (distance <= self.range).then_some(distance).ok_or(distance)
@@ -62,7 +76,7 @@ impl Trigger for AttackDistance {
 // then change direction after a set timer
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
-pub struct Idle {
+pub struct IdleState {
     pub walk_timer: Timer,
     pub direction: MoveDirection,
     pub speed: f32,
@@ -114,25 +128,27 @@ impl MoveDirection {
 // Entities in the `Follow` state should move towards the given entity at the given speed
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
-pub struct Follow {
+pub struct FollowState {
     pub target: Entity,
     pub speed: f32,
 }
 // Entities in the `Attack` state should move towards the given entity at the given speed
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
-pub struct Attack {
+pub struct AttackState {
     pub target: Entity,
     pub attack_startup_timer: Timer,
+    pub attack_duration_timer: Timer,
     pub attack_cooldown_timer: Timer,
     pub speed: f32,
+    pub dir: Option<Vec2>,
     pub damage: u8,
 }
 
 pub fn follow(
     mut transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
-    follows: Query<(Entity, &Follow)>,
+    follows: Query<(Entity, &FollowState)>,
 ) {
     for (entity, follow) in &follows {
         // Get the positions of the follower and target
@@ -152,7 +168,7 @@ pub fn follow(
 
 pub fn attack(
     mut transforms: Query<(&mut Transform, &Collider)>,
-    mut attacks: Query<(Entity, &mut Attack)>,
+    mut attacks: Query<(Entity, &mut AttackState)>,
     player_query: Query<Entity, With<Player>>,
     item_stack_query: Query<Entity, With<ItemStack>>,
     mut context: ResMut<RapierContext>,
@@ -165,19 +181,21 @@ pub fn attack(
         let (mut attack_transform, attack_col) = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
 
-        let delta = target_translation - attack_translation;
-
         let mut hit = false;
-        if attack.attack_startup_timer.finished() {
+        if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+            let delta = target_translation - attack_translation;
+            if attack.dir.is_none() {
+                attack.dir = Some(delta.normalize_or_zero().truncate() * attack.speed);
+            }
             let output = context.move_shape(
-                delta.normalize_or_zero().truncate() * attack.speed,
+                attack.dir.unwrap(),
                 attack_col,
                 attack_translation.truncate(),
                 0.,
                 0.,
                 &MoveShapeOptions::default(),
                 QueryFilter {
-                    // flags: QueryFilterFlags::EXCLUDE_SENSORS,
+                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
                     predicate: Some(&|e| {
                         if item_stack_query.get(e).is_ok() || e == entity {
                             false
@@ -202,16 +220,18 @@ pub fn attack(
                 },
             );
             attack_transform.translation += output.effective_translation.extend(0.);
-            attack.attack_cooldown_timer.tick(time.delta());
+            attack.attack_duration_timer.tick(time.delta());
         }
 
-        if attack.attack_cooldown_timer.finished() || hit {
-            attack.attack_cooldown_timer.reset();
+        if attack.attack_cooldown_timer.finished() {
             attack.attack_startup_timer.reset();
+            attack.attack_duration_timer.reset();
+            attack.attack_cooldown_timer.reset();
         }
 
-        if hit || attack.attack_cooldown_timer.percent() != 0. {
+        if hit || attack.attack_duration_timer.finished() {
             //start attack cooldown timer
+            attack.dir = None;
             attack.attack_cooldown_timer.tick(time.delta());
         } else {
             attack.attack_startup_timer.tick(time.delta());
@@ -220,7 +240,7 @@ pub fn attack(
 }
 pub fn idle(
     mut transforms: Query<&mut KinematicCharacterController>,
-    mut idles: Query<(Entity, &mut Idle)>,
+    mut idles: Query<(Entity, &mut IdleState)>,
     time: Res<Time>,
 ) {
     for (entity, mut idle) in idles.iter_mut() {
@@ -241,30 +261,3 @@ pub fn idle(
         }
     }
 }
-// let output_ws = context.move_shape(
-//     Vec2::new(0., d.y),
-//     player_collider,
-//     raw_pos.0,
-//     0.,
-//     0.,
-//     &MoveShapeOptions::default(),
-//     QueryFilter {
-//         // flags: QueryFilterFlags::EXCLUDE_SENSORS,
-//         exclude_collider: Some(ent),
-//         predicate: Some(&|e| {
-//             if let Some(c) = children {
-//                 !c.iter().any(|cc| *cc == e)
-//             } else {
-//                 true
-//             }
-//         }),
-//         ..default()
-//     },
-//     |col| {
-//         for (item_stack_entity, _, _) in game.items_query.iter() {
-//             if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
-//                 collected_drops.insert(col.entity);
-//             }
-//         }
-//     },
-// );

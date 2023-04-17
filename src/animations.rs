@@ -9,8 +9,10 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 use interpolation::lerp;
 
+use crate::ai::AttackState;
 use crate::attributes::AttackCooldown;
 use crate::combat::{AttackTimer, HitMarker};
+use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
 use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
@@ -77,6 +79,7 @@ impl Plugin for AnimationsPlugin {
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::animate_limbs)
+                    .with_system(Self::animate_enemies)
                     .with_system(Self::animate_dropped_items)
                     .with_system(Self::animate_attack)
                     .with_system(Self::animate_hit)
@@ -144,6 +147,50 @@ impl AnimationsPlugin {
             //             // t.translation.x = 0.;
             //         }
             //     }
+            // }
+        }
+    }
+    fn animate_enemies(
+        time: Res<Time>,
+        game: Res<Game>,
+        asset_server: Res<AssetServer>,
+        mut materials: ResMut<Assets<EnemyMaterial>>,
+        mut enemy_query: Query<(
+            &mut AnimationFrameTracker,
+            &mut AnimationTimer,
+            &Handle<EnemyMaterial>,
+            &Enemy,
+            Option<&AttackState>,
+        )>,
+    ) {
+        for (mut tracker, mut timer, enemy_handle, enemy, att_option) in enemy_query.iter_mut() {
+            let enemy_material = materials.get_mut(enemy_handle);
+            timer.tick(time.delta());
+            if let Some(mat) = enemy_material {
+                if timer.just_finished() && game.player_state.is_moving {
+                    tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
+                } else if !game.player_state.is_moving {
+                    tracker.0 = 0;
+                }
+                mat.source_texture = Some(asset_server.load(format!(
+                    "textures/slime/{}-move-{}.png",
+                    enemy.to_string().to_lowercase(),
+                    tracker.0
+                )));
+                if let Some(attack) = att_option {
+                    mat.is_attacking = if attack.attack_startup_timer.finished()
+                        && !attack.attack_duration_timer.finished()
+                    {
+                        1.
+                    } else {
+                        0.
+                    };
+                }
+            }
+
+            // else if let Ok(mut t) = eq_query.get_mut(*l) {
+            //     // t.translation.y = (t.translation.y + 1.) % 2.;
+            //     // t.translation.x = (t.translation.y + 1.) % 2.;
             // }
         }
     }
@@ -216,7 +263,7 @@ impl AnimationsPlugin {
             ),
             With<Equipment>,
         >,
-        mut attack_event: EventReader<AttackEvent>,
+        attack_event: EventReader<AttackEvent>,
         player_dir: Query<&FacingDirection, With<Player>>,
     ) {
         if let Ok((e, mut t, mut at, cooldown, timer_option)) = tool_query.get_single_mut() {
@@ -237,7 +284,7 @@ impl AnimationsPlugin {
                 }
             }
 
-            if attack_event.iter().count() > 0 || !at.0.elapsed().is_zero() {
+            if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
                 if !game.player_state.is_attacking {
                     let mut attack_cd_timer =
                         AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
