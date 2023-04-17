@@ -4,7 +4,7 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::{AttributesPlugin, Health};
+use attributes::{AttributesPlugin, Health, InvincibilityCooldown};
 //TODO:
 // - get player movement
 // - set up tilemap or world generation
@@ -535,6 +535,7 @@ fn setup(
             AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
             Player,
             Health(100),
+            InvincibilityCooldown(0.3),
             MovementVector::default(),
             FacingDirection::default(),
             KinematicCharacterController::default(),

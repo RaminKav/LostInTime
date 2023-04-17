@@ -39,6 +39,9 @@ pub struct HitAnimationTracker {
 #[derive(Component, Debug)]
 pub struct AttackAnimationTimer(pub Timer, pub f32);
 
+#[derive(Component, Debug)]
+pub struct DoneAnimation;
+
 #[derive(Debug, Clone, Default)]
 pub struct AttackEvent;
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
@@ -234,7 +237,7 @@ impl AnimationsPlugin {
                 }
             }
 
-            if (attack_event.iter().count() > 0 || !at.0.elapsed().is_zero()) {
+            if attack_event.iter().count() > 0 || !at.0.elapsed().is_zero() {
                 if !game.player_state.is_attacking {
                     let mut attack_cd_timer =
                         AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
@@ -273,21 +276,28 @@ impl AnimationsPlugin {
         }
     }
     fn animate_spritesheet_animations(
+        mut commands: Commands,
         time: Res<Time>,
         texture_atlases: Res<Assets<TextureAtlas>>,
         mut query: Query<
             (
+                Entity,
                 &mut AnimationTimer,
                 &mut TextureAtlasSprite,
                 &Handle<TextureAtlas>,
+                Option<&DoneAnimation>,
             ),
             Without<ItemStack>,
         >,
     ) {
-        for (mut timer, mut sprite, texture_atlas_handle) in &mut query {
+        for (e, mut timer, mut sprite, texture_atlas_handle, remove_me_option) in &mut query {
             timer.tick(time.delta());
             if timer.just_finished() {
                 let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
+                if sprite.index == texture_atlas.textures.len() - 1 && remove_me_option.is_some() {
+                    commands.entity(e).despawn();
+                    return;
+                }
                 sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
             }
         }
