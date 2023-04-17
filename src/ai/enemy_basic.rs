@@ -1,11 +1,6 @@
-use std::{f32::MIN, time::Duration};
-
 use bevy::prelude::*;
-use bevy_rapier2d::{
-    na::ComplexField,
-    prelude::{
-        Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, RapierContext,
-    },
+use bevy_rapier2d::prelude::{
+    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, RapierContext,
 };
 use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
@@ -43,7 +38,6 @@ pub struct AttackDistance {
     pub target: Entity,
     pub range: f32,
 }
-const MIN_ATTACK_DISTANCE: f32 = 20.;
 
 impl Trigger for AttackDistance {
     type Param<'w, 's> = (Query<'w, 's, &'static Transform>, Res<'w, Time>);

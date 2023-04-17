@@ -4,7 +4,7 @@ use crate::attributes::{
     Attack, AttackCooldown, BlockAttributeBundle, EquipmentAttributeBundle, Health,
 };
 use crate::inventory::ItemStack;
-use crate::ui::{InventorySlotState, InventoryState};
+use crate::ui::InventoryState;
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
 };
@@ -29,11 +29,11 @@ pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
 
+//TODO: Convert attributes to a vec of attributes?
 #[derive(Debug)]
 pub struct EquipmentMetaData {
     pub entity: Entity,
     pub obj: WorldObject,
-    pub health: Health,
     pub attack: Attack,
 }
 #[derive(Component)]
@@ -379,7 +379,6 @@ impl WorldObject {
             player_state.main_hand_slot = Some(EquipmentMetaData {
                 obj: self,
                 entity: item,
-                health,
                 attack,
             });
             let mut item_entity = commands.entity(item);
@@ -423,7 +422,6 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
-        let health = Health(100);
         let attack = Attack(20);
         let attack_cooldown = AttackCooldown(0.4);
         let limb = Limb::Hands;
@@ -449,11 +447,7 @@ impl WorldObject {
                 },
                 ..Default::default()
             })
-            .insert(EquipmentAttributeBundle {
-                health,
-                attack,
-                attack_cooldown,
-            })
+            .insert((attack, attack_cooldown))
             .insert(Equipment(limb))
             .insert(Name::new("EquipItem"))
             .insert(YSort)
@@ -463,7 +457,6 @@ impl WorldObject {
         player_state.main_hand_slot = Some(EquipmentMetaData {
             obj: self,
             entity: item,
-            health,
             attack,
         });
         let mut item_entity = commands.entity(item);

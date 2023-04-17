@@ -24,6 +24,9 @@ pub struct Attack(pub u8);
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
 
 pub struct AttackCooldown(pub f32);
+#[derive(Component, Inspectable, Clone, Debug, Copy)]
+
+pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
