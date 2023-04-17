@@ -3,11 +3,11 @@ use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
-    animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
+    animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, Health, InvincibilityCooldown},
     item::{Placeable, WorldObject},
     world_generation::WorldGenerationPlugin,
-    GameParam, GameState, Player, YSort, TIME_STEP,
+    Game, GameParam, GameState, Player, YSort, TIME_STEP,
 };
 
 #[derive(Debug, Clone)]
@@ -112,7 +112,7 @@ impl CombatPlugin {
                         texture_atlas: texture_atlas_handle,
                         transform: Transform::from_translation(Vec3::new(
                             0. + x_rng as f32,
-                            6. + y_rng as f32,
+                            -5. + y_rng as f32,
                             1.,
                         )),
                         ..default()
@@ -177,6 +177,7 @@ impl CombatPlugin {
                 }
 
                 hit_health.0 -= hit.damage as i8;
+                println!("GOT HIT JP: {:?}", hit_health.0);
                 if hit_health.0 <= 0 && player.single() != e {
                     death_events.send(EnemyDeathEvent {
                         entity: e,
@@ -191,6 +192,7 @@ impl CombatPlugin {
         context: ResMut<RapierContext>,
         weapons: Query<(Entity, &Parent, &Attack), Without<HitMarker>>,
         mut hit_event: EventWriter<HitEvent>,
+        game: Res<Game>,
     ) {
         for weapon in weapons.iter() {
             let weapon_parent = weapon.1;
@@ -198,8 +200,10 @@ impl CombatPlugin {
                 (c.0 == weapon.0 && c.1 != weapon_parent.get())
                     || (c.1 == weapon.0 && c.0 != weapon_parent.get())
             }) {
+                if !game.player_state.is_attacking {
+                    continue;
+                }
                 commands.entity(weapon.0).insert(HitMarker);
-
                 hit_event.send(HitEvent {
                     hit_entity: if hit.0 == weapon.0 { hit.1 } else { hit.0 },
                     damage: weapon.2 .0,

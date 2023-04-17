@@ -452,6 +452,7 @@ impl WorldObject {
             .insert(Name::new("EquipItem"))
             .insert(YSort)
             .insert(self)
+            .set_parent(player_e)
             .id();
 
         player_state.main_hand_slot = Some(EquipmentMetaData {
@@ -460,6 +461,7 @@ impl WorldObject {
             attack,
         });
         let mut item_entity = commands.entity(item);
+
         if obj_data.collider {
             item_entity
                 .insert(Collider::cuboid(
@@ -472,7 +474,6 @@ impl WorldObject {
             Timer::from_seconds(0.125, TimerMode::Once),
             0.,
         ));
-        item_entity.set_parent(player_e);
 
         item
     }

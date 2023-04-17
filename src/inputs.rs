@@ -11,11 +11,12 @@ use bevy_rapier2d::prelude::{
 use bevy_rapier2d::rapier::prelude::RigidBodyType;
 use seldom_state::prelude::{NotTrigger, StateMachine};
 
-use crate::ai::{Attack, AttackDistance, Follow, Idle, LineOfSight, MoveDirection};
+use crate::ai::{AttackDistance, AttackState, FollowState, IdleState, LineOfSight, MoveDirection};
 use crate::animations::{AnimatedTextureMaterial, AnimationTimer, AttackEvent};
 
 use crate::attributes::Health;
 use crate::combat::{AttackTimer, HitEvent};
+use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::ItemStack;
 use crate::item::Equipment;
 use crate::ui::{change_hotbar_slot, InventoryState};
@@ -264,11 +265,10 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
         mut commands: Commands,
-        player: Query<Entity, With<Player>>,
         asset_server: Res<AssetServer>,
-        mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+        mut materials: ResMut<Assets<EnemyMaterial>>,
         mut hit_event: EventWriter<HitEvent>,
-        slime: Query<Entity, With<Idle>>,
+        slime: Query<Entity, With<IdleState>>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -283,73 +283,13 @@ impl InputsPlugin {
         }
 
         if key_input.just_pressed(KeyCode::L) {
-            let player_e = player.single();
-            let texture_handle = asset_server.load("textures/slime/slime-move.png");
-            let texture_atlas =
-                TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
-            let texture_atlas_handle = texture_atlases.add(texture_atlas);
-
-            commands.spawn((
-                SpriteSheetBundle {
-                    texture_atlas: texture_atlas_handle,
-                    ..default()
-                },
-                AnimationTimer(Timer::from_seconds(0.20, TimerMode::Repeating)),
-                Health(100),
-                KinematicCharacterController::default(),
-                Collider::cuboid(10., 6.),
-                YSort,
-                StateMachine::new(Idle {
-                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                    speed: 0.5,
-                })
-                .trans::<Idle>(
-                    LineOfSight {
-                        target: player_e,
-                        range: 100.,
-                    },
-                    Follow {
-                        target: player_e,
-                        speed: 0.7,
-                    },
-                )
-                .trans::<Follow>(
-                    AttackDistance {
-                        target: player_e,
-                        range: 50.,
-                    },
-                    Attack {
-                        target: player_e,
-                        attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                        attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
-                        speed: 1.4,
-                        damage: 10,
-                    },
-                )
-                .trans::<Follow>(
-                    NotTrigger(LineOfSight {
-                        target: player_e,
-                        range: 100.,
-                    }),
-                    Idle {
-                        walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                        direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                        speed: 0.5,
-                    },
-                )
-                .trans::<Attack>(
-                    NotTrigger(AttackDistance {
-                        target: player_e,
-                        range: 50.,
-                    }),
-                    Follow {
-                        target: player_e,
-                        speed: 0.7,
-                    },
-                ),
-                Name::new("Slime"),
-            ));
+            Enemy::Slime.summon(
+                &mut commands,
+                &mut game,
+                &asset_server,
+                &mut materials,
+                Vec2::ZERO,
+            );
         }
         if key_input.just_pressed(KeyCode::K) {
             hit_event.send(HitEvent {
@@ -515,6 +455,14 @@ impl InputsPlugin {
         // Attempt to place block in hand
         // TODO: Interact
         if mouse_button_input.just_pressed(MouseButton::Right) {
+            let player_pos = game.game.player_state.position;
+            if player_pos
+                .truncate()
+                .distance(cursor_pos.world_coords.truncate())
+                > (game.game.player_state.reach_distance * 32) as f32
+            {
+                return;
+            }
             let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
