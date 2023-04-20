@@ -3,9 +3,11 @@ use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
-    animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
+    animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, Health, InvincibilityCooldown},
+    inventory::Inventory,
     item::{Placeable, WorldObject},
+    ui::InventoryState,
     world_generation::WorldGenerationPlugin,
     Game, GameParam, GameState, Player, YSort, TIME_STEP,
 };
@@ -72,6 +74,7 @@ impl CombatPlugin {
                 enemy_tile_pos,
                 enemy_chunk_pos,
                 2,
+                None,
             );
         }
     }
@@ -144,7 +147,7 @@ impl CombatPlugin {
         mut death_events: EventWriter<EnemyDeathEvent>,
         player: Query<Entity, With<Player>>,
         in_i_frame: Query<&InvincibilityTimer>,
-        has_i_frames: Query<&InvincibilityCooldown>,
+        // has_i_frames: Query<&InvincibilityCooldown>,
     ) {
         for hit in hit_events.iter() {
             // is in invincibility frames from a previous hit
@@ -193,6 +196,8 @@ impl CombatPlugin {
         weapons: Query<(Entity, &Parent, &Attack), Without<HitMarker>>,
         mut hit_event: EventWriter<HitEvent>,
         game: Res<Game>,
+        inv_state: Query<&InventoryState>,
+        mut inv: Query<&mut Inventory>,
     ) {
         for weapon in weapons.iter() {
             let weapon_parent = weapon.1;
@@ -202,6 +207,21 @@ impl CombatPlugin {
             }) {
                 if !game.player_state.is_attacking {
                     continue;
+                }
+                if let Some(mut wep) = inv
+                    .single_mut()
+                    .items
+                    .get_mut(inv_state.single().active_hotbar_slot)
+                    .unwrap()
+                    .clone()
+                {
+                    wep.item_stack.attributes.durability -= 1;
+                    inv.single_mut().items[inv_state.single().active_hotbar_slot] =
+                        Some(wep.clone());
+                    println!(
+                        "HIT, durability dropped {:?}",
+                        wep.item_stack.attributes.durability.clone()
+                    );
                 }
                 commands.entity(weapon.0).insert(HitMarker);
                 hit_event.send(HitEvent {
