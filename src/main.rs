@@ -50,8 +50,8 @@ use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
 use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
-use inventory::{InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_SIZE};
-use item::{Block, Equipment, EquipmentMetaData, ItemsPlugin, WorldObjectResource};
+use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
+use item::{Block, Equipment, EquipmentData, ItemsPlugin, WorldObjectResource};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -207,13 +207,12 @@ pub struct GameParam<'w, 's> {
 }
 #[derive(Component, Debug)]
 pub struct Player;
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlayerState {
     is_moving: bool,
     is_dashing: bool,
     is_attacking: bool,
-    inventory: [Option<InventoryItemStack>; INVENTORY_SIZE],
-    main_hand_slot: Option<EquipmentMetaData>,
+    main_hand_slot: Option<EquipmentData>,
     position: Vec3,
     reach_distance: u8,
     player_dash_cooldown: Timer,
@@ -226,7 +225,6 @@ impl Default for PlayerState {
             is_moving: false,
             is_dashing: false,
             is_attacking: false,
-            inventory: [None; INVENTORY_SIZE],
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 2,
@@ -547,6 +545,9 @@ fn setup(
             },
             AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
             Player,
+            Inventory {
+                items: [INVENTORY_INIT; INVENTORY_SIZE],
+            },
             Health(100),
             InvincibilityCooldown(0.3),
             MovementVector::default(),

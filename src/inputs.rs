@@ -5,20 +5,15 @@ use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, RapierContext, RigidBody,
-};
-use bevy_rapier2d::rapier::prelude::RigidBodyType;
-use seldom_state::prelude::{NotTrigger, StateMachine};
+use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
-use crate::ai::{AttackDistance, AttackState, FollowState, IdleState, LineOfSight, MoveDirection};
-use crate::animations::{AnimatedTextureMaterial, AnimationTimer, AttackEvent};
+use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::Health;
-use crate::combat::{AttackTimer, HitEvent};
+use crate::attributes::{Health, ItemAttributes};
+use crate::combat::AttackTimer;
 use crate::enemy::{Enemy, EnemyMaterial};
-use crate::inventory::ItemStack;
-use crate::item::Equipment;
+use crate::inventory::{Inventory, ItemStack};
+use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world_generation::TileMapPositionData;
 use crate::{
@@ -26,8 +21,8 @@ use crate::{
     PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    Game, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
-    PLAYER_MOVE_SPEED, WIDTH,
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
+    WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -133,6 +128,7 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
         mut move_event: EventWriter<PlayerMoveEvent>,
+        mut inv: Query<&mut Inventory>,
     ) {
         let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
             player_query.single_mut();
@@ -253,8 +249,8 @@ impl InputsPlugin {
             move_event.send(PlayerMoveEvent(false));
         }
         for drop in collected_drops.iter() {
-            let item_stack = game.items_query.get(*drop).unwrap().2;
-            item_stack.add_to_inventory(&mut game.game, &mut game.inv_slot_query);
+            let item_stack = game.items_query.get(*drop).unwrap().2.clone();
+            item_stack.add_to_inventory(&mut inv, &mut game.inv_slot_query);
 
             game.world_obj_data.drop_entities.remove(&drop);
             commands.entity(*drop).despawn();
@@ -267,19 +263,35 @@ impl InputsPlugin {
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
-        mut hit_event: EventWriter<HitEvent>,
-        slime: Query<Entity, With<IdleState>>,
+        mut inv: Query<&mut Inventory>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
             inv_state.open = !inv_state.open;
         }
         if key_input.just_pressed(KeyCode::E) {
+            let attributes = ItemAttributes {
+                durability: 100,
+                max_durability: 100,
+                attack: 20,
+                attack_cooldown: 0.4,
+                ..Default::default()
+            };
+            let tooltips = attributes.get_tooltips();
+            let durability_tooltip = attributes.get_durability_tooltip();
+
             let sword_stack = ItemStack {
                 obj_type: WorldObject::Sword,
+                attributes,
+                metadata: ItemDisplayMetaData {
+                    name: WorldObject::Sword.to_string(),
+                    desc: "A cool piece of Equipment".to_string(),
+                    attributes: tooltips,
+                    durability: durability_tooltip,
+                },
                 count: 1,
             };
-            sword_stack.add_to_empty_inventory_slot(&mut game.game, &mut game.inv_slot_query);
+            sword_stack.add_to_empty_inventory_slot(&mut inv, &mut game.inv_slot_query);
         }
 
         if key_input.just_pressed(KeyCode::L) {
@@ -290,13 +302,6 @@ impl InputsPlugin {
                 &mut materials,
                 Vec2::ZERO,
             );
-        }
-        if key_input.just_pressed(KeyCode::K) {
-            hit_event.send(HitEvent {
-                hit_entity: slime.single(),
-                damage: 10,
-                dir: Vec2::new(-1., 0.),
-            })
         }
     }
     pub fn test_take_damage(
@@ -317,7 +322,7 @@ impl InputsPlugin {
     ) {
         for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
             if key_input.just_pressed(*key) {
-                change_hotbar_slot(&mut game, slot, &mut inv_state);
+                change_hotbar_slot(slot, &mut inv_state, &mut game.inv_slot_query);
                 key_input.clear();
             }
         }
@@ -385,6 +390,7 @@ impl InputsPlugin {
         mut attack_event: EventWriter<AttackEvent>,
         inv_query: Query<(&mut Visibility, &InventoryState)>,
         tool_query: Query<(Entity, Option<&AttackTimer>), With<Equipment>>,
+        mut inv: Query<&mut Inventory>,
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
@@ -472,7 +478,7 @@ impl InputsPlugin {
                 cursor_pos.world_coords.y,
             ));
             let hotbar_slot = inv_state.unwrap().1.active_hotbar_slot;
-            let held_item_option = game.game.player_state.inventory[hotbar_slot];
+            let held_item_option = inv.single().items[hotbar_slot].clone();
             if let Some(mut held_item) = held_item_option {
                 if let Some(places_into_item) = game
                     .world_obj_data
@@ -487,7 +493,7 @@ impl InputsPlugin {
                         tile_pos,
                         chunk_pos,
                     ) {
-                        game.game.player_state.inventory[hotbar_slot] = held_item.modify_count(-1);
+                        inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
                     }
                 }
             }
