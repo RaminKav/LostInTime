@@ -74,3 +74,12 @@
     Fail if the target slot is not empty or the same type).
   - Right clicks work the same, but only half the slot is added to the cursor (create new entity with half the count)
   - If same slot, merge. If dropped outside of inv, spawn an ItemStack
+
+  ## Tooltips
+
+  - Items in `ItemStacks` can have `ItemMetaData` Component, which will holds things like:
+    - Desc: Item lore/description
+    - Vec of Attributes (need to_string impl): Stats like att, dur, etc
+  - Tooltips will display the data
+  - Items by default will have a default impl of `ItemMetaData`, or a randomly generated one by a drop system
+  - Different gameplay systems can modify `Attributes` which will update `ItemMetaData` in a `Changed<>` query system thing

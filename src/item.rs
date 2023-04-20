@@ -1,9 +1,9 @@
+use std::fmt;
+
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
-use crate::attributes::{
-    Attack, AttackCooldown, BlockAttributeBundle, EquipmentAttributeBundle, Health,
-};
-use crate::inventory::ItemStack;
+use crate::attributes::{Attack, AttackCooldown, BlockAttributeBundle, Health, ItemAttributes};
+use crate::inventory::{Inventory, ItemStack};
 use crate::ui::InventoryState;
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
@@ -30,11 +30,18 @@ pub struct Block;
 pub struct Equipment(Limb);
 
 //TODO: Convert attributes to a vec of attributes?
-#[derive(Debug)]
-pub struct EquipmentMetaData {
+#[derive(Debug, Clone)]
+pub struct EquipmentData {
     pub entity: Entity,
     pub obj: WorldObject,
-    pub attack: Attack,
+}
+
+#[derive(Component, Inspectable, Debug, PartialEq, Clone)]
+pub struct ItemDisplayMetaData {
+    pub name: String,
+    pub desc: String,
+    pub attributes: Vec<String>,
+    pub durability: String,
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -66,11 +73,19 @@ impl Default for Foliage {
     }
 }
 #[derive(
-    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display,
+    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
 )]
 pub enum Placeable {
     Log,
     Flint,
+}
+impl fmt::Display for Placeable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Placeable::Log => write!(f, "Log"),
+            Placeable::Flint => write!(f, "Flint"),
+        }
+    }
 }
 impl Default for Placeable {
     fn default() -> Self {
@@ -106,6 +121,22 @@ impl WorldObjectResource {
         Self {
             properties: HashMap::new(),
             drop_entities: HashMap::new(),
+        }
+    }
+}
+impl fmt::Display for WorldObject {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            WorldObject::None => write!(f, ""),
+            WorldObject::Grass => write!(f, "Grass"),
+            WorldObject::StoneHalf => write!(f, "Stone Block"),
+            WorldObject::StoneFull => write!(f, "Stone Block"),
+            WorldObject::StoneTop => write!(f, "Stone Block"),
+            WorldObject::Water => write!(f, "Water"),
+            WorldObject::Sand => write!(f, "Sand"),
+            WorldObject::Foliage(_) => write!(f, "Tree"),
+            WorldObject::Placeable(p) => write!(f, "{}", p.to_string()),
+            WorldObject::Sword => write!(f, "Basic Sword"),
         }
     }
 }
@@ -343,9 +374,15 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
-        let health = Health(100);
-        let attack = Attack(20);
-        let attack_cooldown = AttackCooldown(0.4);
+        let attributes = ItemAttributes {
+            durability: 100,
+            max_durability: 100,
+            attack: 20,
+            attack_cooldown: 0.4,
+            ..Default::default()
+        };
+        let tooltips = attributes.get_tooltips();
+        let durability_tooltip = attributes.get_durability_tooltip();
 
         if let Some(limb) = obj_data.equip_slot {
             position = Vec3::new(
@@ -365,10 +402,12 @@ impl WorldObject {
                     },
                     ..Default::default()
                 })
-                .insert(EquipmentAttributeBundle {
-                    health,
-                    attack,
-                    attack_cooldown,
+                .insert(attributes)
+                .insert(ItemDisplayMetaData {
+                    name: self.to_string(),
+                    desc: "A cool piece of Equipment".to_string(),
+                    attributes: tooltips,
+                    durability: durability_tooltip,
                 })
                 .insert(Equipment(limb))
                 .insert(Name::new("EquipItem"))
@@ -376,10 +415,9 @@ impl WorldObject {
                 .insert(self)
                 .id();
 
-            player_state.main_hand_slot = Some(EquipmentMetaData {
+            player_state.main_hand_slot = Some(EquipmentData {
                 obj: self,
                 entity: item,
-                attack,
             });
             let mut item_entity = commands.entity(item);
             if obj_data.collider {
@@ -455,10 +493,9 @@ impl WorldObject {
             .set_parent(player_e)
             .id();
 
-        player_state.main_hand_slot = Some(EquipmentMetaData {
+        player_state.main_hand_slot = Some(EquipmentData {
             obj: self,
             entity: item,
-            attack,
         });
         let mut item_entity = commands.entity(item);
 
@@ -484,6 +521,7 @@ impl WorldObject {
         tile_pos: IVec2,
         chunk_pos: IVec2,
         count: usize,
+        attributes: Option<ItemAttributes>,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
@@ -515,8 +553,24 @@ impl WorldObject {
                 + rng.gen_range(-drop_spread..drop_spread))
                 * 0.1,
         );
+        //TODO: temp attr
+        let attributes = if let Some(att) = attributes {
+            att
+        } else {
+            ItemAttributes::default()
+        };
+        let tooltips = attributes.get_tooltips();
+        let durability_tooltip = attributes.get_durability_tooltip();
+
         let stack = ItemStack {
             obj_type: self,
+            attributes,
+            metadata: ItemDisplayMetaData {
+                name: self.to_string(),
+                desc: "A cool item drop!".to_string(),
+                attributes: tooltips,
+                durability: durability_tooltip,
+            },
             count,
         };
         let transform = Transform {
@@ -533,7 +587,7 @@ impl WorldObject {
                 ..Default::default()
             })
             .insert(Name::new("DropItem"))
-            .insert(stack)
+            .insert(stack.clone())
             .insert(Collider::cuboid(8., 8.))
             .insert(Sensor)
             .insert(AnimationTimer(Timer::from_seconds(
@@ -553,7 +607,7 @@ impl WorldObject {
         }
         game.world_obj_data
             .drop_entities
-            .insert(item, (stack, transform));
+            .insert(item, (stack.clone(), transform));
         item
     }
     pub fn attempt_to_break_item(
@@ -623,6 +677,7 @@ impl WorldObject {
                     tile_pos,
                     chunk_pos,
                     rng.gen_range(1..4),
+                    None,
                 );
             }
             game.chunk_manager
@@ -696,9 +751,10 @@ impl ItemsPlugin {
         mut commands: Commands,
         mut game_param: GameParam,
         inv_state: Query<&mut InventoryState>,
+        mut inv: Query<&mut Inventory>,
     ) {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
-        let active_hotbar_item = game_param.game.player_state.inventory[active_hotbar_slot];
+        let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
         let player_data = &mut game_param.game.player_state;
         let current_held_item_data = &player_data.main_hand_slot;
         if let Some(new_item) = active_hotbar_item {
