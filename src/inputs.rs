@@ -9,10 +9,10 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Health, ItemAttributes};
+use crate::attributes::{AttributeModifier, Health, ItemAttributes};
 use crate::combat::AttackTimer;
 use crate::enemy::{Enemy, EnemyMaterial};
-use crate::inventory::{Inventory, ItemStack};
+use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world_generation::TileMapPositionData;
@@ -301,6 +301,16 @@ impl InputsPlugin {
                 &asset_server,
                 &mut materials,
                 Vec2::ZERO,
+            );
+        }
+        if key_input.just_pressed(KeyCode::M) {
+            let mut item = inv.single().items[0].clone().unwrap();
+            item.modify_attributes(
+                AttributeModifier {
+                    modifier: "attack".to_owned(),
+                    delta: 10,
+                },
+                inv,
             );
         }
     }

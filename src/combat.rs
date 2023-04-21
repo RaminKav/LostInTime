@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct HitEvent {
     pub hit_entity: Entity,
-    pub damage: u8,
+    pub damage: i32,
     pub dir: Vec2,
 }
 
@@ -179,7 +179,7 @@ impl CombatPlugin {
                     }
                 }
 
-                hit_health.0 -= hit.damage as i8;
+                hit_health.0 -= hit.damage as i32;
                 println!("GOT HIT JP: {:?}", hit_health.0);
                 if hit_health.0 <= 0 && player.single() != e {
                     death_events.send(EnemyDeathEvent {
