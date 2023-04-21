@@ -59,6 +59,8 @@ impl CombatPlugin {
         mut commands: Commands,
         mut game: GameParam,
         mut death_events: EventReader<EnemyDeathEvent>,
+        asset_server: Res<AssetServer>,
+        mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
@@ -67,7 +69,21 @@ impl CombatPlugin {
                 WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
             let enemy_tile_pos =
                 WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
-
+            let texture_handle = asset_server.load("textures/effects/hit-particles.png");
+            let texture_atlas =
+                TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
+            let texture_atlas_handle = texture_atlases.add(texture_atlas);
+            commands.spawn((
+                SpriteSheetBundle {
+                    texture_atlas: texture_atlas_handle,
+                    transform: Transform::from_translation(t.extend(0.)),
+                    ..default()
+                },
+                AnimationTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
+                YSort,
+                DoneAnimation,
+                Name::new("Hit Spark"),
+            ));
             WorldObject::Placeable(Placeable::Flint).spawn_item_drop(
                 &mut commands,
                 &mut game,
