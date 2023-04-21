@@ -258,16 +258,16 @@ impl AnimationsPlugin {
                 Entity,
                 &mut Transform,
                 &mut AttackAnimationTimer,
-                &AttackCooldown,
                 Option<&mut AttackTimer>,
             ),
             With<Equipment>,
         >,
         attack_event: EventReader<AttackEvent>,
-        player_dir: Query<&FacingDirection, With<Player>>,
+        player: Query<(&FacingDirection, Option<&AttackCooldown>), With<Player>>,
     ) {
-        if let Ok((e, mut t, mut at, cooldown, timer_option)) = tool_query.get_single_mut() {
-            let is_facing_left = if *player_dir.single() == FacingDirection::Left {
+        if let Ok((e, mut t, mut at, timer_option)) = tool_query.get_single_mut() {
+            let (dir, cooldown) = player.single();
+            let is_facing_left = if *dir == FacingDirection::Left {
                 1.
             } else {
                 -1.
@@ -286,10 +286,12 @@ impl AnimationsPlugin {
 
             if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
                 if !game.player_state.is_attacking {
-                    let mut attack_cd_timer =
-                        AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
-                    attack_cd_timer.0.tick(time.delta());
-                    commands.entity(e).insert(attack_cd_timer);
+                    if let Some(cooldown) = cooldown {
+                        let mut attack_cd_timer =
+                            AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
+                        attack_cd_timer.0.tick(time.delta());
+                        commands.entity(e).insert(attack_cd_timer);
+                    }
                 }
                 game.player_state.is_attacking = true;
 
@@ -346,6 +348,7 @@ impl AnimationsPlugin {
                     return;
                 }
                 sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
+                timer.reset();
             }
         }
     }
