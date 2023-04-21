@@ -52,9 +52,9 @@ impl InventoryItemStack {
         inv.single_mut().items[self.slot] = None
     }
     pub fn modify_attributes(
-        &mut self,
+        &self,
         modifier: AttributeModifier,
-        mut inv: Query<&mut Inventory>,
+        inv: &mut Query<&mut Inventory>,
     ) -> Self {
         let new_item_stack = self
             .item_stack

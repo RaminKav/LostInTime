@@ -4,9 +4,9 @@ use rand::Rng;
 
 use crate::{
     animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
-    attributes::{Attack, Health, InvincibilityCooldown},
+    attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
     inventory::Inventory,
-    item::{Placeable, WorldObject},
+    item::{MainHand, Placeable, WorldObject},
     ui::InventoryState,
     world_generation::WorldGenerationPlugin,
     Game, GameParam, GameState, Player, YSort, TIME_STEP,
@@ -92,13 +92,14 @@ impl CombatPlugin {
     }
     fn spawn_hit_spark_effect(
         mut commands: Commands,
-        hits: Query<(Entity, &JustGotHit, Option<&Player>)>,
+        hits: Query<(Entity, Added<JustGotHit>, Option<&Player>)>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     ) {
         // add spark animation entity as child, will animate once and remove itself.
         for hit in hits.iter() {
             if hit.2.is_some() {
+                commands.entity(hit.0).remove::<JustGotHit>();
                 continue;
             }
             let texture_handle = asset_server.load("textures/effects/hit-particles.png");
@@ -109,6 +110,7 @@ impl CombatPlugin {
             let s = 5;
             let x_rng = rng.gen_range(-s..s);
             let y_rng = rng.gen_range(-s..s);
+
             let hit_spark_entity = commands
                 .spawn((
                     SpriteSheetBundle {
@@ -159,7 +161,6 @@ impl CombatPlugin {
             {
                 if obj_option.is_none() {
                     // let has_i_frames = has_i_frames.get(hit.hit_entity);
-
                     commands
                         .entity(hit.hit_entity)
                         .insert(HitAnimationTracker {
@@ -180,7 +181,6 @@ impl CombatPlugin {
                 }
 
                 hit_health.0 -= hit.damage as i32;
-                println!("GOT HIT JP: {:?}", hit_health.0);
                 if hit_health.0 <= 0 && player.single() != e {
                     death_events.send(EnemyDeathEvent {
                         entity: e,
@@ -193,40 +193,40 @@ impl CombatPlugin {
     fn check_hit_collisions(
         mut commands: Commands,
         context: ResMut<RapierContext>,
-        weapons: Query<(Entity, &Parent, &Attack), Without<HitMarker>>,
+        weapons: Query<(Entity, &Parent), (Without<HitMarker>, With<MainHand>)>,
+        parent_attack: Query<&Attack>,
         mut hit_event: EventWriter<HitEvent>,
         game: Res<Game>,
         inv_state: Query<&InventoryState>,
         mut inv: Query<&mut Inventory>,
     ) {
-        for weapon in weapons.iter() {
+        if let Ok(weapon) = weapons.get_single() {
             let weapon_parent = weapon.1;
             if let Some(hit) = context.intersection_pairs().find(|c| {
                 (c.0 == weapon.0 && c.1 != weapon_parent.get())
                     || (c.1 == weapon.0 && c.0 != weapon_parent.get())
             }) {
                 if !game.player_state.is_attacking {
-                    continue;
+                    return;
                 }
-                if let Some(mut wep) = inv
-                    .single_mut()
-                    .items
-                    .get_mut(inv_state.single().active_hotbar_slot)
-                    .unwrap()
+                if let Some(Some(wep)) = inv
+                    .single()
                     .clone()
+                    .items
+                    .get(inv_state.single().active_hotbar_slot)
                 {
-                    wep.item_stack.attributes.durability -= 1;
-                    inv.single_mut().items[inv_state.single().active_hotbar_slot] =
-                        Some(wep.clone());
-                    println!(
-                        "HIT, durability dropped {:?}",
-                        wep.item_stack.attributes.durability.clone()
+                    wep.modify_attributes(
+                        AttributeModifier {
+                            modifier: "durability".to_owned(),
+                            delta: -1,
+                        },
+                        &mut inv,
                     );
                 }
                 commands.entity(weapon.0).insert(HitMarker);
                 hit_event.send(HitEvent {
                     hit_entity: if hit.0 == weapon.0 { hit.1 } else { hit.0 },
-                    damage: weapon.2 .0,
+                    damage: parent_attack.get(**weapon_parent).unwrap().0,
                     dir: Vec2::new(0., 0.),
                 });
             }

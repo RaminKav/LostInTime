@@ -310,7 +310,7 @@ impl InputsPlugin {
                     modifier: "attack".to_owned(),
                     delta: 10,
                 },
-                inv,
+                &mut inv,
             );
         }
     }

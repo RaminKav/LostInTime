@@ -3,7 +3,7 @@ use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::{
     inventory::{Inventory, InventoryItemStack},
-    item::ItemDisplayMetaData,
+    item::{Equipment, ItemDisplayMetaData},
     ui::InventorySlotState,
     GameState, Player, TIME_STEP,
 };
@@ -63,8 +63,6 @@ impl ItemAttributes {
         if self.attack_cooldown > 0. {
             entity.insert(AttackCooldown(self.attack_cooldown));
         }
-        println!("ADDING {:?}", entity.id());
-        entity.insert(self.clone());
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {
@@ -84,6 +82,9 @@ pub struct AttributeModifier {
     pub delta: i32,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct AttributeChangeEvent;
+
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
 pub struct Health(pub i32);
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
@@ -99,11 +100,16 @@ pub struct InvincibilityCooldown(pub f32);
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
         app.register_inspectable::<BlockAttributeBundle>()
+            .add_event::<AttributeChangeEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
                     .with_system(Self::clamp_health)
-                    .with_system(Self::handle_attribute_change),
+                    .with_system(Self::handle_item_attribute_change)
+                    .with_system(
+                        Self::handle_attribute_change_events
+                            .after(Self::handle_item_attribute_change),
+                    ),
             );
     }
 }
@@ -118,9 +124,28 @@ impl AttributesPlugin {
             }
         }
     }
-    fn handle_attribute_change(
+    fn handle_attribute_change_events(
+        mut commands: Commands,
+        player: Query<Entity, With<Player>>,
+        eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
+        mut att_events: EventReader<AttributeChangeEvent>,
+    ) {
+        for _event in att_events.iter() {
+            let mut new_att = ItemAttributes::default();
+            for a in eqp_attributes.iter() {
+                new_att.health += a.health;
+                new_att.attack += a.attack;
+                new_att.attack_cooldown += a.attack_cooldown;
+                new_att.invincibility_cooldown += a.invincibility_cooldown;
+            }
+            let player = player.single();
+            new_att.add_attribute_components(&mut commands.entity(player));
+        }
+    }
+    fn handle_item_attribute_change(
         mut inv: Query<&mut Inventory, Changed<Inventory>>,
         mut inv_slot_state: Query<&mut InventorySlotState>,
+        mut att_event: EventWriter<AttributeChangeEvent>,
     ) {
         if let Ok(mut inv) = inv.get_single_mut() {
             for inv_item_option in inv.clone().items.iter() {
@@ -140,6 +165,7 @@ impl AttributesPlugin {
                         item_stack: item,
                         slot: inv_item.slot,
                     });
+                    att_event.send(AttributeChangeEvent);
                     for mut slot_state in inv_slot_state.iter_mut() {
                         if slot_state.slot_index == inv_item.slot {
                             slot_state.dirty = true;

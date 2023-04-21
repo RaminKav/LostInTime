@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
-use crate::attributes::{Attack, AttackCooldown, BlockAttributeBundle, Health, ItemAttributes};
+use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::InventoryState;
 use crate::world_generation::{
@@ -28,6 +28,8 @@ pub struct Breakable(pub Option<WorldObject>);
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
+#[derive(Component)]
+pub struct MainHand;
 
 //TODO: Convert attributes to a vec of attributes?
 #[derive(Debug, Clone)]
@@ -485,15 +487,13 @@ impl WorldObject {
                 ..Default::default()
             })
             .insert(Equipment(limb))
+            .insert(MainHand)
             .insert(Name::new("HeldItem"))
             .insert(YSort)
+            .insert(inv_item_stack.item_stack.attributes.clone())
             .insert(self)
             .set_parent(player_e)
             .id();
-        inv_item_stack
-            .item_stack
-            .attributes
-            .add_attribute_components(&mut commands.entity(item));
 
         player_state.main_hand_slot = Some(EquipmentData {
             obj: self,
@@ -755,6 +755,7 @@ impl ItemsPlugin {
         inv_state: Query<&mut InventoryState>,
         mut inv: Query<&mut Inventory>,
         item_stack_query: Query<&ItemAttributes>,
+        mut att_event: EventWriter<AttributeChangeEvent>,
     ) {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
         let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
@@ -768,15 +769,18 @@ impl ItemsPlugin {
                 if new_item_obj != current_item.obj {
                     new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
                 } else if curr_attributes != new_attributes {
-                    new_attributes
-                        .add_attribute_components(&mut commands.entity(current_item.entity));
+                    commands
+                        .entity(current_item.entity)
+                        .insert(new_attributes.clone());
                 }
             } else {
                 new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
             }
+            att_event.send(AttributeChangeEvent);
         } else if let Some(current_item) = current_held_item_data {
             commands.entity(current_item.entity).despawn();
             player_data.main_hand_slot = None;
+            att_event.send(AttributeChangeEvent);
         }
     }
 }
