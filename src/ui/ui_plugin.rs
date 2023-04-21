@@ -559,7 +559,7 @@ pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-62. / 2., 0., -1.),
+                translation: Vec3::new(-62. / 2., 0., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -659,6 +659,12 @@ fn spawn_inv_item_tooltip(
     asset_server: &AssetServer,
     item_stack: &ItemStack,
 ) -> Entity {
+    let has_attributes = item_stack.metadata.attributes.len() > 0;
+    let size = if has_attributes {
+        Vec2::new(80., 80.)
+    } else {
+        Vec2::new(64., 24.)
+    };
     let tooltip = commands
         .spawn((
             SpriteBundle {
@@ -666,16 +672,20 @@ fn spawn_inv_item_tooltip(
                     .ui_image_handles
                     .as_ref()
                     .unwrap()
-                    .get(&UIElement::LargeTooltip)
+                    .get(if has_attributes {
+                        &UIElement::LargeTooltip
+                    } else {
+                        &UIElement::Tooltip
+                    })
                     .unwrap()
                     .clone(),
                 transform: Transform {
-                    translation: Vec3::new(0., 48., 2.),
+                    translation: Vec3::new(0., if has_attributes { 48. } else { 20. }, 2.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(80., 80.)),
+                    custom_size: Some(size),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -693,7 +703,9 @@ fn spawn_inv_item_tooltip(
         let d = if i == 0 { 2. } else { 0. };
         tooltip_text.push((a.to_string(), d));
     }
-    tooltip_text.push((item_stack.metadata.durability.clone(), 28.));
+    if has_attributes {
+        tooltip_text.push((item_stack.metadata.durability.clone(), 28.));
+    }
 
     // let item_stack = ItemStack {
     //     obj_type: item_stack.obj_type,
@@ -704,6 +716,11 @@ fn spawn_inv_item_tooltip(
     // let item_icon = spawn_item_stack_icon(commands, graphics, &item_stack, asset_server);
     // commands.entity(tooltip).add_child(item_icon);
     for (i, (text, d)) in tooltip_text.iter().enumerate() {
+        let text_pos = if has_attributes {
+            Vec3::new(-32., 28. - (i as f32 * 10.) - d, 1.)
+        } else {
+            Vec3::new(-24., 0., 1.)
+        };
         let text = commands
             .spawn((
                 Text2dBundle {
@@ -722,7 +739,7 @@ fn spawn_inv_item_tooltip(
                     )
                     .with_alignment(TextAlignment::CENTER_LEFT),
                     transform: Transform {
-                        translation: Vec3::new(-32., 28. - (i as f32 * 10.) - d, 1.),
+                        translation: text_pos,
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },

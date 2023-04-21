@@ -1,4 +1,4 @@
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::{ecs::system::EntityCommands, prelude::*, time::FixedTimestep};
 use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 use crate::{
@@ -16,10 +16,10 @@ pub struct BlockAttributeBundle {
 }
 #[derive(Component, PartialEq, Clone, Debug, Inspectable)]
 pub struct ItemAttributes {
-    pub health: i8,
-    pub attack: u8,
-    pub durability: u64,
-    pub max_durability: u64,
+    pub health: i32,
+    pub attack: i32,
+    pub durability: i32,
+    pub max_durability: i32,
     pub attack_cooldown: f32,
     pub invincibility_cooldown: f32,
 }
@@ -53,14 +53,43 @@ impl ItemAttributes {
     pub fn get_durability_tooltip(&self) -> String {
         format!("{}/{}", self.durability, self.max_durability)
     }
+    pub fn add_attribute_components(&self, entity: &mut EntityCommands) {
+        if self.health > 0 {
+            entity.insert(Health(self.health));
+        }
+        if self.attack > 0 {
+            entity.insert(Attack(self.attack));
+        }
+        if self.attack_cooldown > 0. {
+            entity.insert(AttackCooldown(self.attack_cooldown));
+        }
+        println!("ADDING {:?}", entity.id());
+        entity.insert(self.clone());
+    }
+    pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
+        match modifier.modifier.as_str() {
+            "health" => self.health += modifier.delta,
+            "attack" => self.attack += modifier.delta,
+            "durability" => self.durability += modifier.delta,
+            "max_durability" => self.max_durability += modifier.delta,
+            "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,
+            "invincibility_cooldown" => self.invincibility_cooldown += modifier.delta as f32,
+            _ => warn!("Got an unexpected attribute: {:?}", modifier.modifier),
+        }
+        self
+    }
+}
+pub struct AttributeModifier {
+    pub modifier: String,
+    pub delta: i32,
 }
 
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
-pub struct Health(pub i8);
+pub struct Health(pub i32);
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
-pub struct Attack(pub u8);
+pub struct Attack(pub i32);
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
-pub struct Durability(pub u8);
+pub struct Durability(pub i32);
 
 #[derive(Component, Inspectable, Clone, Debug, Copy)]
 pub struct AttackCooldown(pub f32);

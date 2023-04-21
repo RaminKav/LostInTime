@@ -3,7 +3,7 @@ use std::fmt;
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::Graphics;
 use crate::attributes::{Attack, AttackCooldown, BlockAttributeBundle, Health, ItemAttributes};
-use crate::inventory::{Inventory, ItemStack};
+use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::InventoryState;
 use crate::world_generation::{
     ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE,
@@ -369,7 +369,6 @@ impl WorldObject {
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .0
             .clone();
-        let player_state = &mut game.game.player_state;
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
@@ -415,10 +414,6 @@ impl WorldObject {
                 .insert(self)
                 .id();
 
-            player_state.main_hand_slot = Some(EquipmentData {
-                obj: self,
-                entity: item,
-            });
             let mut item_entity = commands.entity(item);
             if obj_data.collider {
                 item_entity
@@ -441,7 +436,12 @@ impl WorldObject {
             panic!("No slot found for equipment");
         }
     }
-    pub fn spawn_item_on_hand(self, commands: &mut Commands, game: &mut GameParam) -> Entity {
+    pub fn spawn_item_on_hand(
+        self,
+        commands: &mut Commands,
+        game: &mut GameParam,
+        inv_item_stack: &InventoryItemStack,
+    ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
             panic!("graphics not loaded");
@@ -460,8 +460,7 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
-        let attack = Attack(20);
-        let attack_cooldown = AttackCooldown(0.4);
+
         let limb = Limb::Hands;
         position = Vec3::new(
             PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
@@ -485,13 +484,16 @@ impl WorldObject {
                 },
                 ..Default::default()
             })
-            .insert((attack, attack_cooldown))
             .insert(Equipment(limb))
-            .insert(Name::new("EquipItem"))
+            .insert(Name::new("HeldItem"))
             .insert(YSort)
             .insert(self)
             .set_parent(player_e)
             .id();
+        inv_item_stack
+            .item_stack
+            .attributes
+            .add_attribute_components(&mut commands.entity(item));
 
         player_state.main_hand_slot = Some(EquipmentData {
             obj: self,
@@ -752,19 +754,25 @@ impl ItemsPlugin {
         mut game_param: GameParam,
         inv_state: Query<&mut InventoryState>,
         mut inv: Query<&mut Inventory>,
+        item_stack_query: Query<&ItemAttributes>,
     ) {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
         let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
         let player_data = &mut game_param.game.player_state;
         let current_held_item_data = &player_data.main_hand_slot;
         if let Some(new_item) = active_hotbar_item {
-            let new_item = new_item.item_stack.obj_type;
+            let new_item_obj = new_item.item_stack.obj_type;
             if let Some(current_item) = current_held_item_data {
-                if current_item.obj != new_item {
-                    new_item.spawn_item_on_hand(&mut commands, &mut game_param);
+                let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
+                let new_attributes = &new_item.item_stack.attributes;
+                if new_item_obj != current_item.obj {
+                    new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
+                } else if curr_attributes != new_attributes {
+                    new_attributes
+                        .add_attribute_components(&mut commands.entity(current_item.entity));
                 }
             } else {
-                new_item.spawn_item_on_hand(&mut commands, &mut game_param);
+                new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
             }
         } else if let Some(current_item) = current_held_item_data {
             commands.entity(current_item.entity).despawn();
