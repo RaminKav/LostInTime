@@ -142,7 +142,7 @@ pub struct AttackState {
     pub attack_cooldown_timer: Timer,
     pub speed: f32,
     pub dir: Option<Vec2>,
-    pub damage: u8,
+    pub damage: i32,
 }
 
 pub fn follow(

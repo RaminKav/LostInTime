@@ -2,7 +2,7 @@ use core::panic;
 use std::cmp::min;
 
 use crate::{
-    attributes::ItemAttributes,
+    attributes::{AttributeModifier, ItemAttributes},
     item::{ItemDisplayMetaData, WorldObject},
     ui::InventorySlotState,
     GameState, TIME_STEP,
@@ -51,6 +51,24 @@ impl InventoryItemStack {
     pub fn remove_from_inventory(self, mut inv: Query<&mut Inventory>) {
         inv.single_mut().items[self.slot] = None
     }
+    pub fn modify_attributes(
+        &mut self,
+        modifier: AttributeModifier,
+        mut inv: Query<&mut Inventory>,
+    ) -> Self {
+        let new_item_stack = self
+            .item_stack
+            .clone()
+            .get_copy_with_modified_attributes(modifier);
+
+        let inv_stack = Self {
+            item_stack: new_item_stack,
+            slot: 0,
+        };
+        inv.single_mut().items[0] = Some(inv_stack.clone());
+
+        inv_stack
+    }
     pub fn modify_count(&mut self, amount: i8) -> Option<Self> {
         self.item_stack.modify_count(amount);
         if self.item_stack.count == 0 {
@@ -61,6 +79,19 @@ impl InventoryItemStack {
 }
 //TODO: abstract all these behind a AddItemToInventoryEvent ? let event drive info needed for sub-fns
 impl ItemStack {
+    pub fn copy_with_attributes(&self, attributes: &ItemAttributes) -> Self {
+        Self {
+            obj_type: self.obj_type,
+            count: self.count,
+            attributes: attributes.clone(),
+            metadata: ItemDisplayMetaData {
+                name: self.metadata.name.clone(),
+                desc: self.metadata.desc.clone(),
+                attributes: attributes.clone().get_tooltips(),
+                durability: attributes.get_durability_tooltip(),
+            },
+        }
+    }
     pub fn add_to_inventory(
         self,
         inv: &mut Query<&mut Inventory>,
@@ -147,6 +178,10 @@ impl ItemStack {
     pub fn split(self) -> (usize, usize) {
         let split_count = self.count / 2;
         (self.count - split_count, split_count)
+    }
+    pub fn get_copy_with_modified_attributes(&mut self, modifier: AttributeModifier) -> Self {
+        self.clone()
+            .copy_with_attributes(self.attributes.change_attribute(modifier))
     }
     pub fn modify_count(&mut self, amount: i8) -> Self {
         if (self.count as i8) + amount <= 0 {
