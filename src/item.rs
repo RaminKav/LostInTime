@@ -412,7 +412,6 @@ impl WorldObject {
                 })
                 .insert(Equipment(limb))
                 .insert(Name::new("EquipItem"))
-                .insert(YSort)
                 .insert(self)
                 .id();
 
@@ -467,7 +466,7 @@ impl WorldObject {
         position = Vec3::new(
             PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
             PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y,
-            500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
+            0.000000000001, //500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
         );
         //despawn old item if one exists
         if let Some(main_hand_data) = &player_state.main_hand_slot {
@@ -489,7 +488,6 @@ impl WorldObject {
             .insert(Equipment(limb))
             .insert(MainHand)
             .insert(Name::new("HeldItem"))
-            .insert(YSort)
             .insert(inv_item_stack.item_stack.attributes.clone())
             .insert(self)
             .set_parent(player_e)
