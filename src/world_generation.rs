@@ -1,4 +1,5 @@
 use crate::assets::FoliageMaterial;
+use crate::dimension::{ActiveDimension, Dimension, GenerationSeed};
 use crate::item::{Foliage, WorldObject};
 use crate::{Game, GameParam, GameState, ImageAssets, MainCamera};
 use bevy::app::AppExit;
@@ -19,14 +20,18 @@ const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
 impl Plugin for WorldGenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ChunkManager::new())
-            .add_startup_system(load_game_data)
-            .add_system_set(
-                SystemSet::on_enter(GameState::Main).with_system(Self::spawn_and_cache_init_chunks),
-            )
+        app.add_startup_system(load_game_data)
+            .add_event::<SpawnChunkEvent>()
+            .add_event::<CacheChunkEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
-                    // .with_system(Self::spawn_chunk)
+                    .with_system(
+                        Self::spawn_and_cache_init_chunks.before(Self::handle_spawn_chunk_event),
+                    )
+                    .with_system(
+                        Self::handle_spawn_chunk_event.after(Self::handle_cache_chunk_event),
+                    )
+                    .with_system(Self::handle_cache_chunk_event)
                     .with_system(Self::spawn_chunks_around_camera)
                     .with_system(Self::despawn_outofrange_chunks)
                     .with_system(Self::toggle_on_screen_mesh_visibility),
@@ -35,7 +40,7 @@ impl Plugin for WorldGenerationPlugin {
     }
 }
 
-#[derive(Debug, Resource)]
+#[derive(Debug, Component, Resource, Clone)]
 pub struct ChunkManager {
     pub spawned_chunks: HashSet<IVec2>,
     pub cached_chunks: HashSet<IVec2>,
@@ -49,11 +54,19 @@ pub struct GameData {
     pub data: HashMap<(i32, i32), ChunkObjectData>,
     pub name: String,
 }
+#[derive(Clone)]
+struct SpawnChunkEvent {
+    chunk_pos: IVec2,
+}
+#[derive(Clone)]
+struct CacheChunkEvent {
+    chunk_pos: IVec2,
+}
 #[derive(Serialize, Deserialize, Debug)]
 
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChunkLoadingState {
     Spawning,
     Caching,
@@ -61,24 +74,24 @@ pub enum ChunkLoadingState {
     None,
 }
 
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct RawChunkData {
     pub raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
     pub raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
 }
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct TileMapPositionData {
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
 }
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct TileEntityData {
     pub entity: Option<Entity>,
     pub tile_bit_index: u8,
     pub block_type: [WorldObject; 4],
     pub block_offset: u8,
 }
-#[derive(Eq, Hash, PartialEq, Debug)]
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
 
 pub struct WorldObjectEntityData {
     pub object: WorldObject,
@@ -86,7 +99,7 @@ pub struct WorldObjectEntityData {
 }
 
 impl ChunkManager {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             spawned_chunks: HashSet::default(),
             cached_chunks: HashSet::default(),
@@ -99,182 +112,253 @@ impl ChunkManager {
 }
 
 impl WorldGenerationPlugin {
-    fn cache_chunk(
-        commands: &mut Commands,
-        game: &ResMut<Game>,
-        chunk_pos: IVec2,
-        chunk_manager: &mut ResMut<ChunkManager>,
+    fn handle_cache_chunk_event(
+        mut cache_events: EventReader<CacheChunkEvent>,
+        mut commands: Commands,
+        mut game: GameParam,
+        mut pkv: ResMut<PkvStore>,
+        seed: Query<&GenerationSeed, With<ActiveDimension>>,
     ) {
-        if chunk_manager.cached_chunks.contains(&chunk_pos) {
-            return;
-        }
-        chunk_manager.cached_chunks.insert(chunk_pos);
-
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                let tile_pos = TilePos { x, y };
-                chunk_manager.chunk_tile_entity_data.insert(
-                    TileMapPositionData {
-                        chunk_pos,
-                        tile_pos,
-                    },
-                    TileEntityData {
-                        entity: None,
-                        tile_bit_index: 0b0000,
-                        block_type: [WorldObject::Sand; 4],
-                        block_offset: 0,
-                    },
-                );
+        for e in cache_events.iter() {
+            let chunk_pos = e.chunk_pos;
+            if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
+                return;
             }
-        }
-
-        let mut raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
-            [[[0; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-        let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
-            [[[WorldObject::Sand; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                let tile_pos = TilePos { x, y };
-
-                let (bits, index_shift, blocks) =
-                    Self::get_tile_from_perlin_noise(game, chunk_pos, tile_pos);
-
-                raw_chunk_bits[x as usize][y as usize] = bits;
-                raw_chunk_blocks[x as usize][y as usize] = blocks;
-                let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
-
-                chunk_manager.chunk_tile_entity_data.insert(
-                    TileMapPositionData {
-                        chunk_pos,
-                        tile_pos,
-                    },
-                    TileEntityData {
-                        entity: None,
-                        tile_bit_index: block_bits,
-                        block_type: blocks,
-                        block_offset: index_shift,
-                    },
-                );
-            }
-        }
-        chunk_manager.raw_chunk_data.insert(
-            chunk_pos,
-            RawChunkData {
-                raw_chunk_bits,
-                raw_chunk_blocks,
-            },
-        );
-        for y in 0..CHUNK_SIZE {
-            for x in 0..CHUNK_SIZE {
-                if raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Water)
-                    && raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Sand)
-                {
-                    Self::update_neighbour_tiles(
-                        TilePos { x, y },
-                        commands,
-                        chunk_manager,
-                        chunk_pos,
-                        false,
-                    );
-                } else if raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Grass) {
-                    Self::update_this_tile(TilePos { x, y }, 16, chunk_manager, chunk_pos);
-                }
-            }
-        }
-    }
-    fn spawn_chunk(
-        commands: &mut Commands,
-        sprite_sheet: &Res<ImageAssets>,
-        chunk_pos: IVec2,
-        game: &mut GameParam,
-        pkv: &mut PkvStore,
-    ) {
-        let tilemap_size = TilemapSize {
-            x: CHUNK_SIZE,
-            y: CHUNK_SIZE,
-        };
-        let tile_size = TilemapTileSize {
-            x: TILE_SIZE.x,
-            y: TILE_SIZE.y,
-        };
-        let grid_size = tile_size.into();
-        let map_type = TilemapType::default();
-
-        let tilemap_entity = commands.spawn_empty().id();
-        let mut tile_storage = TileStorage::empty(tilemap_size);
-        if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
-            println!("Loading chunk {chunk_pos:?} from CACHE!");
+            println!("CACHING CHUNK {:?} {:?}", chunk_pos, seed.single().seed);
+            game.chunk_manager.cached_chunks.insert(chunk_pos);
 
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
-                    let tile_entity_data = game
-                        .chunk_manager
-                        .chunk_tile_entity_data
-                        .get(&TileMapPositionData {
+                    game.chunk_manager.chunk_tile_entity_data.insert(
+                        TileMapPositionData {
                             chunk_pos,
                             tile_pos,
-                        })
-                        .unwrap();
-                    let tile_entity = commands
-                        .spawn(TileBundle {
-                            position: tile_pos,
-                            tilemap_id: TilemapId(tilemap_entity),
-                            texture_index: TileTextureIndex(
-                                (tile_entity_data.tile_bit_index + tile_entity_data.block_offset)
-                                    .into(),
-                            ),
-                            ..Default::default()
-                        })
-                        .id();
-
-                    game.chunk_manager
-                        .chunk_tile_entity_data
-                        .get_mut(&TileMapPositionData {
-                            chunk_pos,
-                            tile_pos,
-                        })
-                        .unwrap()
-                        .entity = Some(tile_entity);
-                    commands.entity(tilemap_entity).add_child(tile_entity);
-                    tile_storage.set(&tile_pos, tile_entity);
+                        },
+                        TileEntityData {
+                            entity: None,
+                            tile_bit_index: 0b0000,
+                            block_type: [WorldObject::Sand; 4],
+                            block_offset: 0,
+                        },
+                    );
                 }
             }
 
-            let transform = Transform::from_translation(Vec3::new(
-                chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
-                chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y,
-                0.,
-            ));
+            let mut raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
+                [[[0; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+            let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
+                CHUNK_SIZE as usize] =
+                [[[WorldObject::Sand; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+            for y in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let tile_pos = TilePos { x, y };
 
-            commands.entity(tilemap_entity).insert(TilemapBundle {
-                grid_size,
-                map_type,
-                size: tilemap_size,
-                storage: tile_storage,
-                texture: TilemapTexture::Single(sprite_sheet.tiles_sheet.clone()),
-                tile_size,
-                transform,
-                ..Default::default()
-            });
-            Self::spawn_objects(commands, game, pkv, chunk_pos);
-            return;
+                    let (bits, index_shift, blocks) = Self::get_tile_from_perlin_noise(
+                        &game.game,
+                        chunk_pos,
+                        tile_pos,
+                        seed.single().seed,
+                    );
+
+                    raw_chunk_bits[x as usize][y as usize] = bits;
+                    raw_chunk_blocks[x as usize][y as usize] = blocks;
+                    let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
+
+                    game.chunk_manager.chunk_tile_entity_data.insert(
+                        TileMapPositionData {
+                            chunk_pos,
+                            tile_pos,
+                        },
+                        TileEntityData {
+                            entity: None,
+                            tile_bit_index: block_bits,
+                            block_type: blocks,
+                            block_offset: index_shift,
+                        },
+                    );
+                }
+            }
+            game.chunk_manager.raw_chunk_data.insert(
+                chunk_pos,
+                RawChunkData {
+                    raw_chunk_bits,
+                    raw_chunk_blocks,
+                },
+            );
+            for y in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    if raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Water)
+                        && raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Sand)
+                    {
+                        Self::update_neighbour_tiles(
+                            TilePos { x, y },
+                            &mut commands,
+                            &mut game.chunk_manager,
+                            chunk_pos,
+                            false,
+                        );
+                    } else if raw_chunk_blocks[x as usize][y as usize].contains(&WorldObject::Grass)
+                    {
+                        Self::update_this_tile(
+                            TilePos { x, y },
+                            16,
+                            &mut game.chunk_manager,
+                            chunk_pos,
+                        );
+                    }
+                }
+            }
+            Self::generate_and_cache_objects(&mut game, &mut pkv, chunk_pos, seed.single().seed);
         }
-        println!("WARNING: chunk {chunk_pos:?} not in CACHE!");
+    }
+    fn handle_spawn_chunk_event(
+        mut spawn_events: EventReader<SpawnChunkEvent>,
+        mut commands: Commands,
+        sprite_sheet: Res<ImageAssets>,
+        mut game: GameParam,
+    ) {
+        for e in spawn_events.iter() {
+            let chunk_pos = e.chunk_pos;
+            let tilemap_size = TilemapSize {
+                x: CHUNK_SIZE,
+                y: CHUNK_SIZE,
+            };
+            let tile_size = TilemapTileSize {
+                x: TILE_SIZE.x,
+                y: TILE_SIZE.y,
+            };
+            let grid_size = tile_size.into();
+            let map_type = TilemapType::default();
+
+            let tilemap_entity = commands.spawn_empty().id();
+            let mut tile_storage = TileStorage::empty(tilemap_size);
+            if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
+                println!("Loading chunk {chunk_pos:?} from CACHE!");
+
+                for y in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        let tile_pos = TilePos { x, y };
+                        let tile_entity_data = game
+                            .chunk_manager
+                            .chunk_tile_entity_data
+                            .get(&TileMapPositionData {
+                                chunk_pos,
+                                tile_pos,
+                            })
+                            .unwrap();
+                        let tile_entity = commands
+                            .spawn(TileBundle {
+                                position: tile_pos,
+                                tilemap_id: TilemapId(tilemap_entity),
+                                texture_index: TileTextureIndex(
+                                    (tile_entity_data.tile_bit_index
+                                        + tile_entity_data.block_offset)
+                                        .into(),
+                                ),
+                                ..Default::default()
+                            })
+                            .id();
+
+                        game.chunk_manager
+                            .chunk_tile_entity_data
+                            .get_mut(&TileMapPositionData {
+                                chunk_pos,
+                                tile_pos,
+                            })
+                            .unwrap()
+                            .entity = Some(tile_entity);
+                        commands.entity(tilemap_entity).add_child(tile_entity);
+                        tile_storage.set(&tile_pos, tile_entity);
+                    }
+                }
+
+                let transform = Transform::from_translation(Vec3::new(
+                    chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
+                    chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y,
+                    0.,
+                ));
+
+                commands.entity(tilemap_entity).insert(TilemapBundle {
+                    grid_size,
+                    map_type,
+                    size: tilemap_size,
+                    storage: tile_storage,
+                    texture: TilemapTexture::Single(sprite_sheet.tiles_sheet.clone()),
+                    tile_size,
+                    transform,
+                    ..Default::default()
+                });
+                Self::spawn_objects(&mut commands, &mut game, chunk_pos);
+
+                game.chunk_manager
+                    .spawned_chunks
+                    .insert(IVec2::new(chunk_pos.x, chunk_pos.y));
+
+                return;
+            }
+            warn!("Chunk {chunk_pos:?} not in CACHE!");
+        }
+    }
+    fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u32) -> f64 {
+        let noise_e = Perlin::new(1 + seed);
+        let noise_e2 = Perlin::new(2 + seed);
+        let noise_e3 = Perlin::new(3 + seed);
+
+        let _noise_m = Simplex::new(4 + seed);
+        let _noise_m2 = Simplex::new(5 + seed);
+        let _noise_m3 = Simplex::new(6 + seed);
+
+        let base_oct = 1. / 10. / 8.;
+
+        let e1 = noise_e.get([x * base_oct, y * base_oct]);
+        let e2 = noise_e2.get([x * base_oct * 8., y * base_oct * 8.]);
+        let e3 = noise_e3.get([x * base_oct * 16., y * base_oct * 16.]);
+
+        let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
+
+        e
+    }
+    fn get_perlin_block_at_tile(
+        game: &Game,
+        chunk_pos: IVec2,
+        tile_pos: TilePos,
+        seed: u32,
+    ) -> Option<WorldObject> {
+        let x = tile_pos.x as f64;
+        let y = tile_pos.y as f64;
+
+        let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
+        let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
+        let e = Self::get_perlin_noise_for_tile(nx, ny, seed);
+        if e <= game.world_generation_params.stone_frequency {
+            return Some(WorldObject::StoneFull);
+        }
+        None
+    }
+    fn generate_stone_for_chunk(
+        game: &Game,
+        chunk_pos: IVec2,
+        seed: u32,
+    ) -> Vec<(f32, f32, WorldObject)> {
+        let mut stone_blocks: Vec<(f32, f32, WorldObject)> = vec![];
+        for x in 0..CHUNK_SIZE {
+            for y in 0..CHUNK_SIZE {
+                if let Some(block) =
+                    Self::get_perlin_block_at_tile(game, chunk_pos, TilePos { x, y }, seed)
+                {
+                    stone_blocks.push((x as f32, y as f32, block));
+                }
+            }
+        }
+        stone_blocks
     }
     fn get_tile_from_perlin_noise(
         game: &ResMut<Game>,
         chunk_pos: IVec2,
         tile_pos: TilePos,
+        seed: u32,
     ) -> ([u8; 4], u8, [WorldObject; 4]) {
-        let noise_e = Perlin::new(1);
-        let noise_e2 = Perlin::new(2);
-        let noise_e3 = Perlin::new(3);
-
-        let _noise_m = Simplex::new(4);
-        let _noise_m2 = Simplex::new(5);
-        let _noise_m3 = Simplex::new(6);
-
         let x = tile_pos.x as f64;
         let y = tile_pos.y as f64;
         //TODO: figure out what this 16. is for
@@ -289,13 +373,7 @@ impl WorldGenerationPlugin {
             WorldObject::Sand,
         ];
         let sample = |x: f64, y: f64| -> (u8, WorldObject) {
-            let base_oct = 1. / 10. / 8.;
-
-            let e1 = noise_e.get([x * base_oct, y * base_oct]);
-            let e2 = noise_e2.get([x * base_oct * 8., y * base_oct * 8.]);
-            let e3 = noise_e3.get([x * base_oct * 16., y * base_oct * 16.]);
-
-            let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
+            let e = Self::get_perlin_noise_for_tile(x, y, seed);
             // let m = (noise_m.get([x * base_oct, ny * base_oct]) + 0.5)
             //     + 0.5 * (noise_m2.get([x * base_oct * 2., ny * base_oct * 2.]) + 0.5)
             //     + 0.25 * (noise_m3.get([x * base_oct * 3., ny * base_oct * 3.]) + 0.5);
@@ -382,7 +460,6 @@ impl WorldGenerationPlugin {
         chunk_pos: IVec2,
         update_entity: bool,
     ) {
-        // return;
         let x = new_tile_pos.x as i8;
         let y = new_tile_pos.y as i8;
         for dy in -1i8..=1 {
@@ -494,7 +571,6 @@ impl WorldGenerationPlugin {
         chunk_manager: &mut ResMut<ChunkManager>,
         chunk_pos: IVec2,
     ) {
-        // return;
         let x = tile_pos.x as i8;
         let y = tile_pos.y as i8;
         for dy in -1i8..=1 {
@@ -820,25 +896,28 @@ impl WorldGenerationPlugin {
 
         block_pos
     }
-    fn spawn_and_cache_init_chunks(mut commands: Commands, mut game: GameParam) {
+    fn spawn_and_cache_init_chunks(
+        mut cache_event: EventWriter<CacheChunkEvent>,
+        mut game: GameParam,
+        new_dimension: Query<&Dimension, Added<ActiveDimension>>,
+    ) {
+        if new_dimension.get_single().is_err() {
+            return;
+        }
         for transform in game.camera_query.iter() {
             let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
-            for y in
-                (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
+            for y in (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT - 1)
+                ..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT + 1)
             {
-                for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)
-                    ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
+                for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT - 1)
+                    ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT + 1)
                 {
                     if !game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
-                        println!("Caching chunk at {x:?} {y:?}");
+                        println!("Init Caching chunk at {x:?} {y:?}");
                         game.chunk_manager.state = ChunkLoadingState::Spawning;
-                        // game.chunk_manager.cached_chunks.insert(IVec2::new(x, y));
-                        Self::cache_chunk(
-                            &mut commands,
-                            &game.game,
-                            IVec2::new(x, y),
-                            &mut game.chunk_manager,
-                        );
+                        cache_event.send(CacheChunkEvent {
+                            chunk_pos: IVec2::new(x, y),
+                        });
                     }
                 }
             }
@@ -847,13 +926,11 @@ impl WorldGenerationPlugin {
     }
 
     fn spawn_chunks_around_camera(
-        mut commands: Commands,
-        sprite_sheet: Res<ImageAssets>,
+        mut cache_event: EventWriter<CacheChunkEvent>,
+        mut spawn_event: EventWriter<SpawnChunkEvent>,
         mut game: GameParam,
-        mut pkv: ResMut<PkvStore>,
     ) {
         let transform = game.camera_query.single_mut();
-        // for transform in game.camera_query.iter() {
         let camera_chunk_pos = Self::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in
             (camera_chunk_pos.y - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.y + CHUNK_CACHE_AMOUNT)
@@ -861,18 +938,11 @@ impl WorldGenerationPlugin {
             for x in
                 (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT)..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT)
             {
-                if !game
-                    .chunk_manager
-                    .spawned_chunks
-                    .contains(&IVec2::new(x, y))
-                {
+                if !game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
                     game.chunk_manager.state = ChunkLoadingState::Caching;
-                    Self::cache_chunk(
-                        &mut commands,
-                        &game.game,
-                        IVec2::new(x, y),
-                        &mut game.chunk_manager,
-                    );
+                    cache_event.send(CacheChunkEvent {
+                        chunk_pos: IVec2::new(x, y),
+                    });
                 }
             }
         }
@@ -887,20 +957,13 @@ impl WorldGenerationPlugin {
                     .spawned_chunks
                     .contains(&IVec2::new(x, y))
                 {
-                    println!("spawning chunk at {x:?} {y:?}");
                     game.chunk_manager.state = ChunkLoadingState::Spawning;
-                    game.chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
-                    Self::spawn_chunk(
-                        &mut commands,
-                        &sprite_sheet,
-                        IVec2::new(x, y),
-                        &mut game,
-                        &mut pkv,
-                    );
+                    spawn_event.send(SpawnChunkEvent {
+                        chunk_pos: IVec2::new(x, y),
+                    });
                 }
             }
         }
-        // }
         game.chunk_manager.state = ChunkLoadingState::None;
     }
 
@@ -977,17 +1040,46 @@ impl WorldGenerationPlugin {
             }
         }
     }
-    //todo: do the same shit w graphcis resource loading, but w GameData and pkvStore
-    fn spawn_objects(
-        commands: &mut Commands,
+    //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
+    fn spawn_objects(commands: &mut Commands, game: &mut GameParam, chunk_pos: IVec2) {
+        let mut tree_children = Vec::new();
+        let tree_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
+        if let Some(tree_points) = tree_points.to_owned() {
+            println!("SPAWNING OBJECTS FOR {chunk_pos:?}");
+            for tp in tree_points.0.clone().iter() {
+                let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
+                let tree;
+                match tp.2 {
+                    WorldObject::Foliage(_) => {
+                        tree = tp.2.spawn_foliage(commands, game, tile_pos, chunk_pos);
+                    }
+                    _ => {
+                        tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
+                    }
+                }
+                if let Some(tree) = tree {
+                    tree_children.push(tree);
+                }
+            }
+
+            commands
+                .spawn(SpatialBundle::default())
+                .push_children(&tree_children);
+        } else {
+            warn!("No Object data found for chunk {:?}", chunk_pos);
+        }
+    }
+    fn generate_and_cache_objects(
         game: &mut GameParam,
         pkv: &mut PkvStore,
         chunk_pos: IVec2,
+        seed: u32,
     ) {
-        let mut tree_children = Vec::new();
         let tree_points;
 
-        if let Ok(data) = pkv.get::<ChunkObjectData>(&format!("{} {}", chunk_pos.x, chunk_pos.y)) {
+        if
+        //false {
+        let Ok(data) = pkv.get::<ChunkObjectData>(&format!("{} {}", chunk_pos.x, chunk_pos.y)) {
             tree_points = data.0;
             info!(
                 "LOADING OLD CHUNK OBJECT DATA FOR CHUNK {:?} TREES: {:?}",
@@ -1033,30 +1125,34 @@ impl WorldGenerationPlugin {
                 .collect::<Vec<(f32, f32, WorldObject)>>();
         }
 
-        for tp in tree_points.as_slice() {
-            let tile_pos = IVec2::new(tp.0 as i32, tp.1 as i32);
-            let tree;
-            match tp.2 {
-                WorldObject::Foliage(_) => {
-                    tree = tp.2.spawn_foliage(commands, game, tile_pos, chunk_pos);
+        let stone_points = Self::generate_stone_for_chunk(&game.game, chunk_pos, seed)
+            .iter()
+            .chain(tree_points.iter())
+            .filter(|tp| {
+                let tile = game
+                    .chunk_manager
+                    .chunk_tile_entity_data
+                    .get(&TileMapPositionData {
+                        chunk_pos,
+                        tile_pos: TilePos {
+                            x: tp.0 as u32,
+                            y: tp.1 as u32,
+                        },
+                    })
+                    .unwrap()
+                    .block_type;
+                if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
+                    return false;
                 }
-                _ => {
-                    tree = tp.2.spawn(commands, game, tile_pos, chunk_pos);
-                }
-            }
-            if let Some(tree) = tree {
-                tree_children.push(tree);
-            }
-        }
+                true
+            })
+            .map(|tp| *tp)
+            .collect::<Vec<(f32, f32, WorldObject)>>();
 
         game.game_data.data.insert(
             (chunk_pos.x, chunk_pos.y),
-            ChunkObjectData(tree_points.to_vec()),
+            ChunkObjectData(stone_points.to_vec()),
         );
-
-        commands
-            .spawn(SpatialBundle::default())
-            .push_children(&tree_children);
     }
 }
 

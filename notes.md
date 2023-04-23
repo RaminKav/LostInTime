@@ -83,3 +83,39 @@
   - Tooltips will display the data
   - Items by default will have a default impl of `ItemMetaData`, or a randomly generated one by a drop system
   - Different gameplay systems can modify `Attributes` which will update `ItemMetaData` in a `Changed<>` query system thing
+
+  ## Next Features:
+
+  - Impl `LootTable` for drops list on enemies and breakable items
+  - UI:
+    - Crafting UI
+    - Equipment UI
+    - Food Bar
+  - World Generation:
+    - Stone
+    - Random Grass Foliage
+    - Biomes ?
+    - Spawn random structures from custom schema files ?
+  - Art/Items
+    - Make borders of tops of blocks like stone merge properly/dynamically
+    - Make new block types: New Stone, Wood blocks, fences, chests/loot box
+    - Mob drops
+    - Weapons, Tools, Armor
+    - Food
+  - Art/Mobs
+    - More Enemies
+    - Passive Mobs/animals
+
+# Moving Between 'Dimensions'
+
+<!-- - despawn all current chunks (they are cached) -->
+
+- Convert ChunkManager to a Compopnent
+- Dimensions are Entities, including main world
+- Each Dimension Entity has a ChunkManager Component,
+- Active Dimension has the ActiveDimension
+- fn that runs setup fns of any dimension that needs to be created (like on startup rn)
+- Query for `Add<ActiveDimension>` -> run the above fn
+- Similarly: Query for `Removed<ActiveDimension>` -> despawns all chunks
+- Any Dimension with `ActiveDimension` will change a field on game struct to it's chunk manager comp
+- world_gen plugin uses game.current_chunk_manager
