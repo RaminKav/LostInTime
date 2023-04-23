@@ -33,6 +33,7 @@ mod animations;
 mod assets;
 mod attributes;
 mod combat;
+mod dimension;
 mod enemy;
 mod inputs;
 mod inventory;
@@ -48,6 +49,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
+use dimension::{ActiveDimension, DimensionPlugin};
 use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
@@ -113,6 +115,7 @@ fn main() {
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
         .add_plugin(EnemyPlugin)
+        .add_plugin(DimensionPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -173,7 +176,8 @@ pub struct YSort;
 
 fn y_sort(mut q: Query<&mut Transform, With<YSort>>) {
     for mut tf in q.iter_mut() {
-        tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
+        // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
+        tf.translation.z = 900. - 900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * tf.translation.y)));
     }
 }
 #[derive(SystemParam)]
@@ -198,7 +202,7 @@ pub struct GameParam<'w, 's> {
         'w,
         's,
         &'static mut Transform,
-        (With<MainCamera>, Without<Player>, Without<ItemStack>),
+        (With<TextureCamera>, Without<Player>, Without<ItemStack>),
     >,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
@@ -297,7 +301,7 @@ fn setup(
 ) {
     game.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
-        stone_frequency: 0.0,
+        stone_frequency: 0.18,
         dirt_frequency: 0.52,
         sand_frequency: 0.22,
         water_frequency: 0.05,

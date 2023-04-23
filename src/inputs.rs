@@ -11,11 +11,12 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{AttributeModifier, Health, ItemAttributes};
 use crate::combat::AttackTimer;
+use crate::dimension::{Dimension, DimensionSwapEvent, GenerationSeed};
 use crate::enemy::{Enemy, EnemyMaterial};
-use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
+use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::{change_hotbar_slot, InventoryState};
-use crate::world_generation::TileMapPositionData;
+use crate::world_generation::{ChunkManager, TileMapPositionData};
 use crate::{
     item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
     PLAYER_DASH_SPEED, TIME_STEP,
@@ -264,6 +265,7 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
+        mut dim_event: EventWriter<DimensionSwapEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -303,8 +305,15 @@ impl InputsPlugin {
                 Vec2::ZERO,
             );
         }
+        if key_input.just_pressed(KeyCode::P) {
+            let dim_e = commands
+                .spawn((Dimension, GenerationSeed { seed: 123 }, ChunkManager::new()))
+                .id();
+            println!("SPAWNING NEW DIMENSION!!!");
+            dim_event.send(DimensionSwapEvent { dimension: dim_e })
+        }
         if key_input.just_pressed(KeyCode::M) {
-            let mut item = inv.single().items[0].clone().unwrap();
+            let item = inv.single().items[0].clone().unwrap();
             item.modify_attributes(
                 AttributeModifier {
                     modifier: "attack".to_owned(),
