@@ -5,10 +5,11 @@ use rand::Rng;
 use crate::{
     animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
+    inputs::CursorPos,
     inventory::Inventory,
     item::{MainHand, Placeable, WorldObject},
     ui::InventoryState,
-    world_generation::WorldGenerationPlugin,
+    world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
     Game, GameParam, GameState, Player, YSort, TIME_STEP,
 };
 
@@ -17,6 +18,7 @@ pub struct HitEvent {
     pub hit_entity: Entity,
     pub damage: i32,
     pub dir: Vec2,
+    pub hit_with: Option<WorldObject>,
 }
 
 #[derive(Debug, Clone)]
@@ -24,6 +26,14 @@ pub struct HitEvent {
 pub struct EnemyDeathEvent {
     pub entity: Entity,
     pub enemy_pos: Vec2,
+}
+#[derive(Debug, Clone)]
+
+pub struct ObjBreakEvent {
+    pub entity: Entity,
+    pub obj: WorldObject,
+    pub tile_pos: IVec2,
+    pub chunk_pos: IVec2,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -42,6 +52,7 @@ impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<HitEvent>()
             .add_event::<EnemyDeathEvent>()
+            .add_event::<ObjBreakEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
@@ -65,10 +76,8 @@ impl CombatPlugin {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
             commands.entity(death_event.entity).despawn();
-            let enemy_chunk_pos =
-                WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
-            let enemy_tile_pos =
-                WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
+            let enemy_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
+            let enemy_tile_pos = camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
             let texture_handle = asset_server.load("textures/effects/hit-particles.png");
             let texture_atlas =
                 TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
@@ -154,6 +163,8 @@ impl CombatPlugin {
 
     fn handle_hits(
         mut commands: Commands,
+        cursor_pos: Res<CursorPos>,
+        game: GameParam,
         mut health: Query<(
             Entity,
             &mut Health,
@@ -162,8 +173,8 @@ impl CombatPlugin {
             Option<&InvincibilityCooldown>,
         )>,
         mut hit_events: EventReader<HitEvent>,
-        mut death_events: EventWriter<EnemyDeathEvent>,
-        player: Query<Entity, With<Player>>,
+        mut enemy_death_events: EventWriter<EnemyDeathEvent>,
+        mut obj_death_events: EventWriter<ObjBreakEvent>,
         in_i_frame: Query<&InvincibilityTimer>,
         // has_i_frames: Query<&InvincibilityCooldown>,
     ) {
@@ -175,7 +186,61 @@ impl CombatPlugin {
             if let Ok((e, mut hit_health, t, obj_option, i_frame_option)) =
                 health.get_mut(hit.hit_entity)
             {
-                if obj_option.is_none() {
+                hit_health.0 -= hit.damage as i32;
+
+                if let Some(obj) = obj_option {
+                    let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
+                        cursor_pos.world_coords.x,
+                        cursor_pos.world_coords.y,
+                    ));
+                    let cursor_tile_pos = camera_pos_to_block_pos(&Vec2::new(
+                        cursor_pos.world_coords.x,
+                        cursor_pos.world_coords.y,
+                    ));
+
+                    // let obj_data = game
+                    //     .chunk_manager
+                    //     .chunk_generation_data
+                    //     .get(&TileMapPositionData {
+                    //         chunk_pos: cursor_chunk_pos,
+                    //         tile_pos: TilePos {
+                    //             x: cursor_tile_pos.x as u32,
+                    //             y: cursor_tile_pos.y as u32,
+                    //         },
+                    //     })
+                    //     .unwrap();
+                    // if game.block_query.contains(obj_data.entity) {
+                    if let Some(data) = game.world_obj_data.properties.get(&obj) {
+                        if let Some(breaks_with) = data.breaks_with {
+                            if let Some(main_hand_tool) = hit.hit_with {
+                                if main_hand_tool == breaks_with {
+                                    if hit_health.0 <= 0 {
+                                        obj_death_events.send(ObjBreakEvent {
+                                            entity: e,
+                                            obj: *obj,
+                                            tile_pos: cursor_tile_pos,
+                                            chunk_pos: cursor_chunk_pos,
+                                        });
+                                    }
+                                }
+                            }
+                        } else {
+                            obj_death_events.send(ObjBreakEvent {
+                                entity: e,
+                                obj: *obj,
+                                tile_pos: cursor_tile_pos,
+                                chunk_pos: cursor_chunk_pos,
+                            });
+                        }
+                    }
+                    // obj.attempt_to_break_item(
+                    //     &mut commands,
+                    //     &mut game,
+                    //     cursor_tile_pos,
+                    //     cursor_chunk_pos,
+                    // );
+                    // }
+                } else {
                     // let has_i_frames = has_i_frames.get(hit.hit_entity);
                     commands
                         .entity(hit.hit_entity)
@@ -194,14 +259,12 @@ impl CombatPlugin {
                             Timer::from_seconds(i_frames.0, TimerMode::Once),
                         ));
                     }
-                }
-
-                hit_health.0 -= hit.damage as i32;
-                if hit_health.0 <= 0 && player.single() != e {
-                    death_events.send(EnemyDeathEvent {
-                        entity: e,
-                        enemy_pos: t.translation.truncate(),
-                    })
+                    if hit_health.0 <= 0 && game.player_query.single().0 != e {
+                        enemy_death_events.send(EnemyDeathEvent {
+                            entity: e,
+                            enemy_pos: t.translation.truncate(),
+                        })
+                    }
                 }
             }
         }
@@ -209,7 +272,7 @@ impl CombatPlugin {
     fn check_hit_collisions(
         mut commands: Commands,
         context: ResMut<RapierContext>,
-        weapons: Query<(Entity, &Parent), (Without<HitMarker>, With<MainHand>)>,
+        weapons: Query<(Entity, &Parent, &WorldObject), (Without<HitMarker>, With<MainHand>)>,
         parent_attack: Query<&Attack>,
         mut hit_event: EventWriter<HitEvent>,
         game: Res<Game>,
@@ -244,6 +307,7 @@ impl CombatPlugin {
                     hit_entity: if hit.0 == weapon.0 { hit.1 } else { hit.0 },
                     damage: parent_attack.get(**weapon_parent).unwrap().0,
                     dir: Vec2::new(0., 0.),
+                    hit_with: Some(*weapon.2),
                 });
             }
         }

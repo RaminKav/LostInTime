@@ -11,6 +11,7 @@ use attributes::{AttributesPlugin, Health, InvincibilityCooldown};
 // - trees/entities to break/mine
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
+    diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::system::SystemParam,
     prelude::*,
     reflect::TypeUuid,
@@ -33,14 +34,13 @@ mod animations;
 mod assets;
 mod attributes;
 mod combat;
-mod dimension;
 mod enemy;
 mod inputs;
 mod inventory;
 mod item;
 mod ui;
 mod vectorize;
-mod world_generation;
+mod world;
 use animations::{
     AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer, AnimationsPlugin,
 };
@@ -49,16 +49,19 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
-use dimension::{ActiveDimension, DimensionPlugin};
 use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
-use item::{Block, Equipment, EquipmentData, ItemsPlugin, WorldObjectResource};
+use item::{Equipment, EquipmentData, ItemsPlugin, WorldObjectResource};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use ui::{InventorySlotState, UIPlugin};
-use world_generation::{ChunkManager, GameData, WorldGenerationPlugin};
+use ui::{FPSText, InventorySlotState, UIPlugin};
+use world::{
+    dimension::{DimensionPlugin, DimensionSpawnEvent},
+    WorldPlugin,
+};
+use world::{generation::GameData, ChunkManager, WorldGeneration};
 
 const PLAYER_MOVE_SPEED: f32 = 2.;
 const PLAYER_DASH_SPEED: f32 = 125.;
@@ -99,6 +102,7 @@ fn main() {
         .insert_resource(Msaa { samples: 1 })
         .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
         // .add_plugin(PixelCameraPlugin)
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
@@ -107,7 +111,6 @@ fn main() {
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
-        .add_plugin(WorldGenerationPlugin)
         .add_plugin(InputsPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
@@ -115,7 +118,7 @@ fn main() {
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
         .add_plugin(EnemyPlugin)
-        .add_plugin(DimensionPlugin)
+        .add_plugin(WorldPlugin)
         .add_startup_system(setup)
         .add_loading_state(
             LoadingState::new(GameState::Loading)
@@ -131,25 +134,14 @@ fn main() {
 pub struct Game {
     player_state: PlayerState,
     player: Entity,
-    world_generation_params: WorldGeneration,
 }
 impl Default for Game {
     fn default() -> Self {
         Self {
             player_state: PlayerState::default(),
             player: Entity::from_raw(0),
-            world_generation_params: WorldGeneration::default(),
         }
     }
-}
-
-#[derive(Default)]
-pub struct WorldGeneration {
-    water_frequency: f64,
-    sand_frequency: f64,
-    dirt_frequency: f64,
-    stone_frequency: f64,
-    tree_frequency: f64,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash)]
@@ -189,20 +181,25 @@ pub struct GameParam<'w, 's> {
     pub game_data: ResMut<'w, GameData>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
 
-    pub block_query: Query<'w, 's, (Entity, &'static mut Health), With<Block>>,
+    // pub block_query: Query<'w, 's, (Entity, &'static mut Health), With<Block>>,
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
     pub items_query: Query<
         'w,
         's,
         (Entity, &'static Transform, &'static ItemStack),
-        (Without<Player>, Without<Equipment>),
+        (Without<Player>, Without<Equipment>, Without<Health>),
     >,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub camera_query: Query<
         'w,
         's,
         &'static mut Transform,
-        (With<TextureCamera>, Without<Player>, Without<ItemStack>),
+        (
+            With<TextureCamera>,
+            Without<Player>,
+            Without<ItemStack>,
+            Without<Health>,
+        ),
     >,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
@@ -295,17 +292,41 @@ fn setup(
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
     mut game_render_materials: ResMut<Assets<ColorMaterial>>,
     mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
+    mut dim_event: EventWriter<DimensionSpawnEvent>,
 
     mut game: ResMut<Game>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    game.world_generation_params = WorldGeneration {
+    let mut cm = ChunkManager::new();
+    cm.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
         stone_frequency: 0.18,
         dirt_frequency: 0.52,
         sand_frequency: 0.22,
         water_frequency: 0.05,
     };
+    dim_event.send(DimensionSpawnEvent {
+        generation_params: WorldGeneration {
+            tree_frequency: 0.,
+            stone_frequency: 0.18,
+            dirt_frequency: 0.52,
+            sand_frequency: 0.22,
+            water_frequency: 0.05,
+        },
+        seed: Some(0),
+        swap_to_dim_now: true,
+    });
+    // dim_event.send(DimensionSpawnEvent {
+    //     generation_params: WorldGeneration {
+    //         tree_frequency: 0.,
+    //         stone_frequency: 0.18,
+    //         dirt_frequency: 0.52,
+    //         sand_frequency: 0.22,
+    //         water_frequency: 0.05,
+    //     },
+    //     swap_to_dim_now: true,
+    // });
+
     game.player_state.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
     game.player_state.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 
@@ -564,6 +585,34 @@ fn setup(
         ))
         .push_children(&limb_children)
         .id();
+    // DEBUG FPS
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "FPS: ",
+                TextStyle {
+                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                    font_size: 8.0,
+                    color: Color::Rgba {
+                        red: 75. / 255.,
+                        green: 61. / 255.,
+                        blue: 68. / 255.,
+                        alpha: 1.,
+                    },
+                },
+            )
+            .with_alignment(TextAlignment::TOP_RIGHT),
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        },
+        Name::new("FPS TEXT"),
+        FPSText,
+        RenderLayers::from_layers(&[3]),
+    ));
 
     game.player = p;
 }

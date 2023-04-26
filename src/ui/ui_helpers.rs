@@ -1,4 +1,4 @@
-use crate::{inputs::CursorPos, world_generation::WorldGenerationPlugin, Game};
+use crate::{inputs::CursorPos, world, Game};
 use bevy::prelude::*;
 
 use super::Interactable;
@@ -37,8 +37,8 @@ pub fn pointcast_2d<'a>(
 pub fn get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, IVec2) {
     let player_pos = game.player_state.position;
     let chunk_pos =
-        WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(player_pos.x, player_pos.y));
+        world::world_helpers::camera_pos_to_chunk_pos(&Vec2::new(player_pos.x, player_pos.y));
     let tile_pos =
-        WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(player_pos.x, player_pos.y));
+        world::world_helpers::camera_pos_to_block_pos(&Vec2::new(player_pos.x, player_pos.y));
     (chunk_pos, tile_pos)
 }

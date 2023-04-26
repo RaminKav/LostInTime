@@ -215,6 +215,7 @@ pub fn attack(
                             hit_entity: p_e,
                             damage: attack.damage,
                             dir: delta.normalize_or_zero().truncate(),
+                            hit_with: None,
                         });
                     }
                 },
