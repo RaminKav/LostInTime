@@ -66,6 +66,17 @@
             breaks_with: None,
             places_into: None
         ),
+        DungeonStone: WorldItemMetadata(
+            pos: (64., 144.),
+            size: (32., 32.),
+            anchor: None,
+            collider: true,
+            breakable: false,
+            breaks_into: None,
+            equip_slot: None,
+            breaks_with: None,
+            places_into: None
+        ),
         Foliage(Tree): WorldItemMetadata(
             pos: (96., 112.),
             size: (32., 40.),
