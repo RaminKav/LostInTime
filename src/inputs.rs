@@ -15,6 +15,7 @@ use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::dimension::DimensionSpawnEvent;
+use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
@@ -302,12 +303,13 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            println!("SENDING DIM SPAWN EVENT");
-            spawn_dim_event.send(DimensionSpawnEvent {
-                generation_params: WorldGeneration { ..default() },
-                seed: Some(123),
-                swap_to_dim_now: true,
-            });
+            println!("R");
+            // spawn_dim_event.send(DimensionSpawnEvent {
+            //     generation_params: WorldGeneration { ..default() },
+            //     seed: Some(123),
+            //     swap_to_dim_now: true,
+            // });
+            DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone().unwrap();

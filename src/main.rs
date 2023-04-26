@@ -103,7 +103,7 @@ fn main() {
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin)
-        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
