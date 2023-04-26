@@ -1,5 +1,5 @@
 use bevy::{ecs::system::EntityCommands, prelude::*, time::FixedTimestep};
-use bevy_inspector_egui::{Inspectable, RegisterInspectable};
+use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 
 use crate::{
     inventory::{Inventory, InventoryItemStack},
@@ -10,11 +10,11 @@ use crate::{
 
 pub struct AttributesPlugin;
 
-#[derive(Bundle, Inspectable)]
+#[derive(Resource, Reflect, Default, Bundle)]
 pub struct BlockAttributeBundle {
     pub health: Health,
 }
-#[derive(Component, PartialEq, Clone, Debug, Inspectable)]
+#[derive(Resource, Reflect, Component, PartialEq, Clone, Debug)]
 pub struct ItemAttributes {
     pub health: i32,
     pub attack: i32,
@@ -85,21 +85,23 @@ pub struct AttributeModifier {
 #[derive(Debug, Clone, Default)]
 pub struct AttributeChangeEvent;
 
-#[derive(Component, Inspectable, Clone, Debug, Copy)]
+#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct Health(pub i32);
-#[derive(Component, Inspectable, Clone, Debug, Copy)]
+#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct Attack(pub i32);
-#[derive(Component, Inspectable, Clone, Debug, Copy)]
+#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct Durability(pub i32);
 
-#[derive(Component, Inspectable, Clone, Debug, Copy)]
+#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct AttackCooldown(pub f32);
-#[derive(Component, Inspectable, Clone, Debug, Copy)]
+#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
-        app.register_inspectable::<BlockAttributeBundle>()
+        app.add_plugin(ResourceInspectorPlugin::<BlockAttributeBundle>::default())
+            .init_resource::<BlockAttributeBundle>()
+            .register_type::<BlockAttributeBundle>()
             .add_event::<AttributeChangeEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)

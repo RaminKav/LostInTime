@@ -6,7 +6,7 @@ use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
-use bevy_inspector_egui::{Inspectable, RegisterInspectable};
+use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use interpolation::lerp;
 
 use crate::ai::AttackState;
@@ -20,13 +20,13 @@ use crate::{Limb, RawPosition};
 
 pub struct AnimationsPlugin;
 
-#[derive(Component, Inspectable)]
+#[derive(Component)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
 
-// #[derive(Component, Inspectable)]
+// #[derive(Component)]
 // pub struct CameraOffsetTracker(Vec2, Vec2);
 
-#[derive(Component, Inspectable)]
+#[derive(Component)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
 #[derive(Component, Clone, Deref, DerefMut)]
@@ -73,8 +73,7 @@ impl Material2d for AnimatedTextureMaterial {
 
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
-        app.register_inspectable::<AnimationPosTracker>()
-            .add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
+        app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
