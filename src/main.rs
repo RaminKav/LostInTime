@@ -26,8 +26,8 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
     window::{CompositeAlphaMode, PresentMode},
 };
-use bevy_inspector_egui::WorldInspectorPlugin;
 
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod ai;
 mod animations;
@@ -57,10 +57,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use ui::{FPSText, InventorySlotState, UIPlugin};
-use world::{
-    dimension::{DimensionPlugin, DimensionSpawnEvent},
-    WorldPlugin,
-};
+use world::{dimension::DimensionSpawnEvent, WorldPlugin};
 use world::{generation::GameData, ChunkManager, WorldGeneration};
 
 const PLAYER_MOVE_SPEED: f32 = 2.;
@@ -105,7 +102,7 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(WorldInspectorPlugin)
         // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)

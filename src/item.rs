@@ -12,7 +12,7 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_inspector_egui::Inspectable;
+
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use lazy_static::lazy_static;
 
@@ -37,7 +37,7 @@ pub struct EquipmentData {
     pub obj: WorldObject,
 }
 
-#[derive(Component, Inspectable, Debug, PartialEq, Clone)]
+#[derive(Component, Debug, PartialEq, Clone)]
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: String,
@@ -47,9 +47,7 @@ pub struct ItemDisplayMetaData {
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(
-    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
 pub enum WorldObject {
     None,
     Grass,
@@ -62,9 +60,7 @@ pub enum WorldObject {
     Placeable(Placeable),
     Sword,
 }
-#[derive(
-    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display)]
 pub enum Foliage {
     Tree,
 }
@@ -73,9 +69,7 @@ impl Default for Foliage {
         Self::Tree
     }
 }
-#[derive(
-    Debug, Inspectable, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
 pub enum Placeable {
     Log,
     Flint,
