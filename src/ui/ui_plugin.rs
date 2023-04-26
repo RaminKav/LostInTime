@@ -1,4 +1,9 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{
+    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
+    prelude::*,
+    render::view::RenderLayers,
+    sprite::Anchor,
+};
 
 use strum_macros::{Display, EnumIter};
 
@@ -107,6 +112,8 @@ pub struct LastHoveredSlot {
 #[derive(Component)]
 pub struct HealthBar;
 
+#[derive(Component)]
+pub struct FPSText;
 pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
@@ -122,6 +129,7 @@ impl Plugin for UIPlugin {
             .add_system_set(SystemSet::on_enter(GameState::Main).with_system(setup_inv_slots_ui))
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
+                    .with_system(text_update_system)
                     .with_system(toggle_inv_visibility)
                     .with_system(handle_item_drop_clicks)
                     .with_system(handle_dragging)
@@ -964,4 +972,14 @@ fn update_healthbar(
         x: 62. * player_health.0 as f32 / 100.,
         y: 7.,
     });
+}
+fn text_update_system(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<FPSText>>) {
+    for mut text in &mut query {
+        if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
+            if let Some(value) = fps.smoothed() {
+                // Update the value of the second section
+                text.sections[0].value = format!("{value:.2}");
+            }
+        }
+    }
 }
