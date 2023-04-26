@@ -8,7 +8,6 @@ use crate::{
     GameState, TIME_STEP,
 };
 use bevy::{prelude::*, time::FixedTimestep};
-use bevy_inspector_egui::{Inspectable, RegisterInspectable};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
@@ -20,7 +19,7 @@ pub struct Inventory {
 }
 pub struct InventoryPlugin;
 
-#[derive(Component, Inspectable, Debug, PartialEq, Clone)]
+#[derive(Component, Debug, PartialEq, Clone)]
 pub struct ItemStack {
     pub obj_type: WorldObject,
     pub count: usize,
@@ -28,7 +27,7 @@ pub struct ItemStack {
     pub metadata: ItemDisplayMetaData,
 }
 
-#[derive(Component, Inspectable, Debug, PartialEq, Clone)]
+#[derive(Component, Debug, PartialEq, Clone)]
 
 pub struct InventoryItemStack {
     pub item_stack: ItemStack,
@@ -195,7 +194,7 @@ impl ItemStack {
 
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
-        app.register_inspectable::<ItemStack>().add_system_set(
+        app.add_system_set(
             SystemSet::on_update(GameState::Main)
                 .with_run_criteria(FixedTimestep::step(TIME_STEP as f64)), // .with_system(Self::update_inventory),
         );

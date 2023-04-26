@@ -1,5 +1,6 @@
 pub mod chunk;
 pub mod dimension;
+mod dungeon_generation;
 pub mod generation;
 mod noise_helpers;
 mod tile;
@@ -10,12 +11,17 @@ use bevy::{
     prelude::*,
     utils::{HashMap, HashSet},
 };
+use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::item::WorldObject;
 
 use self::{
-    chunk::ChunkPlugin, dimension::DimensionPlugin, generation::GenerationPlugin, tile::TilePlugin,
+    chunk::ChunkPlugin,
+    dimension::DimensionPlugin,
+    dungeon_generation::{Bias, GridSize, NumSteps},
+    generation::GenerationPlugin,
+    tile::TilePlugin,
 };
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
@@ -98,6 +104,15 @@ impl Plugin for WorldPlugin {
         app.add_plugin(GenerationPlugin)
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
-            .add_plugin(TilePlugin);
+            .add_plugin(TilePlugin)
+            .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
+            .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
+            .add_plugin(ResourceInspectorPlugin::<Bias>::default())
+            .init_resource::<NumSteps>()
+            .init_resource::<GridSize>()
+            .init_resource::<Bias>()
+            .register_type::<NumSteps>()
+            .register_type::<GridSize>()
+            .register_type::<Bias>();
     }
 }
