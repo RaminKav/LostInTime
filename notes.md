@@ -119,3 +119,11 @@
 - Similarly: Query for `Removed<ActiveDimension>` -> despawns all chunks
 - Any Dimension with `ActiveDimension` will change a field on game struct to it's chunk manager comp
 - world_gen plugin uses game.current_chunk_manager
+
+
+split world_generation into
+-> generation -> generate objs/tiles
+-> noise_helpers -> perlin fns, disk sampling
+-> chunk -> cache/spawning of chunks, chunk manager
+-> tile -> tilemapping code?
+-> world_helpers -> camera pos fn

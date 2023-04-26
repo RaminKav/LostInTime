@@ -4,26 +4,22 @@ use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
-use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{AttributeModifier, Health, ItemAttributes};
 use crate::combat::AttackTimer;
-use crate::dimension::{Dimension, DimensionSwapEvent, GenerationSeed};
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::{change_hotbar_slot, InventoryState};
-use crate::world_generation::{ChunkManager, TileMapPositionData};
+use crate::world::dimension::DimensionSpawnEvent;
+use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
+use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
-    item::WorldObject, world_generation::WorldGenerationPlugin, GameState, Player,
-    PLAYER_DASH_SPEED, TIME_STEP,
-};
-use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
-    WIDTH,
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, WorldGeneration,
+    PLAYER_MOVE_SPEED, WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -265,7 +261,7 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
-        mut dim_event: EventWriter<DimensionSwapEvent>,
+        mut spawn_dim_event: EventWriter<DimensionSpawnEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -306,11 +302,12 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            let dim_e = commands
-                .spawn((Dimension, GenerationSeed { seed: 123 }, ChunkManager::new()))
-                .id();
-            println!("SPAWNING NEW DIMENSION!!!");
-            dim_event.send(DimensionSwapEvent { dimension: dim_e })
+            println!("SENDING DIM SPAWN EVENT");
+            spawn_dim_event.send(DimensionSpawnEvent {
+                generation_params: WorldGeneration { ..default() },
+                seed: Some(123),
+                swap_to_dim_now: true,
+            });
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone().unwrap();
@@ -428,54 +425,54 @@ impl InputsPlugin {
 
             attack_event.send(AttackEvent);
 
-            let player_pos = game.game.player_state.position;
-            if player_pos
-                .truncate()
-                .distance(cursor_pos.world_coords.truncate())
-                > (game.game.player_state.reach_distance * 32) as f32
-            {
-                return;
-            }
-            let cursor_chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
-            let cursor_tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
+            // let player_pos = game.game.player_state.position;
+            // if player_pos
+            //     .truncate()
+            //     .distance(cursor_pos.world_coords.truncate())
+            //     > (game.game.player_state.reach_distance * 32) as f32
+            // {
+            //     return;
+            // }
+            // let cursor_chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            //     cursor_pos.world_coords.x,
+            //     cursor_pos.world_coords.y,
+            // ));
+            // let cursor_tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            //     cursor_pos.world_coords.x,
+            //     cursor_pos.world_coords.y,
+            // ));
 
-            if game
-                .chunk_manager
-                .chunk_generation_data
-                .contains_key(&TileMapPositionData {
-                    chunk_pos: cursor_chunk_pos,
-                    tile_pos: TilePos {
-                        x: cursor_tile_pos.x as u32,
-                        y: cursor_tile_pos.y as u32,
-                    },
-                })
-            {
-                let obj_data = game
-                    .chunk_manager
-                    .chunk_generation_data
-                    .get(&TileMapPositionData {
-                        chunk_pos: cursor_chunk_pos,
-                        tile_pos: TilePos {
-                            x: cursor_tile_pos.x as u32,
-                            y: cursor_tile_pos.y as u32,
-                        },
-                    })
-                    .unwrap();
-                if game.block_query.contains(obj_data.entity) {
-                    obj_data.object.attempt_to_break_item(
-                        &mut commands,
-                        &mut game,
-                        cursor_tile_pos,
-                        cursor_chunk_pos,
-                    );
-                }
-            }
+            // if game
+            //     .chunk_manager
+            //     .chunk_generation_data
+            //     .contains_key(&TileMapPositionData {
+            //         chunk_pos: cursor_chunk_pos,
+            //         tile_pos: TilePos {
+            //             x: cursor_tile_pos.x as u32,
+            //             y: cursor_tile_pos.y as u32,
+            //         },
+            //     })
+            // {
+            //     let obj_data = game
+            //         .chunk_manager
+            //         .chunk_generation_data
+            //         .get(&TileMapPositionData {
+            //             chunk_pos: cursor_chunk_pos,
+            //             tile_pos: TilePos {
+            //                 x: cursor_tile_pos.x as u32,
+            //                 y: cursor_tile_pos.y as u32,
+            //             },
+            //         })
+            //         .unwrap();
+            //     if game.block_query.contains(obj_data.entity) {
+            //         obj_data.object.attempt_to_break_item(
+            //             &mut commands,
+            //             &mut game,
+            //             cursor_tile_pos,
+            //             cursor_chunk_pos,
+            //         );
+            //     }
+            // }
         }
         // Attempt to place block in hand
         // TODO: Interact
@@ -488,11 +485,11 @@ impl InputsPlugin {
             {
                 return;
             }
-            let chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
+            let chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            let tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
+            let tile_pos = camera_pos_to_block_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
