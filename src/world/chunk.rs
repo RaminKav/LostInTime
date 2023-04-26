@@ -4,6 +4,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_pkv::PkvStore;
 
 use super::dimension::{ActiveDimension, Dimension, GenerationSeed};
+use super::dungeon::Dungeon;
 use super::generation::GenerationPlugin;
 use crate::GameState;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets, MainCamera};
@@ -13,6 +14,8 @@ use super::{
     world_helpers, ChunkLoadingState, ChunkManager, RawChunkData, TileEntityData,
     TileMapPositionData, CHUNK_CACHE_AMOUNT, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
 };
+
+pub const ZERO_ZERO: IVec2 = IVec2 { x: 0, y: 0 };
 
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
@@ -171,6 +174,7 @@ impl ChunkPlugin {
 
             let tilemap_entity = commands.spawn_empty().id();
             let mut tile_storage = TileStorage::empty(tilemap_size);
+            let mut is_dungeon = false;
             if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
                 println!("Loading chunk {chunk_pos:?} from CACHE!");
 
@@ -197,6 +201,9 @@ impl ChunkPlugin {
                                 ..Default::default()
                             })
                             .id();
+                        if tile_entity_data.block_offset == 32 {
+                            is_dungeon = true;
+                        }
 
                         game.chunk_manager
                             .chunk_tile_entity_data
@@ -228,7 +235,9 @@ impl ChunkPlugin {
                     ..Default::default()
                 });
                 //TODO: add event for this
-                GenerationPlugin::spawn_objects(&mut commands, &mut game, chunk_pos);
+                if !is_dungeon {
+                    GenerationPlugin::spawn_objects(&mut commands, &mut game, chunk_pos);
+                }
 
                 game.chunk_manager
                     .spawned_chunks
@@ -242,11 +251,12 @@ impl ChunkPlugin {
     fn spawn_and_cache_init_chunks(
         mut cache_event: EventWriter<CacheChunkEvent>,
         mut game: GameParam,
-        new_dimension: Query<&Dimension, Added<ActiveDimension>>,
+        new_dimension: Query<(&Dimension, Option<&Dungeon>), Added<ActiveDimension>>,
     ) {
         if new_dimension.get_single().is_err() {
             return;
         }
+
         for transform in game.camera_query.iter() {
             let camera_chunk_pos =
                 world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
@@ -256,6 +266,12 @@ impl ChunkPlugin {
                 for x in (camera_chunk_pos.x - CHUNK_CACHE_AMOUNT - 1)
                     ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT + 1)
                 {
+                    if let Some(_) = new_dimension.single().1 {
+                        println!("DUNGEON {x:?} {y:?}");
+                        if x != 0 || y != 0 {
+                            continue;
+                        }
+                    }
                     if !game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
                         println!("Init Caching chunk at {x:?} {y:?}");
                         game.chunk_manager.state = ChunkLoadingState::Spawning;
@@ -273,6 +289,7 @@ impl ChunkPlugin {
         mut cache_event: EventWriter<CacheChunkEvent>,
         mut spawn_event: EventWriter<SpawnChunkEvent>,
         mut game: GameParam,
+        new_dimension: Query<Option<&Dungeon>, With<ActiveDimension>>,
     ) {
         let transform = game.camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
@@ -296,6 +313,11 @@ impl ChunkPlugin {
             for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
                 ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
             {
+                if let Some(_) = new_dimension.single() {
+                    if x != 0 || y != 0 {
+                        continue;
+                    }
+                }
                 if !game
                     .chunk_manager
                     .spawned_chunks

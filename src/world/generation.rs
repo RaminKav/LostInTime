@@ -203,7 +203,10 @@ impl GenerationPlugin {
                         })
                         .unwrap()
                         .block_type;
-                    if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
+                    if tile.contains(&WorldObject::Water)
+                        || tile.contains(&WorldObject::Sand)
+                        || tile.contains(&WorldObject::DungeonStone)
+                    {
                         return false;
                     }
                     true
@@ -227,7 +230,10 @@ impl GenerationPlugin {
                     })
                     .unwrap()
                     .block_type;
-                if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
+                if tile.contains(&WorldObject::Water)
+                    || tile.contains(&WorldObject::Sand)
+                    || tile.contains(&WorldObject::DungeonStone)
+                {
                     return false;
                 }
                 true

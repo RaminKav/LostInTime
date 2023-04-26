@@ -12,7 +12,7 @@ pub enum Direction {
     Up,
     Down,
 }
-pub struct Walker {
+struct Walker {
     pos: Vec2,
 }
 
@@ -35,9 +35,9 @@ impl Default for GridSize {
 #[derive(Reflect, Resource, Clone, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct Bias {
-    bias: Direction,
+    pub bias: Direction,
     #[inspector(min = 0, max = 50)]
-    strength: u32,
+    pub strength: u32,
 }
 impl Default for Bias {
     fn default() -> Self {
@@ -81,31 +81,25 @@ impl Direction {
         }
     }
 }
-fn key_event(
-    mut commands: Commands,
-    key_input: ResMut<Input<KeyCode>>,
-    old: Query<Entity, With<Sprite>>,
-    steps: Res<NumSteps>,
-    grid_size: Res<GridSize>,
-    bias: Res<Bias>,
-) {
-    if key_input.just_pressed(KeyCode::R) {
-        // gen_new_dungeon(steps, grid_size, bias);
-    }
-}
+// fn key_event(
+//     mut commands: Commands,
+//     key_input: ResMut<Input<KeyCode>>,
+//     old: Query<Entity, With<Sprite>>,
+//     steps: Res<NumSteps>,
+//     grid_size: Res<GridSize>,
+//     bias: Res<Bias>,
+// ) {
+//     if key_input.just_pressed(KeyCode::R) {
+//         // gen_new_dungeon(steps, grid_size, bias);
+//     }
+// }
 
-pub fn gen_new_dungeon(
-    steps: Res<NumSteps>,
-    grid_size: Res<GridSize>,
-    bias: Res<Bias>,
-) -> Vec<Vec<i8>> {
-    let mut grid: Vec<Vec<i8>> = vec![vec![0; grid_size.0 as usize]; grid_size.0 as usize];
+pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>> {
+    let mut grid: Vec<Vec<i8>> = vec![vec![0; grid_size as usize]; grid_size as usize];
     let mut walker = Walker {
-        pos: Vec2::new((grid_size.0 / 2) as f32, (grid_size.0 / 2) as f32),
+        pos: Vec2::new((grid_size / 2) as f32, (grid_size / 2) as f32),
     };
-    let num_steps = steps.0;
-    let square_size = 10.;
-    let offset = (grid_size.0 * 6) as f32;
+    let num_steps = steps;
     for _ in 0..num_steps {
         let new_dir = Direction::get_next_dir(rand::thread_rng(), bias.clone());
         grid[walker.pos.x as usize][walker.pos.y as usize] = 1;
@@ -115,11 +109,11 @@ pub fn gen_new_dungeon(
             Direction::Left => walker.pos.x -= 1.,
             Direction::Right => walker.pos.x += 1.,
         }
-        if walker.pos.x > (grid_size.0 - 1) as f32 {
-            walker.pos.x = (grid_size.0 - 1) as f32
+        if walker.pos.x > (grid_size - 1) as f32 {
+            walker.pos.x = (grid_size - 1) as f32
         }
-        if walker.pos.y > (grid_size.0 - 1) as f32 {
-            walker.pos.y = (grid_size.0 - 1) as f32
+        if walker.pos.y > (grid_size - 1) as f32 {
+            walker.pos.y = (grid_size - 1) as f32
         }
     }
     grid

@@ -1,5 +1,6 @@
 pub mod chunk;
 pub mod dimension;
+pub mod dungeon;
 mod dungeon_generation;
 pub mod generation;
 mod noise_helpers;
