@@ -1,7 +1,7 @@
 (
     map : {
-        None: WorldItemMetadata(
-            pos: (32., 0.),
+        None: WorldObjectData(
+            texture_pos: (32., 0.),
             size: (16., 16.),
             anchor: None,
             collider: false,
@@ -11,8 +11,8 @@
             breaks_with: None,
             places_into: None
         ),
-        Placeable(Flint): WorldItemMetadata(
-            pos: (48., 16.),
+        Placeable(Flint): WorldObjectData(
+            texture_pos: (48., 16.),
             size: (16., 16.),
             anchor: None,
             collider: false,
@@ -22,8 +22,8 @@
             breaks_with: None,
             places_into: Some(StoneFull)
         ),
-        Placeable(Log): WorldItemMetadata(
-            pos: (32., 48.),
+        Placeable(Log): WorldObjectData(
+            texture_pos: (32., 48.),
             size: (16., 16.),
             anchor: None,
             collider: false,
@@ -33,8 +33,8 @@
             breaks_with: None,
             places_into: Some(Foliage(Tree))
         ),
-         StoneHalf: WorldItemMetadata(
-            pos: (0., 128.),
+         StoneHalf: WorldObjectData(
+            texture_pos: (0., 128.),
             size: (32., 48.),
             anchor: Some((0., 0.166666666667)),
             collider: true,
@@ -44,8 +44,8 @@
             breaks_with: None,
             places_into: None
         ),
-         StoneFull: WorldItemMetadata(
-            pos: (32., 112.),
+         StoneFull: WorldObjectData(
+            texture_pos: (32., 112.),
             size: (32., 64.),
             anchor: Some((0., 0.25)),
             collider: true,
@@ -55,8 +55,8 @@
             breaks_with: None,
             places_into: None
         ),
-         StoneTop: WorldItemMetadata(
-            pos: (64., 112.),
+         StoneTop: WorldObjectData(
+            texture_pos: (64., 112.),
             size: (32., 32.),
             anchor: None,
             collider: true,
@@ -66,8 +66,8 @@
             breaks_with: None,
             places_into: None
         ),
-        DungeonStone: WorldItemMetadata(
-            pos: (64., 144.),
+        DungeonStone: WorldObjectData(
+            texture_pos: (64., 144.),
             size: (32., 32.),
             anchor: None,
             collider: true,
@@ -77,8 +77,8 @@
             breaks_with: None,
             places_into: None
         ),
-        Foliage(Tree): WorldItemMetadata(
-            pos: (96., 112.),
+        Foliage(Tree): WorldObjectData(
+            texture_pos: (96., 112.),
             size: (32., 40.),
             anchor: None,
             collider: true,
@@ -88,8 +88,8 @@
             breaks_with: Some(Sword),
             places_into: None
         ),
-        Sword: WorldItemMetadata(
-            pos: (64., 64.),
+        Sword: WorldObjectData(
+            texture_pos: (64., 64.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
             collider: true,

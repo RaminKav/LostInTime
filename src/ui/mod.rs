@@ -1,5 +1,6 @@
 // mod inventory_slot_widget;
 // mod inventory_widget;
+pub mod minimap;
 mod ui_helpers;
 mod ui_plugin;
 

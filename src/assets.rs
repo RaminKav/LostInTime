@@ -10,52 +10,52 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::item::{WorldObject, WorldObjectData, WorldObjectResource};
+use crate::item::{WorldObject, WorldObjectResource};
 use crate::ui::UIElement;
 use crate::{GameState, ImageAssets, Limb};
 use ron::de::from_str;
-
-pub const WORLD_SCALE: f32 = 3.5; //SOURCE_TILE_SIZE * PIXEL_SCALE;
 
 pub struct GameAssetsPlugin;
 
 /// Used to describe the location and styling of sprites on the sprite sheet
 #[derive(Default, Clone, Copy, Debug, Deserialize)]
-pub struct WorldItemMetadata {
-    pub pos: (f32, f32),
-    pub size: (f32, f32),
+pub struct WorldObjectData {
+    pub texture_pos: Vec2,
+    pub size: Vec2,
     pub anchor: Option<Vec2>,
     pub collider: bool,
     pub breakable: bool,
     pub breaks_into: Option<WorldObject>,
-    pub equip_slot: Option<Limb>,
     pub breaks_with: Option<WorldObject>,
+    /// 0 = main hand, 1 = head, 2 = chest, 3 = legs
+    pub equip_slot: Option<Limb>,
     pub places_into: Option<WorldObject>,
 }
 
-impl WorldItemMetadata {
-    pub fn new(pos: (f32, f32), size: (f32, f32)) -> Self {
-        Self {
-            pos,
-            size,
-            anchor: None,
-            collider: false,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None,
-        }
-    }
+impl WorldObjectData {
+    // pub fn new(texture_pos: Vec2, size: Vec2) -> Self {
+    //     Self {
+    //         texture_pos,
+    //         size,
+    //         anchor: None,
+    //         collider: false,
+    //         breakable: false,
+    //         breaks_into: None,
+    //         equip_slot: None,
+    //         breaks_with: None,
+    //         places_into: None,
+    //         minimap_color: ,
+    //     }
+    // }
 
     pub fn to_atlas_rect(self) -> bevy::math::Rect {
         bevy::math::Rect {
             //A tiny amount is clipped off the sides of the rectangle
             //to stop contents of other sprites from bleeding through
-            min: Vec2::new(self.pos.0 + 0.15, self.pos.1 + 0.15),
+            min: Vec2::new(self.texture_pos.x + 0.15, self.texture_pos.y + 0.15),
             max: Vec2::new(
-                self.pos.0 + self.size.0 - 0.15,
-                self.pos.1 + self.size.1 - 0.15,
+                self.texture_pos.x + self.size.x - 0.15,
+                self.texture_pos.y + self.size.y - 0.15,
             ),
         }
     }
@@ -64,7 +64,7 @@ impl WorldItemMetadata {
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
 #[derive(Deserialize)]
 pub struct GraphicsDesc {
-    map: HashMap<WorldObject, WorldItemMetadata>,
+    map: HashMap<WorldObject, WorldObjectData>,
 }
 
 impl Plugin for GameAssetsPlugin {
@@ -131,7 +131,7 @@ pub struct Graphics {
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
 /// Copies sprite data pixel by pixel, needed to render things in UI
 fn convert_to_image(
-    sprite_desc: WorldItemMetadata,
+    sprite_desc: WorldObjectData,
     original_image: Handle<Image>,
     assets: &mut ResMut<Assets<Image>>,
 ) -> Handle<Image> {
@@ -142,9 +142,9 @@ fn convert_to_image(
     let mut data = Vec::default();
     //Every pixel is 4 entries in image.data
     let mut starting_index =
-        (sprite_desc.pos.0 + original_image.size().x * sprite_desc.pos.1) as usize;
-    for _y in 0..sprite_desc.size.1 as usize {
-        for x in 0..sprite_desc.size.0 as usize {
+        (sprite_desc.texture_pos.x + original_image.size().x * sprite_desc.texture_pos.y) as usize;
+    for _y in 0..sprite_desc.size.y as usize {
+        for x in 0..sprite_desc.size.x as usize {
             let index = starting_index + x;
             //Copy 1 pixel at index
             data.push(original_image.data[index * 4]);
@@ -156,8 +156,8 @@ fn convert_to_image(
     }
 
     let size = Extent3d {
-        width: sprite_desc.size.0 as u32,
-        height: sprite_desc.size.1 as u32,
+        width: sprite_desc.size.x as u32,
+        height: sprite_desc.size.y as u32,
         depth_or_array_layers: 1,
     };
     let image = Image::new(
@@ -224,7 +224,7 @@ impl GameAssetsPlugin {
                         TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
                     //Set the size to be proportional to the source rectangle
-                    sprite.custom_size = Some(Vec2::new(rect.size.0, rect.size.1));
+                    sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
                     spritesheet_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
                     world_obj_image_handles.insert(
                         *item,
@@ -240,19 +240,7 @@ impl GameAssetsPlugin {
             //         0.5 - anchor.1 / rect.size.1,
             //     ));
             // };
-            world_obj_data.properties.insert(
-                *item,
-                WorldObjectData {
-                    size: Vec2::new(rect.size.0, rect.size.1),
-                    anchor: rect.anchor,
-                    collider: rect.collider,
-                    breakable: rect.breakable,
-                    breaks_into: rect.breaks_into,
-                    equip_slot: rect.equip_slot,
-                    breaks_with: rect.breaks_with,
-                    places_into: rect.places_into,
-                },
-            );
+            world_obj_data.properties.insert(*item, *rect);
         }
 
         // load UI
@@ -274,6 +262,6 @@ impl GameAssetsPlugin {
     }
 }
 
-pub fn get_index_from_pixel_cords(p: WorldItemMetadata) -> usize {
-    (p.pos.1 + (p.pos.0 / 16.)) as usize
+pub fn get_index_from_pixel_cords(p: WorldObjectData) -> usize {
+    (p.texture_pos.y + (p.texture_pos.x / 16.)) as usize
 }
