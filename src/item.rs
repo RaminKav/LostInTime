@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
-use crate::assets::Graphics;
+use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
@@ -100,18 +100,7 @@ pub struct WorldObjectResource {
 }
 
 //TODO: delete this and unify with WorldItemMetadata...
-#[derive(Debug, Default)]
-pub struct WorldObjectData {
-    pub size: Vec2,
-    pub anchor: Option<Vec2>,
-    pub collider: bool,
-    pub breakable: bool,
-    pub breaks_into: Option<WorldObject>,
-    pub breaks_with: Option<WorldObject>,
-    /// 0 = main hand, 1 = head, 2 = chest, 3 = legs
-    pub equip_slot: Option<Limb>,
-    pub places_into: Option<WorldObject>,
-}
+
 impl WorldObjectResource {
     fn new() -> Self {
         Self {
@@ -606,6 +595,21 @@ impl WorldObject {
             .drop_entities
             .insert(item, (stack.clone(), transform));
         item
+    }
+    pub fn get_minimap_color(&self) -> (u8, u8, u8) {
+        match self {
+            WorldObject::None => (255, 70, 255),
+            WorldObject::Grass => (113, 133, 51),
+            WorldObject::StoneHalf => (255, 70, 255),
+            WorldObject::StoneFull => (255, 70, 255),
+            WorldObject::StoneTop => (255, 70, 255),
+            WorldObject::DungeonStone => (255, 70, 255),
+            WorldObject::Water => (87, 72, 82),
+            WorldObject::Sand => (210, 201, 165),
+            WorldObject::Foliage(_) => (119, 116, 59),
+            WorldObject::Placeable(_) => (255, 70, 255),
+            WorldObject::Sword => (255, 70, 255),
+        }
     }
     // pub fn attempt_to_break_item(
     //     self,

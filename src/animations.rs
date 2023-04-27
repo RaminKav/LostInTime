@@ -6,7 +6,6 @@ use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::time::FixedTimestep;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use interpolation::lerp;
 
 use crate::ai::AttackState;

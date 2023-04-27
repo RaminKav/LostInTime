@@ -19,8 +19,8 @@ use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, WorldGeneration,
-    PLAYER_MOVE_SPEED, WIDTH,
+    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
+    WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -262,7 +262,6 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
-        mut spawn_dim_event: EventWriter<DimensionSpawnEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -303,12 +302,6 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            println!("R");
-            // spawn_dim_event.send(DimensionSpawnEvent {
-            //     generation_params: WorldGeneration { ..default() },
-            //     seed: Some(123),
-            //     swap_to_dim_now: true,
-            // });
             DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands);
         }
         if key_input.just_pressed(KeyCode::M) {
@@ -435,14 +428,22 @@ impl InputsPlugin {
             // {
             //     return;
             // }
-            // let cursor_chunk_pos = WorldGenerationPlugin::camera_pos_to_chunk_pos(&Vec2::new(
-            //     cursor_pos.world_coords.x,
-            //     cursor_pos.world_coords.y,
-            // ));
-            // let cursor_tile_pos = WorldGenerationPlugin::camera_pos_to_block_pos(&Vec2::new(
-            //     cursor_pos.world_coords.x,
-            //     cursor_pos.world_coords.y,
-            // ));
+            let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
+            ));
+            let cursor_tile_pos = camera_pos_to_block_pos(&Vec2::new(
+                cursor_pos.world_coords.x,
+                cursor_pos.world_coords.y,
+            ));
+
+            let x = game
+                .chunk_manager
+                .raw_chunk_data
+                .get(&cursor_chunk_pos)
+                .unwrap()
+                .raw_chunk_blocks[cursor_tile_pos.x as usize][cursor_tile_pos.y as usize];
+            println!("{cursor_chunk_pos:?} {cursor_tile_pos:?} {x:?}");
 
             // if game
             //     .chunk_manager

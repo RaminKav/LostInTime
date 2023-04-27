@@ -6,6 +6,7 @@ use bevy_pkv::PkvStore;
 use super::dimension::{ActiveDimension, Dimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::generation::GenerationPlugin;
+use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::GameState;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets, MainCamera};
 
@@ -53,6 +54,7 @@ impl ChunkPlugin {
         mut game: GameParam,
         mut pkv: ResMut<PkvStore>,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
+        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
     ) {
         for e in cache_events.iter() {
             let chunk_pos = e.chunk_pos;
@@ -151,6 +153,7 @@ impl ChunkPlugin {
                 chunk_pos,
                 seed.single().seed,
             );
+            minimap_update.send(UpdateMiniMapEvent);
         }
     }
     fn handle_spawn_chunk_event(
