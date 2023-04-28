@@ -13,8 +13,8 @@ use crate::combat::AttackTimer;
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
+use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
-use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
@@ -125,7 +125,9 @@ impl InputsPlugin {
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
-        mut move_event: EventWriter<PlayerMoveEvent>,
+        mut move_event: EventWriter<PlayerMoveEvent>, // unused
+        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+
         mut inv: Query<&mut Inventory>,
     ) {
         let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
@@ -245,6 +247,7 @@ impl InputsPlugin {
 
         if d.x != 0. || d.y != 0. {
             move_event.send(PlayerMoveEvent(false));
+            minimap_event.send(UpdateMiniMapEvent);
         }
         for drop in collected_drops.iter() {
             let item_stack = game.items_query.get(*drop).unwrap().2.clone();
@@ -399,6 +402,7 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
         mut attack_event: EventWriter<AttackEvent>,
+        minimap_event: EventWriter<UpdateMiniMapEvent>,
         inv_query: Query<(&mut Visibility, &InventoryState)>,
         tool_query: Query<(Entity, Option<&AttackTimer>), With<Equipment>>,
         mut inv: Query<&mut Inventory>,
@@ -444,38 +448,6 @@ impl InputsPlugin {
                 .unwrap()
                 .raw_chunk_blocks[cursor_tile_pos.x as usize][cursor_tile_pos.y as usize];
             println!("{cursor_chunk_pos:?} {cursor_tile_pos:?} {x:?}");
-
-            // if game
-            //     .chunk_manager
-            //     .chunk_generation_data
-            //     .contains_key(&TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: TilePos {
-            //             x: cursor_tile_pos.x as u32,
-            //             y: cursor_tile_pos.y as u32,
-            //         },
-            //     })
-            // {
-            //     let obj_data = game
-            //         .chunk_manager
-            //         .chunk_generation_data
-            //         .get(&TileMapPositionData {
-            //             chunk_pos: cursor_chunk_pos,
-            //             tile_pos: TilePos {
-            //                 x: cursor_tile_pos.x as u32,
-            //                 y: cursor_tile_pos.y as u32,
-            //             },
-            //         })
-            //         .unwrap();
-            //     if game.block_query.contains(obj_data.entity) {
-            //         obj_data.object.attempt_to_break_item(
-            //             &mut commands,
-            //             &mut game,
-            //             cursor_tile_pos,
-            //             cursor_chunk_pos,
-            //         );
-            //     }
-            // }
         }
         // Attempt to place block in hand
         // TODO: Interact
@@ -511,6 +483,7 @@ impl InputsPlugin {
                         &mut game,
                         tile_pos,
                         chunk_pos,
+                        minimap_event,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
                     }

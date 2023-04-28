@@ -16,7 +16,7 @@ use crate::{
     GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
 
-use super::ui_helpers;
+use super::{minimap::MinimapPlugin, ui_helpers};
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
 pub enum UIElement {
@@ -26,6 +26,8 @@ pub enum UIElement {
     HealthBarFrame,
     Tooltip,
     LargeTooltip,
+    Minimap,
+    LargeMinimap,
 }
 
 #[derive(Component, Clone, Debug)]
@@ -121,6 +123,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(LastHoveredSlot { slot: None })
             .add_event::<DropOnSlotEvent>()
             .add_event::<DropInWorldEvent>()
+            .add_plugin(MinimapPlugin)
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
                     .with_system(setup_inv_ui.after(GameAssetsPlugin::load_graphics))
