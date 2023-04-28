@@ -7,8 +7,8 @@ use super::dimension::{ActiveDimension, Dimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::generation::GenerationPlugin;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::GameState;
-use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets, MainCamera};
+use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
+use crate::{GameState, TextureCamera};
 
 use super::tile::TilePlugin;
 use super::{
@@ -54,7 +54,6 @@ impl ChunkPlugin {
         mut game: GameParam,
         mut pkv: ResMut<PkvStore>,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
-        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
     ) {
         for e in cache_events.iter() {
             let chunk_pos = e.chunk_pos;
@@ -153,7 +152,6 @@ impl ChunkPlugin {
                 chunk_pos,
                 seed.single().seed,
             );
-            minimap_update.send(UpdateMiniMapEvent);
         }
     }
     fn handle_spawn_chunk_event(
@@ -161,6 +159,7 @@ impl ChunkPlugin {
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
         mut game: GameParam,
+        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
     ) {
         for e in spawn_events.iter() {
             let chunk_pos = e.chunk_pos;
@@ -245,7 +244,7 @@ impl ChunkPlugin {
                 game.chunk_manager
                     .spawned_chunks
                     .insert(IVec2::new(chunk_pos.x, chunk_pos.y));
-
+                minimap_update.send(UpdateMiniMapEvent);
                 return;
             }
             warn!("Chunk {chunk_pos:?} not in CACHE!");
@@ -335,10 +334,10 @@ impl ChunkPlugin {
         }
         game.chunk_manager.state = ChunkLoadingState::None;
     }
-
+    //TODO: change despawning systems to use playe rpos instead??
     fn despawn_outofrange_chunks(
         mut commands: Commands,
-        camera_query: Query<&Transform, With<MainCamera>>,
+        camera_query: Query<&Transform, With<TextureCamera>>,
         chunks_query: Query<(Entity, &Transform)>,
         mut chunk_manager: ResMut<ChunkManager>,
     ) {
@@ -366,7 +365,7 @@ impl ChunkPlugin {
         chunk_manager.state = ChunkLoadingState::None;
     }
     fn toggle_on_screen_mesh_visibility(
-        camera_query: Query<&Transform, With<MainCamera>>,
+        camera_query: Query<&Transform, With<TextureCamera>>,
         mut foliage_query: Query<(&mut Visibility, &Transform, &Handle<FoliageMaterial>)>,
         mut chunk_manager: ResMut<ChunkManager>,
     ) {

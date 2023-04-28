@@ -99,8 +99,7 @@ pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(ResourceInspectorPlugin::<BlockAttributeBundle>::default())
-            .init_resource::<BlockAttributeBundle>()
+        app.init_resource::<BlockAttributeBundle>()
             .register_type::<BlockAttributeBundle>()
             .add_event::<AttributeChangeEvent>()
             .add_system_set(

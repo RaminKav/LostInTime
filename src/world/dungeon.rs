@@ -4,8 +4,8 @@ use bevy_ecs_tilemap::tiles::TilePos;
 use crate::{
     item::WorldObject,
     world::{
-        dimension::{Dimension, DimensionSpawnEvent, GenerationSeed, SpawnDimension},
-        RawChunkData, WorldGeneration,
+        dimension::{Dimension, GenerationSeed, SpawnDimension},
+        RawChunkData,
     },
 };
 
@@ -19,7 +19,7 @@ use super::{
 pub struct Dungeon;
 pub struct DungeonPlugin;
 impl Plugin for DungeonPlugin {
-    fn build(&self, app: &mut App) {}
+    fn build(&self, _app: &mut App) {}
 }
 
 impl DungeonPlugin {
@@ -47,7 +47,11 @@ impl DungeonPlugin {
                 } else {
                     0001
                 };
-                let tile_quad_blocks = [WorldObject::DungeonStone; 4];
+                let tile_quad_blocks = if tile_bits == 0000 {
+                    [WorldObject::DungeonStone; 4]
+                } else {
+                    [WorldObject::None; 4]
+                };
 
                 raw_chunk_bits[x as usize][y as usize] = [0; 4];
                 raw_chunk_blocks[x as usize][y as usize] = tile_quad_blocks;

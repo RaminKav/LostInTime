@@ -5,6 +5,7 @@ use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
+use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::{ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
 use crate::{AnimationTimer, GameParam, GameState, Limb, YSort};
@@ -316,6 +317,7 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: IVec2,
         chunk_pos: IVec2,
+        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) -> Option<Entity> {
         let item = match self {
             WorldObject::Foliage(_) => self.spawn_foliage(commands, game, tile_pos, chunk_pos),
@@ -332,6 +334,7 @@ impl WorldObject {
                     .data
                     .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
             }
+            minimap_event.send(UpdateMiniMapEvent);
 
             return Some(item);
         }
@@ -600,10 +603,10 @@ impl WorldObject {
         match self {
             WorldObject::None => (255, 70, 255),
             WorldObject::Grass => (113, 133, 51),
-            WorldObject::StoneHalf => (255, 70, 255),
-            WorldObject::StoneFull => (255, 70, 255),
-            WorldObject::StoneTop => (255, 70, 255),
-            WorldObject::DungeonStone => (255, 70, 255),
+            WorldObject::StoneHalf => (171, 155, 142),
+            WorldObject::StoneFull => (171, 155, 142),
+            WorldObject::StoneTop => (171, 155, 142),
+            WorldObject::DungeonStone => (53, 53, 57),
             WorldObject::Water => (87, 72, 82),
             WorldObject::Sand => (210, 201, 165),
             WorldObject::Foliage(_) => (119, 116, 59),
@@ -611,44 +614,6 @@ impl WorldObject {
             WorldObject::Sword => (255, 70, 255),
         }
     }
-    // pub fn attempt_to_break_item(
-    //     self,
-    //     commands: &mut Commands,
-    //     game: &mut GameParam,
-    //     tile_pos: IVec2,
-    //     chunk_pos: IVec2,
-    // ) {
-    //     let obj_data = game
-    //         .chunk_manager
-    //         .chunk_generation_data
-    //         .get(&TileMapPositionData {
-    //             chunk_pos,
-    //             tile_pos: TilePos {
-    //                 x: tile_pos.x as u32,
-    //                 y: tile_pos.y as u32,
-    //             },
-    //         })
-    //         .unwrap();
-
-    //     let main_hand_tool = &game.game.player_state.main_hand_slot;
-    //     let b_data = game.block_query.get_mut(obj_data.entity).unwrap();
-
-    //     if let Some(data) = game.world_obj_data.properties.get(&self) {
-    //         //TODO: maybe move this logic to combat.rs? or move the hp loss from combat to here?
-    //         if let Some(breaks_with) = data.breaks_with {
-    //             if let Some(main_hand_tool) = main_hand_tool {
-    //                 if main_hand_tool.obj == breaks_with {
-    //                     let h = dbg!(b_data.1);
-    //                     if h.0 <= 0 {
-    //                         Self::break_item(self, commands, game, tile_pos, chunk_pos)
-    //                     }
-    //                 }
-    //             }
-    //         } else {
-    //             Self::break_item(self, commands, game, tile_pos, chunk_pos)
-    //         }
-    //     }
-    // }
 }
 
 impl Default for WorldObject {
@@ -676,24 +641,13 @@ impl ItemsPlugin {
         mut commands: Commands,
         mut game: GameParam,
         mut obj_break_events: EventReader<ObjBreakEvent>,
+        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
-        // let obj_data = game
-        //     .chunk_manager
-        //     .chunk_generation_data
-        //     .get(&TileMapPositionData {
-        //         chunk_pos,
-        //         tile_pos: TilePos {
-        //             x: tile_pos.x as u32,
-        //             y: tile_pos.y as u32,
-        //         },
-        //     })
-        //     .unwrap();
         for broken in obj_break_events.iter() {
             if let Some(breaks_into_option) = game.world_obj_data.properties.get(&broken.obj) {
-                // commands.entity(obj_data.entity).despawn();
+                commands.entity(broken.entity).despawn();
                 if let Some(breaks_into) = breaks_into_option.breaks_into {
                     let mut rng = rand::thread_rng();
-                    println!("SPAWNING DROP");
                     breaks_into.spawn_item_drop(
                         &mut commands,
                         &mut game,
@@ -703,39 +657,40 @@ impl ItemsPlugin {
                         None,
                     );
                 }
-                game.chunk_manager
-                    .chunk_generation_data
-                    .remove(&TileMapPositionData {
-                        chunk_pos: broken.chunk_pos,
-                        tile_pos: TilePos {
-                            x: broken.tile_pos.x as u32,
-                            y: broken.tile_pos.y as u32,
-                        },
-                    });
-                let old_points = game
-                    .game_data
-                    .data
-                    .get(&(broken.chunk_pos.x, broken.chunk_pos.y))
-                    .unwrap();
-                let updated_old_points = old_points
-                    .0
-                    .clone()
-                    .iter()
-                    .filter(|p| {
-                        **p != (
-                            broken.tile_pos.x as f32,
-                            broken.tile_pos.y as f32,
-                            broken.obj,
-                        )
-                    })
-                    .copied()
-                    .collect::<Vec<(f32, f32, WorldObject)>>();
-
-                game.game_data.data.insert(
-                    (broken.chunk_pos.x, broken.chunk_pos.y),
-                    ChunkObjectData(updated_old_points.to_vec()),
-                );
             }
+            game.chunk_manager
+                .chunk_generation_data
+                .remove(&TileMapPositionData {
+                    chunk_pos: broken.chunk_pos,
+                    tile_pos: TilePos {
+                        x: broken.tile_pos.x as u32,
+                        y: broken.tile_pos.y as u32,
+                    },
+                });
+            let old_points = game
+                .game_data
+                .data
+                .get(&(broken.chunk_pos.x, broken.chunk_pos.y))
+                .unwrap();
+            let updated_old_points = old_points
+                .0
+                .clone()
+                .iter()
+                .filter(|p| {
+                    **p != (
+                        broken.tile_pos.x as f32,
+                        broken.tile_pos.y as f32,
+                        broken.obj,
+                    )
+                })
+                .copied()
+                .collect::<Vec<(f32, f32, WorldObject)>>();
+
+            game.game_data.data.insert(
+                (broken.chunk_pos.x, broken.chunk_pos.y),
+                ChunkObjectData(updated_old_points.to_vec()),
+            );
+            minimap_event.send(UpdateMiniMapEvent);
         }
     }
     /// Keeps the graphics up to date for things that are harvested or grown
