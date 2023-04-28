@@ -163,7 +163,6 @@ impl CombatPlugin {
 
     fn handle_hits(
         mut commands: Commands,
-        cursor_pos: Res<CursorPos>,
         game: GameParam,
         mut health: Query<(
             Entity,
@@ -176,7 +175,6 @@ impl CombatPlugin {
         mut enemy_death_events: EventWriter<EnemyDeathEvent>,
         mut obj_death_events: EventWriter<ObjBreakEvent>,
         in_i_frame: Query<&InvincibilityTimer>,
-        // has_i_frames: Query<&InvincibilityCooldown>,
     ) {
         for hit in hit_events.iter() {
             // is in invincibility frames from a previous hit
@@ -189,27 +187,15 @@ impl CombatPlugin {
                 hit_health.0 -= hit.damage as i32;
 
                 if let Some(obj) = obj_option {
-                    let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
-                        cursor_pos.world_coords.x,
-                        cursor_pos.world_coords.y,
-                    ));
-                    let cursor_tile_pos = camera_pos_to_block_pos(&Vec2::new(
-                        cursor_pos.world_coords.x,
-                        cursor_pos.world_coords.y,
-                    ));
+                    let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+                    let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+                    let obj_chunk_pos = camera_pos_to_chunk_pos(
+                        &(t.translation.truncate() - anchor * obj_data.size),
+                    );
+                    let obj_tile_pos = camera_pos_to_block_pos(
+                        &(t.translation.truncate() - anchor * obj_data.size),
+                    );
 
-                    // let obj_data = game
-                    //     .chunk_manager
-                    //     .chunk_generation_data
-                    //     .get(&TileMapPositionData {
-                    //         chunk_pos: cursor_chunk_pos,
-                    //         tile_pos: TilePos {
-                    //             x: cursor_tile_pos.x as u32,
-                    //             y: cursor_tile_pos.y as u32,
-                    //         },
-                    //     })
-                    //     .unwrap();
-                    // if game.block_query.contains(obj_data.entity) {
                     if let Some(data) = game.world_obj_data.properties.get(&obj) {
                         if let Some(breaks_with) = data.breaks_with {
                             if let Some(main_hand_tool) = hit.hit_with {
@@ -218,8 +204,8 @@ impl CombatPlugin {
                                         obj_death_events.send(ObjBreakEvent {
                                             entity: e,
                                             obj: *obj,
-                                            tile_pos: cursor_tile_pos,
-                                            chunk_pos: cursor_chunk_pos,
+                                            tile_pos: obj_tile_pos,
+                                            chunk_pos: obj_chunk_pos,
                                         });
                                     }
                                 }
@@ -228,18 +214,11 @@ impl CombatPlugin {
                             obj_death_events.send(ObjBreakEvent {
                                 entity: e,
                                 obj: *obj,
-                                tile_pos: cursor_tile_pos,
-                                chunk_pos: cursor_chunk_pos,
+                                tile_pos: obj_tile_pos,
+                                chunk_pos: obj_chunk_pos,
                             });
                         }
                     }
-                    // obj.attempt_to_break_item(
-                    //     &mut commands,
-                    //     &mut game,
-                    //     cursor_tile_pos,
-                    //     cursor_chunk_pos,
-                    // );
-                    // }
                 } else {
                     // let has_i_frames = has_i_frames.get(hit.hit_entity);
                     commands

@@ -12,7 +12,6 @@ use bevy::{
     prelude::*,
     utils::{HashMap, HashSet},
 };
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::item::WorldObject;
@@ -106,9 +105,9 @@ impl Plugin for WorldPlugin {
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
             .add_plugin(TilePlugin)
-            .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
-            .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
-            .add_plugin(ResourceInspectorPlugin::<Bias>::default())
+            // .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
+            // .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
+            // .add_plugin(ResourceInspectorPlugin::<Bias>::default())
             .init_resource::<NumSteps>()
             .init_resource::<GridSize>()
             .init_resource::<Bias>()
