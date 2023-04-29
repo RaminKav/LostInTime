@@ -8,12 +8,13 @@ use super::dungeon::Dungeon;
 use super::generation::GenerationPlugin;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
-use crate::{GameState, TextureCamera};
+use crate::{GameState, MainCamera, TextureCamera};
 
 use super::tile::TilePlugin;
 use super::{
     world_helpers, ChunkLoadingState, ChunkManager, RawChunkData, TileEntityData,
-    TileMapPositionData, CHUNK_CACHE_AMOUNT, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
+    TileMapPositionData, CHUNK_CACHE_AMOUNT, CHUNK_SIZE, MAX_VISIBILITY, NUM_CHUNKS_AROUND_CAMERA,
+    TILE_SIZE,
 };
 
 pub const ZERO_ZERO: IVec2 = IVec2 { x: 0, y: 0 };
@@ -176,7 +177,6 @@ impl ChunkPlugin {
 
             let tilemap_entity = commands.spawn_empty().id();
             let mut tile_storage = TileStorage::empty(tilemap_size);
-            let mut is_dungeon = false;
             if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
                 println!("Loading chunk {chunk_pos:?} from CACHE!");
 
@@ -203,10 +203,6 @@ impl ChunkPlugin {
                                 ..Default::default()
                             })
                             .id();
-                        if tile_entity_data.block_offset == 32 {
-                            is_dungeon = true;
-                        }
-
                         game.chunk_manager
                             .chunk_tile_entity_data
                             .get_mut(&TileMapPositionData {
@@ -237,9 +233,7 @@ impl ChunkPlugin {
                     ..Default::default()
                 });
                 //TODO: add event for this
-                if !is_dungeon {
-                    GenerationPlugin::spawn_objects(&mut commands, &mut game, chunk_pos);
-                }
+                GenerationPlugin::spawn_objects(&mut commands, &mut game, chunk_pos);
 
                 game.chunk_manager
                     .spawned_chunks
@@ -269,7 +263,6 @@ impl ChunkPlugin {
                     ..(camera_chunk_pos.x + CHUNK_CACHE_AMOUNT + 1)
                 {
                     if let Some(_) = new_dimension.single().1 {
-                        println!("DUNGEON {x:?} {y:?}");
                         if x != 0 || y != 0 {
                             continue;
                         }
@@ -338,7 +331,7 @@ impl ChunkPlugin {
     fn despawn_outofrange_chunks(
         mut commands: Commands,
         camera_query: Query<&Transform, With<TextureCamera>>,
-        chunks_query: Query<(Entity, &Transform)>,
+        chunks_query: Query<(Entity, &Transform), Without<MainCamera>>,
         mut chunk_manager: ResMut<ChunkManager>,
     ) {
         for camera_transform in camera_query.iter() {
@@ -370,14 +363,13 @@ impl ChunkPlugin {
         mut chunk_manager: ResMut<ChunkManager>,
     ) {
         for camera_transform in camera_query.iter() {
-            let max_distance = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
             for (mut v, ft, _) in foliage_query.iter_mut() {
                 let foliage_pos = ft.translation.xy();
                 let distance = camera_transform.translation.xy().distance(foliage_pos);
 
-                if v.is_visible && distance > (max_distance * 2_u32) as f32 {
+                if v.is_visible && distance > (MAX_VISIBILITY * 2_u32) as f32 {
                     v.is_visible = false;
-                } else if !v.is_visible && distance <= (max_distance * 2_u32) as f32 {
+                } else if !v.is_visible && distance <= (MAX_VISIBILITY * 2_u32) as f32 {
                     v.is_visible = true;
                 }
             }
