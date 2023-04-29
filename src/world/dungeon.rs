@@ -5,8 +5,9 @@ use crate::{
     item::WorldObject,
     world::{
         dimension::{Dimension, GenerationSeed, SpawnDimension},
-        RawChunkData,
+        ChunkObjectData, RawChunkData,
     },
+    GameParam,
 };
 
 use super::{
@@ -23,7 +24,7 @@ impl Plugin for DungeonPlugin {
 }
 
 impl DungeonPlugin {
-    pub fn gen_and_spawn_new_dungeon_dimension(commands: &mut Commands) {
+    pub fn gen_and_spawn_new_dungeon_dimension(commands: &mut Commands, game: &mut GameParam) {
         let grid = gen_new_dungeon(
             1500,
             CHUNK_SIZE as usize,
@@ -35,6 +36,8 @@ impl DungeonPlugin {
         let chunk_pos = ZERO_ZERO;
 
         let mut cm = ChunkManager::new();
+        let mut wall_children = Vec::new();
+
         let mut raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
             [[[0; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
         let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize] =
@@ -42,16 +45,15 @@ impl DungeonPlugin {
         for y in 0..CHUNK_SIZE {
             for x in 0..CHUNK_SIZE {
                 let tile_pos = TilePos { x, y };
-                let tile_bits = if grid[x as usize][y as usize] == 1 {
-                    0000
-                } else {
-                    0001
-                };
-                let tile_quad_blocks = if tile_bits == 0000 {
-                    [WorldObject::DungeonStone; 4]
-                } else {
-                    [WorldObject::None; 4]
-                };
+                let tile_bits = 0000;
+                let tile_quad_blocks = [WorldObject::DungeonStone; 4];
+                if grid[x as usize][y as usize] == 0 {
+                    wall_children.push((
+                        tile_pos.x as f32,
+                        tile_pos.y as f32,
+                        WorldObject::StoneHalf,
+                    ));
+                }
 
                 raw_chunk_bits[x as usize][y as usize] = [0; 4];
                 raw_chunk_blocks[x as usize][y as usize] = tile_quad_blocks;
@@ -80,6 +82,9 @@ impl DungeonPlugin {
                 );
             }
         }
+        game.game_data
+            .data
+            .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(wall_children));
         println!("SENDING DIM SPAWN EVENT");
         let dim_e = commands
             .spawn((Dimension, Dungeon, GenerationSeed { seed: 123 }, cm))

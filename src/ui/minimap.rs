@@ -81,17 +81,19 @@ impl MinimapPlugin {
                         let mut chunk_pos = p_cp;
                         let mut tile_x = p_tp.x + x;
                         let mut tile_y = p_tp.y + y;
-                        if tile_x >= CHUNK_SIZE as i32 {
+                        while tile_x >= CHUNK_SIZE as i32 {
                             tile_x = tile_x - CHUNK_SIZE as i32;
                             chunk_pos.x += 1;
-                        } else if tile_x < 0 {
+                        }
+                        while tile_x < 0 {
                             tile_x = CHUNK_SIZE as i32 + tile_x;
                             chunk_pos.x -= 1;
                         }
-                        if tile_y >= CHUNK_SIZE as i32 {
+                        while tile_y >= CHUNK_SIZE as i32 {
                             tile_y = tile_y - CHUNK_SIZE as i32;
                             chunk_pos.y += 1;
-                        } else if tile_y < 0 {
+                        }
+                        while tile_y < 0 {
                             tile_y = CHUNK_SIZE as i32 + tile_y;
                             chunk_pos.y -= 1;
                         }

@@ -103,7 +103,7 @@ fn main() {
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin)
-        .add_plugin(RapierDebugRenderPlugin::default())
+        // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -175,6 +175,7 @@ pub struct GameParam<'w, 's> {
     pub graphics: Res<'w, Graphics>,
     pub chunk_manager: ResMut<'w, ChunkManager>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
+    //TODO: remove this to use Bevy_Save
     pub game_data: ResMut<'w, GameData>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
 
@@ -600,7 +601,7 @@ fn setup(
             )
             .with_alignment(TextAlignment::TOP_RIGHT),
             transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
+                translation: Vec3::new(GAME_WIDTH / 2. - 10., -GAME_HEIGHT / 2. + 10., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
