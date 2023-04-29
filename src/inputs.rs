@@ -4,12 +4,13 @@ use bevy::prelude::*;
 use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
 use bevy::window::{WindowFocused, WindowId};
+use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{AttributeModifier, Health, ItemAttributes};
-use crate::combat::AttackTimer;
+use crate::attributes::{Attack, AttributeModifier, Health, ItemAttributes};
+use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
@@ -17,6 +18,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
+use crate::world::TileMapPositionData;
 use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
     GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
@@ -305,7 +307,7 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands);
+            DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands, &mut game);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone().unwrap();
@@ -403,9 +405,12 @@ impl InputsPlugin {
         mut game: GameParam,
         mut attack_event: EventWriter<AttackEvent>,
         minimap_event: EventWriter<UpdateMiniMapEvent>,
+        mut hit_event: EventWriter<HitEvent>,
+
         inv_query: Query<(&mut Visibility, &InventoryState)>,
         tool_query: Query<(Entity, Option<&AttackTimer>), With<Equipment>>,
         mut inv: Query<&mut Inventory>,
+        parent_attack: Query<&Attack>,
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
@@ -415,8 +420,10 @@ impl InputsPlugin {
         }
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
+            let mut main_hand_option = None;
             // if it has AttackTimer, the action is on cooldown, so we abort.
             if let Some(tool) = &game.game.player_state.main_hand_slot {
+                main_hand_option = Some(tool.obj);
                 if tool_query.get(tool.entity).unwrap().1.is_some() {
                     return;
                 }
@@ -424,14 +431,14 @@ impl InputsPlugin {
 
             attack_event.send(AttackEvent);
 
-            // let player_pos = game.game.player_state.position;
-            // if player_pos
-            //     .truncate()
-            //     .distance(cursor_pos.world_coords.truncate())
-            //     > (game.game.player_state.reach_distance * 32) as f32
-            // {
-            //     return;
-            // }
+            let player_pos = game.game.player_state.position;
+            if player_pos
+                .truncate()
+                .distance(cursor_pos.world_coords.truncate())
+                > (game.game.player_state.reach_distance * 32) as f32
+            {
+                return;
+            }
             let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
@@ -440,6 +447,24 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
+            if let Some(hit_obj) =
+                game.chunk_manager
+                    .chunk_generation_data
+                    .get(&TileMapPositionData {
+                        tile_pos: TilePos {
+                            x: cursor_tile_pos.x as u32,
+                            y: cursor_tile_pos.y as u32,
+                        },
+                        chunk_pos: cursor_chunk_pos,
+                    })
+            {
+                hit_event.send(HitEvent {
+                    hit_entity: hit_obj.entity,
+                    damage: parent_attack.get(game.game.player).unwrap().0,
+                    dir: Vec2::new(0., 0.),
+                    hit_with: main_hand_option,
+                });
+            }
 
             let x = game
                 .chunk_manager

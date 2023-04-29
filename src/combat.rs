@@ -5,7 +5,6 @@ use rand::Rng;
 use crate::{
     animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
-    inputs::CursorPos,
     inventory::Inventory,
     item::{MainHand, Placeable, WorldObject},
     ui::InventoryState,
@@ -257,6 +256,7 @@ impl CombatPlugin {
         game: Res<Game>,
         inv_state: Query<&InventoryState>,
         mut inv: Query<&mut Inventory>,
+        world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     ) {
         if let Ok(weapon) = weapons.get_single() {
             let weapon_parent = weapon.1;
@@ -264,7 +264,8 @@ impl CombatPlugin {
                 (c.0 == weapon.0 && c.1 != weapon_parent.get())
                     || (c.1 == weapon.0 && c.0 != weapon_parent.get())
             }) {
-                if !game.player_state.is_attacking {
+                let hit_entity = if hit.0 == weapon.0 { hit.1 } else { hit.0 };
+                if !game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
                     return;
                 }
                 if let Some(Some(wep)) = inv
@@ -283,7 +284,7 @@ impl CombatPlugin {
                 }
                 commands.entity(weapon.0).insert(HitMarker);
                 hit_event.send(HitEvent {
-                    hit_entity: if hit.0 == weapon.0 { hit.1 } else { hit.0 },
+                    hit_entity,
                     damage: parent_attack.get(**weapon_parent).unwrap().0,
                     dir: Vec2::new(0., 0.),
                     hit_with: Some(*weapon.2),
