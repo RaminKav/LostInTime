@@ -197,7 +197,7 @@ impl GameAssetsPlugin {
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
-            Vec2::new(32., 64.),
+            Vec2::new(32., 48.),
             16,
             2,
             None,
