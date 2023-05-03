@@ -43,6 +43,7 @@ impl Plugin for ChunkPlugin {
 pub struct SpawnChunkEvent {
     chunk_pos: IVec2,
 }
+
 #[derive(Clone)]
 pub struct CacheChunkEvent {
     chunk_pos: IVec2,
@@ -59,9 +60,8 @@ impl ChunkPlugin {
         for e in cache_events.iter() {
             let chunk_pos = e.chunk_pos;
             if game.chunk_manager.cached_chunks.contains(&chunk_pos) {
-                return;
+                continue;
             }
-            // println!("CACHING CHUNK {:?} {:?}", chunk_pos, seed.single().seed);
             game.chunk_manager.cached_chunks.insert(chunk_pos);
 
             for y in 0..CHUNK_SIZE {
@@ -76,7 +76,7 @@ impl ChunkPlugin {
                             entity: None,
                             tile_bit_index: 0b0000,
                             block_type: [WorldObject::Sand; 4],
-                            block_offset: 0,
+                            texture_offset: 0,
                         },
                     );
                 }
@@ -111,7 +111,7 @@ impl ChunkPlugin {
                             entity: None,
                             tile_bit_index: block_bits,
                             block_type: blocks,
-                            block_offset: index_shift,
+                            texture_offset: index_shift,
                         },
                     );
                 }
@@ -197,7 +197,7 @@ impl ChunkPlugin {
                                 tilemap_id: TilemapId(tilemap_entity),
                                 texture_index: TileTextureIndex(
                                     (tile_entity_data.tile_bit_index
-                                        + tile_entity_data.block_offset)
+                                        + tile_entity_data.texture_offset)
                                         .into(),
                                 ),
                                 ..Default::default()
@@ -235,11 +235,7 @@ impl ChunkPlugin {
                 //TODO: add event for this
                 GenerationPlugin::spawn_objects(&mut commands, &mut game, chunk_pos);
 
-                game.chunk_manager
-                    .spawned_chunks
-                    .insert(IVec2::new(chunk_pos.x, chunk_pos.y));
                 minimap_update.send(UpdateMiniMapEvent);
-                return;
             }
             warn!("Chunk {chunk_pos:?} not in CACHE!");
         }
@@ -313,15 +309,17 @@ impl ChunkPlugin {
                         continue;
                     }
                 }
-                if !game
+                if (!game
                     .chunk_manager
                     .spawned_chunks
-                    .contains(&IVec2::new(x, y))
+                    .contains(&IVec2::new(x, y)))
+                    && game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y))
+                    && !(game.chunk_manager.state == ChunkLoadingState::Caching)
                 {
-                    game.chunk_manager.state = ChunkLoadingState::Spawning;
                     spawn_event.send(SpawnChunkEvent {
                         chunk_pos: IVec2::new(x, y),
                     });
+                    game.chunk_manager.spawned_chunks.insert(IVec2::new(x, y));
                 }
             }
         }

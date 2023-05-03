@@ -20,7 +20,7 @@
             breaks_into: None,
             equip_slot: None,
             breaks_with: None,
-            places_into: Some(StoneFull)
+            places_into: Some(Wall(Stone))
         ),
         Placeable(Log): WorldObjectData(
             texture_pos: (32., 48.),
@@ -33,35 +33,13 @@
             breaks_with: None,
             places_into: Some(Foliage(Tree))
         ),
-         StoneHalf: WorldObjectData(
-            texture_pos: (0., 128.),
+         Wall(Stone): WorldObjectData(
+            texture_pos: (0., 144.),
             size: (32., 48.),
-            anchor: Some((0., 0.166666666667)),
-            collider: true,
-            breakable: true,
-            breaks_into: Some(Placeable(Flint)),
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
-        ),
-         StoneFull: WorldObjectData(
-            texture_pos: (32., 112.),
-            size: (32., 64.),
-            anchor: Some((0., 0.25)),
-            collider: true,
-            breakable: true,
-            breaks_into: Some(Placeable(Flint)),
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
-        ),
-         StoneTop: WorldObjectData(
-            texture_pos: (64., 112.),
-            size: (32., 32.),
             anchor: None,
             collider: true,
             breakable: true,
-            breaks_into: None,
+            breaks_into: Some(Placeable(Flint)),
             equip_slot: None,
             breaks_with: None,
             places_into: None

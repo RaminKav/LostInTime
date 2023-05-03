@@ -19,7 +19,7 @@ use lazy_static::lazy_static;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use strum_macros::{Display, EnumIter};
 
 #[derive(Component)]
 pub struct Breakable(pub Option<WorldObject>);
@@ -52,9 +52,7 @@ pub struct Size(pub Vec2);
 pub enum WorldObject {
     None,
     Grass,
-    StoneHalf,
-    StoneFull,
-    StoneTop,
+    Wall(Wall),
     DungeonStone,
     Water,
     Sand,
@@ -71,6 +69,18 @@ impl Default for Foliage {
         Self::Tree
     }
 }
+#[derive(
+    Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display, EnumIter,
+)]
+pub enum Wall {
+    Stone,
+}
+impl Default for Wall {
+    fn default() -> Self {
+        Self::Stone
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
 pub enum Placeable {
     Log,
@@ -115,9 +125,7 @@ impl fmt::Display for WorldObject {
         match self {
             WorldObject::None => write!(f, ""),
             WorldObject::Grass => write!(f, "Grass"),
-            WorldObject::StoneHalf => write!(f, "Stone Block"),
-            WorldObject::StoneFull => write!(f, "Stone Block"),
-            WorldObject::StoneTop => write!(f, "Stone Block"),
+            WorldObject::Wall(_) => write!(f, "Stone Wall"),
             WorldObject::DungeonStone => write!(f, "Dungeon Stone Block"),
             WorldObject::Water => write!(f, "Water"),
             WorldObject::Sand => write!(f, "Sand"),
@@ -132,7 +140,7 @@ impl WorldObject {
         self,
         commands: &mut Commands,
         game: &mut GameParam,
-        tile_pos: IVec2,
+        tile_pos: TilePos,
         chunk_pos: IVec2,
     ) -> Option<Entity> {
         let item_map = &game.graphics.spritesheet_map;
@@ -143,10 +151,7 @@ impl WorldObject {
             .chunk_manager
             .chunk_generation_data
             .get(&TileMapPositionData {
-                tile_pos: TilePos {
-                    x: tile_pos.x as u32,
-                    y: tile_pos.y as u32,
-                },
+                tile_pos,
                 chunk_pos,
             })
             .is_some()
@@ -161,14 +166,13 @@ impl WorldObject {
             .unwrap()
             .get(&self)
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .0
             .clone();
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
-            (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.x * obj_data.size.x,
-            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y,
             0.,
         );
@@ -213,16 +217,102 @@ impl WorldObject {
             WorldObjectEntityData {
                 object: self,
                 entity: item,
+                obj_bit_index: 0,
+                texture_offset: 0,
             },
         );
 
         Some(item)
     }
+    pub fn spawn_wall(
+        self,
+        commands: &mut Commands,
+        game: &mut GameParam,
+        tile_pos: TilePos,
+        chunk_pos: IVec2,
+    ) -> Option<Entity> {
+        let item_map = &game.graphics.spritesheet_map;
+        if item_map.is_none() {
+            panic!("graphics not loaded");
+        }
+        let pos = TileMapPositionData {
+            tile_pos,
+            chunk_pos,
+        };
+        if game.chunk_manager.chunk_generation_data.get(&pos).is_some() {
+            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
+            return None;
+        }
+        match self {
+            WorldObject::Wall(_) => {
+                let obj_data = game.world_obj_data.properties.get(&self).unwrap();
+                let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+                let position = Vec3::new(
+                    (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+                        + anchor.x * obj_data.size.x,
+                    (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                        + anchor.y * obj_data.size.y,
+                    0.,
+                );
+                let item = commands
+                    .spawn(SpriteSheetBundle {
+                        texture_atlas: game.graphics.wall_texture_atlas.as_ref().unwrap().clone(),
+                        transform: Transform {
+                            translation: position,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    })
+                    .insert(Name::new("Wall"))
+                    .insert(BlockAttributeBundle {
+                        health: Health(100),
+                    })
+                    .insert(Wall::Stone)
+                    .insert(YSort)
+                    .insert(pos)
+                    .insert(self)
+                    .id();
+                if obj_data.breakable {
+                    commands
+                        .entity(item)
+                        .insert(Breakable(obj_data.breaks_into));
+                }
+
+                if obj_data.collider {
+                    commands.entity(item).insert(Collider::cuboid(
+                        obj_data.size.x / 3.5,
+                        obj_data.size.y / 4.5,
+                    ));
+                }
+                game.chunk_manager.chunk_generation_data.insert(
+                    TileMapPositionData {
+                        tile_pos: TilePos {
+                            x: tile_pos.x as u32,
+                            y: tile_pos.y as u32,
+                        },
+                        chunk_pos,
+                    },
+                    WorldObjectEntityData {
+                        object: self,
+                        entity: item,
+                        obj_bit_index: 0,
+                        texture_offset: 0,
+                    },
+                );
+
+                Some(item)
+            }
+            _ => {
+                error!("Tried to spawn non-wall WorldObject as a Wall!");
+                None
+            }
+        }
+    }
     pub fn spawn_foliage(
         self,
         commands: &mut Commands,
         game: &mut GameParam,
-        tile_pos: IVec2,
+        tile_pos: TilePos,
         chunk_pos: IVec2,
     ) -> Option<Entity> {
         let item_map = &game.graphics.spritesheet_map;
@@ -249,9 +339,9 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
-            (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.x * obj_data.size.x,
-            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y,
             0.,
         );
@@ -306,6 +396,8 @@ impl WorldObject {
             WorldObjectEntityData {
                 object: self,
                 entity: item,
+                obj_bit_index: 0,
+                texture_offset: 0,
             },
         );
 
@@ -315,12 +407,13 @@ impl WorldObject {
         self,
         commands: &mut Commands,
         game: &mut GameParam,
-        tile_pos: IVec2,
+        tile_pos: TilePos,
         chunk_pos: IVec2,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) -> Option<Entity> {
         let item = match self {
             WorldObject::Foliage(_) => self.spawn_foliage(commands, game, tile_pos, chunk_pos),
+            WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos),
             _ => self.spawn(commands, game, tile_pos, chunk_pos),
         };
         if let Some(item) = item {
@@ -335,7 +428,6 @@ impl WorldObject {
                     .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
             }
             minimap_event.send(UpdateMiniMapEvent);
-
             return Some(item);
         }
         None
@@ -356,7 +448,6 @@ impl WorldObject {
             .unwrap()
             .get(&self)
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .0
             .clone();
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
@@ -442,7 +533,6 @@ impl WorldObject {
             .unwrap()
             .get(&self)
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .0
             .clone();
         let player_state = &mut game.game.player_state;
         let player_e = game.player_query.single().0;
@@ -507,7 +597,7 @@ impl WorldObject {
         self,
         commands: &mut Commands,
         game: &mut GameParam,
-        tile_pos: IVec2,
+        tile_pos: TilePos,
         chunk_pos: IVec2,
         count: usize,
         attributes: Option<ItemAttributes>,
@@ -523,7 +613,6 @@ impl WorldObject {
             .unwrap()
             .get(&self)
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .0
             .clone();
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
@@ -531,13 +620,13 @@ impl WorldObject {
         let drop_spread = 10.;
 
         let position = Vec3::new(
-            (tile_pos.x * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.x * obj_data.size.x
                 + rng.gen_range(-drop_spread..drop_spread),
-            (tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
                 + rng.gen_range(-drop_spread..drop_spread),
-            500. - ((tile_pos.y * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+            500. - ((tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
                 + anchor.y * obj_data.size.y
                 + rng.gen_range(-drop_spread..drop_spread))
                 * 0.1,
@@ -603,9 +692,7 @@ impl WorldObject {
         match self {
             WorldObject::None => (255, 70, 255),
             WorldObject::Grass => (113, 133, 51),
-            WorldObject::StoneHalf => (171, 155, 142),
-            WorldObject::StoneFull => (171, 155, 142),
-            WorldObject::StoneTop => (171, 155, 142),
+            WorldObject::Wall(_) => (171, 155, 142),
             WorldObject::DungeonStone => (53, 53, 57),
             WorldObject::Water => (87, 72, 82),
             WorldObject::Sand => (210, 201, 165),
@@ -637,7 +724,7 @@ impl Plugin for ItemsPlugin {
 }
 
 impl ItemsPlugin {
-    fn break_item(
+    pub fn break_item(
         mut commands: Commands,
         mut game: GameParam,
         mut obj_break_events: EventReader<ObjBreakEvent>,
@@ -695,7 +782,10 @@ impl ItemsPlugin {
     }
     /// Keeps the graphics up to date for things that are harvested or grown
     fn update_graphics(
-        mut to_update_query: Query<(&mut TextureAtlasSprite, &WorldObject), Changed<WorldObject>>,
+        mut to_update_query: Query<
+            (&mut TextureAtlasSprite, &WorldObject),
+            (Changed<WorldObject>, Without<Wall>),
+        >,
         graphics: Res<Graphics>,
     ) {
         let item_map = &&graphics.spritesheet_map;
@@ -704,8 +794,7 @@ impl ItemsPlugin {
                 sprite.clone_from(
                     &item_map
                         .get(world_object)
-                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
-                        .0,
+                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}")),
                 );
             }
         }

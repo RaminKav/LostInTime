@@ -58,7 +58,7 @@ impl ChunkManager {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ChunkLoadingState {
     Spawning,
     Caching,
@@ -71,7 +71,7 @@ pub struct RawChunkData {
     pub raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
     pub raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
 }
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Clone)]
 pub struct TileMapPositionData {
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
@@ -79,9 +79,9 @@ pub struct TileMapPositionData {
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct TileEntityData {
     pub entity: Option<Entity>,
-    pub tile_bit_index: u8,
     pub block_type: [WorldObject; 4],
-    pub block_offset: u8,
+    pub tile_bit_index: u8,
+    pub texture_offset: u8,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -89,6 +89,8 @@ pub struct TileEntityData {
 pub struct WorldObjectEntityData {
     pub object: WorldObject,
     pub entity: Entity,
+    pub obj_bit_index: u8,
+    pub texture_offset: u8,
 }
 
 #[derive(Default, Debug, Clone)]
