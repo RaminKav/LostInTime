@@ -184,6 +184,13 @@ impl GenerationPlugin {
                 let mut new_sprite = wall_data.get_mut(new_wall_data.entity).unwrap().1;
                 new_wall_data.obj_bit_index = updated_bit_index;
                 new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
+                // println!(
+                //     "UPDATE {:?} {:?} | {:?} {:?}",
+                //     (dx, dy),
+                //     new_wall_pos.tile_pos,
+                //     updated_bit_index + new_wall_data.texture_offset,
+                //     neighbour_is_wall
+                // )
             }
         }
         let mut first_corner_is_wall = false;
@@ -277,6 +284,13 @@ impl GenerationPlugin {
     ) {
         for broken_wall in obj_break_events.iter() {
             let chunk_pos = broken_wall.chunk_pos;
+            game.chunk_manager
+                .chunk_generation_data
+                .remove(&TileMapPositionData {
+                    chunk_pos: broken_wall.chunk_pos,
+                    tile_pos: broken_wall.tile_pos,
+                });
+
             for dy in -1i8..=1 {
                 for dx in -1i8..=1 {
                     //skip corner block updates for walls

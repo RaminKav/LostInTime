@@ -745,15 +745,6 @@ impl ItemsPlugin {
                     );
                 }
             }
-            game.chunk_manager
-                .chunk_generation_data
-                .remove(&TileMapPositionData {
-                    chunk_pos: broken.chunk_pos,
-                    tile_pos: TilePos {
-                        x: broken.tile_pos.x as u32,
-                        y: broken.tile_pos.y as u32,
-                    },
-                });
             let old_points = game
                 .game_data
                 .data
