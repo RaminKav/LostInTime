@@ -1,4 +1,5 @@
 use bevy::{prelude::*, time::FixedTimestep};
+use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
@@ -31,7 +32,7 @@ pub struct EnemyDeathEvent {
 pub struct ObjBreakEvent {
     pub entity: Entity,
     pub obj: WorldObject,
-    pub tile_pos: IVec2,
+    pub tile_pos: TilePos,
     pub chunk_pos: IVec2,
 }
 

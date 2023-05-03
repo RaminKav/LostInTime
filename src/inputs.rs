@@ -458,6 +458,7 @@ impl InputsPlugin {
                         chunk_pos: cursor_chunk_pos,
                     })
             {
+                //TODO: skip this if no wep in hand
                 hit_event.send(HitEvent {
                     hit_entity: hit_obj.entity,
                     damage: parent_attack.get(game.game.player).unwrap().0,
@@ -465,14 +466,6 @@ impl InputsPlugin {
                     hit_with: main_hand_option,
                 });
             }
-
-            let x = game
-                .chunk_manager
-                .raw_chunk_data
-                .get(&cursor_chunk_pos)
-                .unwrap()
-                .raw_chunk_blocks[cursor_tile_pos.x as usize][cursor_tile_pos.y as usize];
-            println!("{cursor_chunk_pos:?} {cursor_tile_pos:?} {x:?}");
         }
         // Attempt to place block in hand
         // TODO: Interact

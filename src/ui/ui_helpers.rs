@@ -1,5 +1,6 @@
 use crate::{inputs::CursorPos, world, Game};
 use bevy::prelude::*;
+use bevy_ecs_tilemap::tiles::TilePos;
 
 use super::Interactable;
 
@@ -34,7 +35,7 @@ pub fn pointcast_2d<'a>(
     ret
 }
 
-pub fn get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, IVec2) {
+pub fn get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
     let player_pos = game.player_state.position;
     let chunk_pos =
         world::world_helpers::camera_pos_to_chunk_pos(&Vec2::new(player_pos.x, player_pos.y));

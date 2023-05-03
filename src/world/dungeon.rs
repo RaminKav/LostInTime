@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
 use crate::{
-    item::WorldObject,
+    item::{Wall, WorldObject},
     world::{
         dimension::{Dimension, GenerationSeed, SpawnDimension},
         ChunkObjectData, RawChunkData,
@@ -51,7 +51,7 @@ impl DungeonPlugin {
                     wall_children.push((
                         tile_pos.x as f32,
                         tile_pos.y as f32,
-                        WorldObject::StoneHalf,
+                        WorldObject::Wall(Wall::Stone),
                     ));
                 }
 
@@ -69,7 +69,7 @@ impl DungeonPlugin {
                         entity: None,
                         tile_bit_index: tile_bits,
                         block_type: tile_quad_blocks,
-                        block_offset: 32,
+                        texture_offset: 32,
                     },
                 );
 

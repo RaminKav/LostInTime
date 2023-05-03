@@ -79,22 +79,22 @@ impl MinimapPlugin {
                             continue;
                         }
                         let mut chunk_pos = p_cp;
-                        let mut tile_x = p_tp.x + x;
-                        let mut tile_y = p_tp.y + y;
-                        while tile_x >= CHUNK_SIZE as i32 {
-                            tile_x = tile_x - CHUNK_SIZE as i32;
+                        let mut tile_x = p_tp.x + x as u32;
+                        let mut tile_y = p_tp.y + y as u32;
+                        while tile_x >= CHUNK_SIZE {
+                            tile_x = tile_x - CHUNK_SIZE;
                             chunk_pos.x += 1;
                         }
                         while tile_x < 0 {
-                            tile_x = CHUNK_SIZE as i32 + tile_x;
+                            tile_x = CHUNK_SIZE + tile_x;
                             chunk_pos.x -= 1;
                         }
-                        while tile_y >= CHUNK_SIZE as i32 {
-                            tile_y = tile_y - CHUNK_SIZE as i32;
+                        while tile_y >= CHUNK_SIZE {
+                            tile_y = tile_y - CHUNK_SIZE;
                             chunk_pos.y += 1;
                         }
                         while tile_y < 0 {
-                            tile_y = CHUNK_SIZE as i32 + tile_y;
+                            tile_y = CHUNK_SIZE + tile_y;
                             chunk_pos.y -= 1;
                         }
                         let tile_pos = TilePos {
@@ -111,10 +111,7 @@ impl MinimapPlugin {
 
                             if let Some(obj_data) =
                                 cm.chunk_generation_data.get(&TileMapPositionData {
-                                    tile_pos: TilePos {
-                                        x: tile_pos.x as u32,
-                                        y: tile_pos.y as u32,
-                                    },
+                                    tile_pos,
                                     chunk_pos,
                                 })
                             {
