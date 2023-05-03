@@ -3,7 +3,10 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use crate::item::WorldObject;
 
-use super::{noise_helpers, ChunkManager, TileEntityData, TileMapPositionData, CHUNK_SIZE};
+use super::{
+    noise_helpers, ChunkManager, TileEntityData, TileMapPositionData, WorldObjectEntityData,
+    CHUNK_SIZE,
+};
 
 pub struct TilePlugin;
 impl Plugin for TilePlugin {
@@ -168,7 +171,7 @@ impl TilePlugin {
 
                     if let Some(neighbour_tile_entity_data) = neighbour_tile_entity_data {
                         neighbour_entity = neighbour_tile_entity_data.entity;
-                        neighbour_tile_offset = neighbour_tile_entity_data.block_offset;
+                        neighbour_tile_offset = neighbour_tile_entity_data.texture_offset;
                         neighbour_tile_blocks = neighbour_tile_entity_data.block_type;
                     } else {
                         continue;
@@ -216,7 +219,7 @@ impl TilePlugin {
                             },
                             tile_bit_index: updated_bit_index,
                             block_type: updated_block_type,
-                            block_offset: neighbour_tile_offset,
+                            texture_offset: neighbour_tile_offset,
                         },
                     );
                 }
@@ -272,7 +275,7 @@ impl TilePlugin {
                         .unwrap();
 
                     if target_block_entity_data.tile_bit_index
-                        + target_block_entity_data.block_offset
+                        + target_block_entity_data.texture_offset
                         == 0
                     {
                         continue;
@@ -306,7 +309,7 @@ impl TilePlugin {
                             entity: None,
                             tile_bit_index: updated_bit_index,
                             block_type,
-                            block_offset: tile_index_offset,
+                            texture_offset: tile_index_offset,
                         },
                     );
                 }
@@ -382,7 +385,7 @@ impl TilePlugin {
 
         (bits, offset)
     }
-    fn compute_tile_index(new_tile_bits: u8, neighbour_bits: u8, edge: (i8, i8)) -> u8 {
+    pub fn compute_tile_index(new_tile_bits: u8, neighbour_bits: u8, edge: (i8, i8)) -> u8 {
         let mut index = 0;
         // new tile will be 0b1111 i think
         if edge == (0, 1) {

@@ -72,6 +72,7 @@ impl Plugin for GameAssetsPlugin {
         app.add_plugin(Material2dPlugin::<FoliageMaterial>::default())
             .insert_resource(Graphics {
                 texture_atlas: None,
+                wall_texture_atlas: None,
                 spritesheet_map: None,
                 foliage_material_map: None,
                 world_obj_image_handles: None,
@@ -122,7 +123,8 @@ pub struct FoliageMaterial {
 
 pub struct Graphics {
     pub texture_atlas: Option<Handle<TextureAtlas>>,
-    pub spritesheet_map: Option<HashMap<WorldObject, (TextureAtlasSprite, usize)>>,
+    pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
+    pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub foliage_material_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
     pub world_obj_image_handles: Option<HashMap<WorldObject, Handle<Image>>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
@@ -184,6 +186,7 @@ impl GameAssetsPlugin {
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
+        let wall_image_handle = sprite_sheet.walls_sheet.clone();
         let sprite_desc = fs::read_to_string("assets/textures/sprites_desc.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
@@ -192,6 +195,14 @@ impl GameAssetsPlugin {
         });
 
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
+        let wall_atlas = TextureAtlas::from_grid(
+            wall_image_handle.clone(),
+            Vec2::new(32., 64.),
+            16,
+            2,
+            None,
+            None,
+        );
 
         let mut spritesheet_map = HashMap::default();
         let mut world_obj_image_handles = HashMap::default();
@@ -225,14 +236,14 @@ impl GameAssetsPlugin {
 
                     //Set the size to be proportional to the source rectangle
                     sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-                    spritesheet_map.insert(*item, (sprite, get_index_from_pixel_cords(*rect)));
+                    spritesheet_map.insert(*item, sprite);
                     world_obj_image_handles.insert(
                         *item,
                         convert_to_image(*rect, image_handle.clone(), &mut image_assets),
                     );
                 }
             }
-
+            //TODO: maybe we can clean up our spawning code with this vvv
             //Position the sprite anchor if one is defined
             // if let Some(anchor) = rect.anchor {
             //     sprite.anchor = Anchor::Custom(Vec2::new(
@@ -251,9 +262,11 @@ impl GameAssetsPlugin {
         }
 
         let atlas_handle = texture_assets.add(atlas);
+        let wall_atlas_handle = texture_assets.add(wall_atlas);
 
         *graphics = Graphics {
             texture_atlas: Some(atlas_handle),
+            wall_texture_atlas: Some(wall_atlas_handle),
             spritesheet_map: Some(spritesheet_map),
             foliage_material_map: Some(foliage_material_map),
             world_obj_image_handles: Some(world_obj_image_handles),

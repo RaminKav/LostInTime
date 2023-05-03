@@ -120,10 +120,18 @@
 - Any Dimension with `ActiveDimension` will change a field on game struct to it's chunk manager comp
 - world_gen plugin uses game.current_chunk_manager
 
-
 split world_generation into
 -> generation -> generate objs/tiles
 -> noise_helpers -> perlin fns, disk sampling
 -> chunk -> cache/spawning of chunks, chunk manager
 -> tile -> tilemapping code?
 -> world_helpers -> camera pos fn
+
+# Wall Assets
+
+- WorldObjet Wall type for unique wall interactions
+- Lonely walls are 1.5 tiles high. 1.0 is the wall face, and half for the top darkness
+- Walls only show a face if there is no wall directly below them.
+- If there is a wall below, they show a 1.0 tile top only (darkness)
+- The 1.0 tile is offset to be above the 1.5 tile below it
+- Tops must follow auto-tilign algorithem for border matching.

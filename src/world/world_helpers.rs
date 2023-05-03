@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy_ecs_tilemap::tiles::TilePos;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
@@ -13,7 +14,7 @@ pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
         (camera_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32,
     )
 }
-pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> IVec2 {
+pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> TilePos {
     let camera_pos = Vec2::new(
         camera_pos.x + (TILE_SIZE.x / 2.),
         camera_pos.y + (TILE_SIZE.y / 2.),
@@ -31,5 +32,8 @@ pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> IVec2 {
         block_pos.y += CHUNK_SIZE as i32;
     }
 
-    block_pos
+    TilePos {
+        x: block_pos.x as u32,
+        y: block_pos.y as u32,
+    }
 }

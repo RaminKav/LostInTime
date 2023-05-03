@@ -158,6 +158,8 @@ pub struct ImageAssets {
     pub sprite_sheet: Handle<Image>,
     #[asset(path = "RPGTiles.png")]
     pub tiles_sheet: Handle<Image>,
+    #[asset(path = "WallTextures.png")]
+    pub walls_sheet: Handle<Image>,
 }
 
 #[derive(Component)]
@@ -179,7 +181,6 @@ pub struct GameParam<'w, 's> {
     pub game_data: ResMut<'w, GameData>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
 
-    // pub block_query: Query<'w, 's, (Entity, &'static mut Health), With<Block>>,
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
     pub items_query: Query<
         'w,
