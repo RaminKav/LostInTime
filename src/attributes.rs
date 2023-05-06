@@ -1,5 +1,4 @@
 use bevy::{ecs::system::EntityCommands, prelude::*, time::FixedTimestep};
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 
 use crate::{
     inventory::{Inventory, InventoryItemStack},
@@ -14,7 +13,7 @@ pub struct AttributesPlugin;
 pub struct BlockAttributeBundle {
     pub health: Health,
 }
-#[derive(Resource, Reflect, Component, PartialEq, Clone, Debug)]
+#[derive(Resource, Component, PartialEq, Clone, Debug)]
 pub struct ItemAttributes {
     pub health: i32,
     pub attack: i32,
