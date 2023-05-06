@@ -38,7 +38,7 @@ pub struct EquipmentData {
     pub obj: WorldObject,
 }
 
-#[derive(Component, Debug, PartialEq, Clone)]
+#[derive(Component, Reflect, FromReflect, Debug, PartialEq, Clone)]
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: String,
@@ -48,7 +48,9 @@ pub struct ItemDisplayMetaData {
 #[derive(Component)]
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
+#[derive(
+    Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
+)]
 pub enum WorldObject {
     None,
     Grass,
@@ -60,7 +62,20 @@ pub enum WorldObject {
     Placeable(Placeable),
     Sword,
 }
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display)]
+#[derive(
+    Debug,
+    FromReflect,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    Display,
+)]
 pub enum Foliage {
     Tree,
 }
@@ -70,7 +85,19 @@ impl Default for Foliage {
     }
 }
 #[derive(
-    Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component, Display, EnumIter,
+    Debug,
+    Reflect,
+    FromReflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    Display,
+    EnumIter,
 )]
 pub enum Wall {
     Stone,
@@ -81,7 +108,9 @@ impl Default for Wall {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component)]
+#[derive(
+    Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
+)]
 pub enum Placeable {
     Log,
     Flint,
@@ -718,7 +747,7 @@ impl Plugin for ItemsPlugin {
                 SystemSet::on_update(GameState::Main)
                     .with_system(Self::update_graphics)
                     .with_system(Self::break_item)
-                    .with_system(Self::update_help_hotbar_item),
+                    .with_system(Self::update_held_hotbar_item),
             );
     }
 }
@@ -790,7 +819,7 @@ impl ItemsPlugin {
             }
         }
     }
-    fn update_help_hotbar_item(
+    fn update_held_hotbar_item(
         mut commands: Commands,
         mut game_param: GameParam,
         inv_state: Query<&mut InventoryState>,

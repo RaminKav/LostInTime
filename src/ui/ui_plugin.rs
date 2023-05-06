@@ -30,13 +30,14 @@ pub enum UIElement {
     LargeMinimap,
 }
 
-#[derive(Component, Clone, Debug)]
+#[derive(Component, FromReflect, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
     pub slot_index: usize,
     pub item: Option<Entity>,
     pub count: Option<usize>,
     pub obj_type: Option<WorldObject>,
     pub is_hotbar: bool,
+    pub is_crafting: bool,
     pub dirty: bool,
 }
 #[derive(Component, Debug)]
@@ -45,7 +46,6 @@ pub struct InventoryState {
     pub active_hotbar_slot: usize,
     pub hotbar_dirty: bool,
 }
-
 #[derive(Component, Debug, Clone)]
 pub struct Interactable {
     state: Interaction,
@@ -123,6 +123,7 @@ impl Plugin for UIPlugin {
         app.insert_resource(LastHoveredSlot { slot: None })
             .add_event::<DropOnSlotEvent>()
             .add_event::<DropInWorldEvent>()
+            .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
@@ -213,6 +214,7 @@ fn handle_drop_on_slot_events(
             drop_event.drop_target_slot_state.slot_index,
             &mut inv,
             &mut game.inv_slot_query,
+            drop_event.drop_target_slot_state.is_crafting,
         );
         let updated_drag_item;
         if let Some(return_item) = return_item {
@@ -301,15 +303,24 @@ fn handle_hovering(
                         .clone()
                         .to_owned(),
                 );
+
                 if let Some(_item_e) = state.item {
+                    let item = if state.is_crafting {
+                        inv.single().crafting_items[state.slot_index]
+                            .clone()
+                            .unwrap()
+                            .item_stack
+                    } else {
+                        inv.single().items[state.slot_index]
+                            .clone()
+                            .unwrap()
+                            .item_stack
+                    };
                     let tooltip = self::spawn_inv_item_tooltip(
                         &mut commands,
                         &graphics,
                         &asset_server,
-                        &inv.single().items[state.slot_index]
-                            .clone()
-                            .unwrap()
-                            .item_stack,
+                        &item,
                     );
                     commands.entity(e).add_child(tooltip);
                 }
@@ -468,7 +479,11 @@ fn handle_cursor_update(
                                     .insert(DraggedItem);
 
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
-                                inv.single_mut().items[state.slot_index] = None;
+                                if state.is_crafting {
+                                    inv.single_mut().crafting_items[state.slot_index] = None;
+                                } else {
+                                    inv.single_mut().items[state.slot_index] = None;
+                                }
                                 state.dirty = true;
                                 mouse_input.clear();
                             }
@@ -538,8 +553,7 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 .unwrap()
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(162., 128.)),
-
+                custom_size: Some(Vec2::new(218., 128.)),
                 ..Default::default()
             },
             transform: Transform {
@@ -627,8 +641,10 @@ pub fn setup_inv_slots_ui(
             &inv_query,
             &asset_server,
             false,
+            false,
             item.clone(),
         );
+        // hotbar slots
         if slot_index <= 5 {
             spawn_inv_slot(
                 &mut commands,
@@ -638,7 +654,22 @@ pub fn setup_inv_slots_ui(
                 &inv_query,
                 &asset_server,
                 true,
+                false,
                 item.clone(),
+            );
+        }
+        // crafting slots
+        if slot_index < 4 {
+            spawn_inv_slot(
+                &mut commands,
+                &graphics,
+                slot_index,
+                Interaction::None,
+                &inv_query,
+                &asset_server,
+                false,
+                true,
+                None,
             );
         }
     }
@@ -654,6 +685,10 @@ pub fn toggle_inv_visibility(
             With<InventorySlotState>,
         ),
     >,
+    crafting_slots: Query<(Entity, &InventorySlotState), With<Interactable>>,
+    crafting_item_stacks: Query<&ItemStack>,
+    mut inv: Query<&mut Inventory>,
+    mut world_drop_events: EventWriter<DropInWorldEvent>,
 ) {
     let (mut v, state) = inv_query.single_mut();
     if v.is_visible == state.open {
@@ -662,6 +697,24 @@ pub fn toggle_inv_visibility(
     v.is_visible = state.open;
     for mut hbv in hotbar_slots.iter_mut() {
         hbv.is_visible = !v.is_visible;
+    }
+    if state.open {
+        return;
+    }
+    // if closing inv, drop all items in crafting slot
+    for (e, state) in crafting_slots.iter() {
+        if state.is_crafting && state.item.is_some() {
+            world_drop_events.send(DropInWorldEvent {
+                dropped_entity: state.item.unwrap(),
+                dropped_item_stack: crafting_item_stacks
+                    .get(state.item.unwrap())
+                    .unwrap()
+                    .clone(),
+                parent_interactable_entity: e,
+                stack_empty: true,
+            });
+            inv.single_mut().crafting_items[state.slot_index] = None;
+        }
     }
 }
 fn spawn_inv_item_tooltip(
@@ -773,13 +826,14 @@ pub fn spawn_inv_slot(
     inv_query: &Query<(Entity, &InventoryState, &Sprite)>,
     asset_server: &AssetServer,
     is_hotbar_slot: bool,
+    is_crafting_slot: bool,
     item_stack: Option<InventoryItemStack>,
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
     let (inv_e, inv_state, inv_sprite) = inv_query.single();
 
-    let x =
+    let mut x =
         ((slot_index % 6) as f32 * 26.) - (inv_sprite.custom_size.unwrap().x) / 2. + 26. / 2. + 3.;
     let mut y = ((slot_index / 6) as f32).trunc() * 26. - (inv_sprite.custom_size.unwrap().y) / 2.
         + 6.
@@ -787,6 +841,15 @@ pub fn spawn_inv_slot(
 
     if is_hotbar_slot {
         y = -GAME_HEIGHT / 2. + 22.;
+    } else if is_crafting_slot {
+        x = ((slot_index % 2) as f32 * 26.) - (inv_sprite.custom_size.unwrap().x) / 2.
+            + 26. / 2.
+            + 6.
+            + 6. * 26.;
+        y = ((slot_index / 2) as f32).trunc() * 26.
+            - (inv_sprite.custom_size.unwrap().y + 26.) / 2.
+            + 3. * 26.
+            + 6.;
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
@@ -798,6 +861,7 @@ pub fn spawn_inv_slot(
     // check if we need to spawn an item icon for this slot
     if let Some(item) = item_stack {
         // player has item in this slot
+
         let obj_type = item.item_stack.obj_type;
         item_type_option = Some(obj_type);
         item_count_option = Some(item.item_stack.count);
@@ -843,9 +907,14 @@ pub fn spawn_inv_slot(
             count: item_count_option,
             dirty: false,
             is_hotbar: is_hotbar_slot,
+            is_crafting: is_crafting_slot,
         })
         .insert(UIElement::InventorySlot)
-        .insert(Name::new("SLOT"));
+        .insert(Name::new(if is_crafting_slot {
+            "CRAFTING SLOT"
+        } else {
+            "SLOT"
+        }));
     if let Some(i) = item_icon_option {
         slot_entity.push_children(&[i]);
     }
@@ -940,7 +1009,11 @@ pub fn update_inventory_ui(
         }
 
         let interactable_option = interactables.get(e);
-        let item_option = inv.single_mut().items[state.slot_index].clone();
+        let item_option = if state.is_crafting {
+            inv.single_mut().crafting_items[state.slot_index].clone()
+        } else {
+            inv.single_mut().items[state.slot_index].clone()
+        };
         let real_count = if let Some(item) = item_option.clone() {
             Some(item.item_stack.count)
         } else {
@@ -961,6 +1034,7 @@ pub fn update_inventory_ui(
                 &inv_query,
                 &asset_server,
                 state.is_hotbar,
+                state.is_crafting,
                 item_option.clone(),
             );
         }

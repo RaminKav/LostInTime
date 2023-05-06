@@ -16,6 +16,7 @@ pub const MAX_STACK_SIZE: usize = 16;
 #[derive(Component, Debug, Clone)]
 pub struct Inventory {
     pub items: [Option<InventoryItemStack>; INVENTORY_SIZE],
+    pub crafting_items: [Option<InventoryItemStack>; 4],
 }
 pub struct InventoryPlugin;
 
@@ -156,8 +157,14 @@ impl ItemStack {
         slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
+        is_crafting: bool,
     ) -> Result<(), InventoryError> {
-        if let Some(mut existing_stack) = inv.single_mut().items[slot].clone() {
+        let inv_or_crafting = if is_crafting {
+            inv.single_mut().crafting_items[slot].clone()
+        } else {
+            inv.single_mut().items[slot].clone()
+        };
+        if let Some(mut existing_stack) = inv_or_crafting {
             if existing_stack.item_stack.obj_type == self.obj_type {
                 existing_stack.modify_count(self.count as i8);
                 return Ok(());
@@ -170,7 +177,12 @@ impl ItemStack {
                 item_stack: self,
                 slot,
             };
-            item.add_to_inventory(inv, inv_slots);
+            if is_crafting {
+                inv.single_mut().crafting_items[slot] = Some(item);
+                InventoryPlugin::mark_slot_dirty(slot, inv_slots);
+            } else {
+                item.add_to_inventory(inv, inv_slots);
+            }
             Ok(())
         }
     }
@@ -215,6 +227,7 @@ impl InventoryPlugin {
         to_merge: ItemStack,
         merge_into: InventoryItemStack,
         inv: &mut Query<&mut Inventory>,
+        is_crafting: bool,
     ) -> Option<ItemStack> {
         let item_type = to_merge.obj_type;
         //TODO: should this return  None, or the original stack??
@@ -230,8 +243,7 @@ impl InventoryPlugin {
         let item_a_count = to_merge.count;
         let item_b_count = merge_into.item_stack.count;
         let combined_size = item_a_count + item_b_count;
-
-        inv.single_mut().items[merge_into.slot] = Some(InventoryItemStack {
+        let new_item = Some(InventoryItemStack {
             item_stack: ItemStack {
                 obj_type: item_type,
                 metadata: to_merge.metadata.clone(),
@@ -240,6 +252,11 @@ impl InventoryPlugin {
             },
             slot: merge_into.slot,
         });
+        if is_crafting {
+            inv.single_mut().crafting_items[merge_into.slot] = new_item;
+        } else {
+            inv.single_mut().items[merge_into.slot] = new_item;
+        }
 
         // if we overflow, keep remainder where it was
         if combined_size > MAX_STACK_SIZE {
@@ -258,13 +275,23 @@ impl InventoryPlugin {
         target_slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
+        is_crafting: bool,
     ) -> ItemStack {
-        let target_item_option = inv.single().items[target_slot].clone();
+        let target_item_option = if is_crafting {
+            inv.single().crafting_items[target_slot].clone()
+        } else {
+            inv.single().items[target_slot].clone()
+        };
         if let Some(target_item_stack) = target_item_option {
-            inv.single_mut().items[target_slot] = Some(InventoryItemStack {
+            let swapped_item = Some(InventoryItemStack {
                 item_stack: item,
                 slot: target_item_stack.slot,
             });
+            if is_crafting {
+                inv.single_mut().crafting_items[target_slot] = swapped_item;
+            } else {
+                inv.single_mut().items[target_slot] = swapped_item;
+            }
             Self::mark_slot_dirty(target_slot, inv_slots);
             return target_item_stack.item_stack;
         }
@@ -275,20 +302,31 @@ impl InventoryPlugin {
         drop_slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
+        is_crafting: bool,
     ) -> Option<ItemStack> {
         let obj_type = item.obj_type;
-        let target_item_option = inv.single().items[drop_slot].clone();
+        let target_item_option = if is_crafting {
+            inv.single().crafting_items[drop_slot].clone()
+        } else {
+            inv.single().items[drop_slot].clone()
+        };
         if let Some(target_item) = target_item_option {
             if target_item.item_stack.obj_type == obj_type
                 && target_item.item_stack.metadata == item.metadata
             {
                 Self::mark_slot_dirty(drop_slot, inv_slots);
-                return Self::merge_item_stacks(item, target_item, inv);
+                return Self::merge_item_stacks(item, target_item, inv, is_crafting);
             } else {
-                return Some(Self::swap_items(item, drop_slot, inv, inv_slots));
+                return Some(Self::swap_items(
+                    item,
+                    drop_slot,
+                    inv,
+                    inv_slots,
+                    is_crafting,
+                ));
             }
         } else if item
-            .try_add_to_target_inventory_slot(drop_slot, inv, inv_slots)
+            .try_add_to_target_inventory_slot(drop_slot, inv, inv_slots, is_crafting)
             .is_err()
         {
             panic!("Failed to drop item on stot");
@@ -308,7 +346,7 @@ impl InventoryPlugin {
         inv: &mut Query<&mut Inventory>,
     ) -> ItemStack {
         let (amount_split, remainder_left) = item_stack.clone().split();
-        inv.single_mut().items[item_slot] = if remainder_left > 0 {
+        let remainder_stack = if remainder_left > 0 {
             Some(InventoryItemStack {
                 item_stack: ItemStack {
                     obj_type: item_stack.obj_type.clone(),
@@ -321,6 +359,11 @@ impl InventoryPlugin {
         } else {
             None
         };
+        if item_slot_state.is_crafting {
+            inv.single_mut().crafting_items[item_slot] = remainder_stack
+        } else {
+            inv.single_mut().items[item_slot] = remainder_stack
+        }
         item_slot_state.dirty = true;
         ItemStack {
             obj_type: item_stack.obj_type.clone(),

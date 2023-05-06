@@ -571,6 +571,7 @@ fn setup(
             Player,
             Inventory {
                 items: [INVENTORY_INIT; INVENTORY_SIZE],
+                crafting_items: [INVENTORY_INIT; 4],
             },
             Health(100),
             InvincibilityCooldown(0.3),
