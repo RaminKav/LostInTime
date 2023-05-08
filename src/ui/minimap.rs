@@ -79,22 +79,22 @@ impl MinimapPlugin {
                             continue;
                         }
                         let mut chunk_pos = p_cp;
-                        let mut tile_x = p_tp.x + x as u32;
-                        let mut tile_y = p_tp.y + y as u32;
-                        while tile_x >= CHUNK_SIZE {
-                            tile_x = tile_x - CHUNK_SIZE;
+                        let mut tile_x = p_tp.x as i32 + x;
+                        let mut tile_y = p_tp.y as i32 + y;
+                        while tile_x >= CHUNK_SIZE as i32 {
+                            tile_x = tile_x - CHUNK_SIZE as i32;
                             chunk_pos.x += 1;
                         }
                         while tile_x < 0 {
-                            tile_x = CHUNK_SIZE + tile_x;
+                            tile_x = CHUNK_SIZE as i32 + tile_x;
                             chunk_pos.x -= 1;
                         }
-                        while tile_y >= CHUNK_SIZE {
-                            tile_y = tile_y - CHUNK_SIZE;
+                        while tile_y >= CHUNK_SIZE as i32 {
+                            tile_y = tile_y - CHUNK_SIZE as i32;
                             chunk_pos.y += 1;
                         }
                         while tile_y < 0 {
-                            tile_y = CHUNK_SIZE + tile_y;
+                            tile_y = CHUNK_SIZE as i32 + tile_y;
                             chunk_pos.y -= 1;
                         }
                         let tile_pos = TilePos {
@@ -128,6 +128,7 @@ impl MinimapPlugin {
                                 data.push(255);
                             }
                         } else {
+                            println!("CHUNK NOT LOADED! {chunk_pos:?} {tile_pos:?}");
                             for _ in 0..2 {
                                 //Unloaded chunk, spawn nothing for now
                                 data.push(0);
