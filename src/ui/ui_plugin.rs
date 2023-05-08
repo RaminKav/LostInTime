@@ -10,8 +10,9 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     assets::{GameAssetsPlugin, Graphics},
     attributes::Health,
+    crafting::CraftingSlotUpdateEvent,
     inputs::CursorPos,
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
+    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_INIT},
     item::WorldObject,
     GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
@@ -36,8 +37,7 @@ pub struct InventorySlotState {
     pub item: Option<Entity>,
     pub count: Option<usize>,
     pub obj_type: Option<WorldObject>,
-    pub is_hotbar: bool,
-    pub is_crafting: bool,
+    pub r#type: InventorySlotType,
     pub dirty: bool,
 }
 #[derive(Component, Debug)]
@@ -45,6 +45,27 @@ pub struct InventoryState {
     pub open: bool,
     pub active_hotbar_slot: usize,
     pub hotbar_dirty: bool,
+}
+#[derive(FromReflect, PartialEq, Reflect, Debug, Clone, Copy)]
+pub enum InventorySlotType {
+    Normal,
+    Hotbar,
+    Crafting,
+    CraftingResult,
+}
+impl InventorySlotType {
+    pub fn is_crafting(self) -> bool {
+        self == InventorySlotType::Crafting
+    }
+    pub fn is_hotbar(self) -> bool {
+        self == InventorySlotType::Hotbar
+    }
+    pub fn is_crafting_result(self) -> bool {
+        self == InventorySlotType::CraftingResult
+    }
+    pub fn is_normal(self) -> bool {
+        self == InventorySlotType::Normal
+    }
 }
 #[derive(Component, Debug, Clone)]
 pub struct Interactable {
@@ -205,6 +226,7 @@ fn handle_drop_on_slot_events(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
+    mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
@@ -214,8 +236,9 @@ fn handle_drop_on_slot_events(
             drop_event.drop_target_slot_state.slot_index,
             &mut inv,
             &mut game.inv_slot_query,
-            drop_event.drop_target_slot_state.is_crafting,
+            drop_event.drop_target_slot_state.r#type,
         );
+
         let updated_drag_item;
         if let Some(return_item) = return_item {
             updated_drag_item = return_item;
@@ -223,6 +246,10 @@ fn handle_drop_on_slot_events(
         } else {
             updated_drag_item = item_stacks.get(drop_event.dropped_entity).unwrap().clone();
             no_more_dragging = drop_event.stack_empty;
+        }
+
+        if drop_event.drop_target_slot_state.r#type.is_crafting() {
+            crafting_slot_event.send(CraftingSlotUpdateEvent);
         }
 
         // if nothing left on cursor and dragging is done
@@ -305,8 +332,14 @@ fn handle_hovering(
                 );
 
                 if let Some(_item_e) = state.item {
-                    let item = if state.is_crafting {
+                    let item = if state.r#type.is_crafting() {
                         inv.single().crafting_items[state.slot_index]
+                            .clone()
+                            .unwrap()
+                            .item_stack
+                    } else if state.r#type.is_crafting_result() {
+                        inv.single()
+                            .crafting_result_item
                             .clone()
                             .unwrap()
                             .item_stack
@@ -375,6 +408,9 @@ fn handle_item_drop_clicks(
             if let Ok(mut item_stack) = item_stack_query.get_mut(*item) {
                 if let Some(drop_target) = hit_test {
                     if let Ok(state) = slot_states.get(drop_target.0) {
+                        if state.r#type.is_crafting_result() {
+                            continue;
+                        }
                         if left_mouse_pressed {
                             slot_drop_events.send(DropOnSlotEvent {
                                 dropped_entity: *item,
@@ -451,6 +487,7 @@ fn handle_cursor_update(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
+    mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -479,8 +516,12 @@ fn handle_cursor_update(
                                     .insert(DraggedItem);
 
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
-                                if state.is_crafting {
+                                if state.r#type.is_crafting() {
                                     inv.single_mut().crafting_items[state.slot_index] = None;
+                                    crafting_slot_event.send(CraftingSlotUpdateEvent);
+                                } else if state.r#type.is_crafting_result() {
+                                    inv.single_mut().crafting_items = [INVENTORY_INIT; 4];
+                                    inv.single_mut().crafting_result_item = None;
                                 } else {
                                     inv.single_mut().items[state.slot_index] = None;
                                 }
@@ -534,7 +575,7 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., -1.),
+                translation: Vec3::new(-28., 0., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -553,11 +594,11 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 .unwrap()
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(218., 128.)),
+                custom_size: Some(Vec2::new(218., 128. - 14.)),
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., 10.),
+                translation: Vec3::new(28., 0., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -640,8 +681,7 @@ pub fn setup_inv_slots_ui(
             Interaction::None,
             &inv_query,
             &asset_server,
-            false,
-            false,
+            InventorySlotType::Normal,
             item.clone(),
         );
         // hotbar slots
@@ -653,8 +693,7 @@ pub fn setup_inv_slots_ui(
                 Interaction::None,
                 &inv_query,
                 &asset_server,
-                true,
-                false,
+                InventorySlotType::Hotbar,
                 item.clone(),
             );
         }
@@ -667,11 +706,21 @@ pub fn setup_inv_slots_ui(
                 Interaction::None,
                 &inv_query,
                 &asset_server,
-                false,
-                true,
+                InventorySlotType::Crafting,
                 None,
             );
         }
+        // crafting result slot
+        spawn_inv_slot(
+            &mut commands,
+            &graphics,
+            slot_index,
+            Interaction::None,
+            &inv_query,
+            &asset_server,
+            InventorySlotType::CraftingResult,
+            None,
+        );
     }
 }
 
@@ -703,7 +752,7 @@ pub fn toggle_inv_visibility(
     }
     // if closing inv, drop all items in crafting slot
     for (e, state) in crafting_slots.iter() {
-        if state.is_crafting && state.item.is_some() {
+        if state.r#type.is_crafting() && state.item.is_some() {
             world_drop_events.send(DropInWorldEvent {
                 dropped_entity: state.item.unwrap(),
                 dropped_item_stack: crafting_item_stacks
@@ -825,8 +874,7 @@ pub fn spawn_inv_slot(
     interactable_state: Interaction,
     inv_query: &Query<(Entity, &InventoryState, &Sprite)>,
     asset_server: &AssetServer,
-    is_hotbar_slot: bool,
-    is_crafting_slot: bool,
+    slot_type: InventorySlotType,
     item_stack: Option<InventoryItemStack>,
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
@@ -839,9 +887,10 @@ pub fn spawn_inv_slot(
         + 6.
         + 26. / 2.;
 
-    if is_hotbar_slot {
+    if slot_type.is_hotbar() {
         y = -GAME_HEIGHT / 2. + 22.;
-    } else if is_crafting_slot {
+        x += 28.;
+    } else if slot_type.is_crafting() {
         x = ((slot_index % 2) as f32 * 26.) - (inv_sprite.custom_size.unwrap().x) / 2.
             + 26. / 2.
             + 6.
@@ -850,6 +899,9 @@ pub fn spawn_inv_slot(
             - (inv_sprite.custom_size.unwrap().y + 26.) / 2.
             + 3. * 26.
             + 6.;
+    } else if slot_type.is_crafting_result() {
+        x = 6. + (7. * 26.) - (inv_sprite.custom_size.unwrap().x) / 2.;
+        y = 2. * 26. + 6. - (inv_sprite.custom_size.unwrap().y + 26.) / 2.;
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
@@ -879,7 +931,7 @@ pub fn spawn_inv_slot(
             .as_ref()
             .unwrap()
             .get(
-                if is_hotbar_slot && inv_state.active_hotbar_slot == slot_index {
+                if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
                     &UIElement::InventorySlotHover
                 } else {
                     &UIElement::InventorySlot
@@ -906,19 +958,20 @@ pub fn spawn_inv_slot(
             obj_type: item_type_option,
             count: item_count_option,
             dirty: false,
-            is_hotbar: is_hotbar_slot,
-            is_crafting: is_crafting_slot,
+            r#type: slot_type,
         })
         .insert(UIElement::InventorySlot)
-        .insert(Name::new(if is_crafting_slot {
+        .insert(Name::new(if slot_type.is_crafting() {
             "CRAFTING SLOT"
+        } else if slot_type.is_crafting_result() {
+            "CRAFT RESULT"
         } else {
             "SLOT"
         }));
     if let Some(i) = item_icon_option {
         slot_entity.push_children(&[i]);
     }
-    if !is_hotbar_slot {
+    if !slot_type.is_hotbar() {
         slot_entity
             .set_parent(inv_e)
             .insert(Interactable::from_state(interactable_state));
@@ -931,18 +984,24 @@ pub fn spawn_item_stack_icon(
     item_stack: &ItemStack,
     asset_server: &AssetServer,
 ) -> Entity {
+    let has_icon = graphics.icons.as_ref().unwrap().get(&item_stack.obj_type);
+    let sprite = if let Some(icon) = has_icon {
+        icon.clone()
+    } else {
+        graphics
+            .spritesheet_map
+            .as_ref()
+            .unwrap()
+            .get(&item_stack.obj_type)
+            .unwrap_or_else(|| panic!("No graphic for object {:?}", item_stack.obj_type))
+            .clone()
+    };
     let item = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .world_obj_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&item_stack.obj_type)
-                .unwrap()
-                .clone(),
+        .spawn(SpriteSheetBundle {
+            sprite,
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
             transform: Transform {
                 translation: Vec3::new(0., 0., 1.),
-                scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
             ..Default::default()
@@ -1004,13 +1063,15 @@ pub fn update_inventory_ui(
         // hotbars are hidden when inventory is open, so defer update
         // untile inv is closed again.
         let inv_state = inv_query.get_single().unwrap().1;
-        if inv_state.open && state.is_hotbar {
+        if inv_state.open && state.r#type.is_hotbar() {
             continue;
         }
 
         let interactable_option = interactables.get(e);
-        let item_option = if state.is_crafting {
+        let item_option = if state.r#type.is_crafting() {
             inv.single_mut().crafting_items[state.slot_index].clone()
+        } else if state.r#type.is_crafting_result() {
+            inv.single_mut().crafting_result_item.clone()
         } else {
             inv.single_mut().items[state.slot_index].clone()
         };
@@ -1033,8 +1094,7 @@ pub fn update_inventory_ui(
                 },
                 &inv_query,
                 &asset_server,
-                state.is_hotbar,
-                state.is_crafting,
+                state.r#type,
                 item_option.clone(),
             );
         }

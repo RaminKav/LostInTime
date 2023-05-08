@@ -10,6 +10,7 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
+use crate::crafting::CraftingGrid;
 use crate::item::{WorldObject, WorldObjectResource};
 use crate::ui::UIElement;
 use crate::{GameState, ImageAssets, Limb};
@@ -64,7 +65,8 @@ impl WorldObjectData {
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
 #[derive(Deserialize)]
 pub struct GraphicsDesc {
-    map: HashMap<WorldObject, WorldObjectData>,
+    items: HashMap<WorldObject, WorldObjectData>,
+    icons: HashMap<WorldObject, WorldObjectData>,
 }
 
 impl Plugin for GameAssetsPlugin {
@@ -74,10 +76,11 @@ impl Plugin for GameAssetsPlugin {
                 texture_atlas: None,
                 wall_texture_atlas: None,
                 spritesheet_map: None,
+                icons: None,
                 foliage_material_map: None,
-                world_obj_image_handles: None,
                 ui_image_handles: None,
             })
+            .insert_resource(Recipes::default())
             .add_system_set(
                 SystemSet::on_exit(GameState::Loading)
                     .with_system(Self::load_graphics.label("graphics")),
@@ -125,10 +128,17 @@ pub struct Graphics {
     pub texture_atlas: Option<Handle<TextureAtlas>>,
     pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
     pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
+    pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub foliage_material_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
-    pub world_obj_image_handles: Option<HashMap<WorldObject, Handle<Image>>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
 }
+
+#[derive(Resource, Default, Deserialize)]
+pub struct Recipes {
+    // map of recipie result and its recipe matrix
+    pub recipes_list: RecipeList,
+}
+pub type RecipeList = HashMap<WorldObject, CraftingGrid>;
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
 /// Copies sprite data pixel by pixel, needed to render things in UI
@@ -177,6 +187,7 @@ impl GameAssetsPlugin {
     /// and creates the graphics resource
     pub fn load_graphics(
         mut graphics: ResMut<Graphics>,
+        mut recipes: ResMut<Recipes>,
         sprite_sheet: Res<ImageAssets>,
         mut image_assets: ResMut<Assets<Image>>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
@@ -188,9 +199,14 @@ impl GameAssetsPlugin {
         let image_handle = sprite_sheet.sprite_sheet.clone();
         let wall_image_handle = sprite_sheet.walls_sheet.clone();
         let sprite_desc = fs::read_to_string("assets/textures/sprites_desc.ron").unwrap();
+        let recipe_desc = fs::read_to_string("assets/recipes/recipes.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
             println!("Failed to load config for graphics: {e}");
+            std::process::exit(1);
+        });
+        let recipes_desc: Recipes = from_str(&recipe_desc).unwrap_or_else(|e| {
+            println!("Failed to load config for recipes: {e}");
             std::process::exit(1);
         });
 
@@ -205,11 +221,14 @@ impl GameAssetsPlugin {
         );
 
         let mut spritesheet_map = HashMap::default();
+        let mut icon_map = HashMap::default();
         let mut world_obj_image_handles = HashMap::default();
         let mut ui_image_handles = HashMap::default();
         let mut foliage_material_map = HashMap::default();
 
-        for (item, rect) in sprite_desc.map.iter() {
+        let mut recipes_list = RecipeList::default();
+
+        for (item, rect) in sprite_desc.items.iter() {
             println!("Found graphic {item:?}");
             match item {
                 WorldObject::Foliage(f) => {
@@ -253,7 +272,19 @@ impl GameAssetsPlugin {
             // };
             world_obj_data.properties.insert(*item, *rect);
         }
+        for (item, rect) in sprite_desc.icons.iter() {
+            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
+            //Set the size to be proportional to the source rectangle
+            sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
+            icon_map.insert(*item, sprite);
+        }
+
+        for (result, recipe) in recipes_desc.recipes_list.iter() {
+            recipes_list.insert(*result, *recipe);
+            println!("Loaded recipe for {result:?}: {recipe:?}");
+        }
+        *recipes = Recipes { recipes_list };
         // load UI
         for u in UIElement::iter() {
             println!("LOADED UI ASSET {:?}", u.to_string());
@@ -269,8 +300,8 @@ impl GameAssetsPlugin {
             wall_texture_atlas: Some(wall_atlas_handle),
             spritesheet_map: Some(spritesheet_map),
             foliage_material_map: Some(foliage_material_map),
-            world_obj_image_handles: Some(world_obj_image_handles),
             ui_image_handles: Some(ui_image_handles),
+            icons: Some(icon_map),
         };
     }
 }

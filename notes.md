@@ -92,12 +92,13 @@
     - Equipment UI
     - Food Bar
   - World Generation:
-    - Stone
+    [x] Stone
     - Random Grass Foliage
     - Biomes ?
     - Spawn random structures from custom schema files ?
+      [x] dungeons
   - Art/Items
-    - Make borders of tops of blocks like stone merge properly/dynamically
+    [x] Make borders of tops of blocks like stone merge properly/dynamically
     - Make new block types: New Stone, Wood blocks, fences, chests/loot box
     - Mob drops
     - Weapons, Tools, Armor
@@ -135,3 +136,11 @@ split world_generation into
 - If there is a wall below, they show a 1.0 tile top only (darkness)
 - The 1.0 tile is offset to be above the 1.5 tile below it
 - Tops must follow auto-tilign algorithem for border matching.
+
+# Crafting TODO
+
+[x] orient slots in 2x2 grid
+[x] drop items in slots when inv closes (or try to add them back in)
+
+[x] create crafting result slot (dif from normal slots, cant drop into)
+[x] add support for recipies

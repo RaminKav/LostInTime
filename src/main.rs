@@ -34,6 +34,7 @@ mod animations;
 mod assets;
 mod attributes;
 mod combat;
+mod crafting;
 mod enemy;
 mod inputs;
 mod inventory;
@@ -49,6 +50,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
+use crafting::CraftingPlugin;
 use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
@@ -111,6 +113,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
+        .add_plugin(CraftingPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
@@ -572,6 +575,7 @@ fn setup(
             Inventory {
                 items: [INVENTORY_INIT; INVENTORY_SIZE],
                 crafting_items: [INVENTORY_INIT; 4],
+                crafting_result_item: None,
             },
             Health(100),
             InvincibilityCooldown(0.3),
