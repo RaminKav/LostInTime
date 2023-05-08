@@ -25,9 +25,9 @@ use self::{
 };
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
-pub const CHUNK_SIZE: u32 = 64;
+pub const CHUNK_SIZE: u32 = 16;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
-const CHUNK_CACHE_AMOUNT: i32 = 3;
+const CHUNK_CACHE_AMOUNT: i32 = 4;
 const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
 #[derive(Debug, Component, Resource, Clone)]
