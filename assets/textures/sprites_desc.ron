@@ -1,5 +1,5 @@
 (
-    map : {
+    items : {
         None: WorldObjectData(
             texture_pos: (32., 0.),
             size: (16., 16.),
@@ -20,7 +20,7 @@
             breaks_into: None,
             equip_slot: None,
             breaks_with: None,
-            places_into: Some(Wall(Stone))
+            places_into: None
         ),
         Placeable(Log): WorldObjectData(
             texture_pos: (32., 48.),
@@ -42,7 +42,7 @@
             breaks_into: Some(Placeable(Flint)),
             equip_slot: None,
             breaks_with: None,
-            places_into: None
+            places_into: Some(Wall(Stone))
         ),
         DungeonStone: WorldObjectData(
             texture_pos: (64., 144.),
@@ -70,6 +70,30 @@
             texture_pos: (64., 64.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+    },
+    icons : {
+        DungeonStone: WorldObjectData(
+            texture_pos: (32., 96.),
+            size: (16., 16.),
+            anchor: None,
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+        Wall(Stone): WorldObjectData(
+            texture_pos: (16., 96.),
+            size: (16., 16.),
+            anchor: None,
             collider: true,
             breakable: true,
             breaks_into: None,

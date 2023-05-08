@@ -58,10 +58,12 @@ pub enum WorldObject {
     DungeonStone,
     Water,
     Sand,
+    Flint,
     Foliage(Foliage),
     Placeable(Placeable),
     Sword,
 }
+
 #[derive(
     Debug,
     FromReflect,
@@ -113,19 +115,17 @@ impl Default for Wall {
 )]
 pub enum Placeable {
     Log,
-    Flint,
 }
 impl fmt::Display for Placeable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Placeable::Log => write!(f, "Log"),
-            Placeable::Flint => write!(f, "Flint"),
         }
     }
 }
 impl Default for Placeable {
     fn default() -> Self {
-        Self::Flint
+        Self::Log
     }
 }
 lazy_static! {
@@ -161,6 +161,7 @@ impl fmt::Display for WorldObject {
             WorldObject::Foliage(_) => write!(f, "Tree"),
             WorldObject::Placeable(p) => write!(f, "{}", p.to_string()),
             WorldObject::Sword => write!(f, "Basic Sword"),
+            WorldObject::Flint => write!(f, "Flint"),
         }
     }
 }
@@ -555,14 +556,20 @@ impl WorldObject {
         if item_map.is_none() {
             panic!("graphics not loaded");
         }
-        let sprite = game
-            .graphics
-            .spritesheet_map
-            .as_ref()
-            .unwrap()
-            .get(&self)
-            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .clone();
+        //TODO: extract this out to helper fn vvvv
+        let has_icon = game.graphics.icons.as_ref().unwrap().get(&self);
+        let sprite = if let Some(icon) = has_icon {
+            icon.clone()
+        } else {
+            game.graphics
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(&self)
+                .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
+                .clone()
+        };
+
         let player_state = &mut game.game.player_state;
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
@@ -728,6 +735,7 @@ impl WorldObject {
             WorldObject::Foliage(_) => (119, 116, 59),
             WorldObject::Placeable(_) => (255, 70, 255),
             WorldObject::Sword => (255, 70, 255),
+            WorldObject::Flint => (255, 70, 255),
         }
     }
 }
@@ -811,11 +819,15 @@ impl ItemsPlugin {
         let item_map = &&graphics.spritesheet_map;
         if let Some(item_map) = item_map {
             for (mut sprite, world_object) in to_update_query.iter_mut() {
-                sprite.clone_from(
+                let has_icon = graphics.icons.as_ref().unwrap().get(&world_object);
+                let new_sprite = if let Some(icon) = has_icon {
+                    icon
+                } else {
                     &item_map
                         .get(world_object)
-                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}")),
-                );
+                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
+                };
+                sprite.clone_from(new_sprite);
             }
         }
     }

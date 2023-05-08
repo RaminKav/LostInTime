@@ -7,7 +7,7 @@ use crate::{
     animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
     inventory::Inventory,
-    item::{MainHand, Placeable, WorldObject},
+    item::{MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
     Game, GameParam, GameState, Player, YSort, TIME_STEP,
@@ -93,7 +93,7 @@ impl CombatPlugin {
                 DoneAnimation,
                 Name::new("Hit Spark"),
             ));
-            WorldObject::Placeable(Placeable::Flint).spawn_item_drop(
+            WorldObject::Flint.spawn_item_drop(
                 &mut commands,
                 &mut game,
                 enemy_tile_pos,

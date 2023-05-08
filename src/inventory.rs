@@ -4,7 +4,7 @@ use std::cmp::min;
 use crate::{
     attributes::{AttributeModifier, ItemAttributes},
     item::{ItemDisplayMetaData, WorldObject},
-    ui::InventorySlotState,
+    ui::{InventorySlotState, InventorySlotType},
     GameState, TIME_STEP,
 };
 use bevy::{prelude::*, time::FixedTimestep};
@@ -17,6 +17,7 @@ pub const MAX_STACK_SIZE: usize = 16;
 pub struct Inventory {
     pub items: [Option<InventoryItemStack>; INVENTORY_SIZE],
     pub crafting_items: [Option<InventoryItemStack>; 4],
+    pub crafting_result_item: Option<InventoryItemStack>,
 }
 pub struct InventoryPlugin;
 
@@ -157,10 +158,12 @@ impl ItemStack {
         slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
-        is_crafting: bool,
+        slot_type: InventorySlotType,
     ) -> Result<(), InventoryError> {
-        let inv_or_crafting = if is_crafting {
+        let inv_or_crafting = if slot_type.is_crafting() {
             inv.single_mut().crafting_items[slot].clone()
+        } else if slot_type.is_crafting_result() {
+            inv.single().crafting_result_item.clone()
         } else {
             inv.single_mut().items[slot].clone()
         };
@@ -177,7 +180,7 @@ impl ItemStack {
                 item_stack: self,
                 slot,
             };
-            if is_crafting {
+            if slot_type.is_crafting() {
                 inv.single_mut().crafting_items[slot] = Some(item);
                 InventoryPlugin::mark_slot_dirty(slot, inv_slots);
             } else {
@@ -227,14 +230,10 @@ impl InventoryPlugin {
         to_merge: ItemStack,
         merge_into: InventoryItemStack,
         inv: &mut Query<&mut Inventory>,
-        is_crafting: bool,
+        slot_type: InventorySlotType,
     ) -> Option<ItemStack> {
         let item_type = to_merge.obj_type;
         //TODO: should this return  None, or the original stack??
-        println!(
-            "{:?} |||| {:?}",
-            merge_into.item_stack.metadata, to_merge.metadata
-        );
         if item_type != merge_into.item_stack.obj_type
             || merge_into.item_stack.metadata != to_merge.metadata
         {
@@ -252,7 +251,7 @@ impl InventoryPlugin {
             },
             slot: merge_into.slot,
         });
-        if is_crafting {
+        if slot_type.is_crafting() {
             inv.single_mut().crafting_items[merge_into.slot] = new_item;
         } else {
             inv.single_mut().items[merge_into.slot] = new_item;
@@ -275,9 +274,9 @@ impl InventoryPlugin {
         target_slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
-        is_crafting: bool,
+        slot_type: InventorySlotType,
     ) -> ItemStack {
-        let target_item_option = if is_crafting {
+        let target_item_option = if slot_type.is_crafting() {
             inv.single().crafting_items[target_slot].clone()
         } else {
             inv.single().items[target_slot].clone()
@@ -287,7 +286,7 @@ impl InventoryPlugin {
                 item_stack: item,
                 slot: target_item_stack.slot,
             });
-            if is_crafting {
+            if slot_type.is_crafting() {
                 inv.single_mut().crafting_items[target_slot] = swapped_item;
             } else {
                 inv.single_mut().items[target_slot] = swapped_item;
@@ -302,10 +301,10 @@ impl InventoryPlugin {
         drop_slot: usize,
         inv: &mut Query<&mut Inventory>,
         inv_slots: &mut Query<&mut InventorySlotState>,
-        is_crafting: bool,
+        slot_type: InventorySlotType,
     ) -> Option<ItemStack> {
         let obj_type = item.obj_type;
-        let target_item_option = if is_crafting {
+        let target_item_option = if slot_type.is_crafting() {
             inv.single().crafting_items[drop_slot].clone()
         } else {
             inv.single().items[drop_slot].clone()
@@ -315,18 +314,12 @@ impl InventoryPlugin {
                 && target_item.item_stack.metadata == item.metadata
             {
                 Self::mark_slot_dirty(drop_slot, inv_slots);
-                return Self::merge_item_stacks(item, target_item, inv, is_crafting);
+                return Self::merge_item_stacks(item, target_item, inv, slot_type);
             } else {
-                return Some(Self::swap_items(
-                    item,
-                    drop_slot,
-                    inv,
-                    inv_slots,
-                    is_crafting,
-                ));
+                return Some(Self::swap_items(item, drop_slot, inv, inv_slots, slot_type));
             }
         } else if item
-            .try_add_to_target_inventory_slot(drop_slot, inv, inv_slots, is_crafting)
+            .try_add_to_target_inventory_slot(drop_slot, inv, inv_slots, slot_type)
             .is_err()
         {
             panic!("Failed to drop item on stot");
@@ -359,7 +352,7 @@ impl InventoryPlugin {
         } else {
             None
         };
-        if item_slot_state.is_crafting {
+        if item_slot_state.r#type.is_crafting() {
             inv.single_mut().crafting_items[item_slot] = remainder_stack
         } else {
             inv.single_mut().items[item_slot] = remainder_stack
