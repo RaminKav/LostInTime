@@ -1,8 +1,10 @@
-# BevySurvivalGame
+# A Top Down 2D Survival Game
 
 A simple survival game for the exploration of Bevy/Rust.
 
 Slimes drop flint that can be used to craft stone in a 2x2 grid.
+
+run using `cargo run --release` 
 
 ### Controls
 
