@@ -1,7 +1,7 @@
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::{prelude::*, time::FixedTimestep, utils::HashMap};
+use serde::Deserialize;
 
 use crate::{
-    assets::Recipes,
     attributes::ItemAttributes,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{ItemDisplayMetaData, WorldObject},
@@ -11,13 +11,21 @@ use crate::{
 pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<CraftingSlotUpdateEvent>().add_system_set(
-            SystemSet::on_update(GameState::Main)
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                .with_system(Self::handle_crafting_slot_update),
-        );
+        app.add_event::<CraftingSlotUpdateEvent>()
+            .insert_resource(Recipes::default())
+            .add_system_set(
+                SystemSet::on_update(GameState::Main)
+                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
+                    .with_system(Self::handle_crafting_slot_update),
+            );
     }
 }
+#[derive(Resource, Default, Deserialize)]
+pub struct Recipes {
+    // map of recipie result and its recipe matrix
+    pub recipes_list: RecipeList,
+}
+pub type RecipeList = HashMap<WorldObject, CraftingGrid>;
 
 impl CraftingPlugin {
     fn handle_crafting_slot_update(

@@ -7,7 +7,7 @@ use crate::{
     animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
     inventory::Inventory,
-    item::{MainHand, WorldObject},
+    item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
     Game, GameParam, GameState, Player, YSort, TIME_STEP,
@@ -72,6 +72,7 @@ impl CombatPlugin {
         mut death_events: EventReader<EnemyDeathEvent>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+        loot_tables: Query<&LootTable>,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
@@ -93,14 +94,18 @@ impl CombatPlugin {
                 DoneAnimation,
                 Name::new("Hit Spark"),
             ));
-            WorldObject::Flint.spawn_item_drop(
-                &mut commands,
-                &mut game,
-                enemy_tile_pos,
-                enemy_chunk_pos,
-                2,
-                None,
-            );
+            if let Ok(loot_table) = loot_tables.get(death_event.entity) {
+                for drop in LootTablePlugin::get_drops(loot_table) {
+                    drop.obj_type.spawn_item_drop(
+                        &mut commands,
+                        &mut game,
+                        enemy_tile_pos,
+                        enemy_chunk_pos,
+                        drop.count,
+                        Some(drop.attributes),
+                    );
+                }
+            }
         }
     }
     fn handle_invincibility_frames(

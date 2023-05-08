@@ -6,6 +6,7 @@ use bevy::{
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use seldom_state::prelude::{NotTrigger, StateMachine};
+use serde::Deserialize;
 use strum_macros::Display;
 
 use crate::{
@@ -23,7 +24,7 @@ impl Plugin for EnemyPlugin {
     }
 }
 
-#[derive(Component, Debug, Clone, Display, Eq, PartialEq)]
+#[derive(Component, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
 pub enum Enemy {
     Slime,
 }
@@ -46,7 +47,7 @@ impl Enemy {
             source_texture: Some(handle),
             is_attacking: 0.,
         });
-        commands.spawn((
+        let mut enemy = commands.spawn((
             MaterialMesh2dBundle {
                 mesh: game
                     .meshes
@@ -65,7 +66,7 @@ impl Enemy {
             KinematicCharacterController::default(),
             Collider::cuboid(10., 6.),
             YSort,
-            self,
+            self.clone(),
             StateMachine::new(IdleState {
                 walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                 direction: MoveDirection::new_rand_dir(rand::thread_rng()),
@@ -119,6 +120,9 @@ impl Enemy {
             ),
             Name::new(name),
         ));
+        if let Some(loot_table) = game.loot_tables.table.get(&self) {
+            enemy.insert(loot_table.clone());
+        }
     }
 }
 

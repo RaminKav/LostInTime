@@ -11,7 +11,7 @@
             breaks_with: None,
             places_into: None
         ),
-        Placeable(Flint): WorldObjectData(
+        Flint: WorldObjectData(
             texture_pos: (48., 16.),
             size: (16., 16.),
             anchor: None,
@@ -39,7 +39,7 @@
             anchor: None,
             collider: true,
             breakable: true,
-            breaks_into: Some(Placeable(Flint)),
+            breaks_into: Some(Flint),
             equip_slot: None,
             breaks_with: None,
             places_into: Some(Wall(Stone))

@@ -1,5 +1,5 @@
 (
     recipes_list : {
-        Wall(Stone): ((Some(Placeable(Flint)), Some(Placeable(Flint))), (Some(Placeable(Flint)), Some(Placeable(Flint)))),
+        Wall(Stone): ((Some(Flint), Some(Flint)), (Some(Flint), Some(Flint))),
     }
 )
