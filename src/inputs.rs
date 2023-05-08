@@ -310,14 +310,16 @@ impl InputsPlugin {
             DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands, &mut game);
         }
         if key_input.just_pressed(KeyCode::M) {
-            let item = inv.single().items[0].clone().unwrap();
-            item.modify_attributes(
-                AttributeModifier {
-                    modifier: "attack".to_owned(),
-                    delta: 10,
-                },
-                &mut inv,
-            );
+            let item = inv.single().items[0].clone();
+            if let Some(item) = item {
+                item.modify_attributes(
+                    AttributeModifier {
+                        modifier: "attack".to_owned(),
+                        delta: 10,
+                    },
+                    &mut inv,
+                );
+            }
         }
     }
     pub fn test_take_damage(
