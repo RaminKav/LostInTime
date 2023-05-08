@@ -34,7 +34,6 @@ mod animations;
 mod assets;
 mod attributes;
 mod combat;
-mod crafting;
 mod enemy;
 mod inputs;
 mod inventory;
@@ -50,11 +49,10 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
-use crafting::CraftingPlugin;
 use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
-use item::{Equipment, EquipmentData, ItemsPlugin, WorldObjectResource};
+use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObjectResource};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -113,7 +111,6 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
-        .add_plugin(CraftingPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
@@ -179,6 +176,7 @@ pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
     pub chunk_manager: ResMut<'w, ChunkManager>,
+    pub loot_tables: Res<'w, LootTableMap>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
     pub game_data: ResMut<'w, GameData>,

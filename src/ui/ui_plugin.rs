@@ -10,10 +10,9 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     assets::{GameAssetsPlugin, Graphics},
     attributes::Health,
-    crafting::CraftingSlotUpdateEvent,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_INIT},
-    item::WorldObject,
+    item::{CraftingSlotUpdateEvent, WorldObject},
     GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
 

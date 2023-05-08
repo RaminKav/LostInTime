@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
@@ -13,6 +11,12 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
+use std::fmt;
+
+mod crafting;
+mod loot_table;
+pub use crafting::*;
+pub use loot_table::*;
 
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use lazy_static::lazy_static;
@@ -20,6 +24,8 @@ use lazy_static::lazy_static;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
+
+use self::crafting::CraftingPlugin;
 
 #[derive(Component)]
 pub struct Breakable(pub Option<WorldObject>);
@@ -751,6 +757,8 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
+            .add_plugin(CraftingPlugin)
+            .add_plugin(LootTablePlugin)
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
                     .with_system(Self::update_graphics)

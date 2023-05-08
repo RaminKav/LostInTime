@@ -86,9 +86,12 @@
 
   ## Next Features:
 
-  - Impl `LootTable` for drops list on enemies and breakable items
+  //TODO: add ron file for stats/metadata for WorldObjects
+  [x] Impl `LootTable` for drops list on enemies and breakable items
+
+  - Impl spawners that auto spawn mobs
   - UI:
-    - Crafting UI
+    [x] Crafting UI
     - Equipment UI
     - Food Bar
   - World Generation:
