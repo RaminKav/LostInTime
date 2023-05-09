@@ -96,6 +96,7 @@ pub struct WorldObjectEntityData {
 #[derive(Default, Debug, Clone)]
 pub struct WorldGeneration {
     pub water_frequency: f64,
+    pub dungeon_stone_frequency: f64,
     pub sand_frequency: f64,
     pub dirt_frequency: f64,
     pub stone_frequency: f64,

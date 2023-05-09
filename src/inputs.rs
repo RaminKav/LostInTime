@@ -14,6 +14,7 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
+use crate::player::MovePlayerEvent;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::dungeon::DungeonPlugin;
@@ -63,7 +64,6 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
-            .add_event::<PlayerMoveEvent>()
             .add_event::<AttackEvent>()
             .add_system_set(
                 SystemSet::on_update(GameState::Main)
@@ -80,9 +80,6 @@ impl Plugin for InputsPlugin {
             .add_system(Self::mouse_click_system);
     }
 }
-
-#[derive(Clone, Debug, Default)]
-pub struct PlayerMoveEvent(bool);
 
 impl InputsPlugin {
     fn turn_player(
@@ -127,7 +124,6 @@ impl InputsPlugin {
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut context: ResMut<RapierContext>,
-        mut move_event: EventWriter<PlayerMoveEvent>, // unused
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 
         mut inv: Query<&mut Inventory>,
@@ -168,7 +164,6 @@ impl InputsPlugin {
         !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
         {
             player.is_moving = false;
-            move_event.send(PlayerMoveEvent(true));
         }
         if d.x != 0. || d.y != 0. {
             d = d.normalize() * s;
@@ -248,7 +243,6 @@ impl InputsPlugin {
         player.position = player_transform.translation;
 
         if d.x != 0. || d.y != 0. {
-            move_event.send(PlayerMoveEvent(false));
             minimap_event.send(UpdateMiniMapEvent);
         }
         for drop in collected_drops.iter() {
@@ -267,6 +261,7 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
+        mut move_player_event: EventWriter<MovePlayerEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -307,7 +302,12 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands, &mut game);
+            let player_spawn_pos =
+                DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands, &mut game);
+            move_player_event.send(MovePlayerEvent {
+                chunk_pos: player_spawn_pos.chunk_pos,
+                tile_pos: player_spawn_pos.tile_pos,
+            })
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -463,7 +463,7 @@ impl InputsPlugin {
                 //TODO: skip this if no wep in hand
                 hit_event.send(HitEvent {
                     hit_entity: hit_obj.entity,
-                    damage: parent_attack.get(game.game.player).unwrap().0,
+                    damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
                     dir: Vec2::new(0., 0.),
                     hit_with: main_hand_option,
                 });
@@ -476,7 +476,7 @@ impl InputsPlugin {
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
-                > (game.game.player_state.reach_distance * 32) as f32
+                > ((game.game.player_state.reach_distance + 1) * 32) as f32
             {
                 return;
             }

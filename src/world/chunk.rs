@@ -264,7 +264,6 @@ impl ChunkPlugin {
                         }
                     }
                     if !game.chunk_manager.cached_chunks.contains(&IVec2::new(x, y)) {
-                        println!("Init Caching chunk at {x:?} {y:?}");
                         game.chunk_manager.state = ChunkLoadingState::Spawning;
                         cache_event.send(CacheChunkEvent {
                             chunk_pos: IVec2::new(x, y),
@@ -280,7 +279,6 @@ impl ChunkPlugin {
         mut cache_event: EventWriter<CacheChunkEvent>,
         mut spawn_event: EventWriter<SpawnChunkEvent>,
         mut game: GameParam,
-        new_dimension: Query<Option<&Dungeon>, With<ActiveDimension>>,
     ) {
         let transform = game.camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
@@ -304,11 +302,6 @@ impl ChunkPlugin {
             for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
                 ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
             {
-                if let Some(_) = new_dimension.single() {
-                    if x != 0 || y != 0 {
-                        continue;
-                    }
-                }
                 if (!game
                     .chunk_manager
                     .spawned_chunks

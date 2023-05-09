@@ -45,7 +45,13 @@ impl TilePlugin {
             // let m = f64::powf(m / (1. + 0.5 + 0.25), 1.);
             // print!("{:?}", e);
             // let m = f64::powf(m, 1.);
-            let block = if e <= chunk_manager.world_generation_params.water_frequency {
+            let block = if e
+                <= chunk_manager
+                    .world_generation_params
+                    .dungeon_stone_frequency
+            {
+                WorldObject::DungeonStone
+            } else if e <= chunk_manager.world_generation_params.water_frequency {
                 WorldObject::Water
             } else if e <= chunk_manager.world_generation_params.sand_frequency {
                 WorldObject::Sand
@@ -72,7 +78,10 @@ impl TilePlugin {
             //         block = WorldObject::Dirt
             //     }
             // }
-            let block_bits: u8 = if block == WorldObject::Sand || block == WorldObject::Grass {
+            let block_bits: u8 = if block == WorldObject::Sand
+                || block == WorldObject::Grass
+                || block == WorldObject::DungeonStone
+            {
                 0
             } else {
                 1
@@ -111,6 +120,8 @@ impl TilePlugin {
                     bits[b] = 1;
                 }
             }
+        } else if blocks.contains(&WorldObject::DungeonStone) {
+            index_shift = 32;
         }
         (bits, index_shift, blocks)
     }
