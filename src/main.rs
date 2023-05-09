@@ -38,6 +38,7 @@ mod enemy;
 mod inputs;
 mod inventory;
 mod item;
+mod player;
 mod ui;
 mod vectorize;
 mod world;
@@ -53,6 +54,7 @@ use enemy::EnemyPlugin;
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
 use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObjectResource};
+use player::PlayerPlugin;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -115,6 +117,7 @@ fn main() {
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
         .add_plugin(EnemyPlugin)
+        .add_plugin(PlayerPlugin)
         .add_plugin(WorldPlugin)
         .add_startup_system(setup)
         .add_loading_state(
@@ -228,7 +231,7 @@ impl Default for PlayerState {
             is_attacking: false,
             main_hand_slot: None,
             position: Vec3::ZERO,
-            reach_distance: 2,
+            reach_distance: 1,
             player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
             player_dash_duration: Timer::from_seconds(0.05, TimerMode::Once),
         }
@@ -300,6 +303,7 @@ fn setup(
     let mut cm = ChunkManager::new();
     cm.world_generation_params = WorldGeneration {
         tree_frequency: 0.,
+        dungeon_stone_frequency: 0.,
         stone_frequency: 0.18,
         dirt_frequency: 0.52,
         sand_frequency: 0.22,
@@ -308,6 +312,7 @@ fn setup(
     dim_event.send(DimensionSpawnEvent {
         generation_params: WorldGeneration {
             tree_frequency: 0.,
+            dungeon_stone_frequency: 0.,
             stone_frequency: 0.18,
             dirt_frequency: 0.52,
             sand_frequency: 0.22,
