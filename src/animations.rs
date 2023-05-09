@@ -343,8 +343,9 @@ impl AnimationsPlugin {
                 let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
                 if sprite.index == texture_atlas.textures.len() - 1 && remove_me_option.is_some() {
                     commands.entity(e).despawn();
-                    return;
+                    continue;
                 }
+
                 sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
                 timer.reset();
             }
