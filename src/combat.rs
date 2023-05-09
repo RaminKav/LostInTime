@@ -89,7 +89,7 @@ impl CombatPlugin {
                     transform: Transform::from_translation(t.extend(0.)),
                     ..default()
                 },
-                AnimationTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
+                AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
                 YSort,
                 DoneAnimation,
                 Name::new("Hit Spark"),
@@ -123,6 +123,7 @@ impl CombatPlugin {
     fn spawn_hit_spark_effect(
         mut commands: Commands,
         hits: Query<(Entity, Added<JustGotHit>, Option<&Player>)>,
+        transforms: Query<&Transform>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     ) {
@@ -140,29 +141,27 @@ impl CombatPlugin {
             let s = 5;
             let x_rng = rng.gen_range(-s..s);
             let y_rng = rng.gen_range(-s..s);
+            let hit_pos = transforms.get(hit.0).unwrap().translation;
 
             let hit_spark_entity = commands
                 .spawn((
                     SpriteSheetBundle {
                         texture_atlas: texture_atlas_handle,
                         transform: Transform::from_translation(Vec3::new(
-                            0. + x_rng as f32,
-                            -5. + y_rng as f32,
+                            hit_pos.x + x_rng as f32,
+                            hit_pos.y - 5. + y_rng as f32,
                             1.,
                         )),
                         ..default()
                     },
-                    AnimationTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
+                    AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
                     YSort,
                     DoneAnimation,
                     Name::new("Hit Spark"),
                 ))
                 .id();
 
-            commands
-                .entity(hit.0)
-                .remove::<JustGotHit>()
-                .add_child(hit_spark_entity);
+            commands.entity(hit.0).remove::<JustGotHit>();
         }
     }
 
@@ -189,8 +188,6 @@ impl CombatPlugin {
             if let Ok((e, mut hit_health, t, obj_option, i_frame_option)) =
                 health.get_mut(hit.hit_entity)
             {
-                hit_health.0 -= hit.damage as i32;
-
                 if let Some(obj) = obj_option {
                     let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
                     let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
@@ -202,20 +199,17 @@ impl CombatPlugin {
                     );
 
                     if let Some(data) = game.world_obj_data.properties.get(&obj) {
-                        if let Some(breaks_with) = data.breaks_with {
-                            if let Some(main_hand_tool) = hit.hit_with {
-                                if main_hand_tool == breaks_with {
-                                    if hit_health.0 <= 0 {
-                                        obj_death_events.send(ObjBreakEvent {
-                                            entity: e,
-                                            obj: *obj,
-                                            tile_pos: obj_tile_pos,
-                                            chunk_pos: obj_chunk_pos,
-                                        });
-                                    }
+                        if let Some(main_hand_tool) = hit.hit_with {
+                            if let Some(breaks_with) = data.breaks_with {
+                                if main_hand_tool != breaks_with {
+                                    continue;
                                 }
                             }
-                        } else {
+                        }
+                        hit_health.0 -= hit.damage as i32;
+
+                        println!("HP {hit_health:?}");
+                        if hit_health.0 <= 0 {
                             obj_death_events.send(ObjBreakEvent {
                                 entity: e,
                                 obj: *obj,
@@ -225,19 +219,18 @@ impl CombatPlugin {
                         }
                     }
                 } else {
+                    hit_health.0 -= hit.damage as i32;
+
                     // let has_i_frames = has_i_frames.get(hit.hit_entity);
-                    commands
-                        .entity(hit.hit_entity)
-                        .insert(HitAnimationTracker {
-                            timer: Timer::from_seconds(
-                                //TODO: once we create builders for creatures, add this as a default to all creatures that can be hit
-                                0.2,
-                                TimerMode::Once,
-                            ),
-                            knockback: 400.,
-                            dir: hit.dir,
-                        })
-                        .insert(JustGotHit);
+                    commands.entity(hit.hit_entity).insert(HitAnimationTracker {
+                        timer: Timer::from_seconds(
+                            //TODO: once we create builders for creatures, add this as a default to all creatures that can be hit
+                            0.2,
+                            TimerMode::Once,
+                        ),
+                        knockback: 400.,
+                        dir: hit.dir,
+                    });
                     if let Some(i_frames) = i_frame_option {
                         commands.entity(hit.hit_entity).insert(InvincibilityTimer(
                             Timer::from_seconds(i_frames.0, TimerMode::Once),
@@ -250,6 +243,8 @@ impl CombatPlugin {
                         })
                     }
                 }
+
+                commands.entity(hit.hit_entity).insert(JustGotHit);
             }
         }
     }
