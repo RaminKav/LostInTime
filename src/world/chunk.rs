@@ -41,7 +41,7 @@ impl Plugin for ChunkPlugin {
 }
 #[derive(Clone)]
 pub struct SpawnChunkEvent {
-    chunk_pos: IVec2,
+    pub chunk_pos: IVec2,
 }
 
 #[derive(Clone)]

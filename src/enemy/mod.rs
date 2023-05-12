@@ -15,17 +15,21 @@ use crate::{
     attributes::Health,
     GameParam, YSort,
 };
+pub mod spawner;
+use spawner::*;
 
 pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(Material2dPlugin::<EnemyMaterial>::default());
+        app.add_plugin(Material2dPlugin::<EnemyMaterial>::default())
+            .add_plugin(SpawnerPlugin);
     }
 }
 
-#[derive(Component, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
 pub enum Enemy {
+    #[default]
     Slime,
 }
 impl Enemy {
