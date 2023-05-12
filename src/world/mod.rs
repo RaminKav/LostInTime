@@ -14,7 +14,7 @@ use bevy::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::item::WorldObject;
+use crate::{enemy::spawner::ChunkSpawner, item::WorldObject};
 
 use self::{
     chunk::ChunkPlugin,
@@ -28,17 +28,30 @@ pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 16;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
 const CHUNK_CACHE_AMOUNT: i32 = 4;
-const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
+pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
 #[derive(Debug, Component, Resource, Clone)]
+// for dimensions, chunks are child of D, and when swapping,
+// save only obj data, tiles/chunks will regenerate from seed
+// obj data is  saved in cm of dimension
+// when dim is changed, despawn all children, but parent dim
+// will keep its CM data with the obj data inside
+// when we swap back, use the obj data to spawn teh objs back
+// may not need to add obj data as comp to tile??
 pub struct ChunkManager {
+    // give Spawned comonent to chunk entity
     pub spawned_chunks: HashSet<IVec2>,
+    // any chunk entity that exists is cached
     pub cached_chunks: HashSet<IVec2>,
+    // give as comonent to each tile entity
     pub raw_chunk_data: HashMap<IVec2, RawChunkData>,
+    // turn TileEntityData into comp for each tile
     pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
+    // turn into comp for each tile
     pub chunk_generation_data: HashMap<TileMapPositionData, WorldObjectEntityData>,
     pub state: ChunkLoadingState,
     pub world_generation_params: WorldGeneration,
+    pub spawner_data: HashMap<IVec2, Vec<ChunkSpawner>>,
 }
 
 impl ChunkManager {
@@ -47,6 +60,7 @@ impl ChunkManager {
             spawned_chunks: HashSet::default(),
             cached_chunks: HashSet::default(),
             chunk_tile_entity_data: HashMap::new(),
+            spawner_data: HashMap::new(),
             raw_chunk_data: HashMap::new(),
             state: ChunkLoadingState::Spawning,
             chunk_generation_data: HashMap::new(),
