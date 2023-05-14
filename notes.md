@@ -147,3 +147,21 @@ split world_generation into
 
 [x] create crafting result slot (dif from normal slots, cant drop into)
 [x] add support for recipies
+
+# Crafting Manager Refactor
+
+- Dimension entities will have:
+  <!-- - `chunk_tile_entity_data` component to cache all chunks tiles -->
+  <!-- - `chunk_generation_data` component to cache obj data -->
+  <!-- - both of those can just live on the existing CM? -->
+  - when a chunk is depsawned, we loop all its tiles and store their data in `bevy_save`.
+- Chunk entities will have:
+  - `SpawnedChunk`
+  - `ChunkSpawners` -> vec of spawners
+  - Chunks have a map of TilePos -> Entity of tile
+- Tiles:
+  - `TileEntityData` stored on each tile
+  - `RawChunkData` maybe add as part of `TileEntityData`
+  - objs are children of tiles with `WorldObject`/etc
+  - need: Map of chunk_pos -> Entity per dimension
+  - need: Map of tile_pos -> Entity per chunk

@@ -1,7 +1,7 @@
 use crate::assets::Graphics;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::world::{ChunkManager, TileMapPositionData, CHUNK_SIZE};
-use crate::{GameState, Player, GAME_HEIGHT, GAME_WIDTH, TIME_STEP};
+use crate::{GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH, TIME_STEP};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -35,8 +35,7 @@ impl MinimapPlugin {
         graphics: Res<Graphics>,
         mut assets: ResMut<Assets<Image>>,
         mut color_mat: ResMut<Assets<ColorMaterial>>,
-        mut meshes: ResMut<Assets<Mesh>>,
-        cm: Res<ChunkManager>,
+        mut game: GameParam,
         minimap_update: EventReader<UpdateMiniMapEvent>,
         old_map: Query<Entity, With<Minimap>>,
         p_t: Query<&Transform, With<Player>>,
@@ -101,20 +100,16 @@ impl MinimapPlugin {
                             x: tile_x as u32,
                             y: (tile_y) as u32,
                         };
-                        if let Some(tile_data) =
-                            cm.chunk_tile_entity_data.get(&TileMapPositionData {
-                                chunk_pos,
-                                tile_pos,
-                            })
-                        {
+                        if let Some(tile_data) = game.get_tile_data(TileMapPositionData {
+                            chunk_pos,
+                            tile_pos,
+                        }) {
                             let mut tile = tile_data.block_type;
 
-                            if let Some(obj_data) =
-                                cm.chunk_generation_data.get(&TileMapPositionData {
-                                    tile_pos,
-                                    chunk_pos,
-                                })
-                            {
+                            if let Some(obj_data) = game.get_tile_obj_data(TileMapPositionData {
+                                tile_pos,
+                                chunk_pos,
+                            }) {
                                 let obj_type = obj_data.object;
                                 tile = [obj_type; 4];
                             }
@@ -184,7 +179,8 @@ impl MinimapPlugin {
             let map = commands
                 .spawn((
                     MaterialMesh2dBundle {
-                        mesh: meshes
+                        mesh: game
+                            .meshes
                             .add(
                                 shape::Quad {
                                     size: Vec2::new((num_tiles * 2) as f32, (num_tiles * 2) as f32),

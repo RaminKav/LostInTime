@@ -17,6 +17,7 @@ use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::player::MovePlayerEvent;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
+use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::world::TileMapPositionData;
@@ -119,7 +120,12 @@ impl InputsPlugin {
                 &mut MovementVector,
                 Option<&Children>,
             ),
-            (With<Player>, Without<MainCamera>, Without<Equipment>),
+            (
+                With<Player>,
+                Without<MainCamera>,
+                Without<Chunk>,
+                Without<Equipment>,
+            ),
         >,
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
@@ -449,20 +455,24 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            if let Some(hit_obj) =
-                game.chunk_manager
-                    .chunk_generation_data
-                    .get(&TileMapPositionData {
-                        tile_pos: TilePos {
-                            x: cursor_tile_pos.x as u32,
-                            y: cursor_tile_pos.y as u32,
-                        },
-                        chunk_pos: cursor_chunk_pos,
-                    })
-            {
+            if let Some(hit_obj) = game.get_tile_obj_data(TileMapPositionData {
+                tile_pos: TilePos {
+                    x: cursor_tile_pos.x as u32,
+                    y: cursor_tile_pos.y as u32,
+                },
+                chunk_pos: cursor_chunk_pos,
+            }) {
                 //TODO: skip this if no wep in hand
                 hit_event.send(HitEvent {
-                    hit_entity: hit_obj.entity,
+                    hit_entity: game
+                        .get_obj_entity_at_tile(TileMapPositionData {
+                            tile_pos: TilePos {
+                                x: cursor_tile_pos.x as u32,
+                                y: cursor_tile_pos.y as u32,
+                            },
+                            chunk_pos: cursor_chunk_pos,
+                        })
+                        .unwrap(),
                     damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
                     dir: Vec2::new(0., 0.),
                     hit_with: main_hand_option,

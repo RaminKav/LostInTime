@@ -50,7 +50,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
-use enemy::EnemyPlugin;
+use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
 use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObjectResource};
@@ -59,7 +59,11 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use ui::{FPSText, InventorySlotState, UIPlugin};
-use world::{dimension::DimensionSpawnEvent, WorldPlugin};
+use world::{
+    chunk::{Chunk, SpawnedObject, TileEntityCollection, TileSpriteData},
+    dimension::DimensionSpawnEvent,
+    TileMapPositionData, WorldObjectEntityData, WorldPlugin,
+};
 use world::{generation::GameData, ChunkManager, WorldGeneration};
 
 const PLAYER_MOVE_SPEED: f32 = 2.;
@@ -186,11 +190,23 @@ pub struct GameParam<'w, 's> {
     pub meshes: ResMut<'w, Assets<Mesh>>,
 
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
+    pub chunk_query:
+        Query<'w, 's, (Entity, &'static Transform, &'static mut ChunkSpawners), With<Chunk>>,
+    pub tile_collection_query: Query<'w, 's, &'static TileEntityCollection, With<Chunk>>,
+    pub tile_data_query:
+        Query<'w, 's, (&'static mut TileSpriteData, Option<&'static SpawnedObject>)>,
+    pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
+
     pub items_query: Query<
         'w,
         's,
         (Entity, &'static Transform, &'static ItemStack),
-        (Without<Player>, Without<Equipment>, Without<Health>),
+        (
+            Without<Player>,
+            Without<Equipment>,
+            Without<Chunk>,
+            Without<Health>,
+        ),
     >,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub camera_query: Query<
@@ -200,6 +216,7 @@ pub struct GameParam<'w, 's> {
         (
             With<TextureCamera>,
             Without<Player>,
+            Without<Chunk>,
             Without<ItemStack>,
             Without<Health>,
         ),
@@ -208,6 +225,61 @@ pub struct GameParam<'w, 's> {
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
+}
+
+impl<'w, 's> GameParam<'w, 's> {
+    pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<&Entity> {
+        self.chunk_manager.chunks.get(&chunk_pos)
+    }
+    pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
+        self.chunk_manager.chunks.insert(chunk_pos, e);
+    }
+    pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
+        self.chunk_manager.chunks.remove(&chunk_pos);
+    }
+
+    pub fn get_tile_entity(&self, tile: TileMapPositionData) -> Option<Entity> {
+        if let Some(chunk_e) = self.get_chunk_entity(tile.chunk_pos) {
+            let tile_collection = self.tile_collection_query.get(*chunk_e).unwrap();
+            return tile_collection.map.get(&tile.tile_pos).copied();
+        }
+        None
+    }
+    pub fn get_tile_data_mut(&mut self, tile: TileMapPositionData) -> Option<Mut<TileSpriteData>> {
+        if let Some(tile_e) = self.get_tile_entity(tile) {
+            return Some(self.tile_data_query.get_mut(tile_e).unwrap().0);
+        }
+        None
+    }
+    pub fn get_tile_data(&self, tile: TileMapPositionData) -> Option<TileSpriteData> {
+        if let Some(tile_e) = self.get_tile_entity(tile) {
+            return Some(self.tile_data_query.get(tile_e).unwrap().0.clone());
+        }
+        None
+    }
+    pub fn get_obj_entity_at_tile(&self, tile: TileMapPositionData) -> Option<Entity> {
+        if let Some(tile_e) = self.get_tile_entity(tile) {
+            if let Some(e) = self.tile_data_query.get(tile_e).unwrap().1 {
+                return Some(e.0);
+            }
+        }
+        None
+    }
+    pub fn get_tile_obj_data(&self, tile: TileMapPositionData) -> Option<WorldObjectEntityData> {
+        if let Some(e) = self.get_obj_entity_at_tile(tile) {
+            return Some(self.world_obj_data_query.get(e).unwrap().clone());
+        }
+        None
+    }
+    pub fn get_tile_obj_data_mut(
+        &mut self,
+        tile: TileMapPositionData,
+    ) -> Option<Mut<WorldObjectEntityData>> {
+        if let Some(e) = self.get_obj_entity_at_tile(tile) {
+            return Some(self.world_obj_data_query.get_mut(e).unwrap());
+        }
+        None
+    }
 }
 #[derive(Component, Debug)]
 pub struct Player;

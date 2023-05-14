@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
-use crate::item::WorldObject;
+use crate::{item::WorldObject, GameParam};
 
 use super::{
-    noise_helpers, ChunkManager, TileEntityData, TileMapPositionData, WorldObjectEntityData,
-    CHUNK_SIZE,
+    chunk::TileSpriteData, noise_helpers, ChunkManager, TileEntityData, TileMapPositionData,
+    WorldObjectEntityData, CHUNK_SIZE,
 };
 
 pub struct TilePlugin;
@@ -128,7 +128,7 @@ impl TilePlugin {
     pub fn update_neighbour_tiles(
         new_tile_pos: TilePos,
         commands: &mut Commands,
-        chunk_manager: &mut ResMut<ChunkManager>,
+        game: &mut GameParam,
         chunk_pos: IVec2,
         update_entity: bool,
     ) {
@@ -161,29 +161,32 @@ impl TilePlugin {
                     let mut neighbour_tile_offset;
                     let neighbour_entity;
                     let neighbour_tile_blocks;
+                    let neighbour_raw_tile_blocks;
 
-                    if !chunk_manager.cached_chunks.contains(&adjusted_chunk_pos) {
+                    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
                     }
-                    let neighbour_tile_entity_data =
-                        chunk_manager
-                            .chunk_tile_entity_data
-                            .get(&TileMapPositionData {
-                                chunk_pos: adjusted_chunk_pos,
-                                tile_pos: neighbour_tile_pos,
-                            });
-                    let new_tile_entity_data = chunk_manager
-                        .chunk_tile_entity_data
-                        .get(&TileMapPositionData {
+                    let neighbour_tile_entity_data = game.get_tile_data(TileMapPositionData {
+                        chunk_pos: adjusted_chunk_pos,
+                        tile_pos: neighbour_tile_pos,
+                    });
+                    let new_tile_entity_data = game
+                        .get_tile_data(TileMapPositionData {
                             chunk_pos,
                             tile_pos: new_tile_pos,
                         })
                         .unwrap();
 
                     if let Some(neighbour_tile_entity_data) = neighbour_tile_entity_data {
-                        neighbour_entity = neighbour_tile_entity_data.entity;
+                        neighbour_entity = game
+                            .get_tile_entity(TileMapPositionData {
+                                chunk_pos: adjusted_chunk_pos,
+                                tile_pos: neighbour_tile_pos,
+                            })
+                            .unwrap();
                         neighbour_tile_offset = neighbour_tile_entity_data.texture_offset;
                         neighbour_tile_blocks = neighbour_tile_entity_data.block_type;
+                        neighbour_raw_tile_blocks = neighbour_tile_entity_data.raw_block_type;
                     } else {
                         continue;
                     }
@@ -210,37 +213,35 @@ impl TilePlugin {
                     let updated_block_type =
                         Self::get_block_type_from_bits(updated_bit_index, neighbour_tile_offset);
                     if update_entity {
-                        if let Some(mut e_commands) = commands.get_entity(neighbour_entity.unwrap())
-                        {
+                        if let Some(mut e_commands) = commands.get_entity(neighbour_entity) {
                             e_commands.insert(TileTextureIndex(
                                 (updated_bit_index + neighbour_tile_offset).into(),
                             ));
                         }
                     };
-                    chunk_manager.chunk_tile_entity_data.insert(
-                        TileMapPositionData {
-                            chunk_pos: adjusted_chunk_pos,
-                            tile_pos: neighbour_tile_pos,
-                        },
-                        TileEntityData {
-                            entity: if update_entity {
-                                neighbour_entity
-                            } else {
-                                None
-                            },
+                    commands
+                        .entity(
+                            game.get_tile_entity(TileMapPositionData {
+                                chunk_pos: adjusted_chunk_pos,
+                                tile_pos: neighbour_tile_pos,
+                            })
+                            .unwrap(),
+                        )
+                        .insert(TileSpriteData {
                             tile_bit_index: updated_bit_index,
                             block_type: updated_block_type,
                             texture_offset: neighbour_tile_offset,
-                        },
-                    );
+                            raw_block_type: neighbour_raw_tile_blocks,
+                        });
                 }
             }
         }
     }
     pub fn update_this_tile(
+        commands: &mut Commands,
         tile_pos: TilePos,
         mut tile_index_offset: u8,
-        chunk_manager: &mut ResMut<ChunkManager>,
+        game: &mut GameParam,
         chunk_pos: IVec2,
     ) {
         let x = tile_pos.x as i8;
@@ -268,18 +269,19 @@ impl TilePlugin {
                     adjusted_chunk_pos.y = chunk_pos.y + 1;
                     neighbour_tile_pos.y = 0;
                 }
+                let neighbour_pos = TileMapPositionData {
+                    chunk_pos: adjusted_chunk_pos,
+                    tile_pos: neighbour_tile_pos,
+                };
                 if !(dx == 0 && dy == 0) {
-                    if !chunk_manager.cached_chunks.contains(&adjusted_chunk_pos) {
+                    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
                     }
-                    let neighbour_raw_block_data = chunk_manager
-                        .raw_chunk_data
-                        .get(&adjusted_chunk_pos)
-                        .unwrap();
+                    let neighbour_raw_block_data =
+                        game.get_tile_data(neighbour_pos).unwrap().raw_block_type;
 
-                    let target_block_entity_data = chunk_manager
-                        .chunk_tile_entity_data
-                        .get(&TileMapPositionData {
+                    let target_block_entity_data = game
+                        .get_tile_data(TileMapPositionData {
                             chunk_pos,
                             tile_pos,
                         })
@@ -293,15 +295,13 @@ impl TilePlugin {
                     }
 
                     // only continue for tiles with water
-                    let mut updated_bit_index = if neighbour_raw_block_data.raw_chunk_blocks
-                        [neighbour_tile_pos.x as usize][neighbour_tile_pos.y as usize]
-                        .contains(&WorldObject::Water)
-                    {
-                        let bits = target_block_entity_data.tile_bit_index;
-                        Self::compute_tile_index(0b1111, bits, (-dx, -dy))
-                    } else {
-                        continue;
-                    };
+                    let mut updated_bit_index =
+                        if neighbour_raw_block_data.contains(&WorldObject::Water) {
+                            let bits = target_block_entity_data.tile_bit_index;
+                            Self::compute_tile_index(0b1111, bits, (-dx, -dy))
+                        } else {
+                            continue;
+                        };
 
                     // turn to sand
                     if updated_bit_index == 0b1111 && tile_index_offset == 16 {
@@ -311,18 +311,20 @@ impl TilePlugin {
                     let block_type =
                         Self::get_block_type_from_bits(updated_bit_index, tile_index_offset);
 
-                    chunk_manager.chunk_tile_entity_data.insert(
-                        TileMapPositionData {
-                            chunk_pos,
-                            tile_pos,
-                        },
-                        TileEntityData {
-                            entity: None,
+                    commands
+                        .entity(
+                            game.get_tile_entity(TileMapPositionData {
+                                chunk_pos,
+                                tile_pos,
+                            })
+                            .unwrap(),
+                        )
+                        .insert(TileSpriteData {
                             tile_bit_index: updated_bit_index,
                             block_type,
                             texture_offset: tile_index_offset,
-                        },
-                    );
+                            raw_block_type: target_block_entity_data.raw_block_type,
+                        });
                 }
             }
         }
@@ -478,23 +480,27 @@ impl TilePlugin {
         chunk_pos: IVec2,
         bits: u8,
         offset: u8,
-        chunk_manager: &mut ResMut<ChunkManager>,
+        game: &mut GameParam,
         commands: &mut Commands,
     ) {
         let block_type = Self::get_block_type_from_bits(bits, offset);
 
-        let tile_entity_data = chunk_manager
-            .chunk_tile_entity_data
-            .get_mut(&TileMapPositionData {
-                chunk_pos,
-                tile_pos,
-            });
-        if let Some(tile_entity_data) = tile_entity_data {
-            if let Some(mut e_commands) = commands.get_entity(tile_entity_data.entity.unwrap()) {
-                e_commands.insert(TileTextureIndex((bits + offset).into()));
-                tile_entity_data.block_type = block_type;
-                Self::update_neighbour_tiles(tile_pos, commands, chunk_manager, chunk_pos, true);
-            }
-        }
+        let tile_entity_data = game.get_tile_data_mut(TileMapPositionData {
+            chunk_pos,
+            tile_pos,
+        });
+        // if let Some(tile_entity_data) = tile_entity_data {
+        //     if let Some(mut e_commands) = commands.get_entity(
+        //         game.get_tile_entity(TileMapPositionData {
+        //             chunk_pos,
+        //             tile_pos,
+        //         })
+        //         .unwrap(),
+        //     ) {
+        //         e_commands.insert(TileTextureIndex((bits + offset).into()));
+        //         tile_entity_data.block_type = block_type;
+        //         Self::update_neighbour_tiles(tile_pos, commands, game, chunk_pos, true);
+        //     }
+        // }
     }
 }
