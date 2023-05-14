@@ -6,8 +6,9 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     world::{
-        chunk::SpawnChunkEvent, world_helpers::camera_pos_to_chunk_pos, ChunkManager, CHUNK_SIZE,
-        NUM_CHUNKS_AROUND_CAMERA,
+        chunk::{Chunk, SpawnChunkEvent},
+        world_helpers::camera_pos_to_chunk_pos,
+        ChunkManager, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA,
     },
     GameParam, GameState, TIME_STEP,
 };
@@ -30,7 +31,7 @@ impl Plugin for SpawnerPlugin {
 
 #[derive(Clone, Debug, Default)]
 
-pub struct ChunkSpawner {
+pub struct Spawner {
     pub chunk_pos: IVec2,
     // pub radius: u32,
     pub weight: f32,
@@ -38,13 +39,18 @@ pub struct ChunkSpawner {
     pub max_summons: u32,
     pub enemy: Enemy,
 }
+#[derive(Component, Debug)]
+pub struct ChunkSpawners {
+    pub spawners: Vec<Spawner>,
+}
+
 #[derive(Debug)]
 pub struct MobSpawnEvent {
     chunk_pos: IVec2,
-    spawners: Vec<ChunkSpawner>,
+    spawners: Vec<Spawner>,
 }
 
-impl ChunkSpawner {
+impl Spawner {
     fn spawn_mob(
         &mut self,
         game: &mut GameParam,
@@ -71,35 +77,33 @@ impl ChunkSpawner {
 }
 
 impl SpawnerPlugin {
-    fn handle_spawn_mobs(
-        mut game: GameParam,
-        mut commands: Commands,
-        asset_server: Res<AssetServer>,
-        mut materials: ResMut<Assets<EnemyMaterial>>,
-        mut spawn_event: EventReader<MobSpawnEvent>,
-        mut cm: ResMut<ChunkManager>,
-        time: Res<Time>,
-    ) {
+    fn handle_spawn_mobs(mut game: GameParam, mut spawn_event: EventReader<MobSpawnEvent>) {
         for e in spawn_event.iter() {
             println!("GOT SPAWN EVENT FOR {:?}", e.chunk_pos);
             let mut rng = rand::thread_rng();
-            if let Ok(picked_spawner) = e
+            if let Ok(picked_spawner) = game
+                .chunk_query
+                .get_mut(*game.get_chunk_entity(e.chunk_pos).unwrap())
+                .unwrap()
+                .2
                 .spawners
-                .choose_weighted(&mut rng, |spawner| spawner.weight)
+                .choose_weighted_mut(&mut rng, |spawner| spawner.weight)
             {
                 if picked_spawner.spawn_timer.percent() == 0. {
-                    picked_spawner.spawn_mob(
-                        &mut game,
-                        &mut commands,
-                        asset_server.clone(),
-                        &mut materials,
-                    );
+                    //TODO: Turn into event vvv
+
+                    // picked_spawner.spawn_mob(
+                    //     &mut game,
+                    //     &mut commands,
+                    //     asset_server.clone(),
+                    //     &mut materials,
+                    // );
                 }
             }
         }
     }
     fn check_mob_count(
-        chunk_manager: Res<ChunkManager>,
+        chunk_query: Query<(Entity, &Transform, &mut ChunkSpawners), With<Chunk>>,
         mobs: Query<&Transform, With<Enemy>>,
         mut spawn_event: EventWriter<MobSpawnEvent>,
     ) {
@@ -113,21 +117,21 @@ impl SpawnerPlugin {
         }
         // for each spawned chunk, check if mob count is < max
         // and if so, send event to spawn more
-        for chunk_pos in chunk_manager.spawned_chunks.iter() {
+        for (e, t, spawners) in chunk_query.iter() {
+            let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
             if mob_counts[chunk_pos.x as usize][chunk_pos.y as usize] >= MAX_MOB_PER_CHUNK {
                 continue;
             }
-            if let Some(spawners) = chunk_manager.spawner_data.get(&chunk_pos) {
-                spawn_event.send(MobSpawnEvent {
-                    chunk_pos: *chunk_pos,
-                    spawners: spawners.to_vec(),
-                });
-            }
+            spawn_event.send(MobSpawnEvent {
+                chunk_pos,
+                spawners: spawners.spawners.to_vec(),
+            });
         }
     }
-    fn tick_spawner_timers(cm: ResMut<ChunkManager>, time: Res<Time>) {
-        for (chunk_pos, s) in cm.spawner_data.iter_mut() {
-            for spawner in s.iter_mut() {
+    fn tick_spawner_timers(mut game: GameParam, time: Res<Time>) {
+        for (e, t, mut spawners) in game.chunk_query.iter_mut() {
+            let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
+            for spawner in spawners.spawners.iter_mut() {
                 if spawner.spawn_timer.percent() > 0. {
                     spawner.spawn_timer.tick(time.delta());
                     println!("tick! {:?}", spawner.spawn_timer.percent());
@@ -140,13 +144,14 @@ impl SpawnerPlugin {
     }
     fn handle_add_spawners_on_chunk_spawn(
         mut spawn_events: EventReader<SpawnChunkEvent>,
-        mut cm: ResMut<ChunkManager>,
+        mut game: GameParam,
+        mut commands: Commands,
     ) {
         for e in spawn_events.iter() {
             if e.chunk_pos != (IVec2 { x: 0, y: 0 }) {
                 continue;
             }
-            let spawner = ChunkSpawner {
+            let spawner = Spawner {
                 chunk_pos: IVec2 { x: 0, y: 0 },
                 weight: 1.,
                 spawn_timer: Timer::new(Duration::from_secs(5), TimerMode::Once),
@@ -154,7 +159,11 @@ impl SpawnerPlugin {
                 enemy: Enemy::Slime,
             };
             println!("Adding spawner for {:?}", e.chunk_pos);
-            cm.spawner_data.insert(e.chunk_pos, vec![spawner]);
+            commands
+                .entity(*game.get_chunk_entity(e.chunk_pos).unwrap())
+                .insert(ChunkSpawners {
+                    spawners: vec![spawner],
+                });
         }
     }
 }

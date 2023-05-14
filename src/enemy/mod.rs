@@ -15,8 +15,9 @@ use crate::{
     attributes::Health,
     GameParam, YSort,
 };
+
 pub mod spawner;
-use spawner::*;
+use self::spawner::SpawnerPlugin;
 
 pub struct EnemyPlugin;
 
