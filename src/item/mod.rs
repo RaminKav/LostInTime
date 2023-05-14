@@ -172,6 +172,7 @@ impl fmt::Display for WorldObject {
     }
 }
 impl WorldObject {
+    //TODO: turn this into event
     pub fn spawn(
         self,
         commands: &mut Commands,
@@ -184,9 +185,7 @@ impl WorldObject {
             panic!("graphics not loaded");
         }
         if game
-            .chunk_manager
-            .chunk_generation_data
-            .get(&TileMapPositionData {
+            .get_obj_entity_at_tile(TileMapPositionData {
                 tile_pos,
                 chunk_pos,
             })
@@ -226,6 +225,11 @@ impl WorldObject {
             .insert(BlockAttributeBundle {
                 health: Health(100),
             })
+            .insert(WorldObjectEntityData {
+                object: self,
+                obj_bit_index: 0,
+                texture_offset: 0,
+            })
             .insert(Block)
             .insert(YSort)
             .insert(self)
@@ -242,21 +246,6 @@ impl WorldObject {
                 obj_data.size.y / 4.5,
             ));
         }
-        game.chunk_manager.chunk_generation_data.insert(
-            TileMapPositionData {
-                tile_pos: TilePos {
-                    x: tile_pos.x as u32,
-                    y: tile_pos.y as u32,
-                },
-                chunk_pos,
-            },
-            WorldObjectEntityData {
-                object: self,
-                entity: item,
-                obj_bit_index: 0,
-                texture_offset: 0,
-            },
-        );
 
         Some(item)
     }
@@ -275,7 +264,7 @@ impl WorldObject {
             tile_pos,
             chunk_pos,
         };
-        if game.chunk_manager.chunk_generation_data.get(&pos).is_some() {
+        if game.get_obj_entity_at_tile(pos.clone()).is_some() {
             warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
             return None;
         }
@@ -284,11 +273,11 @@ impl WorldObject {
                 let obj_data = game.world_obj_data.properties.get(&self).unwrap();
                 let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
                 let position = Vec3::new(
-                    (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                        + anchor.x * obj_data.size.x,
-                    (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                        + anchor.y * obj_data.size.y,
-                    0.,
+                    // (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+                    //     + anchor.x * obj_data.size.x,
+                    // (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                    //     + anchor.y * obj_data.size.y,
+                    0., 0., 1.,
                 );
                 let item = commands
                     .spawn(SpriteSheetBundle {
@@ -304,7 +293,12 @@ impl WorldObject {
                         health: Health(100),
                     })
                     .insert(Wall::Stone)
-                    .insert(YSort)
+                    .insert(WorldObjectEntityData {
+                        object: self,
+                        obj_bit_index: 0,
+                        texture_offset: 0,
+                    })
+                    // .insert(YSort)
                     .insert(pos)
                     .insert(self)
                     .id();
@@ -320,22 +314,6 @@ impl WorldObject {
                         obj_data.size.y / 4.5,
                     ));
                 }
-                game.chunk_manager.chunk_generation_data.insert(
-                    TileMapPositionData {
-                        tile_pos: TilePos {
-                            x: tile_pos.x as u32,
-                            y: tile_pos.y as u32,
-                        },
-                        chunk_pos,
-                    },
-                    WorldObjectEntityData {
-                        object: self,
-                        entity: item,
-                        obj_bit_index: 0,
-                        texture_offset: 0,
-                    },
-                );
-
                 Some(item)
             }
             _ => {
@@ -357,9 +335,7 @@ impl WorldObject {
         }
 
         if game
-            .chunk_manager
-            .chunk_generation_data
-            .get(&TileMapPositionData {
+            .get_obj_entity_at_tile(TileMapPositionData {
                 tile_pos: TilePos {
                     x: tile_pos.x as u32,
                     y: tile_pos.y as u32,
@@ -406,6 +382,11 @@ impl WorldObject {
             .insert(BlockAttributeBundle {
                 health: Health(100),
             })
+            .insert(WorldObjectEntityData {
+                object: self,
+                obj_bit_index: 0,
+                texture_offset: 0,
+            })
             .insert(Block)
             .insert(YSort)
             .insert(self)
@@ -421,21 +402,6 @@ impl WorldObject {
                 .entity(item)
                 .insert(Collider::cuboid(1. / 3.5, 1. / 4.5));
         }
-        game.chunk_manager.chunk_generation_data.insert(
-            TileMapPositionData {
-                tile_pos: TilePos {
-                    x: tile_pos.x as u32,
-                    y: tile_pos.y as u32,
-                },
-                chunk_pos,
-            },
-            WorldObjectEntityData {
-                object: self,
-                entity: item,
-                obj_bit_index: 0,
-                texture_offset: 0,
-            },
-        );
 
         Some(item)
     }
@@ -778,6 +744,7 @@ impl ItemsPlugin {
         for broken in obj_break_events.iter() {
             if let Some(breaks_into_option) = game.world_obj_data.properties.get(&broken.obj) {
                 commands.entity(broken.entity).despawn();
+                //TODO: remove SpawnedObject comp from parent tile
                 if let Some(breaks_into) = breaks_into_option.breaks_into {
                     let mut rng = rand::thread_rng();
                     breaks_into.spawn_item_drop(

@@ -1,6 +1,7 @@
 use super::{ChunkManager, ChunkObjectData, WorldObjectEntityData};
 use crate::combat::ObjBreakEvent;
 use crate::item::{Foliage, ItemsPlugin, Wall, WorldObject};
+use crate::world::chunk::SpawnedObject;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
 use crate::{GameParam, GameState};
 use bevy::app::AppExit;
@@ -86,18 +87,16 @@ impl GenerationPlugin {
                         tile_pos: neighbour_tile_pos,
                     } = get_adjusted_tile(new_wall_pos.clone(), (dx, dy));
 
-                    if !game
-                        .chunk_manager
-                        .cached_chunks
-                        .contains(&adjusted_chunk_pos)
-                    {
+                    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
                     }
+                    let neighbour_wall_entity = game.get_obj_entity_at_tile(TileMapPositionData {
+                        chunk_pos: adjusted_chunk_pos,
+                        tile_pos: neighbour_tile_pos,
+                    });
 
-                    if let Some(neighbour_wall_data) = game
-                        .chunk_manager
-                        .chunk_generation_data
-                        .get_mut(&TileMapPositionData {
+                    if let Some(mut neighbour_wall_data) =
+                        game.get_tile_obj_data_mut(TileMapPositionData {
                             chunk_pos: adjusted_chunk_pos,
                             tile_pos: neighbour_tile_pos,
                         })
@@ -119,7 +118,8 @@ impl GenerationPlugin {
                             false,
                         );
                         //TODO: this might not be needed anymore
-                        if let Ok(neighbour_sprite) = wall_data.get_mut(neighbour_wall_data.entity)
+                        if let Ok(neighbour_sprite) =
+                            wall_data.get_mut(neighbour_wall_entity.unwrap())
                         {
                             let mut neighbour_sprite = neighbour_sprite.1;
                             neighbour_wall_data.obj_bit_index = neighbours_updated_bit_index;
@@ -151,6 +151,7 @@ impl GenerationPlugin {
             chunk_pos,
             tile_pos,
         };
+        let new_wall_entity = game.get_obj_entity_at_tile(new_wall_pos.clone());
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 //skip corner block updates for walls
@@ -159,7 +160,6 @@ impl GenerationPlugin {
                 }
                 // only use neighbours that have at least one water bitt
                 let mut neighbour_is_wall = false;
-
                 if let Some(neighbour_block_entity_data) =
                     get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), game)
                 {
@@ -167,11 +167,7 @@ impl GenerationPlugin {
                         neighbour_is_wall = true;
                     }
                 }
-                let new_wall_data = game
-                    .chunk_manager
-                    .chunk_generation_data
-                    .get_mut(&new_wall_pos)
-                    .unwrap();
+                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
 
                 let updated_bit_index = Self::compute_wall_index(
                     new_wall_data.obj_bit_index,
@@ -181,7 +177,7 @@ impl GenerationPlugin {
 
                 new_wall_data.texture_offset = 0;
 
-                let mut new_sprite = wall_data.get_mut(new_wall_data.entity).unwrap().1;
+                let mut new_sprite = wall_data.get_mut(new_wall_entity.unwrap()).unwrap().1;
                 new_wall_data.obj_bit_index = updated_bit_index;
                 new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
                 // println!(
@@ -208,11 +204,7 @@ impl GenerationPlugin {
                     corner_neighbour_is_wall =
                         matches!(neighbour_block_entity_data.object, WorldObject::Wall(_));
                 }
-                let new_wall_data = game
-                    .chunk_manager
-                    .chunk_generation_data
-                    .get_mut(&new_wall_pos)
-                    .unwrap();
+                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
 
                 let has_wall_below = (new_wall_data.obj_bit_index & 0b0100) == 0b0100;
 
@@ -251,7 +243,7 @@ impl GenerationPlugin {
                         new_wall_data.obj_bit_index
                     };
                     new_wall_data.texture_offset = 16;
-                    let mut new_sprite = wall_data.get_mut(new_wall_data.entity).unwrap().1;
+                    let mut new_sprite = wall_data.get_mut(new_wall_entity.unwrap()).unwrap().1;
                     new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
 
                     if dx == -1 {
@@ -284,12 +276,6 @@ impl GenerationPlugin {
     ) {
         for broken_wall in obj_break_events.iter() {
             let chunk_pos = broken_wall.chunk_pos;
-            game.chunk_manager
-                .chunk_generation_data
-                .remove(&TileMapPositionData {
-                    chunk_pos: broken_wall.chunk_pos,
-                    tile_pos: broken_wall.tile_pos,
-                });
 
             for dy in -1i8..=1 {
                 for dx in -1i8..=1 {
@@ -427,7 +413,7 @@ impl GenerationPlugin {
 
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn spawn_objects(commands: &mut Commands, game: &mut GameParam, chunk_pos: IVec2) {
-        let mut tree_children = Vec::new();
+        // let mut tree_children = Vec::new();
         let obj_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
         if let Some(obj_points) = obj_points.to_owned() {
             println!("SPAWNING OBJECTS FOR {chunk_pos:?}");
@@ -448,13 +434,22 @@ impl GenerationPlugin {
                     _ => {}
                 }
                 if let Some(tree) = obj_e {
-                    tree_children.push(tree);
+                    commands
+                        .entity(
+                            game.get_tile_entity(TileMapPositionData {
+                                chunk_pos,
+                                tile_pos,
+                            })
+                            .unwrap(),
+                        )
+                        .insert(SpawnedObject(tree))
+                        .add_child(tree);
                 }
             }
 
-            commands
-                .spawn(SpatialBundle::default())
-                .push_children(&tree_children);
+            // commands
+            //     .spawn(SpatialBundle::default())
+            //     .push_children(&tree_children);
         } else {
             warn!("No Object data found for chunk {:?}", chunk_pos);
         }
@@ -499,9 +494,7 @@ impl GenerationPlugin {
                 })
                 .filter(|tp| {
                     let tile = game
-                        .chunk_manager
-                        .chunk_tile_entity_data
-                        .get(&TileMapPositionData {
+                        .get_tile_data(TileMapPositionData {
                             chunk_pos,
                             tile_pos: TilePos {
                                 x: tp.0 as u32,
@@ -527,9 +520,7 @@ impl GenerationPlugin {
             .chain(tree_points.iter())
             .filter(|tp| {
                 let tile = game
-                    .chunk_manager
-                    .chunk_tile_entity_data
-                    .get(&TileMapPositionData {
+                    .get_tile_data(TileMapPositionData {
                         chunk_pos,
                         tile_pos: TilePos {
                             x: tp.0 as u32,
@@ -614,22 +605,14 @@ fn get_neighbour_obj_data(
         tile_pos: neighbour_wall_pos,
     } = get_adjusted_tile(pos, offset);
 
-    if !game
-        .chunk_manager
-        .cached_chunks
-        .contains(&adjusted_chunk_pos)
-    {
+    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
         return None;
     }
 
-    if let Some(d) = game
-        .chunk_manager
-        .chunk_generation_data
-        .get(&TileMapPositionData {
-            chunk_pos: adjusted_chunk_pos,
-            tile_pos: neighbour_wall_pos,
-        })
-    {
+    if let Some(d) = game.get_tile_obj_data(TileMapPositionData {
+        chunk_pos: adjusted_chunk_pos,
+        tile_pos: neighbour_wall_pos,
+    }) {
         return Some(d.clone());
     }
     None

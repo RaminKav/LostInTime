@@ -14,7 +14,7 @@ use bevy::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{enemy::spawner::ChunkSpawner, item::WorldObject};
+use crate::{enemy::spawner::Spawner, item::WorldObject};
 
 use self::{
     chunk::ChunkPlugin,
@@ -39,31 +39,15 @@ pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 // when we swap back, use the obj data to spawn teh objs back
 // may not need to add obj data as comp to tile??
 pub struct ChunkManager {
-    // give Spawned comonent to chunk entity
-    pub spawned_chunks: HashSet<IVec2>,
-    // any chunk entity that exists is cached
-    pub cached_chunks: HashSet<IVec2>,
-    // give as comonent to each tile entity
-    pub raw_chunk_data: HashMap<IVec2, RawChunkData>,
-    // turn TileEntityData into comp for each tile
-    pub chunk_tile_entity_data: HashMap<TileMapPositionData, TileEntityData>,
+    pub chunks: HashMap<IVec2, Entity>,
     // turn into comp for each tile
-    pub chunk_generation_data: HashMap<TileMapPositionData, WorldObjectEntityData>,
-    pub state: ChunkLoadingState,
     pub world_generation_params: WorldGeneration,
-    pub spawner_data: HashMap<IVec2, Vec<ChunkSpawner>>,
 }
 
 impl ChunkManager {
     pub fn new() -> Self {
         Self {
-            spawned_chunks: HashSet::default(),
-            cached_chunks: HashSet::default(),
-            chunk_tile_entity_data: HashMap::new(),
-            spawner_data: HashMap::new(),
-            raw_chunk_data: HashMap::new(),
-            state: ChunkLoadingState::Spawning,
-            chunk_generation_data: HashMap::new(),
+            chunks: HashMap::new(),
             world_generation_params: WorldGeneration::default(),
         }
     }
@@ -87,6 +71,7 @@ pub struct RawChunkData {
 }
 #[derive(Eq, Hash, PartialEq, Debug, Component, Clone)]
 pub struct TileMapPositionData {
+    //TODO: Add ::new() impl
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
 }
@@ -98,11 +83,10 @@ pub struct TileEntityData {
     pub texture_offset: u8,
 }
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Eq, Hash, Component, PartialEq, Debug, Clone)]
 
 pub struct WorldObjectEntityData {
     pub object: WorldObject,
-    pub entity: Entity,
     pub obj_bit_index: u8,
     pub texture_offset: u8,
 }
