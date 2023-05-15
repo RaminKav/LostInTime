@@ -1,4 +1,4 @@
-use bevy::{prelude::*, time::FixedTimestep, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
@@ -13,11 +13,7 @@ impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<CraftingSlotUpdateEvent>()
             .insert_resource(Recipes::default())
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::handle_crafting_slot_update),
-            );
+            .add_system(Self::handle_crafting_slot_update.in_set(OnUpdate(GameState::Main)));
     }
 }
 #[derive(Resource, Default, Deserialize)]

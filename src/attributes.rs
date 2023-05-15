@@ -1,4 +1,4 @@
-use bevy::{ecs::system::EntityCommands, prelude::*, time::FixedTimestep};
+use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use crate::{
     inventory::{Inventory, InventoryItemStack},
@@ -101,15 +101,13 @@ impl Plugin for AttributesPlugin {
         app.init_resource::<BlockAttributeBundle>()
             .register_type::<BlockAttributeBundle>()
             .add_event::<AttributeChangeEvent>()
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::clamp_health)
-                    .with_system(Self::handle_item_attribute_change)
-                    .with_system(
-                        Self::handle_attribute_change_events
-                            .after(Self::handle_item_attribute_change),
-                    ),
+            .add_systems(
+                (
+                    Self::clamp_health,
+                    Self::handle_item_attribute_change,
+                    Self::handle_attribute_change_events.after(Self::handle_item_attribute_change),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }

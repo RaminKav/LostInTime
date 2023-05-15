@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 use rand::{seq::SliceRandom, Rng};
 
@@ -19,12 +19,13 @@ pub const MAX_MOB_PER_CHUNK: u32 = 16;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MobSpawnEvent>().add_system_set(
-            SystemSet::on_update(GameState::Main)
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                .with_system(Self::handle_spawn_mobs)
-                .with_system(Self::handle_add_spawners_on_chunk_spawn)
-                .with_system(Self::check_mob_count),
+        app.add_event::<MobSpawnEvent>().add_systems(
+            (
+                Self::handle_spawn_mobs,
+                Self::handle_add_spawners_on_chunk_spawn,
+                Self::check_mob_count,
+            )
+                .in_set(OnUpdate(GameState::Main)),
         );
     }
 }

@@ -12,7 +12,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MovePlayerEvent>()
-            .add_system_set(SystemSet::on_update(GameState::Main).with_system(handle_move_player));
+            .add_system(handle_move_player.in_set(OnUpdate(GameState::Main)));
     }
 }
 pub fn handle_move_player(

@@ -79,10 +79,7 @@ impl Plugin for GameAssetsPlugin {
                 foliage_material_map: None,
                 ui_image_handles: None,
             })
-            .add_system_set(
-                SystemSet::on_exit(GameState::Loading)
-                    .with_system(Self::load_graphics.label("graphics")),
-            );
+            .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
     }
 }
 

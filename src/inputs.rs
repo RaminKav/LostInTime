@@ -1,9 +1,8 @@
 use bevy::app::AppExit;
 
 use bevy::prelude::*;
-use bevy::time::FixedTimestep;
 use bevy::utils::HashSet;
-use bevy::window::{WindowFocused, WindowId};
+use bevy::window::{PrimaryWindow, WindowFocused};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
@@ -66,15 +65,16 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
             .add_event::<AttackEvent>()
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::turn_player)
-                    .with_system(Self::move_player)
-                    .with_system(Self::handle_hotbar_key_input)
-                    .with_system(Self::test_take_damage)
-                    .with_system(Self::update_cursor_pos.after(Self::move_player))
-                    .with_system(Self::move_camera_with_player.after(Self::move_player)),
+            .add_systems(
+                (
+                    Self::turn_player,
+                    Self::move_player,
+                    Self::handle_hotbar_key_input,
+                    Self::test_take_damage,
+                    Self::update_cursor_pos.after(Self::move_player),
+                    Self::move_camera_with_player.after(Self::move_player),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(Self::close_on_esc)
             .add_system(Self::toggle_inventory)
@@ -352,7 +352,7 @@ impl InputsPlugin {
         }
     }
     pub fn update_cursor_pos(
-        windows: Res<Windows>,
+        windows: Query<&Window, With<PrimaryWindow>>,
         camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
         mut cursor_moved_events: EventReader<CursorMoved>,
         mut cursor_pos: ResMut<CursorPos>,
@@ -378,12 +378,12 @@ impl InputsPlugin {
     // Converts the cursor position into a world position, taking into account any transforms applied
     // the camera.
     pub fn cursor_pos_in_world(
-        windows: &Windows,
+        windows: &Query<&Window, With<PrimaryWindow>>,
         cursor_pos: Vec2,
         cam_t: &Transform,
         cam: &Camera,
     ) -> Vec3 {
-        let window = windows.primary();
+        let window = windows.single();
 
         let window_size = Vec2::new(window.width(), window.height());
 
@@ -393,8 +393,12 @@ impl InputsPlugin {
         let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
         ndc_to_world.project_point3(ndc.extend(0.0))
     }
-    pub fn cursor_pos_in_ui(windows: &Windows, cursor_pos: Vec2, cam: &Camera) -> Vec3 {
-        let window = windows.primary();
+    pub fn cursor_pos_in_ui(
+        windows: &Query<&Window, With<PrimaryWindow>>,
+        cursor_pos: Vec2,
+        cam: &Camera,
+    ) -> Vec3 {
+        let window = windows.single();
 
         let window_size = Vec2::new(window.width(), window.height());
 
@@ -422,7 +426,7 @@ impl InputsPlugin {
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
-            if inv_state.0.is_visible {
+            if inv_state.0 == Visibility::Inherited {
                 return;
             }
         }
@@ -522,25 +526,23 @@ impl InputsPlugin {
         }
     }
     pub fn close_on_esc(
-        mut focused: Local<Option<WindowId>>,
+        // mut focused: Local<Option<WindowId>>,
         mut focused_events: EventReader<WindowFocused>,
         mut exit: EventWriter<AppExit>,
-        mut windows: ResMut<Windows>,
+        mut windows: Query<&mut Window, With<PrimaryWindow>>,
         input: Res<Input<KeyCode>>,
     ) {
         // TODO: Track this in e.g. a resource to ensure consistent behaviour across similar systems
-        for event in focused_events.iter() {
-            *focused = event.focused.then_some(event.id);
-        }
+        // for event in focused_events.iter() {
+        //     *focused = event.focused.then_some(event.window);
+        // }
 
-        if let Some(focused) = &*focused {
-            if input.just_pressed(KeyCode::Escape) {
-                if let Some(window) = windows.get_mut(*focused) {
-                    exit.send(AppExit);
-                    window.close();
-                }
-            }
+        // if let Some(focused) = &*focused {
+        if input.just_pressed(KeyCode::Escape) {
+            exit.send(AppExit);
+            // windows.single_mut().close();
         }
+        // }
     }
     pub fn move_camera_with_player(
         mut player_query: Query<

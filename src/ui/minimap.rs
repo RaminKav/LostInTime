@@ -6,7 +6,6 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::time::FixedTimestep;
 use bevy_ecs_tilemap::prelude::*;
 
 use super::UIElement;
@@ -14,11 +13,8 @@ pub struct MinimapPlugin;
 
 impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<UpdateMiniMapEvent>().add_system_set(
-            SystemSet::on_update(GameState::Main)
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                .with_system(Self::setup_mini_map),
-        );
+        app.add_event::<UpdateMiniMapEvent>()
+            .add_system(Self::setup_mini_map.in_set(OnUpdate(GameState::Main)));
     }
 }
 
@@ -36,7 +32,7 @@ impl MinimapPlugin {
         mut assets: ResMut<Assets<Image>>,
         mut color_mat: ResMut<Assets<ColorMaterial>>,
         mut game: GameParam,
-        minimap_update: EventReader<UpdateMiniMapEvent>,
+        mut minimap_update: EventReader<UpdateMiniMapEvent>,
         old_map: Query<Entity, With<Minimap>>,
         p_t: Query<&Transform, With<Player>>,
     ) {
