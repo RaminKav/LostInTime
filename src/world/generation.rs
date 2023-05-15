@@ -14,16 +14,13 @@ pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(load_game_data)
-            .add_system_to_stage(CoreStage::PostUpdate, exit_system)
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_system(Self::handle_new_wall_spawn_update)
-                    .with_system(Self::handle_wall_break.after(ItemsPlugin::break_item))
-                    .with_system(
-                        Self::handle_update_this_wall.after(Self::handle_new_wall_spawn_update),
-                    ),
-            );
+        app.add_startup_system(load_game_data.in_base_set(StartupSet::PostStartup))
+            .add_system(exit_system.in_base_set(CoreSet::PostUpdate))
+            .add_systems((
+                Self::handle_new_wall_spawn_update,
+                Self::handle_wall_break.after(ItemsPlugin::break_item),
+                Self::handle_update_this_wall.after(Self::handle_new_wall_spawn_update),
+            ));
     }
 }
 
@@ -456,16 +453,16 @@ impl GenerationPlugin {
     }
     pub fn generate_and_cache_objects(
         game: &mut GameParam,
-        pkv: &mut PkvStore,
+        // pkv: &mut PkvStore,
         chunk_pos: IVec2,
         seed: u32,
     ) {
         let tree_points;
 
-        if
-        //false {
-        let Ok(data) = pkv.get::<ChunkObjectData>(&format!("{} {}", chunk_pos.x, chunk_pos.y)) {
-            tree_points = data.0;
+        if false {
+            // let Ok(data) = pkv.get::<ChunkObjectData>(&format!("{} {}", chunk_pos.x, chunk_pos.y)) {
+            // tree_points = data.0;
+            tree_points = vec![];
             // info!(
             //     "LOADING OLD CHUNK OBJECT DATA FOR CHUNK {:?} TREES: {:?}",
             //     (chunk_pos.x, chunk_pos.y),
@@ -543,7 +540,7 @@ impl GenerationPlugin {
     }
 }
 fn exit_system(
-    mut pkv: ResMut<PkvStore>,
+    // mut pkv: ResMut<PkvStore>,
     mut events: EventReader<AppExit>,
     game_data: Res<GameData>,
 ) {
@@ -551,8 +548,8 @@ fn exit_system(
         info!("SAVING GAME DATA...");
 
         for (chunk_pos, data) in game_data.data.iter() {
-            pkv.set(&format!("{} {}", chunk_pos.0, chunk_pos.1), data)
-                .expect("failed to store data");
+            // pkv.set(&format!("{} {}", chunk_pos.0, chunk_pos.1), data)
+            //     .expect("failed to store data");
         }
     }
 }

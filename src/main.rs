@@ -78,22 +78,24 @@ pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 fn main() {
     App::new()
         .init_resource::<Game>()
+        .add_state::<GameState>()
         .add_plugins(
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
-                    window: WindowDescriptor {
-                        width: WIDTH,
-                        height: HEIGHT,
-                        scale_factor_override: Some(1.0),
+                    primary_window: Some(Window {
+                        resolution: (WIDTH, HEIGHT).into(),
+                        // width: WIDTH,
+                        // height: HEIGHT,
+                        // scale_factor_override: Some(1.0),
                         // mode: WindowMode::BorderlessFullscreen,
                         title: "Survival Game".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
                         transparent: true,
-                        alpha_mode: CompositeAlphaMode::PostMultiplied,
+                        // alpha_mode: CompositeAlphaMode::PostMultiplied,
                         ..Default::default()
-                    },
+                    }),
                     ..default()
                 }),
             // .set(LogPlugin {
@@ -102,13 +104,14 @@ fn main() {
             //     ..Default::default()
             // }),
         )
-        .insert_resource(Msaa { samples: 1 })
-        .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
+        .insert_resource(Msaa::Off)
+        .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+        // .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
         // .add_plugin(PixelCameraPlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(WorldInspectorPlugin)
+        .add_plugin(WorldInspectorPlugin::new())
         // .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
@@ -124,12 +127,8 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .add_plugin(WorldPlugin)
         .add_startup_system(setup)
-        .add_loading_state(
-            LoadingState::new(GameState::Loading)
-                .continue_to_state(GameState::Main)
-                .with_collection::<ImageAssets>(),
-        )
-        .add_state(GameState::Loading)
+        .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
+        .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .add_system(y_sort)
         .run();
 }
@@ -148,16 +147,14 @@ impl Default for Game {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
 pub enum GameState {
+    #[default]
     Loading,
     Main,
 }
-#[derive(Clone, Eq, PartialEq, Debug, Hash, SystemLabel)]
-pub enum GameSystems {
-    Loading,
-    Main,
-}
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+struct CustomFlush;
 
 #[derive(Resource, AssetCollection)]
 pub struct ImageAssets {
@@ -426,6 +423,7 @@ fn setup(
             usage: TextureUsages::TEXTURE_BINDING
                 | TextureUsages::COPY_DST
                 | TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
         },
         ..default()
     };
@@ -440,6 +438,7 @@ fn setup(
             usage: TextureUsages::TEXTURE_BINDING
                 | TextureUsages::COPY_DST
                 | TextureUsages::RENDER_ATTACHMENT,
+            view_formats: &[],
         },
         ..default()
     };
@@ -459,7 +458,7 @@ fn setup(
         Camera2dBundle {
             camera: Camera {
                 // render before the "main pass" camera
-                priority: -2,
+                order: -2,
                 target: RenderTarget::Image(game_image_handle.clone()),
                 ..default()
             },
@@ -472,7 +471,7 @@ fn setup(
         Camera2dBundle {
             camera: Camera {
                 // render before the "main pass" camera
-                priority: -1,
+                order: -1,
                 target: RenderTarget::Image(ui_image_handle.clone()),
                 ..default()
             },
@@ -541,7 +540,7 @@ fn setup(
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
-                priority: 0,
+                order: 0,
                 ..default()
             },
             camera_2d: Camera2d {
@@ -556,7 +555,7 @@ fn setup(
     commands.spawn((
         Camera2dBundle {
             camera: Camera {
-                priority: 1,
+                order: 1,
                 ..default()
             },
             camera_2d: Camera2d {
@@ -680,7 +679,7 @@ fn setup(
                     },
                 },
             )
-            .with_alignment(TextAlignment::TOP_RIGHT),
+            .with_alignment(TextAlignment::Right),
             transform: Transform {
                 translation: Vec3::new(GAME_WIDTH / 2. - 10., -GAME_HEIGHT / 2. + 10., 1.),
                 scale: Vec3::new(1., 1., 1.),

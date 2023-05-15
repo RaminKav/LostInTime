@@ -34,11 +34,8 @@ impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ChunkManager::new())
             .add_event::<DimensionSpawnEvent>()
-            .add_system_to_stage(
-                CoreStage::PreUpdate,
-                Self::handle_dimension_swap_events.after(Self::new_dim_with_params),
-            )
-            .add_system_to_stage(CoreStage::PreUpdate, Self::new_dim_with_params);
+            .add_system(Self::handle_dimension_swap_events.after(Self::new_dim_with_params))
+            .add_system(Self::new_dim_with_params);
     }
 }
 impl DimensionPlugin {

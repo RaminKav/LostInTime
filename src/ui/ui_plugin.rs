@@ -145,24 +145,28 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
-            .add_system_set(
-                SystemSet::on_exit(GameState::Loading)
-                    .with_system(setup_inv_ui.after(GameAssetsPlugin::load_graphics))
-                    .with_system(setup_healthbar_ui.after(GameAssetsPlugin::load_graphics)),
+            .add_systems(
+                (
+                    setup_inv_ui.after(GameAssetsPlugin::load_graphics),
+                    setup_healthbar_ui.after(GameAssetsPlugin::load_graphics),
+                )
+                    .in_schedule(OnExit(GameState::Loading)),
             )
-            .add_system_set(SystemSet::on_enter(GameState::Main).with_system(setup_inv_slots_ui))
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_system(text_update_system)
-                    .with_system(toggle_inv_visibility)
-                    .with_system(handle_item_drop_clicks)
-                    .with_system(handle_dragging)
-                    .with_system(handle_hovering)
-                    .with_system(handle_drop_on_slot_events.after(handle_item_drop_clicks))
-                    .with_system(handle_drop_in_world_events.after(handle_item_drop_clicks))
-                    .with_system(handle_cursor_update.before(handle_item_drop_clicks))
-                    .with_system(update_inventory_ui.after(handle_hovering))
-                    .with_system(update_healthbar),
+            .add_system(setup_inv_slots_ui.in_schedule(OnEnter(GameState::Main)))
+            .add_systems(
+                (
+                    text_update_system,
+                    toggle_inv_visibility,
+                    handle_item_drop_clicks,
+                    handle_dragging,
+                    handle_hovering,
+                    handle_drop_on_slot_events.after(handle_item_drop_clicks),
+                    handle_drop_in_world_events.after(handle_item_drop_clicks),
+                    handle_cursor_update.before(handle_item_drop_clicks),
+                    update_inventory_ui.after(handle_hovering),
+                    update_healthbar,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
@@ -601,7 +605,7 @@ pub fn setup_inv_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            visibility: Visibility { is_visible: false },
+            visibility: Visibility::Hidden,
             ..Default::default()
         })
         .insert(InventoryState {
@@ -739,12 +743,26 @@ pub fn toggle_inv_visibility(
     mut world_drop_events: EventWriter<DropInWorldEvent>,
 ) {
     let (mut v, state) = inv_query.single_mut();
-    if v.is_visible == state.open {
+    if *v
+        == if state.open {
+            Visibility::Inherited
+        } else {
+            Visibility::Hidden
+        }
+    {
         return;
     }
-    v.is_visible = state.open;
+    *v = if state.open {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
     for mut hbv in hotbar_slots.iter_mut() {
-        hbv.is_visible = !v.is_visible;
+        *hbv = if *v == Visibility::Inherited {
+            Visibility::Hidden
+        } else {
+            Visibility::Inherited
+        };
     }
     if state.open {
         return;
@@ -849,7 +867,7 @@ fn spawn_inv_item_tooltip(
                             },
                         },
                     )
-                    .with_alignment(TextAlignment::CENTER_LEFT),
+                    .with_alignment(TextAlignment::Left),
                     transform: Transform {
                         translation: text_pos,
                         scale: Vec3::new(1., 1., 1.),
@@ -1019,7 +1037,7 @@ pub fn spawn_item_stack_icon(
                         color: Color::WHITE,
                     },
                 )
-                .with_alignment(TextAlignment::BOTTOM_RIGHT),
+                .with_alignment(TextAlignment::Right),
                 transform: Transform {
                     translation: Vec3::new(10., -9., 1.),
                     scale: Vec3::new(1., 1., 1.),

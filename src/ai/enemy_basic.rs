@@ -24,7 +24,7 @@ impl Trigger for LineOfSight {
     fn trigger(
         &self,
         entity: Entity,
-        (transforms, _time): &Self::Param<'_, '_>,
+        (transforms, _time): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
         let delta = transforms.get(self.target).unwrap().translation.truncate()
             - transforms.get(entity).unwrap().translation.truncate();
@@ -52,7 +52,7 @@ impl Trigger for AttackDistance {
     fn trigger(
         &self,
         entity: Entity,
-        (transforms, _time): &Self::Param<'_, '_>,
+        (transforms, _time): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
         if let Some(attack) = transforms.get(entity).unwrap().1 {
             if !attack.attack_cooldown_timer.finished() {
