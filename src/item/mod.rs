@@ -725,11 +725,13 @@ impl Plugin for ItemsPlugin {
         app.insert_resource(WorldObjectResource::new())
             .add_plugin(CraftingPlugin)
             .add_plugin(LootTablePlugin)
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_system(Self::update_graphics)
-                    .with_system(Self::break_item)
-                    .with_system(Self::update_held_hotbar_item),
+            .add_systems(
+                (
+                    Self::update_graphics,
+                    Self::break_item,
+                    Self::update_held_hotbar_item,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
@@ -53,14 +53,15 @@ impl Plugin for CombatPlugin {
         app.add_event::<HitEvent>()
             .add_event::<EnemyDeathEvent>()
             .add_event::<ObjBreakEvent>()
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::handle_hits)
-                    .with_system(Self::spawn_hit_spark_effect.after(Self::handle_hits))
-                    .with_system(Self::handle_invincibility_frames.after(Self::handle_hits))
-                    .with_system(Self::handle_enemy_death.after(Self::handle_hits))
-                    .with_system(Self::check_hit_collisions),
+            .add_systems(
+                (
+                    Self::handle_hits,
+                    Self::spawn_hit_spark_effect.after(Self::handle_hits),
+                    Self::handle_invincibility_frames.after(Self::handle_hits),
+                    Self::handle_enemy_death.after(Self::handle_hits),
+                    Self::check_hit_collisions,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }

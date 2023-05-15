@@ -7,7 +7,7 @@ use crate::{
     ui::{InventorySlotState, InventorySlotType},
     GameState, TIME_STEP,
 };
-use bevy::{prelude::*, time::FixedTimestep};
+use bevy::prelude::*;
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
@@ -209,10 +209,7 @@ impl ItemStack {
 
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::on_update(GameState::Main)
-                .with_run_criteria(FixedTimestep::step(TIME_STEP as f64)), // .with_system(Self::update_inventory),
-        );
+        //
     }
 }
 

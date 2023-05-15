@@ -9,7 +9,7 @@ use super::dungeon::Dungeon;
 use super::generation::GenerationPlugin;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
-use crate::{GameState, MainCamera, TextureCamera};
+use crate::{CustomFlush, GameState, MainCamera, TextureCamera};
 
 use super::tile::TilePlugin;
 use super::{
@@ -25,19 +25,20 @@ impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SpawnChunkEvent>()
             .add_event::<CacheChunkEvent>()
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_system(
-                        Self::spawn_and_cache_init_chunks.before(Self::handle_spawn_chunk_event),
-                    )
-                    .with_system(
-                        Self::handle_spawn_chunk_event.after(Self::handle_cache_chunk_event),
-                    )
-                    .with_system(Self::handle_cache_chunk_event)
-                    .with_system(Self::spawn_chunks_around_camera)
-                    .with_system(Self::despawn_outofrange_chunks)
-                    .with_system(Self::toggle_on_screen_mesh_visibility),
-            );
+            .add_systems(
+                (
+                    Self::spawn_and_cache_init_chunks.before(Self::handle_spawn_chunk_event),
+                    Self::handle_spawn_chunk_event
+                        .after(Self::handle_cache_chunk_event)
+                        .before(CustomFlush),
+                    Self::handle_cache_chunk_event,
+                    Self::spawn_chunks_around_camera,
+                    Self::despawn_outofrange_chunks,
+                    Self::toggle_on_screen_mesh_visibility,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 #[derive(Component)]
@@ -72,7 +73,7 @@ impl ChunkPlugin {
         mut cache_events: EventReader<CacheChunkEvent>,
         mut commands: Commands,
         mut game: GameParam,
-        mut pkv: ResMut<PkvStore>,
+        // mut pkv: ResMut<PkvStore>,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
     ) {
         // for e in cache_events.iter() {
@@ -179,7 +180,7 @@ impl ChunkPlugin {
         sprite_sheet: Res<ImageAssets>,
         mut game: GameParam,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
-        mut pkv: ResMut<PkvStore>,
+        // mut pkv: ResMut<PkvStore>,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
     ) {
         for e in spawn_events.iter() {
@@ -288,7 +289,7 @@ impl ChunkPlugin {
             //TODO: add event for this
             GenerationPlugin::generate_and_cache_objects(
                 &mut game,
-                &mut pkv,
+                // &mut pkv,
                 chunk_pos,
                 seed.single().seed,
             );
@@ -408,10 +409,11 @@ impl ChunkPlugin {
                 let foliage_pos = ft.translation.xy();
                 let distance = camera_transform.translation.xy().distance(foliage_pos);
 
-                if v.is_visible && distance > (MAX_VISIBILITY * 2_u32) as f32 {
-                    v.is_visible = false;
-                } else if !v.is_visible && distance <= (MAX_VISIBILITY * 2_u32) as f32 {
-                    v.is_visible = true;
+                if *v == Visibility::Inherited && distance > (MAX_VISIBILITY * 2_u32) as f32 {
+                    *v = Visibility::Hidden;
+                } else if *v != Visibility::Inherited && distance <= (MAX_VISIBILITY * 2_u32) as f32
+                {
+                    *v = Visibility::Inherited;
                 }
             }
         }

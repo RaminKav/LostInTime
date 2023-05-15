@@ -5,7 +5,7 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
-use seldom_state::prelude::{NotTrigger, StateMachine};
+use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
 use strum_macros::Display;
 
@@ -72,57 +72,58 @@ impl Enemy {
             Collider::cuboid(10., 6.),
             YSort,
             self.clone(),
-            StateMachine::new(IdleState {
+            StateMachine::default()
+                .trans::<IdleState>(
+                    LineOfSight {
+                        target: game.game.player,
+                        range: 100.,
+                    },
+                    FollowState {
+                        target: game.game.player,
+                        speed: 0.7,
+                    },
+                )
+                .trans::<FollowState>(
+                    AttackDistance {
+                        target: game.game.player,
+                        range: 50.,
+                    },
+                    AttackState {
+                        target: game.game.player,
+                        attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                        attack_duration_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                        attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
+                        dir: None,
+                        speed: 1.4,
+                        damage: 10,
+                    },
+                )
+                .trans::<FollowState>(
+                    Trigger::not(LineOfSight {
+                        target: game.game.player,
+                        range: 100.,
+                    }),
+                    IdleState {
+                        walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                        direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                        speed: 0.5,
+                    },
+                )
+                .trans::<AttackState>(
+                    Trigger::not(AttackDistance {
+                        target: game.game.player,
+                        range: 50.,
+                    }),
+                    FollowState {
+                        target: game.game.player,
+                        speed: 0.7,
+                    },
+                ),
+            IdleState {
                 walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                 direction: MoveDirection::new_rand_dir(rand::thread_rng()),
                 speed: 0.5,
-            })
-            .trans::<IdleState>(
-                LineOfSight {
-                    target: game.game.player,
-                    range: 100.,
-                },
-                FollowState {
-                    target: game.game.player,
-                    speed: 0.7,
-                },
-            )
-            .trans::<FollowState>(
-                AttackDistance {
-                    target: game.game.player,
-                    range: 50.,
-                },
-                AttackState {
-                    target: game.game.player,
-                    attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                    attack_duration_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                    attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
-                    dir: None,
-                    speed: 1.4,
-                    damage: 10,
-                },
-            )
-            .trans::<FollowState>(
-                NotTrigger(LineOfSight {
-                    target: game.game.player,
-                    range: 100.,
-                }),
-                IdleState {
-                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                    speed: 0.5,
-                },
-            )
-            .trans::<AttackState>(
-                NotTrigger(AttackDistance {
-                    target: game.game.player,
-                    range: 50.,
-                }),
-                FollowState {
-                    target: game.game.player,
-                    speed: 0.7,
-                },
-            ),
+            },
             Name::new(name),
         ));
         if let Some(loot_table) = game.loot_tables.table.get(&self) {

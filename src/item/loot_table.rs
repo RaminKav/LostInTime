@@ -2,7 +2,7 @@ use crate::attributes::ItemAttributes;
 use crate::enemy::Enemy;
 use crate::inventory::ItemStack;
 use crate::{GameState, TIME_STEP};
-use bevy::{prelude::*, time::FixedTimestep, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 use rand::Rng;
 use serde::Deserialize;
 

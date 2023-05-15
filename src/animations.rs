@@ -4,7 +4,6 @@ use std::{cmp::max, time::Duration};
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
-use bevy::time::FixedTimestep;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use interpolation::lerp;
 
@@ -73,16 +72,16 @@ impl Material2d for AnimatedTextureMaterial {
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
-            .add_system_set(
-                SystemSet::on_update(GameState::Main)
-                    .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
-                    .with_system(Self::animate_limbs)
-                    .with_system(Self::animate_enemies)
-                    .with_system(Self::animate_dropped_items)
-                    .with_system(Self::animate_attack)
-                    .with_system(Self::animate_hit)
-                    .with_system(Self::animate_spritesheet_animations)
-                    .after(InputsPlugin::mouse_click_system),
+            .add_systems(
+                (
+                    Self::animate_limbs,
+                    Self::animate_enemies,
+                    Self::animate_dropped_items,
+                    Self::animate_attack,
+                    Self::animate_hit,
+                    Self::animate_spritesheet_animations.after(InputsPlugin::mouse_click_system),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
