@@ -10,7 +10,7 @@ use crate::{
     item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
-    Game, GameParam, GameState, Player, YSort, TIME_STEP,
+    Game, GameParam, GameState, Player, YSort,
 };
 
 #[derive(Debug, Clone)]
@@ -144,23 +144,21 @@ impl CombatPlugin {
             let y_rng = rng.gen_range(-s..s);
             let hit_pos = transforms.get(hit.0).unwrap().translation;
 
-            let hit_spark_entity = commands
-                .spawn((
-                    SpriteSheetBundle {
-                        texture_atlas: texture_atlas_handle,
-                        transform: Transform::from_translation(Vec3::new(
-                            hit_pos.x + x_rng as f32,
-                            hit_pos.y - 5. + y_rng as f32,
-                            1.,
-                        )),
-                        ..default()
-                    },
-                    AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-                    YSort,
-                    DoneAnimation,
-                    Name::new("Hit Spark"),
-                ))
-                .id();
+            commands.spawn((
+                SpriteSheetBundle {
+                    texture_atlas: texture_atlas_handle,
+                    transform: Transform::from_translation(Vec3::new(
+                        hit_pos.x + x_rng as f32,
+                        hit_pos.y - 5. + y_rng as f32,
+                        1.,
+                    )),
+                    ..default()
+                },
+                AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
+                YSort,
+                DoneAnimation,
+                Name::new("Hit Spark"),
+            ));
 
             commands.entity(hit.0).remove::<JustGotHit>();
         }

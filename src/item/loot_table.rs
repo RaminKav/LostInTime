@@ -1,12 +1,11 @@
 use crate::attributes::ItemAttributes;
 use crate::enemy::Enemy;
 use crate::inventory::ItemStack;
-use crate::{GameState, TIME_STEP};
 use bevy::{prelude::*, utils::HashMap};
 use rand::Rng;
 use serde::Deserialize;
 
-use super::{CraftingSlotUpdateEvent, ItemDisplayMetaData, WorldObject};
+use super::{ItemDisplayMetaData, WorldObject};
 pub struct LootTablePlugin;
 impl Plugin for LootTablePlugin {
     fn build(&self, app: &mut App) {

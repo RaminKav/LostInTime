@@ -8,8 +8,9 @@ edition = "2021"
 [dependencies]
 bevy = {version = "0.10"}
 bevy_asset_loader = "0.16.0"
-bevy_rapier2d = {version = "0.21.0", features = ["simd-stable","parallel"]  }
+bevy_rapier2d = {git = "https://github.com/dimforge/bevy_rapier.git", branch = "master", features = ["simd-stable","parallel"]  }
 bevy_ecs_tilemap = "0.10.0"
+bevy_diagnostics_explorer = "0.1.0"
 bevy-inspector-egui = "0.18"
 seldom_state = "0.6"
 ron = "0.7.0"
@@ -17,6 +18,7 @@ serde = "1.0.136"
 serde_with = "2.1.0"
 rand = "0.8.5"
 noise = "0.8.2"
+bevy_save = { git = "https://github.com/hankjordan/bevy_save.git", branch = "master" }
 bevy_pkv = "0.6"
 serde_json = "1.0"
 strum = "^0.15"

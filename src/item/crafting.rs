@@ -5,7 +5,7 @@ use crate::{
     attributes::ItemAttributes,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{ItemDisplayMetaData, WorldObject},
-    GameState, TIME_STEP,
+    GameState,
 };
 
 pub struct CraftingPlugin;
@@ -26,7 +26,6 @@ pub type RecipeList = HashMap<WorldObject, CraftingGrid>;
 impl CraftingPlugin {
     fn handle_crafting_slot_update(
         mut events: EventReader<CraftingSlotUpdateEvent>,
-        mut commands: Commands,
         mut inv: Query<&mut Inventory>,
         recipes_list: Res<Recipes>,
     ) {

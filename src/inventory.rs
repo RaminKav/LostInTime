@@ -5,7 +5,6 @@ use crate::{
     attributes::{AttributeModifier, ItemAttributes},
     item::{ItemDisplayMetaData, WorldObject},
     ui::{InventorySlotState, InventorySlotType},
-    GameState, TIME_STEP,
 };
 use bevy::prelude::*;
 
@@ -208,7 +207,7 @@ impl ItemStack {
 }
 
 impl Plugin for InventoryPlugin {
-    fn build(&self, app: &mut App) {
+    fn build(&self, _app: &mut App) {
         //
     }
 }

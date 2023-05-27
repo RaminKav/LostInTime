@@ -5,6 +5,8 @@ use std::{
 
 use ai::AIPlugin;
 use attributes::{AttributesPlugin, Health, InvincibilityCooldown};
+use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
+
 //TODO:
 // - get player movement
 // - set up tilemap or world generation
@@ -13,6 +15,7 @@ use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::system::SystemParam,
+    log::LogPlugin,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -24,7 +27,7 @@ use bevy::{
         view::RenderLayers,
     },
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
-    window::{CompositeAlphaMode, PresentMode},
+    window::{PresentMode, WindowResolution},
 };
 
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -33,6 +36,7 @@ mod ai;
 mod animations;
 mod assets;
 mod attributes;
+mod client;
 mod combat;
 mod enemy;
 mod inputs;
@@ -40,7 +44,6 @@ mod inventory;
 mod item;
 mod player;
 mod ui;
-mod vectorize;
 mod world;
 use animations::{
     AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer, AnimationsPlugin,
@@ -48,32 +51,31 @@ use animations::{
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
-use bevy_pkv::PkvStore;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
-use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObjectResource};
+use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObject, WorldObjectResource};
 use player::PlayerPlugin;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
-    chunk::{Chunk, SpawnedObject, TileEntityCollection, TileSpriteData},
+    chunk::{Chunk, TileEntityCollection, TileSpriteData},
     dimension::DimensionSpawnEvent,
     TileMapPositionData, WorldObjectEntityData, WorldPlugin,
 };
-use world::{generation::GameData, ChunkManager, WorldGeneration};
-
-const PLAYER_MOVE_SPEED: f32 = 2.;
-const PLAYER_DASH_SPEED: f32 = 125.;
+use world::{ChunkManager, WorldGeneration};
+const ZOOM_SCALE: f32 = 1.;
+const PLAYER_MOVE_SPEED: f32 = 2. * ZOOM_SCALE;
+const PLAYER_DASH_SPEED: f32 = 125. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
-pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
-pub const GAME_HEIGHT: f32 = 180.;
-pub const GAME_WIDTH: f32 = 320.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
+pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
+pub const GAME_HEIGHT: f32 = 180. * ZOOM_SCALE;
+pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
 
 fn main() {
     App::new()
@@ -82,37 +84,27 @@ fn main() {
         .add_plugins(
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
+                // .disable::<LogPlugin>()
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: (WIDTH, HEIGHT).into(),
-                        // width: WIDTH,
-                        // height: HEIGHT,
-                        // scale_factor_override: Some(1.0),
-                        // mode: WindowMode::BorderlessFullscreen,
+                        resolution: WindowResolution::new(WIDTH, HEIGHT)
+                            .with_scale_factor_override(1.0),
                         title: "Survival Game".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
                         transparent: true,
-                        // alpha_mode: CompositeAlphaMode::PostMultiplied,
                         ..Default::default()
                     }),
                     ..default()
                 }),
-            // .set(LogPlugin {
-            //     level: Level::TRACE,
-            //     filter: "kayak_ui::context=trace".to_string(),
-            //     ..Default::default()
-            // }),
         )
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
-        // .insert_resource(PkvStore::new("Fleam", "SurvivalRogueLike"))
-        // .add_plugin(PixelCameraPlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
-        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -126,6 +118,7 @@ fn main() {
         .add_plugin(EnemyPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(WorldPlugin)
+        // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
@@ -169,10 +162,11 @@ pub struct ImageAssets {
 #[derive(Component)]
 pub struct YSort;
 
-fn y_sort(mut q: Query<&mut Transform, With<YSort>>) {
-    for mut tf in q.iter_mut() {
+fn y_sort(mut q: Query<(&mut Transform, &GlobalTransform), With<YSort>>) {
+    for (mut tf, gtf) in q.iter_mut() {
         // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
-        tf.translation.z = 900. - 900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * tf.translation.y)));
+        tf.translation.z =
+            900. - 900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * gtf.translation().y)));
     }
 }
 #[derive(SystemParam)]
@@ -183,15 +177,15 @@ pub struct GameParam<'w, 's> {
     pub loot_tables: Res<'w, LootTableMap>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
-    pub game_data: ResMut<'w, GameData>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
 
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
     pub chunk_query:
         Query<'w, 's, (Entity, &'static Transform, &'static mut ChunkSpawners), With<Chunk>>,
     pub tile_collection_query: Query<'w, 's, &'static TileEntityCollection, With<Chunk>>,
-    pub tile_data_query:
-        Query<'w, 's, (&'static mut TileSpriteData, Option<&'static SpawnedObject>)>,
+    pub tile_data_query: Query<'w, 's, (&'static mut TileSpriteData, Option<&'static Children>)>,
+    pub world_object_query:
+        Query<'w, 's, (Entity, &'static TileMapPositionData), With<WorldObject>>,
     pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
 
     pub items_query: Query<
@@ -255,9 +249,9 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
     pub fn get_obj_entity_at_tile(&self, tile: TileMapPositionData) -> Option<Entity> {
-        if let Some(tile_e) = self.get_tile_entity(tile) {
-            if let Some(e) = self.tile_data_query.get(tile_e).unwrap().1 {
-                return Some(e.0);
+        for (obj_e, pos) in self.world_object_query.iter() {
+            if pos == &tile {
+                return Some(obj_e);
             }
         }
         None
@@ -370,23 +364,17 @@ fn setup(
     mut images: ResMut<Assets<Image>>,
 ) {
     let mut cm = ChunkManager::new();
-    cm.world_generation_params = WorldGeneration {
+    let params = WorldGeneration {
         tree_frequency: 0.,
         dungeon_stone_frequency: 0.,
-        stone_frequency: 0.18,
-        dirt_frequency: 0.52,
-        sand_frequency: 0.22,
-        water_frequency: 0.05,
+        sand_frequency: 0.32,
+        water_frequency: 0.15,
+        stone_frequency: 0.0,
+        dirt_frequency: 0.0,
     };
+    cm.world_generation_params = params.clone();
     dim_event.send(DimensionSpawnEvent {
-        generation_params: WorldGeneration {
-            tree_frequency: 0.,
-            dungeon_stone_frequency: 0.,
-            stone_frequency: 0.18,
-            dirt_frequency: 0.52,
-            sand_frequency: 0.22,
-            water_frequency: 0.05,
-        },
+        generation_params: params,
         seed: Some(0),
         swap_to_dim_now: true,
     });
@@ -656,7 +644,7 @@ fn setup(
             MovementVector::default(),
             FacingDirection::default(),
             KinematicCharacterController::default(),
-            Collider::cuboid(7., 10.),
+            Collider::cuboid(7., 5.),
             YSort,
             Name::new("Player"),
             RawPosition::default(),

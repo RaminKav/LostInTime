@@ -1,7 +1,7 @@
 use crate::assets::Graphics;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
-use crate::world::{ChunkManager, TileMapPositionData, CHUNK_SIZE};
-use crate::{GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH, TIME_STEP};
+use crate::world::{TileMapPositionData, CHUNK_SIZE};
+use crate::{GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -119,7 +119,6 @@ impl MinimapPlugin {
                                 data.push(255);
                             }
                         } else {
-                            println!("CHUNK NOT LOADED! {chunk_pos:?} {tile_pos:?}");
                             for _ in 0..2 {
                                 //Unloaded chunk, spawn nothing for now
                                 data.push(0);

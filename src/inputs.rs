@@ -2,7 +2,7 @@ use bevy::app::AppExit;
 
 use bevy::prelude::*;
 use bevy::utils::HashSet;
-use bevy::window::{PrimaryWindow, WindowFocused};
+use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
@@ -49,8 +49,8 @@ pub struct MovementVector(pub Vec2);
 pub enum FacingDirection {
     Left,
     Right,
-    Up,
-    Down,
+    // Up,
+    // Down,
 }
 
 impl Default for FacingDirection {
@@ -267,7 +267,7 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
-        mut move_player_event: EventWriter<MovePlayerEvent>,
+        move_player_event: EventWriter<MovePlayerEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -308,12 +308,7 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            let player_spawn_pos =
-                DungeonPlugin::gen_and_spawn_new_dungeon_dimension(&mut commands, &mut game);
-            move_player_event.send(MovePlayerEvent {
-                chunk_pos: player_spawn_pos.chunk_pos,
-                tile_pos: player_spawn_pos.tile_pos,
-            })
+            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, move_player_event);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -444,13 +439,6 @@ impl InputsPlugin {
             attack_event.send(AttackEvent);
 
             let player_pos = game.game.player_state.position;
-            if player_pos
-                .truncate()
-                .distance(cursor_pos.world_coords.truncate())
-                > (game.game.player_state.reach_distance * 32) as f32
-            {
-                return;
-            }
             let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
@@ -459,7 +447,21 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            if let Some(hit_obj) = game.get_tile_obj_data(TileMapPositionData {
+            println!(
+                "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
+                game.get_tile_data(TileMapPositionData {
+                    chunk_pos: cursor_chunk_pos,
+                    tile_pos: cursor_tile_pos
+                })
+            );
+            if player_pos
+                .truncate()
+                .distance(cursor_pos.world_coords.truncate())
+                > (game.game.player_state.reach_distance * 32) as f32
+            {
+                return;
+            }
+            if let Some(hit_obj) = game.get_obj_entity_at_tile(TileMapPositionData {
                 tile_pos: TilePos {
                     x: cursor_tile_pos.x as u32,
                     y: cursor_tile_pos.y as u32,
@@ -468,15 +470,7 @@ impl InputsPlugin {
             }) {
                 //TODO: skip this if no wep in hand
                 hit_event.send(HitEvent {
-                    hit_entity: game
-                        .get_obj_entity_at_tile(TileMapPositionData {
-                            tile_pos: TilePos {
-                                x: cursor_tile_pos.x as u32,
-                                y: cursor_tile_pos.y as u32,
-                            },
-                            chunk_pos: cursor_chunk_pos,
-                        })
-                        .unwrap(),
+                    hit_entity: hit_obj,
                     damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
                     dir: Vec2::new(0., 0.),
                     hit_with: main_hand_option,
@@ -527,9 +521,9 @@ impl InputsPlugin {
     }
     pub fn close_on_esc(
         // mut focused: Local<Option<WindowId>>,
-        mut focused_events: EventReader<WindowFocused>,
+        // mut focused_events: EventReader<WindowFocused>,
         mut exit: EventWriter<AppExit>,
-        mut windows: Query<&mut Window, With<PrimaryWindow>>,
+        // mut windows: Query<&mut Window, With<PrimaryWindow>>,
         input: Res<Input<KeyCode>>,
     ) {
         // TODO: Track this in e.g. a resource to ensure consistent behaviour across similar systems

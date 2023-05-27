@@ -1,13 +1,9 @@
-use bevy::prelude::*;
-use bevy_ecs_tilemap::prelude::TilemapTexture;
+use bevy::{prelude::*, utils::HashMap};
+use bevy_save::{CloneReflect, Snapshot};
 
-use crate::{
-    enemy::Enemy,
-    item::{Equipment, WorldObject},
-    WorldGeneration,
-};
+use crate::{enemy::Enemy, item::Equipment, WorldGeneration};
 
-use super::ChunkManager;
+use super::{chunk::Chunk, ChunkManager};
 
 #[derive(Component, Debug)]
 pub struct Dimension;
@@ -28,6 +24,23 @@ pub struct DimensionSpawnEvent {
 #[derive(Component)]
 
 pub struct ActiveDimension;
+
+#[derive(Component)]
+pub struct ChunkCache {
+    pub snapshots: HashMap<IVec2, Snapshot>,
+}
+impl Clone for ChunkCache {
+    fn clone(&self) -> Self {
+        let mut cloned_map = HashMap::default();
+        for v in &self.snapshots {
+            cloned_map.insert(*v.0, v.1.clone_value());
+        }
+        Self {
+            snapshots: cloned_map,
+        }
+    }
+}
+
 pub struct DimensionPlugin;
 
 impl Plugin for DimensionPlugin {
@@ -62,16 +75,11 @@ impl DimensionPlugin {
             }
         }
     }
+    //TODO: integrate this with events to work wiht bevy_save
     pub fn handle_dimension_swap_events(
         new_dim: Query<Entity, Added<SpawnDimension>>,
         mut commands: Commands,
-        entity_query: Query<
-            Entity,
-            (
-                Or<(With<WorldObject>, With<Enemy>, With<TilemapTexture>)>,
-                Without<Equipment>,
-            ),
-        >,
+        entity_query: Query<Entity, (Or<(With<Enemy>, With<Chunk>)>, Without<Equipment>)>,
         old_dim: Query<Entity, With<ActiveDimension>>,
         cm: Query<&ChunkManager>,
         old_cm: Res<ChunkManager>,

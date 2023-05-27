@@ -1,33 +1,34 @@
-use super::{ChunkManager, ChunkObjectData, WorldObjectEntityData};
+use super::chunk::GenerateObjectsEvent;
+use super::dimension::{ActiveDimension, GenerationSeed};
+use super::dungeon::Dungeon;
+use super::{ChunkManager, WorldObjectEntityData};
 use crate::combat::ObjBreakEvent;
 use crate::item::{Foliage, ItemsPlugin, Wall, WorldObject};
-use crate::world::chunk::SpawnedObject;
+use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
-use crate::{GameParam, GameState};
+use crate::{CustomFlush, GameParam, GameState};
 use bevy::app::AppExit;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
-use bevy_pkv::PkvStore;
 
 pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(load_game_data.in_base_set(StartupSet::PostStartup))
-            .add_system(exit_system.in_base_set(CoreSet::PostUpdate))
-            .add_systems((
-                Self::handle_new_wall_spawn_update,
-                Self::handle_wall_break.after(ItemsPlugin::break_item),
-                Self::handle_update_this_wall.after(Self::handle_new_wall_spawn_update),
-            ));
+        app.add_system(exit_system.in_base_set(CoreSet::PostUpdate))
+            .add_systems(
+                (
+                    Self::handle_new_wall_spawn_update,
+                    Self::generate_and_cache_objects.before(CustomFlush),
+                    Self::handle_wall_break.after(ItemsPlugin::break_item),
+                    Self::handle_update_this_wall
+                        .after(CustomFlush)
+                        .after(Self::handle_new_wall_spawn_update),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(apply_system_buffers.in_set(CustomFlush));
     }
-}
-
-#[derive(Resource)]
-pub struct GameData {
-    pub data: HashMap<(i32, i32), ChunkObjectData>,
-    pub name: String,
 }
 
 impl GenerationPlugin {
@@ -39,7 +40,11 @@ impl GenerationPlugin {
     ) -> Option<WorldObject> {
         let x = tile_pos.x as f64;
         let y = tile_pos.y as f64;
-
+        // dont need to use expencive noise fn if it will always
+        // result in the same tile
+        if chunk_manager.world_generation_params.stone_frequency == 1. {
+            return Some(WorldObject::Wall(Wall::Stone));
+        }
         let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
         let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
         let e = noise_helpers::get_perlin_noise_for_tile(nx, ny, seed);
@@ -87,12 +92,8 @@ impl GenerationPlugin {
                     if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
                     }
-                    let neighbour_wall_entity = game.get_obj_entity_at_tile(TileMapPositionData {
-                        chunk_pos: adjusted_chunk_pos,
-                        tile_pos: neighbour_tile_pos,
-                    });
 
-                    if let Some(mut neighbour_wall_data) =
+                    if let Some(neighbour_wall_data) =
                         game.get_tile_obj_data_mut(TileMapPositionData {
                             chunk_pos: adjusted_chunk_pos,
                             tile_pos: neighbour_tile_pos,
@@ -100,7 +101,8 @@ impl GenerationPlugin {
                     {
                         if !matches!(neighbour_wall_data.object, WorldObject::Wall(_)) {
                             continue;
-                        } else if dx != 0 && dy != 0 {
+                        } else if dx != 0 && dy != 0 && neighbour_wall_data.obj_bit_index != 0b1111
+                        {
                             Self::update_wall(
                                 neighbour_tile_pos,
                                 adjusted_chunk_pos,
@@ -109,30 +111,9 @@ impl GenerationPlugin {
                             );
                             continue;
                         }
-                        let neighbours_updated_bit_index = Self::compute_wall_index(
-                            neighbour_wall_data.obj_bit_index,
-                            (-dx, -dy),
-                            false,
-                        );
-                        //TODO: this might not be needed anymore
-                        if let Ok(neighbour_sprite) =
-                            wall_data.get_mut(neighbour_wall_entity.unwrap())
-                        {
-                            let mut neighbour_sprite = neighbour_sprite.1;
-                            neighbour_wall_data.obj_bit_index = neighbours_updated_bit_index;
-                            neighbour_sprite.index = (neighbours_updated_bit_index
-                                + neighbour_wall_data.texture_offset)
-                                as usize;
-                        }
                     } else {
                         continue;
                     }
-                    Self::update_wall(
-                        neighbour_tile_pos,
-                        adjusted_chunk_pos,
-                        &mut game,
-                        &mut wall_data,
-                    );
                 }
             }
         }
@@ -177,13 +158,6 @@ impl GenerationPlugin {
                 let mut new_sprite = wall_data.get_mut(new_wall_entity.unwrap()).unwrap().1;
                 new_wall_data.obj_bit_index = updated_bit_index;
                 new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
-                // println!(
-                //     "UPDATE {:?} {:?} | {:?} {:?}",
-                //     (dx, dy),
-                //     new_wall_pos.tile_pos,
-                //     updated_bit_index + new_wall_data.texture_offset,
-                //     neighbour_is_wall
-                // )
             }
         }
         let mut first_corner_is_wall = false;
@@ -257,12 +231,14 @@ impl GenerationPlugin {
     ) {
         for new_wall in new_wall_query.iter_mut() {
             let new_wall = wall_data.get(new_wall).unwrap().clone();
-            Self::update_wall(
-                new_wall.2.tile_pos,
-                new_wall.2.chunk_pos,
-                &mut game,
-                &mut wall_data,
-            );
+            if game.get_tile_obj_data(*new_wall.2).unwrap().texture_offset == 0 {
+                Self::update_wall(
+                    new_wall.2.tile_pos,
+                    new_wall.2.chunk_pos,
+                    &mut game,
+                    &mut wall_data,
+                );
+            }
         }
     }
     pub fn handle_wall_break(
@@ -409,67 +385,20 @@ impl GenerationPlugin {
     }
 
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
-    pub fn spawn_objects(commands: &mut Commands, game: &mut GameParam, chunk_pos: IVec2) {
-        // let mut tree_children = Vec::new();
-        let obj_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
-        if let Some(obj_points) = obj_points.to_owned() {
-            println!("SPAWNING OBJECTS FOR {chunk_pos:?}");
-            for tp in obj_points.0.clone().iter() {
-                let tile_pos = TilePos {
-                    x: tp.0 as u32,
-                    y: tp.1 as u32,
-                };
-                let mut obj_e = None;
-                match tp.2 {
-                    WorldObject::Foliage(_) => {
-                        obj_e = tp.2.spawn_foliage(commands, game, tile_pos, chunk_pos);
-                    }
-                    WorldObject::Wall(_) => {
-                        obj_e = tp.2.spawn_wall(commands, game, tile_pos, chunk_pos);
-                        if let Some(_wall) = obj_e {}
-                    }
-                    _ => {}
-                }
-                if let Some(tree) = obj_e {
-                    commands
-                        .entity(
-                            game.get_tile_entity(TileMapPositionData {
-                                chunk_pos,
-                                tile_pos,
-                            })
-                            .unwrap(),
-                        )
-                        .insert(SpawnedObject(tree))
-                        .add_child(tree);
-                }
-            }
 
-            // commands
-            //     .spawn(SpatialBundle::default())
-            //     .push_children(&tree_children);
-        } else {
-            warn!("No Object data found for chunk {:?}", chunk_pos);
-        }
-    }
     pub fn generate_and_cache_objects(
-        game: &mut GameParam,
-        // pkv: &mut PkvStore,
-        chunk_pos: IVec2,
-        seed: u32,
+        mut commands: Commands,
+        mut game: GameParam,
+        mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
+        seed: Query<&GenerationSeed, With<ActiveDimension>>,
+        dungeon: Query<&Dungeon, With<ActiveDimension>>,
+        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
     ) {
-        let tree_points;
+        for chunk in chunk_spawn_event.iter() {
+            let chunk_pos = chunk.chunk_pos;
+            let tree_points;
+            let maybe_dungeon = dungeon.get_single();
 
-        if false {
-            // let Ok(data) = pkv.get::<ChunkObjectData>(&format!("{} {}", chunk_pos.x, chunk_pos.y)) {
-            // tree_points = data.0;
-            tree_points = vec![];
-            // info!(
-            //     "LOADING OLD CHUNK OBJECT DATA FOR CHUNK {:?} TREES: {:?}",
-            //     (chunk_pos.x, chunk_pos.y),
-            //     tree_points.len()
-            // );
-        } else {
-            println!("GENERATING AND STORING NEW CHUNK OBJECT DATA");
             let raw_tree_points = noise_helpers::poisson_disk_sampling(
                 1.5 * TILE_SIZE.x as f64,
                 30,
@@ -509,58 +438,96 @@ impl GenerationPlugin {
                     true
                 })
                 .collect::<Vec<(f32, f32, WorldObject)>>();
-        }
+            let stone_points =
+                Self::generate_stone_for_chunk(&game.chunk_manager, chunk_pos, seed.single().seed);
+            let objs = stone_points
+                .iter()
+                .chain(tree_points.iter())
+                .filter(|tp| {
+                    let tile = game
+                        .get_tile_data(TileMapPositionData {
+                            chunk_pos,
+                            tile_pos: TilePos {
+                                x: tp.0 as u32,
+                                y: tp.1 as u32,
+                            },
+                        })
+                        .unwrap()
+                        .block_type;
+                    if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
+                        return false;
+                    }
+                    if let Ok(dungeon) = maybe_dungeon {
+                        if chunk_pos.x < -1
+                            || chunk_pos.x > 2
+                            || chunk_pos.y < -2
+                            || chunk_pos.y > 1
+                        {
+                            return true;
+                        }
+                        if dungeon.grid
+                            [(CHUNK_SIZE as i32 * (2 - chunk_pos.y) - 1 - tp.1 as i32) as usize]
+                            [(CHUNK_SIZE as i32 + (chunk_pos.x * CHUNK_SIZE as i32) + tp.0 as i32)
+                                as usize]
+                            == 1
+                        {
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .map(|tp| *tp)
+                .collect::<Vec<(f32, f32, WorldObject)>>();
 
-        let stone_points = Self::generate_stone_for_chunk(&game.chunk_manager, chunk_pos, seed);
-        let objs = stone_points
-            .iter()
-            .chain(tree_points.iter())
-            .filter(|tp| {
-                let tile = game
-                    .get_tile_data(TileMapPositionData {
-                        chunk_pos,
-                        tile_pos: TilePos {
-                            x: tp.0 as u32,
-                            y: tp.1 as u32,
-                        },
-                    })
-                    .unwrap()
-                    .block_type;
-                if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
-                    return false;
+            println!("SPAWNING OBJECTS FOR {chunk_pos:?} {:?}", objs.len(),);
+            for tp in objs.clone().iter() {
+                let tile_pos = TilePos {
+                    x: tp.0 as u32,
+                    y: tp.1 as u32,
+                };
+                let mut obj_e = None;
+                match tp.2 {
+                    WorldObject::Foliage(_) => {
+                        obj_e =
+                            tp.2.spawn_foliage(&mut commands, &mut game, tile_pos, chunk_pos);
+                    }
+                    WorldObject::Wall(_) => {
+                        obj_e = tp.2.spawn_wall(
+                            &mut commands,
+                            &mut game,
+                            tile_pos,
+                            chunk_pos,
+                            Some(0b1111),
+                        );
+                    }
+                    _ => {}
                 }
-                true
-            })
-            .map(|tp| *tp)
-            .collect::<Vec<(f32, f32, WorldObject)>>();
-
-        game.game_data
-            .data
-            .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(objs.to_vec()));
+                if let Some(e) = obj_e {
+                    commands
+                        .entity(*game.get_chunk_entity(chunk_pos).unwrap())
+                        .add_child(e);
+                }
+            }
+            minimap_update.send(UpdateMiniMapEvent);
+        }
     }
 }
+
 fn exit_system(
     // mut pkv: ResMut<PkvStore>,
     mut events: EventReader<AppExit>,
-    game_data: Res<GameData>,
 ) {
     if events.iter().count() > 0 {
         info!("SAVING GAME DATA...");
 
-        for (chunk_pos, data) in game_data.data.iter() {
-            // pkv.set(&format!("{} {}", chunk_pos.0, chunk_pos.1), data)
-            //     .expect("failed to store data");
-        }
+        // for (chunk_pos, data) in game_data.data.iter() {
+        //     // pkv.set(&format!("{} {}", chunk_pos.0, chunk_pos.1), data)
+        //     //     .expect("failed to store data");
+        // }
     }
 }
-fn load_game_data(mut commands: Commands) {
-    //TODO: just instanciates GameData resource for now...
-    commands.insert_resource(GameData {
-        data: HashMap::new(),
-        name: "".to_string(),
-    })
-}
 
+//TODO: move to own helpers file
 pub fn get_adjusted_tile(pos: TileMapPositionData, offset: (i8, i8)) -> TileMapPositionData {
     let dx = offset.0;
     let dy = offset.1;
