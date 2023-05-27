@@ -1,27 +1,41 @@
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin, Simplex};
+use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
 pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u32) -> f64 {
-    let noise_e = Perlin::new(1 + seed);
-    let noise_e2 = Perlin::new(2 + seed);
-    let noise_e3 = Perlin::new(3 + seed);
-
-    let _noise_m = Simplex::new(4 + seed);
-    let _noise_m2 = Simplex::new(5 + seed);
-    let _noise_m3 = Simplex::new(6 + seed);
+    let n1 = Perlin::new(1 + seed);
+    let n2 = Perlin::new(2 + seed);
+    let n3 = Perlin::new(3 + seed);
+    // let n1 = Fbm::<Perlin>::new(seed)
+    //     .set_octaves(2)
+    //     .set_frequency(1.)
+    //     .set_lacunarity(2.0)
+    //     .set_persistence(0.01);
+    // let n2 = Fbm::<Perlin>::new(1 + seed)
+    //     .set_octaves(2)
+    //     .set_frequency(1. / 2.)
+    //     .set_lacunarity(4.0)
+    //     .set_persistence(0.01);
+    // let n3 = Fbm::<Perlin>::new(2 + seed)
+    //     .set_octaves(2)
+    //     .set_frequency(1. / 4.)
+    //     .set_lacunarity(8.0)
+    //     .set_persistence(0.01);
+    // .set_persistence(1.);
+    // let _noise_m = Simplex::new(4 + seed);
+    // let _noise_m2 = Simplex::new(5 + seed);
+    // let _noise_m3 = Simplex::new(6 + seed);
 
     let base_oct = 1. / 10. / 8.;
 
-    let e1 = noise_e.get([x * base_oct, y * base_oct]);
-    let e2 = noise_e2.get([x * base_oct * 8., y * base_oct * 8.]);
-    let e3 = noise_e3.get([x * base_oct * 16., y * base_oct * 16.]);
+    let e1 = (n1.get([x * base_oct, y * base_oct]) + 1.) / 2.;
+    let e2 = (n2.get([x * base_oct * 8., y * base_oct * 8.]) + 1.) / 2.;
+    let e3 = (n3.get([x * base_oct * 16., y * base_oct * 16.]) + 1.) / 2.;
 
-    let e = f64::min(e1, f64::min(e2, e3) + 0.4) + 0.5;
-
+    let e = (f64::min(e1, f64::min(e2, e3) + 0.1)).clamp(0., 1.);
     e
 }
 

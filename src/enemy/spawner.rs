@@ -8,9 +8,9 @@ use crate::{
     world::{
         chunk::{Chunk, SpawnChunkEvent},
         world_helpers::camera_pos_to_chunk_pos,
-        ChunkManager, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA,
+        CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA,
     },
-    GameParam, GameState, TIME_STEP,
+    GameParam, GameState,
 };
 
 use super::{Enemy, EnemyMaterial};
