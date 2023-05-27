@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use crate::{world::CHUNK_SIZE, GameParam, GameState, Player, RawPosition};
+use crate::{world::CHUNK_SIZE, GameState, Player, RawPosition};
 
 pub struct MovePlayerEvent {
     pub chunk_pos: IVec2,

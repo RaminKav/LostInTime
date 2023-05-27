@@ -4,7 +4,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack},
     item::{Equipment, ItemDisplayMetaData},
     ui::InventorySlotState,
-    GameState, Player, TIME_STEP,
+    GameState, Player,
 };
 
 pub struct AttributesPlugin;

@@ -1,7 +1,11 @@
 use bevy::prelude::*;
+use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_inspector_egui::prelude::*;
 use rand::rngs::ThreadRng;
+use rand::seq::IteratorRandom;
 use rand::Rng;
+
+use super::{TileMapPositionData, CHUNK_SIZE};
 
 #[derive(Reflect, Resource, Clone, Debug, Default, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
@@ -81,19 +85,32 @@ impl Direction {
         }
     }
 }
-// fn key_event(
-//     mut commands: Commands,
-//     key_input: ResMut<Input<KeyCode>>,
-//     old: Query<Entity, With<Sprite>>,
-//     steps: Res<NumSteps>,
-//     grid_size: Res<GridSize>,
-//     bias: Res<Bias>,
-// ) {
-//     if key_input.just_pressed(KeyCode::R) {
-//         // gen_new_dungeon(steps, grid_size, bias);
-//     }
-// }
 
+pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPositionData> {
+    let grid_size = grid.len() as i32 - 1;
+    for y in 0..grid_size {
+        let g_y = &grid[(grid_size - y) as usize];
+        let picked_tile = g_y
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| *v == &1)
+            .choose(&mut rand::thread_rng());
+        if let Some((x, _)) = picked_tile {
+            return Some(TileMapPositionData {
+                chunk_pos: IVec2::new(
+                    f64::floor((x as u32 - CHUNK_SIZE) as f64 / CHUNK_SIZE as f64) as i32,
+                    -(f64::floor((grid_size - y - 1) as f64 / CHUNK_SIZE as f64) as i32 - 1),
+                ),
+                tile_pos: TilePos {
+                    x: x as u32 % CHUNK_SIZE,
+                    y: CHUNK_SIZE - ((grid_size - y) as u32 % CHUNK_SIZE) - 1,
+                },
+            });
+        }
+    }
+    None
+}
+//TODO: add seed to this rng
 pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>> {
     let mut grid: Vec<Vec<i8>> = vec![vec![0; grid_size as usize]; grid_size as usize];
     let mut walker = Walker {
@@ -117,38 +134,4 @@ pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>>
         }
     }
     grid
-
-    // for (x, sub_grid) in grid.iter().enumerate() {
-    //     for (y, v) in sub_grid.iter().enumerate() {
-    //         if v == &1 {
-    //             commands.spawn(SpriteBundle {
-    //                 sprite: Sprite {
-    //                     color: Color::rgb(0.25, 0.25, 0.75),
-    //                     custom_size: Some(Vec2::new(square_size, square_size)),
-    //                     ..default()
-    //                 },
-    //                 transform: Transform::from_translation(Vec3::new(
-    //                     x as f32 * (square_size + 2.) - offset,
-    //                     y as f32 * (square_size + 2.) - offset,
-    //                     0.,
-    //                 )),
-    //                 ..default()
-    //             });
-    //         } else {
-    //             commands.spawn(SpriteBundle {
-    //                 sprite: Sprite {
-    //                     color: Color::rgb(1., 0.25, 0.75),
-    //                     custom_size: Some(Vec2::new(square_size, square_size)),
-    //                     ..default()
-    //                 },
-    //                 transform: Transform::from_translation(Vec3::new(
-    //                     x as f32 * (square_size + 2.) - offset,
-    //                     y as f32 * (square_size + 2.) - offset,
-    //                     0.,
-    //                 )),
-    //                 ..default()
-    //             });
-    //         }
-    //     }
-    // }
 }

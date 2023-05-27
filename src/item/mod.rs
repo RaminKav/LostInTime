@@ -255,6 +255,7 @@ impl WorldObject {
         game: &mut GameParam,
         tile_pos: TilePos,
         chunk_pos: IVec2,
+        with_bits: Option<u8>,
     ) -> Option<Entity> {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
@@ -272,12 +273,11 @@ impl WorldObject {
             WorldObject::Wall(_) => {
                 let obj_data = game.world_obj_data.properties.get(&self).unwrap();
                 let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+
                 let position = Vec3::new(
-                    // (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                    //     + anchor.x * obj_data.size.x,
-                    // (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                    //     + anchor.y * obj_data.size.y,
-                    0., 0., 1.,
+                    (tile_pos.x as i32 * 32) as f32 + anchor.x * obj_data.size.x,
+                    (tile_pos.y as i32 * 32) as f32 + anchor.y * obj_data.size.y,
+                    0.,
                 );
                 let item = commands
                     .spawn(SpriteSheetBundle {
@@ -286,6 +286,7 @@ impl WorldObject {
                             translation: position,
                             ..Default::default()
                         },
+                        visibility: Visibility::Visible,
                         ..Default::default()
                     })
                     .insert(Name::new("Wall"))
@@ -295,10 +296,10 @@ impl WorldObject {
                     .insert(Wall::Stone)
                     .insert(WorldObjectEntityData {
                         object: self,
-                        obj_bit_index: 0,
+                        obj_bit_index: with_bits.unwrap_or(0),
                         texture_offset: 0,
                     })
-                    // .insert(YSort)
+                    .insert(YSort)
                     .insert(pos)
                     .insert(self)
                     .id();
@@ -333,17 +334,12 @@ impl WorldObject {
         if item_map.is_none() {
             panic!("graphics not loaded");
         }
+        let pos = TileMapPositionData {
+            tile_pos,
+            chunk_pos,
+        };
 
-        if game
-            .get_obj_entity_at_tile(TileMapPositionData {
-                tile_pos: TilePos {
-                    x: tile_pos.x as u32,
-                    y: tile_pos.y as u32,
-                },
-                chunk_pos,
-            })
-            .is_some()
-        {
+        if game.get_obj_entity_at_tile(pos.clone()).is_some() {
             warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
             return None;
         }
@@ -351,10 +347,8 @@ impl WorldObject {
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position = Vec3::new(
-            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.x * obj_data.size.x,
-            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y,
+            (tile_pos.x as i32 * 32) as f32 + anchor.x * obj_data.size.x,
+            (tile_pos.y as i32 * 32) as f32 + anchor.y * obj_data.size.y,
             0.,
         );
         let foliage_material = game
@@ -375,6 +369,7 @@ impl WorldObject {
                     scale: obj_data.size.extend(1.),
                     ..Default::default()
                 },
+                visibility: Visibility::Visible,
                 material: foliage_material,
                 ..default()
             })
@@ -389,6 +384,7 @@ impl WorldObject {
             })
             .insert(Block)
             .insert(YSort)
+            .insert(pos)
             .insert(self)
             .id();
         if obj_data.breakable {
@@ -415,20 +411,11 @@ impl WorldObject {
     ) -> Option<Entity> {
         let item = match self {
             WorldObject::Foliage(_) => self.spawn_foliage(commands, game, tile_pos, chunk_pos),
-            WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos),
+            WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos, None),
             _ => self.spawn(commands, game, tile_pos, chunk_pos),
         };
         if let Some(item) = item {
-            let old_points = game.game_data.data.get(&(chunk_pos.x, chunk_pos.y));
-
-            if let Some(old_points) = old_points {
-                let mut new_points = old_points.0.clone();
-                new_points.push((tile_pos.x as f32, tile_pos.y as f32, self));
-
-                game.game_data
-                    .data
-                    .insert((chunk_pos.x, chunk_pos.y), ChunkObjectData(new_points));
-            }
+            //TODO: do what old game data did, add obj to registry
             minimap_event.send(UpdateMiniMapEvent);
             return Some(item);
         }
@@ -759,29 +746,6 @@ impl ItemsPlugin {
                     );
                 }
             }
-            let old_points = game
-                .game_data
-                .data
-                .get(&(broken.chunk_pos.x, broken.chunk_pos.y))
-                .unwrap();
-            let updated_old_points = old_points
-                .0
-                .clone()
-                .iter()
-                .filter(|p| {
-                    **p != (
-                        broken.tile_pos.x as f32,
-                        broken.tile_pos.y as f32,
-                        broken.obj,
-                    )
-                })
-                .copied()
-                .collect::<Vec<(f32, f32, WorldObject)>>();
-
-            game.game_data.data.insert(
-                (broken.chunk_pos.x, broken.chunk_pos.y),
-                ChunkObjectData(updated_old_points.to_vec()),
-            );
             minimap_event.send(UpdateMiniMapEvent);
         }
     }

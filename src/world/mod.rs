@@ -8,17 +8,15 @@ mod tile;
 pub mod world_helpers;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
-use bevy::{
-    prelude::*,
-    utils::{HashMap, HashSet},
-};
+use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
-use crate::{enemy::spawner::Spawner, item::WorldObject};
+use crate::item::WorldObject;
 
 use self::{
     chunk::ChunkPlugin,
     dimension::DimensionPlugin,
+    dungeon::DungeonPlugin,
     dungeon_generation::{Bias, GridSize, NumSteps},
     generation::GenerationPlugin,
     tile::TilePlugin,
@@ -27,7 +25,6 @@ use self::{
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 16;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
-const CHUNK_CACHE_AMOUNT: i32 = 4;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
 #[derive(Debug, Component, Resource, Clone)]
@@ -56,20 +53,12 @@ impl ChunkManager {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ChunkLoadingState {
-    Spawning,
-    Caching,
-    Despawning,
-    None,
-}
-
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct RawChunkData {
     pub raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
     pub raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
 }
-#[derive(Eq, Hash, PartialEq, Debug, Component, Clone)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone)]
 pub struct TileMapPositionData {
     //TODO: Add ::new() impl
     pub chunk_pos: IVec2,
@@ -106,6 +95,7 @@ impl Plugin for WorldPlugin {
         app.add_plugin(GenerationPlugin)
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
+            .add_plugin(DungeonPlugin)
             .add_plugin(TilePlugin)
             // .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
             // .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
