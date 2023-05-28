@@ -485,14 +485,12 @@ impl GenerationPlugin {
                     x: tp.0 as u32,
                     y: tp.1 as u32,
                 };
-                let mut obj_e = None;
                 match tp.2 {
                     WorldObject::Foliage(_) => {
-                        obj_e =
-                            tp.2.spawn_foliage(&mut commands, &mut game, tile_pos, chunk_pos);
+                        tp.2.spawn_foliage(&mut commands, &mut game, tile_pos, chunk_pos);
                     }
                     WorldObject::Wall(_) => {
-                        obj_e = tp.2.spawn_wall(
+                        tp.2.spawn_wall(
                             &mut commands,
                             &mut game,
                             tile_pos,
@@ -501,11 +499,6 @@ impl GenerationPlugin {
                         );
                     }
                     _ => {}
-                }
-                if let Some(e) = obj_e {
-                    commands
-                        .entity(*game.get_chunk_entity(chunk_pos).unwrap())
-                        .add_child(e);
                 }
             }
             minimap_update.send(UpdateMiniMapEvent);

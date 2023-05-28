@@ -4,8 +4,8 @@ use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
-    animations::{AnimationTimer, DoneAnimation, HitAnimationTracker},
-    attributes::{Attack, AttributeModifier, Health, InvincibilityCooldown},
+    animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
+    attributes::{Attack, AttackCooldown, AttributeModifier, Health, InvincibilityCooldown},
     inventory::Inventory,
     item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
@@ -56,6 +56,7 @@ impl Plugin for CombatPlugin {
             .add_systems(
                 (
                     Self::handle_hits,
+                    Self::handle_attack_cooldowns,
                     Self::spawn_hit_spark_effect.after(Self::handle_hits),
                     Self::handle_invincibility_frames.after(Self::handle_hits),
                     Self::handle_enemy_death.after(Self::handle_hits),
@@ -67,6 +68,34 @@ impl Plugin for CombatPlugin {
 }
 
 impl CombatPlugin {
+    fn handle_attack_cooldowns(
+        mut commands: Commands,
+        time: Res<Time>,
+        tool_query: Query<Entity, With<MainHand>>,
+        attack_event: EventReader<AttackEvent>,
+        mut player: Query<
+            (Entity, Option<&AttackCooldown>, Option<&mut AttackTimer>),
+            With<Player>,
+        >,
+    ) {
+        let (player_e, cooldown_option, timer_option) = player.single_mut();
+
+        if attack_event.len() > 0 && timer_option.is_none() {
+            let mut attack_cd_timer = AttackTimer(Timer::from_seconds(
+                cooldown_option.unwrap_or(&AttackCooldown(0.4)).0,
+                TimerMode::Once,
+            ));
+            attack_cd_timer.0.tick(time.delta());
+            commands.entity(player_e).insert(attack_cd_timer);
+            commands.entity(tool_query.single()).remove::<HitMarker>();
+        }
+        if let Some(mut t) = timer_option {
+            t.0.tick(time.delta());
+            if t.0.finished() {
+                commands.entity(player_e).remove::<AttackTimer>();
+            }
+        }
+    }
     fn handle_enemy_death(
         mut commands: Commands,
         mut game: GameParam,
@@ -124,7 +153,7 @@ impl CombatPlugin {
     fn spawn_hit_spark_effect(
         mut commands: Commands,
         hits: Query<(Entity, Added<JustGotHit>, Option<&Player>)>,
-        transforms: Query<&Transform>,
+        transforms: Query<&GlobalTransform>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     ) {
@@ -142,7 +171,7 @@ impl CombatPlugin {
             let s = 5;
             let x_rng = rng.gen_range(-s..s);
             let y_rng = rng.gen_range(-s..s);
-            let hit_pos = transforms.get(hit.0).unwrap().translation;
+            let hit_pos = transforms.get(hit.0).unwrap().translation();
 
             commands.spawn((
                 SpriteSheetBundle {
@@ -170,7 +199,7 @@ impl CombatPlugin {
         mut health: Query<(
             Entity,
             &mut Health,
-            &Transform,
+            &GlobalTransform,
             Option<&WorldObject>,
             Option<&InvincibilityCooldown>,
         )>,
@@ -191,10 +220,10 @@ impl CombatPlugin {
                     let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
                     let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
                     let obj_chunk_pos = camera_pos_to_chunk_pos(
-                        &(t.translation.truncate() - anchor * obj_data.size),
+                        &(t.translation().truncate() - anchor * obj_data.size),
                     );
                     let obj_tile_pos = camera_pos_to_block_pos(
-                        &(t.translation.truncate() - anchor * obj_data.size),
+                        &(t.translation().truncate() - anchor * obj_data.size),
                     );
 
                     if let Some(data) = game.world_obj_data.properties.get(&obj) {
@@ -238,7 +267,7 @@ impl CombatPlugin {
                     if hit_health.0 <= 0 && game.player_query.single().0 != e {
                         enemy_death_events.send(EnemyDeathEvent {
                             entity: e,
-                            enemy_pos: t.translation.truncate(),
+                            enemy_pos: t.translation().truncate(),
                         })
                     }
                 }

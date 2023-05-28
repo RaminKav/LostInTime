@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::tiles::TilePos;
 use rand::{seq::SliceRandom, Rng};
 
@@ -110,17 +110,17 @@ impl SpawnerPlugin {
     ) {
         //
         const S: usize = (NUM_CHUNKS_AROUND_CAMERA + 1) as usize;
-        let mut mob_counts: [[u32; S]; S] = [[0; S]; S];
+        let mut mob_counts = HashMap::new();
         // count # mobs in each chunk
         for t in mobs.iter() {
             let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
-            mob_counts[chunk_pos.x as usize][chunk_pos.y as usize] += 1;
+            mob_counts.insert(chunk_pos, *mob_counts.get(&chunk_pos).unwrap_or(&0) + 1);
         }
         // for each spawned chunk, check if mob count is < max
         // and if so, send event to spawn more
         for (e, t, spawners) in chunk_query.iter() {
             let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
-            if mob_counts[chunk_pos.x as usize][chunk_pos.y as usize] >= MAX_MOB_PER_CHUNK {
+            if *mob_counts.get(&chunk_pos).unwrap_or(&0) >= MAX_MOB_PER_CHUNK {
                 continue;
             }
             spawn_event.send(MobSpawnEvent {
