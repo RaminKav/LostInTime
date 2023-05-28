@@ -4,7 +4,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack},
     item::{Equipment, ItemDisplayMetaData},
     ui::InventorySlotState,
-    GameState, Player,
+    CustomFlush, GameState, Player,
 };
 
 pub struct AttributesPlugin;
@@ -58,9 +58,13 @@ impl ItemAttributes {
         }
         if self.attack > 0 {
             entity.insert(Attack(self.attack));
+        } else {
+            entity.remove::<Attack>();
         }
         if self.attack_cooldown > 0. {
             entity.insert(AttackCooldown(self.attack_cooldown));
+        } else {
+            entity.remove::<AttackCooldown>();
         }
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
@@ -84,6 +88,7 @@ pub struct AttributeModifier {
 #[derive(Debug, Clone, Default)]
 pub struct AttributeChangeEvent;
 
+//TODO: Add max health vs curr health
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 pub struct Health(pub i32);
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
@@ -105,7 +110,7 @@ impl Plugin for AttributesPlugin {
                 (
                     Self::clamp_health,
                     Self::handle_item_attribute_change,
-                    Self::handle_attribute_change_events.after(Self::handle_item_attribute_change),
+                    Self::handle_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -135,6 +140,9 @@ impl AttributesPlugin {
                 new_att.attack += a.attack;
                 new_att.attack_cooldown += a.attack_cooldown;
                 new_att.invincibility_cooldown += a.invincibility_cooldown;
+            }
+            if new_att.attack_cooldown == 0. {
+                new_att.attack_cooldown = 0.4;
             }
             let player = player.single();
             new_att.add_attribute_components(&mut commands.entity(player));

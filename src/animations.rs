@@ -8,8 +8,6 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use interpolation::lerp;
 
 use crate::ai::AttackState;
-use crate::attributes::AttackCooldown;
-use crate::combat::{AttackTimer, HitMarker};
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
@@ -247,49 +245,21 @@ impl AnimationsPlugin {
         //TODO: move to hit_handler fn
     }
     fn animate_attack(
-        mut commands: Commands,
         mut game: ResMut<Game>,
         time: Res<Time>,
-        mut tool_query: Query<
-            (
-                Entity,
-                &mut Transform,
-                &mut AttackAnimationTimer,
-                Option<&mut AttackTimer>,
-            ),
-            With<Equipment>,
-        >,
+        mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
         attack_event: EventReader<AttackEvent>,
-        player: Query<(&FacingDirection, Option<&AttackCooldown>), With<Player>>,
+        player: Query<&FacingDirection, With<Player>>,
     ) {
-        if let Ok((e, mut t, mut at, timer_option)) = tool_query.get_single_mut() {
-            let (dir, cooldown) = player.single();
+        if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
+            let dir = player.single();
             let is_facing_left = if *dir == FacingDirection::Left {
                 1.
             } else {
                 -1.
             };
-            let on_cooldown = timer_option.is_some();
-            if on_cooldown {
-                let mut t = timer_option.unwrap();
-                t.0.tick(time.delta());
-                if t.0.finished() {
-                    commands
-                        .entity(e)
-                        .remove::<AttackTimer>()
-                        .remove::<HitMarker>();
-                }
-            }
 
             if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
-                if !game.player_state.is_attacking {
-                    if let Some(cooldown) = cooldown {
-                        let mut attack_cd_timer =
-                            AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
-                        attack_cd_timer.0.tick(time.delta());
-                        commands.entity(e).insert(attack_cd_timer);
-                    }
-                }
                 game.player_state.is_attacking = true;
 
                 let d = time.delta();
