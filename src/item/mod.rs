@@ -5,8 +5,9 @@ use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
+use crate::world::generation::WallBreakEvent;
 use crate::world::{TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
-use crate::{AnimationTimer, GameParam, GameState, Limb, YSort};
+use crate::{AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
@@ -717,11 +718,12 @@ impl Plugin for ItemsPlugin {
             .add_systems(
                 (
                     Self::update_graphics,
-                    Self::break_item,
+                    Self::break_item.before(CustomFlush),
                     Self::update_held_hotbar_item,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            );
+            )
+            .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 
@@ -731,6 +733,7 @@ impl ItemsPlugin {
         mut game: GameParam,
         mut obj_break_events: EventReader<ObjBreakEvent>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+        mut wall_break_event: EventWriter<WallBreakEvent>,
     ) {
         for broken in obj_break_events.iter() {
             if let Some(breaks_into_option) = game.world_obj_data.properties.get(&broken.obj) {
@@ -747,6 +750,13 @@ impl ItemsPlugin {
                         None,
                     );
                 }
+            }
+
+            if let WorldObject::Wall(_) = broken.obj {
+                wall_break_event.send(WallBreakEvent {
+                    chunk_pos: broken.chunk_pos,
+                    tile_pos: broken.tile_pos,
+                })
             }
             minimap_event.send(UpdateMiniMapEvent);
         }

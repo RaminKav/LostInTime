@@ -11,16 +11,22 @@ use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
 
+#[derive(Debug, Clone)]
+pub struct WallBreakEvent {
+    pub chunk_pos: IVec2,
+    pub tile_pos: TilePos,
+}
 pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(exit_system.in_base_set(CoreSet::PostUpdate))
+        app.add_event::<WallBreakEvent>()
+            .add_system(exit_system.in_base_set(CoreSet::PostUpdate))
             .add_systems(
                 (
-                    Self::handle_new_wall_spawn_update,
+                    Self::handle_new_wall_spawn_update.after(CustomFlush),
                     Self::generate_and_cache_objects.before(CustomFlush),
-                    Self::handle_wall_break.after(ItemsPlugin::break_item),
+                    Self::handle_wall_break.after(CustomFlush),
                     Self::handle_update_this_wall
                         .after(CustomFlush)
                         .after(Self::handle_new_wall_spawn_update),
@@ -101,8 +107,7 @@ impl GenerationPlugin {
                     {
                         if !matches!(neighbour_wall_data.object, WorldObject::Wall(_)) {
                             continue;
-                        } else if dx != 0 && dy != 0 && neighbour_wall_data.obj_bit_index != 0b1111
-                        {
+                        } else if neighbour_wall_data.obj_bit_index != 0b1111 {
                             Self::update_wall(
                                 neighbour_tile_pos,
                                 adjusted_chunk_pos,
@@ -243,7 +248,7 @@ impl GenerationPlugin {
     }
     pub fn handle_wall_break(
         mut game: GameParam,
-        mut obj_break_events: EventReader<ObjBreakEvent>,
+        mut obj_break_events: EventReader<WallBreakEvent>,
 
         mut wall_data: Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
     ) {

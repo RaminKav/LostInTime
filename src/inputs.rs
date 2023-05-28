@@ -449,7 +449,7 @@ impl InputsPlugin {
             ));
             // println!(
             //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
-            //     game.get_tile_data(TileMapPositionData {
+            //     game.get_tile_obj_data(TileMapPositionData {
             //         chunk_pos: cursor_chunk_pos,
             //         tile_pos: cursor_tile_pos
             //     })
