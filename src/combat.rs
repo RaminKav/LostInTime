@@ -87,7 +87,9 @@ impl CombatPlugin {
             ));
             attack_cd_timer.0.tick(time.delta());
             commands.entity(player_e).insert(attack_cd_timer);
-            commands.entity(tool_query.single()).remove::<HitMarker>();
+            if let Ok(tool) = tool_query.get_single() {
+                commands.entity(tool).remove::<HitMarker>();
+            }
         }
         if let Some(mut t) = timer_option {
             t.0.tick(time.delta());
