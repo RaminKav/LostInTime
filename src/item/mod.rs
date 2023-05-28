@@ -5,7 +5,7 @@ use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
-use crate::world::{ChunkObjectData, TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
+use crate::world::{TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
 use crate::{AnimationTimer, GameParam, GameState, Limb, YSort};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
@@ -302,6 +302,7 @@ impl WorldObject {
                     .insert(YSort)
                     .insert(pos)
                     .insert(self)
+                    .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
                     .id();
                 if obj_data.breakable {
                     commands
@@ -386,6 +387,7 @@ impl WorldObject {
             .insert(YSort)
             .insert(pos)
             .insert(self)
+            .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
             .id();
         if obj_data.breakable {
             commands
@@ -783,24 +785,26 @@ impl ItemsPlugin {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
         let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
         let player_data = &mut game_param.game.player_state;
-        let current_held_item_data = &player_data.main_hand_slot;
+        let prev_held_item_data = &player_data.main_hand_slot;
         if let Some(new_item) = active_hotbar_item {
             let new_item_obj = new_item.item_stack.obj_type;
-            if let Some(current_item) = current_held_item_data {
+            if let Some(current_item) = prev_held_item_data {
                 let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
                 let new_attributes = &new_item.item_stack.attributes;
                 if new_item_obj != current_item.obj {
                     new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
+                    att_event.send(AttributeChangeEvent);
                 } else if curr_attributes != new_attributes {
                     commands
                         .entity(current_item.entity)
                         .insert(new_attributes.clone());
+                    att_event.send(AttributeChangeEvent);
                 }
             } else {
                 new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
+                att_event.send(AttributeChangeEvent);
             }
-            att_event.send(AttributeChangeEvent);
-        } else if let Some(current_item) = current_held_item_data {
+        } else if let Some(current_item) = prev_held_item_data {
             commands.entity(current_item.entity).despawn();
             player_data.main_hand_slot = None;
             att_event.send(AttributeChangeEvent);

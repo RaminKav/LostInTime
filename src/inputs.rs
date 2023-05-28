@@ -415,7 +415,7 @@ impl InputsPlugin {
         mut hit_event: EventWriter<HitEvent>,
 
         inv_query: Query<(&mut Visibility, &InventoryState)>,
-        tool_query: Query<(Entity, Option<&AttackTimer>), With<Equipment>>,
+        att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut inv: Query<&mut Inventory>,
         parent_attack: Query<&Attack>,
     ) {
@@ -427,13 +427,13 @@ impl InputsPlugin {
         }
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
+            if att_cooldown_query.single().1.is_some() {
+                return;
+            }
             let mut main_hand_option = None;
             // if it has AttackTimer, the action is on cooldown, so we abort.
             if let Some(tool) = &game.game.player_state.main_hand_slot {
                 main_hand_option = Some(tool.obj);
-                if tool_query.get(tool.entity).unwrap().1.is_some() {
-                    return;
-                }
             }
 
             attack_event.send(AttackEvent);
@@ -447,13 +447,13 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            println!(
-                "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
-                game.get_tile_data(TileMapPositionData {
-                    chunk_pos: cursor_chunk_pos,
-                    tile_pos: cursor_tile_pos
-                })
-            );
+            // println!(
+            //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
+            //     game.get_tile_data(TileMapPositionData {
+            //         chunk_pos: cursor_chunk_pos,
+            //         tile_pos: cursor_tile_pos
+            //     })
+            // );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
