@@ -31,10 +31,11 @@ impl MinimapPlugin {
         graphics: Res<Graphics>,
         mut assets: ResMut<Assets<Image>>,
         mut color_mat: ResMut<Assets<ColorMaterial>>,
-        mut game: GameParam,
+        game: GameParam,
         mut minimap_update: EventReader<UpdateMiniMapEvent>,
         old_map: Query<Entity, With<Minimap>>,
         p_t: Query<&Transform, With<Player>>,
+        mut meshes: ResMut<Assets<Mesh>>,
     ) {
         //NOTES:
         // construct an array of tiles based on whats around the player
@@ -174,8 +175,7 @@ impl MinimapPlugin {
             let map = commands
                 .spawn((
                     MaterialMesh2dBundle {
-                        mesh: game
-                            .meshes
+                        mesh: meshes
                             .add(
                                 shape::Quad {
                                     size: Vec2::new((num_tiles * 2) as f32, (num_tiles * 2) as f32),

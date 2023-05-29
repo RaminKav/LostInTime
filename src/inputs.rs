@@ -10,7 +10,6 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{Attack, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
-use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -263,8 +262,6 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
         mut commands: Commands,
-        asset_server: Res<AssetServer>,
-        mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
@@ -296,15 +293,6 @@ impl InputsPlugin {
             sword_stack.add_to_empty_inventory_slot(&mut inv, &mut game.inv_slot_query);
         }
 
-        if key_input.just_pressed(KeyCode::L) {
-            Enemy::Slime.summon(
-                &mut commands,
-                &mut game,
-                &asset_server,
-                &mut materials,
-                Vec2::ZERO,
-            );
-        }
         if key_input.just_pressed(KeyCode::P) {
             DungeonPlugin::spawn_new_dungeon_dimension(&mut commands);
         }
@@ -416,6 +404,7 @@ impl InputsPlugin {
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut inv: Query<&mut Inventory>,
         parent_attack: Query<&Attack>,
+        mut meshes: ResMut<Assets<Mesh>>,
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
@@ -510,6 +499,7 @@ impl InputsPlugin {
                         tile_pos,
                         chunk_pos,
                         minimap_event,
+                        &mut meshes,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
                     }

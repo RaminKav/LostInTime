@@ -329,6 +329,7 @@ impl WorldObject {
         self,
         commands: &mut Commands,
         game: &mut GameParam,
+        meshes: &mut Assets<Mesh>,
         tile_pos: TilePos,
         chunk_pos: IVec2,
     ) -> Option<Entity> {
@@ -365,7 +366,7 @@ impl WorldObject {
 
         let item = commands
             .spawn(MaterialMesh2dBundle {
-                mesh: game.meshes.add(Mesh::from(shape::Quad::default())).into(),
+                mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
                 transform: Transform {
                     translation: position,
                     scale: obj_data.size.extend(1.),
@@ -411,9 +412,12 @@ impl WorldObject {
         tile_pos: TilePos,
         chunk_pos: IVec2,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+        meshes: &mut Assets<Mesh>,
     ) -> Option<Entity> {
         let item = match self {
-            WorldObject::Foliage(_) => self.spawn_foliage(commands, game, tile_pos, chunk_pos),
+            WorldObject::Foliage(_) => {
+                self.spawn_foliage(commands, game, meshes, tile_pos, chunk_pos)
+            }
             WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos, None),
             _ => self.spawn(commands, game, tile_pos, chunk_pos),
         };

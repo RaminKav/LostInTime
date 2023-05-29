@@ -177,8 +177,6 @@ pub struct GameParam<'w, 's> {
     pub loot_tables: Res<'w, LootTableMap>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
-    pub meshes: ResMut<'w, Assets<Mesh>>,
-
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
     pub chunk_query:
         Query<'w, 's, (Entity, &'static Transform, &'static mut ChunkSpawners), With<Chunk>>,
