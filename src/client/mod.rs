@@ -1,5 +1,5 @@
 use bevy::{ecs::system::SystemState, prelude::*, utils::HashMap};
-use bevy_save::{Capture, CloneReflect, DespawnMode, MappingMode, Snapshot};
+use bevy_save::{Build, CloneReflect, DespawnMode, MappingMode, Snapshot};
 
 use crate::world::{
     chunk::{DespawnChunkEvent, SpawnChunkEvent},
@@ -60,9 +60,9 @@ impl ClientPlugin {
 
         let mut snapshots: HashMap<IVec2, Snapshot> = HashMap::default();
         for (chunk_pos, entity) in saved_chunks.iter() {
-            let mut snapshot = Snapshot::default();
-
-            snapshot.extract_entities_with_filter(&world, vec![*entity].into_iter(), |_| true);
+            let snapshot = Snapshot::builder(world)
+                .extract_entities(vec![*entity].into_iter())
+                .build();
             snapshots.insert(*chunk_pos, snapshot);
         }
 
