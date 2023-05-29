@@ -314,7 +314,7 @@ impl WorldObject {
                 if obj_data.collider {
                     commands.entity(item).insert(Collider::cuboid(
                         obj_data.size.x / 3.5,
-                        obj_data.size.y / 4.5,
+                        obj_data.size.y / 4.,
                     ));
                 }
                 Some(item)
@@ -578,10 +578,7 @@ impl WorldObject {
 
         if obj_data.collider {
             item_entity
-                .insert(Collider::cuboid(
-                    obj_data.size.x / 3.5,
-                    obj_data.size.y / 2.,
-                ))
+                .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
                 .insert(Sensor);
         }
         item_entity.insert(AttackAnimationTimer(

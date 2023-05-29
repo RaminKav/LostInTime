@@ -6,6 +6,7 @@ use crate::{
 };
 
 use super::{
+    dimension::ActiveDimension,
     dungeon_generation::{gen_new_dungeon, get_player_spawn_tile, Bias},
     ChunkManager, CHUNK_SIZE,
 };
@@ -16,14 +17,13 @@ pub struct Dungeon {
 }
 pub struct DungeonPlugin;
 impl Plugin for DungeonPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.add_system(Self::handle_move_player_after_dungeon_gen);
+    }
 }
 
 impl DungeonPlugin {
-    pub fn spawn_new_dungeon_dimension(
-        commands: &mut Commands,
-        mut move_player_event: EventWriter<MovePlayerEvent>,
-    ) {
+    pub fn spawn_new_dungeon_dimension(commands: &mut Commands) {
         let mut cm = ChunkManager::new();
         let grid = gen_new_dungeon(
             1500,
@@ -45,11 +45,19 @@ impl DungeonPlugin {
             ))
             .id();
         commands.entity(dim_e).insert(SpawnDimension);
-        if let Some(pos) = get_player_spawn_tile(grid.clone()) {
-            move_player_event.send(MovePlayerEvent {
-                chunk_pos: pos.chunk_pos,
-                tile_pos: pos.tile_pos,
-            });
+    }
+    fn handle_move_player_after_dungeon_gen(
+        new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
+        mut move_player_event: EventWriter<MovePlayerEvent>,
+    ) {
+        if let Ok(dungeon) = new_dungeon.get_single() {
+            let grid = &dungeon.grid;
+            if let Some(pos) = get_player_spawn_tile(grid.clone()) {
+                move_player_event.send(MovePlayerEvent {
+                    chunk_pos: pos.chunk_pos,
+                    tile_pos: pos.tile_pos,
+                });
+            }
         }
     }
 }
