@@ -13,7 +13,6 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::{Enemy, EnemyMaterial};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
-use crate::player::MovePlayerEvent;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
@@ -267,7 +266,6 @@ impl InputsPlugin {
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut inv: Query<&mut Inventory>,
-        move_player_event: EventWriter<MovePlayerEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -308,7 +306,7 @@ impl InputsPlugin {
             );
         }
         if key_input.just_pressed(KeyCode::P) {
-            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, move_player_event);
+            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -449,7 +447,7 @@ impl InputsPlugin {
             ));
             // println!(
             //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
-            //     game.get_tile_obj_data(TileMapPositionData {
+            //     game.get_tile_data(TileMapPositionData {
             //         chunk_pos: cursor_chunk_pos,
             //         tile_pos: cursor_tile_pos
             //     })
