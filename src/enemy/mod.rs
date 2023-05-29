@@ -69,7 +69,7 @@ impl Enemy {
             AnimationFrameTracker(0, 7),
             Health(100),
             KinematicCharacterController::default(),
-            Collider::cuboid(10., 6.),
+            Collider::cuboid(10., 8.),
             YSort,
             self.clone(),
             StateMachine::default()
