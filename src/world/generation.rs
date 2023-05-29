@@ -2,8 +2,7 @@ use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::{ChunkManager, WorldObjectEntityData};
-use crate::combat::ObjBreakEvent;
-use crate::item::{Foliage, ItemsPlugin, Wall, WorldObject};
+use crate::item::{Foliage, Wall, WorldObject};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
 use crate::{CustomFlush, GameParam, GameState};
@@ -398,6 +397,7 @@ impl GenerationPlugin {
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
         dungeon: Query<&Dungeon, With<ActiveDimension>>,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
+        mut meshes: ResMut<Assets<Mesh>>,
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
@@ -492,7 +492,13 @@ impl GenerationPlugin {
                 };
                 match tp.2 {
                     WorldObject::Foliage(_) => {
-                        tp.2.spawn_foliage(&mut commands, &mut game, tile_pos, chunk_pos);
+                        tp.2.spawn_foliage(
+                            &mut commands,
+                            &mut game,
+                            &mut meshes,
+                            tile_pos,
+                            chunk_pos,
+                        );
                     }
                     WorldObject::Wall(_) => {
                         tp.2.spawn_wall(
