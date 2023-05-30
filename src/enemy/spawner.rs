@@ -86,31 +86,35 @@ impl SpawnerPlugin {
         mut spawn_enemy_event: EventWriter<EnemySpawnEvent>,
     ) {
         for e in spawner_trigger_event.iter() {
+            if game.get_chunk_entity(e.chunk_pos).is_none() {
+                continue;
+            }
             let mut rng = rand::thread_rng();
-            let mut picked_spawner = game
+            let maybe_spawner = game
                 .chunk_query
-                .get_mut(*game.get_chunk_entity(e.chunk_pos).unwrap())
-                .unwrap();
-            if let Ok(picked_spawner) = picked_spawner
-                .2
-                .spawners
-                .choose_weighted_mut(&mut rng, |spawner| spawner.weight)
-            {
-                if picked_spawner.spawn_timer.percent() == 0. {
-                    let tile_pos = TilePos {
-                        x: rng.gen_range(0..CHUNK_SIZE),
-                        y: rng.gen_range(0..CHUNK_SIZE),
-                    };
+                .get_mut(*game.get_chunk_entity(e.chunk_pos).unwrap());
+            if let Ok(mut chunk_spawner) = maybe_spawner {
+                if let Ok(picked_spawner) = chunk_spawner
+                    .2
+                    .spawners
+                    .choose_weighted_mut(&mut rng, |spawner| spawner.weight)
+                {
+                    if picked_spawner.spawn_timer.percent() == 0. {
+                        let tile_pos = TilePos {
+                            x: rng.gen_range(0..CHUNK_SIZE),
+                            y: rng.gen_range(0..CHUNK_SIZE),
+                        };
 
-                    spawn_enemy_event.send(EnemySpawnEvent {
-                        enemy: picked_spawner.enemy.clone(),
-                        pos: TileMapPositionData {
-                            tile_pos,
-                            chunk_pos: picked_spawner.chunk_pos,
-                        },
-                    });
+                        spawn_enemy_event.send(EnemySpawnEvent {
+                            enemy: picked_spawner.enemy.clone(),
+                            pos: TileMapPositionData {
+                                tile_pos,
+                                chunk_pos: picked_spawner.chunk_pos,
+                            },
+                        });
 
-                    picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
+                        picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
+                    }
                 }
             }
         }

@@ -58,7 +58,7 @@ pub struct RawChunkData {
     pub raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
     pub raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
 }
-#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Reflect)]
 pub struct TileMapPositionData {
     //TODO: Add ::new() impl
     pub chunk_pos: IVec2,
@@ -72,7 +72,7 @@ pub struct TileEntityData {
     pub texture_offset: u8,
 }
 
-#[derive(Eq, Hash, Component, PartialEq, Debug, Clone)]
+#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Reflect)]
 
 pub struct WorldObjectEntityData {
     pub object: WorldObject,

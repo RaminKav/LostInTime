@@ -847,9 +847,9 @@ fn spawn_inv_item_tooltip(
     // commands.entity(tooltip).add_child(item_icon);
     for (i, (text, d)) in tooltip_text.iter().enumerate() {
         let text_pos = if has_attributes {
-            Vec3::new(-32., 28. - (i as f32 * 10.) - d, 1.)
+            Vec3::new(0., 28. - (i as f32 * 10.) - d, 1.)
         } else {
-            Vec3::new(-24., 0., 1.)
+            Vec3::new(12., 0., 1.)
         };
         let text = commands
             .spawn((
@@ -1037,7 +1037,7 @@ pub fn spawn_item_stack_icon(
                         color: Color::WHITE,
                     },
                 )
-                .with_alignment(TextAlignment::Right),
+                .with_alignment(TextAlignment::Center),
                 transform: Transform {
                     translation: Vec3::new(10., -9., 1.),
                     scale: Vec3::new(1., 1., 1.),
