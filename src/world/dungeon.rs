@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
     player::MovePlayerEvent,
@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    dimension::ActiveDimension,
+    dimension::{ActiveDimension, ChunkCache},
     dungeon_generation::{gen_new_dungeon, get_player_spawn_tile, Bias},
     ChunkManager, CHUNK_SIZE,
 };
@@ -41,6 +41,9 @@ impl DungeonPlugin {
                 Dimension,
                 Dungeon { grid: grid.clone() },
                 GenerationSeed { seed: 123 },
+                ChunkCache {
+                    snapshots: HashMap::new(),
+                },
                 cm,
             ))
             .id();

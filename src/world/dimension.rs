@@ -67,6 +67,9 @@ impl DimensionPlugin {
                     GenerationSeed {
                         seed: new_dim.seed.unwrap_or(0),
                     },
+                    ChunkCache {
+                        snapshots: HashMap::new(),
+                    },
                     cm,
                 ))
                 .id();

@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -6,6 +8,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::generation::{self};
 use crate::ui::minimap::UpdateMiniMapEvent;
+use crate::world::dimension::ChunkCache;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
 
@@ -37,7 +40,7 @@ impl Plugin for ChunkPlugin {
 }
 #[derive(Component)]
 pub struct SpawnedChunk;
-#[derive(Eq, Hash, Component, PartialEq, Debug, Clone)]
+#[derive(Eq, Hash, Reflect, Component, PartialEq, Debug, Clone)]
 pub struct TileSpriteData {
     pub block_type: [WorldObject; 4],
     pub raw_block_type: [WorldObject; 4],
@@ -66,7 +69,9 @@ pub struct TileEntityCollection {
     pub map: HashMap<TilePos, Entity>,
 }
 #[derive(Component, Reflect, Debug, Clone)]
-pub struct Chunk;
+pub struct Chunk {
+    pub chunk_pos: IVec2,
+}
 
 impl ChunkPlugin {
     fn handle_new_chunk_event(
@@ -154,10 +159,11 @@ impl ChunkPlugin {
                     ..Default::default()
                 })
                 .insert(TileEntityCollection { map: tiles })
-                .insert(Chunk)
+                .insert(Chunk { chunk_pos })
+                .insert(Name::new(format!("Pos: {}", chunk_pos)))
                 .id();
-            game.set_chunk_entity(chunk_pos, chunk);
-            minimap_update.send(UpdateMiniMapEvent);
+            // game.set_chunk_entity(chunk_pos, chunk);
+            // minimap_update.send(UpdateMiniMapEvent);
         }
     }
 
@@ -232,8 +238,10 @@ impl ChunkPlugin {
     }
 
     fn spawn_chunks_around_camera(
-        mut cache_event: EventWriter<CreateChunkEvent>,
         mut game: GameParam,
+        mut create_chunk_event: EventWriter<CreateChunkEvent>,
+        mut load_chunk_event: EventWriter<SpawnChunkEvent>,
+        chunk_cache: Query<&ChunkCache, With<ActiveDimension>>,
     ) {
         let transform = game.camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
@@ -245,9 +253,13 @@ impl ChunkPlugin {
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
-                    println!("Sending cache event {chunk_pos:?}");
-                    // game.chunk_manager.state = ChunkLoadingState::Caching;
-                    cache_event.send(CreateChunkEvent { chunk_pos });
+                    if chunk_cache.single().snapshots.contains_key(&chunk_pos) {
+                        println!("Sending load event {chunk_pos:?}");
+                        load_chunk_event.send(SpawnChunkEvent { chunk_pos });
+                    } else {
+                        println!("Sending cache event {chunk_pos:?}");
+                        create_chunk_event.send(CreateChunkEvent { chunk_pos });
+                    }
                 }
             }
         }
@@ -277,9 +289,6 @@ impl ChunkPlugin {
                     })
                 }
             }
-        }
-        for chunk_pos in removed_chunks.iter() {
-            game.remove_chunk_entity(*chunk_pos);
         }
     }
     fn toggle_on_screen_mesh_visibility(

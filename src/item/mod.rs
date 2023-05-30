@@ -1,6 +1,7 @@
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
+use crate::client::ColliderReflect;
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -28,10 +29,10 @@ use strum_macros::{Display, EnumIter};
 
 use self::crafting::CraftingPlugin;
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct Breakable(pub Option<WorldObject>);
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
@@ -242,7 +243,7 @@ impl WorldObject {
         }
 
         if obj_data.collider {
-            commands.entity(item).insert(Collider::cuboid(
+            commands.entity(item).insert(ColliderReflect::new(
                 obj_data.size.x / 3.5,
                 obj_data.size.y / 4.5,
             ));
@@ -312,7 +313,7 @@ impl WorldObject {
                 }
 
                 if obj_data.collider {
-                    commands.entity(item).insert(Collider::cuboid(
+                    commands.entity(item).insert(ColliderReflect::new(
                         obj_data.size.x / 3.5,
                         obj_data.size.y / 4.,
                     ));
@@ -400,7 +401,7 @@ impl WorldObject {
         if obj_data.collider {
             commands
                 .entity(item)
-                .insert(Collider::cuboid(1. / 3.5, 1. / 4.5));
+                .insert(ColliderReflect::new(1. / 3.5, 1. / 4.5));
         }
 
         Some(item)
@@ -665,6 +666,7 @@ impl WorldObject {
             })
             .insert(Name::new("DropItem"))
             .insert(stack.clone())
+            //TODO: double colliders??
             .insert(Collider::cuboid(8., 8.))
             .insert(Sensor)
             .insert(AnimationTimer(Timer::from_seconds(
@@ -739,6 +741,7 @@ impl ItemsPlugin {
         for broken in obj_break_events.iter() {
             if let Some(breaks_into_option) = game.world_obj_data.properties.get(&broken.obj) {
                 commands.entity(broken.entity).despawn();
+                println!("break");
                 //TODO: remove SpawnedObject comp from parent tile
                 if let Some(breaks_into) = breaks_into_option.breaks_into {
                     let mut rng = rand::thread_rng();

@@ -51,6 +51,7 @@ use animations::{
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
+use client::ClientPlugin;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
@@ -118,6 +119,7 @@ fn main() {
         .add_plugin(EnemyPlugin)
         .add_plugin(PlayerPlugin)
         .add_plugin(WorldPlugin)
+        .add_plugin(ClientPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
@@ -159,7 +161,7 @@ pub struct ImageAssets {
     pub walls_sheet: Handle<Image>,
 }
 
-#[derive(Component)]
+#[derive(Component, Reflect)]
 pub struct YSort;
 
 fn y_sort(mut q: Query<(&mut Transform, &GlobalTransform), With<YSort>>) {
@@ -182,8 +184,12 @@ pub struct GameParam<'w, 's> {
         Query<'w, 's, (Entity, &'static Transform, &'static mut ChunkSpawners), With<Chunk>>,
     pub tile_collection_query: Query<'w, 's, &'static TileEntityCollection, With<Chunk>>,
     pub tile_data_query: Query<'w, 's, (&'static mut TileSpriteData, Option<&'static Children>)>,
-    pub world_object_query:
-        Query<'w, 's, (Entity, &'static TileMapPositionData), With<WorldObject>>,
+    pub world_object_query: Query<
+        'w,
+        's,
+        (Entity, &'static TileMapPositionData),
+        (With<WorldObject>, With<WorldObjectEntityData>),
+    >,
     pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
 
     pub items_query: Query<
