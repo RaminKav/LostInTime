@@ -161,7 +161,8 @@ pub struct ImageAssets {
     pub walls_sheet: Handle<Image>,
 }
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Default)]
+#[reflect(Component)]
 pub struct YSort;
 
 fn y_sort(mut q: Query<(&mut Transform, &GlobalTransform), With<YSort>>) {
@@ -224,19 +225,19 @@ pub struct GameParam<'w, 's> {
 
 impl<'w, 's> GameParam<'w, 's> {
     pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<&Entity> {
-        self.chunk_manager.chunks.get(&chunk_pos)
+        self.chunk_manager.chunks.get(&chunk_pos.into())
     }
     pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
-        self.chunk_manager.chunks.insert(chunk_pos, e);
+        self.chunk_manager.chunks.insert(chunk_pos.into(), e);
     }
     pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
-        self.chunk_manager.chunks.remove(&chunk_pos);
+        self.chunk_manager.chunks.remove(&chunk_pos.into());
     }
 
     pub fn get_tile_entity(&self, tile: TileMapPositionData) -> Option<Entity> {
         if let Some(chunk_e) = self.get_chunk_entity(tile.chunk_pos) {
             let tile_collection = self.tile_collection_query.get(*chunk_e).unwrap();
-            return tile_collection.map.get(&tile.tile_pos).copied();
+            return tile_collection.map.get(&tile.tile_pos.into()).copied();
         }
         None
     }
@@ -367,32 +368,6 @@ fn setup(
     mut game: ResMut<Game>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let mut cm = ChunkManager::new();
-    let params = WorldGeneration {
-        tree_frequency: 0.,
-        dungeon_stone_frequency: 0.,
-        sand_frequency: 0.32,
-        water_frequency: 0.15,
-        stone_frequency: 0.0,
-        dirt_frequency: 0.0,
-    };
-    cm.world_generation_params = params.clone();
-    dim_event.send(DimensionSpawnEvent {
-        generation_params: params,
-        seed: Some(0),
-        swap_to_dim_now: true,
-    });
-    // dim_event.send(DimensionSpawnEvent {
-    //     generation_params: WorldGeneration {
-    //         tree_frequency: 0.,
-    //         stone_frequency: 0.18,
-    //         dirt_frequency: 0.52,
-    //         sand_frequency: 0.22,
-    //         water_frequency: 0.05,
-    //     },
-    //     swap_to_dim_now: true,
-    // });
-
     game.player_state.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
     game.player_state.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
 

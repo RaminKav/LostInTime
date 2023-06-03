@@ -11,6 +11,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::dimension::ChunkCache;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
+use serde::{Deserialize, Serialize};
 
 use super::tile::TilePlugin;
 use super::{
@@ -27,11 +28,14 @@ impl Plugin for ChunkPlugin {
             .add_event::<GenerateObjectsEvent>()
             .add_systems(
                 (
-                    Self::spawn_chunks_around_camera.before(Self::handle_new_chunk_event),
+                    Self::spawn_chunks_around_camera.after(CustomFlush), //.before(Self::handle_new_chunk_event),
                     Self::handle_new_chunk_event.before(CustomFlush),
-                    Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
+                    Self::handle_update_tiles_for_new_chunks
+                        .after(Self::register_spawned_chunks)
+                        .after(CustomFlush),
                     Self::despawn_outofrange_chunks,
                     Self::toggle_on_screen_mesh_visibility,
+                    Self::register_spawned_chunks.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -40,7 +44,8 @@ impl Plugin for ChunkPlugin {
 }
 #[derive(Component)]
 pub struct SpawnedChunk;
-#[derive(Eq, Hash, Reflect, Component, PartialEq, Debug, Clone)]
+#[derive(Eq, Hash, Reflect, Component, PartialEq, Default, Debug, Clone)]
+#[reflect(Component)]
 pub struct TileSpriteData {
     pub block_type: [WorldObject; 4],
     pub raw_block_type: [WorldObject; 4],
@@ -64,11 +69,46 @@ pub struct GenerateObjectsEvent {
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(Component, Reflect, FromReflect, Default, Debug, Clone)]
+#[reflect(Component)]
 pub struct TileEntityCollection {
-    pub map: HashMap<TilePos, Entity>,
+    pub map: HashMap<ReflectedPos, Entity>,
 }
-#[derive(Component, Reflect, Debug, Clone)]
+#[derive(
+    Component,
+    Reflect,
+    FromReflect,
+    Default,
+    Clone,
+    Copy,
+    Debug,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Serialize,
+    Deserialize,
+)]
+#[reflect_value(Component, Hash, Serialize, Deserialize)]
+pub struct ReflectedPos {
+    x: i32,
+    y: i32,
+}
+impl From<TilePos> for ReflectedPos {
+    fn from(val: TilePos) -> ReflectedPos {
+        ReflectedPos {
+            x: val.x as i32,
+            y: val.y as i32,
+        }
+    }
+}
+impl From<IVec2> for ReflectedPos {
+    fn from(val: IVec2) -> ReflectedPos {
+        ReflectedPos { x: val.x, y: val.y }
+    }
+}
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
 pub struct Chunk {
     pub chunk_pos: IVec2,
 }
@@ -135,7 +175,7 @@ impl ChunkPlugin {
                         })
                         .id();
                     raw_chunk_blocks[x as usize][y as usize] = blocks;
-                    tiles.insert(tile_pos, tile_entity);
+                    tiles.insert(tile_pos.into(), tile_entity);
                     commands.entity(tilemap_entity).add_child(tile_entity);
                     tile_storage.set(&tile_pos, tile_entity);
                 }
@@ -166,7 +206,16 @@ impl ChunkPlugin {
             // minimap_update.send(UpdateMiniMapEvent);
         }
     }
-
+    fn register_spawned_chunks(
+        mut game: GameParam,
+        loaded_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
+        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
+    ) {
+        for (e, chunk) in loaded_chunks.iter() {
+            game.set_chunk_entity(chunk.chunk_pos, e);
+            minimap_update.send(UpdateMiniMapEvent);
+        }
+    }
     pub fn handle_update_tiles_for_new_chunks(
         mut create_events: EventReader<CreateChunkEvent>,
         mut gen_events: EventWriter<GenerateObjectsEvent>,
@@ -237,12 +286,15 @@ impl ChunkPlugin {
         }
     }
 
-    fn spawn_chunks_around_camera(
+    pub fn spawn_chunks_around_camera(
         mut game: GameParam,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         mut load_chunk_event: EventWriter<SpawnChunkEvent>,
         chunk_cache: Query<&ChunkCache, With<ActiveDimension>>,
     ) {
+        if chunk_cache.get_single().is_err() {
+            return;
+        }
         let transform = game.camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)

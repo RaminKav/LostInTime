@@ -20,8 +20,8 @@ use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_p
 use crate::world::TileMapPositionData;
 use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
-    GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
-    WIDTH,
+    CustomFlush, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera,
+    PLAYER_MOVE_SPEED, WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -67,6 +67,7 @@ impl Plugin for InputsPlugin {
                 (
                     Self::turn_player,
                     Self::move_player,
+                    Self::mouse_click_system.after(CustomFlush),
                     Self::handle_hotbar_key_input,
                     Self::test_take_damage,
                     Self::update_cursor_pos.after(Self::move_player),
@@ -74,9 +75,7 @@ impl Plugin for InputsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(Self::close_on_esc)
-            .add_system(Self::toggle_inventory)
-            .add_system(Self::mouse_click_system);
+            .add_system(Self::toggle_inventory);
     }
 }
 
@@ -434,13 +433,17 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            // println!(
-            //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?}",
-            //     game.get_tile_data(TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: cursor_tile_pos
-            //     })
-            // );
+            println!(
+                "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?}",
+                game.get_tile_data(TileMapPositionData {
+                    chunk_pos: cursor_chunk_pos,
+                    tile_pos: cursor_tile_pos
+                }),
+                game.get_tile_obj_data(TileMapPositionData {
+                    chunk_pos: cursor_chunk_pos,
+                    tile_pos: cursor_tile_pos
+                })
+            );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
@@ -507,25 +510,7 @@ impl InputsPlugin {
             }
         }
     }
-    pub fn close_on_esc(
-        // mut focused: Local<Option<WindowId>>,
-        // mut focused_events: EventReader<WindowFocused>,
-        mut exit: EventWriter<AppExit>,
-        // mut windows: Query<&mut Window, With<PrimaryWindow>>,
-        input: Res<Input<KeyCode>>,
-    ) {
-        // TODO: Track this in e.g. a resource to ensure consistent behaviour across similar systems
-        // for event in focused_events.iter() {
-        //     *focused = event.focused.then_some(event.window);
-        // }
 
-        // if let Some(focused) = &*focused {
-        if input.just_pressed(KeyCode::Escape) {
-            exit.send(AppExit);
-            // windows.single_mut().close();
-        }
-        // }
-    }
     pub fn move_camera_with_player(
         mut player_query: Query<
             (&Transform, &MovementVector),

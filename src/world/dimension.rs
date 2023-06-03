@@ -1,15 +1,20 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_save::{CloneReflect, Snapshot};
 
-use crate::{enemy::Enemy, item::Equipment, WorldGeneration};
+use crate::{enemy::Enemy, item::Equipment, CustomFlush, WorldGeneration};
 
-use super::{chunk::Chunk, ChunkManager};
+use super::{
+    chunk::{Chunk, ChunkPlugin},
+    ChunkManager,
+};
 
-#[derive(Component, Debug)]
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
 pub struct Dimension;
 impl Dimension {}
 
-#[derive(Component, Debug)]
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
 pub struct GenerationSeed {
     pub seed: u32,
 }
@@ -21,11 +26,12 @@ pub struct DimensionSpawnEvent {
     pub seed: Option<u32>,
     pub swap_to_dim_now: bool,
 }
-#[derive(Component)]
+#[derive(Component, Reflect, Default, Debug, Clone)]
+#[reflect(Component)]
 
 pub struct ActiveDimension;
 
-#[derive(Component)]
+#[derive(Component, Default)]
 pub struct ChunkCache {
     pub snapshots: HashMap<IVec2, Snapshot>,
 }
@@ -48,7 +54,8 @@ impl Plugin for DimensionPlugin {
         app.insert_resource(ChunkManager::new())
             .add_event::<DimensionSpawnEvent>()
             .add_system(Self::handle_dimension_swap_events.after(Self::new_dim_with_params))
-            .add_system(Self::new_dim_with_params);
+            .add_system(Self::new_dim_with_params.before(CustomFlush))
+            .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 impl DimensionPlugin {

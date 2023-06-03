@@ -10,7 +10,7 @@ use crate::{
     item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
-    Game, GameParam, GameState, Player, YSort,
+    CustomFlush, Game, GameParam, GameState, Player, YSort,
 };
 
 #[derive(Debug, Clone)]
@@ -56,14 +56,15 @@ impl Plugin for CombatPlugin {
             .add_systems(
                 (
                     Self::handle_hits,
-                    Self::handle_attack_cooldowns,
+                    Self::handle_attack_cooldowns.before(CustomFlush),
                     Self::spawn_hit_spark_effect.after(Self::handle_hits),
                     Self::handle_invincibility_frames.after(Self::handle_hits),
                     Self::handle_enemy_death.after(Self::handle_hits),
                     Self::check_hit_collisions,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            );
+            )
+            .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 
@@ -274,7 +275,9 @@ impl CombatPlugin {
                     }
                 }
 
-                commands.entity(hit.hit_entity).insert(JustGotHit);
+                if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
+                    hit_e.insert(JustGotHit);
+                }
             }
         }
     }

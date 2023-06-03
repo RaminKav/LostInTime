@@ -8,8 +8,9 @@ use bevy::{
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    assets::{GameAssetsPlugin, Graphics},
+    assets::Graphics,
     attributes::Health,
+    client::ClientPlugin,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_INIT},
     item::{CraftingSlotUpdateEvent, WorldObject},
@@ -147,14 +148,14 @@ impl Plugin for UIPlugin {
             .add_plugin(MinimapPlugin)
             .add_systems(
                 (
-                    setup_inv_ui.after(GameAssetsPlugin::load_graphics),
-                    setup_healthbar_ui.after(GameAssetsPlugin::load_graphics),
+                    setup_inv_ui.after(ClientPlugin::load_on_start),
+                    setup_healthbar_ui.after(ClientPlugin::load_on_start),
                 )
-                    .in_schedule(OnExit(GameState::Loading)),
+                    .in_schedule(OnEnter(GameState::Main)),
             )
-            .add_system(setup_inv_slots_ui.in_schedule(OnEnter(GameState::Main)))
             .add_systems(
                 (
+                    setup_inv_slots_ui,
                     text_update_system,
                     toggle_inv_visibility,
                     handle_item_drop_clicks,
@@ -673,9 +674,13 @@ pub fn setup_inv_slots_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     inv_query: Query<(Entity, &InventoryState, &Sprite)>,
+    inv_spawn_check: Query<Entity, Added<InventoryState>>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
 ) {
+    if inv_spawn_check.get_single().is_err() {
+        return;
+    }
     for (slot_index, item) in inv.single_mut().items.iter().enumerate() {
         spawn_inv_slot(
             &mut commands,
@@ -714,16 +719,18 @@ pub fn setup_inv_slots_ui(
             );
         }
         // crafting result slot
-        spawn_inv_slot(
-            &mut commands,
-            &graphics,
-            slot_index,
-            Interaction::None,
-            &inv_query,
-            &asset_server,
-            InventorySlotType::CraftingResult,
-            None,
-        );
+        if slot_index == 0 {
+            spawn_inv_slot(
+                &mut commands,
+                &graphics,
+                slot_index,
+                Interaction::None,
+                &inv_query,
+                &asset_server,
+                InventorySlotType::CraftingResult,
+                None,
+            );
+        }
     }
 }
 
