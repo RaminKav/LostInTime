@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::item::WorldObject;
 
 use self::{
-    chunk::ChunkPlugin,
+    chunk::{ChunkPlugin, ReflectedPos},
     dimension::DimensionPlugin,
     dungeon::DungeonPlugin,
     dungeon_generation::{Bias, GridSize, NumSteps},
@@ -27,7 +27,8 @@ pub const CHUNK_SIZE: u32 = 16;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 
-#[derive(Debug, Component, Resource, Clone)]
+#[derive(Debug, Component, Resource, Reflect, Default, Clone)]
+#[reflect(Resource)]
 // for dimensions, chunks are child of D, and when swapping,
 // save only obj data, tiles/chunks will regenerate from seed
 // obj data is  saved in cm of dimension
@@ -36,7 +37,7 @@ pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 // when we swap back, use the obj data to spawn teh objs back
 // may not need to add obj data as comp to tile??
 pub struct ChunkManager {
-    pub chunks: HashMap<IVec2, Entity>,
+    pub chunks: HashMap<ReflectedPos, Entity>,
     // turn into comp for each tile
     pub world_generation_params: WorldGeneration,
 }
@@ -53,26 +54,16 @@ impl ChunkManager {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct RawChunkData {
-    pub raw_chunk_bits: [[[u8; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
-    pub raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
-}
-#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Reflect)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect)]
+#[reflect(Component)]
 pub struct TileMapPositionData {
     //TODO: Add ::new() impl
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
 }
-#[derive(Eq, Hash, PartialEq, Debug, Clone)]
-pub struct TileEntityData {
-    pub entity: Option<Entity>,
-    pub block_type: [WorldObject; 4],
-    pub tile_bit_index: u8,
-    pub texture_offset: u8,
-}
 
-#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Reflect)]
+#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect)]
+#[reflect(Component)]
 
 pub struct WorldObjectEntityData {
     pub object: WorldObject,
@@ -80,7 +71,7 @@ pub struct WorldObjectEntityData {
     pub texture_offset: u8,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Reflect, Clone)]
 pub struct WorldGeneration {
     pub water_frequency: f64,
     pub dungeon_stone_frequency: f64,
@@ -102,9 +93,9 @@ impl Plugin for WorldPlugin {
             // .add_plugin(ResourceInspectorPlugin::<Bias>::default())
             .init_resource::<NumSteps>()
             .init_resource::<GridSize>()
-            .init_resource::<Bias>()
-            .register_type::<NumSteps>()
-            .register_type::<GridSize>()
-            .register_type::<Bias>();
+            .init_resource::<Bias>();
+        // .register_type::<NumSteps>()
+        // .register_type::<GridSize>()
+        // .register_type::<Bias>();
     }
 }

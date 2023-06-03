@@ -32,7 +32,9 @@ use self::crafting::CraftingPlugin;
 #[derive(Component, Reflect)]
 pub struct Breakable(pub Option<WorldObject>);
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, Default)]
+#[reflect(Component)]
+
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(Limb);
@@ -59,6 +61,7 @@ pub struct Size(pub Vec2);
 #[derive(
     Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
 )]
+#[reflect(Component)]
 pub enum WorldObject {
     None,
     Grass,
@@ -86,6 +89,7 @@ pub enum WorldObject {
     Component,
     Display,
 )]
+#[reflect(Component)]
 pub enum Foliage {
     Tree,
 }
@@ -109,6 +113,7 @@ impl Default for Foliage {
     Display,
     EnumIter,
 )]
+#[reflect(Component)]
 pub enum Wall {
     Stone,
 }

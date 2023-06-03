@@ -90,21 +90,27 @@ pub struct AttributeChangeEvent;
 
 //TODO: Add max health vs curr health
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct Health(pub i32);
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
+
 pub struct Attack(pub i32);
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct Durability(pub i32);
 
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct AttackCooldown(pub f32);
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
 pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<BlockAttributeBundle>()
-            .register_type::<BlockAttributeBundle>()
+            // .register_type::<BlockAttributeBundle>()
             .add_event::<AttributeChangeEvent>()
             .add_systems(
                 (
