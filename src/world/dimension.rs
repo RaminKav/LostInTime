@@ -1,7 +1,7 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_save::{CloneReflect, Snapshot};
 
-use crate::{enemy::Enemy, item::Equipment, CustomFlush, WorldGeneration};
+use crate::{enemy::Mob, item::Equipment, CustomFlush, WorldGeneration};
 
 use super::{
     chunk::{Chunk, ChunkPlugin},
@@ -89,7 +89,7 @@ impl DimensionPlugin {
     pub fn handle_dimension_swap_events(
         new_dim: Query<Entity, Added<SpawnDimension>>,
         mut commands: Commands,
-        entity_query: Query<Entity, (Or<(With<Enemy>, With<Chunk>)>, Without<Equipment>)>,
+        entity_query: Query<Entity, (Or<(With<Mob>, With<Chunk>)>, Without<Equipment>)>,
         old_dim: Query<Entity, With<ActiveDimension>>,
         cm: Query<&ChunkManager>,
         old_cm: Res<ChunkManager>,

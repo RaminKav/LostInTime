@@ -8,7 +8,7 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use interpolation::lerp;
 
 use crate::ai::AttackState;
-use crate::enemy::{Enemy, EnemyMaterial};
+use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
 use crate::{inventory::ItemStack, Game, GameState, Player, TIME_STEP};
@@ -154,7 +154,7 @@ impl AnimationsPlugin {
             &mut AnimationFrameTracker,
             &mut AnimationTimer,
             &Handle<EnemyMaterial>,
-            &Enemy,
+            &Mob,
             Option<&AttackState>,
         )>,
     ) {
@@ -162,14 +162,13 @@ impl AnimationsPlugin {
             let enemy_material = materials.get_mut(enemy_handle);
             timer.tick(time.delta());
             if let Some(mat) = enemy_material {
-                if timer.just_finished() && game.player_state.is_moving {
+                if timer.just_finished() {
                     tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
-                } else if !game.player_state.is_moving {
-                    tracker.0 = 0;
                 }
                 mat.source_texture = Some(asset_server.load(format!(
                     "textures/slime/{}-move-{}.png",
-                    enemy.to_string().to_lowercase(),
+                    "slime",
+                    //enemy.to_string().to_lowercase(),
                     tracker.0
                 )));
                 if let Some(attack) = att_option {

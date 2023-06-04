@@ -14,7 +14,7 @@ use crate::{
     GameParam, GameState,
 };
 
-use super::Enemy;
+use super::{Mob, NeutralMob};
 
 pub const MAX_MOB_PER_CHUNK: u32 = 6;
 pub struct SpawnerPlugin;
@@ -41,7 +41,7 @@ pub struct Spawner {
     pub weight: f32,
     pub spawn_timer: Timer,
     pub max_summons: u32,
-    pub enemy: Enemy,
+    pub enemy: Mob,
 }
 impl PartialEq for Spawner {
     fn eq(&self, other: &Self) -> bool {
@@ -73,7 +73,7 @@ impl SpawnerPlugin {
                 weight: 1.,
                 spawn_timer: Timer::from_seconds(30., TimerMode::Once),
                 max_summons: 5,
-                enemy: Enemy::Slime,
+                enemy: Mob::Neutral(NeutralMob::Slime),
             });
             commands
                 .entity(new_chunk.0)
@@ -121,7 +121,7 @@ impl SpawnerPlugin {
     }
     fn check_mob_count(
         chunk_query: Query<(Entity, &Transform, &mut ChunkSpawners), With<Chunk>>,
-        mobs: Query<&Transform, With<Enemy>>,
+        mobs: Query<&Transform, With<Mob>>,
         mut spawn_event: EventWriter<MobSpawnEvent>,
     ) {
         //
@@ -167,7 +167,7 @@ impl SpawnerPlugin {
                 weight: 1.,
                 spawn_timer: Timer::from_seconds(30., TimerMode::Once),
                 max_summons: 5,
-                enemy: Enemy::Slime,
+                enemy: Mob::Neutral(NeutralMob::Slime),
             };
             println!("Adding spawner for {:?}", e.chunk_pos);
             commands

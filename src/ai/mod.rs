@@ -1,9 +1,9 @@
-mod enemy_basic;
+mod enemy_hostile_basic;
 
 use crate::{GameState, Plugin};
 
 use bevy::prelude::{App, IntoSystemConfigs, OnUpdate};
-pub use enemy_basic::*;
+pub use enemy_hostile_basic::*;
 use seldom_state::StateMachinePlugin;
 
 pub struct AIPlugin;
