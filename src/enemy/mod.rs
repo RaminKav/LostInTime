@@ -10,7 +10,10 @@ use serde::Deserialize;
 use strum_macros::Display;
 
 use crate::{
-    ai::{AttackDistance, AttackState, FollowState, IdleState, LineOfSight, MoveDirection},
+    ai::{
+        AttackDistance, AttackState, FollowState, HurtByPlayer, IdleState, LineOfSight,
+        MoveDirection,
+    },
     animations::{AnimationFrameTracker, AnimationTimer},
     attributes::Health,
     world::{TileMapPositionData, CHUNK_SIZE},
@@ -32,13 +35,31 @@ impl Plugin for EnemyPlugin {
 }
 
 #[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
-pub enum Enemy {
+pub enum Mob {
+    #[default]
+    None,
+    Neutral(NeutralMob),
+    Hostile(HostileMob),
+    Passive(PassiveMob),
+}
+#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+pub enum NeutralMob {
+    #[default]
+    Slime,
+}
+#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+pub enum HostileMob {
+    #[default]
+    Slime,
+}
+#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+pub enum PassiveMob {
     #[default]
     Slime,
 }
 
 pub struct EnemySpawnEvent {
-    enemy: Enemy,
+    enemy: Mob,
     pos: TileMapPositionData,
 }
 impl EnemyPlugin {
@@ -58,7 +79,7 @@ impl EnemyPlugin {
                 (enemy.pos.tile_pos.y as i32 * 32 + enemy.pos.chunk_pos.y * CHUNK_SIZE as i32 * 32)
                     as f32,
             );
-            let name = enemy.enemy.to_string();
+            let name = "slime"; //enemy.enemy.to_string();
             let handle = asset_server.load(format!(
                 "textures/{}/{}-move-0.png",
                 name.to_lowercase(),
@@ -87,53 +108,6 @@ impl EnemyPlugin {
                 Collider::cuboid(10., 8.),
                 YSort,
                 enemy.enemy.clone(),
-                StateMachine::default()
-                    .trans::<IdleState>(
-                        LineOfSight {
-                            target: game.game.player,
-                            range: 100.,
-                        },
-                        FollowState {
-                            target: game.game.player,
-                            speed: 0.7,
-                        },
-                    )
-                    .trans::<FollowState>(
-                        AttackDistance {
-                            target: game.game.player,
-                            range: 50.,
-                        },
-                        AttackState {
-                            target: game.game.player,
-                            attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                            attack_duration_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                            attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
-                            dir: None,
-                            speed: 1.4,
-                            damage: 10,
-                        },
-                    )
-                    .trans::<FollowState>(
-                        Trigger::not(LineOfSight {
-                            target: game.game.player,
-                            range: 100.,
-                        }),
-                        IdleState {
-                            walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                            direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                            speed: 0.5,
-                        },
-                    )
-                    .trans::<AttackState>(
-                        Trigger::not(AttackDistance {
-                            target: game.game.player,
-                            range: 50.,
-                        }),
-                        FollowState {
-                            target: game.game.player,
-                            speed: 0.7,
-                        },
-                    ),
                 IdleState {
                     walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                     direction: MoveDirection::new_rand_dir(rand::thread_rng()),
@@ -143,6 +117,117 @@ impl EnemyPlugin {
             ));
             if let Some(loot_table) = game.loot_tables.table.get(&enemy.enemy) {
                 enemy_e.insert(loot_table.clone());
+            }
+            match enemy.enemy {
+                Mob::Neutral(_) => {
+                    enemy_e.insert(
+                        StateMachine::default()
+                            .trans::<IdleState>(
+                                HurtByPlayer,
+                                FollowState {
+                                    target: game.game.player,
+                                    speed: 0.7,
+                                },
+                            )
+                            .trans::<FollowState>(
+                                AttackDistance {
+                                    target: game.game.player,
+                                    range: 50.,
+                                },
+                                AttackState {
+                                    target: game.game.player,
+                                    attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                                    attack_duration_timer: Timer::from_seconds(
+                                        0.3,
+                                        TimerMode::Once,
+                                    ),
+                                    attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
+                                    dir: None,
+                                    speed: 1.4,
+                                    damage: 10,
+                                },
+                            )
+                            .trans::<FollowState>(
+                                Trigger::not(LineOfSight {
+                                    target: game.game.player,
+                                    range: 130.,
+                                }),
+                                IdleState {
+                                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                    speed: 0.5,
+                                },
+                            )
+                            .trans::<AttackState>(
+                                Trigger::not(AttackDistance {
+                                    target: game.game.player,
+                                    range: 20.,
+                                }),
+                                FollowState {
+                                    target: game.game.player,
+                                    speed: 0.7,
+                                },
+                            ),
+                    );
+                }
+                Mob::Hostile(_) => {
+                    enemy_e.insert(
+                        StateMachine::default()
+                            .trans::<IdleState>(
+                                LineOfSight {
+                                    target: game.game.player,
+                                    range: 130.,
+                                },
+                                FollowState {
+                                    target: game.game.player,
+                                    speed: 0.7,
+                                },
+                            )
+                            .trans::<FollowState>(
+                                AttackDistance {
+                                    target: game.game.player,
+                                    range: 50.,
+                                },
+                                AttackState {
+                                    target: game.game.player,
+                                    attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                                    attack_duration_timer: Timer::from_seconds(
+                                        0.3,
+                                        TimerMode::Once,
+                                    ),
+                                    attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
+                                    dir: None,
+                                    speed: 1.4,
+                                    damage: 10,
+                                },
+                            )
+                            .trans::<FollowState>(
+                                Trigger::not(LineOfSight {
+                                    target: game.game.player,
+                                    range: 130.,
+                                }),
+                                IdleState {
+                                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                    speed: 0.5,
+                                },
+                            )
+                            .trans::<AttackState>(
+                                Trigger::not(AttackDistance {
+                                    target: game.game.player,
+                                    range: 50.,
+                                }),
+                                FollowState {
+                                    target: game.game.player,
+                                    speed: 0.7,
+                                },
+                            ),
+                    );
+                }
+                Mob::Passive(_) => {
+                    //TODO: impl run away
+                }
+                _ => {}
             }
         }
     }

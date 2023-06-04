@@ -1,5 +1,5 @@
 use crate::attributes::ItemAttributes;
-use crate::enemy::Enemy;
+use crate::enemy::Mob;
 use crate::inventory::ItemStack;
 use bevy::{prelude::*, utils::HashMap};
 use rand::Rng;
@@ -19,7 +19,7 @@ impl Plugin for LootTablePlugin {
 
 #[derive(Resource, Clone, Debug, Default, Deserialize)]
 pub struct LootTableMap {
-    pub table: HashMap<Enemy, LootTable>,
+    pub table: HashMap<Mob, LootTable>,
 }
 
 #[derive(Default, Clone, Debug, Component, Deserialize)]

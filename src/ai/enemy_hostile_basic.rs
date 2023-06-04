@@ -35,6 +35,22 @@ impl Trigger for LineOfSight {
 }
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
+pub struct HurtByPlayer;
+
+impl BoolTrigger for HurtByPlayer {
+    type Param<'w, 's> = EventReader<'w, 's, HitEvent>;
+
+    fn trigger(&self, entity: Entity, mut hit_events: Self::Param<'_, '_>) -> bool {
+        for hit in hit_events.iter() {
+            if hit.hit_entity == entity {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+// This trigger checks if the enemy is within the the given range of the target
+#[derive(Clone, Copy, Reflect)]
 pub struct AttackDistance {
     pub target: Entity,
     pub range: f32,

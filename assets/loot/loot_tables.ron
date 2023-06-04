@@ -1,6 +1,6 @@
 (
     table : {
-        Slime: (
+        Neutral(Slime): (
             drops: [(
                 item: Flint,
                 min: 1,
