@@ -235,13 +235,24 @@ fn handle_drop_on_slot_events(
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
         let no_more_dragging: bool;
-        let return_item = InventoryPlugin::drop_item_on_slot(
-            drop_event.dropped_item_stack.clone(),
-            drop_event.drop_target_slot_state.slot_index,
-            &mut inv,
-            &mut game.inv_slot_query,
-            drop_event.drop_target_slot_state.r#type,
-        );
+        let return_item = if drop_event
+            .drop_target_slot_state
+            .r#type
+            .is_crafting_result()
+        {
+            InventoryPlugin::pick_up_and_merge_crafting_result_stack(
+                drop_event.dropped_item_stack.clone(),
+                &mut inv,
+            )
+        } else {
+            InventoryPlugin::drop_item_on_slot(
+                drop_event.dropped_item_stack.clone(),
+                drop_event.drop_target_slot_state.slot_index,
+                &mut inv,
+                &mut game.inv_slot_query,
+                drop_event.drop_target_slot_state.r#type,
+            )
+        };
 
         let updated_drag_item;
         if let Some(return_item) = return_item {
@@ -267,7 +278,6 @@ fn handle_drop_on_slot_events(
             if no_more_dragging {
                 parent_interactable.2.change(Interaction::None);
             } else {
-                println!("RESETTING DRAG ITEM");
                 let new_drag_icon_entity = spawn_item_stack_icon(
                     &mut commands,
                     &graphics,
@@ -412,9 +422,6 @@ fn handle_item_drop_clicks(
             if let Ok(mut item_stack) = item_stack_query.get_mut(*item) {
                 if let Some(drop_target) = hit_test {
                     if let Ok(state) = slot_states.get(drop_target.0) {
-                        if state.r#type.is_crafting_result() {
-                            continue;
-                        }
                         if left_mouse_pressed {
                             slot_drop_events.send(DropOnSlotEvent {
                                 dropped_entity: *item,
@@ -524,8 +531,21 @@ fn handle_cursor_update(
                                     inv.single_mut().crafting_items[state.slot_index] = None;
                                     crafting_slot_event.send(CraftingSlotUpdateEvent);
                                 } else if state.r#type.is_crafting_result() {
-                                    inv.single_mut().crafting_items = [INVENTORY_INIT; 4];
+                                    for crafting_item_option in
+                                        inv.single_mut().crafting_items.iter_mut()
+                                    {
+                                        if let Some(crafting_item) = crafting_item_option.as_mut() {
+                                            if let Some(remaining_item) =
+                                                crafting_item.modify_count(-1)
+                                            {
+                                                *crafting_item = remaining_item;
+                                            } else {
+                                                *crafting_item_option = None;
+                                            }
+                                        }
+                                    }
                                     inv.single_mut().crafting_result_item = None;
+                                    crafting_slot_event.send(CraftingSlotUpdateEvent);
                                 } else {
                                     inv.single_mut().items[state.slot_index] = None;
                                 }

@@ -233,7 +233,7 @@ impl InventoryPlugin {
         if item_type != merge_into.item_stack.obj_type
             || merge_into.item_stack.metadata != to_merge.metadata
         {
-            return None;
+            return Some(to_merge);
         }
         let item_a_count = to_merge.count;
         let item_b_count = merge_into.item_stack.count;
@@ -264,6 +264,50 @@ impl InventoryPlugin {
         }
 
         None
+    }
+    pub fn pick_up_and_merge_crafting_result_stack(
+        dragging_item: ItemStack,
+        inv: &mut Query<&mut Inventory>,
+    ) -> Option<ItemStack> {
+        let pickup_item_option = inv.single().crafting_result_item.clone();
+        if let Some(pickup_item) = pickup_item_option {
+            let item_type = dragging_item.obj_type;
+            //TODO: should this return  None, or the original stack??
+            if item_type != pickup_item.item_stack.obj_type
+                || pickup_item.item_stack.metadata != dragging_item.metadata
+            {
+                return Some(dragging_item);
+            }
+            let item_a_count = dragging_item.count;
+            let item_b_count = pickup_item.item_stack.count;
+            let combined_size = item_a_count + item_b_count;
+            let new_item = Some(ItemStack {
+                obj_type: item_type,
+                metadata: dragging_item.metadata.clone(),
+                attributes: dragging_item.attributes.clone(),
+                count: min(combined_size, MAX_STACK_SIZE),
+            });
+
+            // if we overflow, keep remainder where it was
+
+            inv.single_mut().crafting_result_item = if combined_size > MAX_STACK_SIZE {
+                Some(InventoryItemStack {
+                    item_stack: ItemStack {
+                        obj_type: item_type,
+                        metadata: dragging_item.metadata.clone(),
+                        attributes: dragging_item.attributes.clone(),
+                        count: combined_size - MAX_STACK_SIZE,
+                    },
+                    slot: pickup_item.slot,
+                })
+            } else {
+                None
+            };
+
+            return new_item;
+        } else {
+            Some(dragging_item)
+        }
     }
     fn swap_items(
         item: ItemStack,
