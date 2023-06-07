@@ -10,6 +10,7 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{Attack, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
+use crate::enemy::{EnemySpawnEvent, Mob, NeutralMob};
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -262,6 +263,7 @@ impl InputsPlugin {
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
         mut commands: Commands,
         mut inv: Query<&mut Inventory>,
+        mut spawn_event: EventWriter<EnemySpawnEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -294,6 +296,15 @@ impl InputsPlugin {
 
         if key_input.just_pressed(KeyCode::P) {
             DungeonPlugin::spawn_new_dungeon_dimension(&mut commands);
+        }
+        if key_input.just_pressed(KeyCode::L) {
+            spawn_event.send(EnemySpawnEvent {
+                enemy: Mob::Neutral(NeutralMob::Slime),
+                pos: TileMapPositionData {
+                    chunk_pos: IVec2 { x: 0, y: 0 },
+                    tile_pos: TilePos { x: 0, y: 0 },
+                },
+            });
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -433,17 +444,17 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            println!(
-                "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?}",
-                game.get_tile_data(TileMapPositionData {
-                    chunk_pos: cursor_chunk_pos,
-                    tile_pos: cursor_tile_pos
-                }),
-                game.get_tile_obj_data(TileMapPositionData {
-                    chunk_pos: cursor_chunk_pos,
-                    tile_pos: cursor_tile_pos
-                })
-            );
+            // println!(
+            //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?}",
+            //     game.get_tile_data(TileMapPositionData {
+            //         chunk_pos: cursor_chunk_pos,
+            //         tile_pos: cursor_tile_pos
+            //     }),
+            //     game.get_tile_obj_data(TileMapPositionData {
+            //         chunk_pos: cursor_chunk_pos,
+            //         tile_pos: cursor_tile_pos
+            //     })
+            // );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
