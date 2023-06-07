@@ -27,8 +27,8 @@ pub struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<EnemySpawnEvent>()
-            .add_plugin(Material2dPlugin::<EnemyMaterial>::default())
+        app.add_plugin(Material2dPlugin::<EnemyMaterial>::default())
+            .add_event::<EnemySpawnEvent>()
             .add_system(Self::summon_enemies.in_set(OnUpdate(GameState::Main)))
             .add_plugin(SpawnerPlugin);
     }
@@ -59,8 +59,8 @@ pub enum PassiveMob {
 }
 
 pub struct EnemySpawnEvent {
-    enemy: Mob,
-    pos: TileMapPositionData,
+    pub enemy: Mob,
+    pub pos: TileMapPositionData,
 }
 impl EnemyPlugin {
     pub fn summon_enemies(
@@ -122,6 +122,7 @@ impl EnemyPlugin {
                 Mob::Neutral(_) => {
                     enemy_e.insert(
                         StateMachine::default()
+                            .set_trans_logging(true)
                             .trans::<IdleState>(
                                 HurtByPlayer,
                                 FollowState {
@@ -239,7 +240,8 @@ impl Material2d for EnemyMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[derive(AsBindGroup, TypeUuid, Reflect, FromReflect, Default, Debug, Clone)]
+#[reflect(Default, Debug)]
 #[uuid = "a04064b6-dcdd-11ed-afa1-0242ac120002"]
 pub struct EnemyMaterial {
     #[uniform(0)]
