@@ -6,6 +6,7 @@ pub mod generation;
 mod noise_helpers;
 mod tile;
 pub mod world_helpers;
+pub mod y_sort;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use bevy::{prelude::*, utils::HashMap};
@@ -20,6 +21,7 @@ use self::{
     dungeon_generation::{Bias, GridSize, NumSteps},
     generation::GenerationPlugin,
     tile::TilePlugin,
+    y_sort::YSortPlugin,
 };
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
@@ -88,6 +90,7 @@ impl Plugin for WorldPlugin {
             .add_plugin(DimensionPlugin)
             .add_plugin(DungeonPlugin)
             .add_plugin(TilePlugin)
+            .add_plugin(YSortPlugin)
             // .add_plugin(ResourceInspectorPlugin::<NumSteps>::default())
             // .add_plugin(ResourceInspectorPlugin::<GridSize>::default())
             // .add_plugin(ResourceInspectorPlugin::<Bias>::default())

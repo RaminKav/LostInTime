@@ -1,0 +1,6 @@
+(
+  name: "EnemyBasic",
+  schematics: {
+   "survival_rogue_like::enemy::Mob": Neutral(Slime),
+  }
+)

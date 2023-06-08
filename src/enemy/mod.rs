@@ -4,7 +4,7 @@ use bevy::{
     render::render_resource::{AsBindGroup, ShaderRef},
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
 };
-use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
+use bevy_proto::prelude::{prototype_ready, ProtoCommands, ReflectSchematic, Schematic};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
 use strum_macros::Display;
@@ -14,10 +14,8 @@ use crate::{
         AttackDistance, AttackState, FollowState, HurtByPlayer, IdleState, LineOfSight,
         MoveDirection,
     },
-    animations::{AnimationFrameTracker, AnimationTimer},
-    attributes::Health,
     world::{TileMapPositionData, CHUNK_SIZE},
-    GameParam, GameState, YSort,
+    GameParam, GameState,
 };
 
 pub mod spawner;
@@ -29,12 +27,30 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<EnemyMaterial>::default())
             .add_event::<EnemySpawnEvent>()
-            .add_system(Self::summon_enemies.in_set(OnUpdate(GameState::Main)))
+            .add_system(
+                Self::summon_enemies
+                    .run_if(prototype_ready("EnemyBasicNeutral"))
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_plugin(SpawnerPlugin);
     }
 }
 
-#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+#[derive(
+    Component,
+    Default,
+    Deserialize,
+    Debug,
+    Clone,
+    Hash,
+    Display,
+    Eq,
+    PartialEq,
+    Schematic,
+    Reflect,
+    FromReflect,
+)]
+#[reflect(Schematic)]
 pub enum Mob {
     #[default]
     None,
@@ -42,17 +58,59 @@ pub enum Mob {
     Hostile(HostileMob),
     Passive(PassiveMob),
 }
-#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+#[derive(
+    Component,
+    Default,
+    Deserialize,
+    Debug,
+    Clone,
+    Hash,
+    Display,
+    Eq,
+    PartialEq,
+    Schematic,
+    Reflect,
+    FromReflect,
+)]
+#[reflect(Schematic)]
 pub enum NeutralMob {
     #[default]
     Slime,
 }
-#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+#[derive(
+    Component,
+    Default,
+    Deserialize,
+    Debug,
+    Clone,
+    Hash,
+    Display,
+    Eq,
+    PartialEq,
+    Schematic,
+    Reflect,
+    FromReflect,
+)]
+#[reflect(Schematic)]
 pub enum HostileMob {
     #[default]
     Slime,
 }
-#[derive(Component, Default, Deserialize, Debug, Clone, Hash, Display, Eq, PartialEq)]
+#[derive(
+    Component,
+    Default,
+    Deserialize,
+    Debug,
+    Clone,
+    Hash,
+    Display,
+    Eq,
+    PartialEq,
+    Schematic,
+    Reflect,
+    FromReflect,
+)]
+#[reflect(Schematic)]
 pub enum PassiveMob {
     #[default]
     Slime,
@@ -64,7 +122,7 @@ pub struct EnemySpawnEvent {
 }
 impl EnemyPlugin {
     pub fn summon_enemies(
-        mut commands: Commands,
+        mut proto_commands: ProtoCommands,
         game: GameParam,
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
@@ -89,32 +147,46 @@ impl EnemyPlugin {
                 source_texture: Some(handle),
                 is_attacking: 0.,
             });
-            let mut enemy_e = commands.spawn((
-                MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(Mesh::from(shape::Quad {
-                            size: Vec2::new(32., 32.),
-                            ..Default::default()
-                        }))
-                        .into(),
-                    transform: Transform::from_translation(pos.extend(0.)),
-                    material: enemy_material,
-                    ..default()
-                },
-                AnimationTimer(Timer::from_seconds(0.20, TimerMode::Repeating)),
-                AnimationFrameTracker(0, 7),
-                Health(100),
-                KinematicCharacterController::default(),
-                Collider::cuboid(10., 8.),
-                YSort,
-                enemy.enemy.clone(),
-                IdleState {
-                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                    speed: 0.5,
-                },
-                Name::new(name),
-            ));
+            let mut enemy_e = proto_commands.spawn("EnemyBasicNeutral");
+            let mut enemy_e = enemy_e.entity_commands();
+            enemy_e.insert(MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(Mesh::from(shape::Quad {
+                        size: Vec2::new(32., 32.),
+                        ..Default::default()
+                    }))
+                    .into(),
+                transform: Transform::from_translation(pos.extend(0.)),
+                material: enemy_material,
+                ..default()
+            });
+
+            // .spawn((
+            //     MaterialMesh2dBundle {
+            //         mesh: meshes
+            //             .add(Mesh::from(shape::Quad {
+            //                 size: Vec2::new(32., 32.),
+            //                 ..Default::default()
+            //             }))
+            //             .into(),
+            //         transform: Transform::from_translation(pos.extend(0.)),
+            //         material: enemy_material,
+            //         ..default()
+            //     },
+            //     AnimationTimer(Timer::from_seconds(0.20, TimerMode::Repeating)),
+            //     AnimationFrameTracker(0, 7),
+            //     Health(100),
+            //     KinematicCharacterController::default(),
+            //     Collider::cuboid(10., 8.),
+            //     YSort,
+            //     enemy.enemy.clone(),
+            //     IdleState {
+            //         walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+            //         direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+            //         speed: 0.5,
+            //     },
+            //     Name::new(name),
+            // ));
             if let Some(loot_table) = game.loot_tables.table.get(&enemy.enemy) {
                 enemy_e.insert(loot_table.clone());
             }
@@ -122,7 +194,7 @@ impl EnemyPlugin {
                 Mob::Neutral(_) => {
                     enemy_e.insert(
                         StateMachine::default()
-                            .set_trans_logging(true)
+                            .set_trans_logging(false)
                             .trans::<IdleState>(
                                 HurtByPlayer,
                                 FollowState {

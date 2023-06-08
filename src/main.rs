@@ -15,7 +15,6 @@ use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::system::SystemParam,
-    log::LogPlugin,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -31,6 +30,7 @@ use bevy::{
 };
 
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::*;
 mod ai;
 mod animations;
@@ -43,6 +43,7 @@ mod inputs;
 mod inventory;
 mod item;
 mod player;
+mod proto;
 mod ui;
 mod world;
 use animations::{
@@ -58,6 +59,7 @@ use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
 use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObject, WorldObjectResource};
 use player::PlayerPlugin;
+use proto::ProtoPlugin;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -65,6 +67,7 @@ use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
     dimension::DimensionSpawnEvent,
+    y_sort::YSort,
     TileMapPositionData, WorldObjectEntityData, WorldPlugin,
 };
 use world::{ChunkManager, WorldGeneration};
@@ -84,6 +87,11 @@ fn main() {
         .add_state::<GameState>()
         .add_plugins(
             DefaultPlugins
+                .set(AssetPlugin {
+                    // Enable hot-reloading of assets:
+                    watch_for_changes: true,
+                    ..default()
+                })
                 .set(ImagePlugin::default_nearest())
                 // .disable::<LogPlugin>()
                 .set(WindowPlugin {
@@ -120,11 +128,11 @@ fn main() {
         .add_plugin(PlayerPlugin)
         .add_plugin(WorldPlugin)
         .add_plugin(ClientPlugin)
+        .add_plugin(ProtoPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
-        .add_system(y_sort)
         .run();
 }
 
@@ -161,17 +169,6 @@ pub struct ImageAssets {
     pub walls_sheet: Handle<Image>,
 }
 
-#[derive(Component, Reflect, Default)]
-#[reflect(Component)]
-pub struct YSort;
-
-fn y_sort(mut q: Query<(&mut Transform, &GlobalTransform), With<YSort>>) {
-    for (mut tf, gtf) in q.iter_mut() {
-        // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
-        tf.translation.z =
-            900. - 900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * gtf.translation().y)));
-    }
-}
 #[derive(SystemParam)]
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,

@@ -89,7 +89,8 @@
   //TODO: add ron file for stats/metadata for WorldObjects
   [x] Impl `LootTable` for drops list on enemies and breakable items
 
-  - Impl spawners that auto spawn mobs
+  [x] Impl spawners that auto spawn mobs
+
   - UI:
     [x] Crafting UI
     - Equipment UI
@@ -109,59 +110,25 @@
   - Art/Mobs
     - More Enemies
     - Passive Mobs/animals
+  - Misc.
+    [x] Impl passive/neutral enemies AI
+    [x] Fix crafting table bug
+    - fix weapon Z fighting bug
+    - Fix UI text bug regression
+    - Bundle components for useful types
+    - Animate drops better
+    - fix neutral mob fighting bug
 
-# Moving Between 'Dimensions'
+slime comps:
 
-<!-- - despawn all current chunks (they are cached) -->
-
-- Convert ChunkManager to a Compopnent
-- Dimensions are Entities, including main world
-- Each Dimension Entity has a ChunkManager Component,
-- Active Dimension has the ActiveDimension
-- fn that runs setup fns of any dimension that needs to be created (like on startup rn)
-- Query for `Add<ActiveDimension>` -> run the above fn
-- Similarly: Query for `Removed<ActiveDimension>` -> despawns all chunks
-- Any Dimension with `ActiveDimension` will change a field on game struct to it's chunk manager comp
-- world_gen plugin uses game.current_chunk_manager
-
-split world_generation into
--> generation -> generate objs/tiles
--> noise_helpers -> perlin fns, disk sampling
--> chunk -> cache/spawning of chunks, chunk manager
--> tile -> tilemapping code?
--> world_helpers -> camera pos fn
-
-# Wall Assets
-
-- WorldObjet Wall type for unique wall interactions
-- Lonely walls are 1.5 tiles high. 1.0 is the wall face, and half for the top darkness
-- Walls only show a face if there is no wall directly below them.
-- If there is a wall below, they show a 1.0 tile top only (darkness)
-- The 1.0 tile is offset to be above the 1.5 tile below it
-- Tops must follow auto-tilign algorithem for border matching.
-
-# Crafting TODO
-
-[x] orient slots in 2x2 grid
-[x] drop items in slots when inv closes (or try to add them back in)
-
-[x] create crafting result slot (dif from normal slots, cant drop into)
-[x] add support for recipies
-
-# Crafting Manager Refactor
-
-- Dimension entities will have:
-  <!-- - `chunk_tile_entity_data` component to cache all chunks tiles -->
-  <!-- - `chunk_generation_data` component to cache obj data -->
-  <!-- - both of those can just live on the existing CM? -->
-  - when a chunk is depsawned, we loop all its tiles and store their data in `bevy_save`.
-- Chunk entities will have:
-  - `SpawnedChunk`
-  - `ChunkSpawners` -> vec of spawners
-  - Chunks have a map of TilePos -> Entity of tile
-- Tiles:
-  - `TileEntityData` stored on each tile
-  - `RawChunkData` maybe add as part of `TileEntityData`
-  - objs are children of tiles with `WorldObject`/etc
-  - need: Map of chunk_pos -> Entity per dimension
-  - need: Map of tile_pos -> Entity per chunk
+- - - mesh2D -> skip this and add after with .insert()
+- - AnimationTimer(Timer) -> manually fill out fields
+- AnimationFrameTracker(i32, i32)
+- Health
+- - - KCC -> use custom from impl
+- - - Collider -> use custom from impl
+- YSort
+- enemy
+- - - IdleState (default) -> use custom from impl with inputs for speed and walk timer
+- Name
+- - - StateMachine -> skip and add after

@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use bevy::{
     app::AppExit, ecs::system::SystemState, prelude::*, sprite::Mesh2dHandle, utils::HashMap,
 };
@@ -16,14 +14,13 @@ use bevy_save::prelude::*;
 // use bevy_save::{Build, CloneReflect, DespawnMode, MappingMode, SavePlugins, Snapshot};
 
 use crate::{
-    assets::FoliageMaterial,
     attributes::Health,
-    item::{Breakable, Foliage, Placeable, Wall, WorldObject},
-    ui::minimap::{Minimap, UpdateMiniMapEvent},
+    item::{Foliage, Placeable, Wall, WorldObject},
+    ui::minimap::Minimap,
     world::{
         chunk::{
-            Chunk, CreateChunkEvent, DespawnChunkEvent, ReflectedPos, SpawnChunkEvent,
-            TileEntityCollection, TileSpriteData,
+            Chunk, DespawnChunkEvent, ReflectedPos, SpawnChunkEvent, TileEntityCollection,
+            TileSpriteData,
         },
         dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
         ChunkManager, TileMapPositionData, WorldGeneration, WorldObjectEntityData,
@@ -185,17 +182,13 @@ impl ClientPlugin {
         world: &mut World,
         mut local: Local<
             SystemState<(
-                Commands,
                 Res<ChunkManager>,
                 EventReader<DespawnChunkEvent>,
                 Query<&Children>,
             )>,
         >,
     ) {
-        // let mut state: SystemState<(Res<ChunkManager>, EventReader<DespawnChunkEvent>)> =
-        //     SystemState::new(world);
-
-        let (mut commands, chunk_manager, mut save_events, children) = local.get_mut(world);
+        let (chunk_manager, mut save_events, children) = local.get_mut(world);
         let mut saved_chunks = HashMap::default();
         for saves in save_events.iter() {
             println!("SAVING {:?}...", saves.chunk_pos);
