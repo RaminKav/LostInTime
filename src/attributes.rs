@@ -1,4 +1,5 @@
 use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{
     inventory::{Inventory, InventoryItemStack},
@@ -89,8 +90,8 @@ pub struct AttributeModifier {
 pub struct AttributeChangeEvent;
 
 //TODO: Add max health vs curr health
-#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
-#[reflect(Component)]
+#[derive(Resource, Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
 pub struct Health(pub i32);
 #[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]

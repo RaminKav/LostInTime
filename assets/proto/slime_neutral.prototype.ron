@@ -1,0 +1,14 @@
+(
+  name: "EnemyBasicNeutral",
+  templates: ["mob_basic"],
+  schematics: {
+    "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 2., speed: 0.5),
+    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
+    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
+    "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
+    "survival_rogue_like::attributes::Health": (1000),
+    "survival_rogue_like::YSort": (),
+    "survival_rogue_like::enemy::Mob": None,
+  }
+)

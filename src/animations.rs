@@ -5,6 +5,7 @@ use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use interpolation::lerp;
 
 use crate::ai::AttackState;
@@ -22,10 +23,12 @@ pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
 // #[derive(Component)]
 // pub struct CameraOffsetTracker(Vec2, Vec2);
 
-#[derive(Component)]
+#[derive(Component, Schematic, Reflect, FromReflect, Default)]
+#[reflect(Schematic)]
 pub struct AnimationFrameTracker(pub i32, pub i32);
 
-#[derive(Component, Clone, Deref, DerefMut)]
+#[derive(Component, Clone, Deref, DerefMut, Schematic, Reflect, FromReflect)]
+#[reflect(Schematic)]
 pub struct AnimationTimer(pub Timer);
 #[derive(Component, Clone)]
 pub struct HitAnimationTracker {
