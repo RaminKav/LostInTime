@@ -119,16 +119,22 @@
     - Animate drops better
     - fix neutral mob fighting bug
 
-slime comps:
+proto todo:
 
-- - - mesh2D -> skip this and add after with .insert()
-- - AnimationTimer(Timer) -> manually fill out fields
-- AnimationFrameTracker(i32, i32)
-- Health
-- - - KCC -> use custom from impl
-- - - Collider -> use custom from impl
-- YSort
-- enemy
-- - - IdleState (default) -> use custom from impl with inputs for speed and walk timer
-- Name
-- - - StateMachine -> skip and add after
+- make weapons proto?
+- make impl for mesh2dmaterial that takes input of asset, size, move txfm to .insert()
+
+- weapon/tool protos need:
+  \*\*\*\* remove sprite_desc entries for weps, this should replace all of those
+  -basic misc stuff (collider, ysort, markers, etc)
+
+  - WorldObject
+  - attributes(attack, durability, other stats)
+  - sprite image
+  - Equipman(Limb)
+  - Melee or Ranged attack types (maybe ranged needs a projectile?)
+    - projectile needs: sprite, speed, lerp_Type (linear speed, ease in, etc),
+  - ToolToughness (replaces breaks_with)
+
+- Item Attributes:
+-

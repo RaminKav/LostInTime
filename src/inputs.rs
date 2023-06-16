@@ -1,5 +1,3 @@
-use bevy::app::AppExit;
-
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use bevy::window::PrimaryWindow;
@@ -8,7 +6,7 @@ use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierCont
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Attack, AttributeModifier, Health, ItemAttributes};
+use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::{EnemySpawnEvent, Mob, NeutralMob};
 use crate::inventory::{Inventory, ItemStack};
@@ -19,10 +17,10 @@ use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::world::TileMapPositionData;
-use crate::{item::WorldObject, GameState, Player, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{item::WorldObject, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
-    CustomFlush, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera,
-    PLAYER_MOVE_SPEED, WIDTH,
+    CoreGameSet, CustomFlush, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera,
+    UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -74,7 +72,7 @@ impl Plugin for InputsPlugin {
                     Self::update_cursor_pos.after(Self::move_player),
                     Self::move_camera_with_player.after(Self::move_player),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_base_set(CoreGameSet::Main),
             )
             .add_system(Self::toggle_inventory);
     }
@@ -320,14 +318,18 @@ impl InputsPlugin {
         }
     }
     pub fn test_take_damage(
-        mut player_health_query: Query<&mut Health, With<Player>>,
+        // mut player_health_query: Query<&mut Health, With<Player>>,
         key_input: ResMut<Input<KeyCode>>,
+        mut att_query: Query<(&mut Health, &Attack, &AttackCooldown), With<Player>>,
     ) {
         if key_input.just_pressed(KeyCode::X) {
-            player_health_query.single_mut().0 -= 20;
+            // att_query.single_mut().0 -= 20;
         }
         if key_input.just_pressed(KeyCode::Z) {
-            player_health_query.single_mut().0 += 20;
+            // att_query.single_mut().0 += 20;
+        }
+        if key_input.just_pressed(KeyCode::T) {
+            println!("STATS: {:?}", att_query.single());
         }
     }
     fn handle_hotbar_key_input(

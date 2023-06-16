@@ -216,7 +216,6 @@ impl GameAssetsPlugin {
 
         let mut spritesheet_map = HashMap::default();
         let mut icon_map = HashMap::default();
-        let mut world_obj_image_handles = HashMap::default();
         let mut ui_image_handles = HashMap::default();
         let mut foliage_material_map = HashMap::default();
 
@@ -251,10 +250,6 @@ impl GameAssetsPlugin {
                     //Set the size to be proportional to the source rectangle
                     sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
                     spritesheet_map.insert(*item, sprite);
-                    world_obj_image_handles.insert(
-                        *item,
-                        convert_to_image(*rect, image_handle.clone(), &mut image_assets),
-                    );
                 }
             }
             //TODO: maybe we can clean up our spawning code with this vvv

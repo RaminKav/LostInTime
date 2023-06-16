@@ -5,7 +5,7 @@ use super::{ChunkManager, WorldObjectEntityData};
 use crate::item::{Foliage, Wall, WorldObject};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
-use crate::{CustomFlush, GameParam, GameState};
+use crate::{CoreGameSet, CustomFlush, GameParam, GameState};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
@@ -30,7 +30,7 @@ impl Plugin for GenerationPlugin {
                         .after(CustomFlush)
                         .after(Self::handle_new_wall_spawn_update),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_base_set(CoreGameSet::Main),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

@@ -4,7 +4,9 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::{AttributesPlugin, Health, InvincibilityCooldown};
+use attributes::{
+    Attack, AttackCooldown, AttributesPlugin, Health, InvincibilityCooldown, PlayerAttributeBundle,
+};
 use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
 
 //TODO:
@@ -85,6 +87,9 @@ fn main() {
     App::new()
         .init_resource::<Game>()
         .add_state::<GameState>()
+        .edit_schedule(CoreSchedule::FixedUpdate, |s| {
+            s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
+        })
         .add_plugins(
             DefaultPlugins
                 .set(AssetPlugin {
@@ -148,6 +153,11 @@ impl Default for Game {
             player: Entity::from_raw(0),
         }
     }
+}
+#[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
+#[system_set(base)]
+pub enum CoreGameSet {
+    Main,
 }
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -246,7 +256,9 @@ impl<'w, 's> GameParam<'w, 's> {
     }
     pub fn get_tile_data(&self, tile: TileMapPositionData) -> Option<TileSpriteData> {
         if let Some(tile_e) = self.get_tile_entity(tile) {
-            return Some(self.tile_data_query.get(tile_e).unwrap().0.clone());
+            if let Ok(tile_sprite) = self.tile_data_query.get(tile_e) {
+                return Some(tile_sprite.0.clone());
+            }
         }
         None
     }
@@ -615,7 +627,11 @@ fn setup(
                 crafting_items: [INVENTORY_INIT; 4],
                 crafting_result_item: None,
             },
-            Health(100),
+            PlayerAttributeBundle {
+                health: Health(100),
+                attack: Attack(5),
+                attack_cooldown: AttackCooldown(0.4),
+            },
             InvincibilityCooldown(0.3),
             MovementVector::default(),
             FacingDirection::default(),

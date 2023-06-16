@@ -11,7 +11,7 @@ use crate::{
         world_helpers::camera_pos_to_chunk_pos,
         TileMapPositionData, CHUNK_SIZE,
     },
-    GameParam, GameState,
+    CoreGameSet, GameParam, GameState,
 };
 
 use super::{Mob, NeutralMob};
@@ -28,7 +28,7 @@ impl Plugin for SpawnerPlugin {
                 Self::handle_add_spawners_on_chunk_spawn,
                 Self::check_mob_count,
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .in_base_set(CoreGameSet::Main),
         );
     }
 }
@@ -154,12 +154,11 @@ impl SpawnerPlugin {
         }
     }
     fn handle_add_spawners_on_chunk_spawn(
-        mut spawn_events: EventReader<SpawnChunkEvent>,
-        game: GameParam,
+        spawned_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
         mut commands: Commands,
     ) {
-        for e in spawn_events.iter() {
-            if e.chunk_pos != (IVec2 { x: 0, y: 0 }) {
+        for (e, chunk) in spawned_chunks.iter() {
+            if chunk.chunk_pos != (IVec2 { x: 0, y: 0 }) {
                 continue;
             }
             let spawner = Spawner {
@@ -169,12 +168,10 @@ impl SpawnerPlugin {
                 max_summons: 5,
                 enemy: Mob::Neutral(NeutralMob::Slime),
             };
-            println!("Adding spawner for {:?}", e.chunk_pos);
-            commands
-                .entity(*game.get_chunk_entity(e.chunk_pos).unwrap())
-                .insert(ChunkSpawners {
-                    spawners: vec![spawner],
-                });
+            println!("Adding spawner for {:?}", chunk.chunk_pos);
+            commands.entity(e).insert(ChunkSpawners {
+                spawners: vec![spawner],
+            });
         }
     }
 }
