@@ -7,8 +7,8 @@
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
     "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
     "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
-    "survival_rogue_like::attributes::Health": (1000),
-    "survival_rogue_like::YSort": (),
+    "survival_rogue_like::attributes::Health": (10),
+    "survival_rogue_like::world::y_sort::YSort": (),
     "survival_rogue_like::enemy::Mob": None,
   }
 )

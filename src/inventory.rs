@@ -63,9 +63,9 @@ impl InventoryItemStack {
 
         let inv_stack = Self {
             item_stack: new_item_stack,
-            slot: 0,
+            slot: self.slot,
         };
-        inv.single_mut().items[0] = Some(inv_stack.clone());
+        inv.single_mut().items[self.slot] = Some(inv_stack.clone());
 
         inv_stack
     }

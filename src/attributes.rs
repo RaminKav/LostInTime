@@ -5,7 +5,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack},
     item::{Equipment, ItemDisplayMetaData},
     ui::InventorySlotState,
-    CustomFlush, GameState, Player,
+    CoreGameSet, CustomFlush, Player,
 };
 
 pub struct AttributesPlugin;
@@ -89,28 +89,35 @@ pub struct AttributeModifier {
 #[derive(Debug, Clone, Default)]
 pub struct AttributeChangeEvent;
 
+#[derive(Reflect, FromReflect, Bundle, Clone, Debug, Copy)]
+pub struct PlayerAttributeBundle {
+    pub health: Health,
+    pub attack: Attack,
+    pub attack_cooldown: AttackCooldown,
+}
+
 //TODO: Add max health vs curr health
-#[derive(Resource, Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct Health(pub i32);
-#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 
 pub struct Attack(pub i32);
-#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct Durability(pub i32);
 
-#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct AttackCooldown(pub f32);
-#[derive(Resource, Reflect, Default, Component, Clone, Debug, Copy)]
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BlockAttributeBundle>()
+        app
             // .register_type::<BlockAttributeBundle>()
             .add_event::<AttributeChangeEvent>()
             .add_systems(
@@ -119,7 +126,7 @@ impl Plugin for AttributesPlugin {
                     Self::handle_item_attribute_change,
                     Self::handle_attribute_change_events.after(CustomFlush),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_base_set(CoreGameSet::Main),
             );
     }
 }

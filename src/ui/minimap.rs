@@ -1,7 +1,7 @@
 use crate::assets::Graphics;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::world::{TileMapPositionData, CHUNK_SIZE};
-use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
+use crate::{CoreGameSet, CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -16,7 +16,7 @@ impl Plugin for MinimapPlugin {
         app.add_event::<UpdateMiniMapEvent>().add_system(
             Self::setup_mini_map
                 .after(CustomFlush)
-                .in_set(OnUpdate(GameState::Main)),
+                .in_base_set(CoreGameSet::Main),
         );
     }
 }

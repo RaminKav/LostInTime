@@ -19,13 +19,14 @@ use crate::{
     ui::minimap::Minimap,
     world::{
         chunk::{
-            Chunk, DespawnChunkEvent, ReflectedPos, SpawnChunkEvent, TileEntityCollection,
-            TileSpriteData,
+            Chunk, CreateChunkEvent, DespawnChunkEvent, ReflectedPos, SpawnChunkEvent,
+            TileEntityCollection, TileSpriteData,
         },
         dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
+        generation::GenerationPlugin,
         ChunkManager, TileMapPositionData, WorldGeneration, WorldObjectEntityData,
     },
-    CustomFlush, GameParam, GameState, YSort,
+    CoreGameSet, CustomFlush, GameParam, GameState, YSort,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -79,7 +80,7 @@ impl Plugin for ClientPlugin {
             // .register_saveable::<Mesh2dHandle>()
             // .register_saveable::<Handle<FoliageMaterial>>()
             // .register_saveable::<Handle<TextureAtlas>>()
-            // .register_saveable::<TextureAtlasSprite>()
+            .register_saveable::<TextureAtlasSprite>()
             .register_saveable::<Health>()
             .register_saveable::<WorldObjectEntityData>()
             .register_saveable::<YSort>()
@@ -98,9 +99,13 @@ impl Plugin for ClientPlugin {
             .register_type_data::<ReflectedPos, ReflectDeserialize>()
             .register_type::<HashMap<ReflectedPos, Entity>>()
             .register_type::<[WorldObject; 4]>()
-            .insert_resource(AppDespawnMode::new(DespawnMode::Missing))
+            .insert_resource(AppDespawnMode::new(DespawnMode::None))
             .insert_resource(AppMappingMode::new(MappingMode::Strict))
-            .add_system(Self::load_on_start.in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                Self::load_on_start
+                    .run_if(run_once())
+                    .in_schedule(CoreSchedule::Startup),
+            )
             .add_systems(
                 (
                     Self::save_chunk,
@@ -108,7 +113,9 @@ impl Plugin for ClientPlugin {
                     Self::close_and_save_on_esc.after(CustomFlush),
                     Self::load_chunk.before(CustomFlush),
                     Self::handle_add_collider_to_loaded_entity.after(CustomFlush),
-                    Self::handle_add_visuals_to_loaded_foliage.after(CustomFlush),
+                    Self::handle_add_visuals_to_loaded_foliage
+                        .after(CustomFlush)
+                        .before(GenerationPlugin::handle_new_wall_spawn_update),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -123,21 +130,50 @@ impl ClientPlugin {
             EventReader<SpawnChunkEvent>,
         )> = SystemState::new(world);
         let (dim_query, mut spawn_events) = state.get_mut(world);
-        let mut snapshots = vec![];
+        let mut chunks = vec![];
         for event in spawn_events.iter() {
-            if let Some(snapshot) = dim_query.single().snapshots.get(&event.chunk_pos) {
-                snapshots.push(snapshot.clone_value());
-                println!("Loading chunk from cache {:?}.", event.chunk_pos);
+            println!("attempting load chunk {:?}", event.chunk_pos);
+            chunks.push(event.chunk_pos);
+            // if let Some(snapshot) = dim_query.single().snapshots.get(&event.chunk_pos) {
+            //     snapshots.push(snapshot.clone_value());
+            //     println!("Loading chunk from cache {:?}.", event.chunk_pos);
+            // }
+        }
+        let mut new_chunks = vec![];
+        for chunk in chunks.iter() {
+            if let Ok(reader) = world
+                .resource::<AppBackend>()
+                .reader(&format!("{}", chunk))
+                .map_err(SaveableError::other)
+            {
+                print!(" LOADING CHUNK ");
+                let loader = world.resource::<AppLoader>();
+                let deser = world.deserialize_applier(&mut loader.deserializer(reader));
+                if let Err(e) = deser {
+                    new_chunks.push(chunk);
+                    println!("{e}");
+                } else {
+                    // deser.unwrap().map(EntityMap::new())
+                }
+            } else {
+                new_chunks.push(chunk);
             }
         }
-        for snapshot in snapshots.iter() {
-            snapshot
-                .applier(world)
-                .despawn(DespawnMode::None)
-                .mapping(MappingMode::Strict)
-                .apply()
-                .expect("Failed to Load snapshot.");
+        let mut state: SystemState<EventWriter<CreateChunkEvent>> = SystemState::new(world);
+        for chunk_pos in new_chunks.iter() {
+            println!("          NO LOAD {chunk_pos:?}");
+            state.get_mut(world).send(CreateChunkEvent {
+                chunk_pos: **chunk_pos,
+            });
         }
+        // for snapshot in snapshots.iter() {
+        //     snapshot
+        //         .applier(world)
+        //         .despawn(DespawnMode::None)
+        //         .mapping(MappingMode::Strict)
+        //         .apply()
+        //         .expect("Failed to Load snapshot.");
+        // }
     }
 
     fn handle_add_collider_to_loaded_entity(
@@ -166,15 +202,23 @@ impl ClientPlugin {
             .0;
 
         for (e, obj) in loaded_entities.iter() {
-            if obj != &WorldObject::Foliage(Foliage::Tree) {
-                continue;
+            match obj {
+                &WorldObject::Foliage(Foliage::Tree) => {
+                    commands
+                        .entity(e)
+                        .insert(Mesh2dHandle::from(
+                            meshes.add(Mesh::from(shape::Quad::default())),
+                        ))
+                        .insert(foliage_material.clone());
+                }
+                &WorldObject::Wall(Wall::Stone) => {
+                    commands
+                        .entity(e)
+                        .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())
+                        .insert(TextureAtlasSprite::default());
+                }
+                _ => {}
             }
-            commands
-                .entity(e)
-                .insert(Mesh2dHandle::from(
-                    meshes.add(Mesh::from(shape::Quad::default())),
-                ))
-                .insert(foliage_material.clone());
         }
     }
     //TODO: make this work with Spawn events too ,change event name
@@ -202,33 +246,43 @@ impl ClientPlugin {
             saved_chunks.insert(saves.chunk_pos, entities);
         }
 
-        let mut snapshots: HashMap<IVec2, Snapshot> = HashMap::default();
         for (chunk_pos, entities) in saved_chunks.iter() {
             let snapshot = Snapshot::builder(world)
                 .extract_entities(entities.clone().into_iter())
                 .build();
-            snapshots.insert(*chunk_pos, snapshot);
+            if let Ok(mut writer) = world
+                .resource::<AppBackend>()
+                .writer(&format!("{}", chunk_pos))
+                .map_err(SaveableError::other)
+            {
+                let saver = world.resource::<AppSaver>();
+                if let Err(e) = saver.serialize(
+                    &SnapshotSerializer::new(&snapshot, world.resource::<AppTypeRegistry>()),
+                    writer,
+                ) {
+                    println!("{e}")
+                };
+            }
+            // snapshots.insert(*chunk_pos, snapshot);
+        }
+        let mut state: SystemState<GameParam> = SystemState::new(world);
+        for (chunk_pos, _) in saved_chunks.iter() {
+            state.get_mut(world).remove_chunk_entity(*chunk_pos);
         }
 
-        let mut state: SystemState<(
-            GameParam,
-            Commands,
-            Query<&mut ChunkCache, With<ActiveDimension>>,
-        )> = SystemState::new(world);
+        // let (mut game, mut commands, mut dim_query) = state.get_mut(world);
 
-        let (mut game, mut commands, mut dim_query) = state.get_mut(world);
-
-        for (chunk_pos, snapshot) in snapshots.iter() {
-            // println!("Inserting new snapshot for {chunk_pos:?} and despawning it");
-            dim_query
-                .single_mut()
-                .snapshots
-                .insert(*chunk_pos, snapshot.clone_value());
-            commands
-                .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
-                .despawn_recursive();
-            game.remove_chunk_entity(*chunk_pos);
-        }
+        // for (chunk_pos, snapshot) in snapshots.iter() {
+        //     // println!("Inserting new snapshot for {chunk_pos:?} and despawning it");
+        //     dim_query
+        //         .single_mut()
+        //         .snapshots
+        //         .insert(*chunk_pos, snapshot.clone_value());
+        //     commands
+        //         .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
+        //         .despawn_recursive();
+        //     game.remove_chunk_entity(*chunk_pos);
+        // }
     }
     pub fn despawn_non_saveable_entities(
         mut commands: Commands,

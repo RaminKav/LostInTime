@@ -10,7 +10,7 @@ use crate::{
     item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
-    CustomFlush, Game, GameParam, GameState, Player, YSort,
+    CoreGameSet, CustomFlush, Game, GameParam, Player, YSort,
 };
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl Plugin for CombatPlugin {
                     Self::handle_enemy_death.after(Self::handle_hits),
                     Self::check_hit_collisions,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_base_set(CoreGameSet::Main),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -74,18 +74,12 @@ impl CombatPlugin {
         time: Res<Time>,
         tool_query: Query<Entity, With<MainHand>>,
         attack_event: EventReader<AttackEvent>,
-        mut player: Query<
-            (Entity, Option<&AttackCooldown>, Option<&mut AttackTimer>),
-            With<Player>,
-        >,
+        mut player: Query<(Entity, &AttackCooldown, Option<&mut AttackTimer>), With<Player>>,
     ) {
-        let (player_e, cooldown_option, timer_option) = player.single_mut();
+        let (player_e, cooldown, timer_option) = player.single_mut();
 
         if attack_event.len() > 0 && timer_option.is_none() {
-            let mut attack_cd_timer = AttackTimer(Timer::from_seconds(
-                cooldown_option.unwrap_or(&AttackCooldown(0.4)).0,
-                TimerMode::Once,
-            ));
+            let mut attack_cd_timer = AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
             attack_cd_timer.0.tick(time.delta());
             commands.entity(player_e).insert(attack_cd_timer);
             if let Ok(tool) = tool_query.get_single() {

@@ -305,13 +305,13 @@ impl ChunkPlugin {
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
-                    if chunk_cache.single().snapshots.contains_key(&chunk_pos) {
-                        println!("Sending load event {chunk_pos:?}");
-                        load_chunk_event.send(SpawnChunkEvent { chunk_pos });
-                    } else {
-                        println!("Sending cache event {chunk_pos:?}");
-                        create_chunk_event.send(CreateChunkEvent { chunk_pos });
-                    }
+                    // load_chunk_event.send(SpawnChunkEvent { chunk_pos });
+                    // if chunk_cache.single().snapshots.contains_key(&chunk_pos) {
+                    //     println!("Sending load event {chunk_pos:?}");
+                    // } else {
+                    // println!("Sending cache event {chunk_pos:?}");
+                    create_chunk_event.send(CreateChunkEvent { chunk_pos });
+                    // }
                 }
             }
         }

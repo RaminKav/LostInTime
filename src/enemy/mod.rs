@@ -15,7 +15,7 @@ use crate::{
         MoveDirection,
     },
     world::{TileMapPositionData, CHUNK_SIZE},
-    GameParam, GameState,
+    CoreGameSet, GameParam,
 };
 
 pub mod spawner;
@@ -30,7 +30,7 @@ impl Plugin for EnemyPlugin {
             .add_system(
                 Self::summon_enemies
                     .run_if(prototype_ready("EnemyBasicNeutral"))
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_base_set(CoreGameSet::Main),
             )
             .add_plugin(SpawnerPlugin);
     }
