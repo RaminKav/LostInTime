@@ -5,7 +5,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack},
     item::{Equipment, ItemDisplayMetaData},
     ui::InventorySlotState,
-    CoreGameSet, CustomFlush, Player,
+    CustomFlush, GameState, Player,
 };
 
 pub struct AttributesPlugin;
@@ -126,7 +126,7 @@ impl Plugin for AttributesPlugin {
                     Self::handle_item_attribute_change,
                     Self::handle_attribute_change_events.after(CustomFlush),
                 )
-                    .in_base_set(CoreGameSet::Main),
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
@@ -146,9 +146,10 @@ impl AttributesPlugin {
         player: Query<Entity, With<Player>>,
         eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
         mut att_events: EventReader<AttributeChangeEvent>,
+        player_atts: Query<&ItemAttributes, With<Player>>,
     ) {
         for _event in att_events.iter() {
-            let mut new_att = ItemAttributes::default();
+            let mut new_att = player_atts.single().clone();
             for a in eqp_attributes.iter() {
                 new_att.health += a.health;
                 new_att.attack += a.attack;

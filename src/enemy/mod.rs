@@ -14,8 +14,9 @@ use crate::{
         AttackDistance, AttackState, FollowState, HurtByPlayer, IdleState, LineOfSight,
         MoveDirection,
     },
+    ui::minimap::UpdateMiniMapEvent,
     world::{TileMapPositionData, CHUNK_SIZE},
-    CoreGameSet, GameParam,
+    AppExt, CoreGameSet, GameParam, GameState,
 };
 
 pub mod spawner;
@@ -26,12 +27,16 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<EnemyMaterial>::default())
-            .add_event::<EnemySpawnEvent>()
+            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+                app.add_event::<EnemySpawnEvent>();
+            })
             .add_system(
                 Self::summon_enemies
                     .run_if(prototype_ready("EnemyBasicNeutral"))
-                    .in_base_set(CoreGameSet::Main),
+                    .in_set(CoreGameSet::Main)
+                    .in_schedule(CoreSchedule::FixedUpdate),
             )
+            .add_system(Self::handle_mob_move_minimap_update.in_set(OnUpdate(GameState::Main)))
             .add_plugin(SpawnerPlugin);
     }
 }
@@ -302,6 +307,14 @@ impl EnemyPlugin {
                 }
                 _ => {}
             }
+        }
+    }
+    fn handle_mob_move_minimap_update(
+        moving_enemies: Query<Entity, (With<Mob>, Changed<GlobalTransform>)>,
+        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    ) {
+        if moving_enemies.iter().count() > 0 {
+            minimap_event.send(UpdateMiniMapEvent);
         }
     }
 }

@@ -1,7 +1,8 @@
 use crate::assets::Graphics;
+use crate::enemy::Mob;
 use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
 use crate::world::{TileMapPositionData, CHUNK_SIZE};
-use crate::{CoreGameSet, CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
+use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -16,7 +17,7 @@ impl Plugin for MinimapPlugin {
         app.add_event::<UpdateMiniMapEvent>().add_system(
             Self::setup_mini_map
                 .after(CustomFlush)
-                .in_base_set(CoreGameSet::Main),
+                .in_set(OnUpdate(GameState::Main)),
         );
     }
 }
@@ -38,6 +39,7 @@ impl MinimapPlugin {
         mut minimap_update: EventReader<UpdateMiniMapEvent>,
         old_map: Query<Entity, With<Minimap>>,
         p_t: Query<&Transform, With<Player>>,
+        mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
         mut meshes: ResMut<Assets<Mesh>>,
     ) {
         //NOTES:
@@ -62,6 +64,15 @@ impl MinimapPlugin {
             let pt = p_t.single();
             let p_cp = camera_pos_to_chunk_pos(&pt.translation.truncate());
             let p_tp = camera_pos_to_block_pos(&pt.translation.truncate());
+            let mobs: Vec<_> = mob_t
+                .iter()
+                .map(|t| {
+                    (
+                        camera_pos_to_chunk_pos(&t.translation().truncate()),
+                        camera_pos_to_block_pos(&t.translation().truncate()),
+                    )
+                })
+                .collect();
             let mut data = Vec::default();
             //Every pixel is 4 entries in image.data
 
@@ -80,6 +91,7 @@ impl MinimapPlugin {
                         let mut chunk_pos = p_cp;
                         let mut tile_x = p_tp.x as i32 + x;
                         let mut tile_y = p_tp.y as i32 + y;
+
                         while tile_x >= CHUNK_SIZE as i32 {
                             tile_x = tile_x - CHUNK_SIZE as i32;
                             chunk_pos.x += 1;
@@ -100,16 +112,26 @@ impl MinimapPlugin {
                             x: tile_x as u32,
                             y: (tile_y) as u32,
                         };
+
                         if let Some(tile_data) = game.get_tile_data(TileMapPositionData {
                             chunk_pos,
                             tile_pos,
                         }) {
                             let mut tile = tile_data.block_type;
-
-                            if let Some(obj_data) = game.get_tile_obj_data(TileMapPositionData {
-                                tile_pos,
-                                chunk_pos,
-                            }) {
+                            if mobs.contains(&(chunk_pos, tile_pos)) {
+                                for _ in 0..2 {
+                                    data.push(230);
+                                    data.push(25);
+                                    data.push(25);
+                                    data.push(255);
+                                }
+                                continue;
+                            } else if let Some(obj_data) =
+                                game.get_tile_obj_data(TileMapPositionData {
+                                    tile_pos,
+                                    chunk_pos,
+                                })
+                            {
                                 let obj_type = obj_data.object;
                                 tile = [obj_type; 4];
                             }

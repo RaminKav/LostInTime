@@ -30,7 +30,7 @@ impl Plugin for GenerationPlugin {
                         .after(CustomFlush)
                         .after(Self::handle_new_wall_spawn_update),
                 )
-                    .in_base_set(CoreGameSet::Main),
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -484,7 +484,7 @@ impl GenerationPlugin {
                 .map(|tp| *tp)
                 .collect::<Vec<(f32, f32, WorldObject)>>();
 
-            println!("SPAWNING OBJECTS FOR {chunk_pos:?} {:?}", objs.len(),);
+            // println!("SPAWNING OBJECTS FOR {chunk_pos:?} {:?}", objs.len(),);
             for tp in objs.clone().iter() {
                 let tile_pos = TilePos {
                     x: tp.0 as u32,
