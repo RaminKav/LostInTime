@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use crate::{world::CHUNK_SIZE, CoreGameSet, Player, RawPosition};
+use crate::{world::CHUNK_SIZE, AppExt, CoreGameSet, Player, RawPosition};
 
 pub struct MovePlayerEvent {
     pub chunk_pos: IVec2,
@@ -11,8 +11,14 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MovePlayerEvent>()
-            .add_system(handle_move_player.in_base_set(CoreGameSet::Main));
+        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+            app.add_event::<MovePlayerEvent>();
+        })
+        .add_system(
+            handle_move_player
+                .in_set(CoreGameSet::Main)
+                .in_schedule(CoreSchedule::FixedUpdate),
+        );
     }
 }
 pub fn handle_move_player(

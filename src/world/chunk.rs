@@ -229,7 +229,6 @@ impl ChunkPlugin {
             }
 
             let chunk_pos = e.chunk_pos;
-            println!("UPDATE TILES FOR {chunk_pos:?}");
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let pos = TileMapPositionData {

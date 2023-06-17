@@ -122,6 +122,12 @@ pub struct DropOnSlotEvent {
 }
 #[derive(Debug, Clone)]
 
+pub struct ToolTipUpdateEvent {
+    item_stack: ItemStack,
+    parent_slot_entity: Entity,
+}
+#[derive(Debug, Clone)]
+
 pub struct DropInWorldEvent {
     dropped_entity: Entity,
     dropped_item_stack: ItemStack,
@@ -143,6 +149,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(LastHoveredSlot { slot: None })
             .add_event::<DropOnSlotEvent>()
+            .add_event::<ToolTipUpdateEvent>()
             .add_event::<DropInWorldEvent>()
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
@@ -164,6 +171,7 @@ impl Plugin for UIPlugin {
                     handle_drop_on_slot_events.after(handle_item_drop_clicks),
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
                     handle_cursor_update.before(handle_item_drop_clicks),
+                    handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(handle_hovering),
                     update_healthbar,
                 )
@@ -323,8 +331,8 @@ fn handle_hovering(
     tooltips: Query<(Entity, &UIElement, &Parent), Without<InventorySlotState>>,
     graphics: Res<Graphics>,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     inv: Query<&Inventory>,
+    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
@@ -363,13 +371,10 @@ fn handle_hovering(
                             .unwrap()
                             .item_stack
                     };
-                    let tooltip = self::spawn_inv_item_tooltip(
-                        &mut commands,
-                        &graphics,
-                        &asset_server,
-                        &item,
-                    );
-                    commands.entity(e).add_child(tooltip);
+                    tooltip_update_events.send(ToolTipUpdateEvent {
+                        item_stack: item,
+                        parent_slot_entity: e,
+                    });
                 }
             }
         }
@@ -810,105 +815,114 @@ pub fn toggle_inv_visibility(
         }
     }
 }
-fn spawn_inv_item_tooltip(
-    commands: &mut Commands,
-    graphics: &Graphics,
-    asset_server: &AssetServer,
-    item_stack: &ItemStack,
-) -> Entity {
-    let has_attributes = item_stack.metadata.attributes.len() > 0;
-    let size = if has_attributes {
-        Vec2::new(80., 80.)
-    } else {
-        Vec2::new(64., 24.)
-    };
-    let tooltip = commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics
-                    .ui_image_handles
-                    .as_ref()
-                    .unwrap()
-                    .get(if has_attributes {
-                        &UIElement::LargeTooltip
-                    } else {
-                        &UIElement::Tooltip
-                    })
-                    .unwrap()
-                    .clone(),
-                transform: Transform {
-                    translation: Vec3::new(0., if has_attributes { 48. } else { 20. }, 2.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                sprite: Sprite {
-                    custom_size: Some(size),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            UIElement::LargeTooltip,
-            Name::new("TOOLTIP"),
-        ))
-        .id();
-
-    let mut tooltip_text: Vec<(String, f32)> = vec![];
-    tooltip_text.push((item_stack.metadata.name.clone(), 0.));
-    // tooltip_text.push(item_stack.metadata.desc.clone());
-    for (i, a) in item_stack.metadata.attributes.iter().enumerate().clone() {
-        let d = if i == 0 { 2. } else { 0. };
-        tooltip_text.push((a.to_string(), d));
-    }
-    if has_attributes {
-        tooltip_text.push((item_stack.metadata.durability.clone(), 28.));
-    }
-
-    // let item_stack = ItemStack {
-    //     obj_type: item_stack.obj_type,
-    //     metadata: item_stack.metadata.clone(),
-    //     attributes: item_stack.attributes.clone(),
-    //     count: item_stack.count,
-    // };
-    // let item_icon = spawn_item_stack_icon(commands, graphics, &item_stack, asset_server);
-    // commands.entity(tooltip).add_child(item_icon);
-    for (i, (text, d)) in tooltip_text.iter().enumerate() {
-        let text_pos = if has_attributes {
-            Vec3::new(0., 28. - (i as f32 * 10.) - d, 1.)
+fn handle_spawn_inv_item_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    mut updates: EventReader<ToolTipUpdateEvent>,
+) {
+    for item in updates.iter() {
+        let has_attributes = item.item_stack.metadata.attributes.len() > 0;
+        let size = if has_attributes {
+            Vec2::new(80., 80.)
         } else {
-            Vec3::new(12., 0., 1.)
+            Vec2::new(64., 24.)
         };
-        let text = commands
+        let tooltip = commands
             .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        text,
-                        TextStyle {
-                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                            font_size: 8.0,
-                            color: Color::Rgba {
-                                red: 75. / 255.,
-                                green: 61. / 255.,
-                                blue: 68. / 255.,
-                                alpha: 1.,
-                            },
-                        },
-                    )
-                    .with_alignment(TextAlignment::Left),
+                SpriteBundle {
+                    texture: graphics
+                        .ui_image_handles
+                        .as_ref()
+                        .unwrap()
+                        .get(if has_attributes {
+                            &UIElement::LargeTooltip
+                        } else {
+                            &UIElement::Tooltip
+                        })
+                        .unwrap()
+                        .clone(),
                     transform: Transform {
-                        translation: text_pos,
+                        translation: Vec3::new(0., if has_attributes { 48. } else { 20. }, 2.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
-                    ..default()
+                    sprite: Sprite {
+                        custom_size: Some(size),
+                        ..Default::default()
+                    },
+                    ..Default::default()
                 },
-                Name::new("TOOLTIP TEXT"),
                 RenderLayers::from_layers(&[3]),
+                UIElement::LargeTooltip,
+                Name::new("TOOLTIP"),
             ))
             .id();
-        commands.entity(tooltip).add_child(text);
+
+        let mut tooltip_text: Vec<(String, f32)> = vec![];
+        tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
+        // tooltip_text.push(item.item_stack.metadata.desc.clone());
+        for (i, a) in item
+            .item_stack
+            .metadata
+            .attributes
+            .iter()
+            .enumerate()
+            .clone()
+        {
+            let d = if i == 0 { 2. } else { 0. };
+            tooltip_text.push((a.to_string(), d));
+        }
+        if has_attributes {
+            tooltip_text.push((item.item_stack.metadata.durability.clone(), 28.));
+        }
+
+        // let item_stack = ItemStack {
+        //     obj_type: item_stack.obj_type,
+        //     metadata: item_stack.metadata.clone(),
+        //     attributes: item_stack.attributes.clone(),
+        //     count: item_stack.count,
+        // };
+        // let item_icon = spawn_item_stack_icon(commands, graphics, &item_stack, asset_server);
+        // commands.entity(tooltip).add_child(item_icon);
+        for (i, (text, d)) in tooltip_text.iter().enumerate() {
+            let text_pos = if has_attributes {
+                Vec3::new(0., 28. - (i as f32 * 10.) - d, 1.)
+            } else {
+                Vec3::new(12., 0., 1.)
+            };
+            let text = commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            text,
+                            TextStyle {
+                                font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                                font_size: 8.0,
+                                color: Color::Rgba {
+                                    red: 75. / 255.,
+                                    green: 61. / 255.,
+                                    blue: 68. / 255.,
+                                    alpha: 1.,
+                                },
+                            },
+                        )
+                        .with_alignment(TextAlignment::Left),
+                        transform: Transform {
+                            translation: text_pos,
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    },
+                    Name::new("TOOLTIP TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .id();
+            commands.entity(tooltip).add_child(text);
+        }
+        commands.entity(item.parent_slot_entity).add_child(tooltip);
     }
-    tooltip
 }
 
 pub fn spawn_inv_slot(
@@ -1079,7 +1093,7 @@ pub fn spawn_item_stack_icon(
     commands.entity(item).push_children(&[text]);
     item
 }
-
+//TODO: make event?
 pub fn change_hotbar_slot(
     slot: usize,
     inv_state: &mut Query<&mut InventoryState>,

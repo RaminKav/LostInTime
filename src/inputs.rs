@@ -19,8 +19,8 @@ use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_p
 use crate::world::TileMapPositionData;
 use crate::{item::WorldObject, Player, PLAYER_DASH_SPEED, TIME_STEP};
 use crate::{
-    CoreGameSet, CustomFlush, GameParam, GameUpscale, MainCamera, RawPosition, TextureCamera,
-    UICamera, PLAYER_MOVE_SPEED, WIDTH,
+    AppExt, CoreGameSet, CustomFlush, GameParam, GameState, GameUpscale, MainCamera, RawPosition,
+    TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -61,18 +61,26 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
-            .add_event::<AttackEvent>()
+            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+                app.add_event::<AttackEvent>();
+            })
             .add_systems(
                 (
                     Self::turn_player,
                     Self::move_player,
                     Self::mouse_click_system.after(CustomFlush),
-                    Self::handle_hotbar_key_input,
-                    Self::test_take_damage,
-                    Self::update_cursor_pos.after(Self::move_player),
                     Self::move_camera_with_player.after(Self::move_player),
+                    Self::test_take_damage,
                 )
-                    .in_base_set(CoreGameSet::Main),
+                    .in_set(CoreGameSet::Main)
+                    .in_schedule(CoreSchedule::FixedUpdate),
+            )
+            .add_systems(
+                (
+                    Self::handle_hotbar_key_input,
+                    Self::update_cursor_pos.after(Self::move_player),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(Self::toggle_inventory);
     }
@@ -161,9 +169,9 @@ impl InputsPlugin {
             player.player_dash_cooldown.reset();
             player.player_dash_duration.reset();
         }
-        if key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]) &&
-        // || (dx == 0. && dy == 0.)
-        !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
+        if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
+            && !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]))
+            || (d.x == 0. && d.y == 0.)
         {
             player.is_moving = false;
         }

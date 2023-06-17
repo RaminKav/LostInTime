@@ -10,7 +10,7 @@ use crate::{
     item::{LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
-    CoreGameSet, CustomFlush, Game, GameParam, Player, YSort,
+    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
 };
 
 #[derive(Debug, Clone)]
@@ -50,21 +50,23 @@ pub struct JustGotHit;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<HitEvent>()
-            .add_event::<EnemyDeathEvent>()
-            .add_event::<ObjBreakEvent>()
-            .add_systems(
-                (
-                    Self::handle_hits,
-                    Self::handle_attack_cooldowns.before(CustomFlush),
-                    Self::spawn_hit_spark_effect.after(Self::handle_hits),
-                    Self::handle_invincibility_frames.after(Self::handle_hits),
-                    Self::handle_enemy_death.after(Self::handle_hits),
-                    Self::check_hit_collisions,
-                )
-                    .in_base_set(CoreGameSet::Main),
+        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+            app.add_event::<HitEvent>()
+                .add_event::<EnemyDeathEvent>()
+                .add_event::<ObjBreakEvent>();
+        })
+        .add_systems(
+            (
+                Self::handle_hits,
+                Self::handle_attack_cooldowns.before(CustomFlush),
+                Self::spawn_hit_spark_effect.after(Self::handle_hits),
+                Self::handle_invincibility_frames.after(Self::handle_hits),
+                Self::handle_enemy_death.after(Self::handle_hits),
+                Self::check_hit_collisions,
             )
-            .add_system(apply_system_buffers.in_set(CustomFlush));
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 

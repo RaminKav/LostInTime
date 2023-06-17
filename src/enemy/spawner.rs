@@ -7,11 +7,9 @@ use rand::{seq::SliceRandom, Rng};
 use crate::{
     enemy::EnemySpawnEvent,
     world::{
-        chunk::{Chunk, SpawnChunkEvent},
-        world_helpers::camera_pos_to_chunk_pos,
-        TileMapPositionData, CHUNK_SIZE,
+        chunk::Chunk, world_helpers::camera_pos_to_chunk_pos, TileMapPositionData, CHUNK_SIZE,
     },
-    CoreGameSet, GameParam, GameState,
+    GameParam, GameState,
 };
 
 use super::{Mob, NeutralMob};
@@ -28,7 +26,7 @@ impl Plugin for SpawnerPlugin {
                 Self::handle_add_spawners_on_chunk_spawn,
                 Self::check_mob_count,
             )
-                .in_base_set(CoreGameSet::Main),
+                .in_set(OnUpdate(GameState::Main)),
         );
     }
 }

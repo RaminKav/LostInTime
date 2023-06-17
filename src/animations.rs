@@ -13,7 +13,7 @@ use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
 use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
-use crate::{CoreGameSet, Limb, RawPosition};
+use crate::{GameState, Limb, RawPosition};
 
 pub struct AnimationsPlugin;
 
@@ -82,7 +82,7 @@ impl Plugin for AnimationsPlugin {
                     Self::animate_hit,
                     Self::animate_spritesheet_animations.after(InputsPlugin::mouse_click_system),
                 )
-                    .in_base_set(CoreGameSet::Main),
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }

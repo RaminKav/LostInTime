@@ -5,7 +5,8 @@ use std::{
 
 use ai::AIPlugin;
 use attributes::{
-    Attack, AttackCooldown, AttributesPlugin, Health, InvincibilityCooldown, PlayerAttributeBundle,
+    Attack, AttackCooldown, AttributesPlugin, Health, InvincibilityCooldown, ItemAttributes,
+    PlayerAttributeBundle,
 };
 use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
 
@@ -16,7 +17,7 @@ use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
-    ecs::system::SystemParam,
+    ecs::{schedule::ScheduleLabel, system::SystemParam},
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -155,7 +156,6 @@ impl Default for Game {
     }
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
-#[system_set(base)]
 pub enum CoreGameSet {
     Main,
 }
@@ -627,6 +627,11 @@ fn setup(
                 crafting_items: [INVENTORY_INIT; 4],
                 crafting_result_item: None,
             },
+            ItemAttributes {
+                health: 100,
+                attack: 5,
+                ..default()
+            },
             PlayerAttributeBundle {
                 health: Health(100),
                 attack: Attack(5),
@@ -673,4 +678,22 @@ fn setup(
     ));
 
     game.player = p;
+}
+
+trait AppExt {
+    fn with_default_schedule(&mut self, s: impl ScheduleLabel, f: impl Fn(&mut App)) -> &mut App;
+}
+
+impl AppExt for App {
+    fn with_default_schedule(
+        &mut self,
+        schedule: impl ScheduleLabel,
+        f: impl Fn(&mut App),
+    ) -> &mut App {
+        let orig_default = self.default_schedule_label.clone();
+        self.default_schedule_label = Box::new(schedule);
+        f(self);
+        self.default_schedule_label = orig_default;
+        self
+    }
 }
