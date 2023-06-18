@@ -33,7 +33,6 @@ use bevy::{
 };
 
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::*;
 mod ai;
 mod animations;
@@ -41,6 +40,7 @@ mod assets;
 mod attributes;
 mod client;
 mod combat;
+mod custom_commands;
 mod enemy;
 mod inputs;
 mod inventory;
@@ -60,7 +60,7 @@ use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::{FacingDirection, InputsPlugin, MovementVector};
 use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
-use item::{Equipment, EquipmentData, ItemsPlugin, LootTableMap, WorldObject, WorldObjectResource};
+use item::{Equipment, EquipmentData, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::PlayerPlugin;
 use proto::ProtoPlugin;
 use serde::Deserialize;
@@ -184,7 +184,6 @@ pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
     pub chunk_manager: ResMut<'w, ChunkManager>,
-    pub loot_tables: Res<'w, LootTableMap>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,

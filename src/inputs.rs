@@ -2,26 +2,29 @@ use bevy::prelude::*;
 use bevy::utils::HashSet;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
-use crate::enemy::{EnemySpawnEvent, Mob, NeutralMob};
+use crate::enemy::EnemySpawnEvent;
 use crate::inventory::{Inventory, ItemStack};
 use crate::item::{Equipment, ItemDisplayMetaData};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
-use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
-use crate::world::TileMapPositionData;
-use crate::{item::WorldObject, Player, PLAYER_DASH_SPEED, TIME_STEP};
-use crate::{
-    AppExt, CoreGameSet, CustomFlush, GameParam, GameState, GameUpscale, MainCamera, RawPosition,
-    TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
+use crate::world::world_helpers::{
+    camera_pos_to_block_pos, camera_pos_to_chunk_pos, tile_pos_to_world_pos,
 };
+use crate::world::TileMapPositionData;
+use crate::{
+    custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
+    GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
+};
+use crate::{item::WorldObject, Player, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -161,6 +164,7 @@ impl InputsPlugin {
             d.y -= 1.;
             player.is_moving = true;
         }
+        //TODO: move this tick to animations.rs
         if player.player_dash_cooldown.tick(time.delta()).finished()
             && key_input.pressed(KeyCode::Space)
         {
@@ -268,8 +272,9 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
         mut commands: Commands,
+        mut proto_commands: ProtoCommands,
+        prototypes: Prototypes,
         mut inv: Query<&mut Inventory>,
-        mut spawn_event: EventWriter<EnemySpawnEvent>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             let mut inv_state = inv_query.single_mut().1;
@@ -304,13 +309,11 @@ impl InputsPlugin {
             DungeonPlugin::spawn_new_dungeon_dimension(&mut commands);
         }
         if key_input.just_pressed(KeyCode::L) {
-            spawn_event.send(EnemySpawnEvent {
-                enemy: Mob::Neutral(NeutralMob::Slime),
-                pos: TileMapPositionData {
-                    chunk_pos: IVec2 { x: 0, y: 0 },
-                    tile_pos: TilePos { x: 0, y: 0 },
-                },
+            let pos = tile_pos_to_world_pos(TileMapPositionData {
+                chunk_pos: IVec2 { x: 0, y: 0 },
+                tile_pos: TilePos { x: 0, y: 0 },
             });
+            proto_commands.spawn_item_from_proto("Slime".to_owned(), &prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();

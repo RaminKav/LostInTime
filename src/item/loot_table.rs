@@ -1,15 +1,14 @@
 use crate::attributes::ItemAttributes;
-use crate::enemy::Mob;
 use crate::inventory::ItemStack;
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 use serde::Deserialize;
 
 use super::{ItemDisplayMetaData, WorldObject};
 pub struct LootTablePlugin;
 impl Plugin for LootTablePlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(LootTableMap::default());
+    fn build(&self, _app: &mut App) {
         // app.add_event::<CraftingSlotUpdateEvent>().add_system_set(
         //     SystemSet::on_update(GameState::Main)
         //         .with_run_criteria(FixedTimestep::step(TIME_STEP as f64))
@@ -17,17 +16,13 @@ impl Plugin for LootTablePlugin {
     }
 }
 
-#[derive(Resource, Clone, Debug, Default, Deserialize)]
-pub struct LootTableMap {
-    pub table: HashMap<Mob, LootTable>,
-}
-
-#[derive(Default, Clone, Debug, Component, Deserialize)]
+#[derive(Default, Schematic, Reflect, FromReflect, Clone, Debug, Component, Deserialize)]
+#[reflect(Schematic)]
 pub struct LootTable {
     pub drops: Vec<Loot>,
 }
 
-#[derive(Default, Clone, Debug, Deserialize)]
+#[derive(Default, Reflect, FromReflect, Clone, Debug, Deserialize)]
 pub struct Loot {
     pub item: WorldObject,
     pub min: usize,

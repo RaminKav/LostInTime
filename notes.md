@@ -136,5 +136,23 @@ proto todo:
     - projectile needs: sprite, speed, lerp_Type (linear speed, ease in, etc),
   - ToolToughness (replaces breaks_with)
 
+- add item attribute systemparam?
+
 - Item Attributes:
--
+- Players have Components of individual stats: Health, Attack, AttackCooldown, etc
+  these stats' values are obtained from the summation of the player's base value of that stat, if any, plus the summation of all equipment the player is wearing with that given stat.
+  this calculation is done in a system whenever any stat changes on an item (recalculate stat comps for player)
+  Items do not have components for each stat like player, instead they have a ItemAttributes field as part of their ItemStack object in the Inventory Vec.
+  ItemAttributes is the source of truth for that item while it lives in an Inventory or equipped on a player
+
+updating ItemAttributes on an item sends an Event to recalc the player stats as well as reconstructing the item's tooltip metadata
+
+how to set up item prefabs:
+
+- Equipment that enter the world as an Entity from a drop:
+  - use prefab custom impl that takes attribute min/max, calculates an rng roll per stat
+- spawn_item_drop already takes optional attributes override. use this for existing items that get dropped from inv
+- creating an item directly into the inventory will currently not work with this design. if its not an entity, cant use prefab to get attributes
+
+BUG: moving very far causes dash cooldown to double in speed? weird behaviour
+BUG: move dash tick to animations.rs

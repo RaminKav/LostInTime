@@ -10,7 +10,7 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::item::{LootTableMap, RecipeList, Recipes, WorldObject, WorldObjectResource};
+use crate::item::{RecipeList, Recipes, WorldObject, WorldObjectResource};
 use crate::ui::UIElement;
 use crate::{GameState, ImageAssets, Limb};
 use ron::de::from_str;
@@ -176,9 +176,7 @@ impl GameAssetsPlugin {
     pub fn load_graphics(
         mut graphics: ResMut<Graphics>,
         mut recipes: ResMut<Recipes>,
-        mut loot_tables: ResMut<LootTableMap>,
         sprite_sheet: Res<ImageAssets>,
-        mut image_assets: ResMut<Assets<Image>>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
         mut materials: ResMut<Assets<FoliageMaterial>>,
@@ -189,17 +187,12 @@ impl GameAssetsPlugin {
         let wall_image_handle = sprite_sheet.walls_sheet.clone();
         let sprite_desc = fs::read_to_string("assets/textures/sprites_desc.ron").unwrap();
         let recipe_desc = fs::read_to_string("assets/recipes/recipes.ron").unwrap();
-        let loot_table_desc = fs::read_to_string("assets/loot/loot_tables.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
             println!("Failed to load config for graphics: {e}");
             std::process::exit(1);
         });
         let recipes_desc: Recipes = from_str(&recipe_desc).unwrap_or_else(|e| {
-            println!("Failed to load config for recipes: {e}");
-            std::process::exit(1);
-        });
-        let loot_table_desc: LootTableMap = from_str(&loot_table_desc).unwrap_or_else(|e| {
             println!("Failed to load config for recipes: {e}");
             std::process::exit(1);
         });
@@ -220,7 +213,6 @@ impl GameAssetsPlugin {
         let mut foliage_material_map = HashMap::default();
 
         let mut recipes_list = RecipeList::default();
-        let mut loot_table_list = LootTableMap::default();
 
         for (item, rect) in sprite_desc.items.iter() {
             println!("Found graphic {item:?}");
@@ -278,16 +270,7 @@ impl GameAssetsPlugin {
             println!("Loaded recipe for {result:?}: {recipe:?}");
         }
 
-        // load loot_tables
-        for (enemy, loot_table) in loot_table_desc.table.iter() {
-            loot_table_list
-                .table
-                .insert(enemy.clone(), loot_table.clone());
-            println!("Loaded loot table for {enemy:?}: {loot_table:?}");
-        }
-
         *recipes = Recipes { recipes_list };
-        *loot_tables = loot_table_list;
         // load UI
         for u in UIElement::iter() {
             println!("LOADED UI ASSET {:?}", u.to_string());
