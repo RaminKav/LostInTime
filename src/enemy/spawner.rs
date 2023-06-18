@@ -2,12 +2,16 @@ use std::time::Duration;
 
 use bevy::{prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
+    custom_commands::CommandsExt,
     enemy::EnemySpawnEvent,
     world::{
-        chunk::Chunk, world_helpers::camera_pos_to_chunk_pos, TileMapPositionData, CHUNK_SIZE,
+        chunk::Chunk,
+        world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos},
+        TileMapPositionData, CHUNK_SIZE,
     },
     GameParam, GameState,
 };
@@ -80,8 +84,9 @@ impl SpawnerPlugin {
     }
     fn handle_spawn_mobs(
         mut game: GameParam,
+        mut proto_commands: ProtoCommands,
+        prototypes: Prototypes,
         mut spawner_trigger_event: EventReader<MobSpawnEvent>,
-        mut spawn_enemy_event: EventWriter<EnemySpawnEvent>,
     ) {
         for e in spawner_trigger_event.iter() {
             if game.get_chunk_entity(e.chunk_pos).is_none() {
@@ -102,14 +107,12 @@ impl SpawnerPlugin {
                             x: rng.gen_range(0..CHUNK_SIZE),
                             y: rng.gen_range(0..CHUNK_SIZE),
                         };
-
-                        spawn_enemy_event.send(EnemySpawnEvent {
-                            enemy: picked_spawner.enemy.clone(),
-                            pos: TileMapPositionData {
-                                tile_pos,
-                                chunk_pos: picked_spawner.chunk_pos,
-                            },
+                        let pos = tile_pos_to_world_pos(TileMapPositionData {
+                            tile_pos,
+                            chunk_pos: picked_spawner.chunk_pos,
                         });
+                        prototypes.is_ready("Slime");
+                        proto_commands.spawn_item_from_proto("Slime".to_owned(), &prototypes, pos);
 
                         picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     }

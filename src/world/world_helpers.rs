@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use super::{CHUNK_SIZE, TILE_SIZE};
+use super::{TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
 
 pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
     // do this bc we want bottom left of the block to be 0,0 instead of centre
@@ -36,4 +36,12 @@ pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> TilePos {
         x: block_pos.x as u32,
         y: block_pos.y as u32,
     }
+}
+pub fn tile_pos_to_world_pos(pos: TileMapPositionData) -> Vec2 {
+    Vec2::new(
+        pos.tile_pos.x as f32 * TILE_SIZE.x
+            + pos.chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
+        pos.tile_pos.y as f32 * TILE_SIZE.x
+            + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
+    )
 }

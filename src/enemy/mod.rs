@@ -2,9 +2,9 @@ use bevy::{
     prelude::*,
     reflect::TypeUuid,
     render::render_resource::{AsBindGroup, ShaderRef},
-    sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
+    sprite::{Material2d, Material2dPlugin},
 };
-use bevy_proto::prelude::{prototype_ready, ProtoCommands, ReflectSchematic, Schematic};
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
 use strum_macros::Display;
@@ -15,8 +15,8 @@ use crate::{
         MoveDirection,
     },
     ui::minimap::UpdateMiniMapEvent,
-    world::{TileMapPositionData, CHUNK_SIZE},
-    AppExt, CoreGameSet, GameParam, GameState,
+    world::TileMapPositionData,
+    AppExt, GameParam, GameState,
 };
 
 pub mod spawner;
@@ -30,12 +30,7 @@ impl Plugin for EnemyPlugin {
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<EnemySpawnEvent>();
             })
-            .add_system(
-                Self::summon_enemies
-                    .run_if(prototype_ready("EnemyBasicNeutral"))
-                    .in_set(CoreGameSet::Main)
-                    .in_schedule(CoreSchedule::FixedUpdate),
-            )
+            .add_system(Self::handle_new_mob_state_machine.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::handle_mob_move_minimap_update.in_set(OnUpdate(GameState::Main)))
             .add_plugin(SpawnerPlugin);
     }
@@ -126,78 +121,16 @@ pub struct EnemySpawnEvent {
     pub pos: TileMapPositionData,
 }
 impl EnemyPlugin {
-    pub fn summon_enemies(
-        mut proto_commands: ProtoCommands,
+    pub fn handle_new_mob_state_machine(
+        mut commands: Commands,
         game: GameParam,
-        asset_server: Res<AssetServer>,
-        mut materials: ResMut<Assets<EnemyMaterial>>,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut spawn_events: EventReader<EnemySpawnEvent>,
+        spawn_events: Query<(Entity, &Mob), Added<Mob>>,
     ) {
-        for enemy in spawn_events.iter() {
-            //TODO: Add helper fn for this
-            let pos = Vec2::new(
-                (enemy.pos.tile_pos.x as i32 * 32 + enemy.pos.chunk_pos.x * CHUNK_SIZE as i32 * 32)
-                    as f32,
-                (enemy.pos.tile_pos.y as i32 * 32 + enemy.pos.chunk_pos.y * CHUNK_SIZE as i32 * 32)
-                    as f32,
-            );
-            let name = "slime"; //enemy.enemy.to_string();
-            let handle = asset_server.load(format!(
-                "textures/{}/{}-move-0.png",
-                name.to_lowercase(),
-                name.to_lowercase()
-            ));
-            let enemy_material = materials.add(EnemyMaterial {
-                source_texture: Some(handle),
-                is_attacking: 0.,
-            });
-            let mut enemy_e = proto_commands.spawn("EnemyBasicNeutral");
-            let mut enemy_e = enemy_e.entity_commands();
-            enemy_e.insert(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(Mesh::from(shape::Quad {
-                        size: Vec2::new(32., 32.),
-                        ..Default::default()
-                    }))
-                    .into(),
-                transform: Transform::from_translation(pos.extend(0.)),
-                material: enemy_material,
-                ..default()
-            });
-
-            // .spawn((
-            //     MaterialMesh2dBundle {
-            //         mesh: meshes
-            //             .add(Mesh::from(shape::Quad {
-            //                 size: Vec2::new(32., 32.),
-            //                 ..Default::default()
-            //             }))
-            //             .into(),
-            //         transform: Transform::from_translation(pos.extend(0.)),
-            //         material: enemy_material,
-            //         ..default()
-            //     },
-            //     AnimationTimer(Timer::from_seconds(0.20, TimerMode::Repeating)),
-            //     AnimationFrameTracker(0, 7),
-            //     Health(100),
-            //     KinematicCharacterController::default(),
-            //     Collider::cuboid(10., 8.),
-            //     YSort,
-            //     enemy.enemy.clone(),
-            //     IdleState {
-            //         walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-            //         direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-            //         speed: 0.5,
-            //     },
-            //     Name::new(name),
-            // ));
-            if let Some(loot_table) = game.loot_tables.table.get(&enemy.enemy) {
-                enemy_e.insert(loot_table.clone());
-            }
-            match enemy.enemy {
+        for (e, mob) in spawn_events.iter() {
+            let mut e_cmds = commands.entity(e);
+            match mob {
                 Mob::Neutral(_) => {
-                    enemy_e.insert(
+                    e_cmds.insert(
                         StateMachine::default()
                             .set_trans_logging(false)
                             .trans::<IdleState>(
@@ -249,7 +182,7 @@ impl EnemyPlugin {
                     );
                 }
                 Mob::Hostile(_) => {
-                    enemy_e.insert(
+                    e_cmds.insert(
                         StateMachine::default()
                             .trans::<IdleState>(
                                 LineOfSight {

@@ -13,6 +13,7 @@ use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use std::fmt;
 
 mod crafting;
@@ -59,9 +60,20 @@ pub struct ItemDisplayMetaData {
 pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(
-    Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
+    Debug,
+    FromReflect,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    Schematic,
 )]
-#[reflect(Component)]
+#[reflect(Component, Schematic)]
 pub enum WorldObject {
     None,
     Grass,
@@ -87,9 +99,10 @@ pub enum WorldObject {
     Serialize,
     Deserialize,
     Component,
+    Schematic,
     Display,
 )]
-#[reflect(Component)]
+#[reflect(Component, Schematic)]
 pub enum Foliage {
     Tree,
 }
@@ -110,10 +123,11 @@ impl Default for Foliage {
     Serialize,
     Deserialize,
     Component,
+    Schematic,
     Display,
     EnumIter,
 )]
-#[reflect(Component)]
+#[reflect(Component, Schematic)]
 pub enum Wall {
     Stone,
 }
@@ -124,8 +138,20 @@ impl Default for Wall {
 }
 
 #[derive(
-    Debug, FromReflect, Reflect, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize, Component,
+    Debug,
+    FromReflect,
+    Reflect,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    Hash,
+    Serialize,
+    Deserialize,
+    Component,
+    Schematic,
 )]
+#[reflect(Component, Schematic)]
 pub enum Placeable {
     Log,
 }
