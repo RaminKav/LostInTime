@@ -49,12 +49,11 @@ pub struct EquipmentData {
     pub obj: WorldObject,
 }
 
-#[derive(Component, Reflect, FromReflect, Debug, PartialEq, Clone)]
+#[derive(Component, Reflect, FromReflect, Schematic, Debug, Default, PartialEq, Clone)]
+#[reflect(Schematic)]
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: String,
-    pub attributes: Vec<String>,
-    pub durability: String,
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -488,8 +487,6 @@ impl WorldObject {
             attack_cooldown: 0.4,
             ..Default::default()
         };
-        let tooltips = attributes.get_tooltips();
-        let durability_tooltip = attributes.get_durability_tooltip();
 
         if let Some(limb) = obj_data.equip_slot {
             position = Vec3::new(
@@ -513,8 +510,6 @@ impl WorldObject {
                 .insert(ItemDisplayMetaData {
                     name: self.to_string(),
                     desc: "A cool piece of Equipment".to_string(),
-                    attributes: tooltips,
-                    durability: durability_tooltip,
                 })
                 .insert(Equipment(limb))
                 .insert(YSort)
@@ -668,8 +663,6 @@ impl WorldObject {
         } else {
             ItemAttributes::default()
         };
-        let tooltips = attributes.get_tooltips();
-        let durability_tooltip = attributes.get_durability_tooltip();
 
         let stack = ItemStack {
             obj_type: self,
@@ -677,8 +670,6 @@ impl WorldObject {
             metadata: ItemDisplayMetaData {
                 name: self.to_string(),
                 desc: "A cool item drop!".to_string(),
-                attributes: tooltips,
-                durability: durability_tooltip,
             },
             count,
         };
@@ -799,14 +790,16 @@ impl ItemsPlugin {
     /// Keeps the graphics up to date for things that are harvested or grown
     fn update_graphics(
         mut to_update_query: Query<
-            (&mut TextureAtlasSprite, &WorldObject),
+            (Entity, &mut TextureAtlasSprite, &WorldObject),
             (Changed<WorldObject>, Without<Wall>),
         >,
+        game: GameParam,
+        mut commands: Commands,
         graphics: Res<Graphics>,
     ) {
         let item_map = &&graphics.spritesheet_map;
         if let Some(item_map) = item_map {
-            for (mut sprite, world_object) in to_update_query.iter_mut() {
+            for (e, mut sprite, world_object) in to_update_query.iter_mut() {
                 let has_icon = graphics.icons.as_ref().unwrap().get(&world_object);
                 let new_sprite = if let Some(icon) = has_icon {
                     icon
@@ -815,6 +808,9 @@ impl ItemsPlugin {
                         .get(world_object)
                         .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
                 };
+                commands
+                    .entity(e)
+                    .insert(game.graphics.texture_atlas.as_ref().unwrap().clone());
                 sprite.clone_from(new_sprite);
             }
         }

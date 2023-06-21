@@ -45,7 +45,6 @@ impl CraftingPlugin {
             let result_option = if let Some(result) =
                 recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
             {
-                let attributes = ItemAttributes::default();
                 //TODO: get correct metadata for new item. add as .ron data?
                 Some(InventoryItemStack {
                     item_stack: ItemStack {
@@ -55,8 +54,6 @@ impl CraftingPlugin {
                         metadata: ItemDisplayMetaData {
                             name: result.to_string(),
                             desc: "A cool piece of Equipment".to_string(),
-                            attributes: attributes.get_tooltips(),
-                            durability: attributes.get_durability_tooltip(),
                         },
                     },
                     slot: 0,

@@ -12,7 +12,7 @@ use crate::{
     attributes::Health,
     client::ClientPlugin,
     inputs::CursorPos,
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack, INVENTORY_INIT},
+    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::{CraftingSlotUpdateEvent, WorldObject},
     GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
@@ -822,7 +822,9 @@ fn handle_spawn_inv_item_tooltip(
     mut updates: EventReader<ToolTipUpdateEvent>,
 ) {
     for item in updates.iter() {
-        let has_attributes = item.item_stack.metadata.attributes.len() > 0;
+        let attributes = item.item_stack.attributes.get_tooltips();
+        let durability = item.item_stack.attributes.get_durability_tooltip();
+        let has_attributes = attributes.len() > 0;
         let size = if has_attributes {
             Vec2::new(80., 80.)
         } else {
@@ -862,19 +864,12 @@ fn handle_spawn_inv_item_tooltip(
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
         // tooltip_text.push(item.item_stack.metadata.desc.clone());
-        for (i, a) in item
-            .item_stack
-            .metadata
-            .attributes
-            .iter()
-            .enumerate()
-            .clone()
-        {
+        for (i, a) in attributes.iter().enumerate().clone() {
             let d = if i == 0 { 2. } else { 0. };
             tooltip_text.push((a.to_string(), d));
         }
         if has_attributes {
-            tooltip_text.push((item.item_stack.metadata.durability.clone(), 28.));
+            tooltip_text.push((durability.clone(), 28.));
         }
 
         // let item_stack = ItemStack {

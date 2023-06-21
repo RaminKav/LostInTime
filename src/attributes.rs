@@ -14,7 +14,8 @@ pub struct AttributesPlugin;
 pub struct BlockAttributeBundle {
     pub health: Health,
 }
-#[derive(Resource, Component, PartialEq, Clone, Debug)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Debug)]
+#[reflect(Schematic, Default)]
 pub struct ItemAttributes {
     pub health: i32,
     pub attack: i32,
@@ -172,14 +173,10 @@ impl AttributesPlugin {
             for inv_item_option in inv.clone().items.iter() {
                 if let Some(inv_item) = inv_item_option {
                     let mut item = inv_item.item_stack.clone();
-                    let tooltips = item.attributes.get_tooltips();
-                    let durability_tooltip = item.attributes.get_durability_tooltip();
 
                     let new_meta = ItemDisplayMetaData {
                         name: item.metadata.name.clone(),
                         desc: item.metadata.desc.clone(),
-                        attributes: tooltips,
-                        durability: durability_tooltip,
                     };
                     item.metadata = new_meta;
                     inv.items[inv_item.slot] = Some(InventoryItemStack {
