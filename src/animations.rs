@@ -17,11 +17,9 @@ use crate::{GameState, Limb, RawPosition};
 
 pub struct AnimationsPlugin;
 
-#[derive(Component)]
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Schematic)]
 pub struct AnimationPosTracker(pub f32, pub f32, pub f32);
-
-// #[derive(Component)]
-// pub struct CameraOffsetTracker(Vec2, Vec2);
 
 #[derive(Component, Schematic, Reflect, FromReflect, Default)]
 #[reflect(Schematic)]

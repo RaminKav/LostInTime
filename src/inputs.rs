@@ -9,9 +9,8 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
-use crate::enemy::EnemySpawnEvent;
-use crate::inventory::{Inventory, ItemStack};
-use crate::item::{Equipment, ItemDisplayMetaData};
+use crate::inventory::Inventory;
+use crate::item::Equipment;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
@@ -281,28 +280,7 @@ impl InputsPlugin {
             inv_state.open = !inv_state.open;
         }
         if key_input.just_pressed(KeyCode::E) {
-            let attributes = ItemAttributes {
-                durability: 100,
-                max_durability: 100,
-                attack: 20,
-                attack_cooldown: 0.4,
-                ..Default::default()
-            };
-            let tooltips = attributes.get_tooltips();
-            let durability_tooltip = attributes.get_durability_tooltip();
-
-            let sword_stack = ItemStack {
-                obj_type: WorldObject::Sword,
-                attributes,
-                metadata: ItemDisplayMetaData {
-                    name: WorldObject::Sword.to_string(),
-                    desc: "A cool piece of Equipment".to_string(),
-                    attributes: tooltips,
-                    durability: durability_tooltip,
-                },
-                count: 1,
-            };
-            sword_stack.add_to_empty_inventory_slot(&mut inv, &mut game.inv_slot_query);
+            proto_commands.spawn_item_from_proto("Sword".to_owned(), &prototypes, Vec2::ZERO);
         }
 
         if key_input.just_pressed(KeyCode::P) {
@@ -331,7 +309,7 @@ impl InputsPlugin {
     pub fn test_take_damage(
         // mut player_health_query: Query<&mut Health, With<Player>>,
         key_input: ResMut<Input<KeyCode>>,
-        mut att_query: Query<(&mut Health, &Attack, &AttackCooldown), With<Player>>,
+        att_query: Query<(&mut Health, &Attack, &AttackCooldown), With<Player>>,
     ) {
         if key_input.just_pressed(KeyCode::X) {
             // att_query.single_mut().0 -= 20;

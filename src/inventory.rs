@@ -7,6 +7,7 @@ use crate::{
     ui::{InventorySlotState, InventorySlotType},
 };
 use bevy::prelude::*;
+use bevy_proto::prelude::*;
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
@@ -20,7 +21,8 @@ pub struct Inventory {
 }
 pub struct InventoryPlugin;
 
-#[derive(Component, Debug, PartialEq, Clone)]
+#[derive(Component, Debug, PartialEq, Reflect, FromReflect, Schematic, Default, Clone)]
+#[reflect(Schematic, Default)]
 pub struct ItemStack {
     pub obj_type: WorldObject,
     pub count: usize,
@@ -87,8 +89,6 @@ impl ItemStack {
             metadata: ItemDisplayMetaData {
                 name: self.metadata.name.clone(),
                 desc: self.metadata.desc.clone(),
-                attributes: attributes.clone().get_tooltips(),
-                durability: attributes.get_durability_tooltip(),
             },
         }
     }
@@ -232,6 +232,7 @@ impl InventoryPlugin {
         //TODO: should this return  None, or the original stack??
         if item_type != merge_into.item_stack.obj_type
             || merge_into.item_stack.metadata != to_merge.metadata
+            || merge_into.item_stack.attributes != to_merge.attributes
         {
             return Some(to_merge);
         }
@@ -275,6 +276,7 @@ impl InventoryPlugin {
             //TODO: should this return  None, or the original stack??
             if item_type != pickup_item.item_stack.obj_type
                 || pickup_item.item_stack.metadata != dragging_item.metadata
+                || pickup_item.item_stack.attributes != dragging_item.attributes
             {
                 return Some(dragging_item);
             }
@@ -352,6 +354,7 @@ impl InventoryPlugin {
         if let Some(target_item) = target_item_option {
             if target_item.item_stack.obj_type == obj_type
                 && target_item.item_stack.metadata == item.metadata
+                && target_item.item_stack.attributes == item.attributes
             {
                 Self::mark_slot_dirty(drop_slot, inv_slots);
                 return Self::merge_item_stacks(item, target_item, inv, slot_type);

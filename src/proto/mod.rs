@@ -8,14 +8,15 @@ use bevy_proto::{
     backend::schematics::FromSchematicInput,
     prelude::{PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
 };
-use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
+use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, Sensor};
 
 use crate::{
     ai::{IdleState, MoveDirection},
-    animations::{AnimationFrameTracker, AnimationTimer},
-    attributes::Health,
+    animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer},
+    attributes::{Health, ItemAttributes},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
-    item::{Loot, LootTable, WorldObject},
+    inventory::ItemStack,
+    item::{ItemDisplayMetaData, Loot, LootTable, WorldObject},
     YSort,
 };
 pub struct ProtoPlugin;
@@ -24,6 +25,7 @@ impl Plugin for ProtoPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.register_type::<Mob>()
             .register_type::<NeutralMob>()
+            .register_type::<SensorProto>()
             .register_type::<PassiveMob>()
             .register_type::<HostileMob>()
             .register_type::<AnimationFrameTracker>()
@@ -32,12 +34,16 @@ impl Plugin for ProtoPlugin {
             .register_type::<Loot>()
             .register_type::<Vec<Loot>>()
             .register_type::<WorldObject>()
+            .register_type::<ItemStack>()
+            .register_type::<ItemAttributes>()
+            .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
             .register_type::<MaterialMesh2DProto>()
             .register_type::<KCC>()
             .register_type::<ColliderProto>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<AnimationPosTracker>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_startup_system(Self::load_prototypes);
     }
@@ -45,6 +51,7 @@ impl Plugin for ProtoPlugin {
 
 impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
+        prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");
     }
@@ -53,6 +60,17 @@ impl ProtoPlugin {
 #[reflect(Schematic)]
 #[schematic(into = KinematicCharacterController)]
 struct KCC;
+
+//TODO: do we need to do this? ask
+#[derive(Schematic, Reflect, FromReflect)]
+#[reflect(Schematic)]
+#[schematic(into = Sensor)]
+struct SensorProto;
+impl From<SensorProto> for Sensor {
+    fn from(_: SensorProto) -> Sensor {
+        Sensor
+    }
+}
 
 impl From<KCC> for KinematicCharacterController {
     fn from(_: KCC) -> KinematicCharacterController {

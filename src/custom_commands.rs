@@ -24,7 +24,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
 
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
         spawned_entity_commands.insert(Transform::from_translation(pos.extend(0.)));
-
         Some(spawned_entity)
     }
 }

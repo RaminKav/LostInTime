@@ -123,29 +123,7 @@ proto todo:
 
 - make weapons proto?
 - make impl for mesh2dmaterial that takes input of asset, size, move txfm to .insert()
-
-- weapon/tool protos need:
-  \*\*\*\* remove sprite_desc entries for weps, this should replace all of those
-  -basic misc stuff (collider, ysort, markers, etc)
-
-  - WorldObject
-  - attributes(attack, durability, other stats)
-  - sprite image
-  - Equipman(Limb)
-  - Melee or Ranged attack types (maybe ranged needs a projectile?)
-    - projectile needs: sprite, speed, lerp_Type (linear speed, ease in, etc),
-  - ToolToughness (replaces breaks_with)
-
 - add item attribute systemparam?
-
-- Item Attributes:
-- Players have Components of individual stats: Health, Attack, AttackCooldown, etc
-  these stats' values are obtained from the summation of the player's base value of that stat, if any, plus the summation of all equipment the player is wearing with that given stat.
-  this calculation is done in a system whenever any stat changes on an item (recalculate stat comps for player)
-  Items do not have components for each stat like player, instead they have a ItemAttributes field as part of their ItemStack object in the Inventory Vec.
-  ItemAttributes is the source of truth for that item while it lives in an Inventory or equipped on a player
-
-updating ItemAttributes on an item sends an Event to recalc the player stats as well as reconstructing the item's tooltip metadata
 
 how to set up item prefabs:
 
@@ -156,3 +134,18 @@ how to set up item prefabs:
 
 BUG: moving very far causes dash cooldown to double in speed? weird behaviour
 BUG: move dash tick to animations.rs
+
+## Misc. Design Ideas
+
+- item identification
+- item re-rolling
+- mobs drop keys to bosses
+  - progression dependant on level/area?
+  - biomes spawn based on distance?
+- small towns spawn
+  - chance to have npcs that do actions for you, or sell gear?
+    - item identifier
+    - blacksmith - sells gear
+    - dark auction house style dude
+- rework inventory uis to use states
+  - different states to easily change what UIs ar shown for npc trades, etc

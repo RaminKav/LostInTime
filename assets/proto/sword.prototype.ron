@@ -1,0 +1,29 @@
+(
+  name: "Sword",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Sword,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Sword,
+        attributes: (
+            durability: 100,
+            max_durability: 100,
+            attack: 20,
+            attack_cooldown: 0.4
+        ),
+        metadata: (
+            name: "Sword", 
+            desc: "A rusty sword."
+        ),
+        count: 1
+  ),
+   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
+   "survival_rogue_like::proto::SensorProto": (),
+  "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+  "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
+  
+  // "bevy_proto::custom::SpriteSheetBundle": (),
+  }
+)

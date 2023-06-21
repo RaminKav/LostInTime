@@ -49,8 +49,6 @@ impl LootTablePlugin {
                     metadata: ItemDisplayMetaData {
                         name: drop.item.to_string(),
                         desc: "A cool piece of Equipment".to_string(),
-                        attributes: attributes.get_tooltips(),
-                        durability: attributes.get_durability_tooltip(),
                     },
                 });
             }
