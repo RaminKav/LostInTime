@@ -78,6 +78,7 @@ impl GenerationPlugin {
     pub fn handle_new_wall_spawn_update(
         mut game: GameParam,
         mut new_wall_query: Query<Entity, Added<Wall>>,
+        txns: Query<&GlobalTransform>,
         mut wall_data: Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
     ) {
         for new_wall in new_wall_query.iter_mut() {

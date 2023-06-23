@@ -26,15 +26,19 @@ use lazy_static::lazy_static;
 
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumIter};
+use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::crafting::CraftingPlugin;
 
-#[derive(Component, Reflect)]
+#[derive(Component, Reflect, FromReflect, Schematic)]
+#[reflect]
 pub struct Breakable(pub Option<WorldObject>);
+#[derive(Component, Reflect, FromReflect, Schematic)]
+#[reflect]
+pub struct BreaksWith(pub WorldObject);
 
-#[derive(Component, Reflect, Default)]
-#[reflect(Component)]
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
 
 pub struct Block;
 #[derive(Component)]
@@ -71,6 +75,8 @@ pub struct Size(pub Vec2);
     Deserialize,
     Component,
     Schematic,
+    IntoStaticStr,
+    Display,
 )]
 #[reflect(Component, Schematic)]
 pub enum WorldObject {
@@ -187,22 +193,7 @@ impl WorldObjectResource {
         }
     }
 }
-impl fmt::Display for WorldObject {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            WorldObject::None => write!(f, ""),
-            WorldObject::Grass => write!(f, "Grass"),
-            WorldObject::Wall(_) => write!(f, "Stone Wall"),
-            WorldObject::DungeonStone => write!(f, "Dungeon Stone Block"),
-            WorldObject::Water => write!(f, "Water"),
-            WorldObject::Sand => write!(f, "Sand"),
-            WorldObject::Foliage(_) => write!(f, "Tree"),
-            WorldObject::Placeable(p) => write!(f, "{}", p.to_string()),
-            WorldObject::Sword => write!(f, "Basic Sword"),
-            WorldObject::Flint => write!(f, "Flint"),
-        }
-    }
-}
+
 impl WorldObject {
     //TODO: turn this into event
     pub fn spawn(
@@ -787,7 +778,7 @@ impl ItemsPlugin {
             minimap_event.send(UpdateMiniMapEvent);
         }
     }
-    /// Keeps the graphics up to date for things that are harvested or grown
+    /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
     fn update_graphics(
         mut to_update_query: Query<
             (Entity, &mut TextureAtlasSprite, &WorldObject),

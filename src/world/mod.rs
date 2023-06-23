@@ -10,6 +10,7 @@ pub mod y_sort;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use bevy::{prelude::*, utils::HashMap};
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
 use crate::item::WorldObject;
@@ -64,8 +65,10 @@ pub struct TileMapPositionData {
     pub tile_pos: TilePos,
 }
 
-#[derive(Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect)]
-#[reflect(Component)]
+#[derive(
+    Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Schematic,
+)]
+#[reflect(Component, Schematic)]
 
 pub struct WorldObjectEntityData {
     pub object: WorldObject,
