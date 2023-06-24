@@ -23,7 +23,7 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
     GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
-use crate::{item::WorldObject, Player, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Player, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,

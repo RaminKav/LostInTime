@@ -1,0 +1,11 @@
+(
+  name: "Flint",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Flint,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Flint,
+        count: 1
+  ),
+  }
+)

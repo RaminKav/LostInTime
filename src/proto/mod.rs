@@ -16,7 +16,8 @@ use crate::{
     attributes::{Health, ItemAttributes},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
-    item::{ItemDisplayMetaData, Loot, LootTable, WorldObject},
+    item::{Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, WorldObject},
+    world::WorldObjectEntityData,
     YSort,
 };
 pub struct ProtoPlugin;
@@ -34,12 +35,16 @@ impl Plugin for ProtoPlugin {
             .register_type::<Loot>()
             .register_type::<Vec<Loot>>()
             .register_type::<WorldObject>()
+            .register_type::<Breakable>()
+            .register_type::<BreaksWith>()
+            .register_type::<Block>()
             .register_type::<ItemStack>()
+            .register_type::<WorldObjectEntityData>()
             .register_type::<ItemAttributes>()
             .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
-            .register_type::<MaterialMesh2DProto>()
+            .register_type::<EnemyMaterialMesh2DProto>()
             .register_type::<KCC>()
             .register_type::<ColliderProto>()
             .register_type::<AnimationTimerProto>()
@@ -51,7 +56,9 @@ impl Plugin for ProtoPlugin {
 
 impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
+        prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
+        prototypes.load("proto/flint.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");
     }
@@ -126,14 +133,14 @@ impl From<ColliderProto> for Collider {
 #[derive(Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
 #[schematic(into = MaterialMesh2dBundle<EnemyMaterial>)]
-struct MaterialMesh2DProto {
+struct EnemyMaterialMesh2DProto {
     asset: String,
     size: Vec2,
 }
 
-impl FromSchematicInput<MaterialMesh2DProto> for MaterialMesh2dBundle<EnemyMaterial> {
+impl FromSchematicInput<EnemyMaterialMesh2DProto> for MaterialMesh2dBundle<EnemyMaterial> {
     fn from_input(
-        input: MaterialMesh2DProto,
+        input: EnemyMaterialMesh2DProto,
         context: &mut SchematicContext,
     ) -> MaterialMesh2dBundle<EnemyMaterial> {
         let world = context.world_mut();
