@@ -3,7 +3,7 @@
   templates: ["mob_basic"],
   schematics: {
    "survival_rogue_like::enemy::Mob": Neutral(Slime),
-   "survival_rogue_like::proto::MaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
+   "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
    "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),

@@ -1,13 +1,15 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     attributes::{Attack, AttackCooldown, AttributeModifier, Health, InvincibilityCooldown},
+    custom_commands::CommandsExt,
     inventory::Inventory,
-    item::{LootTable, LootTablePlugin, MainHand, WorldObject},
+    item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
     world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
     AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
@@ -102,6 +104,8 @@ impl CombatPlugin {
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
         loot_tables: Query<&LootTable>,
+        mut proto_commands: ProtoCommands,
+        prototypes: Prototypes,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
@@ -125,13 +129,19 @@ impl CombatPlugin {
             ));
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
                 for drop in LootTablePlugin::get_drops(loot_table) {
-                    drop.obj_type.spawn_item_drop(
-                        &mut commands,
-                        &mut game,
-                        enemy_tile_pos,
-                        enemy_chunk_pos,
-                        drop.count,
-                        Some(drop.attributes),
+                    // drop.obj_type.spawn_item_drop(
+                    //     &mut commands,
+                    //     &mut game,
+                    //     enemy_tile_pos,
+                    //     enemy_chunk_pos,
+                    //     drop.count,
+                    //     Some(drop.attributes),
+                    // );
+
+                    proto_commands.spawn_item_from_proto(
+                        dbg!(<WorldObject as Into<&str>>::into(drop.obj_type).to_owned()),
+                        &prototypes,
+                        death_event.enemy_pos,
                     );
                 }
             }
@@ -206,6 +216,7 @@ impl CombatPlugin {
         mut enemy_death_events: EventWriter<EnemyDeathEvent>,
         mut obj_death_events: EventWriter<ObjBreakEvent>,
         in_i_frame: Query<&InvincibilityTimer>,
+        breaks_with_query: Query<&BreaksWith>,
     ) {
         for hit in hit_events.iter() {
             // is in invincibility frames from a previous hit
@@ -216,34 +227,27 @@ impl CombatPlugin {
                 health.get_mut(hit.hit_entity)
             {
                 if let Some(obj) = obj_option {
-                    let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
-                    let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-                    let obj_chunk_pos = camera_pos_to_chunk_pos(
-                        &(t.translation().truncate() - anchor * obj_data.size),
-                    );
-                    let obj_tile_pos = camera_pos_to_block_pos(
-                        &(t.translation().truncate() - anchor * obj_data.size),
-                    );
+                    let obj_chunk_pos = camera_pos_to_chunk_pos(&(t.translation().truncate()));
+                    let obj_tile_pos = camera_pos_to_block_pos(&(t.translation().truncate()));
 
-                    if let Some(data) = game.world_obj_data.properties.get(&obj) {
-                        if let Some(main_hand_tool) = hit.hit_with {
-                            if let Some(breaks_with) = data.breaks_with {
-                                if main_hand_tool != breaks_with {
-                                    continue;
-                                }
+                    //TODO: create breaks with tool component, instead of using properties
+                    if let Some(main_hand_tool) = hit.hit_with {
+                        if let Ok(breaks_with) = breaks_with_query.get(hit.hit_entity) {
+                            if main_hand_tool != breaks_with.0 {
+                                continue;
                             }
                         }
-                        hit_health.0 -= hit.damage as i32;
+                    }
+                    hit_health.0 -= hit.damage as i32;
 
-                        println!("HP {hit_health:?}");
-                        if hit_health.0 <= 0 {
-                            obj_death_events.send(ObjBreakEvent {
-                                entity: e,
-                                obj: *obj,
-                                tile_pos: obj_tile_pos,
-                                chunk_pos: obj_chunk_pos,
-                            });
-                        }
+                    println!("HP {hit_health:?}");
+                    if hit_health.0 <= 0 {
+                        obj_death_events.send(ObjBreakEvent {
+                            entity: e,
+                            obj: *obj,
+                            tile_pos: obj_tile_pos,
+                            chunk_pos: obj_chunk_pos,
+                        });
                     }
                 } else {
                     hit_health.0 -= hit.damage as i32;
