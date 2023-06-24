@@ -8,12 +8,14 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
 use crate::world::{TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
-use crate::{AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort};
+use crate::{
+    custom_commands::CommandsExt, AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort,
+};
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use std::fmt;
 
 mod crafting;
@@ -31,10 +33,10 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 use self::crafting::CraftingPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect]
+#[reflect(Schematic)]
 pub struct Breakable(pub Option<WorldObject>);
 #[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect]
+#[reflect(Schematic)]
 pub struct BreaksWith(pub WorldObject);
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -105,6 +107,7 @@ pub enum WorldObject {
     Deserialize,
     Component,
     Schematic,
+    IntoStaticStr,
     Display,
 )]
 #[reflect(Component, Schematic)]
@@ -130,6 +133,7 @@ impl Default for Foliage {
     Component,
     Schematic,
     Display,
+    IntoStaticStr,
     EnumIter,
 )]
 #[reflect(Component, Schematic)]
@@ -154,19 +158,15 @@ impl Default for Wall {
     Serialize,
     Deserialize,
     Component,
+    IntoStaticStr,
+    Display,
     Schematic,
 )]
 #[reflect(Component, Schematic)]
 pub enum Placeable {
     Log,
 }
-impl fmt::Display for Placeable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Placeable::Log => write!(f, "Log"),
-        }
-    }
-}
+
 impl Default for Placeable {
     fn default() -> Self {
         Self::Log
@@ -323,7 +323,6 @@ impl WorldObject {
                         texture_offset: 0,
                     })
                     .insert(YSort)
-                    .insert(pos)
                     .insert(self)
                     .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
                     .id();
@@ -388,10 +387,15 @@ impl WorldObject {
 
         let item = commands
             .spawn(MaterialMesh2dBundle {
-                mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
+                mesh: meshes
+                    .add(Mesh::from(shape::Quad {
+                        size: Vec2::new(32., 40.),
+                        ..Default::default()
+                    }))
+                    .into(),
                 transform: Transform {
                     translation: position,
-                    scale: obj_data.size.extend(1.),
+                    // scale: obj_data.size.extend(1.),
                     ..Default::default()
                 },
                 visibility: Visibility::Visible,
@@ -409,7 +413,6 @@ impl WorldObject {
             })
             .insert(Block)
             .insert(YSort)
-            .insert(pos)
             .insert(self)
             .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
             .id();
@@ -422,26 +425,29 @@ impl WorldObject {
         if obj_data.collider {
             commands
                 .entity(item)
-                .insert(ColliderReflect::new(1. / 3.5, 1. / 4.5));
+                .insert(ColliderReflect::new(32. / 3.5, 40. / 4.5));
         }
 
         Some(item)
     }
     pub fn spawn_and_save_block(
         self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
+        proto_commands: &mut ProtoCommands,
+        prototypes: &Prototypes,
+        pos: Vec2,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-        meshes: &mut Assets<Mesh>,
     ) -> Option<Entity> {
         let item = match self {
-            WorldObject::Foliage(_) => {
-                self.spawn_foliage(commands, game, meshes, tile_pos, chunk_pos)
+            WorldObject::Foliage(obj) => {
+                proto_commands.spawn_object_from_proto(obj, prototypes, pos)
+                // self.spawn_foliage(commands, game, meshes, tile_pos, chunk_pos)
             }
-            WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos, None),
-            _ => self.spawn(commands, game, tile_pos, chunk_pos),
+            WorldObject::Wall(obj) => {
+                proto_commands.spawn_object_from_proto(obj, prototypes, pos)
+                // self.spawn_foliage(commands, game, meshes, tile_pos, chunk_pos)
+            }
+
+            _ => None,
         };
         if let Some(item) = item {
             //TODO: do what old game data did, add obj to registry

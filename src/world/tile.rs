@@ -45,6 +45,13 @@ impl TilePlugin {
             WorldObject::Sand,
         ];
         let sample = |x: f64, y: f64| -> (u8, WorldObject) {
+            if chunk_manager
+                .world_generation_params
+                .dungeon_stone_frequency
+                > 0.
+            {
+                return (0, WorldObject::DungeonStone);
+            }
             let e = noise_helpers::get_perlin_noise_for_tile(x, y, seed);
             // let m = (noise_m.get([x * base_oct, ny * base_oct]) + 0.5)
             //     + 0.5 * (noise_m2.get([x * base_oct * 2., ny * base_oct * 2.]) + 0.5)

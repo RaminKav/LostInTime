@@ -11,7 +11,7 @@ use crate::{
     inventory::Inventory,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     ui::InventoryState,
-    world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
+    world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos},
     AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
 };
 
@@ -111,7 +111,7 @@ impl CombatPlugin {
             let t = death_event.enemy_pos;
             commands.entity(death_event.entity).despawn();
             let enemy_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
-            let enemy_tile_pos = camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
+            let enemy_tile_pos = camera_pos_to_tile_pos(&Vec2::new(t.x, t.y));
             let texture_handle = asset_server.load("textures/effects/hit-particles.png");
             let texture_atlas =
                 TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
@@ -139,7 +139,7 @@ impl CombatPlugin {
                     // );
 
                     proto_commands.spawn_item_from_proto(
-                        dbg!(<WorldObject as Into<&str>>::into(drop.obj_type).to_owned()),
+                        drop.obj_type,
                         &prototypes,
                         death_event.enemy_pos,
                     );
@@ -228,7 +228,7 @@ impl CombatPlugin {
             {
                 if let Some(obj) = obj_option {
                     let obj_chunk_pos = camera_pos_to_chunk_pos(&(t.translation().truncate()));
-                    let obj_tile_pos = camera_pos_to_block_pos(&(t.translation().truncate()));
+                    let obj_tile_pos = camera_pos_to_tile_pos(&(t.translation().truncate()));
 
                     //TODO: create breaks with tool component, instead of using properties
                     if let Some(main_hand_tool) = hit.hit_with {

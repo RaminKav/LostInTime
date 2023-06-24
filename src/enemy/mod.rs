@@ -7,7 +7,7 @@ use bevy::{
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
-use strum_macros::Display;
+use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
     ai::{
@@ -49,6 +49,7 @@ impl Plugin for EnemyPlugin {
     Schematic,
     Reflect,
     FromReflect,
+    IntoStaticStr,
 )]
 #[reflect(Schematic)]
 pub enum Mob {
@@ -66,6 +67,7 @@ pub enum Mob {
     Clone,
     Hash,
     Display,
+    IntoStaticStr,
     Eq,
     PartialEq,
     Schematic,
@@ -85,6 +87,7 @@ pub enum NeutralMob {
     Clone,
     Hash,
     Display,
+    IntoStaticStr,
     Eq,
     PartialEq,
     Schematic,
@@ -104,6 +107,7 @@ pub enum HostileMob {
     Clone,
     Hash,
     Display,
+    IntoStaticStr,
     Eq,
     PartialEq,
     Schematic,

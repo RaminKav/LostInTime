@@ -1,14 +1,16 @@
 use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
+use super::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 use super::{ChunkManager, WorldObjectEntityData};
 use crate::item::{Foliage, Wall, WorldObject};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
-use crate::{CoreGameSet, CustomFlush, GameParam, GameState};
+use crate::{custom_commands::CommandsExt, CoreGameSet, CustomFlush, GameParam, GameState};
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy_ecs_tilemap::prelude::*;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -23,14 +25,17 @@ impl Plugin for GenerationPlugin {
             .add_system(exit_system.in_base_set(CoreSet::PostUpdate))
             .add_systems(
                 (
-                    Self::handle_new_wall_spawn_update.after(CustomFlush),
                     Self::generate_and_cache_objects.before(CustomFlush),
                     Self::handle_wall_break.after(CustomFlush),
-                    Self::handle_update_this_wall
-                        .after(CustomFlush)
-                        .after(Self::handle_new_wall_spawn_update),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    Self::handle_update_this_wall,
+                    Self::handle_new_wall_spawn_update,
+                )
+                    .in_base_set(CoreSet::PostUpdate),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -79,11 +84,13 @@ impl GenerationPlugin {
         mut game: GameParam,
         mut new_wall_query: Query<Entity, Added<Wall>>,
         txns: Query<&GlobalTransform>,
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
+        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
     ) {
         for new_wall in new_wall_query.iter_mut() {
+            let my_span = info_span!("new_wall", name = "new_wall").entered();
             let new_wall = wall_data.get(new_wall).unwrap();
-            let new_wall_pos = new_wall.2.clone();
+            let new_wall_pos =
+                world_pos_to_tile_pos(txns.get(new_wall.0).unwrap().translation().truncate());
             for dy in -1i8..=1 {
                 for dx in -1i8..=1 {
                     //skip corner block updates for walls
@@ -128,7 +135,7 @@ impl GenerationPlugin {
         tile_pos: TilePos,
         chunk_pos: IVec2,
         game: &mut GameParam,
-        wall_data: &mut Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
+        wall_data: &mut Query<(Entity, &mut TextureAtlasSprite)>,
     ) {
         let new_wall_pos = TileMapPositionData {
             chunk_pos,
@@ -232,14 +239,17 @@ impl GenerationPlugin {
     pub fn handle_update_this_wall(
         mut game: GameParam,
         mut new_wall_query: Query<Entity, Added<Wall>>,
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
+        txns: Query<&GlobalTransform>,
+        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
     ) {
         for new_wall in new_wall_query.iter_mut() {
-            let new_wall = wall_data.get(new_wall).unwrap().clone();
-            if game.get_tile_obj_data(*new_wall.2).unwrap().texture_offset == 0 {
+            let my_span = info_span!("new_this_wall", name = "new_this_wall").entered();
+            let new_wall_pos =
+                world_pos_to_tile_pos(txns.get(new_wall).unwrap().translation().truncate());
+            if game.get_tile_obj_data(new_wall_pos).unwrap().texture_offset == 0 {
                 Self::update_wall(
-                    new_wall.2.tile_pos,
-                    new_wall.2.chunk_pos,
+                    new_wall_pos.tile_pos,
+                    new_wall_pos.chunk_pos,
                     &mut game,
                     &mut wall_data,
                 );
@@ -250,7 +260,7 @@ impl GenerationPlugin {
         mut game: GameParam,
         mut obj_break_events: EventReader<WallBreakEvent>,
 
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite, &TileMapPositionData)>,
+        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
     ) {
         for broken_wall in obj_break_events.iter() {
             let chunk_pos = broken_wall.chunk_pos;
@@ -399,6 +409,8 @@ impl GenerationPlugin {
         dungeon: Query<&Dungeon, With<ActiveDimension>>,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
         mut meshes: ResMut<Assets<Mesh>>,
+        mut proto_commands: ProtoCommands,
+        prototypes: Prototypes,
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
@@ -417,7 +429,7 @@ impl GenerationPlugin {
                         tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                         tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                     );
-                    let relative_tp = world_helpers::camera_pos_to_block_pos(&tp_vec);
+                    let relative_tp = world_helpers::camera_pos_to_tile_pos(&tp_vec);
                     (
                         relative_tp.x as f32,
                         relative_tp.y as f32,
@@ -486,31 +498,27 @@ impl GenerationPlugin {
                 .collect::<Vec<(f32, f32, WorldObject)>>();
 
             // println!("SPAWNING OBJECTS FOR {chunk_pos:?} {:?}", objs.len(),);
-            for tp in objs.clone().iter() {
+            for obj_data in objs.clone().iter() {
                 let tile_pos = TilePos {
-                    x: tp.0 as u32,
-                    y: tp.1 as u32,
+                    x: obj_data.0 as u32,
+                    y: obj_data.1 as u32,
                 };
-                match tp.2 {
-                    WorldObject::Foliage(_) => {
-                        tp.2.spawn_foliage(
-                            &mut commands,
-                            &mut game,
-                            &mut meshes,
-                            tile_pos,
-                            chunk_pos,
-                        );
-                    }
-                    WorldObject::Wall(_) => {
-                        tp.2.spawn_wall(
-                            &mut commands,
-                            &mut game,
-                            tile_pos,
-                            chunk_pos,
-                            Some(0b1111),
-                        );
-                    }
-                    _ => {}
+                let obj = match obj_data.2 {
+                    WorldObject::Foliage(_) | WorldObject::Wall(_) => proto_commands
+                        .spawn_object_from_proto(
+                            obj_data.2,
+                            &prototypes,
+                            tile_pos_to_world_pos(TileMapPositionData {
+                                tile_pos,
+                                chunk_pos,
+                            }),
+                        ),
+                    _ => None,
+                };
+                if let Some(spawned_obj) = obj {
+                    commands
+                        .entity(spawned_obj)
+                        .set_parent(*game.get_chunk_entity(chunk_pos).unwrap());
                 }
             }
             minimap_update.send(UpdateMiniMapEvent);

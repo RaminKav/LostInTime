@@ -118,11 +118,11 @@ impl ChunkPlugin {
         mut cache_events: EventReader<CreateChunkEvent>,
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
-        mut game: GameParam,
-        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
+        game: GameParam,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
     ) {
         for e in cache_events.iter() {
+            let my_span = info_span!("inner_spawn", name = "inner_spawn").entered();
             let chunk_pos = e.chunk_pos;
             if game.get_chunk_entity(chunk_pos).is_some() {
                 continue;
@@ -186,7 +186,7 @@ impl ChunkPlugin {
                 0.,
             ));
 
-            let chunk = commands
+            commands
                 .entity(tilemap_entity)
                 .insert(TilemapBundle {
                     grid_size,
@@ -308,7 +308,7 @@ impl ChunkPlugin {
                     // if chunk_cache.single().snapshots.contains_key(&chunk_pos) {
                     //     println!("Sending load event {chunk_pos:?}");
                     // } else {
-                    // println!("Sending cache event {chunk_pos:?}");
+                    println!("Sending cache event {chunk_pos:?}");
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
                     // }
                 }

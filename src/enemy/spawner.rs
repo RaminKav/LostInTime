@@ -26,7 +26,7 @@ impl Plugin for SpawnerPlugin {
             (
                 Self::handle_spawn_mobs,
                 Self::tick_spawner_timers,
-                Self::add_spawners_to_new_chunks,
+                // Self::add_spawners_to_new_chunks,
                 Self::handle_add_spawners_on_chunk_spawn,
                 Self::check_mob_count,
             )
@@ -112,7 +112,11 @@ impl SpawnerPlugin {
                             chunk_pos: picked_spawner.chunk_pos,
                         });
                         prototypes.is_ready("Slime");
-                        proto_commands.spawn_item_from_proto("Slime".to_owned(), &prototypes, pos);
+                        proto_commands.spawn_mob_from_proto(
+                            Mob::Neutral(NeutralMob::Slime),
+                            &prototypes,
+                            pos,
+                        );
 
                         picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     }

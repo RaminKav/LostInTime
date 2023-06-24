@@ -9,14 +9,15 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health, ItemAttributes};
 use crate::combat::{AttackTimer, HitEvent};
+use crate::enemy::{Mob, NeutralMob};
 use crate::inventory::Inventory;
-use crate::item::Equipment;
+use crate::item::{Equipment, WorldObject};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{
-    camera_pos_to_block_pos, camera_pos_to_chunk_pos, tile_pos_to_world_pos,
+    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos,
 };
 use crate::world::TileMapPositionData;
 use crate::{
@@ -280,7 +281,11 @@ impl InputsPlugin {
             inv_state.open = !inv_state.open;
         }
         if key_input.just_pressed(KeyCode::E) {
-            proto_commands.spawn_item_from_proto("Sword".to_owned(), &prototypes, Vec2::ZERO);
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Sword,
+                &prototypes,
+                game.game.player_state.position.truncate(),
+            );
         }
 
         if key_input.just_pressed(KeyCode::P) {
@@ -291,7 +296,7 @@ impl InputsPlugin {
                 chunk_pos: IVec2 { x: 0, y: 0 },
                 tile_pos: TilePos { x: 0, y: 0 },
             });
-            proto_commands.spawn_item_from_proto("Slime".to_owned(), &prototypes, pos);
+            proto_commands.spawn_mob_from_proto(Mob::Neutral(NeutralMob::Slime), &prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -393,7 +398,8 @@ impl InputsPlugin {
     }
 
     pub fn mouse_click_system(
-        mut commands: Commands,
+        mut proto_commands: ProtoCommands,
+        prototypes: Prototypes,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
@@ -431,7 +437,7 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
-            let cursor_tile_pos = camera_pos_to_block_pos(&Vec2::new(
+            let cursor_tile_pos = camera_pos_to_tile_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
@@ -480,14 +486,7 @@ impl InputsPlugin {
             {
                 return;
             }
-            let chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
-            let tile_pos = camera_pos_to_block_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
+
             let hotbar_slot = inv_state.unwrap().1.active_hotbar_slot;
             let held_item_option = inv.single().items[hotbar_slot].clone();
             if let Some(mut held_item) = held_item_option {
@@ -499,12 +498,10 @@ impl InputsPlugin {
                     .places_into
                 {
                     if let Some(_able_to_spawn) = places_into_item.spawn_and_save_block(
-                        &mut commands,
-                        &mut game,
-                        tile_pos,
-                        chunk_pos,
+                        &mut proto_commands,
+                        &prototypes,
+                        cursor_pos.world_coords.truncate(),
                         minimap_event,
-                        &mut meshes,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
                     }

@@ -18,6 +18,7 @@ use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::{schedule::ScheduleLabel, system::SystemParam},
+    log::LogPlugin,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -70,6 +71,7 @@ use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
     dimension::DimensionSpawnEvent,
+    world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPositionData, WorldObjectEntityData, WorldPlugin,
 };
@@ -99,7 +101,7 @@ fn main() {
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest())
-                // .disable::<LogPlugin>()
+                .disable::<LogPlugin>()
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         resolution: WindowResolution::new(WIDTH, HEIGHT)
@@ -119,7 +121,7 @@ fn main() {
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new())
-        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(RapierDebugRenderPlugin::default())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -135,7 +137,7 @@ fn main() {
         .add_plugin(WorldPlugin)
         .add_plugin(ClientPlugin)
         .add_plugin(ProtoPlugin)
-        // .add_plugin(DiagnosticExplorerAgentPlugin)
+        .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
@@ -194,7 +196,7 @@ pub struct GameParam<'w, 's> {
     pub world_object_query: Query<
         'w,
         's,
-        (Entity, &'static TileMapPositionData),
+        (Entity, &'static GlobalTransform),
         (With<WorldObject>, With<WorldObjectEntityData>),
     >,
     pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
@@ -262,8 +264,8 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
     pub fn get_obj_entity_at_tile(&self, tile: TileMapPositionData) -> Option<Entity> {
-        for (obj_e, pos) in self.world_object_query.iter() {
-            if pos == &tile {
+        for (obj_e, g_txm) in self.world_object_query.iter() {
+            if world_pos_to_tile_pos(g_txm.translation().truncate()) == tile {
                 return Some(obj_e);
             }
         }

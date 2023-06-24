@@ -12,7 +12,7 @@ bevy_rapier2d = {git = "https://github.com/dimforge/bevy_rapier.git", branch = "
 bevy_ecs_tilemap = "0.10.0"
 bevy_diagnostics_explorer = "0.1.0"
 bevy-inspector-egui = "0.18"
-bevy_proto = {version = "0.10.0", features = ["bevy_sprite"]}
+bevy_proto = {version = "0.10.0", features = ["bevy_sprite", "bevy_render"]}
 seldom_state = "0.6"
 ron = "0.7.0"
 serde = "1.0.136"
