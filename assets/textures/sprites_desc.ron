@@ -33,7 +33,7 @@
             breaks_with: None,
             places_into: Some(Foliage(Tree))
         ),
-         Wall(Stone): WorldObjectData(
+         Wall(StoneWall): WorldObjectData(
             texture_pos: (0., 144.),
             size: (32., 48.),
             anchor: None,
@@ -42,7 +42,7 @@
             breaks_into: Some(Flint),
             equip_slot: None,
             breaks_with: None,
-            places_into: Some(Wall(Stone))
+            places_into: Some(Wall(StoneWall))
         ),
         DungeonStone: WorldObjectData(
             texture_pos: (64., 144.),
@@ -90,7 +90,7 @@
             breaks_with: None,
             places_into: None
         ),
-        Wall(Stone): WorldObjectData(
+        Wall(StoneWall): WorldObjectData(
             texture_pos: (16., 96.),
             size: (16., 16.),
             anchor: None,

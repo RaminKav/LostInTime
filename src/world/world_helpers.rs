@@ -14,7 +14,7 @@ pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
         (camera_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32,
     )
 }
-pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> TilePos {
+pub fn camera_pos_to_tile_pos(camera_pos: &Vec2) -> TilePos {
     let camera_pos = Vec2::new(
         camera_pos.x + (TILE_SIZE.x / 2.),
         camera_pos.y + (TILE_SIZE.y / 2.),
@@ -39,7 +39,7 @@ pub fn camera_pos_to_block_pos(camera_pos: &Vec2) -> TilePos {
 }
 pub fn world_pos_to_tile_pos(pos: Vec2) -> TileMapPositionData {
     let chunk_pos = camera_pos_to_chunk_pos(&pos);
-    let tile_pos = camera_pos_to_block_pos(&pos);
+    let tile_pos = camera_pos_to_tile_pos(&pos);
     TileMapPositionData {
         chunk_pos,
         tile_pos,

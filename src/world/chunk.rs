@@ -118,8 +118,7 @@ impl ChunkPlugin {
         mut cache_events: EventReader<CreateChunkEvent>,
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
-        mut game: GameParam,
-        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
+        game: GameParam,
         seed: Query<&GenerationSeed, With<ActiveDimension>>,
     ) {
         for e in cache_events.iter() {
@@ -186,7 +185,7 @@ impl ChunkPlugin {
                 0.,
             ));
 
-            let chunk = commands
+            commands
                 .entity(tilemap_entity)
                 .insert(TilemapBundle {
                     grid_size,
@@ -200,8 +199,7 @@ impl ChunkPlugin {
                 })
                 .insert(TileEntityCollection { map: tiles })
                 .insert(Chunk { chunk_pos })
-                .insert(Name::new(format!("Pos: {}", chunk_pos)))
-                .id();
+                .insert(Name::new(format!("Pos: {}", chunk_pos)));
             // game.set_chunk_entity(chunk_pos, chunk);
             // minimap_update.send(UpdateMiniMapEvent);
         }

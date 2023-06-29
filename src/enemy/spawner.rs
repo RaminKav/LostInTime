@@ -112,7 +112,7 @@ impl SpawnerPlugin {
                             chunk_pos: picked_spawner.chunk_pos,
                         });
                         prototypes.is_ready("Slime");
-                        proto_commands.spawn_item_from_proto("Slime".to_owned(), &prototypes, pos);
+                        proto_commands.spawn_mob_from_proto(NeutralMob::Slime, &prototypes, pos);
 
                         picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     }
@@ -159,9 +159,6 @@ impl SpawnerPlugin {
         mut commands: Commands,
     ) {
         for (e, chunk) in spawned_chunks.iter() {
-            if chunk.chunk_pos != (IVec2 { x: 0, y: 0 }) {
-                continue;
-            }
             let spawner = Spawner {
                 chunk_pos: IVec2 { x: 0, y: 0 },
                 weight: 1.,
