@@ -1,6 +1,6 @@
 use crate::assets::Graphics;
 use crate::enemy::Mob;
-use crate::world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos};
+use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPositionData, CHUNK_SIZE};
 use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
 use bevy::prelude::*;
@@ -63,13 +63,13 @@ impl MinimapPlugin {
             };
             let pt = p_t.single();
             let p_cp = camera_pos_to_chunk_pos(&pt.translation.truncate());
-            let p_tp = camera_pos_to_block_pos(&pt.translation.truncate());
+            let p_tp = camera_pos_to_tile_pos(&pt.translation.truncate());
             let mobs: Vec<_> = mob_t
                 .iter()
                 .map(|t| {
                     (
                         camera_pos_to_chunk_pos(&t.translation().truncate()),
-                        camera_pos_to_block_pos(&t.translation().truncate()),
+                        camera_pos_to_tile_pos(&t.translation().truncate()),
                     )
                 })
                 .collect();

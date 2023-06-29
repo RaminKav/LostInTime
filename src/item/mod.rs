@@ -1,20 +1,19 @@
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::{Graphics, WorldObjectData};
-use crate::attributes::{AttributeChangeEvent, BlockAttributeBundle, Health, ItemAttributes};
-use crate::client::ColliderReflect;
+use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
-use crate::world::{TileMapPositionData, WorldObjectEntityData, CHUNK_SIZE};
-use crate::{AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort};
+use crate::world::CHUNK_SIZE;
+use crate::{
+    custom_commands::CommandsExt, AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort,
+};
 use bevy::prelude::*;
-use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
-use std::fmt;
+use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 
 mod crafting;
 mod loot_table;
@@ -31,10 +30,10 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 use self::crafting::CraftingPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect]
+#[reflect(Schematic)]
 pub struct Breakable(pub Option<WorldObject>);
 #[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect]
+#[reflect(Schematic)]
 pub struct BreaksWith(pub WorldObject);
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -105,6 +104,7 @@ pub enum WorldObject {
     Deserialize,
     Component,
     Schematic,
+    IntoStaticStr,
     Display,
 )]
 #[reflect(Component, Schematic)]
@@ -130,15 +130,16 @@ impl Default for Foliage {
     Component,
     Schematic,
     Display,
+    IntoStaticStr,
     EnumIter,
 )]
 #[reflect(Component, Schematic)]
 pub enum Wall {
-    Stone,
+    StoneWall,
 }
 impl Default for Wall {
     fn default() -> Self {
-        Self::Stone
+        Self::StoneWall
     }
 }
 
@@ -154,19 +155,15 @@ impl Default for Wall {
     Serialize,
     Deserialize,
     Component,
+    IntoStaticStr,
+    Display,
     Schematic,
 )]
 #[reflect(Component, Schematic)]
 pub enum Placeable {
     Log,
 }
-impl fmt::Display for Placeable {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Placeable::Log => write!(f, "Log"),
-        }
-    }
-}
+
 impl Default for Placeable {
     fn default() -> Self {
         Self::Log
@@ -195,253 +192,19 @@ impl WorldObjectResource {
 }
 
 impl WorldObject {
-    //TODO: turn this into event
-    pub fn spawn(
-        self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
-    ) -> Option<Entity> {
-        let item_map = &game.graphics.spritesheet_map;
-        if item_map.is_none() {
-            panic!("graphics not loaded");
-        }
-        if game
-            .get_obj_entity_at_tile(TileMapPositionData {
-                tile_pos,
-                chunk_pos,
-            })
-            .is_some()
-        {
-            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
-            return None;
-        }
-        let sprite = game
-            .graphics
-            .spritesheet_map
-            .as_ref()
-            .unwrap()
-            .get(&self)
-            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .clone();
-        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
-        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-        let position = Vec3::new(
-            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.x * obj_data.size.x,
-            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y,
-            0.,
-        );
-        let item = commands
-            .spawn(SpriteSheetBundle {
-                sprite,
-                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: position,
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(Name::new("GroundItem"))
-            .insert(BlockAttributeBundle {
-                health: Health(100),
-            })
-            .insert(WorldObjectEntityData {
-                object: self,
-                obj_bit_index: 0,
-                texture_offset: 0,
-            })
-            .insert(Block)
-            .insert(YSort)
-            .insert(self)
-            .id();
-        if obj_data.breakable {
-            commands
-                .entity(item)
-                .insert(Breakable(obj_data.breaks_into));
-        }
-
-        if obj_data.collider {
-            commands.entity(item).insert(ColliderReflect::new(
-                obj_data.size.x / 3.5,
-                obj_data.size.y / 4.5,
-            ));
-        }
-
-        Some(item)
-    }
-    pub fn spawn_wall(
-        self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
-        with_bits: Option<u8>,
-    ) -> Option<Entity> {
-        let item_map = &game.graphics.spritesheet_map;
-        if item_map.is_none() {
-            panic!("graphics not loaded");
-        }
-        let pos = TileMapPositionData {
-            tile_pos,
-            chunk_pos,
-        };
-        if game.get_obj_entity_at_tile(pos.clone()).is_some() {
-            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
-            return None;
-        }
-        match self {
-            WorldObject::Wall(_) => {
-                let obj_data = game.world_obj_data.properties.get(&self).unwrap();
-                let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-
-                let position = Vec3::new(
-                    (tile_pos.x as i32 * 32) as f32 + anchor.x * obj_data.size.x,
-                    (tile_pos.y as i32 * 32) as f32 + anchor.y * obj_data.size.y,
-                    0.,
-                );
-                let item = commands
-                    .spawn(SpriteSheetBundle {
-                        texture_atlas: game.graphics.wall_texture_atlas.as_ref().unwrap().clone(),
-                        transform: Transform {
-                            translation: position,
-                            ..Default::default()
-                        },
-                        visibility: Visibility::Visible,
-                        ..Default::default()
-                    })
-                    .insert(Name::new("Wall"))
-                    .insert(BlockAttributeBundle {
-                        health: Health(100),
-                    })
-                    .insert(Wall::Stone)
-                    .insert(WorldObjectEntityData {
-                        object: self,
-                        obj_bit_index: with_bits.unwrap_or(0),
-                        texture_offset: 0,
-                    })
-                    .insert(YSort)
-                    .insert(pos)
-                    .insert(self)
-                    .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
-                    .id();
-                if obj_data.breakable {
-                    commands
-                        .entity(item)
-                        .insert(Breakable(obj_data.breaks_into));
-                }
-
-                if obj_data.collider {
-                    commands.entity(item).insert(ColliderReflect::new(
-                        obj_data.size.x / 3.5,
-                        obj_data.size.y / 4.,
-                    ));
-                }
-                Some(item)
-            }
-            _ => {
-                error!("Tried to spawn non-wall WorldObject as a Wall!");
-                None
-            }
-        }
-    }
-    pub fn spawn_foliage(
-        self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-        meshes: &mut Assets<Mesh>,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
-    ) -> Option<Entity> {
-        let item_map = &game.graphics.spritesheet_map;
-        if item_map.is_none() {
-            panic!("graphics not loaded");
-        }
-        let pos = TileMapPositionData {
-            tile_pos,
-            chunk_pos,
-        };
-
-        if game.get_obj_entity_at_tile(pos.clone()).is_some() {
-            warn!("Block {self:?} already exists on tile {tile_pos:?}, skipping...");
-            return None;
-        }
-
-        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
-        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-        let position = Vec3::new(
-            (tile_pos.x as i32 * 32) as f32 + anchor.x * obj_data.size.x,
-            (tile_pos.y as i32 * 32) as f32 + anchor.y * obj_data.size.y,
-            0.,
-        );
-        let foliage_material = game
-            .graphics
-            .foliage_material_map
-            .as_ref()
-            .unwrap()
-            .get(&self)
-            .unwrap()
-            .0
-            .clone();
-
-        let item = commands
-            .spawn(MaterialMesh2dBundle {
-                mesh: meshes.add(Mesh::from(shape::Quad::default())).into(),
-                transform: Transform {
-                    translation: position,
-                    scale: obj_data.size.extend(1.),
-                    ..Default::default()
-                },
-                visibility: Visibility::Visible,
-                material: foliage_material,
-                ..default()
-            })
-            .insert(Name::new("Foliage"))
-            .insert(BlockAttributeBundle {
-                health: Health(100),
-            })
-            .insert(WorldObjectEntityData {
-                object: self,
-                obj_bit_index: 0,
-                texture_offset: 0,
-            })
-            .insert(Block)
-            .insert(YSort)
-            .insert(pos)
-            .insert(self)
-            .set_parent(*game.get_chunk_entity(chunk_pos).unwrap())
-            .id();
-        if obj_data.breakable {
-            commands
-                .entity(item)
-                .insert(Breakable(obj_data.breaks_into));
-        }
-
-        if obj_data.collider {
-            commands
-                .entity(item)
-                .insert(ColliderReflect::new(1. / 3.5, 1. / 4.5));
-        }
-
-        Some(item)
-    }
     pub fn spawn_and_save_block(
         self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
+        proto_commands: &mut ProtoCommands,
+        prototypes: &Prototypes,
+        pos: Vec2,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-        meshes: &mut Assets<Mesh>,
     ) -> Option<Entity> {
         let item = match self {
-            WorldObject::Foliage(_) => {
-                self.spawn_foliage(commands, game, meshes, tile_pos, chunk_pos)
+            WorldObject::Foliage(obj) => {
+                proto_commands.spawn_object_from_proto(obj, prototypes, pos)
             }
-            WorldObject::Wall(_) => self.spawn_wall(commands, game, tile_pos, chunk_pos, None),
-            _ => self.spawn(commands, game, tile_pos, chunk_pos),
+            WorldObject::Wall(obj) => proto_commands.spawn_object_from_proto(obj, prototypes, pos),
+            _ => None,
         };
         if let Some(item) = item {
             //TODO: do what old game data did, add obj to registry

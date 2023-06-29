@@ -206,12 +206,13 @@ impl ClientPlugin {
                 &WorldObject::Foliage(Foliage::Tree) => {
                     commands
                         .entity(e)
-                        .insert(Mesh2dHandle::from(
-                            meshes.add(Mesh::from(shape::Quad::default())),
-                        ))
+                        .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+                            size: Vec2::new(32., 40.),
+                            ..Default::default()
+                        }))))
                         .insert(foliage_material.clone());
                 }
-                &WorldObject::Wall(Wall::Stone) => {
+                &WorldObject::Wall(_) => {
                     commands
                         .entity(e)
                         .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())

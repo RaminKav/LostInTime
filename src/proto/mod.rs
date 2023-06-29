@@ -10,13 +10,14 @@ use bevy_proto::{
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, Sensor};
 
+pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer},
     attributes::{Health, ItemAttributes},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
-    item::{Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, WorldObject},
+    item::{Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject},
     world::WorldObjectEntityData,
     YSort,
 };
@@ -35,9 +36,11 @@ impl Plugin for ProtoPlugin {
             .register_type::<Loot>()
             .register_type::<Vec<Loot>>()
             .register_type::<WorldObject>()
+            .register_type::<Option<WorldObject>>()
             .register_type::<Breakable>()
             .register_type::<BreaksWith>()
             .register_type::<Block>()
+            .register_type::<Wall>()
             .register_type::<ItemStack>()
             .register_type::<WorldObjectEntityData>()
             .register_type::<ItemAttributes>()
@@ -56,6 +59,9 @@ impl Plugin for ProtoPlugin {
 
 impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
+        println!("Loading prototypes...");
+        prototypes.load("proto/tree.prototype.ron");
+        prototypes.load("proto/stone_wall.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/flint.prototype.ron");

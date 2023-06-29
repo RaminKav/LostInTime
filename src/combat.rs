@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
+use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
@@ -10,8 +10,9 @@ use crate::{
     custom_commands::CommandsExt,
     inventory::Inventory,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
+    proto::proto_param::ProtoParam,
     ui::InventoryState,
-    world::world_helpers::{camera_pos_to_block_pos, camera_pos_to_chunk_pos},
+    world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos},
     AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
 };
 
@@ -99,19 +100,16 @@ impl CombatPlugin {
     }
     fn handle_enemy_death(
         mut commands: Commands,
-        mut game: GameParam,
         mut death_events: EventReader<EnemyDeathEvent>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
         loot_tables: Query<&LootTable>,
         mut proto_commands: ProtoCommands,
-        prototypes: Prototypes,
+        proto: ProtoParam,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
             commands.entity(death_event.entity).despawn();
-            let enemy_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(t.x, t.y));
-            let enemy_tile_pos = camera_pos_to_block_pos(&Vec2::new(t.x, t.y));
             let texture_handle = asset_server.load("textures/effects/hit-particles.png");
             let texture_atlas =
                 TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
@@ -129,19 +127,11 @@ impl CombatPlugin {
             ));
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
                 for drop in LootTablePlugin::get_drops(loot_table) {
-                    // drop.obj_type.spawn_item_drop(
-                    //     &mut commands,
-                    //     &mut game,
-                    //     enemy_tile_pos,
-                    //     enemy_chunk_pos,
-                    //     drop.count,
-                    //     Some(drop.attributes),
-                    // );
-
                     proto_commands.spawn_item_from_proto(
-                        dbg!(<WorldObject as Into<&str>>::into(drop.obj_type).to_owned()),
-                        &prototypes,
+                        drop.obj_type,
+                        &proto,
                         death_event.enemy_pos,
+                        drop.count,
                     );
                 }
             }
@@ -228,7 +218,7 @@ impl CombatPlugin {
             {
                 if let Some(obj) = obj_option {
                     let obj_chunk_pos = camera_pos_to_chunk_pos(&(t.translation().truncate()));
-                    let obj_tile_pos = camera_pos_to_block_pos(&(t.translation().truncate()));
+                    let obj_tile_pos = camera_pos_to_tile_pos(&(t.translation().truncate()));
 
                     //TODO: create breaks with tool component, instead of using properties
                     if let Some(main_hand_tool) = hit.hit_with {
