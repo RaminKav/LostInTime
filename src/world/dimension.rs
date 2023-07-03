@@ -3,10 +3,7 @@ use bevy_save::{CloneReflect, Snapshot};
 
 use crate::{enemy::Mob, item::Equipment, CustomFlush, WorldGeneration};
 
-use super::{
-    chunk::{Chunk, ChunkPlugin},
-    ChunkManager,
-};
+use super::{chunk::Chunk, ChunkManager};
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]

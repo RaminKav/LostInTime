@@ -8,7 +8,8 @@ use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
 use crate::world::CHUNK_SIZE;
 use crate::{
-    custom_commands::CommandsExt, AnimationTimer, CustomFlush, GameParam, GameState, Limb, YSort,
+    custom_commands::CommandsExt, player::Limb, AnimationTimer, CustomFlush, GameParam, GameState,
+    YSort,
 };
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -17,6 +18,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic
 
 mod crafting;
 mod loot_table;
+pub mod projectile;
 pub use crafting::*;
 pub use loot_table::*;
 
@@ -28,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::crafting::CraftingPlugin;
+use self::projectile::{Projectile, RangedAttack, RangedAttackPlugin};
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
 #[reflect(Schematic)]
@@ -76,9 +79,11 @@ pub struct Size(pub Vec2);
     Schematic,
     IntoStaticStr,
     Display,
+    Default,
 )]
 #[reflect(Component, Schematic)]
 pub enum WorldObject {
+    #[default]
     None,
     Grass,
     Wall(Wall),
@@ -321,10 +326,9 @@ impl WorldObject {
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-        let position;
 
         let limb = Limb::Hands;
-        position = Vec3::new(
+        let position = Vec3::new(
             PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
             PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y,
             0.000000000001, //500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
@@ -347,9 +351,14 @@ impl WorldObject {
                 ..Default::default()
             })
             .insert(Equipment(limb))
+            // TODO: add to proto
+            .insert(RangedAttack(Projectile::Rock))
+            //
             .insert(MainHand)
             .insert(Name::new("HeldItem"))
             .insert(YSort)
+            .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
+            .insert(Sensor)
             .insert(inv_item_stack.item_stack.attributes.clone())
             .insert(self)
             .set_parent(player_e)
@@ -361,11 +370,6 @@ impl WorldObject {
         });
         let mut item_entity = commands.entity(item);
 
-        if obj_data.collider {
-            item_entity
-                .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
-                .insert(Sensor);
-        }
         item_entity.insert(AttackAnimationTimer(
             Timer::from_seconds(0.125, TimerMode::Once),
             0.,
@@ -462,7 +466,7 @@ impl WorldObject {
         }
         game.world_obj_data
             .drop_entities
-            .insert(item, (stack.clone(), transform));
+            .insert(item, (stack, transform));
         item
     }
     pub fn get_minimap_color(&self) -> (u8, u8, u8) {
@@ -481,18 +485,13 @@ impl WorldObject {
     }
 }
 
-impl Default for WorldObject {
-    fn default() -> Self {
-        WorldObject::None
-    }
-}
-
 pub struct ItemsPlugin;
 
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
             .add_plugin(CraftingPlugin)
+            .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
             .add_systems(
                 (

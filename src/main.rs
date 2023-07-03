@@ -4,16 +4,8 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::{
-    Attack, AttackCooldown, AttributesPlugin, Health, InvincibilityCooldown, ItemAttributes,
-    PlayerAttributeBundle,
-};
-use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
+use attributes::{AttributesPlugin, Health};
 
-//TODO:
-// - get player movement
-// - set up tilemap or world generation
-// - trees/entities to break/mine
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
@@ -49,23 +41,21 @@ mod player;
 mod proto;
 mod ui;
 mod world;
-use animations::{
-    AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer, AnimationsPlugin,
-};
+use animations::{AnimatedTextureMaterial, AnimationTimer, AnimationsPlugin};
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
-use inputs::{FacingDirection, InputsPlugin, MovementVector};
-use inventory::{Inventory, InventoryPlugin, ItemStack, INVENTORY_INIT, INVENTORY_SIZE};
-use item::{Equipment, EquipmentData, ItemsPlugin, WorldObject, WorldObjectResource};
-use player::PlayerPlugin;
+use inputs::InputsPlugin;
+use inventory::{InventoryPlugin, ItemStack};
+use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
+use player::{Player, PlayerPlugin, PlayerState};
 use proto::ProtoPlugin;
-use serde::Deserialize;
+
 use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
+
 use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
@@ -188,8 +178,12 @@ pub struct GameParam<'w, 's> {
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
-    pub chunk_query:
-        Query<'w, 's, (Entity, &'static Transform, &'static mut ChunkSpawners), With<Chunk>>,
+    pub chunk_query: Query<
+        'w,
+        's,
+        (Entity, &'static Transform, &'static mut ChunkSpawners),
+        (With<Chunk>, Without<Player>),
+    >,
     pub tile_collection_query: Query<'w, 's, &'static TileEntityCollection, With<Chunk>>,
     pub tile_data_query: Query<'w, 's, (&'static mut TileSpriteData, Option<&'static Children>)>,
     pub world_object_query: Query<
@@ -286,41 +280,6 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
 }
-#[derive(Component, Debug)]
-pub struct Player;
-#[derive(Debug, Clone)]
-pub struct PlayerState {
-    is_moving: bool,
-    is_dashing: bool,
-    is_attacking: bool,
-    main_hand_slot: Option<EquipmentData>,
-    position: Vec3,
-    reach_distance: u8,
-    player_dash_cooldown: Timer,
-    player_dash_duration: Timer,
-}
-
-impl Default for PlayerState {
-    fn default() -> Self {
-        Self {
-            is_moving: false,
-            is_dashing: false,
-            is_attacking: false,
-            main_hand_slot: None,
-            position: Vec3::ZERO,
-            reach_distance: 1,
-            player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.05, TimerMode::Once),
-        }
-    }
-}
-#[derive(Component, EnumIter, Display, Debug, Hash, Copy, Clone, PartialEq, Eq, Deserialize)]
-pub enum Limb {
-    Torso,
-    Hands,
-    Legs,
-    Head,
-}
 
 #[derive(Component, Default)]
 pub struct CameraDirty(bool, bool);
@@ -367,12 +326,9 @@ pub struct UITextureMaterial {
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
     mut game_render_materials: ResMut<Assets<ColorMaterial>>,
     mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
-    mut dim_event: EventWriter<DimensionSpawnEvent>,
 
     mut game: ResMut<Game>,
     mut images: ResMut<Assets<Image>>,
@@ -544,110 +500,6 @@ fn setup(
         second_pass_layer,
     ));
 
-    let mut limb_children: Vec<Entity> = vec![];
-    //player shadow
-    let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
-    let shadow_texture_atlas =
-        TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
-    let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
-
-    let shadow = commands
-        .spawn(SpriteSheetBundle {
-            texture_atlas: shadow_texture_atlas_handle,
-            transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
-            ..default()
-        })
-        .id();
-    limb_children.push(shadow);
-
-    //player
-    for l in Limb::iter() {
-        let limb_source_handle = asset_server.load(format!(
-            "textures/player/player-run-down/player-{}-run-down-source-0.png",
-            l.to_string().to_lowercase()
-        ));
-        let limb_texture_handle = asset_server.load(format!(
-            "textures/player/player-texture-{}.png",
-            l.to_string().to_lowercase()
-        ));
-        // let limb_texture_atlas =
-        //     TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
-
-        // let limb_texture_atlas_handle = texture_atlases.add(limb_texture_atlas);
-        let transform = if l == Limb::Head {
-            Transform::from_translation(Vec3::new(0., 0., 0.))
-        } else {
-            Transform::default()
-        };
-        let limb = commands
-            .spawn((
-                MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(32., 32.),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
-                    transform,
-                    material: materials.add(AnimatedTextureMaterial {
-                        source_texture: Some(limb_source_handle),
-                        lookup_texture: Some(limb_texture_handle),
-                        opacity: 1.,
-                        flip: 1.,
-                    }),
-                    ..default()
-                },
-                l,
-                AnimationFrameTracker(0, 5),
-            ))
-            .id();
-        // .spawn(SpriteSheetBundle {
-        //     texture_atlas: limb_texture_atlas_handle,
-        //     transform,
-        //     ..default()
-        // })
-        // .id();
-        limb_children.push(limb);
-    }
-
-    //spawn player entity with limb spritesheets as children
-    let p = commands
-        .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                ..Default::default()
-            },
-            AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
-            Player,
-            Inventory {
-                items: [INVENTORY_INIT; INVENTORY_SIZE],
-                crafting_items: [INVENTORY_INIT; 4],
-                crafting_result_item: None,
-            },
-            ItemAttributes {
-                health: 100,
-                attack: 5,
-                ..default()
-            },
-            PlayerAttributeBundle {
-                health: Health(100),
-                attack: Attack(5),
-                attack_cooldown: AttackCooldown(0.4),
-            },
-            InvincibilityCooldown(0.3),
-            MovementVector::default(),
-            FacingDirection::default(),
-            KinematicCharacterController::default(),
-            Collider::cuboid(7., 5.),
-            YSort,
-            Name::new("Player"),
-            RawPosition::default(),
-        ))
-        .push_children(&limb_children)
-        .id();
     // DEBUG FPS
     commands.spawn((
         Text2dBundle {
@@ -676,8 +528,6 @@ fn setup(
         FPSText,
         RenderLayers::from_layers(&[3]),
     ));
-
-    game.player = p;
 }
 
 trait AppExt {

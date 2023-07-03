@@ -1,6 +1,7 @@
 use crate::{proto::proto_param::ProtoParam, world::world_helpers::camera_pos_to_tile_pos};
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
+use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Ccd, RigidBody, Sensor};
 use core::fmt::Display;
 pub trait CommandsExt<'w, 's> {
     fn spawn_item_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
@@ -10,7 +11,14 @@ pub trait CommandsExt<'w, 's> {
         pos: Vec2,
         count: usize,
     ) -> Option<Entity>;
-    fn spawn_mob_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+    fn spawn_projectile_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &mut self,
+        obj: T,
+        params: &ProtoParam,
+        pos: Vec2,
+        dir: Vec2,
+    ) -> Option<Entity>;
+    fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
         prototypes: &Prototypes,
@@ -32,25 +40,45 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         pos: Vec2,
         count: usize,
     ) -> Option<Entity> {
-        let p = <T as Into<&str>>::into(obj).to_owned();
+        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
+            let mut spawned_entity_commands = self.commands().entity(spawned_entity);
 
-        if !params.prototypes.is_ready(&p) {
-            print!("Prototype {} is not ready!", p);
-            return None;
+            if let Some(proto_data) = params.get_item_data(obj) {
+                // modify the item stack count
+                let mut proto_data = proto_data.clone();
+                proto_data.count = count;
+                spawned_entity_commands.insert(proto_data);
+            }
+            return Some(spawned_entity);
         }
-        let spawned_entity = self.spawn(p.clone()).id();
-        let mut spawned_entity_commands = self.commands().entity(spawned_entity);
-        if let Some(proto_data) = params.get_item_data(&p) {
-            // modify item stack count
-            let mut proto_data = proto_data.clone();
-            proto_data.count = count;
-            spawned_entity_commands.insert(proto_data);
-        }
-
-        spawned_entity_commands.insert(Transform::from_translation(pos.extend(0.)));
-        Some(spawned_entity)
+        None
     }
-    fn spawn_mob_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+    fn spawn_projectile_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &mut self,
+        obj: T,
+        params: &ProtoParam,
+        pos: Vec2,
+        dir: Vec2,
+    ) -> Option<Entity> {
+        if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
+            let mut spawned_entity_commands = self.commands().entity(spawned_entity);
+
+            let Some(proto_data) = params.get_projectile_state(obj) else {return None};
+            // modify the direction of projectile
+            let mut proto_data = proto_data.clone();
+            proto_data.direction = dir;
+            //TODO: make these prototype data
+            spawned_entity_commands
+                .insert(proto_data)
+                .insert(ActiveEvents::COLLISION_EVENTS)
+                .insert(Name::new("Rock"))
+                .insert(ActiveCollisionTypes::all());
+
+            return Some(spawned_entity);
+        }
+        None
+    }
+    fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
         mob: T,
         prototypes: &Prototypes,
@@ -63,7 +91,9 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         }
         let spawned_entity = self.spawn(p).id();
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
-        spawned_entity_commands.insert(Transform::from_translation(pos.extend(0.)));
+        spawned_entity_commands
+            .insert(Transform::from_translation(pos.extend(0.)))
+            .insert(ActiveEvents::COLLISION_EVENTS);
         Some(spawned_entity)
     }
     fn spawn_object_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(

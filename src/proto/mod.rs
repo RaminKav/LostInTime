@@ -17,7 +17,10 @@ use crate::{
     attributes::{Health, ItemAttributes},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
-    item::{Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject},
+    item::{
+        projectile::{Projectile, ProjectileState},
+        Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject,
+    },
     world::WorldObjectEntityData,
     YSort,
 };
@@ -41,6 +44,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<BreaksWith>()
             .register_type::<Block>()
             .register_type::<Wall>()
+            .register_type::<Projectile>()
+            .register_type::<ProjectileState>()
             .register_type::<ItemStack>()
             .register_type::<WorldObjectEntityData>()
             .register_type::<ItemAttributes>()
@@ -62,6 +67,8 @@ impl ProtoPlugin {
         println!("Loading prototypes...");
         prototypes.load("proto/tree.prototype.ron");
         prototypes.load("proto/stone_wall.prototype.ron");
+        prototypes.load("proto/projectile.prototype.ron");
+        prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/flint.prototype.ron");

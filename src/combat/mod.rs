@@ -1,20 +1,21 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::ProtoCommands;
-use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
+
+mod collisions;
 
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
-    attributes::{Attack, AttackCooldown, AttributeModifier, Health, InvincibilityCooldown},
+    attributes::{AttackCooldown, Health, InvincibilityCooldown},
     custom_commands::CommandsExt,
-    inventory::Inventory,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     proto::proto_param::ProtoParam,
-    ui::InventoryState,
     world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos},
-    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
+    AppExt, CustomFlush, GameParam, GameState, Player, YSort,
 };
+
+use self::collisions::CollisionPlugion;
 
 #[derive(Debug, Clone)]
 pub struct HitEvent {
@@ -58,6 +59,7 @@ impl Plugin for CombatPlugin {
                 .add_event::<EnemyDeathEvent>()
                 .add_event::<ObjBreakEvent>();
         })
+        .add_plugin(CollisionPlugion)
         .add_systems(
             (
                 Self::handle_hits,
@@ -65,7 +67,6 @@ impl Plugin for CombatPlugin {
                 Self::spawn_hit_spark_effect.after(Self::handle_hits),
                 Self::handle_invincibility_frames.after(Self::handle_hits),
                 Self::handle_enemy_death.after(Self::handle_hits),
-                Self::check_hit_collisions,
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -268,51 +269,6 @@ impl CombatPlugin {
                 if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
                     hit_e.insert(JustGotHit);
                 }
-            }
-        }
-    }
-    fn check_hit_collisions(
-        mut commands: Commands,
-        context: ResMut<RapierContext>,
-        weapons: Query<(Entity, &Parent, &WorldObject), (Without<HitMarker>, With<MainHand>)>,
-        parent_attack: Query<&Attack>,
-        mut hit_event: EventWriter<HitEvent>,
-        game: Res<Game>,
-        inv_state: Query<&InventoryState>,
-        mut inv: Query<&mut Inventory>,
-        world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
-    ) {
-        if let Ok(weapon) = weapons.get_single() {
-            let weapon_parent = weapon.1;
-            if let Some(hit) = context.intersection_pairs().find(|c| {
-                (c.0 == weapon.0 && c.1 != weapon_parent.get())
-                    || (c.1 == weapon.0 && c.0 != weapon_parent.get())
-            }) {
-                let hit_entity = if hit.0 == weapon.0 { hit.1 } else { hit.0 };
-                if !game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
-                    return;
-                }
-                if let Some(Some(wep)) = inv
-                    .single()
-                    .clone()
-                    .items
-                    .get(inv_state.single().active_hotbar_slot)
-                {
-                    wep.modify_attributes(
-                        AttributeModifier {
-                            modifier: "durability".to_owned(),
-                            delta: -1,
-                        },
-                        &mut inv,
-                    );
-                }
-                commands.entity(weapon.0).insert(HitMarker);
-                hit_event.send(HitEvent {
-                    hit_entity,
-                    damage: parent_attack.get(**weapon_parent).unwrap().0,
-                    dir: Vec2::new(0., 0.),
-                    hit_with: Some(*weapon.2),
-                });
             }
         }
     }
