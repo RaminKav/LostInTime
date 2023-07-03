@@ -12,8 +12,9 @@ use crate::ai::AttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::Equipment;
+use crate::player::Limb;
 use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
-use crate::{GameState, Limb, RawPosition};
+use crate::{GameState, RawPosition};
 
 pub struct AnimationsPlugin;
 
@@ -148,7 +149,7 @@ impl AnimationsPlugin {
     }
     fn animate_enemies(
         time: Res<Time>,
-        game: Res<Game>,
+        _game: Res<Game>,
         asset_server: Res<AssetServer>,
         mut materials: ResMut<Assets<EnemyMaterial>>,
         mut enemy_query: Query<(
@@ -159,7 +160,7 @@ impl AnimationsPlugin {
             Option<&AttackState>,
         )>,
     ) {
-        for (mut tracker, mut timer, enemy_handle, enemy, att_option) in enemy_query.iter_mut() {
+        for (mut tracker, mut timer, enemy_handle, _enemy, att_option) in enemy_query.iter_mut() {
             let enemy_material = materials.get_mut(enemy_handle);
             timer.tick(time.delta());
             if let Some(mat) = enemy_material {

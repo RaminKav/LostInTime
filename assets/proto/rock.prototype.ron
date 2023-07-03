@@ -1,0 +1,9 @@
+(
+  name: "Rock",
+  templates: ["projectile"],
+  schematics: {
+        "survival_rogue_like::item::WorldObject": Flint,
+        "survival_rogue_like::item::projectile::Projectile": Rock,
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 2., direction: (x: 0., y: 0.)),
+  }
+)

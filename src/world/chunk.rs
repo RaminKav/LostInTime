@@ -286,7 +286,7 @@ impl ChunkPlugin {
     pub fn spawn_chunks_around_camera(
         mut game: GameParam,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
-        mut load_chunk_event: EventWriter<SpawnChunkEvent>,
+        _load_chunk_event: EventWriter<SpawnChunkEvent>,
         chunk_cache: Query<&ChunkCache, With<ActiveDimension>>,
     ) {
         if chunk_cache.get_single().is_err() {
@@ -314,7 +314,7 @@ impl ChunkPlugin {
         }
     }
     //TODO: change despawning systems to use playe rpos instead??
-    fn despawn_outofrange_chunks(mut game: GameParam, mut events: EventWriter<DespawnChunkEvent>) {
+    fn despawn_outofrange_chunks(game: GameParam, mut events: EventWriter<DespawnChunkEvent>) {
         let mut removed_chunks = vec![];
         for camera_transform in game.camera_query.iter() {
             let max_distance = f32::hypot(

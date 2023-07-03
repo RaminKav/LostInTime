@@ -12,7 +12,7 @@ use strum::IntoEnumIterator;
 
 use crate::item::{RecipeList, Recipes, WorldObject, WorldObjectResource};
 use crate::ui::UIElement;
-use crate::{GameState, ImageAssets, Limb};
+use crate::{player::Limb, GameState, ImageAssets};
 use ron::de::from_str;
 
 pub struct GameAssetsPlugin;

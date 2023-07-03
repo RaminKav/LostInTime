@@ -9,7 +9,7 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
-use bevy_rapier2d::prelude::Collider;
+use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, RigidBody};
 use bevy_save::prelude::*;
 // use bevy_save::{Build, CloneReflect, DespawnMode, MappingMode, SavePlugins, Snapshot};
 
@@ -26,20 +26,13 @@ use crate::{
         generation::GenerationPlugin,
         ChunkManager, TileMapPositionData, WorldGeneration, WorldObjectEntityData,
     },
-    CoreGameSet, CustomFlush, GameParam, GameState, YSort,
+    CustomFlush, GameParam, GameState, YSort,
 };
 
 #[derive(Component, Reflect, Default)]
 #[reflect(Component)]
 pub struct ColliderReflect {
     collider: Vec2,
-}
-impl ColliderReflect {
-    pub fn new(x: f32, y: f32) -> Self {
-        Self {
-            collider: Vec2::new(x, y),
-        }
-    }
 }
 pub struct ClientPlugin;
 
@@ -129,7 +122,7 @@ impl ClientPlugin {
             Query<&ChunkCache, With<ActiveDimension>>,
             EventReader<SpawnChunkEvent>,
         )> = SystemState::new(world);
-        let (dim_query, mut spawn_events) = state.get_mut(world);
+        let (_dim_query, mut spawn_events) = state.get_mut(world);
         let mut chunks = vec![];
         for event in spawn_events.iter() {
             println!("attempting load chunk {:?}", event.chunk_pos);
@@ -203,7 +196,7 @@ impl ClientPlugin {
 
         for (e, obj) in loaded_entities.iter() {
             match obj {
-                &WorldObject::Foliage(Foliage::Tree) => {
+                WorldObject::Foliage(Foliage::Tree) => {
                     commands
                         .entity(e)
                         .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
@@ -212,7 +205,7 @@ impl ClientPlugin {
                         }))))
                         .insert(foliage_material.clone());
                 }
-                &WorldObject::Wall(_) => {
+                WorldObject::Wall(_) => {
                     commands
                         .entity(e)
                         .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())
@@ -237,11 +230,7 @@ impl ClientPlugin {
         let mut saved_chunks = HashMap::default();
         for saves in save_events.iter() {
             println!("SAVING {:?}...", saves.chunk_pos);
-            let chunk_e = chunk_manager
-                .chunks
-                .get(&saves.chunk_pos.into())
-                .unwrap()
-                .clone();
+            let chunk_e = *chunk_manager.chunks.get(&saves.chunk_pos.into()).unwrap();
             let mut entities = children.iter_descendants(chunk_e).collect::<Vec<_>>();
             entities.push(chunk_e);
             saved_chunks.insert(saves.chunk_pos, entities);
@@ -251,7 +240,7 @@ impl ClientPlugin {
             let snapshot = Snapshot::builder(world)
                 .extract_entities(entities.clone().into_iter())
                 .build();
-            if let Ok(mut writer) = world
+            if let Ok(writer) = world
                 .resource::<AppBackend>()
                 .writer(&format!("{}", chunk_pos))
                 .map_err(SaveableError::other)
@@ -286,8 +275,8 @@ impl ClientPlugin {
         // }
     }
     pub fn despawn_non_saveable_entities(
-        mut commands: Commands,
-        minimap: Query<Entity, With<Minimap>>,
+        _commands: Commands,
+        _minimap: Query<Entity, With<Minimap>>,
         key_input: ResMut<Input<KeyCode>>,
     ) {
         if key_input.just_pressed(KeyCode::Escape) {

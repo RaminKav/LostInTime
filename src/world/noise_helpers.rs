@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
+use noise::{NoiseFn, Perlin};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 

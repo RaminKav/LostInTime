@@ -121,9 +121,9 @@
 
 proto todo:
 
-- make weapons proto?
 - make impl for mesh2dmaterial that takes input of asset, size, move txfm to .insert()
 - add item attribute systemparam?
+- let spawn_item_on_hand use proto
 
 how to set up item prefabs:
 

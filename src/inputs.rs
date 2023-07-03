@@ -3,14 +3,18 @@ use bevy::utils::HashSet;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-use bevy_rapier2d::prelude::{Collider, MoveShapeOptions, QueryFilter, RapierContext};
+use bevy_rapier2d::prelude::{
+    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, QueryFilterFlags,
+    RapierContext,
+};
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health, ItemAttributes};
+use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
+use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -116,18 +120,10 @@ impl InputsPlugin {
             }
         }
     }
-    fn move_player(
-        mut commands: Commands,
+    pub fn move_player(
         mut game: GameParam,
         mut player_query: Query<
-            (
-                Entity,
-                &mut Transform,
-                &mut RawPosition,
-                &Collider,
-                &mut MovementVector,
-                Option<&Children>,
-            ),
+            (&mut KinematicCharacterController, &mut MovementVector),
             (
                 With<Player>,
                 Without<MainCamera>,
@@ -137,20 +133,15 @@ impl InputsPlugin {
         >,
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
-        mut context: ResMut<RapierContext>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-
-        mut inv: Query<&mut Inventory>,
     ) {
-        let (ent, mut player_transform, mut raw_pos, player_collider, mut mv, children) =
-            player_query.single_mut();
+        let (mut player_transform, mut mv) = player_query.single_mut();
         let player = &mut game.game.player_state;
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED;
 
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;
-
             player.is_moving = true;
         }
         if key_input.pressed(KeyCode::D) {
@@ -193,79 +184,14 @@ impl InputsPlugin {
                 player.is_dashing = false;
             }
         }
-        let mut collected_drops = HashSet::new();
-        let output_ws = context.move_shape(
-            Vec2::new(0., d.y),
-            player_collider,
-            raw_pos.0,
-            0.,
-            0.,
-            &MoveShapeOptions::default(),
-            QueryFilter {
-                // flags: QueryFilterFlags::EXCLUDE_SENSORS,
-                exclude_collider: Some(ent),
-                predicate: Some(&|e| {
-                    if let Some(c) = children {
-                        !c.iter().any(|cc| *cc == e)
-                    } else {
-                        true
-                    }
-                }),
-                ..default()
-            },
-            |col| {
-                for (item_stack_entity, _, _) in game.items_query.iter() {
-                    if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
-                        collected_drops.insert(col.entity);
-                    }
-                }
-            },
-        );
 
-        let output_ad = context.move_shape(
-            Vec2::new(d.x, 0.),
-            player_collider,
-            raw_pos.0,
-            0.,
-            0.,
-            &MoveShapeOptions::default(),
-            QueryFilter {
-                // flags: QueryFilterFlags::EXCLUDE_SENSORS,
-                exclude_collider: Some(ent),
-                predicate: Some(&|e| {
-                    if let Some(c) = children {
-                        !c.iter().any(|cc| *cc == e)
-                    } else {
-                        true
-                    }
-                }),
-                ..default()
-            },
-            |col| {
-                for (item_stack_entity, _, _) in game.items_query.iter() {
-                    if col.entity == item_stack_entity && !collected_drops.contains(&col.entity) {
-                        collected_drops.insert(col.entity);
-                    }
-                }
-            },
-        );
         mv.0 = d;
-        raw_pos.x += output_ad.effective_translation.x;
-        raw_pos.y += output_ws.effective_translation.y;
-
-        player_transform.translation.x = raw_pos.x.round();
-        player_transform.translation.y = raw_pos.y.round();
-        player.position = player_transform.translation;
 
         if d.x != 0. || d.y != 0. {
+            player_transform.translation = Some(Vec2::new(d.x, d.y));
             minimap_event.send(UpdateMiniMapEvent);
-        }
-        for drop in collected_drops.iter() {
-            let item_stack = game.items_query.get(*drop).unwrap().2.clone();
-            item_stack.add_to_inventory(&mut inv, &mut game.inv_slot_query);
-
-            game.world_obj_data.drop_entities.remove(&drop);
-            commands.entity(*drop).despawn();
+        } else {
+            player_transform.translation = Some(Vec2::ZERO);
         }
     }
     pub fn toggle_inventory(
@@ -298,7 +224,7 @@ impl InputsPlugin {
                 chunk_pos: IVec2 { x: 0, y: 0 },
                 tile_pos: TilePos { x: 0, y: 0 },
             });
-            proto_commands.spawn_mob_from_proto(NeutralMob::Slime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(NeutralMob::Slime, &proto.prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items[0].clone();
@@ -413,6 +339,8 @@ impl InputsPlugin {
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut inv: Query<&mut Inventory>,
         parent_attack: Query<&Attack>,
+        tool_query: Query<&RangedAttack, With<Equipment>>,
+        mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     ) {
         let inv_state = inv_query.get_single();
         if let Ok(inv_state) = inv_state {
@@ -430,9 +358,6 @@ impl InputsPlugin {
             if let Some(tool) = &game.game.player_state.main_hand_slot {
                 main_hand_option = Some(tool.obj);
             }
-
-            attack_event.send(AttackEvent);
-
             let player_pos = game.game.player_state.position;
             let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
                 cursor_pos.world_coords.x,
@@ -442,6 +367,15 @@ impl InputsPlugin {
                 cursor_pos.world_coords.x,
                 cursor_pos.world_coords.y,
             ));
+            if let Ok(ranged_tool) = tool_query.get_single() {
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: ranged_tool.0.clone(),
+                    direction: (cursor_pos.world_coords.truncate() - player_pos.truncate())
+                        .normalize_or_zero(),
+                })
+            }
+            attack_event.send(AttackEvent);
+
             // println!(
             //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?}",
             //     game.get_tile_data(TileMapPositionData {

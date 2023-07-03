@@ -1,7 +1,8 @@
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::*;
+use core::fmt::Display;
 
-use crate::inventory::ItemStack;
+use crate::{inventory::ItemStack, item::projectile::ProjectileState};
 
 #[derive(SystemParam)]
 pub struct ProtoParam<'w, 's> {
@@ -16,8 +17,13 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .get(format!("proto/{}.prototype.ron", id.to_lowercase()))?,
         )
     }
-    pub fn get_item_data(&self, id: &str) -> Option<&ItemStack> {
-        if let Some(data) = self.get_prototype(id) {
+    pub fn get_item_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&ItemStack> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+
+        if let Some(data) = self.get_prototype(&id) {
             data.schematics()
                 .get::<ItemStack>()
                 .unwrap()
@@ -25,6 +31,23 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .downcast_ref::<ItemStack>()
         } else {
             println!("Could not get item data for: {}", id);
+            None
+        }
+    }
+    pub fn get_projectile_state<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&ProjectileState> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+
+        if let Some(data) = self.get_prototype(&id) {
+            data.schematics()
+                .get::<ProjectileState>()
+                .unwrap()
+                .input()
+                .downcast_ref::<ProjectileState>()
+        } else {
+            println!("Could not get projectile data for: {}", id);
             None
         }
     }

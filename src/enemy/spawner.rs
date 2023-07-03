@@ -7,7 +7,6 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     custom_commands::CommandsExt,
-    enemy::EnemySpawnEvent,
     world::{
         chunk::Chunk,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos},
@@ -27,7 +26,6 @@ impl Plugin for SpawnerPlugin {
                 Self::handle_spawn_mobs,
                 Self::tick_spawner_timers,
                 Self::add_spawners_to_new_chunks,
-                Self::handle_add_spawners_on_chunk_spawn,
                 Self::check_mob_count,
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -112,7 +110,7 @@ impl SpawnerPlugin {
                             chunk_pos: picked_spawner.chunk_pos,
                         });
                         prototypes.is_ready("Slime");
-                        proto_commands.spawn_mob_from_proto(NeutralMob::Slime, &prototypes, pos);
+                        proto_commands.spawn_from_proto(NeutralMob::Slime, &prototypes, pos);
 
                         picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     }
@@ -152,24 +150,6 @@ impl SpawnerPlugin {
                     }
                 }
             }
-        }
-    }
-    fn handle_add_spawners_on_chunk_spawn(
-        spawned_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
-        mut commands: Commands,
-    ) {
-        for (e, chunk) in spawned_chunks.iter() {
-            let spawner = Spawner {
-                chunk_pos: IVec2 { x: 0, y: 0 },
-                weight: 1.,
-                spawn_timer: Timer::from_seconds(30., TimerMode::Once),
-                max_summons: 5,
-                enemy: Mob::Neutral(NeutralMob::Slime),
-            };
-            println!("Adding spawner for {:?}", chunk.chunk_pos);
-            commands.entity(e).insert(ChunkSpawners {
-                spawners: vec![spawner],
-            });
         }
     }
 }
