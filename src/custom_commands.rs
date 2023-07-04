@@ -1,7 +1,7 @@
 use crate::{proto::proto_param::ProtoParam, world::world_helpers::camera_pos_to_tile_pos};
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
-use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Ccd, RigidBody, Sensor};
+use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents};
 use core::fmt::Display;
 pub trait CommandsExt<'w, 's> {
     fn spawn_item_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(

@@ -1,12 +1,8 @@
 use bevy::prelude::*;
-use bevy::utils::HashSet;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, QueryFilterFlags,
-    RapierContext,
-};
+use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 

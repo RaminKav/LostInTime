@@ -9,9 +9,8 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
-use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, RigidBody};
+use bevy_rapier2d::prelude::Collider;
 use bevy_save::prelude::*;
-// use bevy_save::{Build, CloneReflect, DespawnMode, MappingMode, SavePlugins, Snapshot};
 
 use crate::{
     attributes::Health,

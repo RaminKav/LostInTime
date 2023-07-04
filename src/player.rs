@@ -1,7 +1,7 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{
-    ActiveCollisionTypes, ActiveEvents, Ccd, CharacterLength, Collider, Dominance,
+    ActiveEvents, CharacterLength, Collider,
     KinematicCharacterController, KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
 };
 use serde::Deserialize;
@@ -18,7 +18,7 @@ use crate::{
     inventory::{Inventory, INVENTORY_INIT, INVENTORY_SIZE},
     item::EquipmentData,
     world::{y_sort::YSort, CHUNK_SIZE},
-    AppExt, CoreGameSet, Game, GameParam, RawPosition, PLAYER_MOVE_SPEED,
+    AppExt, CoreGameSet, Game, GameParam, RawPosition,
 };
 pub struct PlayerPlugin;
 
