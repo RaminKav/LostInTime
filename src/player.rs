@@ -50,7 +50,7 @@ impl Default for PlayerState {
             position: Vec3::ZERO,
             reach_distance: 1,
             player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.05, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.1, TimerMode::Once),
         }
     }
 }
@@ -110,10 +110,8 @@ pub fn handle_player_raw_position(
     mut game: GameParam,
 ) {
     let Ok((mut raw_pos, mut pos,  kcc)) = player_pos.get_single_mut() else {return};
-    raw_pos.0 += kcc.effective_translation.clamp(
-        Vec2::new(-PLAYER_MOVE_SPEED, -PLAYER_MOVE_SPEED),
-        Vec2::new(PLAYER_MOVE_SPEED, PLAYER_MOVE_SPEED),
-    );
+    raw_pos.0 += kcc.effective_translation;
+
     let delta = raw_pos.0 - pos.translation.truncate();
 
     pos.translation.x += delta.x;

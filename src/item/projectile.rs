@@ -5,7 +5,7 @@ use strum_macros::{Display, IntoStaticStr};
 
 use crate::{custom_commands::CommandsExt, proto::proto_param::ProtoParam, GameParam, GameState};
 
-#[derive(Component, Reflect, Schematic, FromReflect, Default)]
+#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
 pub struct RangedAttack(pub Projectile);
 

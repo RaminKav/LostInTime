@@ -18,7 +18,8 @@ use crate::{
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
     item::{
-        projectile::{Projectile, ProjectileState},
+        melee::MeleeAttack,
+        projectile::{Projectile, ProjectileState, RangedAttack},
         Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject,
     },
     world::WorldObjectEntityData,
@@ -46,6 +47,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<Wall>()
             .register_type::<Projectile>()
             .register_type::<ProjectileState>()
+            .register_type::<RangedAttack>()
+            .register_type::<MeleeAttack>()
             .register_type::<ItemStack>()
             .register_type::<WorldObjectEntityData>()
             .register_type::<ItemAttributes>()
