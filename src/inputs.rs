@@ -6,7 +6,7 @@ use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Attack, AttackCooldown, AttributeModifier, Health};
+use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
@@ -238,7 +238,7 @@ impl InputsPlugin {
     pub fn test_take_damage(
         // mut player_health_query: Query<&mut Health, With<Player>>,
         key_input: ResMut<Input<KeyCode>>,
-        att_query: Query<(&mut Health, &Attack, &AttackCooldown), With<Player>>,
+        att_query: Query<(&mut CurrentHealth, &Attack, &AttackCooldown), With<Player>>,
     ) {
         if key_input.just_pressed(KeyCode::X) {
             // att_query.single_mut().0 -= 20;

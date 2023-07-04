@@ -14,7 +14,7 @@ pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer},
-    attributes::{Health, ItemAttributes},
+    attributes::{ItemAttributes, MaxHealth},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
     item::{
@@ -35,7 +35,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<PassiveMob>()
             .register_type::<HostileMob>()
             .register_type::<AnimationFrameTracker>()
-            .register_type::<Health>()
+            .register_type::<MaxHealth>()
             .register_type::<LootTable>()
             .register_type::<Loot>()
             .register_type::<Vec<Loot>>()

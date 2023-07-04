@@ -1,8 +1,8 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_rapier2d::prelude::{
-    ActiveEvents, CharacterLength, Collider,
-    KinematicCharacterController, KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
+    ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
+    KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
 };
 use serde::Deserialize;
 use strum::IntoEnumIterator;
@@ -11,7 +11,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
-        Attack, AttackCooldown, Health, InvincibilityCooldown, ItemAttributes,
+        Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown, ItemAttributes,
         PlayerAttributeBundle,
     },
     inputs::{FacingDirection, InputsPlugin, MovementVector},
@@ -219,7 +219,7 @@ fn spawn_player(
                 ..default()
             },
             PlayerAttributeBundle {
-                health: Health(100),
+                health: CurrentHealth(100),
                 attack: Attack(5),
                 attack_cooldown: AttackCooldown(0.4),
             },

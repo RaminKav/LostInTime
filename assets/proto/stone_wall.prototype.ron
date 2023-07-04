@@ -7,7 +7,7 @@
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::item::Breakable": (Some(Flint)),
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 11),
-  "survival_rogue_like::attributes::Health": (100),
+  "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::world::WorldObjectEntityData": (object: Wall(StoneWall), obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::world::y_sort::YSort": (),
   "bevy_proto::custom::VisibilityBundle": (),

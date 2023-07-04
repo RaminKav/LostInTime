@@ -9,7 +9,7 @@ use strum_macros::{Display, EnumIter};
 
 use crate::{
     assets::Graphics,
-    attributes::Health,
+    attributes::{CurrentHealth, MaxHealth},
     client::ClientPlugin,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
@@ -1139,12 +1139,12 @@ pub fn update_inventory_ui(
     }
 }
 fn update_healthbar(
-    player_health_query: Query<&Health, With<Player>>,
+    player_health_query: Query<(&CurrentHealth, &MaxHealth), With<Player>>,
     mut health_bar_query: Query<&mut Sprite, With<HealthBar>>,
 ) {
-    let player_health = player_health_query.single();
+    let Ok((player_health, player_max_health)) = player_health_query.get_single() else {return};
     health_bar_query.single_mut().custom_size = Some(Vec2 {
-        x: 62. * player_health.0 as f32 / 100.,
+        x: 62. * player_health.0 as f32 / player_max_health.0 as f32,
         y: 7.,
     });
 }
