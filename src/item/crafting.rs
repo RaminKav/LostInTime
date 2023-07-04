@@ -2,9 +2,9 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
-    attributes::ItemAttributes,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{ItemDisplayMetaData, WorldObject},
+    proto::proto_param::ProtoParam,
     GameState,
 };
 
@@ -12,8 +12,15 @@ pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<CraftingSlotUpdateEvent>()
+            .add_event::<CompleteRecipeEvent>()
             .insert_resource(Recipes::default())
-            .add_system(Self::handle_crafting_slot_update.in_set(OnUpdate(GameState::Main)));
+            .add_systems(
+                (
+                    Self::handle_crafting_slot_update,
+                    Self::handle_recipe_complete,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            );
     }
 }
 #[derive(Resource, Default, Deserialize)]
@@ -28,6 +35,7 @@ impl CraftingPlugin {
         mut events: EventReader<CraftingSlotUpdateEvent>,
         mut inv: Query<&mut Inventory>,
         recipes_list: Res<Recipes>,
+        proto: ProtoParam,
     ) {
         for _ in events.iter() {
             let crafting_slots = &inv.single().crafting_items;
@@ -45,17 +53,18 @@ impl CraftingPlugin {
             let result_option = if let Some(result) =
                 recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
             {
-                //TODO: get correct metadata for new item. add as .ron data?
                 Some(InventoryItemStack {
-                    item_stack: ItemStack {
-                        obj_type: result,
-                        count: 1,
-                        attributes: ItemAttributes::default(),
-                        metadata: ItemDisplayMetaData {
-                            name: result.to_string(),
-                            desc: "A cool piece of Equipment".to_string(),
-                        },
-                    },
+                    item_stack: proto
+                        .get_item_data(result)
+                        .unwrap_or(&ItemStack {
+                            count: 1,
+                            metadata: ItemDisplayMetaData {
+                                name: "Null".to_string(),
+                                ..default()
+                            },
+                            ..default()
+                        })
+                        .clone(),
                     slot: 0,
                 })
             } else {
@@ -64,10 +73,31 @@ impl CraftingPlugin {
             inv.single_mut().crafting_result_item = result_option;
         }
     }
+    fn handle_recipe_complete(
+        mut events: EventReader<CompleteRecipeEvent>,
+        mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
+        mut inv: Query<&mut Inventory>,
+    ) {
+        for _ in events.iter() {
+            inv.single_mut().crafting_result_item = None;
+            for crafting_item_option in inv.single_mut().crafting_items.iter_mut() {
+                if let Some(crafting_item) = crafting_item_option.as_mut() {
+                    if let Some(remaining_item) = crafting_item.modify_count(-1) {
+                        *crafting_item = remaining_item;
+                    } else {
+                        *crafting_item_option = None;
+                    }
+                }
+            }
+            crafting_slot_event.send(CraftingSlotUpdateEvent);
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
 pub struct CraftingSlotUpdateEvent;
+#[derive(Clone, Debug, Default)]
+pub struct CompleteRecipeEvent;
 
 #[derive(PartialEq)]
 pub struct CraftingRecipe {
