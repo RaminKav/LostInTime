@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use crate::{
     attributes::{AttributeModifier, ItemAttributes},
-    item::{ItemDisplayMetaData, WorldObject},
+    item::{CompleteRecipeEvent, ItemDisplayMetaData, WorldObject},
     ui::{InventorySlotState, InventorySlotType},
 };
 use bevy::prelude::*;
@@ -269,6 +269,7 @@ impl InventoryPlugin {
     pub fn pick_up_and_merge_crafting_result_stack(
         dragging_item: ItemStack,
         inv: &mut Query<&mut Inventory>,
+        complete_recipe_event: &mut EventWriter<CompleteRecipeEvent>,
     ) -> Option<ItemStack> {
         let pickup_item_option = inv.single().crafting_result_item.clone();
         if let Some(pickup_item) = pickup_item_option {
@@ -305,6 +306,7 @@ impl InventoryPlugin {
             } else {
                 None
             };
+            complete_recipe_event.send(CompleteRecipeEvent);
 
             return new_item;
         } else {

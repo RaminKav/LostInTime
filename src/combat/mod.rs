@@ -55,10 +55,9 @@ pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-            app.add_event::<HitEvent>()
-                .add_event::<EnemyDeathEvent>()
-                .add_event::<ObjBreakEvent>();
+            app.add_event::<HitEvent>().add_event::<EnemyDeathEvent>();
         })
+        .add_event::<ObjBreakEvent>()
         .add_plugin(CollisionPlugion)
         .add_systems(
             (
@@ -217,6 +216,10 @@ impl CombatPlugin {
             if let Ok((e, mut hit_health, t, obj_option, i_frame_option)) =
                 health.get_mut(hit.hit_entity)
             {
+                // don't shoot a dead horse...
+                if hit_health.0 <= 0 {
+                    continue;
+                }
                 if let Some(obj) = obj_option {
                     let obj_chunk_pos = camera_pos_to_chunk_pos(&(t.translation().truncate()));
                     let obj_tile_pos = camera_pos_to_tile_pos(&(t.translation().truncate()));

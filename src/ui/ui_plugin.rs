@@ -13,7 +13,7 @@ use crate::{
     client::ClientPlugin,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
-    item::{CraftingSlotUpdateEvent, WorldObject},
+    item::{CompleteRecipeEvent, CraftingSlotUpdateEvent, WorldObject},
     GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
 };
 
@@ -239,6 +239,7 @@ fn handle_drop_on_slot_events(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
+    mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
@@ -251,6 +252,7 @@ fn handle_drop_on_slot_events(
             InventoryPlugin::pick_up_and_merge_crafting_result_stack(
                 drop_event.dropped_item_stack.clone(),
                 &mut inv,
+                &mut complete_recipe_event,
             )
         } else {
             InventoryPlugin::drop_item_on_slot(
@@ -504,6 +506,7 @@ fn handle_cursor_update(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
+    mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -536,21 +539,7 @@ fn handle_cursor_update(
                                     inv.single_mut().crafting_items[state.slot_index] = None;
                                     crafting_slot_event.send(CraftingSlotUpdateEvent);
                                 } else if state.r#type.is_crafting_result() {
-                                    for crafting_item_option in
-                                        inv.single_mut().crafting_items.iter_mut()
-                                    {
-                                        if let Some(crafting_item) = crafting_item_option.as_mut() {
-                                            if let Some(remaining_item) =
-                                                crafting_item.modify_count(-1)
-                                            {
-                                                *crafting_item = remaining_item;
-                                            } else {
-                                                *crafting_item_option = None;
-                                            }
-                                        }
-                                    }
-                                    inv.single_mut().crafting_result_item = None;
-                                    crafting_slot_event.send(CraftingSlotUpdateEvent);
+                                    complete_recipe_event.send(CompleteRecipeEvent);
                                 } else {
                                     inv.single_mut().items[state.slot_index] = None;
                                 }
@@ -872,19 +861,11 @@ fn handle_spawn_inv_item_tooltip(
             tooltip_text.push((durability.clone(), 28.));
         }
 
-        // let item_stack = ItemStack {
-        //     obj_type: item_stack.obj_type,
-        //     metadata: item_stack.metadata.clone(),
-        //     attributes: item_stack.attributes.clone(),
-        //     count: item_stack.count,
-        // };
-        // let item_icon = spawn_item_stack_icon(commands, graphics, &item_stack, asset_server);
-        // commands.entity(tooltip).add_child(item_icon);
         for (i, (text, d)) in tooltip_text.iter().enumerate() {
             let text_pos = if has_attributes {
-                Vec3::new(0., 28. - (i as f32 * 10.) - d, 1.)
+                Vec3::new(-size.x / 2. + 8., 28. - (i as f32 * 10.) - d, 1.)
             } else {
-                Vec3::new(12., 0., 1.)
+                Vec3::new(0., 0., 1.)
             };
             let text = commands
                 .spawn((
@@ -901,10 +882,14 @@ fn handle_spawn_inv_item_tooltip(
                                     alpha: 1.,
                                 },
                             },
-                        )
-                        .with_alignment(TextAlignment::Left),
+                        ),
+                        text_anchor: if has_attributes {
+                            Anchor::CenterLeft
+                        } else {
+                            Anchor::Center
+                        },
                         transform: Transform {
-                            translation: text_pos,
+                            translation: dbg!(text_pos),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },

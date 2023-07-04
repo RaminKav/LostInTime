@@ -5,6 +5,10 @@
   "survival_rogue_like::item::WorldObject": Flint,
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Flint,
+        metadata: (
+            name: "Flint", 
+            desc: "A chipped piece of flint."
+        ),
         count: 1
   ),
   }

@@ -93,7 +93,6 @@ impl CollisionPlugion {
                 if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                     continue;
                 }
-                println!("Projectile Hit for {damage}");
                 hit_event.send(HitEvent {
                     hit_entity: *e2,
                     damage: *damage,
@@ -127,7 +126,6 @@ impl CollisionPlugion {
                 item_stack.add_to_inventory(&mut inv, &mut game.inv_slot_query);
 
                 game.world_obj_data.drop_entities.remove(&e2);
-                println!("DESPAWN");
                 commands.entity(e2).despawn();
             }
         }
