@@ -329,13 +329,8 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut game_render_materials: ResMut<Assets<ColorMaterial>>,
     mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
-
-    mut game: ResMut<Game>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    game.player_state.player_dash_cooldown = Timer::from_seconds(0.5, TimerMode::Once);
-    game.player_state.player_dash_duration = Timer::from_seconds(0.05, TimerMode::Once);
-
     let img_size = Extent3d {
         width: GAME_WIDTH as u32,
         height: GAME_HEIGHT as u32,

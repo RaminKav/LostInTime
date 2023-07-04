@@ -3,6 +3,7 @@ use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
@@ -18,6 +19,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic
 
 mod crafting;
 mod loot_table;
+pub mod melee;
 pub mod projectile;
 pub use crafting::*;
 pub use loot_table::*;
@@ -303,6 +305,7 @@ impl WorldObject {
         commands: &mut Commands,
         game: &mut GameParam,
         inv_item_stack: &InventoryItemStack,
+        proto: ProtoParam,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
         if item_map.is_none() {
@@ -351,16 +354,17 @@ impl WorldObject {
                 ..Default::default()
             })
             .insert(Equipment(limb))
-            // TODO: add to proto
-            .insert(RangedAttack(Projectile::Rock))
-            //
             .insert(MainHand)
             .insert(Name::new("HeldItem"))
             .insert(YSort)
-            .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
             .insert(Sensor)
             .insert(inv_item_stack.item_stack.attributes.clone())
+            .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
             .insert(self)
+            .insert(AttackAnimationTimer(
+                Timer::from_seconds(0.125, TimerMode::Once),
+                0.,
+            ))
             .set_parent(player_e)
             .id();
 
@@ -369,11 +373,12 @@ impl WorldObject {
             entity: item,
         });
         let mut item_entity = commands.entity(item);
-
-        item_entity.insert(AttackAnimationTimer(
-            Timer::from_seconds(0.125, TimerMode::Once),
-            0.,
-        ));
+        if let Some(melee) = proto.is_item_melee_weapon(self) {
+            item_entity.insert(melee.clone());
+        }
+        if let Some(ranged) = proto.is_item_ranged_weapon(self) {
+            item_entity.insert(ranged.clone());
+        }
 
         item
     }
@@ -575,6 +580,7 @@ impl ItemsPlugin {
         mut inv: Query<&mut Inventory>,
         item_stack_query: Query<&ItemAttributes>,
         mut att_event: EventWriter<AttributeChangeEvent>,
+        proto: ProtoParam,
     ) {
         let active_hotbar_slot = inv_state.single().active_hotbar_slot;
         let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
@@ -586,7 +592,12 @@ impl ItemsPlugin {
                 let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
                 let new_attributes = &new_item.item_stack.attributes;
                 if new_item_obj != current_item.obj {
-                    new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
+                    new_item_obj.spawn_item_on_hand(
+                        &mut commands,
+                        &mut game_param,
+                        &new_item,
+                        proto,
+                    );
                     att_event.send(AttributeChangeEvent);
                 } else if curr_attributes != new_attributes {
                     commands
@@ -595,7 +606,7 @@ impl ItemsPlugin {
                     att_event.send(AttributeChangeEvent);
                 }
             } else {
-                new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item);
+                new_item_obj.spawn_item_on_hand(&mut commands, &mut game_param, &new_item, proto);
                 att_event.send(AttributeChangeEvent);
             }
         } else if let Some(current_item) = prev_held_item_data {

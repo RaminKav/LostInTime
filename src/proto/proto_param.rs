@@ -2,7 +2,13 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::*;
 use core::fmt::Display;
 
-use crate::{inventory::ItemStack, item::projectile::ProjectileState};
+use crate::{
+    inventory::ItemStack,
+    item::{
+        melee::MeleeAttack,
+        projectile::{ProjectileState, RangedAttack},
+    },
+};
 
 #[derive(SystemParam)]
 pub struct ProtoParam<'w, 's> {
@@ -29,6 +35,38 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .unwrap()
                 .input()
                 .downcast_ref::<ItemStack>()
+        } else {
+            println!("Could not get item data for: {}", id);
+            None
+        }
+    }
+    /// Returns the [RangedAttack] component for the given item if it exists
+    pub fn is_item_ranged_weapon<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&RangedAttack> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+
+        if let Some(data) = self.get_prototype(&id) {
+            let Some(data) = data.schematics()
+                .get::<RangedAttack>() else {return None};
+            data.input().downcast_ref::<RangedAttack>()
+        } else {
+            println!("Could not get item data for: {}", id);
+            None
+        }
+    }
+    /// Returns the [MeleeAttack] component for the given item if it exists
+    pub fn is_item_melee_weapon<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&MeleeAttack> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+
+        if let Some(data) = self.get_prototype(&id) {
+            let Some(data) = data.schematics()
+                .get::<MeleeAttack>() else {return None};
+            data.input().downcast_ref::<MeleeAttack>()
         } else {
             println!("Could not get item data for: {}", id);
             None
