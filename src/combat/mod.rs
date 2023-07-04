@@ -7,7 +7,7 @@ mod collisions;
 
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
-    attributes::{AttackCooldown, Health, InvincibilityCooldown},
+    attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown},
     custom_commands::CommandsExt,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     proto::proto_param::ProtoParam,
@@ -197,7 +197,7 @@ impl CombatPlugin {
         game: GameParam,
         mut health: Query<(
             Entity,
-            &mut Health,
+            &mut CurrentHealth,
             &GlobalTransform,
             Option<&WorldObject>,
             Option<&InvincibilityCooldown>,

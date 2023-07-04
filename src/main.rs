@@ -4,7 +4,7 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::{AttributesPlugin, Health};
+use attributes::{AttributesPlugin, CurrentHealth};
 
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
@@ -199,7 +199,7 @@ pub struct GameParam<'w, 's> {
             Without<Player>,
             Without<Equipment>,
             Without<Chunk>,
-            Without<Health>,
+            Without<CurrentHealth>,
         ),
     >,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
@@ -212,7 +212,7 @@ pub struct GameParam<'w, 's> {
             Without<Player>,
             Without<Chunk>,
             Without<ItemStack>,
-            Without<Health>,
+            Without<CurrentHealth>,
         ),
     >,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,

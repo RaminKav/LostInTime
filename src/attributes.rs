@@ -12,7 +12,7 @@ pub struct AttributesPlugin;
 
 #[derive(Resource, Reflect, Default, Bundle)]
 pub struct BlockAttributeBundle {
-    pub health: Health,
+    pub health: CurrentHealth,
 }
 #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Debug)]
 #[reflect(Schematic, Default)]
@@ -56,7 +56,7 @@ impl ItemAttributes {
     }
     pub fn add_attribute_components(&self, entity: &mut EntityCommands) {
         if self.health > 0 {
-            entity.insert(Health(self.health));
+            entity.insert(MaxHealth(self.health));
         }
         if self.attack > 0 {
             entity.insert(Attack(self.attack));
@@ -92,7 +92,7 @@ pub struct AttributeChangeEvent;
 
 #[derive(Reflect, FromReflect, Bundle, Clone, Debug, Copy)]
 pub struct PlayerAttributeBundle {
-    pub health: Health,
+    pub health: CurrentHealth,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
 }
@@ -100,7 +100,10 @@ pub struct PlayerAttributeBundle {
 //TODO: Add max health vs curr health
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
-pub struct Health(pub i32);
+pub struct CurrentHealth(pub i32);
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct MaxHealth(pub i32);
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 
@@ -124,8 +127,9 @@ impl Plugin for AttributesPlugin {
             .add_systems(
                 (
                     Self::clamp_health,
+                    Self::add_current_health_with_max_health,
                     Self::handle_item_attribute_change,
-                    Self::handle_attribute_change_events.after(CustomFlush),
+                    Self::handle_player_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -133,7 +137,7 @@ impl Plugin for AttributesPlugin {
 }
 
 impl AttributesPlugin {
-    fn clamp_health(mut health: Query<&mut Health, With<Player>>) {
+    fn clamp_health(mut health: Query<&mut CurrentHealth, With<Player>>) {
         for mut h in health.iter_mut() {
             if h.0 < 0 {
                 h.0 = 0;
@@ -142,7 +146,7 @@ impl AttributesPlugin {
             }
         }
     }
-    fn handle_attribute_change_events(
+    fn handle_player_attribute_change_events(
         mut commands: Commands,
         player: Query<Entity, With<Player>>,
         eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
@@ -191,6 +195,15 @@ impl AttributesPlugin {
                     }
                 }
             }
+        }
+    }
+    /// Adds a current health component to all entities with a max health component
+    fn add_current_health_with_max_health(
+        mut commands: Commands,
+        mut health: Query<(Entity, &MaxHealth), (Changed<MaxHealth>, Without<CurrentHealth>)>,
+    ) {
+        for (entity, max_health) in health.iter_mut() {
+            commands.entity(entity).insert(CurrentHealth(max_health.0));
         }
     }
 }

@@ -13,7 +13,7 @@ use bevy_rapier2d::prelude::Collider;
 use bevy_save::prelude::*;
 
 use crate::{
-    attributes::Health,
+    attributes::CurrentHealth,
     item::{Foliage, Placeable, Wall, WorldObject},
     ui::minimap::Minimap,
     world::{
@@ -73,7 +73,7 @@ impl Plugin for ClientPlugin {
             // .register_saveable::<Handle<FoliageMaterial>>()
             // .register_saveable::<Handle<TextureAtlas>>()
             .register_saveable::<TextureAtlasSprite>()
-            .register_saveable::<Health>()
+            .register_saveable::<CurrentHealth>()
             .register_saveable::<WorldObjectEntityData>()
             .register_saveable::<YSort>()
             .register_saveable::<TileMapPositionData>()
