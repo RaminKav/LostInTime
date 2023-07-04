@@ -41,7 +41,7 @@ mod player;
 mod proto;
 mod ui;
 mod world;
-use animations::{AnimatedTextureMaterial, AnimationTimer, AnimationsPlugin};
+use animations::{AnimationTimer, AnimationsPlugin};
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
@@ -54,12 +54,9 @@ use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
 use proto::ProtoPlugin;
 
-use strum::IntoEnumIterator;
-
 use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
-    dimension::DimensionSpawnEvent,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPositionData, WorldObjectEntityData, WorldPlugin,

@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::crafting::CraftingPlugin;
-use self::projectile::{Projectile, RangedAttack, RangedAttackPlugin};
+use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
 #[reflect(Schematic)]
