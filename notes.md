@@ -132,7 +132,7 @@ how to set up item prefabs:
 - creating an item directly into the inventory will currently not work with this design. if its not an entity, cant use prefab to get attributes
 
 BUG: moving very far causes dash cooldown to double in speed? weird behaviour
-BUG: move dash tick to animations.rs
+BUG: move dash tick to animations.rs, also dash movement is mega glitched rn
 BUG: multi hit projectiles on mobs?
 
 TODO: `AttackState` remove attack related data to components, for proto? basically how do we impl different att styles w seldum_state
@@ -151,8 +151,13 @@ TODO: `AttackState` remove attack related data to components, for proto? basical
     - dark auction house style dude
 - rework inventory uis to use states
   - different states to easily change what UIs ar shown for npc trades, etc
+- ui slot for off-hands (throwable or any right-clickable item)
+- rework tooltips to be a large display on the side?
 
 ## Easy Features
 
-- add healthbar to enemies
-- add damage numbers
+[x] add healthbar to enemies
+[x] add damage numbers
+
+- throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
+- new types of projectile
