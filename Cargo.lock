@@ -4197,9 +4197,9 @@ dependencies = [
 
 [[package]]
 name = "seldom_state"
-version = "0.6.1"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f50d3d71457f5448d73823e1dfa46e3dfc9c5557d76e8d51166c4b2c6ec46bb"
+checksum = "2fddfe76ba9760f40736339e2417be132d4cf68aa7e0e69e5809d3d91e022b2a"
 dependencies = [
  "bevy",
  "either",
