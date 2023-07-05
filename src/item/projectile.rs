@@ -3,7 +3,10 @@ use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
-use crate::{custom_commands::CommandsExt, proto::proto_param::ProtoParam, GameParam, GameState};
+use crate::{
+    combat::AttackTimer, custom_commands::CommandsExt, player::Player,
+    proto::proto_param::ProtoParam, GameParam, GameState,
+};
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
@@ -55,11 +58,15 @@ impl Plugin for RangedAttackPlugin {
 impl RangedAttackPlugin {
     fn handle_ranged_attack_event(
         mut events: EventReader<RangedAttackEvent>,
+        att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut proto_commands: ProtoCommands,
         game: GameParam,
         proto: ProtoParam,
     ) {
         for proj_event in events.iter() {
+            if att_cooldown_query.single().1.is_some() {
+                continue;
+            }
             proto_commands.spawn_projectile_from_proto(
                 proj_event.projectile.clone(),
                 &proto,
