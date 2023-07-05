@@ -11,7 +11,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
-        Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown, ItemAttributes,
+        Attack, AttackCooldown, InvincibilityCooldown, ItemAttributes, MaxHealth,
         PlayerAttributeBundle,
     },
     inputs::{FacingDirection, InputsPlugin, MovementVector},
@@ -219,11 +219,11 @@ fn spawn_player(
                 ..default()
             },
             PlayerAttributeBundle {
-                health: CurrentHealth(100),
+                health: MaxHealth(100),
                 attack: Attack(5),
                 attack_cooldown: AttackCooldown(0.4),
             },
-            InvincibilityCooldown(0.3),
+            InvincibilityCooldown(1.),
             MovementVector::default(),
             FacingDirection::default(),
             YSort,
@@ -235,11 +235,9 @@ fn spawn_player(
                 filter_flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 ..default()
             },
-            // ActiveCollisionTypes::all(),
             RawPosition::default(),
         ))
         .insert(ActiveEvents::COLLISION_EVENTS)
-        // .insert(Dominance::group(-10))
         .insert(RigidBody::KinematicPositionBased)
         .push_children(&limb_children)
         .id();

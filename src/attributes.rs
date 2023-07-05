@@ -92,7 +92,7 @@ pub struct AttributeChangeEvent;
 
 #[derive(Reflect, FromReflect, Bundle, Clone, Debug, Copy)]
 pub struct PlayerAttributeBundle {
-    pub health: CurrentHealth,
+    pub health: MaxHealth,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
 }
@@ -104,9 +104,8 @@ pub struct CurrentHealth(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct MaxHealth(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
-#[reflect(Component)]
-
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
 pub struct Attack(pub i32);
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]

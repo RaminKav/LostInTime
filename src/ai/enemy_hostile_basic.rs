@@ -1,12 +1,11 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{
-    Collider, KinematicCharacterController, MoveShapeOptions, QueryFilter, QueryFilterFlags,
-    RapierContext,
+    KinematicCharacterController,
 };
 use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
 
-use crate::{combat::HitEvent, inventory::ItemStack, Player};
+use crate::{combat::HitEvent};
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
@@ -158,7 +157,6 @@ pub struct AttackState {
     pub attack_cooldown_timer: Timer,
     pub speed: f32,
     pub dir: Option<Vec2>,
-    pub damage: i32,
 }
 
 pub fn follow(
@@ -183,60 +181,24 @@ pub fn follow(
 }
 
 pub fn attack(
-    mut transforms: Query<(&mut Transform, &Collider)>,
-    mut attacks: Query<(Entity, &mut AttackState)>,
-    player_query: Query<Entity, With<Player>>,
-    item_stack_query: Query<Entity, With<ItemStack>>,
-    mut context: ResMut<RapierContext>,
-    mut hit_event: EventWriter<HitEvent>,
+    mut transforms: Query<&mut Transform>,
+    mut attacks: Query<(Entity, &mut KinematicCharacterController, &mut AttackState)>,
     time: Res<Time>,
 ) {
-    for (entity, mut attack) in attacks.iter_mut() {
+    for (entity, mut kcc, mut attack) in attacks.iter_mut() {
         // Get the positions of the attacker and target
-        let target_translation = transforms.get(attack.target).unwrap().0.translation;
-        let (mut attack_transform, attack_col) = transforms.get_mut(entity).unwrap();
+        let target_translation = transforms.get(attack.target).unwrap().translation;
+        let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
 
-        let mut hit = false;
+        let hit = false;
         if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
                 attack.dir = Some(delta.normalize_or_zero().truncate() * attack.speed);
             }
-            let output = context.move_shape(
-                attack.dir.unwrap(),
-                attack_col,
-                attack_translation.truncate(),
-                0.,
-                0.,
-                &MoveShapeOptions::default(),
-                QueryFilter {
-                    flags: QueryFilterFlags::EXCLUDE_SENSORS,
-                    predicate: Some(&|e| {
-                        if item_stack_query.get(e).is_ok() || e == entity {
-                            false
-                        } else {
-                            true
-                        }
-                    }),
-                    ..default()
-                },
-                |col| {
-                    let p_e = player_query.single();
-                    if col.entity == p_e && !hit {
-                        hit = true;
 
-                        //send hit event
-                        hit_event.send(HitEvent {
-                            hit_entity: p_e,
-                            damage: attack.damage,
-                            dir: delta.normalize_or_zero().truncate(),
-                            hit_with: None,
-                        });
-                    }
-                },
-            );
-            attack_transform.translation += output.effective_translation.extend(0.);
+            kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
         }
 

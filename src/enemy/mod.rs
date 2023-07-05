@@ -159,7 +159,6 @@ impl EnemyPlugin {
                                     attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
                                     dir: None,
                                     speed: 1.4,
-                                    damage: 10,
                                 },
                             )
                             .trans::<FollowState>(
@@ -213,7 +212,6 @@ impl EnemyPlugin {
                                     attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
                                     dir: None,
                                     speed: 1.4,
-                                    damage: 10,
                                 },
                             )
                             .trans::<FollowState>(

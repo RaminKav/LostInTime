@@ -8,6 +8,7 @@
    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
    "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
    "survival_rogue_like::attributes::MaxHealth": (30),
+   "survival_rogue_like::attributes::Attack": (10),
    "survival_rogue_like::item::loot_table::LootTable": (
             drops: [(
                 item: Flint,
