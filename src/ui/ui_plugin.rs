@@ -10,14 +10,13 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
-    client::ClientPlugin,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::{CompleteRecipeEvent, CraftingSlotUpdateEvent, WorldObject},
-    GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH,
+    GameParam, Player, GAME_HEIGHT, GAME_WIDTH,
 };
 
-use super::{minimap::MinimapPlugin, ui_helpers};
+use super::ui_helpers;
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
 pub enum UIElement {
@@ -143,44 +142,8 @@ pub struct HealthBar;
 
 #[derive(Component)]
 pub struct FPSText;
-pub struct UIPlugin;
 
-impl Plugin for UIPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(LastHoveredSlot { slot: None })
-            .add_event::<DropOnSlotEvent>()
-            .add_event::<ToolTipUpdateEvent>()
-            .add_event::<DropInWorldEvent>()
-            .register_type::<InventorySlotState>()
-            .add_plugin(MinimapPlugin)
-            .add_systems(
-                (
-                    setup_inv_ui.after(ClientPlugin::load_on_start),
-                    setup_healthbar_ui.after(ClientPlugin::load_on_start),
-                )
-                    .in_schedule(OnEnter(GameState::Main)),
-            )
-            .add_systems(
-                (
-                    setup_inv_slots_ui,
-                    text_update_system,
-                    toggle_inv_visibility,
-                    handle_item_drop_clicks,
-                    handle_dragging,
-                    handle_hovering,
-                    handle_drop_on_slot_events.after(handle_item_drop_clicks),
-                    handle_drop_in_world_events.after(handle_item_drop_clicks),
-                    handle_cursor_update.before(handle_item_drop_clicks),
-                    handle_spawn_inv_item_tooltip,
-                    update_inventory_ui.after(handle_hovering),
-                    update_healthbar,
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            );
-    }
-}
-
-fn handle_drop_in_world_events(
+pub fn handle_drop_in_world_events(
     mut events: EventReader<DropInWorldEvent>,
     mut game_param: GameParam,
     mut commands: Commands,
@@ -229,7 +192,7 @@ fn handle_drop_in_world_events(
         }
     }
 }
-fn handle_drop_on_slot_events(
+pub fn handle_drop_on_slot_events(
     mut events: EventReader<DropOnSlotEvent>,
     mut game: GameParam,
     mut commands: Commands,
@@ -304,7 +267,7 @@ fn handle_drop_on_slot_events(
     }
 }
 
-fn handle_dragging(
+pub fn handle_dragging(
     cursor_pos: Res<CursorPos>,
     mut interactables: Query<(Entity, &mut Interactable)>,
     mut drag_query: Query<(Entity, &mut Transform)>,
@@ -328,7 +291,7 @@ fn handle_dragging(
         }
     }
 }
-fn handle_hovering(
+pub fn handle_hovering(
     mut interactables: Query<(Entity, &UIElement, &mut Interactable, &InventorySlotState)>,
     tooltips: Query<(Entity, &UIElement, &Parent), Without<InventorySlotState>>,
     graphics: Res<Graphics>,
@@ -402,7 +365,7 @@ fn handle_hovering(
     }
 }
 
-fn handle_item_drop_clicks(
+pub fn handle_item_drop_clicks(
     mouse_input: Res<Input<MouseButton>>,
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
@@ -493,7 +456,7 @@ fn handle_item_drop_clicks(
         };
     }
 }
-fn handle_cursor_update(
+pub fn handle_cursor_update(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mut mouse_input: ResMut<Input<MouseButton>>,
@@ -804,7 +767,7 @@ pub fn toggle_inv_visibility(
         }
     }
 }
-fn handle_spawn_inv_item_tooltip(
+pub fn handle_spawn_inv_item_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
@@ -1138,7 +1101,7 @@ pub fn update_inventory_ui(
         }
     }
 }
-fn update_healthbar(
+pub fn update_healthbar(
     player_health_query: Query<(&CurrentHealth, &MaxHealth), With<Player>>,
     mut health_bar_query: Query<&mut Sprite, With<HealthBar>>,
 ) {
@@ -1148,7 +1111,10 @@ fn update_healthbar(
         y: 7.,
     });
 }
-fn text_update_system(diagnostics: Res<Diagnostics>, mut query: Query<&mut Text, With<FPSText>>) {
+pub fn text_update_system(
+    diagnostics: Res<Diagnostics>,
+    mut query: Query<&mut Text, With<FPSText>>,
+) {
     for mut text in &mut query {
         if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {

@@ -25,6 +25,8 @@ pub struct HitEvent {
     pub hit_with: Option<WorldObject>,
 }
 
+#[derive(Component, Debug, Clone)]
+pub struct MarkedForDeath;
 #[derive(Debug, Clone)]
 
 pub struct EnemyDeathEvent {
@@ -62,6 +64,7 @@ impl Plugin for CombatPlugin {
         .add_systems(
             (
                 Self::handle_hits,
+                Self::cleanup_marked_for_death_entities,
                 Self::handle_attack_cooldowns.before(CustomFlush),
                 Self::spawn_hit_spark_effect.after(Self::handle_hits),
                 Self::handle_invincibility_frames.after(Self::handle_hits),
@@ -109,7 +112,6 @@ impl CombatPlugin {
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
-            commands.entity(death_event.entity).despawn();
             let texture_handle = asset_server.load("textures/effects/hit-particles.png");
             let texture_atlas =
                 TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
@@ -192,7 +194,7 @@ impl CombatPlugin {
         }
     }
 
-    fn handle_hits(
+    pub fn handle_hits(
         mut commands: Commands,
         game: GameParam,
         mut health: Query<(
@@ -234,7 +236,7 @@ impl CombatPlugin {
                     }
                     hit_health.0 -= hit.damage as i32;
 
-                    println!("HP {hit_health:?}");
+                    println!("HP {:?}", hit_health.0);
                     if hit_health.0 <= 0 {
                         obj_death_events.send(ObjBreakEvent {
                             entity: e,
@@ -245,6 +247,7 @@ impl CombatPlugin {
                     }
                 } else {
                     hit_health.0 -= hit.damage as i32;
+                    println!("HP {:?}", hit_health.0);
 
                     // let has_i_frames = has_i_frames.get(hit.hit_entity);
                     commands.entity(hit.hit_entity).insert(HitAnimationTracker {
@@ -262,6 +265,8 @@ impl CombatPlugin {
                         ));
                     }
                     if hit_health.0 <= 0 && game.player_query.single().0 != e {
+                        commands.entity(e).insert(MarkedForDeath);
+
                         enemy_death_events.send(EnemyDeathEvent {
                             entity: e,
                             enemy_pos: t.translation().truncate(),
@@ -273,6 +278,14 @@ impl CombatPlugin {
                     hit_e.insert(JustGotHit);
                 }
             }
+        }
+    }
+    fn cleanup_marked_for_death_entities(
+        mut commands: Commands,
+        dead_query: Query<Entity, With<MarkedForDeath>>,
+    ) {
+        for e in dead_query.iter() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }

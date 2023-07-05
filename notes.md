@@ -123,7 +123,6 @@ proto todo:
 
 - make impl for mesh2dmaterial that takes input of asset, size, move txfm to .insert()
 - add item attribute systemparam?
-- let spawn_item_on_hand use proto
 
 how to set up item prefabs:
 
@@ -134,6 +133,9 @@ how to set up item prefabs:
 
 BUG: moving very far causes dash cooldown to double in speed? weird behaviour
 BUG: move dash tick to animations.rs
+BUG: multi hit projectiles on mobs?
+
+TODO: `AttackState` remove attack related data to components, for proto? basically how do we impl different att styles w seldum_state
 
 ## Misc. Design Ideas
 
@@ -149,3 +151,8 @@ BUG: move dash tick to animations.rs
     - dark auction house style dude
 - rework inventory uis to use states
   - different states to easily change what UIs ar shown for npc trades, etc
+
+## Easy Features
+
+- add healthbar to enemies
+- add damage numbers

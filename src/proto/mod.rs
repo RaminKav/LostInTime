@@ -8,13 +8,13 @@ use bevy_proto::{
     backend::schematics::FromSchematicInput,
     prelude::{PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
 };
-use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, Sensor};
+use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
 
 pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer},
-    attributes::{ItemAttributes, MaxHealth},
+    attributes::{Attack, ItemAttributes, MaxHealth},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
     item::{
@@ -48,6 +48,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Projectile>()
             .register_type::<ProjectileState>()
             .register_type::<RangedAttack>()
+            .register_type::<Attack>()
             .register_type::<MeleeAttack>()
             .register_type::<ItemStack>()
             .register_type::<WorldObjectEntityData>()
@@ -97,7 +98,10 @@ impl From<SensorProto> for Sensor {
 
 impl From<KCC> for KinematicCharacterController {
     fn from(_: KCC) -> KinematicCharacterController {
-        KinematicCharacterController::default()
+        KinematicCharacterController {
+            filter_flags: QueryFilterFlags::EXCLUDE_SENSORS | QueryFilterFlags::EXCLUDE_KINEMATIC,
+            ..default()
+        }
     }
 }
 
