@@ -11,10 +11,10 @@
    "survival_rogue_like::attributes::Attack": (10),
    "survival_rogue_like::item::loot_table::LootTable": (
             drops: [(
-                item: Flint,
+                item: Wall(StoneWall),
                 min: 11,
                 max: 13,
-                rate: 0.8
+                rate: 1.
             ),
             (
                 item: Sword,

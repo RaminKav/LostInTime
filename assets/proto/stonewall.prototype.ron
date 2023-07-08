@@ -1,0 +1,15 @@
+(
+  name: "StoneWall",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Wall(StoneWall),
+        metadata: (
+            name: "Stone Wall", 
+            desc: "A chipped piece of flint."
+        ),
+        count: 1
+  ),
+  }
+)

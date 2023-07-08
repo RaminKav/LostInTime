@@ -852,7 +852,7 @@ pub fn handle_spawn_inv_item_tooltip(
                             Anchor::Center
                         },
                         transform: Transform {
-                            translation: dbg!(text_pos),
+                            translation: text_pos,
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },

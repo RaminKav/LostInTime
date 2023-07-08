@@ -105,9 +105,7 @@ impl Plugin for ClientPlugin {
                     Self::close_and_save_on_esc.after(CustomFlush),
                     Self::load_chunk.before(CustomFlush),
                     Self::handle_add_collider_to_loaded_entity.after(CustomFlush),
-                    Self::handle_add_visuals_to_loaded_foliage
-                        .after(CustomFlush)
-                        .before(GenerationPlugin::handle_new_wall_spawn_update),
+                    // Self::handle_add_visuals_to_loaded_objects.before(CustomFlush), // .before(GenerationPlugin::handle_new_wall_spawn_update),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -178,7 +176,7 @@ impl ClientPlugin {
                 .insert(Collider::cuboid(collider.collider.x, collider.collider.y));
         }
     }
-    fn handle_add_visuals_to_loaded_foliage(
+    fn handle_add_visuals_to_loaded_objects(
         game: GameParam,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
@@ -205,6 +203,7 @@ impl ClientPlugin {
                         .insert(foliage_material.clone());
                 }
                 WorldObject::Wall(_) => {
+                    println!("ADDING WALL VISUALS");
                     commands
                         .entity(e)
                         .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())

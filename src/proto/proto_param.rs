@@ -3,10 +3,12 @@ use bevy_proto::prelude::*;
 use core::fmt::Display;
 
 use crate::{
+    assets::Graphics,
     inventory::ItemStack,
     item::{
         melee::MeleeAttack,
         projectile::{ProjectileState, RangedAttack},
+        WorldObject,
     },
 };
 
@@ -15,6 +17,8 @@ pub struct ProtoParam<'w, 's> {
     pub proto_commands: ProtoCommands<'w, 's>,
     pub prototypes: Prototypes<'w>,
     pub prototype_assets: Res<'w, Assets<Prototype>>,
+    pub meshes: ResMut<'w, Assets<Mesh>>,
+    pub graphics: Res<'w, Graphics>,
 }
 impl<'w, 's> ProtoParam<'w, 's> {
     pub fn get_prototype(&self, id: &str) -> Option<&Prototype> {
@@ -28,7 +32,6 @@ impl<'w, 's> ProtoParam<'w, 's> {
         obj: T,
     ) -> Option<&ItemStack> {
         let id = <T as Into<&str>>::into(obj).to_owned();
-
         if let Some(data) = self.get_prototype(&id) {
             data.schematics()
                 .get::<ItemStack>()
@@ -37,6 +40,22 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .downcast_ref::<ItemStack>()
         } else {
             println!("Could not get item data for: {}", id);
+            None
+        }
+    }
+    pub fn get_world_object<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&WorldObject> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+        if let Some(data) = self.get_prototype(&id) {
+            data.schematics()
+                .get::<WorldObject>()
+                .unwrap()
+                .input()
+                .downcast_ref::<WorldObject>()
+        } else {
+            println!("Could not get world object data for: {}", id);
             None
         }
     }
