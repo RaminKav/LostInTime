@@ -12,7 +12,7 @@ use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
-use crate::proto::proto_param::{self, ProtoParam};
+use crate::proto::proto_param::{ProtoParam};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
@@ -72,7 +72,6 @@ impl Plugin for InputsPlugin {
                 (
                     Self::turn_player,
                     Self::move_player,
-                    Self::mouse_click_system.after(CustomFlush),
                     Self::move_camera_with_player.after(Self::move_player),
                     Self::test_take_damage,
                 )
@@ -81,6 +80,7 @@ impl Plugin for InputsPlugin {
             )
             .add_systems(
                 (
+                    Self::mouse_click_system.after(CustomFlush),
                     Self::handle_hotbar_key_input,
                     Self::update_cursor_pos.after(Self::move_player),
                 )
