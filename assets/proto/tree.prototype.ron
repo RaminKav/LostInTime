@@ -1,5 +1,5 @@
 (
-  name: "Tree",
+  name: "TreeObj",
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": Foliage(Tree),

@@ -12,7 +12,7 @@ use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
-use crate::proto::proto_param::ProtoParam;
+use crate::proto::proto_param::{self, ProtoParam};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
@@ -323,10 +323,12 @@ impl InputsPlugin {
 
     pub fn mouse_click_system(
         mut proto_commands: ProtoCommands,
+        mut commands: Commands,
         prototypes: Prototypes,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         game: GameParam,
+        mut proto_params: ProtoParam,
         mut attack_event: EventWriter<AttackEvent>,
         minimap_event: EventWriter<UpdateMiniMapEvent>,
         mut hit_event: EventWriter<HitEvent>,
@@ -433,6 +435,9 @@ impl InputsPlugin {
                         &prototypes,
                         cursor_pos.world_coords.truncate(),
                         minimap_event,
+                        &mut proto_params,
+                        game,
+                        &mut commands,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
                     }

@@ -4,6 +4,7 @@ use super::dungeon::Dungeon;
 use super::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 use super::{ChunkManager, WorldObjectEntityData};
 use crate::item::{Foliage, Wall, WorldObject};
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
@@ -408,6 +409,7 @@ impl GenerationPlugin {
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
         mut proto_commands: ProtoCommands,
         prototypes: Prototypes,
+        mut proto_param: ProtoParam,
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
@@ -503,19 +505,21 @@ impl GenerationPlugin {
                 let obj = match obj_data.2 {
                     WorldObject::Foliage(obj) => proto_commands.spawn_object_from_proto(
                         obj,
-                        &prototypes,
                         tile_pos_to_world_pos(TileMapPositionData {
                             tile_pos,
                             chunk_pos,
                         }),
+                        &prototypes,
+                        &mut proto_param,
                     ),
                     WorldObject::Wall(obj) => proto_commands.spawn_object_from_proto(
                         obj,
-                        &prototypes,
                         tile_pos_to_world_pos(TileMapPositionData {
                             tile_pos,
                             chunk_pos,
                         }),
+                        &prototypes,
+                        &mut proto_param,
                     ),
                     _ => None,
                 };

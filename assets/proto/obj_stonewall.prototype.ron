@@ -1,5 +1,5 @@
 (
-  name: "StoneWall",
+  name: "StoneWallObj",
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": Wall(StoneWall),

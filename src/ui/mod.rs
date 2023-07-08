@@ -36,7 +36,7 @@ impl Plugin for UIPlugin {
                 (
                     create_enemy_health_bar,
                     handle_enemy_health_bar_change,
-                    handle_add_damage_numbers_after_hit.before(CombatPlugin::handle_hits),
+                    handle_add_damage_numbers_after_hit.after(CombatPlugin::handle_hits),
                     tick_damage_numbers,
                 )
                     .in_set(OnUpdate(GameState::Main)),

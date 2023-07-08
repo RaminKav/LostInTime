@@ -129,12 +129,26 @@ impl CombatPlugin {
             ));
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
                 for drop in LootTablePlugin::get_drops(loot_table) {
-                    proto_commands.spawn_item_from_proto(
-                        drop.obj_type,
-                        &proto,
-                        death_event.enemy_pos,
-                        drop.count,
-                    );
+                    match drop.obj_type {
+                        WorldObject::Wall(wall) => proto_commands.spawn_item_from_proto(
+                            wall,
+                            &proto,
+                            death_event.enemy_pos,
+                            drop.count,
+                        ),
+                        WorldObject::Foliage(tree) => proto_commands.spawn_item_from_proto(
+                            tree,
+                            &proto,
+                            death_event.enemy_pos,
+                            drop.count,
+                        ),
+                        _ => proto_commands.spawn_item_from_proto(
+                            drop.obj_type,
+                            &proto,
+                            death_event.enemy_pos,
+                            drop.count,
+                        ),
+                    };
                 }
             }
         }
