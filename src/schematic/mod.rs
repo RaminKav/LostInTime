@@ -5,7 +5,7 @@ use bevy::{ecs::system::SystemState, prelude::*, tasks::IoTaskPool};
 
 use crate::{
     inventory::ItemStack,
-    item::{Wall, WorldObject},
+    item::{Wall},
 };
 
 #[derive(Component)]

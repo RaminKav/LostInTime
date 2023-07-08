@@ -4,7 +4,8 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use crate::{item::WorldObject, GameParam};
 
 use super::{
-    chunk::TileSpriteData, generation, noise_helpers, ChunkManager, TileMapPositionData, CHUNK_SIZE,
+    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile,
+    ChunkManager, TileMapPositionData, CHUNK_SIZE,
 };
 
 pub struct TilePlugin;
@@ -239,7 +240,7 @@ impl TilePlugin {
                 let TileMapPositionData {
                     chunk_pos: adjusted_chunk_pos,
                     tile_pos: neighbour_tile_pos,
-                } = generation::get_adjusted_tile(
+                } = get_neighbours_tile(
                     TileMapPositionData {
                         chunk_pos,
                         tile_pos,
