@@ -105,7 +105,6 @@ impl Plugin for ClientPlugin {
                     Self::close_and_save_on_esc.after(CustomFlush),
                     Self::load_chunk.before(CustomFlush),
                     Self::handle_add_collider_to_loaded_entity.after(CustomFlush),
-                    // Self::handle_add_visuals_to_loaded_objects.before(CustomFlush), // .before(GenerationPlugin::handle_new_wall_spawn_update),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

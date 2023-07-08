@@ -1,7 +1,7 @@
 use crate::{
     item::{Foliage, WorldObject},
     proto::proto_param::{self, ProtoParam},
-    world::world_helpers::camera_pos_to_tile_pos,
+    world::{wall_auto_tile::Dirty, world_helpers::camera_pos_to_tile_pos},
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
@@ -116,7 +116,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         //TODO: add parent to spawned entity
         let world_object = proto_param.get_world_object(obj).unwrap();
         let spawned_entity = self.spawn(p).id();
-
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
         let tile_pos = camera_pos_to_tile_pos(&pos);
         let pos = Vec3::new(
@@ -124,7 +123,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             (tile_pos.y as i32 * 32) as f32,
             0.,
         );
-        println!("updated to {:?} {}", tile_pos, pos);
         spawned_entity_commands.insert(TransformBundle::from_transform(
             Transform::from_translation(pos),
         ));
@@ -148,7 +146,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     .insert(foliage_material.clone());
             }
             WorldObject::Wall(_) => {
-                println!("ADDING WALL VISUALS");
                 spawned_entity_commands
                     .insert(
                         proto_param
@@ -158,7 +155,8 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                             .unwrap()
                             .clone(),
                     )
-                    .insert(TextureAtlasSprite::default());
+                    .insert(TextureAtlasSprite::default())
+                    .insert(Dirty);
             }
             _ => {}
         }

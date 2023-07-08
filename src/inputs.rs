@@ -72,7 +72,6 @@ impl Plugin for InputsPlugin {
                 (
                     Self::turn_player,
                     Self::move_player,
-                    Self::mouse_click_system.after(CustomFlush),
                     Self::move_camera_with_player.after(Self::move_player),
                     Self::test_take_damage,
                 )
@@ -81,6 +80,7 @@ impl Plugin for InputsPlugin {
             )
             .add_systems(
                 (
+                    Self::mouse_click_system.after(CustomFlush),
                     Self::handle_hotbar_key_input,
                     Self::update_cursor_pos.after(Self::move_player),
                 )

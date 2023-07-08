@@ -5,6 +5,7 @@ mod dungeon_generation;
 pub mod generation;
 mod noise_helpers;
 mod tile;
+pub mod wall_auto_tile;
 pub mod world_helpers;
 pub mod y_sort;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};

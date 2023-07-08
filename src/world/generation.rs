@@ -1,7 +1,10 @@
 use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
-use super::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
+use super::wall_auto_tile::{compute_wall_index, handle_wall_break, update_wall, Dirty};
+use super::world_helpers::{
+    get_neighbour_obj_data, get_neighbours_tile, tile_pos_to_world_pos, world_pos_to_tile_pos,
+};
 use super::{ChunkManager, WorldObjectEntityData};
 use crate::item::{Foliage, Wall, WorldObject};
 use crate::proto::proto_param::ProtoParam;
@@ -23,21 +26,14 @@ pub struct GenerationPlugin;
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<WallBreakEvent>()
-            .add_system(exit_system.in_base_set(CoreSet::PostUpdate))
             .add_systems(
                 (
                     Self::generate_and_cache_objects.before(CustomFlush),
-                    Self::handle_wall_break.after(CustomFlush),
+                    handle_wall_break.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems(
-                (
-                    Self::handle_update_this_wall,
-                    Self::handle_new_wall_spawn_update,
-                )
-                    .in_base_set(CoreSet::PostUpdate),
-            )
+            .add_system(update_wall.in_base_set(CoreSet::PostUpdate))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -80,259 +76,6 @@ impl GenerationPlugin {
             }
         }
         stone_blocks
-    }
-    pub fn handle_new_wall_spawn_update(
-        mut game: GameParam,
-        mut new_wall_query: Query<Entity, Added<Wall>>,
-        txns: Query<&GlobalTransform>,
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
-    ) {
-        for new_wall in new_wall_query.iter_mut() {
-            let new_wall = wall_data.get(new_wall).unwrap();
-            let new_wall_pos =
-                world_pos_to_tile_pos(txns.get(new_wall.0).unwrap().translation().truncate());
-            for dy in -1i8..=1 {
-                for dx in -1i8..=1 {
-                    //skip corner block updates for walls
-                    if dx == 0 && dy == 0 {
-                        continue;
-                    }
-                    let TileMapPositionData {
-                        chunk_pos: adjusted_chunk_pos,
-                        tile_pos: neighbour_tile_pos,
-                    } = get_adjusted_tile(new_wall_pos.clone(), (dx, dy));
-
-                    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
-                        continue;
-                    }
-
-                    if let Some(neighbour_wall_data) =
-                        game.get_tile_obj_data_mut(TileMapPositionData {
-                            chunk_pos: adjusted_chunk_pos,
-                            tile_pos: neighbour_tile_pos,
-                        })
-                    {
-                        if !matches!(neighbour_wall_data.object, WorldObject::Wall(_)) {
-                            continue;
-                        } else if neighbour_wall_data.obj_bit_index != 0b1111 {
-                            Self::update_wall(
-                                neighbour_tile_pos,
-                                adjusted_chunk_pos,
-                                &mut game,
-                                &mut wall_data,
-                            );
-                            continue;
-                        }
-                    } else {
-                        continue;
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn update_wall(
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
-        game: &mut GameParam,
-        wall_data: &mut Query<(Entity, &mut TextureAtlasSprite)>,
-    ) {
-        let new_wall_pos = TileMapPositionData {
-            chunk_pos,
-            tile_pos,
-        };
-        let new_wall_entity = game.get_obj_entity_at_tile(new_wall_pos.clone());
-        for dy in -1i8..=1 {
-            for dx in -1i8..=1 {
-                //skip corner block updates for walls
-                if (dx != 0 && dy != 0) || (dx == 0 && dy == 0) {
-                    continue;
-                }
-                // only use neighbours that have at least one water bitt
-                let mut neighbour_is_wall = false;
-                if let Some(neighbour_block_entity_data) =
-                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), game)
-                {
-                    if matches!(neighbour_block_entity_data.object, WorldObject::Wall(_)) {
-                        neighbour_is_wall = true;
-                    }
-                }
-                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
-
-                let updated_bit_index = Self::compute_wall_index(
-                    new_wall_data.obj_bit_index,
-                    (dx, dy),
-                    !neighbour_is_wall,
-                );
-
-                new_wall_data.texture_offset = 0;
-
-                let mut new_sprite = wall_data.get_mut(new_wall_entity.unwrap()).unwrap().1;
-                new_wall_data.obj_bit_index = updated_bit_index;
-                new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
-            }
-        }
-        let mut first_corner_is_wall = false;
-        for dy in -1i8..=1 {
-            for dx in -1i8..=1 {
-                //only bottom corner block updates for walls
-                if dx == 0 || dy != -1 {
-                    continue;
-                }
-                // only use neighbours that have at least one water bitt
-                let mut corner_neighbour_is_wall = false;
-                if let Some(neighbour_block_entity_data) =
-                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), game)
-                {
-                    corner_neighbour_is_wall =
-                        matches!(neighbour_block_entity_data.object, WorldObject::Wall(_));
-                }
-                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
-
-                let has_wall_below = (new_wall_data.obj_bit_index & 0b0100) == 0b0100;
-
-                let is_0b1111 = new_wall_data.obj_bit_index == 0b1111;
-                let is_0b1101 = new_wall_data.obj_bit_index == 0b1101;
-                let is_0b1110 = new_wall_data.obj_bit_index == 0b1110;
-                let has_wall_on_side = if dx == -1 {
-                    (new_wall_data.obj_bit_index & 0b0001) == 0b0001
-                } else {
-                    (new_wall_data.obj_bit_index & 0b1000) == 0b1000
-                };
-                if !(corner_neighbour_is_wall || !has_wall_on_side || !has_wall_below) {
-                    let updated_bit_index = if is_0b1111 {
-                        if first_corner_is_wall {
-                            10
-                        } else if dx == -1 {
-                            14
-                        } else {
-                            15
-                        }
-                    } else if is_0b1101 {
-                        if first_corner_is_wall {
-                            4
-                        } else if dx == -1 {
-                            13
-                        } else {
-                            11
-                        }
-                    } else if is_0b1110 {
-                        if dx == -1 {
-                            7
-                        } else {
-                            6
-                        }
-                    } else {
-                        new_wall_data.obj_bit_index
-                    };
-                    new_wall_data.texture_offset = 16;
-                    let mut new_sprite = wall_data.get_mut(new_wall_entity.unwrap()).unwrap().1;
-                    new_sprite.index = (updated_bit_index + new_wall_data.texture_offset) as usize;
-
-                    if dx == -1 {
-                        first_corner_is_wall = true;
-                    }
-                }
-            }
-        }
-    }
-    pub fn handle_update_this_wall(
-        mut game: GameParam,
-        mut new_wall_query: Query<Entity, Added<Wall>>,
-        txns: Query<&GlobalTransform>,
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
-    ) {
-        for new_wall in new_wall_query.iter_mut() {
-            let new_wall_pos =
-                world_pos_to_tile_pos(txns.get(new_wall).unwrap().translation().truncate());
-            if game.get_tile_obj_data(new_wall_pos).unwrap().texture_offset == 0 {
-                Self::update_wall(
-                    new_wall_pos.tile_pos,
-                    new_wall_pos.chunk_pos,
-                    &mut game,
-                    &mut wall_data,
-                );
-            }
-        }
-    }
-    pub fn handle_wall_break(
-        mut game: GameParam,
-        mut obj_break_events: EventReader<WallBreakEvent>,
-
-        mut wall_data: Query<(Entity, &mut TextureAtlasSprite)>,
-    ) {
-        for broken_wall in obj_break_events.iter() {
-            let chunk_pos = broken_wall.chunk_pos;
-
-            for dy in -1i8..=1 {
-                for dx in -1i8..=1 {
-                    //skip corner block updates for walls
-                    if dx == 0 && dy == 0 {
-                        continue;
-                    }
-                    let wall_pos = TileMapPositionData {
-                        chunk_pos,
-                        tile_pos: broken_wall.tile_pos,
-                    };
-                    let TileMapPositionData {
-                        chunk_pos: adjusted_chunk_pos,
-                        tile_pos: neighbour_wall_pos,
-                    } = get_adjusted_tile(wall_pos.clone(), (dx, dy));
-
-                    if let Some(neighbour_block_entity_data) =
-                        get_neighbour_obj_data(wall_pos, (dx, dy), &mut game)
-                    {
-                        if matches!(neighbour_block_entity_data.object, WorldObject::Wall(_)) {
-                            Self::update_wall(
-                                neighbour_wall_pos,
-                                adjusted_chunk_pos,
-                                &mut game,
-                                &mut wall_data,
-                            );
-                        }
-                    }
-                }
-            }
-        }
-    }
-    pub fn compute_wall_index(neighbour_bits: u8, edge: (i8, i8), remove: bool) -> u8 {
-        let mut index = 0;
-        // new tile will be 0b1111 i think
-        if edge == (0, 1) {
-            //above me...
-            // Top edge needs b0 b1
-            if !remove {
-                index = 0b0010;
-            }
-            index |= neighbour_bits & 0b1101;
-        } else if edge == (1, 0) {
-            // Right edge
-            if !remove {
-                index = 0b1000;
-            }
-            index |= neighbour_bits & 0b0111;
-        } else if edge == (0, -1) {
-            // Bottom edge
-            if !remove {
-                index = 0b0100;
-            }
-            index |= neighbour_bits & 0b1011;
-        } else if edge == (-1, 0) {
-            // Left edge
-            if !remove {
-                index = 0b0001;
-            }
-            index |= neighbour_bits & 0b1110;
-        } else if edge == (-1, -1) {
-            // Bottom Left edge, remove left bit
-            // index |= new_tile_bits & 0b0001;
-            index |= neighbour_bits & 0b1110;
-        } else if edge == (1, -1) {
-            // Bottom Right edge, remove Right bit
-            // index |= new_tile_bits & 0b0001;
-            index |= neighbour_bits & 0b0111;
-        }
-        index
     }
     // Use chunk manager as source of truth for index
 
@@ -532,73 +275,4 @@ impl GenerationPlugin {
             minimap_update.send(UpdateMiniMapEvent);
         }
     }
-}
-
-fn exit_system(
-    // mut pkv: ResMut<PkvStore>,
-    mut events: EventReader<AppExit>,
-) {
-    if events.iter().count() > 0 {
-        info!("SAVING GAME DATA...");
-
-        // for (chunk_pos, data) in game_data.data.iter() {
-        //     // pkv.set(&format!("{} {}", chunk_pos.0, chunk_pos.1), data)
-        //     //     .expect("failed to store data");
-        // }
-    }
-}
-
-//TODO: move to own helpers file
-pub fn get_adjusted_tile(pos: TileMapPositionData, offset: (i8, i8)) -> TileMapPositionData {
-    let dx = offset.0;
-    let dy = offset.1;
-    let x = pos.tile_pos.x as i8;
-    let y = pos.tile_pos.y as i8;
-    let chunk_pos = pos.chunk_pos;
-    let mut neighbour_wall_pos = TilePos {
-        x: (dx + x) as u32,
-        y: (dy + y) as u32,
-    };
-    let mut adjusted_chunk_pos = pos.chunk_pos;
-    if x + dx < 0 {
-        adjusted_chunk_pos.x = chunk_pos.x - 1;
-        neighbour_wall_pos.x = CHUNK_SIZE - 1;
-    } else if x + dx >= CHUNK_SIZE.try_into().unwrap() {
-        adjusted_chunk_pos.x = chunk_pos.x + 1;
-        neighbour_wall_pos.x = 0;
-    }
-    if y + dy < 0 {
-        adjusted_chunk_pos.y = chunk_pos.y - 1;
-        neighbour_wall_pos.y = CHUNK_SIZE - 1;
-    } else if y + dy >= CHUNK_SIZE.try_into().unwrap() {
-        adjusted_chunk_pos.y = chunk_pos.y + 1;
-        neighbour_wall_pos.y = 0;
-    }
-    TileMapPositionData {
-        chunk_pos: adjusted_chunk_pos,
-        tile_pos: neighbour_wall_pos,
-    }
-}
-
-fn get_neighbour_obj_data(
-    pos: TileMapPositionData,
-    offset: (i8, i8),
-    game: &mut GameParam,
-) -> Option<WorldObjectEntityData> {
-    let TileMapPositionData {
-        chunk_pos: adjusted_chunk_pos,
-        tile_pos: neighbour_wall_pos,
-    } = get_adjusted_tile(pos, offset);
-
-    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
-        return None;
-    }
-
-    if let Some(d) = game.get_tile_obj_data(TileMapPositionData {
-        chunk_pos: adjusted_chunk_pos,
-        tile_pos: neighbour_wall_pos,
-    }) {
-        return Some(d.clone());
-    }
-    None
 }

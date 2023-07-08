@@ -7,6 +7,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::generation::{self};
+use super::world_helpers::get_neighbours_tile;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::dimension::ChunkCache;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
@@ -240,7 +241,7 @@ impl ChunkPlugin {
                             let TileMapPositionData {
                                 chunk_pos: adjusted_chunk_pos,
                                 tile_pos: neighbour_tile_pos,
-                            } = generation::get_adjusted_tile(pos.clone(), (dx, dy));
+                            } = get_neighbours_tile(pos.clone(), (dx, dy));
                             if adjusted_chunk_pos != chunk_pos
                                 && game.get_chunk_entity(adjusted_chunk_pos).is_some()
                             {

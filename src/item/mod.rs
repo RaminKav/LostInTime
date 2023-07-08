@@ -7,7 +7,7 @@ use crate::proto::proto_param::{self, ProtoParam};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
-use crate::world::world_helpers::camera_pos_to_chunk_pos;
+use crate::world::world_helpers::{camera_pos_to_chunk_pos, world_pos_to_tile_pos};
 use crate::world::CHUNK_SIZE;
 use crate::{
     custom_commands::CommandsExt, player::Limb, AnimationTimer, CustomFlush, GameParam, GameState,
@@ -210,6 +210,10 @@ impl WorldObject {
         game: GameParam,
         commands: &mut Commands,
     ) -> Option<Entity> {
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
+            warn!("obj exists here {pos}");
+            return None;
+        }
         let item = match self {
             WorldObject::Foliage(obj) => {
                 proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
