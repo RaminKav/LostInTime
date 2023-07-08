@@ -39,6 +39,7 @@ mod inventory;
 mod item;
 mod player;
 mod proto;
+mod schematic;
 mod ui;
 mod world;
 use animations::{AnimationTimer, AnimationsPlugin};
@@ -54,6 +55,7 @@ use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
 use proto::ProtoPlugin;
 
+use schematic::SchematicPlugin;
 use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
@@ -123,6 +125,7 @@ fn main() {
         .add_plugin(WorldPlugin)
         .add_plugin(ClientPlugin)
         .add_plugin(ProtoPlugin)
+        .add_plugin(SchematicPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))

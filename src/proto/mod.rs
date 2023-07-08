@@ -70,7 +70,8 @@ impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
         println!("Loading prototypes...");
         prototypes.load("proto/tree.prototype.ron");
-        prototypes.load("proto/stone_wall.prototype.ron");
+        prototypes.load("proto/obj_stonewall.prototype.ron");
+        prototypes.load("proto/stonewall.prototype.ron");
         prototypes.load("proto/projectile.prototype.ron");
         prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");

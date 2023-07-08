@@ -133,7 +133,6 @@ how to set up item prefabs:
 
 BUG: moving very far causes dash cooldown to double in speed? weird behaviour
 BUG: move dash tick to animations.rs, also dash movement is mega glitched rn
-BUG: multi hit projectiles on mobs?
 
 TODO: `AttackState` remove attack related data to components, for proto? basically how do we impl different att styles w seldum_state
 

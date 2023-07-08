@@ -1,5 +1,9 @@
-use crate::{proto::proto_param::ProtoParam, world::world_helpers::camera_pos_to_tile_pos};
-use bevy::prelude::*;
+use crate::{
+    item::{Foliage, WorldObject},
+    proto::proto_param::{self, ProtoParam},
+    world::world_helpers::camera_pos_to_tile_pos,
+};
+use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
 use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents};
 use core::fmt::Display;
@@ -27,8 +31,9 @@ pub trait CommandsExt<'w, 's> {
     fn spawn_object_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
-        prototypes: &Prototypes,
         pos: Vec2,
+        prototypes: &Prototypes,
+        proto_param: &mut ProtoParam,
     ) -> Option<Entity>;
 }
 
@@ -99,15 +104,17 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
     fn spawn_object_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
         obj: T,
-        prototypes: &Prototypes,
         pos: Vec2,
+        prototypes: &Prototypes,
+        proto_param: &mut ProtoParam,
     ) -> Option<Entity> {
-        let p = <T as Into<&str>>::into(obj.clone()).to_owned();
+        let p = format!("{}Obj", <T as Into<&str>>::into(obj.clone()).to_owned());
         if !prototypes.is_ready(&p) {
             println!("Prototype {} is not ready", p);
             return None;
         }
         //TODO: add parent to spawned entity
+        let world_object = proto_param.get_world_object(obj).unwrap();
         let spawned_entity = self.spawn(p).id();
 
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
@@ -117,9 +124,44 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             (tile_pos.y as i32 * 32) as f32,
             0.,
         );
+        println!("updated to {:?} {}", tile_pos, pos);
         spawned_entity_commands.insert(TransformBundle::from_transform(
             Transform::from_translation(pos),
         ));
+        match world_object {
+            WorldObject::Foliage(Foliage::Tree) => {
+                let foliage_material = &proto_param
+                    .graphics
+                    .foliage_material_map
+                    .as_ref()
+                    .unwrap()
+                    .get(&WorldObject::Foliage(Foliage::Tree))
+                    .unwrap()
+                    .0;
+                spawned_entity_commands
+                    .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
+                        shape::Quad {
+                            size: Vec2::new(32., 40.),
+                            ..Default::default()
+                        },
+                    ))))
+                    .insert(foliage_material.clone());
+            }
+            WorldObject::Wall(_) => {
+                println!("ADDING WALL VISUALS");
+                spawned_entity_commands
+                    .insert(
+                        proto_param
+                            .graphics
+                            .wall_texture_atlas
+                            .as_ref()
+                            .unwrap()
+                            .clone(),
+                    )
+                    .insert(TextureAtlasSprite::default());
+            }
+            _ => {}
+        }
         Some(spawned_entity)
     }
 }

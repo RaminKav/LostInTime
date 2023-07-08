@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use rand::Rng;
 
 use crate::{
     attributes::{CurrentHealth, MaxHealth},
@@ -77,6 +78,13 @@ pub fn handle_add_damage_numbers_after_hit(
 ) {
     for hit in hit_event.iter() {
         let Ok(_) = changed_health.get(hit.hit_entity) else {continue;};
+        let mut rng = rand::thread_rng();
+        let drop_spread = 10.;
+        let pos_offset = Vec3::new(
+            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            1.,
+        );
         commands
             .spawn(Text2dBundle {
                 text: Text::from_section(
@@ -93,8 +101,7 @@ pub fn handle_add_damage_numbers_after_hit(
                     },
                 ),
                 transform: Transform {
-                    translation: txfms.get(hit.hit_entity).unwrap().translation
-                        + Vec3::new(10., 10., 1.),
+                    translation: txfms.get(hit.hit_entity).unwrap().translation + pos_offset,
                     ..Default::default()
                 },
                 ..Default::default()
