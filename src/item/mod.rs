@@ -3,7 +3,7 @@ use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 use crate::combat::ObjBreakEvent;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
-use crate::proto::proto_param::{ProtoParam};
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
@@ -205,9 +205,9 @@ impl WorldObject {
         proto_commands: &mut ProtoCommands,
         prototypes: &Prototypes,
         pos: Vec2,
-        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+        minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
         proto_param: &mut ProtoParam,
-        game: GameParam,
+        game: &GameParam,
         commands: &mut Commands,
     ) -> Option<Entity> {
         if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
