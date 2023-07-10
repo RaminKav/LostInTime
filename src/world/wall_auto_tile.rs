@@ -19,6 +19,10 @@ pub fn update_wall(
     txns: Query<&GlobalTransform>,
 ) {
     for (wall_entity, mut wall_sprite) in walls_to_update.iter_mut() {
+        let mut has_wall_above = false;
+        let mut has_wall_below = false;
+        let mut has_wall_on_left_side = false;
+        let mut has_wall_on_right_side = false;
         let new_wall_pos =
             world_pos_to_tile_pos(txns.get(wall_entity).unwrap().translation().truncate());
         commands.entity(wall_entity).remove::<Dirty>();
@@ -34,6 +38,15 @@ pub fn update_wall(
                     get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
                 {
                     if matches!(neighbour_block_entity_data.object, WorldObject::Wall(_)) {
+                        if dy == 1 {
+                            has_wall_above = true;
+                        } else if dy == -1 {
+                            has_wall_below = true;
+                        } else if dx == -1 {
+                            has_wall_on_left_side = true;
+                        } else if dx == 1 {
+                            has_wall_on_right_side = true;
+                        }
                         neighbour_is_wall = true;
                     }
                 }
@@ -66,7 +79,7 @@ pub fn update_wall(
                 }
             }
         }
-        let mut first_corner_neighbour_is_wall = false;
+        let mut first_corner_neighbour_is_not_wall = false;
         let mut is_weird_edge_case_corner = false;
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
@@ -75,55 +88,45 @@ pub fn update_wall(
                     continue;
                 }
                 // only use neighbours that are walls
-                let mut corner_neighbour_is_wall = false;
+                let mut this_corner_neighbour_is_wall = false;
                 if let Some(neighbour_block_entity_data) =
                     get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
                 {
-                    corner_neighbour_is_wall =
+                    this_corner_neighbour_is_wall =
                         matches!(neighbour_block_entity_data.object, WorldObject::Wall(_));
                 }
                 let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
 
-                let has_wall_below = (new_wall_data.obj_bit_index & 0b0100) == 0b0100;
-
-                let is_0b1111 = new_wall_data.obj_bit_index == 0b1111;
-                let is_0b1101 = new_wall_data.obj_bit_index == 0b1101;
-                let is_0b1110 = new_wall_data.obj_bit_index == 0b1110;
-                let has_wall_on_left_side = (new_wall_data.obj_bit_index & 0b0001) == 0b0001;
-                let has_wall_on_right_side = (new_wall_data.obj_bit_index & 0b1000) == 0b1000;
-                let has_wall_on_side = if dx == -1 {
+                let has_wall_on_this_side = if dx == -1 {
                     has_wall_on_left_side
                 } else {
                     has_wall_on_right_side
                 };
-                if !(corner_neighbour_is_wall || !has_wall_on_side || !has_wall_below) {
-                    let updated_bit_index = if is_0b1111 {
-                        if first_corner_neighbour_is_wall
-                            && has_wall_on_left_side
-                            && has_wall_on_right_side
-                        {
+                if !(this_corner_neighbour_is_wall || !has_wall_on_this_side || !has_wall_below) {
+                    let updated_bit_index = if has_wall_above
+                        && has_wall_on_left_side
+                        && has_wall_on_right_side
+                    {
+                        if first_corner_neighbour_is_not_wall && !this_corner_neighbour_is_wall {
                             10
                         } else if dx == -1 {
                             14
                         } else {
                             15
                         }
-                    } else if is_0b1101 {
-                        if first_corner_neighbour_is_wall
-                            && has_wall_on_left_side
-                            && has_wall_on_right_side
-                        {
+                    } else if has_wall_above {
+                        if dx == -1 {
+                            7
+                        } else {
+                            6
+                        }
+                    } else if !has_wall_above && has_wall_on_left_side && has_wall_on_right_side {
+                        if first_corner_neighbour_is_not_wall && !this_corner_neighbour_is_wall {
                             4
                         } else if dx == -1 {
                             13
                         } else {
                             11
-                        }
-                    } else if is_0b1110 {
-                        if dx == -1 {
-                            7
-                        } else {
-                            6
                         }
                     } else {
                         new_wall_data.obj_bit_index
@@ -136,12 +139,9 @@ pub fn update_wall(
                         continue;
                     }
                     new_wall_data.obj_bit_index = updated_bit_index;
-
                     (*wall_sprite).index =
                         (updated_bit_index + new_wall_data.texture_offset) as usize;
-                    if dx == -1 {
-                        first_corner_neighbour_is_wall = true;
-                    }
+                    first_corner_neighbour_is_not_wall = true;
                 }
                 // just trust me on this one
                 if !is_weird_edge_case_corner {

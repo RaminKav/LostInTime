@@ -8,6 +8,7 @@ use bevy::{
     scene::SceneInstance,
     tasks::IoTaskPool,
 };
+use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 
 use crate::{
@@ -22,24 +23,48 @@ use crate::{
 #[derive(Component)]
 pub struct SchematicObject;
 
+#[derive(Resource, Default, Debug, Reflect, Clone)]
+pub struct SchematicToggle {
+    enabled: bool,
+}
 pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems((
-            save_schematic_scene,
-            load_schematic,
-            handle_new_scene_entities_parent_chunk,
-            mark_new_world_obj_as_schematic,
-        ));
+        app.insert_resource(SchematicToggle::default())
+            .register_type::<SchematicToggle>()
+            .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
+            .add_systems((
+                save_schematic_scene,
+                load_schematic,
+                handle_new_scene_entities_parent_chunk,
+                clear_schematic_entities,
+                mark_new_world_obj_as_schematic,
+            ));
     }
 }
 fn mark_new_world_obj_as_schematic(
     mut commands: Commands,
     query: Query<Entity, (Added<Wall>, Without<ItemStack>)>,
+    toggle: Res<SchematicToggle>,
 ) {
-    for e in query.iter() {
-        if let Some(mut entity_cmds) = commands.get_entity(e) {
-            entity_cmds.insert(SchematicObject);
+    if toggle.enabled {
+        for e in query.iter() {
+            if let Some(mut entity_cmds) = commands.get_entity(e) {
+                entity_cmds.insert(SchematicObject);
+            }
+        }
+    }
+}
+fn clear_schematic_entities(
+    mut commands: Commands,
+    query: Query<Entity, With<SchematicObject>>,
+    key_input: Res<Input<KeyCode>>,
+) {
+    if key_input.just_pressed(KeyCode::C) {
+        for e in query.iter() {
+            if let Some(entity_cmds) = commands.get_entity(e) {
+                entity_cmds.despawn_recursive();
+            }
         }
     }
 }
