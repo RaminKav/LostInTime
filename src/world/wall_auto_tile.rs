@@ -41,11 +41,10 @@ pub fn update_wall(
 
                 let updated_bit_index =
                     compute_wall_index(new_wall_data.obj_bit_index, (dx, dy), !neighbour_is_wall);
+                new_wall_data.texture_offset = 0;
                 if new_wall_data.obj_bit_index == updated_bit_index {
                     continue;
                 }
-
-                new_wall_data.texture_offset = 0;
 
                 new_wall_data.obj_bit_index = updated_bit_index;
                 (*wall_sprite).index = (updated_bit_index + new_wall_data.texture_offset) as usize;
@@ -67,7 +66,7 @@ pub fn update_wall(
                 }
             }
         }
-        let mut first_corner_is_wall = false;
+        let mut first_corner_neighbour_is_wall = false;
         let mut is_weird_edge_case_corner = false;
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
@@ -90,14 +89,19 @@ pub fn update_wall(
                 let is_0b1111 = new_wall_data.obj_bit_index == 0b1111;
                 let is_0b1101 = new_wall_data.obj_bit_index == 0b1101;
                 let is_0b1110 = new_wall_data.obj_bit_index == 0b1110;
+                let has_wall_on_left_side = (new_wall_data.obj_bit_index & 0b0001) == 0b0001;
+                let has_wall_on_right_side = (new_wall_data.obj_bit_index & 0b1000) == 0b1000;
                 let has_wall_on_side = if dx == -1 {
-                    (new_wall_data.obj_bit_index & 0b0001) == 0b0001
+                    has_wall_on_left_side
                 } else {
-                    (new_wall_data.obj_bit_index & 0b1000) == 0b1000
+                    has_wall_on_right_side
                 };
                 if !(corner_neighbour_is_wall || !has_wall_on_side || !has_wall_below) {
                     let updated_bit_index = if is_0b1111 {
-                        if first_corner_is_wall {
+                        if first_corner_neighbour_is_wall
+                            && has_wall_on_left_side
+                            && has_wall_on_right_side
+                        {
                             10
                         } else if dx == -1 {
                             14
@@ -105,7 +109,10 @@ pub fn update_wall(
                             15
                         }
                     } else if is_0b1101 {
-                        if first_corner_is_wall {
+                        if first_corner_neighbour_is_wall
+                            && has_wall_on_left_side
+                            && has_wall_on_right_side
+                        {
                             4
                         } else if dx == -1 {
                             13
@@ -133,7 +140,7 @@ pub fn update_wall(
                     (*wall_sprite).index =
                         (updated_bit_index + new_wall_data.texture_offset) as usize;
                     if dx == -1 {
-                        first_corner_is_wall = true;
+                        first_corner_neighbour_is_wall = true;
                     }
                 }
                 // just trust me on this one
