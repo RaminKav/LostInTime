@@ -285,7 +285,8 @@ impl ChunkPlugin {
     }
 
     pub fn spawn_chunks_around_camera(
-        mut game: GameParam,
+        game: GameParam,
+        mut camera_query: Query<&Transform, With<TextureCamera>>,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         _load_chunk_event: EventWriter<SpawnChunkEvent>,
         chunk_cache: Query<&ChunkCache, With<ActiveDimension>>,
@@ -293,7 +294,7 @@ impl ChunkPlugin {
         if chunk_cache.get_single().is_err() {
             return;
         }
-        let transform = game.camera_query.single_mut();
+        let transform = camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
             ..(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
@@ -315,9 +316,13 @@ impl ChunkPlugin {
         }
     }
     //TODO: change despawning systems to use playe rpos instead??
-    fn despawn_outofrange_chunks(game: GameParam, mut events: EventWriter<DespawnChunkEvent>) {
+    fn despawn_outofrange_chunks(
+        game: GameParam,
+        mut events: EventWriter<DespawnChunkEvent>,
+        camera_query: Query<&Transform, With<TextureCamera>>,
+    ) {
         let mut removed_chunks = vec![];
-        for camera_transform in game.camera_query.iter() {
+        for camera_transform in camera_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
                 CHUNK_SIZE as f32 * TILE_SIZE.y,

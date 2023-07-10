@@ -110,7 +110,7 @@ impl CollisionPlugion {
         player: Query<Entity, With<Player>>,
         allowed_targets: Query<Entity, (With<ItemStack>, Without<MainHand>, Without<Equipment>)>,
         rapier_context: Res<RapierContext>,
-
+        items_query: Query<&ItemStack>,
         mut game: GameParam,
         mut inv: Query<&mut Inventory>,
     ) {
@@ -124,7 +124,7 @@ impl CollisionPlugion {
                 }
                 // ...and the entity is an item stack, add it to the player's inventory
 
-                let item_stack = game.items_query.get(e2).unwrap().2.clone();
+                let item_stack = items_query.get(e2).unwrap().clone();
                 item_stack.add_to_inventory(&mut inv, &mut game.inv_slot_query);
 
                 game.world_obj_data.drop_entities.remove(&e2);

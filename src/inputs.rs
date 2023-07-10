@@ -12,7 +12,7 @@ use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
-use crate::proto::proto_param::{ProtoParam};
+use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
@@ -329,8 +329,8 @@ impl InputsPlugin {
         cursor_pos: Res<CursorPos>,
         game: GameParam,
         mut proto_params: ProtoParam,
+        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
         mut attack_event: EventWriter<AttackEvent>,
-        minimap_event: EventWriter<UpdateMiniMapEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
         inv_query: Query<(&mut Visibility, &InventoryState)>,
@@ -374,17 +374,17 @@ impl InputsPlugin {
             }
             attack_event.send(AttackEvent);
 
-            // println!(
-            //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?}",
-            //     game.get_tile_data(TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: cursor_tile_pos
-            //     }),
-            //     game.get_tile_obj_data(TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: cursor_tile_pos
-            //     })
-            // );
+            println!(
+                "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?} PLAYER: {player_pos:?}",
+                game.get_tile_data(TileMapPositionData {
+                    chunk_pos: cursor_chunk_pos,
+                    tile_pos: cursor_tile_pos
+                }),
+                game.get_tile_obj_data(TileMapPositionData {
+                    chunk_pos: cursor_chunk_pos,
+                    tile_pos: cursor_tile_pos
+                })
+            );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
@@ -434,9 +434,9 @@ impl InputsPlugin {
                         &mut proto_commands,
                         &prototypes,
                         cursor_pos.world_coords.truncate(),
-                        minimap_event,
+                        &mut minimap_event,
                         &mut proto_params,
-                        game,
+                        &game,
                         &mut commands,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);

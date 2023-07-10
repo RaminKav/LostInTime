@@ -193,31 +193,7 @@ pub struct GameParam<'w, 's> {
         (With<WorldObject>, With<WorldObjectEntityData>),
     >,
     pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
-
-    pub items_query: Query<
-        'w,
-        's,
-        (Entity, &'static Transform, &'static ItemStack),
-        (
-            Without<Player>,
-            Without<Equipment>,
-            Without<Chunk>,
-            Without<CurrentHealth>,
-        ),
-    >,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
-    pub camera_query: Query<
-        'w,
-        's,
-        &'static mut Transform,
-        (
-            With<TextureCamera>,
-            Without<Player>,
-            Without<Chunk>,
-            Without<ItemStack>,
-            Without<CurrentHealth>,
-        ),
-    >,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
     #[system_param(ignore)]
