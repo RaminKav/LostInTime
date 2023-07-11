@@ -11,10 +11,11 @@ use interpolation::lerp;
 use crate::ai::AttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
-use crate::item::Equipment;
+use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
+use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
-use crate::{GameState, RawPosition};
+use crate::{GameParam, GameState, RawPosition};
 
 pub struct AnimationsPlugin;
 
@@ -77,6 +78,7 @@ impl Plugin for AnimationsPlugin {
                     Self::animate_limbs,
                     Self::animate_enemies,
                     Self::animate_dropped_items,
+                    Self::handle_held_item_direction_change,
                     Self::animate_attack,
                     Self::animate_hit,
                     Self::animate_spritesheet_animations.after(InputsPlugin::mouse_click_system),
@@ -245,23 +247,39 @@ impl AnimationsPlugin {
         }
         //TODO: move to hit_handler fn
     }
-    fn animate_attack(
-        mut game: ResMut<Game>,
-        time: Res<Time>,
-        mut tool_query: Query<(&mut Transform, &mut AttackAnimationTimer), With<Equipment>>,
-        attack_event: EventReader<AttackEvent>,
-        player: Query<&FacingDirection, With<Player>>,
+    fn handle_held_item_direction_change(
+        game: GameParam,
+        mut tool_query: Query<(&WorldObject, &mut Transform), (With<MainHand>, Without<Chunk>)>,
     ) {
-        if let Ok((mut t, mut at)) = tool_query.get_single_mut() {
-            let dir = player.single();
-            let is_facing_left = if *dir == FacingDirection::Left {
+        if let Ok((obj, mut t)) = tool_query.get_single_mut() {
+            let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+            let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+
+            let is_facing_left = game.game.player_state.direction == FacingDirection::Left;
+
+            t.translation.x = PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x
+                + anchor.x * obj_data.size.x
+                + if is_facing_left { 0. } else { 11. }
+        }
+    }
+    fn animate_attack(
+        mut game: GameParam,
+        time: Res<Time>,
+        mut tool_query: Query<
+            (&WorldObject, &mut Transform, &mut AttackAnimationTimer),
+            (With<Equipment>, Without<Chunk>),
+        >,
+        attack_event: EventReader<AttackEvent>,
+    ) {
+        if let Ok((obj, mut t, mut at)) = tool_query.get_single_mut() {
+            let is_facing_left = if game.game.player_state.direction == FacingDirection::Left {
                 1.
             } else {
                 -1.
             };
 
             if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
-                game.player_state.is_attacking = true;
+                game.game.player_state.is_attacking = true;
 
                 let d = time.delta();
                 at.0.tick(d);
@@ -276,7 +294,7 @@ impl AnimationsPlugin {
                     // t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
                     t.translation.y = -4.;
                     t.translation.x = lerp(
-                        &(5. * is_facing_left),
+                        &(-5. * is_facing_left),
                         &(-15. * is_facing_left),
                         &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     );
@@ -284,11 +302,15 @@ impl AnimationsPlugin {
                     at.0.reset();
                     at.1 = 0.;
                     t.rotation = Quat::from_rotation_z(-at.1);
-                    t.translation.x = -5.;
-                    t.translation.y = -1.;
+                    let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+                    let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+                    t.translation.x =
+                        PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x + anchor.x * obj_data.size.x;
+                    t.translation.y =
+                        PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].y + anchor.y * obj_data.size.y;
                 }
             } else {
-                game.player_state.is_attacking = false;
+                game.game.player_state.is_attacking = false;
             }
         }
     }

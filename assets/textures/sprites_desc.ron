@@ -22,6 +22,17 @@
             breaks_with: None,
             places_into: None
         ),
+        Fireball: WorldObjectData(
+            texture_pos: (64., 16.),
+            size: (16., 16.),
+            anchor: None,
+            collider: false,
+            breakable: false,
+            breaks_into: None,
+            equip_slot: None,
+            breaks_with: None,
+            places_into: None
+        ),
         Placeable(Log): WorldObjectData(
             texture_pos: (32., 48.),
             size: (16., 16.),
@@ -70,6 +81,50 @@
             texture_pos: (64., 64.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+        Dagger: WorldObjectData(
+            texture_pos: (64., 80.),
+            size: (16., 16.),
+            anchor: Some((0.2, 0.25)),
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+        FireStaff: WorldObjectData(
+            texture_pos: (80., 64.),
+            size: (16., 16.),
+            anchor: Some((0.2, 0.23)),
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+        BasicStaff: WorldObjectData(
+            texture_pos: (96., 64.),
+            size: (16., 16.),
+            anchor: Some((0.2, 0.23)),
+            collider: true,
+            breakable: true,
+            breaks_into: None,
+            equip_slot: Some(Hands),
+            breaks_with: None,
+            places_into: None
+        ),
+         DualStaff: WorldObjectData(
+            texture_pos: (112., 64.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
             collider: true,
             breakable: true,
             breaks_into: None,

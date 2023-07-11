@@ -25,7 +25,7 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
     GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
-use crate::{Player, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, Player, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -45,7 +45,7 @@ pub struct CursorPos {
 #[derive(Component, Default)]
 pub struct MovementVector(pub Vec2);
 
-#[derive(Component, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 
 pub enum FacingDirection {
     Left,
@@ -92,7 +92,7 @@ impl Plugin for InputsPlugin {
 
 impl InputsPlugin {
     fn turn_player(
-        mut commands: Commands,
+        mut game: ResMut<Game>,
         mut player_query: Query<(Entity, Option<&Children>), With<Player>>,
         mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
         mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
@@ -111,7 +111,7 @@ impl InputsPlugin {
                 if let Ok(limb_handle) = limb_query.get_mut(*l) {
                     let limb_material = materials.get_mut(limb_handle).unwrap();
                     limb_material.flip = flip;
-                    commands.entity(e).insert(dir.clone());
+                    game.player_state.direction = dir.clone();
                 }
             }
         }
@@ -205,7 +205,25 @@ impl InputsPlugin {
         }
         if key_input.just_pressed(KeyCode::E) {
             proto_commands.spawn_item_from_proto(
-                WorldObject::Sword,
+                WorldObject::BasicStaff,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::DualStaff,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::FireStaff,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Dagger,
                 &proto,
                 game.game.player_state.position.truncate(),
                 1,

@@ -69,13 +69,19 @@ impl Plugin for ProtoPlugin {
 impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
         println!("Loading prototypes...");
+        //TODO: automate this
         prototypes.load("proto/tree.prototype.ron");
         prototypes.load("proto/obj_stonewall.prototype.ron");
         prototypes.load("proto/stonewall.prototype.ron");
         prototypes.load("proto/projectile.prototype.ron");
         prototypes.load("proto/rock.prototype.ron");
+        prototypes.load("proto/fireball.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
+        prototypes.load("proto/dagger.prototype.ron");
+        prototypes.load("proto/basicstaff.prototype.ron");
+        prototypes.load("proto/dualstaff.prototype.ron");
+        prototypes.load("proto/firestaff.prototype.ron");
         prototypes.load("proto/flint.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");

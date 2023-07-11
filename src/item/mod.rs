@@ -2,6 +2,7 @@ use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 use crate::combat::ObjBreakEvent;
+use crate::inputs::FacingDirection;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -97,6 +98,11 @@ pub enum WorldObject {
     Foliage(Foliage),
     Placeable(Placeable),
     Sword,
+    BasicStaff,
+    FireStaff,
+    DualStaff,
+    Dagger,
+    Fireball,
 }
 
 #[derive(
@@ -343,12 +349,15 @@ impl WorldObject {
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let is_facing_left = player_state.direction == FacingDirection::Left;
 
         let limb = Limb::Hands;
         let position = Vec3::new(
-            PLAYER_EQUIPMENT_POSITIONS[&limb].x + anchor.x * obj_data.size.x,
+            PLAYER_EQUIPMENT_POSITIONS[&limb].x
+                + anchor.x * obj_data.size.x
+                + if is_facing_left { 0. } else { 11. },
             PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y,
-            0.000000000001, //500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
+            0.01, //500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
         );
         //despawn old item if one exists
         if let Some(main_hand_data) = &player_state.main_hand_slot {
@@ -365,12 +374,12 @@ impl WorldObject {
                     // rotation: Quat::from_rotation_z(0.8),
                     ..Default::default()
                 },
+                visibility: Visibility::Visible,
                 ..Default::default()
             })
             .insert(Equipment(limb))
             .insert(MainHand)
             .insert(Name::new("HeldItem"))
-            .insert(YSort)
             .insert(Sensor)
             .insert(inv_item_stack.item_stack.attributes.clone())
             .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
@@ -498,8 +507,7 @@ impl WorldObject {
             WorldObject::Sand => (210, 201, 165),
             WorldObject::Foliage(_) => (119, 116, 59),
             WorldObject::Placeable(_) => (255, 70, 255),
-            WorldObject::Sword => (255, 70, 255),
-            WorldObject::Flint => (255, 70, 255),
+            _ => (255, 70, 255),
         }
     }
 }

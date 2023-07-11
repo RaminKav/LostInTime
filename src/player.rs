@@ -30,6 +30,7 @@ pub struct MovePlayerEvent {
 pub struct Player;
 #[derive(Debug, Clone)]
 pub struct PlayerState {
+    pub direction: FacingDirection,
     pub is_moving: bool,
     pub is_dashing: bool,
     pub is_attacking: bool,
@@ -43,6 +44,7 @@ pub struct PlayerState {
 impl Default for PlayerState {
     fn default() -> Self {
         Self {
+            direction: FacingDirection::Left,
             is_moving: false,
             is_dashing: false,
             is_attacking: false,
@@ -225,7 +227,6 @@ fn spawn_player(
             },
             InvincibilityCooldown(1.),
             MovementVector::default(),
-            FacingDirection::default(),
             YSort,
             Name::new("Player"),
             Collider::cuboid(7., 5.),

@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
@@ -31,6 +33,7 @@ pub enum Projectile {
     #[default]
     None,
     Rock,
+    Fireball,
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic)]
@@ -81,6 +84,8 @@ impl RangedAttackPlugin {
         for (mut transform, state) in query.iter_mut() {
             let delta = state.direction * state.speed;
             transform.translation += delta.extend(0.0);
+            transform.rotation =
+                Quat::from_rotation_z(state.direction.y.atan2(state.direction.x) - PI / 2.0);
         }
     }
 }
