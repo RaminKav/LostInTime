@@ -1,20 +1,21 @@
 (
-  name: "Sword",
+  name: "DualStaff",
   templates: ["world_object"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": Sword,
+  "survival_rogue_like::item::WorldObject": DualStaff,
   "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::item::projectile::RangedAttack": (Rock),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: Sword,
+        obj_type: DualStaff,
         attributes: (
             durability: 100,
             max_durability: 100,
-            attack: 20,
-            attack_cooldown: 0.4
+            attack: 45,
+            attack_cooldown: 0.6
         ),
         metadata: (
-            name: "Sword", 
-            desc: "A rusty sword."
+            name: "Dual Staff", 
+            desc: "A double sided staff."
         ),
         count: 1
   ),

@@ -1,20 +1,20 @@
 (
-  name: "Sword",
+  name: "Dagger",
   templates: ["world_object"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": Sword,
+  "survival_rogue_like::item::WorldObject": Dagger,
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: Sword,
+        obj_type: Dagger,
         attributes: (
             durability: 100,
             max_durability: 100,
-            attack: 20,
-            attack_cooldown: 0.4
+            attack: 10,
+            attack_cooldown: 0.2
         ),
         metadata: (
-            name: "Sword", 
-            desc: "A rusty sword."
+            name: "Dagger", 
+            desc: "A small dagger."
         ),
         count: 1
   ),

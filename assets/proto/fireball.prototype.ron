@@ -1,0 +1,9 @@
+(
+  name: "Fireball",
+  templates: ["projectile"],
+  schematics: {
+        "survival_rogue_like::item::WorldObject": Fireball,
+        "survival_rogue_like::item::projectile::Projectile": Fireball,
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 2., direction: (x: 0., y: 0.)),
+  }
+)
