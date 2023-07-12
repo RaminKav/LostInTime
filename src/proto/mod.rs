@@ -13,7 +13,7 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilter
 pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
-    animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer},
+    animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation},
     attributes::{Attack, ItemAttributes, MaxHealth},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
@@ -44,6 +44,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Breakable>()
             .register_type::<BreaksWith>()
             .register_type::<Block>()
+            .register_type::<DoneAnimation>()
             .register_type::<Wall>()
             .register_type::<Projectile>()
             .register_type::<ProjectileState>()
@@ -57,6 +58,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
             .register_type::<EnemyMaterialMesh2DProto>()
+            .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
             .register_type::<ColliderProto>()
             .register_type::<AnimationTimerProto>()
@@ -76,6 +78,7 @@ impl ProtoPlugin {
         prototypes.load("proto/projectile.prototype.ron");
         prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/fireball.prototype.ron");
+        prototypes.load("proto/electricity.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/dagger.prototype.ron");
@@ -187,6 +190,41 @@ impl FromSchematicInput<EnemyMaterialMesh2DProto> for MaterialMesh2dBundle<Enemy
                 }))
                 .into(),
             material: enemy_material,
+            ..default()
+        }
+    }
+}
+
+#[derive(Schematic, Reflect, Debug, FromReflect)]
+#[reflect(Schematic)]
+#[schematic(into = SpriteSheetBundle)]
+pub struct SpriteSheetProto {
+    pub asset: String,
+    pub size: Vec2,
+    pub cols: usize,
+    pub rows: usize,
+}
+
+impl FromSchematicInput<SpriteSheetProto> for SpriteSheetBundle {
+    fn from_input(input: SpriteSheetProto, context: &mut SchematicContext) -> SpriteSheetBundle {
+        let world = context.world_mut();
+
+        let asset_server = world.resource::<AssetServer>();
+        let texture_handle = asset_server.load(input.asset);
+
+        let mut texture_atlases = world.resource_mut::<Assets<TextureAtlas>>();
+
+        let texture_atlas = TextureAtlas::from_grid(
+            texture_handle,
+            input.size,
+            input.cols,
+            input.rows,
+            None,
+            None,
+        );
+        let texture_atlas_handle = texture_atlases.add(texture_atlas);
+        SpriteSheetBundle {
+            texture_atlas: texture_atlas_handle,
             ..default()
         }
     }

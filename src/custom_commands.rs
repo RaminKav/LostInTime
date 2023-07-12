@@ -1,6 +1,6 @@
 use crate::{
     item::{Foliage, WorldObject},
-    proto::proto_param::{ProtoParam},
+    proto::proto_param::ProtoParam,
     world::{wall_auto_tile::Dirty, world_helpers::camera_pos_to_tile_pos},
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
@@ -68,15 +68,29 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
 
-            let Some(proto_data) = params.get_projectile_state(obj) else {return None};
-            // modify the direction of projectile
+            let Some(proto_data) = params.get_projectile_state(obj.clone()) else {return None};
+            // modify the direction and offset of projectile
             let mut proto_data = proto_data.clone();
             proto_data.direction = dir;
+            let angle = proto_data.direction.y.atan2(proto_data.direction.x);
+            let sprite_size = if let Some(sprite_data) = params.get_sprite_sheet_data(obj) {
+                sprite_data.size
+            } else {
+                Vec2::new(16., 16.)
+            };
+            let x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
+            let y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
+
             //TODO: make these prototype data
             spawned_entity_commands
                 .insert(proto_data)
+                .insert(Transform {
+                    translation: pos.extend(0.) + Vec3::new(x_offset, y_offset, 0.),
+                    rotation: Quat::from_rotation_z(angle),
+                    ..default()
+                })
                 .insert(ActiveEvents::COLLISION_EVENTS)
-                .insert(Name::new("Rock"))
+                .insert(Name::new("Projectile"))
                 .insert(ActiveCollisionTypes::all());
 
             return Some(spawned_entity);

@@ -1,0 +1,12 @@
+(
+  name: "Electricity",
+  templates: ["projectile"],
+  schematics: {
+        "survival_rogue_like::item::projectile::Projectile": Electricity,
+        "survival_rogue_like::proto::ColliderProto": (x: 24., y: 8.),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: []),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/electricity.png", size: (x: 48., y: 16.), cols: 7, rows: 1),
+        "survival_rogue_like::animations::DoneAnimation": (),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+  }
+)

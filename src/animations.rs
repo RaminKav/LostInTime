@@ -40,7 +40,8 @@ pub struct HitAnimationTracker {
 #[derive(Component, Debug)]
 pub struct AttackAnimationTimer(pub Timer, pub f32);
 
-#[derive(Component, Debug)]
+#[derive(Component, Reflect, FromReflect, Schematic, Debug)]
+#[reflect(Schematic)]
 pub struct DoneAnimation;
 
 #[derive(Debug, Clone, Default)]

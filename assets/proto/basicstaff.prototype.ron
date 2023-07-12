@@ -4,13 +4,13 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": BasicStaff,
   "survival_rogue_like::item::melee::MeleeAttack": (),
-  "survival_rogue_like::item::projectile::RangedAttack": (Rock),
+  "survival_rogue_like::item::projectile::RangedAttack": (Electricity),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: BasicStaff,
         attributes: (
             durability: 100,
             max_durability: 100,
-            attack: 45,
+            attack: 5,
             attack_cooldown: 0.6
         ),
         metadata: (

@@ -1,4 +1,5 @@
 use crate::{
+    animations::DoneAnimation,
     attributes::{Attack, AttributeModifier},
     enemy::Mob,
     inventory::{Inventory, ItemStack},
@@ -85,22 +86,32 @@ impl CollisionPlugion {
         >,
         mut hit_event: EventWriter<HitEvent>,
         mut collisions: EventReader<CollisionEvent>,
-        projectiles: Query<(Entity, &ProjectileState), With<Projectile>>,
+        mut projectiles: Query<
+            (Entity, &mut ProjectileState, Option<&DoneAnimation>),
+            With<Projectile>,
+        >,
     ) {
         for evt in collisions.iter() {
             let CollisionEvent::Started(e1, e2, _) = evt else { continue };
             for (e1, e2) in [(e1, e2), (e2, e1)] {
-                let Ok((e, state)) = projectiles.get(*e1) else {continue};
+                let Ok((e, mut state, anim_option)) = projectiles.get_mut(*e1) else {continue};
                 let Ok((player_e, Attack(damage), children)) = player_attack.get_single() else {continue};
                 if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                     continue;
                 }
+                if state.hit_entities.contains(e2) {
+                    continue;
+                }
+                state.hit_entities.push(*e2);
                 hit_event.send(HitEvent {
                     hit_entity: *e2,
                     damage: *damage,
                     dir: state.direction,
                     hit_with: None,
                 });
+                if let Some(_) = anim_option {
+                    continue;
+                }
                 commands.entity(e).despawn()
             }
         }

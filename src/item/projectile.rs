@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    combat::AttackTimer, custom_commands::CommandsExt, player::Player,
+    animations::DoneAnimation, combat::AttackTimer, custom_commands::CommandsExt, player::Player,
     proto::proto_param::ProtoParam, GameParam, GameState,
 };
 
@@ -34,12 +34,14 @@ pub enum Projectile {
     None,
     Rock,
     Fireball,
+    Electricity,
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic)]
 pub struct ProjectileState {
     pub speed: f32,
     pub direction: Vec2,
+    pub hit_entities: Vec<Entity>,
 }
 
 pub struct RangedAttackEvent {
@@ -84,8 +86,6 @@ impl RangedAttackPlugin {
         for (mut transform, state) in query.iter_mut() {
             let delta = state.direction * state.speed;
             transform.translation += delta.extend(0.0);
-            transform.rotation =
-                Quat::from_rotation_z(state.direction.y.atan2(state.direction.x) - PI / 2.0);
         }
     }
 }

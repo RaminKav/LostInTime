@@ -12,6 +12,8 @@ use crate::{
     },
 };
 
+use super::SpriteSheetProto;
+
 #[derive(SystemParam)]
 pub struct ProtoParam<'w, 's> {
     pub proto_commands: ProtoCommands<'w, 's>,
@@ -19,6 +21,7 @@ pub struct ProtoParam<'w, 's> {
     pub prototype_assets: Res<'w, Assets<Prototype>>,
     pub meshes: ResMut<'w, Assets<Mesh>>,
     pub graphics: Res<'w, Graphics>,
+    pub asset_server: Res<'w, AssetServer>,
 }
 impl<'w, 's> ProtoParam<'w, 's> {
     pub fn get_prototype(&self, id: &str) -> Option<&Prototype> {
@@ -39,7 +42,7 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .input()
                 .downcast_ref::<ItemStack>()
         } else {
-            println!("Could not get item data for: {}", id);
+            warn!("Could not get item data for: {}", id);
             None
         }
     }
@@ -55,7 +58,7 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .input()
                 .downcast_ref::<WorldObject>()
         } else {
-            println!("Could not get world object data for: {}", id);
+            warn!("Could not get world object data for: {}", id);
             None
         }
     }
@@ -71,7 +74,7 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .get::<RangedAttack>() else {return None};
             data.input().downcast_ref::<RangedAttack>()
         } else {
-            println!("Could not get item data for: {}", id);
+            warn!("Could not get item data for: {}", id);
             None
         }
     }
@@ -87,7 +90,7 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .get::<MeleeAttack>() else {return None};
             data.input().downcast_ref::<MeleeAttack>()
         } else {
-            println!("Could not get item data for: {}", id);
+            warn!("Could not get item data for: {}", id);
             None
         }
     }
@@ -104,7 +107,23 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .input()
                 .downcast_ref::<ProjectileState>()
         } else {
-            println!("Could not get projectile data for: {}", id);
+            warn!("Could not get projectile data for: {}", id);
+            None
+        }
+    }
+    pub fn get_sprite_sheet_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
+        &self,
+        obj: T,
+    ) -> Option<&SpriteSheetProto> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+
+        if let Some(data) = self.get_prototype(&id) {
+            if let Some(data) = data.schematics().get::<SpriteSheetProto>() {
+                return data.input().downcast_ref::<SpriteSheetProto>();
+            }
+            None
+        } else {
+            warn!("Could not get projectile data for: {}", id);
             None
         }
     }

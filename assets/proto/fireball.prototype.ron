@@ -4,6 +4,6 @@
   schematics: {
         "survival_rogue_like::item::WorldObject": Fireball,
         "survival_rogue_like::item::projectile::Projectile": Fireball,
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 2., direction: (x: 0., y: 0.)),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 3., direction: (x: 0., y: 0.), hit_entities: []),
   }
 )
