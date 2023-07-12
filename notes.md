@@ -134,7 +134,9 @@ how to set up item prefabs:
 BUG: moving very far causes dash cooldown to double in speed? weird behaviour
 BUG: move dash tick to animations.rs, also dash movement is mega glitched rn
 
-TODO: `AttackState` remove attack related data to components, for proto? basically how do we impl different att styles w seldum_state
+TODO: `AttackState` remove attack related data to components, for proto? basically how do we
+TODO: remove fireball from world object/sprite sheet, make own file, with animation
+impl different att styles w seldum_state
 
 ## Misc. Design Ideas
 
@@ -160,3 +162,7 @@ TODO: `AttackState` remove attack related data to components, for proto? basical
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
 - new types of projectile
+
+## Projectile/Magic ideas
+
+- orb that spins around you as you walk, attack fires the orb, then respawns or comes back
