@@ -4,7 +4,7 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::{AttributesPlugin, CurrentHealth};
+use attributes::AttributesPlugin;
 
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
@@ -50,7 +50,7 @@ use client::ClientPlugin;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::InputsPlugin;
-use inventory::{InventoryPlugin, ItemStack};
+use inventory::InventoryPlugin;
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
 use proto::ProtoPlugin;
