@@ -93,12 +93,11 @@ impl Plugin for InputsPlugin {
 impl InputsPlugin {
     fn turn_player(
         mut game: ResMut<Game>,
-        mut player_query: Query<(Entity, Option<&Children>), With<Player>>,
+        mut player_query: Query<&Children, With<Player>>,
         mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
         mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
         cursor_pos: Res<CursorPos>,
     ) {
-        let (e, children) = player_query.single_mut();
         let (flip, dir) = if cursor_pos.screen_coords.x > WIDTH / 2. {
             (0., FacingDirection::Right)
         } else {
@@ -106,7 +105,7 @@ impl InputsPlugin {
         };
         //TODO: make center point based on player pos on screen?
         //TODO: add some way for attack to know dir
-        if let Some(c) = children {
+        if let Ok(c) = player_query.get_single_mut() {
             for l in c.iter() {
                 if let Ok(limb_handle) = limb_query.get_mut(*l) {
                     let limb_material = materials.get_mut(limb_handle).unwrap();

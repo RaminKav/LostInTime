@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+
 
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    animations::DoneAnimation, combat::AttackTimer, custom_commands::CommandsExt, player::Player,
+    combat::AttackTimer, custom_commands::CommandsExt, player::Player,
     proto::proto_param::ProtoParam, GameParam, GameState,
 };
 
