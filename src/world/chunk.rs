@@ -23,7 +23,8 @@ use super::{
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<SpawnChunkEvent>()
+        app.insert_resource(ChunkObjectCache::default())
+            .add_event::<SpawnChunkEvent>()
             .add_event::<DespawnChunkEvent>()
             .add_event::<CreateChunkEvent>()
             .add_event::<GenerateObjectsEvent>()
@@ -42,6 +43,10 @@ impl Plugin for ChunkPlugin {
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
+}
+#[derive(Resource, Debug, Clone, Default)]
+pub struct ChunkObjectCache {
+    pub cache: HashMap<IVec2, Vec<(WorldObject, TilePos)>>,
 }
 #[derive(Component)]
 pub struct SpawnedChunk;
@@ -152,7 +157,7 @@ impl ChunkPlugin {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
                     let (bits, index_shift, blocks) = TilePlugin::get_tile_from_perlin_noise(
-                        &game.chunk_manager,
+                        &game.world_generation_params,
                         chunk_pos,
                         tile_pos,
                         seed.single().seed,

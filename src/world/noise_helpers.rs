@@ -45,6 +45,9 @@ pub fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<(f32, f32
     let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32;
     // the final set of points to return
     let mut points: Vec<(f32, f32)> = vec![];
+    if k == 0 {
+        return points;
+    }
     // the currently "Active" set of points
     let mut active: Vec<(f32, f32)> = vec![];
     let p0 = (

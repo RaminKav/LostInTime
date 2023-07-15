@@ -8,7 +8,9 @@ use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::InventoryState;
 use crate::world::generation::WallBreakEvent;
-use crate::world::world_helpers::{camera_pos_to_chunk_pos, world_pos_to_tile_pos};
+use crate::world::world_helpers::{
+    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, world_pos_to_tile_pos,
+};
 use crate::world::CHUNK_SIZE;
 use crate::{
     custom_commands::CommandsExt, player::Limb, AnimationTimer, CustomFlush, GameParam, GameState,
@@ -213,30 +215,36 @@ impl WorldObject {
         pos: Vec2,
         minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
         proto_param: &mut ProtoParam,
-        game: &GameParam,
+        game: &mut GameParam,
         commands: &mut Commands,
     ) -> Option<Entity> {
         if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
             warn!("obj exists here {pos}");
             return None;
         }
-        let item = match self {
-            WorldObject::Foliage(obj) => {
-                proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
+        let chunk_pos = camera_pos_to_chunk_pos(&pos);
+
+        if let Some(chunk) = game.get_chunk_entity(chunk_pos) {
+            let item = match self {
+                WorldObject::Foliage(obj) => {
+                    proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
+                }
+                WorldObject::Wall(obj) => {
+                    proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
+                }
+                _ => None,
+            };
+            if let Some(item) = item {
+                //TODO: do what old game data did, add obj to registry
+                commands.entity(item).set_parent(*chunk);
+                minimap_event.send(UpdateMiniMapEvent);
+
+                return Some(item);
             }
-            WorldObject::Wall(obj) => {
-                proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
-            }
-            _ => None,
-        };
-        if let Some(item) = item {
-            //TODO: do what old game data did, add obj to registry
-            let chunk_pos = camera_pos_to_chunk_pos(&pos);
-            commands
-                .entity(item)
-                .set_parent(*game.get_chunk_entity(chunk_pos).unwrap());
-            minimap_event.send(UpdateMiniMapEvent);
-            return Some(item);
+
+            return None;
+        } else {
+            game.add_object_to_chunk_cache(chunk_pos, self, camera_pos_to_tile_pos(&pos));
         }
         None
     }

@@ -1,4 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
+use bevy_proto::prelude::ProtoCommands;
 
 use crate::{
     player::MovePlayerEvent,
@@ -23,8 +24,8 @@ impl Plugin for DungeonPlugin {
 }
 
 impl DungeonPlugin {
-    pub fn spawn_new_dungeon_dimension(commands: &mut Commands) {
-        let mut cm = ChunkManager::new();
+    pub fn spawn_new_dungeon_dimension(commands: &mut Commands, protoCommands: &mut ProtoCommands) {
+        let cm = ChunkManager::new();
         let grid = gen_new_dungeon(
             1500,
             (CHUNK_SIZE * 4) as usize,
@@ -33,8 +34,6 @@ impl DungeonPlugin {
                 strength: 0,
             },
         );
-        cm.world_generation_params.stone_frequency = 1.;
-        cm.world_generation_params.dungeon_stone_frequency = 1.;
 
         let dim_e = commands
             .spawn((
@@ -47,6 +46,7 @@ impl DungeonPlugin {
                 cm,
             ))
             .id();
+        protoCommands.apply("DungeonWorldGenerationParams");
         commands.entity(dim_e).insert(SpawnDimension);
     }
     fn handle_move_player_after_dungeon_gen(
