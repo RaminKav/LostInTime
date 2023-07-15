@@ -10,18 +10,28 @@ use bevy::{
 };
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-
+use strum_macros::{Display, IntoStaticStr};
+mod schematic_spawner;
 use crate::{
     inventory::ItemStack,
     item::{Foliage, Placeable, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
-    GameParam,
+    world::world_helpers::world_pos_to_tile_pos,
+    CustomFlush, GameParam,
 };
 
+use self::schematic_spawner::{
+    attempt_to_spawn_schematic_in_chunk, give_chunks_schematic_spawners,
+};
+#[derive(Component, Debug, Clone, Reflect, Default, IntoStaticStr, Display)]
+pub enum SchematicType {
+    #[default]
+    House,
+}
 #[derive(Component)]
-pub struct SchematicObject;
+pub struct SchematicBuilderObject;
 
 #[derive(Resource, Default, Debug, Reflect, Clone)]
 pub struct SchematicToggle {
@@ -36,9 +46,11 @@ impl Plugin for SchematicPlugin {
             .add_systems((
                 save_schematic_scene,
                 load_schematic,
-                handle_new_scene_entities_parent_chunk,
+                handle_new_scene_entities_parent_chunk.after(CustomFlush),
                 clear_schematic_entities,
                 mark_new_world_obj_as_schematic,
+                attempt_to_spawn_schematic_in_chunk,
+                give_chunks_schematic_spawners,
             ));
     }
 }
@@ -50,14 +62,14 @@ fn mark_new_world_obj_as_schematic(
     if toggle.enabled {
         for e in query.iter() {
             if let Some(mut entity_cmds) = commands.get_entity(e) {
-                entity_cmds.insert(SchematicObject);
+                entity_cmds.insert(SchematicBuilderObject);
             }
         }
     }
 }
 fn clear_schematic_entities(
     mut commands: Commands,
-    query: Query<Entity, With<SchematicObject>>,
+    query: Query<Entity, With<SchematicBuilderObject>>,
     key_input: Res<Input<KeyCode>>,
 ) {
     if key_input.just_pressed(KeyCode::C) {
@@ -69,8 +81,10 @@ fn clear_schematic_entities(
     }
 }
 fn save_schematic_scene(world: &mut World) {
-    let mut state: SystemState<(Query<Entity, With<SchematicObject>>, Res<Input<KeyCode>>)> =
-        SystemState::new(world);
+    let mut state: SystemState<(
+        Query<Entity, With<SchematicBuilderObject>>,
+        Res<Input<KeyCode>>,
+    )> = SystemState::new(world);
     let (query, key_input) = state.get(world);
     if key_input.just_pressed(KeyCode::J) {
         println!("Saving schematic scene...");
@@ -101,7 +115,7 @@ fn save_schematic_scene(world: &mut World) {
         IoTaskPool::get()
             .spawn(async move {
                 // Write the scene RON data to file
-                File::create(format!("assets/scenes/test.scn.ron"))
+                File::create(format!("assets/scenes/house.scn.ron"))
                     .and_then(|mut file| file.write(serialized_scene.as_bytes()))
                     .expect("Error while writing scene to file");
             })
@@ -130,8 +144,8 @@ fn load_schematic(
 }
 
 fn handle_new_scene_entities_parent_chunk(
-    game: GameParam,
-    new_scenes: Query<(Entity, &Children), Added<SceneInstance>>,
+    mut game: GameParam,
+    new_scenes: Query<(Entity, &Children, &Transform), Added<SceneInstance>>,
     obj_data: Query<(&WorldObject, &GlobalTransform), (With<WorldObject>, Without<Player>)>,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
@@ -139,7 +153,7 @@ fn handle_new_scene_entities_parent_chunk(
     mut proto_params: ProtoParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
-    for (e, children) in new_scenes.iter() {
+    for (e, children, scene_txfm) in new_scenes.iter() {
         let mut x_offset: f32 = 1_000_000_000.;
         let mut y_offset: f32 = 1_000_000_000.;
         for child in children.iter() {
@@ -152,20 +166,42 @@ fn handle_new_scene_entities_parent_chunk(
                 }
             }
         }
-        println!("{:?} {:?}", x_offset, y_offset);
         for child in children.iter() {
             if let Ok((obj, txfm)) = obj_data.get(*child) {
-                let pos = txfm.translation().truncate() - Vec2::new(x_offset, y_offset)
-                    + game.game.player_state.position.truncate();
-                obj.spawn_and_save_block(
-                    &mut proto_commands,
-                    &prototypes,
-                    pos,
-                    &mut minimap_event,
-                    &mut proto_params,
-                    &game,
-                    &mut commands,
-                );
+                let pos = scene_txfm.translation.truncate()
+                    + (txfm.translation().truncate() - Vec2::new(x_offset, y_offset));
+
+                let mut is_valid_to_spawn = false;
+                if let Some(tile_data) = game.get_tile_data(world_pos_to_tile_pos(pos)) {
+                    let tile_type = tile_data.block_type;
+
+                    let filter = game
+                        .world_generation_params
+                        .obj_allowed_tiles_map
+                        .get(obj)
+                        .unwrap()
+                        .clone();
+                    for allowed_tile in filter.iter() {
+                        if tile_type.contains(allowed_tile) {
+                            is_valid_to_spawn = true;
+                        }
+                    }
+                } else {
+                    is_valid_to_spawn = true;
+                }
+                if is_valid_to_spawn {
+                    obj.spawn_and_save_block(
+                        &mut proto_commands,
+                        &prototypes,
+                        pos,
+                        &mut minimap_event,
+                        &mut proto_params,
+                        &mut game,
+                        &mut commands,
+                    );
+                } else {
+                    println!("did not spawn, Invalid tile type for object: {:?}", obj);
+                }
             }
         }
         commands.entity(e).despawn_recursive();

@@ -3,10 +3,14 @@ use bevy::{
     reflect::{FromReflect, Reflect},
     sprite::MaterialMesh2dBundle,
     time::{Timer, TimerMode},
+    utils::HashMap,
 };
 use bevy_proto::{
     backend::schematics::FromSchematicInput,
-    prelude::{PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
+    prelude::{
+        prototype_ready, ProtoCommands, PrototypesMut, ReflectSchematic, Schematic,
+        SchematicContext,
+    },
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
 
@@ -23,7 +27,7 @@ use crate::{
         Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject,
     },
     world::WorldObjectEntityData,
-    YSort,
+    CustomFlush, GameState, YSort,
 };
 pub struct ProtoPlugin;
 
@@ -63,8 +67,16 @@ impl Plugin for ProtoPlugin {
             .register_type::<ColliderProto>()
             .register_type::<AnimationTimerProto>()
             .register_type::<AnimationPosTracker>()
+            .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
+            .register_type::<Vec<WorldObject>>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
-            .add_startup_system(Self::load_prototypes);
+            .add_system(apply_system_buffers.in_set(CustomFlush))
+            .add_startup_system(Self::load_prototypes.before(CustomFlush))
+            .add_system(
+                Self::spawn_proto_resources
+                    .in_schedule(OnEnter(GameState::Main))
+                    .run_if(prototype_ready("WorldGenerationParams").and_then(run_once())),
+            );
     }
 }
 
@@ -73,6 +85,8 @@ impl ProtoPlugin {
         println!("Loading prototypes...");
         //TODO: automate this
         prototypes.load("proto/tree.prototype.ron");
+        prototypes.load("proto/WorldGenerationParams.prototype.ron");
+        prototypes.load("proto/DungeonWorldGenerationParams.prototype.ron");
         prototypes.load("proto/obj_stonewall.prototype.ron");
         prototypes.load("proto/stonewall.prototype.ron");
         prototypes.load("proto/projectile.prototype.ron");
@@ -88,6 +102,10 @@ impl ProtoPlugin {
         prototypes.load("proto/flint.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");
+    }
+    fn spawn_proto_resources(mut commands: ProtoCommands) {
+        println!("Spawning proto resources...");
+        commands.apply("WorldGenerationParams");
     }
 }
 #[derive(Schematic, Reflect, FromReflect)]

@@ -43,14 +43,12 @@ pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
 pub struct ChunkManager {
     pub chunks: HashMap<ReflectedPos, Entity>,
     // turn into comp for each tile
-    pub world_generation_params: WorldGeneration,
 }
 
 impl ChunkManager {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
-            world_generation_params: WorldGeneration::default(),
         }
     }
 }
@@ -65,6 +63,14 @@ pub struct TileMapPositionData {
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
 }
+impl TileMapPositionData {
+    pub fn new(chunk_pos: IVec2, tile_pos: TilePos) -> Self {
+        Self {
+            chunk_pos,
+            tile_pos,
+        }
+    }
+}
 
 #[derive(
     Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Schematic,
@@ -77,7 +83,9 @@ pub struct WorldObjectEntityData {
     pub texture_offset: u8,
 }
 
-#[derive(Default, Debug, Reflect, Clone)]
+#[derive(Resource, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
+#[reflect(Schematic)]
+#[schematic(kind = "resource")]
 pub struct WorldGeneration {
     pub water_frequency: f64,
     pub dungeon_stone_frequency: f64,
@@ -85,11 +93,13 @@ pub struct WorldGeneration {
     pub dirt_frequency: f64,
     pub stone_frequency: f64,
     pub tree_frequency: f64,
+    pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(GenerationPlugin)
+        app.insert_resource(WorldGeneration::default())
+            .add_plugin(GenerationPlugin)
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
             .add_plugin(DungeonPlugin)

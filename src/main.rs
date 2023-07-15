@@ -45,7 +45,7 @@ mod world;
 use animations::{AnimationTimer, AnimationsPlugin};
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
-use bevy_ecs_tilemap::TilemapPlugin;
+use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
 use client::ClientPlugin;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
@@ -58,7 +58,7 @@ use proto::ProtoPlugin;
 use schematic::SchematicPlugin;
 use ui::{FPSText, InventorySlotState, UIPlugin};
 use world::{
-    chunk::{Chunk, TileEntityCollection, TileSpriteData},
+    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPositionData, WorldObjectEntityData, WorldPlugin,
@@ -174,7 +174,9 @@ pub struct ImageAssets {
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
+    pub chunk_obj_cache: ResMut<'w, ChunkObjectCache>,
     pub chunk_manager: ResMut<'w, ChunkManager>,
+    pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
@@ -206,6 +208,24 @@ impl<'w, 's> GameParam<'w, 's> {
     }
     pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
         self.chunk_manager.chunks.insert(chunk_pos.into(), e);
+    }
+    pub fn add_object_to_chunk_cache(
+        &mut self,
+        chunk_pos: IVec2,
+        obj: WorldObject,
+        tile_pos: TilePos,
+    ) {
+        self.chunk_obj_cache
+            .cache
+            .entry(chunk_pos.into())
+            .or_insert_with(Vec::new)
+            .push((obj, tile_pos));
+    }
+    pub fn get_objects_from_chunk_cache(
+        &self,
+        chunk_pos: IVec2,
+    ) -> Option<&Vec<(WorldObject, TilePos)>> {
+        self.chunk_obj_cache.cache.get(&chunk_pos.into())
     }
     pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
         self.chunk_manager.chunks.remove(&chunk_pos.into());

@@ -251,9 +251,13 @@ impl ClientPlugin {
             }
             // snapshots.insert(*chunk_pos, snapshot);
         }
-        let mut state: SystemState<GameParam> = SystemState::new(world);
+        let mut state: SystemState<(GameParam, Commands)> = SystemState::new(world);
         for (chunk_pos, _) in saved_chunks.iter() {
-            state.get_mut(world).remove_chunk_entity(*chunk_pos);
+            let (mut game, mut commands) = state.get_mut(world);
+            commands
+                .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
+                .despawn_recursive();
+            game.remove_chunk_entity(*chunk_pos);
         }
 
         // let (mut game, mut commands, mut dim_query) = state.get_mut(world);
@@ -310,6 +314,7 @@ impl ClientPlugin {
             water_frequency: 0.15,
             stone_frequency: 0.0,
             dirt_frequency: 0.0,
+            obj_allowed_tiles_map: HashMap::default(),
         };
         let mut state: SystemState<EventWriter<DimensionSpawnEvent>> = SystemState::new(world);
         let mut dim_event = state.get_mut(world);

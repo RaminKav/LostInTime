@@ -4,8 +4,8 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use crate::{item::WorldObject, GameParam};
 
 use super::{
-    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile,
-    ChunkManager, TileMapPositionData, CHUNK_SIZE,
+    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile, TileMapPositionData,
+    WorldGeneration, CHUNK_SIZE,
 };
 
 pub struct TilePlugin;
@@ -27,7 +27,7 @@ impl TilePlugin {
         }
     }
     pub fn get_tile_from_perlin_noise(
-        chunk_manager: &ChunkManager,
+        world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
         tile_pos: TilePos,
         seed: u32,
@@ -46,11 +46,7 @@ impl TilePlugin {
             WorldObject::Sand,
         ];
         let sample = |x: f64, y: f64| -> (u8, WorldObject) {
-            if chunk_manager
-                .world_generation_params
-                .dungeon_stone_frequency
-                > 0.
-            {
+            if world_generation_params.dungeon_stone_frequency > 0. {
                 return (0, WorldObject::DungeonStone);
             }
             let e = noise_helpers::get_perlin_noise_for_tile(x, y, seed);
@@ -62,15 +58,11 @@ impl TilePlugin {
             // let m = f64::powf(m / (1. + 0.5 + 0.25), 1.);
             // print!("{:?}", e);
             // let m = f64::powf(m, 1.);
-            let block = if e <= chunk_manager.world_generation_params.water_frequency {
+            let block = if e <= world_generation_params.water_frequency {
                 WorldObject::Water
-            } else if e <= chunk_manager.world_generation_params.sand_frequency {
+            } else if e <= world_generation_params.sand_frequency {
                 WorldObject::Sand
-            } else if e
-                <= chunk_manager
-                    .world_generation_params
-                    .dungeon_stone_frequency
-            {
+            } else if e <= world_generation_params.dungeon_stone_frequency {
                 WorldObject::DungeonStone
             } else {
                 WorldObject::Grass

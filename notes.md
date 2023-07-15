@@ -155,10 +155,16 @@ impl different att styles w seldum_state
 - ui slot for off-hands (throwable or any right-clickable item)
 - rework tooltips to be a large display on the side?
 
-## Easy Features
+## Features
 
 [x] add healthbar to enemies
 [x] add damage numbers
+[x] Schematics: try out random structure spawns,
+[] `Blocked below` Dungeons: add item that tp to dungeon instance, spawned from schematic probably
+[] Items: add right-click ability items
+[] Items: add random roll stats, clean up naming of stats too
+[] Equipment: UI to equip, visuals pipeline
+[] UI: Containers, allow different UI inventory states to allow for chests, npcs
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
 - new types of projectile

@@ -2,10 +2,8 @@ use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::wall_auto_tile::{handle_wall_break, update_wall};
-use super::world_helpers::{
-    tile_pos_to_world_pos,
-};
-use super::{ChunkManager};
+use super::world_helpers::tile_pos_to_world_pos;
+use super::WorldGeneration;
 use crate::item::{Foliage, Wall, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -40,7 +38,7 @@ impl Plugin for GenerationPlugin {
 
 impl GenerationPlugin {
     fn get_perlin_block_at_tile(
-        chunk_manager: &ChunkManager,
+        world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
         tile_pos: TilePos,
         seed: u32,
@@ -49,28 +47,31 @@ impl GenerationPlugin {
         let y = tile_pos.y as f64;
         // dont need to use expencive noise fn if it will always
         // result in the same tile
-        if chunk_manager.world_generation_params.stone_frequency == 1. {
+        if world_generation_params.stone_frequency == 1. {
             return Some(WorldObject::Wall(Wall::StoneWall));
         }
         let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
         let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
         let e = noise_helpers::get_perlin_noise_for_tile(nx, ny, seed);
-        if e <= chunk_manager.world_generation_params.stone_frequency {
+        if e <= world_generation_params.stone_frequency {
             return Some(WorldObject::Wall(Wall::StoneWall));
         }
         None
     }
     fn generate_stone_for_chunk(
-        chunk_manager: &ChunkManager,
+        world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
         seed: u32,
     ) -> Vec<(f32, f32, WorldObject)> {
         let mut stone_blocks: Vec<(f32, f32, WorldObject)> = vec![];
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                if let Some(block) =
-                    Self::get_perlin_block_at_tile(chunk_manager, chunk_pos, TilePos { x, y }, seed)
-                {
+                if let Some(block) = Self::get_perlin_block_at_tile(
+                    world_generation_params,
+                    chunk_pos,
+                    TilePos { x, y },
+                    seed,
+                ) {
                     stone_blocks.push((x as f32, y as f32, block));
                 }
             }
@@ -160,8 +161,8 @@ impl GenerationPlugin {
             let maybe_dungeon = dungeon.get_single();
 
             let raw_tree_points = noise_helpers::poisson_disk_sampling(
-                1.5 * TILE_SIZE.x as f64,
-                30,
+                2.5 * TILE_SIZE.x as f64,
+                30 * game.world_generation_params.tree_frequency as i8,
                 rand::thread_rng(),
             );
             tree_points = raw_tree_points
@@ -178,45 +179,30 @@ impl GenerationPlugin {
                         WorldObject::Foliage(Foliage::Tree),
                     )
                 })
-                .filter(|tp| {
-                    let tile = game
-                        .get_tile_data(TileMapPositionData {
-                            chunk_pos,
-                            tile_pos: TilePos {
-                                x: tp.0 as u32,
-                                y: tp.1 as u32,
-                            },
-                        })
-                        .unwrap()
-                        .block_type;
-                    if tile.contains(&WorldObject::Water)
-                        || tile.contains(&WorldObject::Sand)
-                        || tile.contains(&WorldObject::DungeonStone)
-                    {
-                        return false;
-                    }
-                    true
-                })
                 .collect::<Vec<(f32, f32, WorldObject)>>();
-            let stone_points =
-                Self::generate_stone_for_chunk(&game.chunk_manager, chunk_pos, seed.single().seed);
-            let objs = stone_points
+            let stone_points = Self::generate_stone_for_chunk(
+                &game.world_generation_params,
+                chunk_pos,
+                seed.single().seed,
+            );
+            let mut genned_objs = stone_points
+                .into_iter()
+                .chain(tree_points.into_iter())
+                .collect::<Vec<(f32, f32, WorldObject)>>();
+            if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
+                genned_objs = genned_objs
+                    .into_iter()
+                    .chain(
+                        cached_objs
+                            .into_iter()
+                            .map(|o| (o.1.x as f32, o.1.y as f32, o.0)),
+                    )
+                    .collect::<Vec<(f32, f32, WorldObject)>>();
+            }
+            let objs = genned_objs
                 .iter()
-                .chain(tree_points.iter())
                 .filter(|tp| {
-                    let tile = game
-                        .get_tile_data(TileMapPositionData {
-                            chunk_pos,
-                            tile_pos: TilePos {
-                                x: tp.0 as u32,
-                                y: tp.1 as u32,
-                            },
-                        })
-                        .unwrap()
-                        .block_type;
-                    if tile.contains(&WorldObject::Water) || tile.contains(&WorldObject::Sand) {
-                        return false;
-                    }
+                    // spawn walls in dungeon according to the generated grid layout
                     if let Ok(dungeon) = maybe_dungeon {
                         if chunk_pos.x < -1
                             || chunk_pos.x > 2
@@ -234,17 +220,43 @@ impl GenerationPlugin {
                             return false;
                         }
                     }
-                    true
+
+                    let tile = game
+                        .get_tile_data(TileMapPositionData {
+                            chunk_pos,
+                            tile_pos: TilePos {
+                                x: tp.0 as u32,
+                                y: tp.1 as u32,
+                            },
+                        })
+                        .unwrap()
+                        .block_type;
+                    let filter = game
+                        .world_generation_params
+                        .obj_allowed_tiles_map
+                        .get(&tp.2)
+                        .unwrap();
+                    for allowed_tile in filter.iter() {
+                        if tile.contains(allowed_tile) {
+                            return true;
+                        }
+                    }
+                    false
                 })
                 .map(|tp| *tp)
                 .collect::<Vec<(f32, f32, WorldObject)>>();
 
-            // println!("SPAWNING OBJECTS FOR {chunk_pos:?} {:?}", objs.len(),);
             for obj_data in objs.clone().iter() {
                 let tile_pos = TilePos {
                     x: obj_data.0 as u32,
                     y: obj_data.1 as u32,
                 };
+                if let Some(_existing_object) =
+                    game.get_obj_entity_at_tile(TileMapPositionData::new(chunk_pos, tile_pos))
+                {
+                    warn!("obj exists here {chunk_pos}, {tile_pos:?}");
+                    continue;
+                }
                 let obj = match obj_data.2 {
                     WorldObject::Foliage(obj) => proto_commands.spawn_object_from_proto(
                         obj,

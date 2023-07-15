@@ -63,8 +63,8 @@ impl DimensionPlugin {
     ) {
         for new_dim in spawn_event.iter() {
             println!("SPAWNING NEW DIMENSION");
-            let mut cm = ChunkManager::new();
-            cm.world_generation_params = new_dim.generation_params.clone();
+            let cm = ChunkManager::new();
+            commands.insert_resource(new_dim.generation_params.clone());
             let dim_e = commands
                 .spawn((
                     Dimension,

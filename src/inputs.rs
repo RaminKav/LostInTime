@@ -83,10 +83,11 @@ impl Plugin for InputsPlugin {
                     Self::mouse_click_system.after(CustomFlush),
                     Self::handle_hotbar_key_input,
                     Self::update_cursor_pos.after(Self::move_player),
+                    Self::toggle_inventory,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(Self::toggle_inventory);
+            );
+        // .add_system(Self::toggle_inventory);
     }
 }
 
@@ -230,7 +231,7 @@ impl InputsPlugin {
         }
 
         if key_input.just_pressed(KeyCode::P) {
-            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands);
+            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
         }
         if key_input.just_pressed(KeyCode::L) {
             let pos = tile_pos_to_world_pos(TileMapPositionData {
@@ -344,7 +345,7 @@ impl InputsPlugin {
         prototypes: Prototypes,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
-        game: GameParam,
+        mut game: GameParam,
         mut proto_params: ProtoParam,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
         mut attack_event: EventWriter<AttackEvent>,
@@ -392,7 +393,7 @@ impl InputsPlugin {
             attack_event.send(AttackEvent);
 
             // println!(
-            //     "TILE {cursor_chunk_pos:?} {cursor_tile_pos:?} {:?} {:?} PLAYER: {player_pos:?}",
+            //     "C: {cursor_chunk_pos:?}  T: {cursor_tile_pos:?} {:?} {:?} P: {player_pos:?}",
             //     game.get_tile_data(TileMapPositionData {
             //         chunk_pos: cursor_chunk_pos,
             //         tile_pos: cursor_tile_pos
@@ -453,7 +454,7 @@ impl InputsPlugin {
                         cursor_pos.world_coords.truncate(),
                         &mut minimap_event,
                         &mut proto_params,
-                        &game,
+                        &mut game,
                         &mut commands,
                     ) {
                         inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);

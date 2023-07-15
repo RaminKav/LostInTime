@@ -1,0 +1,821 @@
+(
+  entities: {
+    4553: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 0.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 512.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    4558: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 192.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 704.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    4560: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 0.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 512.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    5628: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 32.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 544.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    5649: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 480.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 480.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    5650: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 96.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 608.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    5657: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 32.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 544.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6834: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 32.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 544.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6843: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 448.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 448.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6845: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 448.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 448.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6860: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 128.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 640.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6874: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 96.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 608.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6875: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 448.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 448.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6876: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 96.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 608.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6877: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 480.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 480.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6882: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 160.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 672.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6902: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 192.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 704.0,
+            y: 192.0,
+            z: 449.70056,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6917: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 192.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 704.0,
+            y: 160.0,
+            z: 449.75046,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+    6928: (
+      components: {
+        "bevy_transform::components::transform::Transform": (
+          translation: (
+            x: 160.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+          rotation: (0.0, 0.0, 0.0, 1.0),
+          scale: (
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+          ),
+        ),
+        "bevy_transform::components::global_transform::GlobalTransform": ((
+          matrix3: (
+            x_axis: (
+              x: 1.0,
+              y: 0.0,
+              z: 0.0,
+            ),
+            y_axis: (
+              x: 0.0,
+              y: 1.0,
+              z: 0.0,
+            ),
+            z_axis: (
+              x: 0.0,
+              y: 0.0,
+              z: 1.0,
+            ),
+          ),
+          translation: (
+            x: 672.0,
+            y: 128.0,
+            z: 449.80035,
+          ),
+        )),
+        "survival_rogue_like::item::WorldObject": Wall(StoneWall),
+        "survival_rogue_like::item::Wall": StoneWall,
+      },
+    ),
+  },
+)
