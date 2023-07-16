@@ -165,6 +165,7 @@ impl different att styles w seldum_state
 [] Items: add random roll stats, clean up naming of stats too
 [] Equipment: UI to equip, visuals pipeline
 [] UI: Containers, allow different UI inventory states to allow for chests, npcs
+[] Add colliders to water (use corners)
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
 - new types of projectile

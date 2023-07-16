@@ -39,7 +39,7 @@ impl CollisionPlugion {
         parent_attack: Query<&Attack>,
         mut hit_event: EventWriter<HitEvent>,
         game: Res<Game>,
-        inv_state: Query<&InventoryState>,
+        inv_state: Res<InventoryState>,
         mut inv: Query<&mut Inventory>,
         world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     ) {
@@ -53,11 +53,8 @@ impl CollisionPlugion {
                 if !game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
                     return;
                 }
-                if let Some(Some(wep)) = inv
-                    .single()
-                    .clone()
-                    .items
-                    .get(inv_state.single().active_hotbar_slot)
+                if let Some(Some(wep)) =
+                    inv.single().clone().items.get(inv_state.active_hotbar_slot)
                 {
                     wep.modify_attributes(
                         AttributeModifier {

@@ -127,7 +127,7 @@ impl Plugin for AttributesPlugin {
                 (
                     Self::clamp_health,
                     Self::add_current_health_with_max_health,
-                    Self::handle_item_attribute_change,
+                    Self::handle_update_inv_item_entities,
                     Self::handle_player_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -167,29 +167,21 @@ impl AttributesPlugin {
             new_att.add_attribute_components(&mut commands.entity(player));
         }
     }
-    fn handle_item_attribute_change(
+    /// when items in the inventory state change, update the matching entities in the UI
+    fn handle_update_inv_item_entities(
         mut inv: Query<&mut Inventory, Changed<Inventory>>,
         mut inv_slot_state: Query<&mut InventorySlotState>,
-        mut att_event: EventWriter<AttributeChangeEvent>,
+        mut commands: Commands,
     ) {
-        if let Ok(mut inv) = inv.get_single_mut() {
+        if let Ok(inv) = inv.get_single_mut() {
             for inv_item_option in inv.clone().items.iter() {
                 if let Some(inv_item) = inv_item_option {
-                    let mut item = inv_item.item_stack.clone();
-
-                    let new_meta = ItemDisplayMetaData {
-                        name: item.metadata.name.clone(),
-                        desc: item.metadata.desc.clone(),
-                    };
-                    item.metadata = new_meta;
-                    inv.items[inv_item.slot] = Some(InventoryItemStack {
-                        item_stack: item,
-                        slot: inv_item.slot,
-                    });
-                    att_event.send(AttributeChangeEvent);
-                    for mut slot_state in inv_slot_state.iter_mut() {
+                    let item = inv_item.item_stack.clone();
+                    for slot_state in inv_slot_state.iter_mut() {
                         if slot_state.slot_index == inv_item.slot {
-                            slot_state.dirty = true;
+                            if let Some(item_e) = slot_state.item {
+                                commands.entity(item_e).insert(item.clone());
+                            }
                         }
                     }
                 }
