@@ -69,6 +69,7 @@ impl Plugin for PlayerPlugin {
             app.add_event::<MovePlayerEvent>();
         })
         .add_startup_system(spawn_player)
+        .add_system(test_swap_armor_texture)
         .add_system(
             handle_move_player
                 .in_set(CoreGameSet::Main)
@@ -154,10 +155,16 @@ fn spawn_player(
             "textures/player/player-run-down/player-{}-run-down-source-0.png",
             l.to_string().to_lowercase()
         ));
-        let limb_texture_handle = asset_server.load(format!(
+
+        let limb_texture_asset = format!(
             "textures/player/player-texture-{}.png",
-            l.to_string().to_lowercase()
-        ));
+            if l == Limb::Torso || l == Limb::Hands {
+                Limb::Torso.to_string().to_lowercase()
+            } else {
+                l.to_string().to_lowercase()
+            }
+        );
+        let limb_texture_handle = asset_server.load(limb_texture_asset);
         // let limb_texture_atlas =
         //     TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
 
@@ -214,6 +221,8 @@ fn spawn_player(
                 items: [INVENTORY_INIT; INVENTORY_SIZE],
                 crafting_items: [INVENTORY_INIT; 4],
                 crafting_result_item: None,
+                equipment_items: [INVENTORY_INIT; 4],
+                accessory_items: [INVENTORY_INIT; 4],
             },
             ItemAttributes {
                 health: 100,
@@ -243,4 +252,20 @@ fn spawn_player(
         .push_children(&limb_children)
         .id();
     game.player = p;
+}
+pub fn test_swap_armor_texture(
+    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+    keys: Res<Input<KeyCode>>,
+) {
+    if keys.just_pressed(KeyCode::F) {
+        for (mat, limb) in player_limbs.iter() {
+            if limb == &Limb::Torso || limb == &Limb::Hands {
+                let mut mat = materials.get_mut(mat).unwrap();
+                let armor_texture_handle = asset_server.load("textures/player/armor-torso.png");
+                mat.lookup_texture = Some(armor_texture_handle);
+            }
+        }
+    }
 }

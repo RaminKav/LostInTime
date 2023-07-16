@@ -9,12 +9,12 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
-use crate::inventory::Inventory;
+use crate::inventory::{Inventory, CHEST_SIZE, INVENTORY_INIT};
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, InventoryState};
+use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, InventoryUIState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{
@@ -193,16 +193,23 @@ impl InputsPlugin {
     pub fn toggle_inventory(
         game: GameParam,
         key_input: ResMut<Input<KeyCode>>,
-        mut inv_query: Query<(&mut Visibility, &mut InventoryState)>,
+        mut inv_state: ResMut<InventoryState>,
         mut commands: Commands,
         mut proto_commands: ProtoCommands,
         proto: ProtoParam,
         mut inv: Query<&mut Inventory>,
+        mut next_inv_state: ResMut<NextState<InventoryUIState>>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
-            let mut inv_state = inv_query.single_mut().1;
             inv_state.open = !inv_state.open;
         }
+        if key_input.just_pressed(KeyCode::C) {
+            commands.insert_resource(ChestInventory {
+                items: [INVENTORY_INIT; CHEST_SIZE],
+                parent: Entity::from_raw(0),
+            })
+        }
+
         if key_input.just_pressed(KeyCode::E) {
             proto_commands.spawn_item_from_proto(
                 WorldObject::BasicStaff,
@@ -271,7 +278,7 @@ impl InputsPlugin {
     fn handle_hotbar_key_input(
         mut game: GameParam,
         mut key_input: ResMut<Input<KeyCode>>,
-        mut inv_state: Query<&mut InventoryState>,
+        mut inv_state: ResMut<InventoryState>,
     ) {
         for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
             if key_input.just_pressed(*key) {
@@ -351,19 +358,17 @@ impl InputsPlugin {
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
-        inv_query: Query<(&mut Visibility, &InventoryState)>,
+        inv_state: Res<InventoryState>,
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut inv: Query<&mut Inventory>,
         parent_attack: Query<&Attack>,
         tool_query: Query<&RangedAttack, With<Equipment>>,
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     ) {
-        let inv_state = inv_query.get_single();
-        if let Ok(inv_state) = inv_state {
-            if inv_state.0 == Visibility::Inherited {
-                return;
-            }
+        if inv_state.open {
+            return;
         }
+
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
             if att_cooldown_query.single().1.is_some() {
@@ -438,7 +443,7 @@ impl InputsPlugin {
                 return;
             }
 
-            let hotbar_slot = inv_state.unwrap().1.active_hotbar_slot;
+            let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items[hotbar_slot].clone();
             if let Some(mut held_item) = held_item_option {
                 if let Some(places_into_item) = game

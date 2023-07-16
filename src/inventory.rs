@@ -10,12 +10,15 @@ use bevy::prelude::*;
 use bevy_proto::prelude::*;
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
+pub const CHEST_SIZE: usize = 6 * 2;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
 pub const MAX_STACK_SIZE: usize = 16;
 
 #[derive(Component, Debug, Clone)]
 pub struct Inventory {
     pub items: [Option<InventoryItemStack>; INVENTORY_SIZE],
+    pub equipment_items: [Option<InventoryItemStack>; 4],
+    pub accessory_items: [Option<InventoryItemStack>; 4],
     pub crafting_items: [Option<InventoryItemStack>; 4],
     pub crafting_result_item: Option<InventoryItemStack>,
 }
@@ -68,7 +71,6 @@ impl InventoryItemStack {
             slot: self.slot,
         };
         inv.single_mut().items[self.slot] = Some(inv_stack.clone());
-
         inv_stack
     }
     pub fn modify_count(&mut self, amount: i8) -> Option<Self> {

@@ -606,13 +606,13 @@ impl ItemsPlugin {
     fn update_held_hotbar_item(
         mut commands: Commands,
         mut game_param: GameParam,
-        inv_state: Query<&mut InventoryState>,
+        inv_state: Res<InventoryState>,
         mut inv: Query<&mut Inventory>,
         item_stack_query: Query<&ItemAttributes>,
         mut att_event: EventWriter<AttributeChangeEvent>,
         proto: ProtoParam,
     ) {
-        let active_hotbar_slot = inv_state.single().active_hotbar_slot;
+        let active_hotbar_slot = inv_state.active_hotbar_slot;
         let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
         let player_data = &mut game_param.game.player_state;
         let prev_held_item_data = &player_data.main_hand_slot;
