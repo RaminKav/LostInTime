@@ -613,7 +613,7 @@ impl ItemsPlugin {
         proto: ProtoParam,
     ) {
         let active_hotbar_slot = inv_state.active_hotbar_slot;
-        let active_hotbar_item = inv.single_mut().items[active_hotbar_slot].clone();
+        let active_hotbar_item = inv.single_mut().items.items[active_hotbar_slot].clone();
         let player_data = &mut game_param.game.player_state;
         let prev_held_item_data = &player_data.main_hand_slot;
         if let Some(new_item) = active_hotbar_item {

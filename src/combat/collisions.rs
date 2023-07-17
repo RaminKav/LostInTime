@@ -53,8 +53,12 @@ impl CollisionPlugion {
                 if !game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
                     return;
                 }
-                if let Some(Some(wep)) =
-                    inv.single().clone().items.get(inv_state.active_hotbar_slot)
+                if let Some(Some(wep)) = inv
+                    .single()
+                    .clone()
+                    .items
+                    .items
+                    .get(inv_state.active_hotbar_slot)
                 {
                     wep.modify_attributes(
                         AttributeModifier {
@@ -133,7 +137,7 @@ impl CollisionPlugion {
                 // ...and the entity is an item stack, add it to the player's inventory
 
                 let item_stack = items_query.get(e2).unwrap().clone();
-                item_stack.add_to_inventory(&mut inv, &mut game.inv_slot_query);
+                item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
 
                 game.world_obj_data.drop_entities.remove(&e2);
                 commands.entity(e2).despawn();

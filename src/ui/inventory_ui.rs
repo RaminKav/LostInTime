@@ -163,7 +163,7 @@ pub fn setup_inv_slots_ui(
         InventoryUIState::Chest => (false, false),
         _ => return,
     };
-    for (slot_index, item) in inv.single_mut().items.iter().enumerate() {
+    for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
         spawn_inv_slot(
             &mut commands,
             &inv_state,
@@ -193,7 +193,7 @@ pub fn setup_inv_slots_ui(
             );
         }
         // crafting result slot
-        if slot_index == 0 && should_spawn_crafting {
+        if slot_index == 4 && should_spawn_crafting {
             spawn_inv_slot(
                 &mut commands,
                 &inv_state,
@@ -292,7 +292,7 @@ pub fn toggle_inv_visibility(
                 parent_interactable_entity: e,
                 stack_empty: true,
             });
-            inv.single_mut().crafting_items[state.slot_index] = None;
+            inv.single_mut().crafting_items.items[state.slot_index] = None;
         }
     }
 }
@@ -492,9 +492,13 @@ pub fn change_hotbar_slot(
     inv_state: &mut InventoryState,
     inv_slots: &mut Query<&mut InventorySlotState>,
 ) {
-    InventoryPlugin::mark_slot_dirty(inv_state.active_hotbar_slot, inv_slots);
+    InventoryPlugin::mark_slot_dirty(
+        inv_state.active_hotbar_slot,
+        InventorySlotType::Hotbar,
+        inv_slots,
+    );
     inv_state.active_hotbar_slot = slot;
-    InventoryPlugin::mark_slot_dirty(slot, inv_slots);
+    InventoryPlugin::mark_slot_dirty(slot, InventorySlotType::Hotbar, inv_slots);
 }
 pub fn update_inventory_ui(
     mut commands: Commands,
@@ -505,7 +509,8 @@ pub fn update_inventory_ui(
     inv_ui_state: Res<State<InventoryUIState>>,
     inv_query: Query<Entity, With<InventoryUI>>,
     asset_server: Res<AssetServer>,
-    mut inv: Query<&mut Inventory>,
+    inv: Query<&mut Inventory>,
+    chest_option: Option<Res<ChestInventory>>,
 ) {
     for (e, slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
@@ -518,12 +523,13 @@ pub fn update_inventory_ui(
         }
 
         let interactable_option = interactables.get(e);
-        let item_option = if slot_state.r#type.is_crafting() {
-            inv.single_mut().crafting_items[slot_state.slot_index].clone()
-        } else if slot_state.r#type.is_crafting_result() {
-            inv.single_mut().crafting_result_item.clone()
+        let item_option = if slot_state.r#type.is_chest() {
+            chest_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else {
-            inv.single_mut().items[slot_state.slot_index].clone()
+            inv.single()
+                .get_items_from_slot_type(slot_state.r#type)
+                .items[slot_state.slot_index]
+                .clone()
         };
         let real_count = if let Some(item) = item_option.clone() {
             Some(item.item_stack.count)

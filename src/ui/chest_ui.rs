@@ -2,7 +2,7 @@ pub use bevy::prelude::*;
 
 use crate::{
     assets::Graphics,
-    inventory::{InventoryItemStack, CHEST_SIZE},
+    inventory::{Container, InventoryItemStack, CHEST_SIZE},
 };
 
 use super::{
@@ -11,7 +11,7 @@ use super::{
 };
 #[derive(Component, Resource, Debug, Clone)]
 pub struct ChestInventory {
-    pub items: [Option<InventoryItemStack>; CHEST_SIZE],
+    pub items: Container,
     pub parent: Entity,
 }
 
@@ -32,7 +32,7 @@ pub fn setup_chest_slots_ui(
     if inv_state.0 != InventoryUIState::Chest {
         return;
     };
-    for (slot_index, item) in inv.items.iter().enumerate() {
+    for (slot_index, item) in inv.items.items.iter().enumerate() {
         spawn_inv_slot(
             &mut commands,
             &inv_state,
