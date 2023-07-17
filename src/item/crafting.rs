@@ -38,7 +38,7 @@ impl CraftingPlugin {
         proto: ProtoParam,
     ) {
         for _ in events.iter() {
-            let crafting_slots = &inv.single().crafting_items;
+            let crafting_slots = &inv.single().crafting_items.items;
             let mut recipe: CraftingGrid = [[None; 2]; 2];
             for stack_option in crafting_slots.iter() {
                 if let Some(stack) = stack_option {
@@ -74,7 +74,7 @@ impl CraftingPlugin {
             } else {
                 None
             };
-            inv.single_mut().crafting_result_item = result_option;
+            inv.single_mut().crafting_items.items[4] = result_option;
         }
     }
     fn handle_recipe_complete(
@@ -83,8 +83,8 @@ impl CraftingPlugin {
         mut inv: Query<&mut Inventory>,
     ) {
         for _ in events.iter() {
-            inv.single_mut().crafting_result_item = None;
-            for crafting_item_option in inv.single_mut().crafting_items.iter_mut() {
+            inv.single_mut().crafting_items.items[4] = None;
+            for crafting_item_option in inv.single_mut().crafting_items.items.iter_mut() {
                 if let Some(crafting_item) = crafting_item_option.as_mut() {
                     if let Some(remaining_item) = crafting_item.modify_count(-1) {
                         *crafting_item = remaining_item;

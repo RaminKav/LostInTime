@@ -84,7 +84,7 @@ pub fn setup_hotbar_hud(
     mut inv: Query<&mut Inventory>,
     inv_ui_state: Res<State<InventoryUIState>>,
 ) {
-    for (slot_index, item) in inv.single_mut().items.iter().enumerate() {
+    for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
         // hotbar slots
         if slot_index <= 5 {
             spawn_inv_slot(

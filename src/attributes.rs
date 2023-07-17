@@ -4,7 +4,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use crate::{
     inventory::{Inventory, InventoryItemStack},
     item::{Equipment, ItemDisplayMetaData},
-    ui::InventorySlotState,
+    ui::{InventorySlotState, InventorySlotType, InventoryState},
     CustomFlush, GameState, Player,
 };
 
@@ -167,18 +167,25 @@ impl AttributesPlugin {
             new_att.add_attribute_components(&mut commands.entity(player));
         }
     }
+
     /// when items in the inventory state change, update the matching entities in the UI
     fn handle_update_inv_item_entities(
         mut inv: Query<&mut Inventory, Changed<Inventory>>,
         mut inv_slot_state: Query<&mut InventorySlotState>,
+        inv_state: Res<InventoryState>,
         mut commands: Commands,
     ) {
+        if !inv_state.open {
+            return;
+        }
         if let Ok(inv) = inv.get_single_mut() {
-            for inv_item_option in inv.clone().items.iter() {
+            for inv_item_option in inv.clone().items.items.iter() {
                 if let Some(inv_item) = inv_item_option {
                     let item = inv_item.item_stack.clone();
                     for slot_state in inv_slot_state.iter_mut() {
-                        if slot_state.slot_index == inv_item.slot {
+                        if slot_state.slot_index == inv_item.slot
+                            && slot_state.r#type == InventorySlotType::Normal
+                        {
                             if let Some(item_e) = slot_state.item {
                                 commands.entity(item_e).insert(item.clone());
                             }

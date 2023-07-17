@@ -7,10 +7,13 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryPlugin, ItemStack},
     item::{CompleteRecipeEvent, CraftingSlotUpdateEvent},
+    ui::InventorySlotType,
     GameParam,
 };
 
-use super::{spawn_item_stack_icon, ui_helpers, InventorySlotState, InventoryState};
+use super::{
+    spawn_item_stack_icon, ui_helpers, ChestInventory, InventorySlotState, InventoryState,
+};
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
 pub enum UIElement {
@@ -159,12 +162,14 @@ pub fn handle_drop_on_slot_events(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
+    mut chest_option: Option<ResMut<ChestInventory>>,
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
     mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
         let no_more_dragging: bool;
+        let slot_type = drop_event.drop_target_slot_state.r#type;
         let return_item = if drop_event
             .drop_target_slot_state
             .r#type
@@ -172,16 +177,23 @@ pub fn handle_drop_on_slot_events(
         {
             InventoryPlugin::pick_up_and_merge_crafting_result_stack(
                 drop_event.dropped_item_stack.clone(),
-                &mut inv,
+                &mut inv.single_mut().crafting_items,
                 &mut complete_recipe_event,
             )
         } else {
+            let mut inv = inv.single_mut();
+            let container = if slot_type == InventorySlotType::Chest {
+                &mut chest_option.as_mut().unwrap().items
+            } else {
+                inv.get_mut_items_from_slot_type(slot_type)
+            };
+
             InventoryPlugin::drop_item_on_slot(
                 drop_event.dropped_item_stack.clone(),
                 drop_event.drop_target_slot_state.slot_index,
-                &mut inv,
+                container,
                 &mut game.inv_slot_query,
-                drop_event.drop_target_slot_state.r#type,
+                slot_type,
             )
         };
 
@@ -194,7 +206,7 @@ pub fn handle_drop_on_slot_events(
             no_more_dragging = drop_event.stack_empty;
         }
 
-        if drop_event.drop_target_slot_state.r#type.is_crafting() {
+        if slot_type.is_crafting() {
             crafting_slot_event.send(CraftingSlotUpdateEvent);
         }
 
@@ -256,6 +268,7 @@ pub fn handle_hovering(
     graphics: Res<Graphics>,
     mut commands: Commands,
     inv: Query<&Inventory>,
+    chest_option: Option<Res<ChestInventory>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     // iter all interactables, find ones in hover state.
@@ -277,19 +290,13 @@ pub fn handle_hovering(
                 );
 
                 if let Some(_item_e) = state.item {
-                    let item = if state.r#type.is_crafting() {
-                        inv.single().crafting_items[state.slot_index]
-                            .clone()
-                            .unwrap()
-                            .item_stack
-                    } else if state.r#type.is_crafting_result() {
-                        inv.single()
-                            .crafting_result_item
+                    let item = if state.r#type.is_chest() {
+                        chest_option.as_ref().unwrap().items.items[state.slot_index]
                             .clone()
                             .unwrap()
                             .item_stack
                     } else {
-                        inv.single().items[state.slot_index]
+                        inv.single().get_items_from_slot_type(state.r#type).items[state.slot_index]
                             .clone()
                             .unwrap()
                             .item_stack
@@ -426,6 +433,7 @@ pub fn handle_cursor_update(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
+    mut chest_option: Option<ResMut<ChestInventory>>,
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
     mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
 ) {
@@ -456,14 +464,22 @@ pub fn handle_cursor_update(
                                     .insert(DraggedItem);
 
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
+                                let mut inv = inv.single_mut();
+                                let container_items = if state.r#type.is_chest() {
+                                    &mut chest_option.as_mut().unwrap().items
+                                } else {
+                                    inv.get_mut_items_from_slot_type(state.r#type)
+                                };
+
                                 if state.r#type.is_crafting() {
-                                    inv.single_mut().crafting_items[state.slot_index] = None;
                                     crafting_slot_event.send(CraftingSlotUpdateEvent);
-                                } else if state.r#type.is_crafting_result() {
+                                }
+                                if state.r#type.is_crafting_result() {
                                     complete_recipe_event.send(CompleteRecipeEvent);
                                 } else {
-                                    inv.single_mut().items[state.slot_index] = None;
+                                    container_items.items[state.slot_index] = None;
                                 }
+
                                 state.dirty = true;
                                 mouse_input.clear();
                             }
@@ -471,11 +487,18 @@ pub fn handle_cursor_update(
                     } else if right_mouse_pressed && !currently_dragging {
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
+                                let mut inv = inv.single_mut();
+                                let container = if state.r#type == InventorySlotType::Chest {
+                                    &mut chest_option.as_mut().unwrap().items
+                                } else {
+                                    inv.get_mut_items_from_slot_type(state.r#type)
+                                };
+
                                 let split_stack = InventoryPlugin::split_stack(
                                     item_icon.2.clone(),
                                     state.slot_index,
                                     &mut state,
-                                    &mut inv,
+                                    container,
                                 );
                                 let e = spawn_item_stack_icon(
                                     &mut commands,

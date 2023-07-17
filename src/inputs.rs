@@ -9,7 +9,7 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
-use crate::inventory::{Inventory, CHEST_SIZE, INVENTORY_INIT};
+use crate::inventory::{Container, Inventory, CHEST_SIZE, INVENTORY_INIT};
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
@@ -198,16 +198,20 @@ impl InputsPlugin {
         mut proto_commands: ProtoCommands,
         proto: ProtoParam,
         mut inv: Query<&mut Inventory>,
-        mut next_inv_state: ResMut<NextState<InventoryUIState>>,
+        chest_query: Query<&ChestInventory>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             inv_state.open = !inv_state.open;
         }
         if key_input.just_pressed(KeyCode::C) {
-            commands.insert_resource(ChestInventory {
-                items: [INVENTORY_INIT; CHEST_SIZE],
-                parent: Entity::from_raw(0),
-            })
+            let chest = commands.spawn_empty().id();
+            commands.entity(chest).insert(ChestInventory {
+                items: Container::with_size(CHEST_SIZE),
+                parent: chest,
+            });
+        }
+        if key_input.just_pressed(KeyCode::V) {
+            commands.insert_resource(chest_query.single().clone());
         }
 
         if key_input.just_pressed(KeyCode::E) {
@@ -248,7 +252,7 @@ impl InputsPlugin {
             proto_commands.spawn_from_proto(NeutralMob::Slime, &proto.prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
-            let item = inv.single().items[0].clone();
+            let item = inv.single().items.items[0].clone();
             if let Some(item) = item {
                 item.modify_attributes(
                     AttributeModifier {
@@ -444,7 +448,7 @@ impl InputsPlugin {
             }
 
             let hotbar_slot = inv_state.active_hotbar_slot;
-            let held_item_option = inv.single().items[hotbar_slot].clone();
+            let held_item_option = inv.single().items.items[hotbar_slot].clone();
             if let Some(mut held_item) = held_item_option {
                 if let Some(places_into_item) = game
                     .world_obj_data
@@ -462,7 +466,7 @@ impl InputsPlugin {
                         &mut game,
                         &mut commands,
                     ) {
-                        inv.single_mut().items[hotbar_slot] = held_item.modify_count(-1);
+                        inv.single_mut().items.items[hotbar_slot] = held_item.modify_count(-1);
                     }
                 }
             }
