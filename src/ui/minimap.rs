@@ -1,4 +1,5 @@
 use crate::assets::Graphics;
+use crate::colors::LIGHT_RED;
 use crate::enemy::Mob;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPositionData, CHUNK_SIZE};
@@ -120,9 +121,10 @@ impl MinimapPlugin {
                             let mut tile = tile_data.block_type;
                             if mobs.contains(&(chunk_pos, tile_pos)) {
                                 for _ in 0..2 {
-                                    data.push(230);
-                                    data.push(25);
-                                    data.push(25);
+                                    let c = LIGHT_RED;
+                                    data.push((c.r() * 255.) as u8);
+                                    data.push((c.g() * 255.) as u8);
+                                    data.push((c.b() * 255.) as u8);
                                     data.push(255);
                                 }
                                 continue;
@@ -139,9 +141,10 @@ impl MinimapPlugin {
                             for i in 0..2 {
                                 //Copy 1 pixel at index 0,1 2,3
                                 let c = tile[i + offset].get_minimap_color();
-                                data.push(c.0);
-                                data.push(c.1);
-                                data.push(c.2);
+
+                                data.push((c.r() * 255.) as u8);
+                                data.push((c.g() * 255.) as u8);
+                                data.push((c.b() * 255.) as u8);
                                 data.push(255);
                             }
                         } else {

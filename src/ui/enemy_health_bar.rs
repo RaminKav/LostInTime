@@ -3,6 +3,7 @@ use rand::Rng;
 
 use crate::{
     attributes::{CurrentHealth, MaxHealth},
+    colors::{BLACK, RED, YELLOW},
     combat::HitEvent,
     enemy::Mob,
 };
@@ -26,7 +27,7 @@ pub fn create_enemy_health_bar(
                     ..default()
                 },
                 sprite: Sprite {
-                    color: Color::rgba(0.5, 0.5, 0.5, 0.4),
+                    color: YELLOW,
                     ..default()
                 },
                 ..default()
@@ -40,7 +41,7 @@ pub fn create_enemy_health_bar(
                     ..default()
                 },
                 sprite: Sprite {
-                    color: Color::rgba(0.8, 0.1, 0.1, 0.8),
+                    color: RED,
                     ..default()
                 },
                 ..default()
@@ -92,12 +93,7 @@ pub fn handle_add_damage_numbers_after_hit(
                     TextStyle {
                         font: asset_server.load("fonts/Kitchen Sink.ttf"),
                         font_size: 8.0,
-                        color: Color::Rgba {
-                            red: 75. / 255.,
-                            green: 61. / 255.,
-                            blue: 68. / 255.,
-                            alpha: 1.,
-                        },
+                        color: BLACK,
                     },
                 ),
                 transform: Transform {

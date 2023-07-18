@@ -31,6 +31,7 @@ mod animations;
 mod assets;
 mod attributes;
 mod client;
+mod colors;
 mod combat;
 mod custom_commands;
 mod enemy;
