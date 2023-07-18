@@ -1,6 +1,7 @@
 use crate::animations::{AnimationPosTracker, AttackAnimationTimer};
 use crate::assets::{Graphics, WorldObjectData};
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
+use crate::colors::{BLACK, BLUE, DARK_GREEN, GREEN, GREY, YELLOW};
 use crate::combat::ObjBreakEvent;
 use crate::inputs::FacingDirection;
 use crate::inventory::{Inventory, InventoryItemStack, ItemStack};
@@ -505,17 +506,16 @@ impl WorldObject {
             .insert(item, (stack, transform));
         item
     }
-    pub fn get_minimap_color(&self) -> (u8, u8, u8) {
+    pub fn get_minimap_color(&self) -> Color {
         match self {
-            WorldObject::None => (255, 70, 255),
-            WorldObject::Grass => (113, 133, 51),
-            WorldObject::Wall(_) => (171, 155, 142),
-            WorldObject::DungeonStone => (53, 53, 57),
-            WorldObject::Water => (87, 72, 82),
-            WorldObject::Sand => (210, 201, 165),
-            WorldObject::Foliage(_) => (119, 116, 59),
-            WorldObject::Placeable(_) => (255, 70, 255),
-            _ => (255, 70, 255),
+            WorldObject::None => BLACK,
+            WorldObject::Grass => GREEN,
+            WorldObject::Wall(_) => GREY,
+            WorldObject::DungeonStone => BLACK,
+            WorldObject::Water => BLUE,
+            WorldObject::Sand => YELLOW,
+            WorldObject::Foliage(_) => DARK_GREEN,
+            _ => BLACK,
         }
     }
 }

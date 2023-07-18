@@ -3,6 +3,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
+    colors::RED,
     inventory::Inventory,
     player::Player,
     GAME_HEIGHT, GAME_WIDTH,
@@ -17,7 +18,7 @@ pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
     let inner_health = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: Color::rgba(121. / 255., 68. / 255., 74. / 255., 1.),
+                color: RED,
                 custom_size: Some(Vec2::new(62.0, 7.0)),
                 anchor: Anchor::CenterLeft,
                 ..default()
