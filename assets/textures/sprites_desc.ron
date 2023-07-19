@@ -78,7 +78,7 @@
             places_into: None
         ),
         Sword: WorldObjectData(
-            texture_pos: (64., 64.),
+            texture_pos: (48., 64.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
             collider: true,
@@ -89,7 +89,7 @@
             places_into: None
         ),
         Dagger: WorldObjectData(
-            texture_pos: (64., 80.),
+            texture_pos: (64., 64.),
             size: (16., 16.),
             anchor: Some((0.2, 0.25)),
             collider: true,
@@ -134,27 +134,33 @@
         ),
     },
     icons : {
-        DungeonStone: WorldObjectData(
+        DungeonStone: SpriteData(
             texture_pos: (32., 96.),
             size: (16., 16.),
-            anchor: None,
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
         ),
-        Wall(StoneWall): WorldObjectData(
+        Wall(StoneWall): SpriteData(
             texture_pos: (16., 96.),
             size: (16., 16.),
-            anchor: None,
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
+        ),
+        FireStaff: SpriteData(
+            texture_pos: (80., 80.),
+            size: (16., 16.),
+        ),
+        BasicStaff: SpriteData(
+            texture_pos: (96., 80.),
+            size: (16., 16.),
+        ),
+         DualStaff: SpriteData(
+            texture_pos: (112., 80.),
+            size: (16., 16.),
+        ),
+        Sword: SpriteData(
+            texture_pos: (48., 80.),
+            size: (16., 16.),
+        ),
+        Dagger: SpriteData(
+            texture_pos: (64., 80.),
+            size: (16., 16.),
         ),
     }
 )

@@ -60,12 +60,17 @@ impl WorldObjectData {
         }
     }
 }
+#[derive(Default, Clone, Copy, Debug, Deserialize)]
+pub struct SpriteData {
+    pub texture_pos: Vec2,
+    pub size: Vec2,
+}
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
 #[derive(Deserialize)]
 pub struct GraphicsDesc {
     items: HashMap<WorldObject, WorldObjectData>,
-    icons: HashMap<WorldObject, WorldObjectData>,
+    icons: HashMap<WorldObject, SpriteData>,
 }
 
 impl Plugin for GameAssetsPlugin {
@@ -257,7 +262,9 @@ impl GameAssetsPlugin {
 
         // load icons
         for (item, rect) in sprite_desc.icons.iter() {
-            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(
+                bevy::math::Rect::from_corners(rect.texture_pos, rect.texture_pos + rect.size),
+            ));
 
             //Set the size to be proportional to the source rectangle
             sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));

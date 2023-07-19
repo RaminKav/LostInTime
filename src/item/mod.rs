@@ -209,6 +209,13 @@ impl WorldObjectResource {
 }
 
 impl WorldObject {
+    pub fn is_block(&self) -> bool {
+        match self {
+            WorldObject::Wall(_) => true,
+            WorldObject::DungeonStone => true,
+            _ => false,
+        }
+    }
     pub fn spawn_and_save_block(
         self,
         proto_commands: &mut ProtoCommands,
@@ -341,7 +348,12 @@ impl WorldObject {
             panic!("graphics not loaded");
         }
         //TODO: extract this out to helper fn vvvv
-        let has_icon = game.graphics.icons.as_ref().unwrap().get(&self);
+        let is_block = self.is_block();
+        let has_icon = if is_block {
+            game.graphics.icons.as_ref().unwrap().get(&self)
+        } else {
+            None
+        };
         let sprite = if let Some(icon) = has_icon {
             icon.clone()
         } else {
@@ -579,7 +591,7 @@ impl ItemsPlugin {
     fn update_graphics(
         mut to_update_query: Query<
             (Entity, &mut TextureAtlasSprite, &WorldObject),
-            (Changed<WorldObject>, Without<Wall>),
+            (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
         >,
         game: GameParam,
         mut commands: Commands,
