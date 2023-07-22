@@ -461,30 +461,32 @@ pub fn spawn_item_stack_icon(
         .insert(item_stack.clone())
         .insert(RenderLayers::from_layers(&[3]))
         .id();
-    let text = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    item_stack.count.to_string(),
-                    TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
-                        color: Color::WHITE,
+    if item_stack.count > 1 {
+        let text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        item_stack.count.to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                            font_size: 8.0,
+                            color: Color::WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    transform: Transform {
+                        translation: Vec3::new(7., -6., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
                     },
-                )
-                .with_alignment(TextAlignment::Center),
-                transform: Transform {
-                    translation: Vec3::new(7., -6., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
+                    ..default()
                 },
-                ..default()
-            },
-            Name::new("TEXT"),
-            RenderLayers::from_layers(&[3]),
-        ))
-        .id();
-    commands.entity(item).push_children(&[text]);
+                Name::new("TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(item).push_children(&[text]);
+    }
     item
 }
 //TODO: make event?

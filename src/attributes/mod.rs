@@ -130,7 +130,7 @@ impl Plugin for AttributesPlugin {
             .add_systems(
                 (
                     clamp_health,
-                    handle_modify_health_event,
+                    handle_modify_health_event.before(clamp_health),
                     add_current_health_with_max_health,
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
@@ -141,12 +141,12 @@ impl Plugin for AttributesPlugin {
     }
 }
 
-fn clamp_health(mut health: Query<&mut CurrentHealth, With<Player>>) {
-    for mut h in health.iter_mut() {
+fn clamp_health(mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>>) {
+    for (mut h, max_h) in health.iter_mut() {
         if h.0 < 0 {
             h.0 = 0;
-        } else if h.0 > 100 {
-            h.0 = 100;
+        } else if h.0 > max_h.0 {
+            h.0 = max_h.0;
         }
     }
 }

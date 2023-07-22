@@ -22,6 +22,7 @@ use crate::{
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
     item::{
+        item_actions::{ConsumableItem, ItemAction},
         melee::MeleeAttack,
         projectile::{Projectile, ProjectileState, RangedAttack},
         Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
@@ -66,6 +67,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<EnemyMaterialMesh2DProto>()
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
+            .register_type::<ItemAction>()
+            .register_type::<ConsumableItem>()
             .register_type::<ColliderProto>()
             .register_type::<EquipmentType>()
             .register_type::<AnimationTimerProto>()
@@ -107,6 +110,8 @@ impl ProtoPlugin {
         prototypes.load("proto/ring.prototype.ron");
         prototypes.load("proto/pendant.prototype.ron");
         prototypes.load("proto/flint.prototype.ron");
+        prototypes.load("proto/smallpotion.prototype.ron");
+        prototypes.load("proto/largepotion.prototype.ron");
         prototypes.load("proto/log.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");

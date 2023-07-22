@@ -188,11 +188,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                     is_valid_to_spawn = true;
                 }
                 if is_valid_to_spawn {
-                    place_item_event.send(PlaceItemEvent {
-                        obj: *obj,
-                        pos,
-                        is_from_player_item: false,
-                    });
+                    place_item_event.send(PlaceItemEvent { obj: *obj, pos });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);
                 }
