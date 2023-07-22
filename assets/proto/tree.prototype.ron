@@ -1,14 +1,15 @@
 (
-  name: "TreeObj",
+  name: "Tree",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": Foliage(Tree),
+  "survival_rogue_like::item::WorldObject": Tree,
+  "survival_rogue_like::item::Foliage": Tree,
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::item::Breakable": (Some(Log)),
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 9.),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
-  "survival_rogue_like::world::WorldObjectEntityData": (object: Foliage(Tree), obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: Tree, obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
   "survival_rogue_like::world::y_sort::YSort": (),
   "bevy_proto::custom::VisibilityBundle": (),

@@ -11,7 +11,7 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::{Container, Inventory, CHEST_SIZE};
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, PlacesInto, WorldObject};
+use crate::item::{Equipment, PlaceItemEvent, PlacesInto, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState};
@@ -375,14 +375,10 @@ impl InputsPlugin {
     }
 
     pub fn mouse_click_system(
-        mut proto_commands: ProtoCommands,
-        mut commands: Commands,
-        prototypes: Prototypes,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
-        mut game: GameParam,
-        mut proto_params: ProtoParam,
-        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+        game: GameParam,
+        proto_params: ProtoParam,
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
@@ -392,6 +388,7 @@ impl InputsPlugin {
         parent_attack: Query<&Attack>,
         tool_query: Query<&RangedAttack, With<Equipment>>,
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+        mut place_item_event: EventWriter<PlaceItemEvent>,
     ) {
         if inv_state.open {
             return;
@@ -477,17 +474,11 @@ impl InputsPlugin {
                 if let Some(places_into_item) =
                     proto_params.get_component::<PlacesInto, _>(*held_item.get_obj())
                 {
-                    if let Some(_able_to_spawn) = places_into_item.0.spawn_and_save_block(
-                        &mut proto_commands,
-                        &prototypes,
-                        cursor_pos.world_coords.truncate(),
-                        &mut minimap_event,
-                        &mut proto_params,
-                        &mut game,
-                        &mut commands,
-                    ) {
-                        inv.single_mut().items.items[hotbar_slot] = held_item.modify_count(-1);
-                    }
+                    place_item_event.send(PlaceItemEvent {
+                        obj: places_into_item.0,
+                        pos: cursor_pos.world_coords.truncate(),
+                        is_from_player_item: true,
+                    });
                 }
             }
         }

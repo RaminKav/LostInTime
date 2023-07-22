@@ -1,5 +1,5 @@
 (
     recipes_list : {
-        Wall(StoneWall): ((Some(Flint), Some(Flint)), (Some(Flint), Some(Flint))),
+        StoneWallBlock: ((Some(Flint), Some(Flint)), (Some(Flint), Some(Flint))),
     }
 )

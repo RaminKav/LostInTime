@@ -90,8 +90,8 @@ impl ProtoPlugin {
         prototypes.load("proto/tree.prototype.ron");
         prototypes.load("proto/WorldGenerationParams.prototype.ron");
         prototypes.load("proto/DungeonWorldGenerationParams.prototype.ron");
-        prototypes.load("proto/obj_stonewall.prototype.ron");
         prototypes.load("proto/stonewall.prototype.ron");
+        prototypes.load("proto/stonewallblock.prototype.ron");
         prototypes.load("proto/projectile.prototype.ron");
         prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/fireball.prototype.ron");

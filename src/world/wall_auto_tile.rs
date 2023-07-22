@@ -1,9 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{
-    item::{Wall, WorldObject},
-    GameParam,
-};
+use crate::{item::Wall, proto::proto_param::ProtoParam, GameParam};
 
 use super::{
     generation::WallBreakEvent,
@@ -14,6 +11,7 @@ use super::{
 pub struct Dirty;
 pub fn update_wall(
     mut commands: Commands,
+    proto_param: ProtoParam,
     mut walls_to_update: Query<(Entity, &mut TextureAtlasSprite), (With<Wall>, With<Dirty>)>,
     mut game: GameParam,
     txns: Query<&GlobalTransform>,
@@ -37,7 +35,9 @@ pub fn update_wall(
                 if let Some(neighbour_block_entity_data) =
                     get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
                 {
-                    if matches!(neighbour_block_entity_data.object, WorldObject::Wall(_)) {
+                    if let Some(_wall) =
+                        proto_param.get_component::<Wall, _>(neighbour_block_entity_data.object)
+                    {
                         if dy == 1 {
                             has_wall_above = true;
                         } else if dy == -1 {
@@ -92,8 +92,9 @@ pub fn update_wall(
                 if let Some(neighbour_block_entity_data) =
                     get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
                 {
-                    this_corner_neighbour_is_wall =
-                        matches!(neighbour_block_entity_data.object, WorldObject::Wall(_));
+                    this_corner_neighbour_is_wall = proto_param
+                        .get_component::<Wall, _>(neighbour_block_entity_data.object)
+                        .is_some();
                 }
                 let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
 
@@ -155,6 +156,7 @@ pub fn update_wall(
 }
 pub fn handle_wall_break(
     mut game: GameParam,
+    proto_param: ProtoParam,
     mut obj_break_events: EventReader<WallBreakEvent>,
     mut commands: Commands,
 ) {
@@ -176,7 +178,9 @@ pub fn handle_wall_break(
                 if let Some(neighbour_block_entity_data) =
                     get_neighbour_obj_data(wall_pos, (dx, dy), &mut game)
                 {
-                    if matches!(neighbour_block_entity_data.object, WorldObject::Wall(_)) {
+                    if let Some(_wall) =
+                        proto_param.get_component::<Wall, _>(neighbour_block_entity_data.object)
+                    {
                         let new_wall_entity = game.get_obj_entity_at_tile(pos.clone()).unwrap();
 
                         commands.entity(new_wall_entity).insert(Dirty);

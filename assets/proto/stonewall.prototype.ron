@@ -1,16 +1,15 @@
 (
   name: "StoneWall",
-  templates: ["world_object"],
+  templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": Wall(StoneWall),
-  "survival_rogue_like::item::PlacesInto": (Wall(StoneWall)),
-  "survival_rogue_like::inventory::ItemStack": (
-        obj_type: Wall(StoneWall),
-        metadata: (
-            name: "Stone Wall", 
-            desc: "A chipped piece of flint."
-        ),
-        count: 1
-  ),
+  "survival_rogue_like::item::WorldObject": StoneWall,
+  "survival_rogue_like::item::Wall": StoneWall,
+  "survival_rogue_like::item::Block": (),
+  "survival_rogue_like::item::Breakable": (Some(Flint)),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 11),
+  "survival_rogue_like::attributes::MaxHealth": (100),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: StoneWall, obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::VisibilityBundle": (),
   }
 )

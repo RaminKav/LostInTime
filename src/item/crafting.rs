@@ -53,11 +53,7 @@ impl CraftingPlugin {
             let result_option = if let Some(result) =
                 recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
             {
-                let item_data = match result {
-                    WorldObject::Wall(wall) => proto.get_item_data(wall),
-                    WorldObject::Foliage(tree) => proto.get_item_data(tree),
-                    _ => proto.get_item_data(result),
-                };
+                let item_data = proto.get_item_data(result);
                 Some(InventoryItemStack {
                     item_stack: item_data
                         .unwrap_or(&ItemStack {

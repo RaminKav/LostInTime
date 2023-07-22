@@ -1,5 +1,5 @@
 use crate::{
-    item::{Foliage, WorldObject},
+    item::{Foliage, Wall, WorldObject},
     proto::proto_param::ProtoParam,
     world::{wall_auto_tile::Dirty, world_helpers::camera_pos_to_tile_pos},
 };
@@ -48,7 +48,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
 
-            if let Some(proto_data) = params.get_item_data(obj) {
+            if let Some(proto_data) = params.get_item_data(obj.clone()) {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
@@ -122,13 +122,12 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         prototypes: &Prototypes,
         proto_param: &mut ProtoParam,
     ) -> Option<Entity> {
-        let p = format!("{}Obj", <T as Into<&str>>::into(obj.clone()).to_owned());
+        let p = <T as Into<&str>>::into(obj.clone()).to_owned();
         if !prototypes.is_ready(&p) {
             println!("Prototype {} is not ready", p);
             return None;
         }
         //TODO: add parent to spawned entity
-        let world_object = proto_param.get_world_object(obj).unwrap();
         let spawned_entity = self.spawn(p).id();
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
         let tile_pos = camera_pos_to_tile_pos(&pos);
@@ -140,39 +139,38 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         spawned_entity_commands.insert(TransformBundle::from_transform(
             Transform::from_translation(pos),
         ));
-        match world_object {
-            WorldObject::Foliage(Foliage::Tree) => {
-                let foliage_material = &proto_param
-                    .graphics
-                    .foliage_material_map
-                    .as_ref()
-                    .unwrap()
-                    .get(&Foliage::Tree)
-                    .unwrap();
-                spawned_entity_commands
-                    .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
-                        shape::Quad {
-                            size: Vec2::new(32., 40.),
-                            ..Default::default()
-                        },
-                    ))))
-                    .insert((*foliage_material).clone());
-            }
-            WorldObject::Wall(_) => {
-                spawned_entity_commands
-                    .insert(
-                        proto_param
-                            .graphics
-                            .wall_texture_atlas
-                            .as_ref()
-                            .unwrap()
-                            .clone(),
-                    )
-                    .insert(TextureAtlasSprite::default())
-                    .insert(Dirty);
-            }
-            _ => {}
+
+        if let Some(foliage) = proto_param.get_component::<Foliage, _>(obj.clone()) {
+            let foliage_material = &proto_param
+                .graphics
+                .foliage_material_map
+                .as_ref()
+                .unwrap()
+                .get(foliage)
+                .unwrap();
+            spawned_entity_commands
+                .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
+                    shape::Quad {
+                        size: Vec2::new(32., 40.),
+                        ..Default::default()
+                    },
+                ))))
+                .insert((*foliage_material).clone());
         }
+        if let Some(_wall) = proto_param.get_component::<Wall, _>(obj) {
+            spawned_entity_commands
+                .insert(
+                    proto_param
+                        .graphics
+                        .wall_texture_atlas
+                        .as_ref()
+                        .unwrap()
+                        .clone(),
+                )
+                .insert(TextureAtlasSprite::default())
+                .insert(Dirty);
+        }
+
         Some(spawned_entity)
     }
 }

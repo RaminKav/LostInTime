@@ -103,12 +103,12 @@ impl CombatPlugin {
     }
     fn handle_enemy_death(
         mut commands: Commands,
+        proto_param: ProtoParam,
         mut death_events: EventReader<EnemyDeathEvent>,
         asset_server: Res<AssetServer>,
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
         loot_tables: Query<&LootTable>,
         mut proto_commands: ProtoCommands,
-        proto: ProtoParam,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
@@ -129,26 +129,12 @@ impl CombatPlugin {
             ));
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
                 for drop in LootTablePlugin::get_drops(loot_table) {
-                    match drop.obj_type {
-                        WorldObject::Wall(wall) => proto_commands.spawn_item_from_proto(
-                            wall,
-                            &proto,
-                            death_event.enemy_pos,
-                            drop.count,
-                        ),
-                        WorldObject::Foliage(tree) => proto_commands.spawn_item_from_proto(
-                            tree,
-                            &proto,
-                            death_event.enemy_pos,
-                            drop.count,
-                        ),
-                        _ => proto_commands.spawn_item_from_proto(
-                            drop.obj_type,
-                            &proto,
-                            death_event.enemy_pos,
-                            drop.count,
-                        ),
-                    };
+                    proto_commands.spawn_item_from_proto(
+                        drop.obj_type,
+                        &proto_param,
+                        death_event.enemy_pos,
+                        drop.count,
+                    );
                 }
             }
         }

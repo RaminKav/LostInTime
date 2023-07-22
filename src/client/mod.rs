@@ -173,42 +173,43 @@ impl ClientPlugin {
                 .insert(Collider::cuboid(collider.collider.x, collider.collider.y));
         }
     }
-    fn handle_add_visuals_to_loaded_objects(
-        game: GameParam,
-        mut commands: Commands,
-        mut meshes: ResMut<Assets<Mesh>>,
-        loaded_entities: Query<(Entity, &WorldObject), Added<WorldObject>>,
-    ) {
-        let foliage_material = &game
-            .graphics
-            .foliage_material_map
-            .as_ref()
-            .unwrap()
-            .get(&Foliage::Tree)
-            .unwrap();
+    // fn handle_add_visuals_to_loaded_objects(
+    //     game: GameParam,
+    //     mut commands: Commands,
+    //     mut meshes: ResMut<Assets<Mesh>>,
+    //     loaded_entities: Query<(Entity, &WorldObject), Added<WorldObject>>,
+    // ) {
 
-        for (e, obj) in loaded_entities.iter() {
-            match obj {
-                WorldObject::Foliage(Foliage::Tree) => {
-                    commands
-                        .entity(e)
-                        .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-                            size: Vec2::new(32., 40.),
-                            ..Default::default()
-                        }))))
-                        .insert((*foliage_material).clone());
-                }
-                WorldObject::Wall(_) => {
-                    println!("ADDING WALL VISUALS");
-                    commands
-                        .entity(e)
-                        .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())
-                        .insert(TextureAtlasSprite::default());
-                }
-                _ => {}
-            }
-        }
-    }
+    //     // let foliage_material = &game
+    //     //     .graphics
+    //     //     .foliage_material_map
+    //     //     .as_ref()
+    //     //     .unwrap()
+    //     //     .get(&Foliage::Tree)
+    //     //     .unwrap();
+
+    //     // for (e, obj) in loaded_entities.iter() {
+    //     //     match obj {
+    //     //          if let Some(foliage) = proto_param.get_component::<Foliage, _>(obj) {
+    //     //             commands
+    //     //                 .entity(e)
+    //     //                 .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+    //     //                     size: Vec2::new(32., 40.),
+    //     //                     ..Default::default()
+    //     //                 }))))
+    //     //                 .insert((*foliage_material).clone());
+    //     //         }
+    //     //          if let Some(wall) = proto_param.get_component::<Wall, _>(obj) {
+    //     //             println!("ADDING WALL VISUALS");
+    //     //             commands
+    //     //                 .entity(e)
+    //     //                 .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())
+    //     //                 .insert(TextureAtlasSprite::default());
+    //     //         }
+    //     //         _ => {}
+    //     //     }
+    //     // }
+    // }
     //TODO: make this work with Spawn events too ,change event name
     fn save_chunk(
         world: &mut World,

@@ -1,28 +1,27 @@
-use crate::animations::{AttackAnimationTimer};
-use crate::assets::{WorldObjectData};
-use crate::attributes::{ItemAttributes};
+use crate::animations::AttackAnimationTimer;
+use crate::assets::WorldObjectData;
+use crate::attributes::ItemAttributes;
 use crate::colors::{BLACK, BLUE, DARK_GREEN, GREEN, GREY, YELLOW};
 use crate::combat::ObjBreakEvent;
 
-use crate::inventory::{ItemStack};
+use crate::inventory::{Inventory, ItemStack};
 use crate::proto::proto_param::ProtoParam;
+use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{InventorySlotType};
+use crate::ui::{InventorySlotType, InventoryState};
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     camera_pos_to_chunk_pos, camera_pos_to_tile_pos, world_pos_to_tile_pos,
 };
 
-use crate::{
-    custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState,
-    YSort,
-};
+use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 
 mod crafting;
+mod item_actions;
 mod loot_table;
 pub mod melee;
 pub mod projectile;
@@ -133,12 +132,13 @@ pub enum WorldObject {
     #[default]
     None,
     Grass,
-    Wall(Wall),
+    StoneWall,
+    StoneWallBlock,
     DungeonStone,
     Water,
     Sand,
     Flint,
-    Foliage(Foliage),
+    Tree,
     Log,
     Sword,
     BasicStaff,
@@ -234,7 +234,7 @@ impl WorldObjectResource {
 impl WorldObject {
     pub fn is_block(&self) -> bool {
         match self {
-            WorldObject::Wall(_) => true,
+            WorldObject::StoneWall => true,
             WorldObject::DungeonStone => true,
             _ => false,
         }
@@ -256,15 +256,7 @@ impl WorldObject {
         let chunk_pos = camera_pos_to_chunk_pos(&pos);
 
         if let Some(chunk) = game.get_chunk_entity(chunk_pos) {
-            let item = match self {
-                WorldObject::Foliage(obj) => {
-                    proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
-                }
-                WorldObject::Wall(obj) => {
-                    proto_commands.spawn_object_from_proto(obj, pos, prototypes, proto_param)
-                }
-                _ => None,
-            };
+            let item = proto_commands.spawn_object_from_proto(self, pos, prototypes, proto_param);
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
@@ -358,14 +350,20 @@ impl WorldObject {
         match self {
             WorldObject::None => BLACK,
             WorldObject::Grass => GREEN,
-            WorldObject::Wall(_) => GREY,
+            WorldObject::StoneWall => GREY,
             WorldObject::DungeonStone => BLACK,
             WorldObject::Water => BLUE,
             WorldObject::Sand => YELLOW,
-            WorldObject::Foliage(_) => DARK_GREEN,
+            WorldObject::Tree => DARK_GREEN,
             _ => BLACK,
         }
     }
+}
+
+pub struct PlaceItemEvent {
+    pub obj: WorldObject,
+    pub pos: Vec2,
+    pub is_from_player_item: bool,
 }
 
 pub struct ItemsPlugin;
@@ -373,51 +371,103 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
+            .add_event::<PlaceItemEvent>()
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
             .add_system(
-                Self::break_item
+                break_item
                     .before(CustomFlush)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_placing_world_object
+                    .after(handle_new_scene_entities_parent_chunk)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 
-impl ItemsPlugin {
-    pub fn break_item(
-        mut commands: Commands,
-        mut game: GameParam,
-        proto_param: ProtoParam,
-        mut obj_break_events: EventReader<ObjBreakEvent>,
-        mut minimap_event: EventWriter<UpdateMiniMapEvent>,
-        mut wall_break_event: EventWriter<WallBreakEvent>,
-        breakable_query: Query<&Breakable>,
-    ) {
-        for broken in obj_break_events.iter() {
-            if let Ok(breakable) = breakable_query.get(broken.entity) {
-                commands.entity(broken.entity).despawn();
-                if let Some(breaks_into) = breakable.0 {
-                    let mut rng = rand::thread_rng();
-                    let mut base_stack = proto_param.get_item_data(breaks_into).unwrap().clone();
-                    base_stack.count = rng.gen_range(1..4);
-                    base_stack.spawn_as_drop(
-                        &mut commands,
-                        &mut game,
-                        broken.tile_pos,
-                        broken.chunk_pos,
-                    );
+pub fn handle_placing_world_object(
+    mut proto_commands: ProtoCommands,
+    prototypes: Prototypes,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut proto_param: ProtoParam,
+    mut game: GameParam,
+    mut commands: Commands,
+    mut inv: Query<&mut Inventory>,
+    inv_state: Res<InventoryState>,
+    mut events: EventReader<PlaceItemEvent>,
+) {
+    for place_event in events.iter() {
+        let pos = place_event.pos;
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
+            warn!("obj exists here {pos}");
+            continue;
+        }
+        let chunk_pos = camera_pos_to_chunk_pos(&pos);
+
+        if let Some(chunk) = game.get_chunk_entity(chunk_pos) {
+            let item = proto_commands.spawn_object_from_proto(
+                place_event.obj,
+                pos,
+                &prototypes,
+                &mut proto_param,
+            );
+            if let Some(item) = item {
+                //TODO: do what old game data did, add obj to registry
+                commands.entity(item).set_parent(*chunk);
+                minimap_event.send(UpdateMiniMapEvent);
+                if place_event.is_from_player_item {
+                    let hotbar_slot = inv_state.active_hotbar_slot;
+                    let held_item_option = inv.single().items.items[hotbar_slot].clone();
+                    inv.single_mut().items.items[hotbar_slot] =
+                        held_item_option.unwrap().modify_count(-1);
                 }
             }
 
-            if let WorldObject::Wall(_) = broken.obj {
-                wall_break_event.send(WallBreakEvent {
-                    chunk_pos: broken.chunk_pos,
-                    tile_pos: broken.tile_pos,
-                })
-            }
-            minimap_event.send(UpdateMiniMapEvent);
+            continue;
+        } else {
+            game.add_object_to_chunk_cache(
+                chunk_pos,
+                place_event.obj,
+                camera_pos_to_tile_pos(&pos),
+            );
         }
+    }
+}
+pub fn break_item(
+    mut commands: Commands,
+    mut game: GameParam,
+    proto_param: ProtoParam,
+    mut obj_break_events: EventReader<ObjBreakEvent>,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut wall_break_event: EventWriter<WallBreakEvent>,
+    breakable_query: Query<&Breakable>,
+) {
+    for broken in obj_break_events.iter() {
+        if let Ok(breakable) = breakable_query.get(broken.entity) {
+            commands.entity(broken.entity).despawn();
+            if let Some(breaks_into) = breakable.0 {
+                let mut rng = rand::thread_rng();
+                let mut base_stack = proto_param.get_item_data(breaks_into).unwrap().clone();
+                base_stack.count = rng.gen_range(1..4);
+                base_stack.spawn_as_drop(
+                    &mut commands,
+                    &mut game,
+                    broken.tile_pos,
+                    broken.chunk_pos,
+                );
+            }
+        }
+
+        if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
+            wall_break_event.send(WallBreakEvent {
+                chunk_pos: broken.chunk_pos,
+                tile_pos: broken.tile_pos,
+            })
+        }
+        minimap_event.send(UpdateMiniMapEvent);
     }
 }

@@ -1,15 +1,17 @@
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
-
+pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
-    inventory::{Inventory},
-    item::{Equipment},
+    inventory::Inventory,
+    item::Equipment,
     player::Limb,
     proto::proto_param::ProtoParam,
     ui::{DropOnSlotEvent, InventoryState},
     CustomFlush, GameParam, GameState, Player,
 };
+
+use modifiers::*;
 
 pub struct AttributesPlugin;
 
@@ -123,16 +125,16 @@ pub struct InvincibilityCooldown(pub f32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
-        app
-            // .register_type::<BlockAttributeBundle>()
-            .add_event::<AttributeChangeEvent>()
+        app.add_event::<AttributeChangeEvent>()
+            .add_event::<ModifyHealthEvent>()
             .add_systems(
                 (
                     clamp_health,
+                    handle_modify_health_event,
                     add_current_health_with_max_health,
-                    update_held_hotbar_item,
-                    handle_equipment_equiped,
-                    handle_player_attribute_change_events.after(CustomFlush),
+                    update_attributes_with_held_item_change,
+                    update_attributes_and_sprite_with_equipment_change,
+                    handle_player_item_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -148,7 +150,7 @@ fn clamp_health(mut health: Query<&mut CurrentHealth, With<Player>>) {
         }
     }
 }
-fn handle_player_attribute_change_events(
+fn handle_player_item_attribute_change_events(
     mut commands: Commands,
     player: Query<(Entity, &Inventory), With<Player>>,
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
@@ -191,7 +193,7 @@ fn add_current_health_with_max_health(
 }
 
 ///Tracks player held item changes, spawns new held item entity and updates player attributes
-fn update_held_hotbar_item(
+fn update_attributes_with_held_item_change(
     mut commands: Commands,
     mut game_param: GameParam,
     inv_state: Res<InventoryState>,
@@ -230,7 +232,7 @@ fn update_held_hotbar_item(
 }
 ///Tracks player equip or accessory inventory slot changes,
 ///spawns new held equipment entity, and updates player attributes
-fn handle_equipment_equiped(
+fn update_attributes_and_sprite_with_equipment_change(
     player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,

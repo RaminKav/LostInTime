@@ -11,7 +11,7 @@
    "survival_rogue_like::attributes::Attack": (10),
    "survival_rogue_like::item::loot_table::LootTable": (
             drops: [(
-                item: Wall(StoneWall),
+                item: StoneWallBlock,
                 min: 11,
                 max: 13,
                 rate: 1.
