@@ -43,7 +43,7 @@ mod proto;
 mod schematic;
 mod ui;
 mod world;
-use animations::{AnimationTimer, AnimationsPlugin};
+use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};

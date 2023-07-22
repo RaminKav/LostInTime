@@ -5,8 +5,9 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     assets::Graphics,
     inputs::CursorPos,
-    inventory::{Inventory, InventoryPlugin, ItemStack},
+    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::{CompleteRecipeEvent, CraftingSlotUpdateEvent},
+    proto::proto_param::ProtoParam,
     ui::InventorySlotType,
     GameParam,
 };
@@ -75,11 +76,11 @@ pub struct DraggedItem;
 #[derive(Debug, Clone)]
 
 pub struct DropOnSlotEvent {
-    dropped_entity: Entity,
-    dropped_item_stack: ItemStack,
-    drop_target_slot_state: InventorySlotState,
-    parent_interactable_entity: Entity,
-    stack_empty: bool,
+    pub dropped_entity: Entity,
+    pub dropped_item_stack: ItemStack,
+    pub drop_target_slot_state: InventorySlotState,
+    pub parent_interactable_entity: Entity,
+    pub stack_empty: bool,
 }
 #[derive(Debug, Clone)]
 
@@ -116,14 +117,9 @@ pub fn handle_drop_in_world_events(
 ) {
     for drop_event in events.iter() {
         let p = ui_helpers::get_player_chunk_tile_coords(&mut game_param.game);
-        drop_event.dropped_item_stack.obj_type.spawn_item_drop(
-            &mut commands,
-            &mut game_param,
-            p.1,
-            p.0,
-            drop_event.dropped_item_stack.count,
-            Some(drop_event.dropped_item_stack.attributes.clone()),
-        );
+        drop_event
+            .dropped_item_stack
+            .spawn_as_drop(&mut commands, &mut game_param, p.1, p.0);
         commands
             .entity(drop_event.dropped_entity)
             .despawn_recursive();
@@ -156,6 +152,7 @@ pub fn handle_drop_in_world_events(
 pub fn handle_drop_on_slot_events(
     mut events: EventReader<DropOnSlotEvent>,
     mut game: GameParam,
+    proto_param: ProtoParam,
     mut commands: Commands,
     mut interactables: Query<(Entity, &UIElement, &mut Interactable)>,
     item_stacks: Query<&ItemStack>,
@@ -187,13 +184,16 @@ pub fn handle_drop_on_slot_events(
             } else {
                 inv.get_mut_items_from_slot_type(slot_type)
             };
+            let inv_stack = InventoryItemStack {
+                item_stack: drop_event.dropped_item_stack.clone(),
+                slot: drop_event.drop_target_slot_state.slot_index,
+            };
 
-            InventoryPlugin::drop_item_on_slot(
-                drop_event.dropped_item_stack.clone(),
-                drop_event.drop_target_slot_state.slot_index,
+            inv_stack.drop_item_on_slot(
                 container,
                 &mut game.inv_slot_query,
                 slot_type,
+                &proto_param,
             )
         };
 
@@ -493,13 +493,11 @@ pub fn handle_cursor_update(
                                 } else {
                                     inv.get_mut_items_from_slot_type(state.r#type)
                                 };
-
-                                let split_stack = InventoryPlugin::split_stack(
-                                    item_icon.2.clone(),
-                                    state.slot_index,
-                                    &mut state,
-                                    container,
-                                );
+                                let inv_stack = InventoryItemStack {
+                                    item_stack: item_icon.2.clone(),
+                                    slot: state.slot_index,
+                                };
+                                let split_stack = inv_stack.split_stack(&mut state, container);
                                 let e = spawn_item_stack_icon(
                                     &mut commands,
                                     &graphics,

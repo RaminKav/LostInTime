@@ -15,7 +15,7 @@ use crate::{
         PlayerAttributeBundle,
     },
     inputs::{FacingDirection, InputsPlugin, MovementVector},
-    inventory::{Container, Inventory, INVENTORY_INIT, INVENTORY_SIZE},
+    inventory::{Container, Inventory, INVENTORY_SIZE},
     item::EquipmentData,
     world::{y_sort::YSort, CHUNK_SIZE},
     AppExt, CoreGameSet, Game, GameParam, RawPosition,
@@ -62,6 +62,17 @@ pub enum Limb {
     Hands,
     Legs,
     Head,
+}
+impl Limb {
+    pub fn from_slot(slot: usize) -> Self {
+        match slot {
+            3 => Self::Head,
+            2 => Self::Torso,
+            1 => Self::Hands,
+            0 => Self::Legs,
+            _ => panic!("Invalid slot"),
+        }
+    }
 }
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {

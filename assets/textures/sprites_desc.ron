@@ -1,165 +1,113 @@
-(
+( //and then in here we specify each item's data
     items : {
         None: WorldObjectData(
-            texture_pos: (32., 0.),
+            texture_pos: (13., 15.),
             size: (16., 16.),
             anchor: None,
-            collider: false,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
         ),
         Flint: WorldObjectData(
-            texture_pos: (48., 16.),
+            texture_pos: (0., 4.),
             size: (16., 16.),
             anchor: None,
-            collider: false,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
+        ),
+        Chestplate: WorldObjectData(
+            texture_pos: (0., 1.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Pants: WorldObjectData(
+            texture_pos: (0., 2.),
+            size: (16., 16.),
+            anchor: None,
         ),
         Fireball: WorldObjectData(
-            texture_pos: (64., 16.),
+            texture_pos: (1., 4.),
             size: (16., 16.),
             anchor: None,
-            collider: false,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
         ),
-        Placeable(Log): WorldObjectData(
-            texture_pos: (32., 48.),
+        Log: WorldObjectData(
+            texture_pos: (2., 4.),
             size: (16., 16.),
             anchor: None,
-            collider: false,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: Some(Foliage(Tree))
         ),
-         Wall(StoneWall): WorldObjectData(
-            texture_pos: (0., 144.),
+        Wall(StoneWall): WorldObjectData(
+            texture_pos: (1., 6.),
             size: (32., 48.),
             anchor: None,
-            collider: true,
-            breakable: true,
-            breaks_into: Some(Flint),
-            equip_slot: None,
-            breaks_with: None,
-            places_into: Some(Wall(StoneWall))
         ),
         DungeonStone: WorldObjectData(
-            texture_pos: (64., 144.),
+            texture_pos: (2., 6.),
             size: (32., 32.),
             anchor: None,
-            collider: true,
-            breakable: false,
-            breaks_into: None,
-            equip_slot: None,
-            breaks_with: None,
-            places_into: None
         ),
-        Foliage(Tree): WorldObjectData(
-            texture_pos: (96., 112.),
-            size: (32., 40.),
-            anchor: None,
-            collider: true,
-            breakable: true,
-            breaks_into: Some(Placeable(Log)),
-            equip_slot: None,
-            breaks_with: Some(Sword),
-            places_into: None
-        ),
+        // Foliage(Tree): WorldObjectData(
+        //     texture_pos: (96., 112.),
+        //     size: (32., 40.),
+        //     anchor: None,
+        // ),
         Sword: WorldObjectData(
-            texture_pos: (48., 64.),
+            texture_pos: (3., 4.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
         ),
         Dagger: WorldObjectData(
-            texture_pos: (64., 64.),
+            texture_pos: (4., 4.),
             size: (16., 16.),
             anchor: Some((0.2, 0.25)),
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
         ),
         FireStaff: WorldObjectData(
-            texture_pos: (80., 64.),
+            texture_pos: (5., 4.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
         ),
         BasicStaff: WorldObjectData(
-            texture_pos: (96., 64.),
+            texture_pos: (6., 4.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
         ),
          DualStaff: WorldObjectData(
-            texture_pos: (112., 64.),
+            texture_pos: (7., 4.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
-            collider: true,
-            breakable: true,
-            breaks_into: None,
-            equip_slot: Some(Hands),
-            breaks_with: None,
-            places_into: None
+        ),
+        Ring: WorldObjectData(
+            texture_pos: (4., 2.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
+        Pendant: WorldObjectData(
+            texture_pos: (4., 3.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
         ),
     },
     icons : {
         DungeonStone: SpriteData(
-            texture_pos: (32., 96.),
+            texture_pos: (2., 6.),
             size: (16., 16.),
         ),
         Wall(StoneWall): SpriteData(
-            texture_pos: (16., 96.),
-            size: (16., 16.),
-        ),
-        FireStaff: SpriteData(
-            texture_pos: (80., 80.),
-            size: (16., 16.),
-        ),
-        BasicStaff: SpriteData(
-            texture_pos: (96., 80.),
-            size: (16., 16.),
-        ),
-         DualStaff: SpriteData(
-            texture_pos: (112., 80.),
+            texture_pos: (1., 6.),
             size: (16., 16.),
         ),
         Sword: SpriteData(
-            texture_pos: (48., 80.),
+            texture_pos: (3., 5.),
             size: (16., 16.),
         ),
         Dagger: SpriteData(
-            texture_pos: (64., 80.),
+            texture_pos: (4., 5.),
+            size: (16., 16.),
+        ),
+        FireStaff: SpriteData(
+            texture_pos: (5., 5.),
+            size: (16., 16.),
+        ),
+        BasicStaff: SpriteData(
+            texture_pos: (6., 5.),
+            size: (16., 16.),
+        ),
+         DualStaff: SpriteData(
+            texture_pos: (7., 5.),
             size: (16., 16.),
         ),
     }

@@ -1,0 +1,16 @@
+(
+  name: "Log",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Log,
+  "survival_rogue_like::item::PlacesInto": (Foliage(Tree)),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Log,
+        metadata: (
+            name: "Log", 
+            desc: "A Long Log."
+        ),
+        count: 1
+  ),
+  }
+)

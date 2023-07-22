@@ -4,7 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": Foliage(Tree),
   "survival_rogue_like::item::Block": (),
-  "survival_rogue_like::item::Breakable": (Some(Placeable(Log))),
+  "survival_rogue_like::item::Breakable": (Some(Log)),
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 9.),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),

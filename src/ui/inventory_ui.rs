@@ -2,6 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
     assets::Graphics,
+    attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
     ui::ChestInventory,
@@ -364,7 +365,7 @@ pub fn spawn_inv_slot(
     if let Some(item) = item_stack {
         // player has item in this slot
 
-        let obj_type = item.item_stack.obj_type;
+        let obj_type = *item.get_obj();
         item_type_option = Some(obj_type);
         item_count_option = Some(item.item_stack.count);
         item_icon_option = Some(spawn_item_stack_icon(
@@ -555,6 +556,35 @@ pub fn update_inventory_ui(
                 slot_state.r#type,
                 item_option.clone(),
             );
+        }
+    }
+}
+/// when items in the inventory state change, update the matching entities in the UI
+pub fn handle_update_inv_item_entities(
+    mut inv: Query<&mut Inventory, Changed<Inventory>>,
+    mut inv_slot_state: Query<&mut InventorySlotState>,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+    inv_state: Res<InventoryState>,
+    mut commands: Commands,
+) {
+    if !inv_state.open {
+        return;
+    }
+    if let Ok(inv) = inv.get_single_mut() {
+        att_event.send(AttributeChangeEvent);
+        for inv_item_option in inv.clone().items.items.iter() {
+            if let Some(inv_item) = inv_item_option {
+                let item = inv_item.item_stack.clone();
+                for slot_state in inv_slot_state.iter_mut() {
+                    if slot_state.slot_index == inv_item.slot
+                        && slot_state.r#type == InventorySlotType::Normal
+                    {
+                        if let Some(item_e) = slot_state.item {
+                            commands.entity(item_e).insert(item.clone());
+                        }
+                    }
+                }
+            }
         }
     }
 }

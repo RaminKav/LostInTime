@@ -71,6 +71,7 @@ impl Plugin for UIPlugin {
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     update_healthbar,
+                    handle_update_inv_item_entities,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

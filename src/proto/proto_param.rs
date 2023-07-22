@@ -46,6 +46,25 @@ impl<'w, 's> ProtoParam<'w, 's> {
             None
         }
     }
+    pub fn get_component<
+        'a,
+        C: Component + Schematic,
+        T: Display + Schematic + Clone + Into<&'a str>,
+    >(
+        &self,
+        obj: T,
+    ) -> Option<&C> {
+        let id = <T as Into<&str>>::into(obj).to_owned();
+        if let Some(data) = self.get_prototype(&id) {
+            if let Some(data) = data.schematics().get::<C>() {
+                return data.input().downcast_ref::<C>();
+            }
+            None
+        } else {
+            warn!("Could not get component for: {}", id);
+            None
+        }
+    }
     pub fn get_world_object<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &self,
         obj: T,
