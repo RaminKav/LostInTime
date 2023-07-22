@@ -3,7 +3,8 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": StoneWallBlock,
-  "survival_rogue_like::item::PlacesInto": (StoneWall),
+  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(StoneWall),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: StoneWallBlock,
         metadata: (

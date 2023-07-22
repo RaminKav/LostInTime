@@ -10,8 +10,9 @@ use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::{Container, Inventory, CHEST_SIZE};
+use crate::item::item_actions::{ConsumableItem, ItemAction, ItemActionParam};
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, PlaceItemEvent, PlacesInto, WorldObject};
+use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState};
@@ -378,17 +379,17 @@ impl InputsPlugin {
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         game: GameParam,
-        proto_params: ProtoParam,
+        proto_param: ProtoParam,
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
-        inv_state: Res<InventoryState>,
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         mut inv: Query<&mut Inventory>,
+        inv_state: Res<InventoryState>,
         parent_attack: Query<&Attack>,
         tool_query: Query<&RangedAttack, With<Equipment>>,
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-        mut place_item_event: EventWriter<PlaceItemEvent>,
+        mut item_action_param: ItemActionParam,
     ) {
         if inv_state.open {
             return;
@@ -470,15 +471,19 @@ impl InputsPlugin {
 
             let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
-            if let Some(mut held_item) = held_item_option {
-                if let Some(places_into_item) =
-                    proto_params.get_component::<PlacesInto, _>(*held_item.get_obj())
-                {
-                    place_item_event.send(PlaceItemEvent {
-                        obj: places_into_item.0,
-                        pos: cursor_pos.world_coords.truncate(),
-                        is_from_player_item: true,
-                    });
+            if let Some(held_item) = held_item_option {
+                let held_obj = *held_item.get_obj();
+                if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
+                    item_action.run_action(&mut item_action_param);
+                    if proto_param
+                        .get_component::<ConsumableItem, _>(held_obj)
+                        .is_some()
+                    {
+                        let hotbar_slot = inv_state.active_hotbar_slot;
+                        let held_item_option = inv.single().items.items[hotbar_slot].clone();
+                        inv.single_mut().items.items[hotbar_slot] =
+                            held_item_option.unwrap().modify_count(-1);
+                    }
                 }
             }
         }

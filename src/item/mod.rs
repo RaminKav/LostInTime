@@ -21,7 +21,7 @@ use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 
 mod crafting;
-mod item_actions;
+pub mod item_actions;
 mod loot_table;
 pub mod melee;
 pub mod projectile;
@@ -150,6 +150,8 @@ pub enum WorldObject {
     Fireball,
     Ring,
     Pendant,
+    SmallPotion,
+    LargePotion,
 }
 
 #[derive(
@@ -363,7 +365,6 @@ impl WorldObject {
 pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
-    pub is_from_player_item: bool,
 }
 
 pub struct ItemsPlugin;
@@ -419,12 +420,6 @@ pub fn handle_placing_world_object(
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
                 minimap_event.send(UpdateMiniMapEvent);
-                if place_event.is_from_player_item {
-                    let hotbar_slot = inv_state.active_hotbar_slot;
-                    let held_item_option = inv.single().items.items[hotbar_slot].clone();
-                    inv.single_mut().items.items[hotbar_slot] =
-                        held_item_option.unwrap().modify_count(-1);
-                }
             }
 
             continue;

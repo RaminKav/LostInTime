@@ -1,0 +1,17 @@
+(
+  name: "SmallPotion",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SmallPotion,
+  "survival_rogue_like::item::item_actions::ItemAction": ModifyHealth(10),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SmallPotion,
+        metadata: (
+            name: "Small Potion", 
+            desc: "Heals 10 health."
+        ),
+        count: 1
+  ),
+  }
+)

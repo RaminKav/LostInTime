@@ -80,6 +80,16 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        LargePotion: WorldObjectData(
+            texture_pos: (0., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmallPotion: WorldObjectData(
+            texture_pos: (1., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         DungeonStone: SpriteData(

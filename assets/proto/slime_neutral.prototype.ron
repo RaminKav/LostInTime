@@ -17,6 +17,18 @@
                 rate: 1.
             ),
             (
+                item: SmallPotion,
+                min: 11,
+                max: 13,
+                rate: 1.
+            ),
+            (
+                item: LargePotion,
+                min: 11,
+                max: 13,
+                rate: 1.
+            ),
+            (
                 item: Sword,
                 min: 1,
                 max: 1,
