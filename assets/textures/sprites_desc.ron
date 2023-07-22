@@ -30,9 +30,9 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Wall(StoneWall): WorldObjectData(
+        StoneWallBlock: WorldObjectData(
             texture_pos: (1., 6.),
-            size: (32., 48.),
+            size: (16., 16.),
             anchor: None,
         ),
         DungeonStone: WorldObjectData(
@@ -86,7 +86,7 @@
             texture_pos: (2., 6.),
             size: (16., 16.),
         ),
-        Wall(StoneWall): SpriteData(
+        StoneWallBlock: SpriteData(
             texture_pos: (1., 6.),
             size: (16., 16.),
         ),

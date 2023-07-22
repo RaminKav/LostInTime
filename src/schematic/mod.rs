@@ -5,21 +5,17 @@ use bevy::{
     ecs::system::SystemState,
     math::{Affine3A, Mat3A, Vec3A},
     prelude::*,
-    scene::SceneInstance,
     tasks::IoTaskPool,
 };
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use strum_macros::{Display, IntoStaticStr};
 mod schematic_spawner;
 use crate::{
     inventory::ItemStack,
-    item::{Foliage, Wall, WorldObject},
+    item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
-    proto::proto_param::ProtoParam,
-    ui::minimap::UpdateMiniMapEvent,
     world::world_helpers::world_pos_to_tile_pos,
-    CustomFlush, GameParam,
+    GameParam, GameState,
 };
 
 use self::schematic_spawner::{
@@ -43,15 +39,18 @@ impl Plugin for SchematicPlugin {
         app.insert_resource(SchematicToggle::default())
             .register_type::<SchematicToggle>()
             .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
-            .add_systems((
-                save_schematic_scene,
-                load_schematic,
-                handle_new_scene_entities_parent_chunk.after(CustomFlush),
-                clear_schematic_entities,
-                mark_new_world_obj_as_schematic,
-                attempt_to_spawn_schematic_in_chunk,
-                give_chunks_schematic_spawners,
-            ));
+            .add_systems(
+                (
+                    handle_new_scene_entities_parent_chunk.before(handle_placing_world_object),
+                    save_schematic_scene,
+                    load_schematic,
+                    clear_schematic_entities,
+                    mark_new_world_obj_as_schematic,
+                    attempt_to_spawn_schematic_in_chunk,
+                    give_chunks_schematic_spawners,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            );
     }
 }
 fn mark_new_world_obj_as_schematic(
@@ -142,15 +141,15 @@ fn load_schematic(
     }
 }
 
-fn handle_new_scene_entities_parent_chunk(
-    mut game: GameParam,
-    new_scenes: Query<(Entity, &Children, &Transform), Added<SceneInstance>>,
+pub fn handle_new_scene_entities_parent_chunk(
+    game: GameParam,
+    new_scenes: Query<
+        (Entity, &Children, &Transform),
+        (With<Handle<DynamicScene>>, Added<Children>),
+    >,
     obj_data: Query<(&WorldObject, &GlobalTransform), (With<WorldObject>, Without<Player>)>,
-    mut proto_commands: ProtoCommands,
     mut commands: Commands,
-    prototypes: Prototypes,
-    mut proto_params: ProtoParam,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    mut place_item_event: EventWriter<PlaceItemEvent>,
 ) {
     for (e, children, scene_txfm) in new_scenes.iter() {
         let mut x_offset: f32 = 1_000_000_000.;
@@ -189,15 +188,11 @@ fn handle_new_scene_entities_parent_chunk(
                     is_valid_to_spawn = true;
                 }
                 if is_valid_to_spawn {
-                    obj.spawn_and_save_block(
-                        &mut proto_commands,
-                        &prototypes,
+                    place_item_event.send(PlaceItemEvent {
+                        obj: *obj,
                         pos,
-                        &mut minimap_event,
-                        &mut proto_params,
-                        &mut game,
-                        &mut commands,
-                    );
+                        is_from_player_item: false,
+                    });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);
                 }

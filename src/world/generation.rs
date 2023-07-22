@@ -4,7 +4,7 @@ use super::dungeon::Dungeon;
 use super::wall_auto_tile::{handle_wall_break, update_wall};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
-use crate::item::{Foliage, Wall, WorldObject};
+use crate::item::WorldObject;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
@@ -48,13 +48,13 @@ impl GenerationPlugin {
         // dont need to use expencive noise fn if it will always
         // result in the same tile
         if world_generation_params.stone_frequency == 1. {
-            return Some(WorldObject::Wall(Wall::StoneWall));
+            return Some(WorldObject::StoneWall);
         }
         let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
         let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
         let e = noise_helpers::get_perlin_noise_for_tile(nx, ny, seed);
         if e <= world_generation_params.stone_frequency {
-            return Some(WorldObject::Wall(Wall::StoneWall));
+            return Some(WorldObject::StoneWall);
         }
         None
     }
@@ -176,7 +176,7 @@ impl GenerationPlugin {
                     (
                         relative_tp.x as f32,
                         relative_tp.y as f32,
-                        WorldObject::Foliage(Foliage::Tree),
+                        WorldObject::Tree,
                     )
                 })
                 .collect::<Vec<(f32, f32, WorldObject)>>();
@@ -257,27 +257,15 @@ impl GenerationPlugin {
                     warn!("obj exists here {chunk_pos}, {tile_pos:?}");
                     continue;
                 }
-                let obj = match obj_data.2 {
-                    WorldObject::Foliage(obj) => proto_commands.spawn_object_from_proto(
-                        obj,
-                        tile_pos_to_world_pos(TileMapPositionData {
-                            tile_pos,
-                            chunk_pos,
-                        }),
-                        &prototypes,
-                        &mut proto_param,
-                    ),
-                    WorldObject::Wall(obj) => proto_commands.spawn_object_from_proto(
-                        obj,
-                        tile_pos_to_world_pos(TileMapPositionData {
-                            tile_pos,
-                            chunk_pos,
-                        }),
-                        &prototypes,
-                        &mut proto_param,
-                    ),
-                    _ => None,
-                };
+                let obj = proto_commands.spawn_object_from_proto(
+                    obj_data.2,
+                    tile_pos_to_world_pos(TileMapPositionData {
+                        tile_pos,
+                        chunk_pos,
+                    }),
+                    &prototypes,
+                    &mut proto_param,
+                );
                 if let Some(spawned_obj) = obj {
                     commands
                         .entity(spawned_obj)
