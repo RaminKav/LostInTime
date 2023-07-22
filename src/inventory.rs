@@ -2,12 +2,25 @@ use core::panic;
 use std::cmp::min;
 
 use crate::{
+    animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
     attributes::{AttributeModifier, ItemAttributes},
-    item::{CompleteRecipeEvent, ItemDisplayMetaData, WorldObject},
+    inputs::FacingDirection,
+    item::{
+        CompleteRecipeEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData,
+        MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS,
+    },
+    player::Limb,
+    proto::proto_param::ProtoParam,
     ui::{InventorySlotState, InventorySlotType},
+    world::{y_sort::YSort, CHUNK_SIZE},
+    GameParam,
 };
+use rand::Rng;
+
 use bevy::prelude::*;
+use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::*;
+use bevy_rapier2d::prelude::{Collider, Sensor};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const CHEST_SIZE: usize = 6 * 2;
@@ -65,18 +78,191 @@ pub struct ItemStack {
     pub metadata: ItemDisplayMetaData,
 }
 
+#[derive(Debug)]
+pub enum InventoryError {
+    FailedToMerge(String),
+}
 #[derive(Component, Debug, PartialEq, Clone)]
-
 pub struct InventoryItemStack {
     pub item_stack: ItemStack,
     pub slot: usize,
 }
 
-#[derive(Debug)]
-pub enum InventoryError {
-    FailedToMerge(String),
-}
 impl InventoryItemStack {
+    pub fn new(item_stack: ItemStack, slot: usize) -> Self {
+        Self { item_stack, slot }
+    }
+    pub fn get_obj(&self) -> &WorldObject {
+        &self.item_stack.obj_type
+    }
+    pub fn drop_item_on_slot(
+        &self,
+        container: &mut Container,
+        inv_slots: &mut Query<&mut InventorySlotState>,
+        slot_type: InventorySlotType,
+        proto_param: &ProtoParam,
+    ) -> Option<ItemStack> {
+        if !self.validate(slot_type, proto_param) {
+            return Some(self.item_stack.clone());
+        }
+        let obj_type = self.item_stack.obj_type;
+        let target_item_option = container.items[self.slot].clone();
+        if let Some(target_item) = target_item_option {
+            if target_item.get_obj() == &obj_type
+                && target_item.item_stack.metadata == self.item_stack.metadata
+                && target_item.item_stack.attributes == self.item_stack.attributes
+                && !(slot_type.is_equipment() || slot_type.is_accessory())
+            {
+                InventoryPlugin::mark_slot_dirty(self.slot, slot_type, inv_slots);
+                return InventoryPlugin::merge_item_stacks(
+                    self.item_stack.clone(),
+                    target_item,
+                    container,
+                );
+            } else {
+                return Some(InventoryPlugin::swap_items(
+                    self.item_stack.clone(),
+                    self.slot,
+                    container,
+                    inv_slots,
+                    slot_type,
+                ));
+            }
+        } else if self
+            .item_stack
+            .clone()
+            .try_add_to_target_inventory_slot(self.slot, container, inv_slots, slot_type)
+            .is_err()
+        {
+            panic!("Failed to drop item on stot");
+        }
+
+        None
+    }
+    /// spawns the item entity in this item stack in players hand
+    pub fn spawn_item_on_hand(
+        &self,
+        commands: &mut Commands,
+        game: &mut GameParam,
+        proto: &ProtoParam,
+    ) -> Entity {
+        let obj = *self.get_obj();
+        let limb = &Limb::Hands;
+        let item_map = &game.graphics.spritesheet_map;
+        if item_map.is_none() {
+            panic!("graphics not loaded");
+        }
+        //TODO: extract this out to helper fn vvvv
+        let is_block = obj.is_block();
+        let has_icon = if is_block {
+            game.graphics.icons.as_ref().unwrap().get(&obj)
+        } else {
+            None
+        };
+        let sprite = if let Some(icon) = has_icon {
+            icon.clone()
+        } else {
+            game.graphics
+                .spritesheet_map
+                .as_ref()
+                .unwrap()
+                .get(&obj)
+                .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
+                .clone()
+        };
+
+        let player_state = &mut game.game.player_state;
+        let player_e = game.player_query.single().0;
+        let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let is_facing_left = player_state.direction == FacingDirection::Left;
+
+        let position = Vec3::new(
+            PLAYER_EQUIPMENT_POSITIONS[limb].x
+                + anchor.x * obj_data.size.x
+                + if is_facing_left { 0. } else { 11. },
+            PLAYER_EQUIPMENT_POSITIONS[limb].y + anchor.y * obj_data.size.y,
+            0.01, //500. - (PLAYER_EQUIPMENT_POSITIONS[&limb].y + anchor.y * obj_data.size.y) * 0.1,
+        );
+        // despawn old held item if it exists
+        if let Some(main_hand_data) = &player_state.main_hand_slot {
+            commands.entity(main_hand_data.entity).despawn();
+        }
+
+        //spawn new item entity
+        let item = commands
+            .spawn(SpriteSheetBundle {
+                sprite,
+                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: position,
+                    scale: Vec3::new(1., 1., 1.),
+                    // rotation: Quat::from_rotation_z(0.8),
+                    ..Default::default()
+                },
+                visibility: Visibility::Visible,
+                ..Default::default()
+            })
+            .insert(Equipment(*limb))
+            .insert(Name::new("EquippedItem"))
+            .insert(self.item_stack.attributes.clone())
+            .insert(obj)
+            .set_parent(player_e)
+            .id();
+
+        let mut item_entity = commands.entity(item);
+
+        item_entity
+            .insert(MainHand)
+            .insert(Sensor)
+            .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
+            .insert(AttackAnimationTimer(
+                Timer::from_seconds(0.125, TimerMode::Once),
+                0.,
+            ));
+        player_state.main_hand_slot = Some(EquipmentData { obj, entity: item });
+        if let Some(melee) = proto.is_item_melee_weapon(obj) {
+            item_entity.insert(melee.clone());
+        }
+        if let Some(ranged) = proto.is_item_ranged_weapon(obj) {
+            item_entity.insert(ranged.clone());
+        }
+
+        item
+    }
+    // to split a stack, we right click on an existing stack.
+    // we do not know where the target stack is, and since the current stack
+    // is not moving, we are creating a new entity visual to drag
+    // the drag
+    pub fn split_stack(
+        &self,
+        item_slot_state: &mut InventorySlotState,
+        container: &mut Container,
+    ) -> ItemStack {
+        let (amount_split, remainder_left) = self.item_stack.clone().split();
+        let remainder_stack = if remainder_left > 0 {
+            Some(InventoryItemStack {
+                item_stack: ItemStack {
+                    obj_type: self.item_stack.obj_type.clone(),
+                    metadata: self.item_stack.metadata.clone(),
+                    attributes: self.item_stack.attributes.clone(),
+                    count: remainder_left,
+                },
+                slot: self.slot,
+            })
+        } else {
+            None
+        };
+        container.items[self.slot] = remainder_stack;
+        item_slot_state.dirty = true;
+        ItemStack {
+            obj_type: self.item_stack.obj_type.clone(),
+            metadata: self.item_stack.metadata.clone(),
+            attributes: self.item_stack.attributes.clone(),
+            count: amount_split,
+        }
+    }
+
     pub fn add_to_inventory(
         &self,
         container: &mut Container,
@@ -112,9 +298,96 @@ impl InventoryItemStack {
         }
         Some(self.clone())
     }
+    pub fn validate(&self, slot_type: InventorySlotType, proto_param: &ProtoParam) -> bool {
+        if !(slot_type.is_accessory() || slot_type.is_equipment()) {
+            return true;
+        }
+        let equipment_type =
+            proto_param.get_component::<EquipmentType, _>(self.item_stack.obj_type);
+        if let Some(equipment_type) = equipment_type {
+            return equipment_type.get_valid_slots().contains(&self.slot)
+                && equipment_type.get_valid_slot_type() == slot_type;
+        }
+        false
+    }
 }
 //TODO: abstract all these behind a AddItemToInventoryEvent ? let event drive info needed for sub-fns
 impl ItemStack {
+    //TODO: fix for later, remove and use proto
+    pub fn spawn_as_drop(
+        &self,
+        commands: &mut Commands,
+        game: &mut GameParam,
+        tile_pos: TilePos,
+        chunk_pos: IVec2,
+    ) -> Entity {
+        let item_map = &game.graphics.spritesheet_map;
+        let obj = self.obj_type;
+        if item_map.is_none() {
+            panic!("graphics not loaded");
+        }
+        let sprite = game
+            .graphics
+            .spritesheet_map
+            .as_ref()
+            .unwrap()
+            .get(&obj)
+            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
+            .clone();
+        let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
+        let mut rng = rand::thread_rng();
+        let drop_spread = 10.;
+
+        let position = Vec3::new(
+            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.x * obj_data.size.x
+                + rng.gen_range(-drop_spread..drop_spread),
+            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.y * obj_data.size.y
+                + rng.gen_range(-drop_spread..drop_spread),
+            500. - ((tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
+                + anchor.y * obj_data.size.y
+                + rng.gen_range(-drop_spread..drop_spread))
+                * 0.1,
+        );
+
+        let transform = Transform {
+            translation: position,
+            scale: Vec3::new(1., 1., 1.),
+            ..Default::default()
+        };
+
+        let item = commands
+            .spawn(SpriteSheetBundle {
+                sprite,
+                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform,
+                ..Default::default()
+            })
+            .insert(Name::new("DropItem"))
+            .insert(self.clone())
+            //TODO: double colliders??
+            .insert(Collider::cuboid(8., 8.))
+            .insert(Sensor)
+            .insert(AnimationTimer(Timer::from_seconds(
+                0.1,
+                TimerMode::Repeating,
+            )))
+            .insert(AnimationPosTracker(0., 0., 0.3))
+            .insert(YSort)
+            .insert(obj)
+            .id();
+
+        commands.entity(item).insert(Collider::cuboid(
+            obj_data.size.x / 3.5,
+            obj_data.size.y / 4.5,
+        ));
+        game.world_obj_data
+            .drop_entities
+            .insert(item, (self.clone(), transform));
+        item
+    }
     pub fn copy_with_attributes(&self, attributes: &ItemAttributes) -> Self {
         Self {
             obj_type: self.obj_type,
@@ -136,14 +409,14 @@ impl ItemStack {
         // TODO: abstract direct access of .obj_type behind a getter
         if let Some(stack) = container.items.iter().find(|i| match i {
             Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => {
-                ii.item_stack.obj_type == self.obj_type
-                    && ii.item_stack.attributes == self.attributes
+                *ii.get_obj() == self.obj_type && ii.item_stack.attributes == self.attributes
             }
             _ => false,
         }) {
             // safe to unwrap, we check for it above
             let slot = stack.clone().unwrap().slot;
-            let pre_stack_size = container.items[slot].clone().unwrap().item_stack.count;
+            let inv_item_stack = container.items[slot].clone().unwrap();
+            let pre_stack_size = inv_item_stack.item_stack.count;
 
             container.items[slot] = Some(InventoryItemStack {
                 item_stack: Self {
@@ -154,7 +427,11 @@ impl ItemStack {
                 },
                 slot,
             });
-            InventoryPlugin::mark_slot_dirty(slot, InventorySlotType::Normal, inv_slots);
+            InventoryPlugin::mark_slot_dirty(
+                inv_item_stack.slot,
+                InventorySlotType::Normal,
+                inv_slots,
+            );
 
             if pre_stack_size + self.count > MAX_STACK_SIZE {
                 Self::add_to_empty_inventory_slot(
@@ -195,7 +472,7 @@ impl ItemStack {
     ) -> Result<(), InventoryError> {
         let inv_or_crafting = container.items[slot].clone();
         if let Some(mut existing_stack) = inv_or_crafting {
-            if existing_stack.item_stack.obj_type == self.obj_type {
+            if existing_stack.get_obj() == &self.obj_type {
                 existing_stack.modify_count(self.count as i8);
                 return Ok(());
             }
@@ -257,7 +534,7 @@ impl InventoryPlugin {
     ) -> Option<ItemStack> {
         let item_type = to_merge.obj_type;
         //TODO: should this return  None, or the original stack??
-        if item_type != merge_into.item_stack.obj_type
+        if item_type != *merge_into.get_obj()
             || merge_into.item_stack.metadata != to_merge.metadata
             || merge_into.item_stack.attributes != to_merge.attributes
         {
@@ -300,7 +577,7 @@ impl InventoryPlugin {
         if let Some(pickup_item) = pickup_item_option {
             let item_type = dragging_item.obj_type;
             //TODO: should this return  None, or the original stack??
-            if item_type != pickup_item.item_stack.obj_type
+            if item_type != *pickup_item.get_obj()
                 || pickup_item.item_stack.metadata != dragging_item.metadata
                 || pickup_item.item_stack.attributes != dragging_item.attributes
             {
@@ -353,74 +630,10 @@ impl InventoryPlugin {
             });
 
             container.items[target_slot] = swapped_item;
-            Self::mark_slot_dirty(target_slot, slot_type, inv_slots);
+            InventoryPlugin::mark_slot_dirty(target_item_stack.slot, slot_type, inv_slots);
             return target_item_stack.item_stack;
         }
         item
-    }
-    pub fn drop_item_on_slot(
-        item: ItemStack,
-        drop_slot: usize,
-        container: &mut Container,
-        inv_slots: &mut Query<&mut InventorySlotState>,
-        slot_type: InventorySlotType,
-    ) -> Option<ItemStack> {
-        let obj_type = item.obj_type;
-        let target_item_option = container.items[drop_slot].clone();
-        if let Some(target_item) = target_item_option {
-            if target_item.item_stack.obj_type == obj_type
-                && target_item.item_stack.metadata == item.metadata
-                && target_item.item_stack.attributes == item.attributes
-            {
-                Self::mark_slot_dirty(drop_slot, slot_type, inv_slots);
-                return Self::merge_item_stacks(item, target_item, container);
-            } else {
-                return Some(Self::swap_items(
-                    item, drop_slot, container, inv_slots, slot_type,
-                ));
-            }
-        } else if item
-            .try_add_to_target_inventory_slot(drop_slot, container, inv_slots, slot_type)
-            .is_err()
-        {
-            panic!("Failed to drop item on stot");
-        }
-
-        None
-    }
-
-    // to split a stack, we right click on an existing stack.
-    // we do not know where the target stack is, and since the current stack
-    // is not moving, we are creating a new entity visual to drag
-    // the drag
-    pub fn split_stack(
-        item_stack: ItemStack,
-        item_slot: usize,
-        item_slot_state: &mut InventorySlotState,
-        container: &mut Container,
-    ) -> ItemStack {
-        let (amount_split, remainder_left) = item_stack.clone().split();
-        let remainder_stack = if remainder_left > 0 {
-            Some(InventoryItemStack {
-                item_stack: ItemStack {
-                    obj_type: item_stack.obj_type.clone(),
-                    metadata: item_stack.metadata.clone(),
-                    attributes: item_stack.attributes.clone(),
-                    count: remainder_left,
-                },
-                slot: item_slot,
-            })
-        } else {
-            None
-        };
-        container.items[item_slot] = remainder_stack;
-        item_slot_state.dirty = true;
-        ItemStack {
-            obj_type: item_stack.obj_type.clone(),
-            metadata: item_stack.metadata.clone(),
-            attributes: item_stack.attributes.clone(),
-            count: amount_split,
-        }
     }
     //TODO: Maybe make a resource to instead store slot indexs, and then mark them all dirty in a system?
     // benefit: dont need to pass in the inv slot query anymore

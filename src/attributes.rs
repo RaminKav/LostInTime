@@ -2,10 +2,13 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{
-    inventory::{Inventory, InventoryItemStack},
-    item::{Equipment, ItemDisplayMetaData},
-    ui::{InventorySlotState, InventorySlotType, InventoryState},
-    CustomFlush, GameState, Player,
+    animations::AnimatedTextureMaterial,
+    inventory::{Inventory},
+    item::{Equipment},
+    player::Limb,
+    proto::proto_param::ProtoParam,
+    ui::{DropOnSlotEvent, InventoryState},
+    CustomFlush, GameParam, GameState, Player,
 };
 
 pub struct AttributesPlugin;
@@ -125,83 +128,133 @@ impl Plugin for AttributesPlugin {
             .add_event::<AttributeChangeEvent>()
             .add_systems(
                 (
-                    Self::clamp_health,
-                    Self::add_current_health_with_max_health,
-                    Self::handle_update_inv_item_entities,
-                    Self::handle_player_attribute_change_events.after(CustomFlush),
+                    clamp_health,
+                    add_current_health_with_max_health,
+                    update_held_hotbar_item,
+                    handle_equipment_equiped,
+                    handle_player_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
 
-impl AttributesPlugin {
-    fn clamp_health(mut health: Query<&mut CurrentHealth, With<Player>>) {
-        for mut h in health.iter_mut() {
-            if h.0 < 0 {
-                h.0 = 0;
-            } else if h.0 > 100 {
-                h.0 = 100;
-            }
+fn clamp_health(mut health: Query<&mut CurrentHealth, With<Player>>) {
+    for mut h in health.iter_mut() {
+        if h.0 < 0 {
+            h.0 = 0;
+        } else if h.0 > 100 {
+            h.0 = 100;
         }
     }
-    fn handle_player_attribute_change_events(
-        mut commands: Commands,
-        player: Query<Entity, With<Player>>,
-        eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
-        mut att_events: EventReader<AttributeChangeEvent>,
-        player_atts: Query<&ItemAttributes, With<Player>>,
-    ) {
-        for _event in att_events.iter() {
-            let mut new_att = player_atts.single().clone();
-            for a in eqp_attributes.iter() {
-                new_att.health += a.health;
-                new_att.attack += a.attack;
-                new_att.attack_cooldown += a.attack_cooldown;
-                new_att.invincibility_cooldown += a.invincibility_cooldown;
-            }
-            if new_att.attack_cooldown == 0. {
-                new_att.attack_cooldown = 0.4;
-            }
-            let player = player.single();
-            new_att.add_attribute_components(&mut commands.entity(player));
-        }
-    }
+}
+fn handle_player_attribute_change_events(
+    mut commands: Commands,
+    player: Query<(Entity, &Inventory), With<Player>>,
+    eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
+    mut att_events: EventReader<AttributeChangeEvent>,
+    player_atts: Query<&ItemAttributes, With<Player>>,
+) {
+    for _event in att_events.iter() {
+        let mut new_att = player_atts.single().clone();
+        let (player, inv) = player.single();
+        let equips: Vec<ItemAttributes> = inv
+            .equipment_items
+            .items
+            .iter()
+            .chain(inv.accessory_items.items.iter())
+            .flatten()
+            .map(|e| e.item_stack.attributes.clone())
+            .collect();
 
-    /// when items in the inventory state change, update the matching entities in the UI
-    fn handle_update_inv_item_entities(
-        mut inv: Query<&mut Inventory, Changed<Inventory>>,
-        mut inv_slot_state: Query<&mut InventorySlotState>,
-        inv_state: Res<InventoryState>,
-        mut commands: Commands,
-    ) {
-        if !inv_state.open {
-            return;
+        for a in eqp_attributes.iter().chain(equips.iter()) {
+            new_att.health += a.health;
+            new_att.attack += a.attack;
+            new_att.attack_cooldown += a.attack_cooldown;
+            new_att.invincibility_cooldown += a.invincibility_cooldown;
         }
-        if let Ok(inv) = inv.get_single_mut() {
-            for inv_item_option in inv.clone().items.items.iter() {
-                if let Some(inv_item) = inv_item_option {
-                    let item = inv_item.item_stack.clone();
-                    for slot_state in inv_slot_state.iter_mut() {
-                        if slot_state.slot_index == inv_item.slot
-                            && slot_state.r#type == InventorySlotType::Normal
-                        {
-                            if let Some(item_e) = slot_state.item {
-                                commands.entity(item_e).insert(item.clone());
-                            }
-                        }
+        if new_att.attack_cooldown == 0. {
+            new_att.attack_cooldown = 0.4;
+        }
+        new_att.add_attribute_components(&mut commands.entity(player));
+    }
+}
+
+/// Adds a current health component to all entities with a max health component
+fn add_current_health_with_max_health(
+    mut commands: Commands,
+    mut health: Query<(Entity, &MaxHealth), (Changed<MaxHealth>, Without<CurrentHealth>)>,
+) {
+    for (entity, max_health) in health.iter_mut() {
+        commands.entity(entity).insert(CurrentHealth(max_health.0));
+    }
+}
+
+///Tracks player held item changes, spawns new held item entity and updates player attributes
+fn update_held_hotbar_item(
+    mut commands: Commands,
+    mut game_param: GameParam,
+    inv_state: Res<InventoryState>,
+    mut inv: Query<&mut Inventory>,
+    item_stack_query: Query<&ItemAttributes>,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+    proto: ProtoParam,
+) {
+    let active_hotbar_slot = inv_state.active_hotbar_slot;
+    let active_hotbar_item = inv.single_mut().items.items[active_hotbar_slot].clone();
+    let player_data = &mut game_param.game.player_state;
+    let prev_held_item_data = &player_data.main_hand_slot;
+    if let Some(new_item) = active_hotbar_item {
+        let new_item_obj = new_item.get_obj();
+        if let Some(current_item) = prev_held_item_data {
+            let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
+            let new_attributes = &new_item.item_stack.attributes;
+            if new_item_obj != &current_item.obj {
+                new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
+                att_event.send(AttributeChangeEvent);
+            } else if curr_attributes != new_attributes {
+                commands
+                    .entity(current_item.entity)
+                    .insert(new_attributes.clone());
+                att_event.send(AttributeChangeEvent);
+            }
+        } else {
+            new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
+            att_event.send(AttributeChangeEvent);
+        }
+    } else if let Some(current_item) = prev_held_item_data {
+        commands.entity(current_item.entity).despawn();
+        player_data.main_hand_slot = None;
+        att_event.send(AttributeChangeEvent);
+    }
+}
+///Tracks player equip or accessory inventory slot changes,
+///spawns new held equipment entity, and updates player attributes
+fn handle_equipment_equiped(
+    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+    mut events: EventReader<DropOnSlotEvent>,
+) {
+    for drop in events.iter() {
+        if drop.drop_target_slot_state.r#type.is_equipment()
+            || drop.drop_target_slot_state.r#type.is_accessory()
+        {
+            let slot = drop.drop_target_slot_state.slot_index;
+            att_event.send(AttributeChangeEvent);
+            if drop.drop_target_slot_state.r#type.is_equipment() {
+                for (mat, limb) in player_limbs.iter() {
+                    if limb == &Limb::from_slot(slot) || (limb == &Limb::Hands && slot == 2) {
+                        let mut mat = materials.get_mut(mat).unwrap();
+                        let armor_texture_handle = asset_server.load(format!(
+                            "textures/player/{}.png",
+                            drop.dropped_item_stack.obj_type.to_string()
+                        ));
+                        mat.lookup_texture = Some(armor_texture_handle);
                     }
                 }
             }
-        }
-    }
-    /// Adds a current health component to all entities with a max health component
-    fn add_current_health_with_max_health(
-        mut commands: Commands,
-        mut health: Query<(Entity, &MaxHealth), (Changed<MaxHealth>, Without<CurrentHealth>)>,
-    ) {
-        for (entity, max_health) in health.iter_mut() {
-            commands.entity(entity).insert(CurrentHealth(max_health.0));
         }
     }
 }

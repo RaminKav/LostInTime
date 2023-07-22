@@ -1,9 +1,6 @@
 pub use bevy::prelude::*;
 
-use crate::{
-    assets::Graphics,
-    inventory::{Container, InventoryItemStack, CHEST_SIZE},
-};
+use crate::{assets::Graphics, inventory::Container};
 
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,

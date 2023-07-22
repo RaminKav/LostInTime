@@ -147,9 +147,8 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     .foliage_material_map
                     .as_ref()
                     .unwrap()
-                    .get(&WorldObject::Foliage(Foliage::Tree))
-                    .unwrap()
-                    .0;
+                    .get(&Foliage::Tree)
+                    .unwrap();
                 spawned_entity_commands
                     .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
                         shape::Quad {
@@ -157,7 +156,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                             ..Default::default()
                         },
                     ))))
-                    .insert(foliage_material.clone());
+                    .insert((*foliage_material).clone());
             }
             WorldObject::Wall(_) => {
                 spawned_entity_commands

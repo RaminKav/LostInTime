@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::{
     attributes::{CurrentHealth, MaxHealth},
-    colors::{BLACK, RED, YELLOW},
+    colors::{RED, YELLOW},
     combat::HitEvent,
     enemy::Mob,
 };
@@ -93,7 +93,7 @@ pub fn handle_add_damage_numbers_after_hit(
                     TextStyle {
                         font: asset_server.load("fonts/Kitchen Sink.ttf"),
                         font_size: 8.0,
-                        color: BLACK,
+                        color: RED,
                     },
                 ),
                 transform: Transform {

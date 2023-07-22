@@ -14,7 +14,7 @@ use strum_macros::{Display, IntoStaticStr};
 mod schematic_spawner;
 use crate::{
     inventory::ItemStack,
-    item::{Foliage, Placeable, Wall, WorldObject},
+    item::{Foliage, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
     ui::minimap::UpdateMiniMapEvent,
@@ -94,7 +94,6 @@ fn save_schematic_scene(world: &mut World) {
             writer.register::<WorldObject>();
             writer.register::<Wall>();
             writer.register::<Foliage>();
-            writer.register::<Placeable>();
             writer.register::<Transform>();
             writer.register::<GlobalTransform>();
             writer.register::<Vec3>();

@@ -154,6 +154,7 @@ impl different att styles w seldum_state
   - different states to easily change what UIs ar shown for npc trades, etc
 - ui slot for off-hands (throwable or any right-clickable item)
 - rework tooltips to be a large display on the side?
+- possible UI refactor is include InventorySlotState in InventoryItemStack
 
 ## Features
 
@@ -163,8 +164,8 @@ impl different att styles w seldum_state
 [] `Blocked below` Dungeons: add item that tp to dungeon instance, spawned from schematic probably
 [] Items: add right-click ability items
 [] Items: add random roll stats, clean up naming of stats too
-[] Equipment: UI to equip, visuals pipeline
-[] UI: Containers, allow different UI inventory states to allow for chests, npcs
+[x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
+[x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
 [] Add colliders to water (use corners)
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)

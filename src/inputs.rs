@@ -6,15 +6,15 @@ use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth};
+use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
-use crate::inventory::{Container, Inventory, CHEST_SIZE, INVENTORY_INIT};
+use crate::inventory::{Container, Inventory, CHEST_SIZE};
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, WorldObject};
+use crate::item::{Equipment, PlacesInto, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, InventoryUIState};
+use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{
@@ -239,6 +239,30 @@ impl InputsPlugin {
                 game.game.player_state.position.truncate(),
                 1,
             );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Chestplate,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Pants,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Ring,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Pendant,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
         }
 
         if key_input.just_pressed(KeyCode::P) {
@@ -267,7 +291,7 @@ impl InputsPlugin {
     pub fn test_take_damage(
         // mut player_health_query: Query<&mut Health, With<Player>>,
         key_input: ResMut<Input<KeyCode>>,
-        att_query: Query<(&mut CurrentHealth, &Attack, &AttackCooldown), With<Player>>,
+        att_query: Query<(&mut CurrentHealth, &MaxHealth, &Attack, &AttackCooldown), With<Player>>,
     ) {
         if key_input.just_pressed(KeyCode::X) {
             // att_query.single_mut().0 -= 20;
@@ -450,14 +474,10 @@ impl InputsPlugin {
             let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
             if let Some(mut held_item) = held_item_option {
-                if let Some(places_into_item) = game
-                    .world_obj_data
-                    .properties
-                    .get(&held_item.item_stack.obj_type)
-                    .unwrap()
-                    .places_into
+                if let Some(places_into_item) =
+                    proto_params.get_component::<PlacesInto, _>(*held_item.get_obj())
                 {
-                    if let Some(_able_to_spawn) = places_into_item.spawn_and_save_block(
+                    if let Some(_able_to_spawn) = places_into_item.0.spawn_and_save_block(
                         &mut proto_commands,
                         &prototypes,
                         cursor_pos.world_coords.truncate(),

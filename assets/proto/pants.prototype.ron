@@ -1,0 +1,21 @@
+(
+  name: "Pants",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Pants,
+  "survival_rogue_like::item::EquipmentType": Legs,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Pants,
+        attributes: (
+            durability: 100,
+            max_durability: 100,
+            health: 15,
+        ),
+        metadata: (
+            name: "Pants", 
+            desc: "Nice."
+        ),
+        count: 1
+  ),
+  }
+)

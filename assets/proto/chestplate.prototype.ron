@@ -1,0 +1,21 @@
+(
+  name: "Chestplate",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Chestplate,
+  "survival_rogue_like::item::EquipmentType": Chest,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Chestplate,
+        attributes: (
+            durability: 100,
+            max_durability: 100,
+            health: 20,
+        ),
+        metadata: (
+            name: "Chestplate", 
+            desc: "Nice."
+        ),
+        count: 1
+  ),
+  }
+)

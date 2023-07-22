@@ -10,9 +10,12 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::item::{RecipeList, Recipes, WorldObject, WorldObjectResource};
+use crate::item::{
+    Equipment, Foliage, RecipeList, Recipes, Wall, WorldObject, WorldObjectResource,
+};
 use crate::ui::UIElement;
-use crate::{player::Limb, GameState, ImageAssets};
+use crate::GameParam;
+use crate::{GameState, ImageAssets};
 use ron::de::from_str;
 
 pub struct GameAssetsPlugin;
@@ -23,39 +26,20 @@ pub struct WorldObjectData {
     pub texture_pos: Vec2,
     pub size: Vec2,
     pub anchor: Option<Vec2>,
-    pub collider: bool,
-    pub breakable: bool,
-    pub breaks_into: Option<WorldObject>,
-    pub breaks_with: Option<WorldObject>,
-    /// 0 = main hand, 1 = head, 2 = chest, 3 = legs
-    pub equip_slot: Option<Limb>,
-    pub places_into: Option<WorldObject>,
 }
 
 impl WorldObjectData {
-    // pub fn new(texture_pos: Vec2, size: Vec2) -> Self {
-    //     Self {
-    //         texture_pos,
-    //         size,
-    //         anchor: None,
-    //         collider: false,
-    //         breakable: false,
-    //         breaks_into: None,
-    //         equip_slot: None,
-    //         breaks_with: None,
-    //         places_into: None,
-    //         minimap_color: ,
-    //     }
-    // }
-
     pub fn to_atlas_rect(self) -> bevy::math::Rect {
         bevy::math::Rect {
             //A tiny amount is clipped off the sides of the rectangle
             //to stop contents of other sprites from bleeding through
-            min: Vec2::new(self.texture_pos.x + 0.15, self.texture_pos.y + 0.15),
+            min: Vec2::new(
+                self.texture_pos.x * 16. + 0.15,
+                self.texture_pos.y * 16. + 0.15,
+            ),
             max: Vec2::new(
-                self.texture_pos.x + self.size.x - 0.15,
-                self.texture_pos.y + self.size.y - 0.15,
+                self.texture_pos.x * 16. + self.size.x - 0.15,
+                self.texture_pos.y * 16. + self.size.y - 0.15,
             ),
         }
     }
@@ -84,6 +68,7 @@ impl Plugin for GameAssetsPlugin {
                 foliage_material_map: None,
                 ui_image_handles: None,
             })
+            .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
     }
 }
@@ -129,7 +114,7 @@ pub struct Graphics {
     pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
     pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
-    pub foliage_material_map: Option<HashMap<WorldObject, (Handle<FoliageMaterial>, usize)>>,
+    pub foliage_material_map: Option<HashMap<Foliage, Handle<FoliageMaterial>>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
 }
 
@@ -220,26 +205,8 @@ impl GameAssetsPlugin {
         let mut recipes_list = RecipeList::default();
 
         for (item, rect) in sprite_desc.items.iter() {
-            println!("Found graphic {item:?}");
+            println!("Found graphic {item:?} {:?}", rect.to_atlas_rect());
             match item {
-                WorldObject::Foliage(f) => {
-                    let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
-                    let foliage_material = materials.add(FoliageMaterial {
-                        source_texture: Some(handle),
-                        speed: 0.5,
-                        minStrength: 0.001,
-                        maxStrength: 0.003,
-                        strengthScale: 20.,
-                        interval: 3.5,
-                        detail: 1.,
-                        distortion: 1.,
-                        heightOffset: 0.4,
-                        offset: 0.,
-                        // alpha_mode: AlphaMode::Blend,
-                    });
-                    foliage_material_map
-                        .insert(*item, (foliage_material, get_index_from_pixel_cords(*rect)));
-                }
                 _ => {
                     let mut sprite =
                         TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
@@ -259,12 +226,32 @@ impl GameAssetsPlugin {
             // };
             world_obj_data.properties.insert(*item, *rect);
         }
+        // load foliage mat
+        for f in Foliage::iter() {
+            let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
+            let foliage_material = materials.add(FoliageMaterial {
+                source_texture: Some(handle),
+                speed: 0.5,
+                minStrength: 0.001,
+                maxStrength: 0.003,
+                strengthScale: 20.,
+                interval: 3.5,
+                detail: 1.,
+                distortion: 1.,
+                heightOffset: 0.4,
+                offset: 0.,
+                // alpha_mode: AlphaMode::Blend,
+            });
+            foliage_material_map.insert(f, foliage_material);
+        }
 
         // load icons
         for (item, rect) in sprite_desc.icons.iter() {
-            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(
-                bevy::math::Rect::from_corners(rect.texture_pos, rect.texture_pos + rect.size),
-            ));
+            let mut sprite =
+                TextureAtlasSprite::new(atlas.add_texture(bevy::math::Rect::from_corners(
+                    rect.texture_pos * 16.,
+                    rect.texture_pos * 16. + rect.size,
+                )));
 
             //Set the size to be proportional to the source rectangle
             sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
@@ -296,6 +283,34 @@ impl GameAssetsPlugin {
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
         };
+    }
+    /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
+    pub fn update_graphics(
+        mut to_update_query: Query<
+            (Entity, &mut TextureAtlasSprite, &WorldObject),
+            (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
+        >,
+        game: GameParam,
+        mut commands: Commands,
+        graphics: Res<Graphics>,
+    ) {
+        let item_map = &&graphics.spritesheet_map;
+        if let Some(item_map) = item_map {
+            for (e, mut sprite, world_object) in to_update_query.iter_mut() {
+                let has_icon = graphics.icons.as_ref().unwrap().get(&world_object);
+                let new_sprite = if let Some(icon) = has_icon {
+                    icon
+                } else {
+                    &item_map
+                        .get(world_object)
+                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
+                };
+                commands
+                    .entity(e)
+                    .insert(game.graphics.texture_atlas.as_ref().unwrap().clone());
+                sprite.clone_from(new_sprite);
+            }
+        }
     }
 }
 

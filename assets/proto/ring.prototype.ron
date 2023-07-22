@@ -1,0 +1,22 @@
+(
+  name: "Ring",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Ring,
+  "survival_rogue_like::item::EquipmentType": Ring,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Ring,
+        attributes: (
+            durability: 100,
+            max_durability: 100,
+            health: 10,
+            attack: 5,
+        ),
+        metadata: (
+            name: "Ring", 
+            desc: "shiny!"
+        ),
+        count: 1
+  ),
+  }
+)

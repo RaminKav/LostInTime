@@ -24,7 +24,8 @@ use crate::{
     item::{
         melee::MeleeAttack,
         projectile::{Projectile, ProjectileState, RangedAttack},
-        Block, Breakable, BreaksWith, ItemDisplayMetaData, Loot, LootTable, Wall, WorldObject,
+        Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
+        PlacesInto, Wall, WorldObject,
     },
     world::WorldObjectEntityData,
     CustomFlush, GameState, YSort,
@@ -46,6 +47,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<WorldObject>()
             .register_type::<Option<WorldObject>>()
             .register_type::<Breakable>()
+            .register_type::<PlacesInto>()
             .register_type::<BreaksWith>()
             .register_type::<Block>()
             .register_type::<DoneAnimation>()
@@ -65,6 +67,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
             .register_type::<ColliderProto>()
+            .register_type::<EquipmentType>()
             .register_type::<AnimationTimerProto>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
@@ -95,11 +98,16 @@ impl ProtoPlugin {
         prototypes.load("proto/electricity.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
+        prototypes.load("proto/chestplate.prototype.ron");
+        prototypes.load("proto/pants.prototype.ron");
         prototypes.load("proto/dagger.prototype.ron");
         prototypes.load("proto/basicstaff.prototype.ron");
         prototypes.load("proto/dualstaff.prototype.ron");
         prototypes.load("proto/firestaff.prototype.ron");
+        prototypes.load("proto/ring.prototype.ron");
+        prototypes.load("proto/pendant.prototype.ron");
         prototypes.load("proto/flint.prototype.ron");
+        prototypes.load("proto/log.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");
     }

@@ -1,0 +1,22 @@
+(
+  name: "Pendant",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Pendant,
+  "survival_rogue_like::item::EquipmentType": Pendant,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Pendant,
+        attributes: (
+            durability: 100,
+            max_durability: 100,
+            health: 15,
+            attack: 5,
+        ),
+        metadata: (
+            name: "Pendant", 
+            desc: "shiny!"
+        ),
+        count: 1
+  ),
+  }
+)

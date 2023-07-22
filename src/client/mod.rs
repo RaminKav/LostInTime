@@ -14,7 +14,7 @@ use bevy_save::prelude::*;
 
 use crate::{
     attributes::CurrentHealth,
-    item::{Foliage, Placeable, Wall, WorldObject},
+    item::{Foliage, Wall, WorldObject},
     ui::minimap::Minimap,
     world::{
         chunk::{
@@ -67,7 +67,6 @@ impl Plugin for ClientPlugin {
             .register_saveable::<WorldObject>()
             .register_saveable::<Foliage>()
             .register_saveable::<Wall>()
-            .register_saveable::<Placeable>()
             // .register_saveable::<Mesh2dHandle>()
             // .register_saveable::<Handle<FoliageMaterial>>()
             // .register_saveable::<Handle<TextureAtlas>>()
@@ -185,9 +184,8 @@ impl ClientPlugin {
             .foliage_material_map
             .as_ref()
             .unwrap()
-            .get(&WorldObject::Foliage(Foliage::Tree))
-            .unwrap()
-            .0;
+            .get(&Foliage::Tree)
+            .unwrap();
 
         for (e, obj) in loaded_entities.iter() {
             match obj {
@@ -198,7 +196,7 @@ impl ClientPlugin {
                             size: Vec2::new(32., 40.),
                             ..Default::default()
                         }))))
-                        .insert(foliage_material.clone());
+                        .insert((*foliage_material).clone());
                 }
                 WorldObject::Wall(_) => {
                     println!("ADDING WALL VISUALS");

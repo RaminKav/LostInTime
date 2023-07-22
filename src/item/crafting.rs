@@ -42,7 +42,7 @@ impl CraftingPlugin {
             let mut recipe: CraftingGrid = [[None; 2]; 2];
             for stack_option in crafting_slots.iter() {
                 if let Some(stack) = stack_option {
-                    let item = stack.item_stack.obj_type;
+                    let item = *stack.get_obj();
                     let x = if stack.slot < 2 { 0 } else { 1 };
                     let y = if stack.slot % 2 == 0 { 0 } else { 1 };
                     recipe[x][y] = Some(item);
