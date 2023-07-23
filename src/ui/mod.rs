@@ -28,6 +28,7 @@ impl Plugin for UIPlugin {
             .insert_resource(LastHoveredSlot { slot: None })
             .insert_resource(InventoryState::default())
             .add_event::<DropOnSlotEvent>()
+            .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
             .add_event::<DropInWorldEvent>()
             .register_type::<InventorySlotState>()

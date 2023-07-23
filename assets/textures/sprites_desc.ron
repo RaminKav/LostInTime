@@ -40,11 +40,6 @@
             size: (32., 32.),
             anchor: None,
         ),
-        // Foliage(Tree): WorldObjectData(
-        //     texture_pos: (96., 112.),
-        //     size: (32., 40.),
-        //     anchor: None,
-        // ),
         Sword: WorldObjectData(
             texture_pos: (3., 4.),
             size: (16., 16.),
@@ -65,7 +60,7 @@
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
-         DualStaff: WorldObjectData(
+        DualStaff: WorldObjectData(
             texture_pos: (7., 4.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
@@ -86,7 +81,7 @@
             anchor: None,
         ),
         SmallPotion: WorldObjectData(
-            texture_pos: (1., 5.),
+            texture_pos: (2., 5.),
             size: (16., 16.),
             anchor: None,
         ),

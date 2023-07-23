@@ -579,7 +579,8 @@ pub fn handle_update_inv_item_entities(
                 let item = inv_item.item_stack.clone();
                 for slot_state in inv_slot_state.iter_mut() {
                     if slot_state.slot_index == inv_item.slot
-                        && slot_state.r#type == InventorySlotType::Normal
+                        && (slot_state.r#type == InventorySlotType::Normal
+                            || slot_state.r#type == InventorySlotType::Hotbar)
                     {
                         if let Some(item_e) = slot_state.item {
                             commands.entity(item_e).insert(item.clone());

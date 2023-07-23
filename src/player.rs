@@ -64,12 +64,12 @@ pub enum Limb {
     Head,
 }
 impl Limb {
-    pub fn from_slot(slot: usize) -> Self {
+    pub fn from_slot(slot: usize) -> Vec<Self> {
         match slot {
-            3 => Self::Head,
-            2 => Self::Torso,
-            1 => Self::Hands,
-            0 => Self::Legs,
+            3 => vec![Self::Head],
+            2 => vec![Self::Torso, Self::Hands],
+            1 => vec![Self::Legs],
+            0 => vec![],
             _ => panic!("Invalid slot"),
         }
     }

@@ -643,7 +643,9 @@ impl InventoryPlugin {
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
         for mut state in inv_slots.iter_mut() {
-            if state.slot_index == slot_index && state.r#type == slot_type {
+            if state.slot_index == slot_index
+                && (state.r#type == slot_type || state.r#type.is_hotbar())
+            {
                 state.dirty = true;
             }
         }

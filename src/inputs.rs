@@ -18,9 +18,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
-use crate::world::world_helpers::{
-    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos,
-};
+use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 use crate::world::TileMapPositionData;
 use crate::{
     custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
@@ -391,6 +389,18 @@ impl InputsPlugin {
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
         mut item_action_param: ItemActionParam,
     ) {
+        // println!(
+        //     "C: {cursor_chunk_pos:?}  T: {cursor_tile_pos:?} {:?} {:?} P: {player_pos:?}",
+        //     game.get_tile_data(TileMapPositionData {
+        //         chunk_pos: cursor_chunk_pos,
+        //         tile_pos: cursor_tile_pos
+        //     }),
+        //     game.get_tile_obj_data(TileMapPositionData {
+        //         chunk_pos: cursor_chunk_pos,
+        //         tile_pos: cursor_tile_pos
+        //     })
+        // );
+
         if inv_state.open {
             return;
         }
@@ -406,14 +416,7 @@ impl InputsPlugin {
                 main_hand_option = Some(tool.obj);
             }
             let player_pos = game.game.player_state.position;
-            let cursor_chunk_pos = camera_pos_to_chunk_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
-            let cursor_tile_pos = camera_pos_to_tile_pos(&Vec2::new(
-                cursor_pos.world_coords.x,
-                cursor_pos.world_coords.y,
-            ));
+            let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
             if let Ok(ranged_tool) = tool_query.get_single() {
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
@@ -422,18 +425,6 @@ impl InputsPlugin {
                 })
             }
             attack_event.send(AttackEvent);
-
-            // println!(
-            //     "C: {cursor_chunk_pos:?}  T: {cursor_tile_pos:?} {:?} {:?} P: {player_pos:?}",
-            //     game.get_tile_data(TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: cursor_tile_pos
-            //     }),
-            //     game.get_tile_obj_data(TileMapPositionData {
-            //         chunk_pos: cursor_chunk_pos,
-            //         tile_pos: cursor_tile_pos
-            //     })
-            // );
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
@@ -441,14 +432,7 @@ impl InputsPlugin {
             {
                 return;
             }
-            if let Some(hit_obj) = game.get_obj_entity_at_tile(TileMapPositionData {
-                tile_pos: TilePos {
-                    x: cursor_tile_pos.x as u32,
-                    y: cursor_tile_pos.y as u32,
-                },
-                chunk_pos: cursor_chunk_pos,
-            }) {
-                //TODO: skip this if no wep in hand
+            if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos) {
                 hit_event.send(HitEvent {
                     hit_entity: hit_obj,
                     damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
@@ -460,21 +444,12 @@ impl InputsPlugin {
         // Attempt to place block in hand
         // TODO: Interact
         if mouse_button_input.just_pressed(MouseButton::Right) {
-            let player_pos = game.game.player_state.position;
-            if player_pos
-                .truncate()
-                .distance(cursor_pos.world_coords.truncate())
-                > ((game.game.player_state.reach_distance + 1) * 32) as f32
-            {
-                return;
-            }
-
             let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
             if let Some(held_item) = held_item_option {
                 let held_obj = *held_item.get_obj();
                 if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
-                    item_action.run_action(&mut item_action_param);
+                    item_action.run_action(&mut item_action_param, &game.game);
                     if proto_param
                         .get_component::<ConsumableItem, _>(held_obj)
                         .is_some()

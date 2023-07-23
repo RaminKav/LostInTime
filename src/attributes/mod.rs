@@ -4,10 +4,10 @@ pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
     inventory::Inventory,
-    item::Equipment,
+    item::{Equipment, EquipmentType},
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{DropOnSlotEvent, InventoryState},
+    ui::{DropOnSlotEvent, InventoryState, RemoveFromSlotEvent},
     CustomFlush, GameParam, GameState, Player,
 };
 
@@ -134,6 +134,7 @@ impl Plugin for AttributesPlugin {
                     add_current_health_with_max_health,
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
+                    update_attributes_and_sprite_with_equipment_removed,
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -235,6 +236,7 @@ fn update_attributes_with_held_item_change(
 fn update_attributes_and_sprite_with_equipment_change(
     player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
     asset_server: Res<AssetServer>,
+    proto_param: ProtoParam,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
     mut att_event: EventWriter<AttributeChangeEvent>,
     mut events: EventReader<DropOnSlotEvent>,
@@ -244,10 +246,24 @@ fn update_attributes_and_sprite_with_equipment_change(
             || drop.drop_target_slot_state.r#type.is_accessory()
         {
             let slot = drop.drop_target_slot_state.slot_index;
+            let Some(eqp_type) =
+                proto_param.get_component::<EquipmentType, _>(drop.dropped_item_stack.obj_type) else {continue};
+            if !eqp_type.is_equipment() || !eqp_type.get_valid_slots().contains(&slot) {
+                continue;
+            }
             att_event.send(AttributeChangeEvent);
             if drop.drop_target_slot_state.r#type.is_equipment() {
                 for (mat, limb) in player_limbs.iter() {
-                    if limb == &Limb::from_slot(slot) || (limb == &Limb::Hands && slot == 2) {
+                    if Limb::from_slot(slot).contains(limb) {
+                        println!(
+                            "change {:?} {:?} {:?}",
+                            slot,
+                            limb,
+                            format!(
+                                "textures/player/{}.png",
+                                drop.dropped_item_stack.obj_type.to_string()
+                            )
+                        );
                         let mut mat = materials.get_mut(mat).unwrap();
                         let armor_texture_handle = asset_server.load(format!(
                             "textures/player/{}.png",
@@ -255,6 +271,33 @@ fn update_attributes_and_sprite_with_equipment_change(
                         ));
                         mat.lookup_texture = Some(armor_texture_handle);
                     }
+                }
+            }
+        }
+    }
+}
+///Tracks player equip or accessory inventory slot changes,
+///spawns new held equipment entity, and updates player attributes
+fn update_attributes_and_sprite_with_equipment_removed(
+    mut removed_inv_item: EventReader<RemoveFromSlotEvent>,
+    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+) {
+    for item in removed_inv_item.iter() {
+        if item.removed_slot_state.r#type.is_equipment() {
+            for (mat, limb) in player_limbs.iter() {
+                if Limb::from_slot(item.removed_slot_state.slot_index).contains(limb) {
+                    let mut mat = materials.get_mut(mat).unwrap();
+                    let armor_texture_handle = asset_server.load(format!(
+                        "textures/player/player-texture-{}.png",
+                        if limb == &Limb::Torso || limb == &Limb::Hands {
+                            Limb::Torso.to_string().to_lowercase()
+                        } else {
+                            limb.to_string().to_lowercase()
+                        }
+                    ));
+                    mat.lookup_texture = Some(armor_texture_handle);
                 }
             }
         }
