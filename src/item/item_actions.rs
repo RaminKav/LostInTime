@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, inputs::CursorPos, inventory::Inventory,
     player::MovePlayerEvent, proto::proto_param::ProtoParam, ui::InventoryState,
-    world::world_helpers::world_pos_to_tile_pos,
+    world::world_helpers::world_pos_to_tile_pos, Game,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -35,7 +35,7 @@ pub struct ItemActionParam<'w, 's> {
 }
 
 impl ItemAction {
-    pub fn run_action(&self, item_action_param: &mut ItemActionParam) {
+    pub fn run_action(&self, item_action_param: &mut ItemActionParam, game: &Game) {
         match self {
             ItemAction::ModifyHealth(delta) => {
                 item_action_param
@@ -50,6 +50,15 @@ impl ItemAction {
                 });
             }
             ItemAction::PlacesInto(obj) => {
+                if game
+                    .player_state
+                    .position
+                    .truncate()
+                    .distance(item_action_param.cursor_pos.world_coords.truncate())
+                    > (game.player_state.reach_distance * 32) as f32
+                {
+                    return;
+                }
                 item_action_param.place_item_event.send(PlaceItemEvent {
                     obj: *obj,
                     pos: item_action_param.cursor_pos.world_coords.truncate(),

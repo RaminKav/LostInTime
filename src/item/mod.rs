@@ -90,6 +90,18 @@ impl EquipmentType {
             EquipmentType::None => InventorySlotType::Normal,
         }
     }
+    pub fn is_equipment(&self) -> bool {
+        match self {
+            EquipmentType::Head => true,
+            EquipmentType::Chest => true,
+            EquipmentType::Legs => true,
+            EquipmentType::Feet => true,
+            EquipmentType::Ring => false,
+            EquipmentType::Pendant => false,
+            EquipmentType::Trinket => false,
+            EquipmentType::None => false,
+        }
+    }
 }
 #[derive(Component)]
 pub struct MainHand;

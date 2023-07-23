@@ -84,6 +84,12 @@ pub struct DropOnSlotEvent {
 }
 #[derive(Debug, Clone)]
 
+pub struct RemoveFromSlotEvent {
+    pub removed_item_stack: ItemStack,
+    pub removed_slot_state: InventorySlotState,
+}
+#[derive(Debug, Clone)]
+
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub parent_slot_entity: Entity,
@@ -436,6 +442,7 @@ pub fn handle_cursor_update(
     mut chest_option: Option<ResMut<ChestInventory>>,
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
     mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
+    mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -462,6 +469,11 @@ pub fn handle_cursor_update(
                                     .entity(item_icon.0)
                                     .remove_parent()
                                     .insert(DraggedItem);
+
+                                remove_item_event.send(RemoveFromSlotEvent {
+                                    removed_item_stack: item_icon.2.clone(),
+                                    removed_slot_state: state.clone(),
+                                });
 
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
                                 let mut inv = inv.single_mut();
