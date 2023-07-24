@@ -23,7 +23,6 @@ use bevy_proto::prelude::*;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
-pub const CHEST_SIZE: usize = 6 * 2;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
 pub const MAX_STACK_SIZE: usize = 16;
 

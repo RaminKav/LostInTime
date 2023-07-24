@@ -1,11 +1,14 @@
 pub use bevy::prelude::*;
 
-use crate::{assets::Graphics, inventory::Container};
+use crate::{assets::Graphics, inventory::Container, item::WorldObject};
 
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
     InventoryUIState,
 };
+
+pub const CHEST_SIZE: usize = 6 * 2;
+
 #[derive(Component, Resource, Debug, Clone)]
 pub struct ChestInventory {
     pub items: Container,
@@ -50,4 +53,18 @@ pub fn change_ui_state_to_chest_when_resource_added(
 ) {
     inv_state.open = true;
     inv_ui_state.set(InventoryUIState::Chest);
+}
+
+pub fn add_inv_to_new_chest_objs(
+    mut commands: Commands,
+    new_chests: Query<(Entity, &WorldObject), Added<WorldObject>>,
+) {
+    for e in new_chests.iter() {
+        if e.1 == &WorldObject::Chest {
+            commands.entity(e.0).insert(ChestInventory {
+                items: Container::with_size(CHEST_SIZE),
+                parent: e.0,
+            });
+        }
+    }
 }

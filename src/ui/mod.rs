@@ -16,7 +16,10 @@ pub use player_hud::*;
 pub use tooltips::*;
 pub use ui_helpers::*;
 
-use crate::{client::ClientPlugin, combat::CombatPlugin, CustomFlush, GameState};
+use crate::{
+    client::ClientPlugin, combat::CombatPlugin, item::item_actions::ActionSuccessEvent,
+    CustomFlush, GameState,
+};
 
 use self::minimap::MinimapPlugin;
 
@@ -27,6 +30,7 @@ impl Plugin for UIPlugin {
         app.add_state::<InventoryUIState>()
             .insert_resource(LastHoveredSlot { slot: None })
             .insert_resource(InventoryState::default())
+            .add_event::<ActionSuccessEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
@@ -76,6 +80,7 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((add_inv_to_new_chest_objs,).in_set(OnUpdate(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

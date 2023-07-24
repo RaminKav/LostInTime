@@ -9,13 +9,14 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
-use crate::inventory::{Container, Inventory, CHEST_SIZE};
+use crate::inventory::{Container, Inventory};
 use crate::item::item_actions::{ConsumableItem, ItemAction, ItemActionParam};
+use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState};
+use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, CHEST_SIZE};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
@@ -262,6 +263,18 @@ impl InputsPlugin {
                 game.game.player_state.position.truncate(),
                 1,
             );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::ChestBlock,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::DungeonEntranceBlock,
+                &proto,
+                game.game.player_state.position.truncate(),
+                1,
+            );
         }
 
         if key_input.just_pressed(KeyCode::P) {
@@ -374,6 +387,8 @@ impl InputsPlugin {
     }
 
     pub fn mouse_click_system(
+        mut commands: Commands,
+        mut proto_commands: ProtoCommands,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         game: GameParam,
@@ -382,12 +397,13 @@ impl InputsPlugin {
         mut hit_event: EventWriter<HitEvent>,
 
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
-        mut inv: Query<&mut Inventory>,
+        inv: Query<&mut Inventory>,
         inv_state: Res<InventoryState>,
         parent_attack: Query<&Attack>,
         tool_query: Query<&RangedAttack, With<Equipment>>,
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
         mut item_action_param: ItemActionParam,
+        obj_actions: Query<&ObjectAction>,
     ) {
         // println!(
         //     "C: {cursor_chunk_pos:?}  T: {cursor_tile_pos:?} {:?} {:?} P: {player_pos:?}",
@@ -405,6 +421,8 @@ impl InputsPlugin {
             return;
         }
 
+        let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
+
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
             if att_cooldown_query.single().1.is_some() {
@@ -416,7 +434,7 @@ impl InputsPlugin {
                 main_hand_option = Some(tool.obj);
             }
             let player_pos = game.game.player_state.position;
-            let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
+
             if let Ok(ranged_tool) = tool_query.get_single() {
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
@@ -428,7 +446,7 @@ impl InputsPlugin {
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
-                > (game.game.player_state.reach_distance * 32) as f32
+                > game.game.player_state.reach_distance * 32.
             {
                 return;
             }
@@ -449,16 +467,19 @@ impl InputsPlugin {
             if let Some(held_item) = held_item_option {
                 let held_obj = *held_item.get_obj();
                 if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
-                    item_action.run_action(&mut item_action_param, &game.game);
-                    if proto_param
-                        .get_component::<ConsumableItem, _>(held_obj)
-                        .is_some()
-                    {
-                        let hotbar_slot = inv_state.active_hotbar_slot;
-                        let held_item_option = inv.single().items.items[hotbar_slot].clone();
-                        inv.single_mut().items.items[hotbar_slot] =
-                            held_item_option.unwrap().modify_count(-1);
-                    }
+                    item_action.run_action(held_obj, &mut item_action_param, &game.game);
+                }
+            }
+
+            if let Some(obj) = game.get_obj_entity_at_tile(cursor_tile_pos) {
+                if let Ok(obj_action) = obj_actions.get(obj) {
+                    obj_action.run_action(
+                        obj,
+                        &mut item_action_param,
+                        &game.game,
+                        &mut commands,
+                        &mut proto_commands,
+                    );
                 }
             }
         }

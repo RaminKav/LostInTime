@@ -24,6 +24,7 @@ mod crafting;
 pub mod item_actions;
 mod loot_table;
 pub mod melee;
+pub mod object_actions;
 pub mod projectile;
 pub use crafting::*;
 pub use loot_table::*;
@@ -36,6 +37,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::crafting::CraftingPlugin;
+use self::item_actions::handle_item_action_success;
 use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
@@ -164,6 +166,10 @@ pub enum WorldObject {
     Pendant,
     SmallPotion,
     LargePotion,
+    Chest,
+    ChestBlock,
+    DungeonEntrance,
+    DungeonEntranceBlock,
 }
 
 #[derive(
@@ -398,6 +404,7 @@ impl Plugin for ItemsPlugin {
                     .after(handle_new_scene_entities_parent_chunk)
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(handle_item_action_success.in_set(OnUpdate(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

@@ -1,0 +1,17 @@
+(
+  name: "DungeonEntranceBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": DungeonEntranceBlock,
+  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(DungeonEntrance),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: DungeonEntranceBlock,
+        metadata: (
+            name: "Dungeon Entrance", 
+            desc: "spooky."
+        ),
+        count: 1
+  ),
+  }
+)

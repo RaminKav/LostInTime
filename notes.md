@@ -161,12 +161,14 @@ impl different att styles w seldum_state
 [x] add healthbar to enemies
 [x] add damage numbers
 [x] Schematics: try out random structure spawns,
-[] `Blocked below` Dungeons: add item that tp to dungeon instance, spawned from schematic probably
-[] Items: add right-click ability items
+[x] `Blocked below` Dungeons: add item that tp to dungeon instance, spawned from schematic probably
+[x] Items: add right-click ability items (potion, single use items)
+[x] Items: add right-click interact objects (chests, alter, etc)
 [] Items: add random roll stats, clean up naming of stats too
 [x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
 [x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
 [] Add colliders to water (use corners)
+[] save/load/cache
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
 - new types of projectile
