@@ -85,6 +85,26 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Chest: WorldObjectData(
+            texture_pos: (0., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        ChestBlock: WorldObjectData(
+            texture_pos: (0., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+         DungeonEntrance: WorldObjectData(
+            texture_pos: (2., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+         DungeonEntranceBlock: WorldObjectData(
+            texture_pos: (2., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         DungeonStone: SpriteData(
@@ -111,7 +131,7 @@
             texture_pos: (6., 5.),
             size: (16., 16.),
         ),
-         DualStaff: SpriteData(
+        DualStaff: SpriteData(
             texture_pos: (7., 5.),
             size: (16., 16.),
         ),

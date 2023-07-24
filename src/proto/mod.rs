@@ -24,6 +24,7 @@ use crate::{
     item::{
         item_actions::{ConsumableItem, ItemAction},
         melee::MeleeAttack,
+        object_actions::ObjectAction,
         projectile::{Projectile, ProjectileState, RangedAttack},
         Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
         PlacesInto, Wall, WorldObject,
@@ -68,6 +69,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
             .register_type::<ItemAction>()
+            .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
             .register_type::<ColliderProto>()
             .register_type::<EquipmentType>()
@@ -115,6 +117,10 @@ impl ProtoPlugin {
         prototypes.load("proto/log.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
         prototypes.load("proto/slime_neutral.prototype.ron");
+        prototypes.load("proto/chest.prototype.ron");
+        prototypes.load("proto/chestblock.prototype.ron");
+        prototypes.load("proto/dungeonentrance.prototype.ron");
+        prototypes.load("proto/dungeonentranceblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

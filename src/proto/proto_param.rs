@@ -36,11 +36,10 @@ impl<'w, 's> ProtoParam<'w, 's> {
     ) -> Option<&ItemStack> {
         let id = <T as Into<&str>>::into(obj).to_owned();
         if let Some(data) = self.get_prototype(&id) {
-            data.schematics()
-                .get::<ItemStack>()
-                .unwrap()
-                .input()
-                .downcast_ref::<ItemStack>()
+            if let Some(data) = data.schematics().get::<ItemStack>() {
+                return data.input().downcast_ref::<ItemStack>();
+            }
+            None
         } else {
             warn!("Could not get item data for: {}", id);
             None

@@ -1,0 +1,17 @@
+(
+  name: "ChestBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ChestBlock,
+  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(Chest),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ChestBlock,
+        metadata: (
+            name: "Chest", 
+            desc: "Stores items."
+        ),
+        count: 1
+  ),
+  }
+)

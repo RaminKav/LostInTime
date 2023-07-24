@@ -36,7 +36,7 @@ pub struct PlayerState {
     pub is_attacking: bool,
     pub main_hand_slot: Option<EquipmentData>,
     pub position: Vec3,
-    pub reach_distance: u8,
+    pub reach_distance: f32,
     pub player_dash_cooldown: Timer,
     pub player_dash_duration: Timer,
 }
@@ -50,7 +50,7 @@ impl Default for PlayerState {
             is_attacking: false,
             main_hand_slot: None,
             position: Vec3::ZERO,
-            reach_distance: 1,
+            reach_distance: 1.5,
             player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
             player_dash_duration: Timer::from_seconds(0.1, TimerMode::Once),
         }
