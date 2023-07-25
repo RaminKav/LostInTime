@@ -1,6 +1,4 @@
-use bevy::{
-    app::AppExit, ecs::system::SystemState, prelude::*, utils::HashMap,
-};
+use bevy::{app::AppExit, ecs::system::SystemState, prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::{
     prelude::{
         TilemapGridSize, TilemapId, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize,
@@ -308,6 +306,7 @@ impl ClientPlugin {
         // println!("{c:?}");
         let params = WorldGeneration {
             tree_frequency: 0.,
+            boulder_frequency: 0.,
             dungeon_stone_frequency: 0.,
             sand_frequency: 0.32,
             water_frequency: 0.15,

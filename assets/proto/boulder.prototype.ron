@@ -1,0 +1,16 @@
+(
+  name: "Boulder",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Boulder,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::item::Block": (),
+  "survival_rogue_like::item::Breakable": (Some(Flint)),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
+  "survival_rogue_like::attributes::MaxHealth": (100),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: Boulder, obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
+  }
+)

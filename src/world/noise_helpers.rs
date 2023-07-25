@@ -39,7 +39,7 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u32) -> f64 {
     e
 }
 
-pub fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<(f32, f32)> {
+pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(f32, f32)> {
     // TODO: fix this to work w 4 quadrants -/+
     let n = 2.;
     let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32;
@@ -117,7 +117,10 @@ pub fn poisson_disk_sampling(r: f64, k: i8, mut rng: ThreadRng) -> Vec<(f32, f32
             }
 
             //add the new point to our lists and break
-            points.push(new_p);
+            let success = rng.gen_ratio((f * 100.) as u32, 100);
+            if success {
+                points.push(new_p);
+            }
             insert_point(&mut grid, new_p);
             active.push(new_p);
             found = true;

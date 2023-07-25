@@ -125,6 +125,7 @@ impl ProtoPlugin {
         prototypes.load("proto/dungeonentranceblock.prototype.ron");
         prototypes.load("proto/grass.prototype.ron");
         prototypes.load("proto/grassblock.prototype.ron");
+        prototypes.load("proto/boulder.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

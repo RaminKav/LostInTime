@@ -115,6 +115,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Boulder: WorldObjectData(
+            texture_pos: (4., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
     },
     icons : {
         DungeonStone: SpriteData(

@@ -157,15 +157,21 @@ impl GenerationPlugin {
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let tree_points;
             let maybe_dungeon = dungeon.get_single();
 
             let raw_tree_points = noise_helpers::poisson_disk_sampling(
                 2.5 * TILE_SIZE.x as f64,
-                30 * game.world_generation_params.tree_frequency as i8,
+                30,
+                game.world_generation_params.tree_frequency,
                 rand::thread_rng(),
             );
-            tree_points = raw_tree_points
+            let raw_boulder_points = noise_helpers::poisson_disk_sampling(
+                2.5 * TILE_SIZE.x as f64,
+                30,
+                game.world_generation_params.boulder_frequency,
+                rand::thread_rng(),
+            );
+            let tree_points = raw_tree_points
                 .iter()
                 .map(|tp| {
                     let tp_vec = Vec2::new(
@@ -180,6 +186,21 @@ impl GenerationPlugin {
                     )
                 })
                 .collect::<Vec<(f32, f32, WorldObject)>>();
+            let boulder_points = raw_boulder_points
+                .iter()
+                .map(|tp| {
+                    let tp_vec = Vec2::new(
+                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                    );
+                    let relative_tp = world_helpers::camera_pos_to_tile_pos(&tp_vec);
+                    (
+                        relative_tp.x as f32,
+                        relative_tp.y as f32,
+                        WorldObject::Boulder,
+                    )
+                })
+                .collect::<Vec<(f32, f32, WorldObject)>>();
             let stone_points = Self::generate_stone_for_chunk(
                 &game.world_generation_params,
                 chunk_pos,
@@ -188,6 +209,7 @@ impl GenerationPlugin {
             let mut genned_objs = stone_points
                 .into_iter()
                 .chain(tree_points.into_iter())
+                .chain(boulder_points.into_iter())
                 .collect::<Vec<(f32, f32, WorldObject)>>();
             if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
                 genned_objs = genned_objs
