@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
   "survival_rogue_like::proto::SensorProto": (),
+  "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
   "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
   "survival_rogue_like::world::y_sort::YSort": (),

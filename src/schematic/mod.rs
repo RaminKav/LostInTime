@@ -128,10 +128,7 @@ fn load_schematic(
     game: GameParam,
 ) {
     if key_input.just_pressed(KeyCode::M) {
-        println!(
-            "Loading schematic scene... {}",
-            game.game.player_state.position
-        );
+        println!("Loading schematic scene... {}", game.player().position);
         commands
             .spawn(DynamicSceneBundle {
                 scene: asset_server.load("scenes/test.scn.ron"),

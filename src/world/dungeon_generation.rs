@@ -5,7 +5,7 @@ use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use super::{TileMapPositionData, CHUNK_SIZE};
+use super::{TileMapPosition, CHUNK_SIZE};
 
 #[derive(Reflect, Resource, Clone, Debug, Default, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
@@ -86,7 +86,7 @@ impl Direction {
     }
 }
 
-pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPositionData> {
+pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
     let grid_size = grid.len() as i32 - 1;
     for y in 0..grid_size {
         let g_y = &grid[(grid_size - y) as usize];
@@ -96,16 +96,17 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPositionData> 
             .filter(|(_, v)| *v == &1)
             .choose(&mut rand::thread_rng());
         if let Some((x, _)) = picked_tile {
-            return Some(TileMapPositionData {
-                chunk_pos: IVec2::new(
+            return Some(TileMapPosition::new(
+                IVec2::new(
                     f64::floor((x as u32 - CHUNK_SIZE) as f64 / CHUNK_SIZE as f64) as i32,
                     -(f64::floor((grid_size - y - 1) as f64 / CHUNK_SIZE as f64) as i32 - 1),
                 ),
-                tile_pos: TilePos {
+                TilePos {
                     x: x as u32 % CHUNK_SIZE,
                     y: CHUNK_SIZE - ((grid_size - y) as u32 % CHUNK_SIZE) - 1,
                 },
-            });
+                0,
+            ));
         }
     }
     None

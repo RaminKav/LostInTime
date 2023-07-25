@@ -7,6 +7,7 @@ use bevy::render::render_resource::{
 };
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
+use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
@@ -48,6 +49,19 @@ impl WorldObjectData {
 pub struct SpriteData {
     pub texture_pos: Vec2,
     pub size: Vec2,
+}
+
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub enum SpriteSize {
+    #[default]
+    Small,
+    Medium,
+}
+impl SpriteSize {
+    pub fn is_medium(&self) -> bool {
+        matches!(self, SpriteSize::Medium)
+    }
 }
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game

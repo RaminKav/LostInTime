@@ -12,13 +12,13 @@ use crate::{
     player::Limb,
     proto::proto_param::ProtoParam,
     ui::{InventorySlotState, InventorySlotType},
-    world::{y_sort::YSort, CHUNK_SIZE},
+    world::y_sort::YSort,
     GameParam,
 };
 use rand::Rng;
 
 use bevy::prelude::*;
-use bevy_ecs_tilemap::tiles::TilePos;
+
 use bevy_proto::prelude::*;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 
@@ -170,7 +170,7 @@ impl InventoryItemStack {
                 .clone()
         };
 
-        let player_state = &mut game.game.player_state;
+        let player_state = game.player();
         let player_e = game.player_query.single().0;
         let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
@@ -219,7 +219,7 @@ impl InventoryItemStack {
                 Timer::from_seconds(0.125, TimerMode::Once),
                 0.,
             ));
-        player_state.main_hand_slot = Some(EquipmentData { obj, entity: item });
+        game.player_mut().main_hand_slot = Some(EquipmentData { obj, entity: item });
         if let Some(melee) = proto.is_item_melee_weapon(obj) {
             item_entity.insert(melee.clone());
         }
@@ -317,8 +317,7 @@ impl ItemStack {
         &self,
         commands: &mut Commands,
         game: &mut GameParam,
-        tile_pos: TilePos,
-        chunk_pos: IVec2,
+        pos: Vec2,
     ) -> Entity {
         let item_map = &game.graphics.spritesheet_map;
         let obj = self.obj_type;
@@ -339,16 +338,9 @@ impl ItemStack {
         let drop_spread = 10.;
 
         let position = Vec3::new(
-            (tile_pos.x as i32 * 32 + chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.x * obj_data.size.x
-                + rng.gen_range(-drop_spread..drop_spread),
-            (tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y
-                + rng.gen_range(-drop_spread..drop_spread),
-            500. - ((tile_pos.y as i32 * 32 + chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32
-                + anchor.y * obj_data.size.y
-                + rng.gen_range(-drop_spread..drop_spread))
-                * 0.1,
+            pos.x + anchor.x * obj_data.size.x + rng.gen_range(-drop_spread..drop_spread),
+            pos.y + anchor.y * obj_data.size.y + rng.gen_range(-drop_spread..drop_spread),
+            0.,
         );
 
         let transform = Transform {

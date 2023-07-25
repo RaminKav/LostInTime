@@ -205,7 +205,7 @@ fn update_attributes_with_held_item_change(
 ) {
     let active_hotbar_slot = inv_state.active_hotbar_slot;
     let active_hotbar_item = inv.single_mut().items.items[active_hotbar_slot].clone();
-    let player_data = &mut game_param.game.player_state;
+    let mut player_data = game_param.player_mut();
     let prev_held_item_data = &player_data.main_hand_slot;
     if let Some(new_item) = active_hotbar_item {
         let new_item_obj = new_item.get_obj();

@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": StoneWall,
   "survival_rogue_like::item::Wall": StoneWall,
+  "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::item::Breakable": (Some(Flint)),
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 11),

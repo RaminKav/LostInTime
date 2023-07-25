@@ -5,6 +5,7 @@
   "survival_rogue_like::item::WorldObject": DungeonEntrance,
   "survival_rogue_like::item::object_actions::ObjectAction": DungeonTeleport,
   "survival_rogue_like::item::Block": (),
+  "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8),
   "survival_rogue_like::world::WorldObjectEntityData": (object: DungeonEntrance, obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::world::y_sort::YSort": (),

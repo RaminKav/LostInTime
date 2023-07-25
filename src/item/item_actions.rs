@@ -8,7 +8,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{ChestInventory, InventoryState},
     world::world_helpers::world_pos_to_tile_pos,
-    Game,
+    GameParam,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -50,7 +50,7 @@ impl ItemAction {
         &self,
         obj: WorldObject,
         item_action_param: &mut ItemActionParam,
-        game: &Game,
+        game: &GameParam,
     ) {
         match self {
             ItemAction::ModifyHealth(delta) => {
@@ -66,19 +66,21 @@ impl ItemAction {
                 });
             }
             ItemAction::PlacesInto(obj) => {
-                if game
-                    .player_state
-                    .position
-                    .truncate()
-                    .distance(item_action_param.cursor_pos.world_coords.truncate())
-                    > game.player_state.reach_distance * 32.
+                let pos = item_action_param.cursor_pos.world_coords.truncate();
+                if game.player().position.truncate().distance(pos)
+                    > game.player().reach_distance * 32.
                 {
                     return;
                 }
-                item_action_param.place_item_event.send(PlaceItemEvent {
-                    obj: *obj,
-                    pos: item_action_param.cursor_pos.world_coords.truncate(),
-                });
+                if let Some(_existing_object) =
+                    game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos))
+                {
+                    warn!("obj exists here {pos}");
+                    return;
+                }
+                item_action_param
+                    .place_item_event
+                    .send(PlaceItemEvent { obj: *obj, pos });
             }
             _ => {}
         }

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
+use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
@@ -10,7 +10,7 @@ use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::{Container, Inventory};
-use crate::item::item_actions::{ConsumableItem, ItemAction, ItemActionParam};
+use crate::item::item_actions::{ItemAction, ItemActionParam};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
@@ -20,7 +20,7 @@ use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, CHEST_SIZE};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
-use crate::world::TileMapPositionData;
+use crate::world::TileMapPosition;
 use crate::{
     custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
     GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
@@ -132,7 +132,7 @@ impl InputsPlugin {
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
         let (mut player_transform, mut mv) = player_query.single_mut();
-        let player = &mut game.game.player_state;
+        let mut player = game.player_mut();
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED;
 
@@ -218,61 +218,67 @@ impl InputsPlugin {
             proto_commands.spawn_item_from_proto(
                 WorldObject::BasicStaff,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::DualStaff,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::FireStaff,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::Dagger,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::Chestplate,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::Pants,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::Ring,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::Pendant,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::ChestBlock,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::DungeonEntranceBlock,
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::GrassBlock,
+                &proto,
+                game.player().position.truncate(),
                 1,
             );
         }
@@ -281,10 +287,10 @@ impl InputsPlugin {
             DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
         }
         if key_input.just_pressed(KeyCode::L) {
-            let pos = tile_pos_to_world_pos(TileMapPositionData {
-                chunk_pos: IVec2 { x: 0, y: 0 },
-                tile_pos: TilePos { x: 0, y: 0 },
-            });
+            let pos = tile_pos_to_world_pos(
+                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
+                true,
+            );
             proto_commands.spawn_from_proto(NeutralMob::Slime, &proto.prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
@@ -405,35 +411,28 @@ impl InputsPlugin {
         mut item_action_param: ItemActionParam,
         obj_actions: Query<&ObjectAction>,
     ) {
-        // println!(
-        //     "C: {cursor_chunk_pos:?}  T: {cursor_tile_pos:?} {:?} {:?} P: {player_pos:?}",
-        //     game.get_tile_data(TileMapPositionData {
-        //         chunk_pos: cursor_chunk_pos,
-        //         tile_pos: cursor_tile_pos
-        //     }),
-        //     game.get_tile_obj_data(TileMapPositionData {
-        //         chunk_pos: cursor_chunk_pos,
-        //         tile_pos: cursor_tile_pos
-        //     })
-        // );
-
         if inv_state.open {
             return;
         }
 
         let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
+        let player_pos = game.player().position;
 
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
+            // println!(
+            //     "C: {cursor_tile_pos:?} || P: {player_pos:?}  || {:?} {:?}",
+            //     game.get_tile_data(cursor_tile_pos),
+            //     game.get_tile_obj_data(cursor_tile_pos)
+            // );
             if att_cooldown_query.single().1.is_some() {
                 return;
             }
             let mut main_hand_option = None;
             // if it has AttackTimer, the action is on cooldown, so we abort.
-            if let Some(tool) = &game.game.player_state.main_hand_slot {
+            if let Some(tool) = &game.player().main_hand_slot {
                 main_hand_option = Some(tool.obj);
             }
-            let player_pos = game.game.player_state.position;
 
             if let Ok(ranged_tool) = tool_query.get_single() {
                 ranged_attack_event.send(RangedAttackEvent {
@@ -446,7 +445,7 @@ impl InputsPlugin {
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
-                > game.game.player_state.reach_distance * 32.
+                > game.player().reach_distance * 32.
             {
                 return;
             }
@@ -467,7 +466,7 @@ impl InputsPlugin {
             if let Some(held_item) = held_item_option {
                 let held_obj = *held_item.get_obj();
                 if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
-                    item_action.run_action(held_obj, &mut item_action_param, &game.game);
+                    item_action.run_action(held_obj, &mut item_action_param, &game);
                 }
             }
 
@@ -476,7 +475,6 @@ impl InputsPlugin {
                     obj_action.run_action(
                         obj,
                         &mut item_action_param,
-                        &game.game,
                         &mut commands,
                         &mut proto_commands,
                     );

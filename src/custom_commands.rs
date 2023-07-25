@@ -1,7 +1,13 @@
 use crate::{
-    item::{Foliage, Wall, WorldObject},
+    assets::SpriteSize,
+    item::{Foliage, Wall},
     proto::proto_param::ProtoParam,
-    world::{wall_auto_tile::Dirty, world_helpers::camera_pos_to_tile_pos},
+    world::{
+        wall_auto_tile::Dirty,
+        world_helpers::{
+            tile_pos_to_world_pos, world_pos_to_chunk_relative_tile_pos,
+        },
+    },
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
@@ -130,12 +136,12 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         //TODO: add parent to spawned entity
         let spawned_entity = self.spawn(p).id();
         let mut spawned_entity_commands = self.commands().entity(spawned_entity);
-        let tile_pos = camera_pos_to_tile_pos(&pos);
-        let pos = Vec3::new(
-            (tile_pos.x as i32 * 32) as f32,
-            (tile_pos.y as i32 * 32) as f32,
-            0.,
-        );
+        let relative_tile_pos = world_pos_to_chunk_relative_tile_pos(pos);
+        let should_center = proto_param
+            .get_component::<SpriteSize, _>(obj.clone())
+            .unwrap()
+            .is_medium();
+        let pos = tile_pos_to_world_pos(relative_tile_pos, should_center).extend(0.);
         spawned_entity_commands.insert(TransformBundle::from_transform(
             Transform::from_translation(pos),
         ));

@@ -4,7 +4,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use crate::{item::WorldObject, GameParam};
 
 use super::{
-    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile, TileMapPositionData,
+    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile, TileMapPosition,
     WorldGeneration, CHUNK_SIZE,
 };
 
@@ -40,10 +40,10 @@ impl TilePlugin {
                                                                       // let e = noise_e.get([nx, ny]) + 0.5;
         let mut bits = [0, 0, 0, 0];
         let mut blocks = [
-            WorldObject::Sand,
-            WorldObject::Sand,
-            WorldObject::Sand,
-            WorldObject::Sand,
+            WorldObject::SandTile,
+            WorldObject::SandTile,
+            WorldObject::SandTile,
+            WorldObject::SandTile,
         ];
         let sample = |x: f64, y: f64| -> (u8, WorldObject) {
             if world_generation_params.dungeon_stone_frequency > 0. {
@@ -59,16 +59,16 @@ impl TilePlugin {
             // print!("{:?}", e);
             // let m = f64::powf(m, 1.);
             let block = if e <= world_generation_params.water_frequency {
-                WorldObject::Water
+                WorldObject::WaterTile
             } else if e <= world_generation_params.sand_frequency {
-                WorldObject::Sand
+                WorldObject::SandTile
             } else if e <= world_generation_params.dungeon_stone_frequency {
                 WorldObject::DungeonStone
             } else {
-                WorldObject::Grass
+                WorldObject::GrassTile
             };
-            let block_bits: u8 = if block == WorldObject::Sand
-                || block == WorldObject::Grass
+            let block_bits: u8 = if block == WorldObject::SandTile
+                || block == WorldObject::GrassTile
                 || block == WorldObject::DungeonStone
             {
                 0
@@ -93,19 +93,19 @@ impl TilePlugin {
         blocks[3] = br.1;
 
         // if there is grass and water in the same tile, turn the grass to sand
-        if blocks.contains(&WorldObject::Grass) && blocks.contains(&WorldObject::Water) {
+        if blocks.contains(&WorldObject::GrassTile) && blocks.contains(&WorldObject::WaterTile) {
             for b in 0..4 {
-                if blocks[b] == WorldObject::Grass {
-                    blocks[b] = WorldObject::Sand;
+                if blocks[b] == WorldObject::GrassTile {
+                    blocks[b] = WorldObject::SandTile;
                 }
             }
         }
         // for grass/sand blocks, turn sand bits to 1, since grass bits are 0
-        if blocks.contains(&WorldObject::Grass) {
+        if blocks.contains(&WorldObject::GrassTile) {
             index_shift = 16;
 
             for b in 0..4 {
-                if blocks[b] == WorldObject::Sand {
+                if blocks[b] == WorldObject::SandTile {
                     bits[b] = 1;
                 }
             }
@@ -154,15 +154,13 @@ impl TilePlugin {
                     if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
                     }
-                    let neighbour_tile_entity_data = game.get_tile_data(TileMapPositionData {
-                        chunk_pos: adjusted_chunk_pos,
-                        tile_pos: neighbour_tile_pos,
-                    });
+                    let neighbour_tile_entity_data = game.get_tile_data(TileMapPosition::new(
+                        adjusted_chunk_pos,
+                        neighbour_tile_pos,
+                        0,
+                    ));
                     let new_tile_entity_data = game
-                        .get_tile_data(TileMapPositionData {
-                            chunk_pos,
-                            tile_pos: new_tile_pos,
-                        })
+                        .get_tile_data(TileMapPosition::new(chunk_pos, new_tile_pos, 0))
                         .unwrap();
 
                     if let Some(neighbour_tile_entity_data) = neighbour_tile_entity_data {
@@ -194,10 +192,11 @@ impl TilePlugin {
                         Self::get_block_type_from_bits(updated_bit_index, neighbour_tile_offset);
                     commands
                         .entity(
-                            game.get_tile_entity(TileMapPositionData {
-                                chunk_pos: adjusted_chunk_pos,
-                                tile_pos: neighbour_tile_pos,
-                            })
+                            game.get_tile_entity(TileMapPosition::new(
+                                adjusted_chunk_pos,
+                                neighbour_tile_pos,
+                                0,
+                            ))
                             .unwrap(),
                         )
                         .insert(TileSpriteData {
@@ -218,10 +217,7 @@ impl TilePlugin {
         chunk_pos: IVec2,
     ) {
         let target_block_entity_data = game
-            .get_tile_data(TileMapPositionData {
-                chunk_pos,
-                tile_pos,
-            })
+            .get_tile_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
             .unwrap();
         let mut updated_bits = target_block_entity_data.tile_bit_index;
         let mut updated_index = tile_index_offset;
@@ -229,21 +225,13 @@ impl TilePlugin {
             for dx in -1i8..=1 {
                 // only use neighbours that have at least one water bitt
 
-                let TileMapPositionData {
+                let TileMapPosition {
                     chunk_pos: adjusted_chunk_pos,
                     tile_pos: neighbour_tile_pos,
-                } = get_neighbours_tile(
-                    TileMapPositionData {
-                        chunk_pos,
-                        tile_pos,
-                    },
-                    (dx, dy),
-                );
+                    ..
+                } = get_neighbours_tile(TileMapPosition::new(chunk_pos, tile_pos, 0), (dx, dy));
 
-                let neighbour_pos = TileMapPositionData {
-                    chunk_pos: adjusted_chunk_pos,
-                    tile_pos: neighbour_tile_pos,
-                };
+                let neighbour_pos = TileMapPosition::new(adjusted_chunk_pos, neighbour_tile_pos, 0);
                 if !(dx == 0 && dy == 0) {
                     if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
                         continue;
@@ -255,7 +243,7 @@ impl TilePlugin {
                         .iter()
                         .enumerate()
                         .map(|(i, b)| match b {
-                            WorldObject::Sand => 1 * (u8::pow(2, i as u32)) as u8,
+                            WorldObject::SandTile => 1 * (u8::pow(2, i as u32)) as u8,
                             _ => 0 as u8,
                         })
                         .sum();
@@ -263,7 +251,7 @@ impl TilePlugin {
                     // only continue for tiles with water
                     updated_bits = if target_block_entity_data
                         .raw_block_type
-                        .contains(&WorldObject::Water)
+                        .contains(&WorldObject::WaterTile)
                     {
                         let my_blocks = Self::compute_tile_blocks(
                             Self::get_block_type_from_bits(updated_bits, 0),
@@ -273,7 +261,7 @@ impl TilePlugin {
                         Self::get_bits_from_block_type(my_blocks).0 & updated_bits
                     } else if target_block_entity_data
                         .raw_block_type
-                        .contains(&WorldObject::Grass)
+                        .contains(&WorldObject::GrassTile)
                         && updated_index != 0
                     {
                         Self::compute_tile_bits(updated_bits, neighbour_bits, (dx, dy))
@@ -292,11 +280,8 @@ impl TilePlugin {
         let block_type = Self::get_block_type_from_bits(updated_bits, updated_index);
         commands
             .entity(
-                game.get_tile_entity(TileMapPositionData {
-                    chunk_pos,
-                    tile_pos,
-                })
-                .unwrap(),
+                game.get_tile_entity(TileMapPosition::new(chunk_pos, tile_pos, 0))
+                    .unwrap(),
             )
             .insert(TileSpriteData {
                 tile_bit_index: updated_bits,
@@ -307,14 +292,14 @@ impl TilePlugin {
     }
     fn get_block_type_from_bits(bits: u8, offset: u8) -> [WorldObject; 4] {
         let used_blocks = if offset == 0 {
-            (WorldObject::Sand, WorldObject::Water)
+            (WorldObject::SandTile, WorldObject::WaterTile)
         } else if offset == 16 {
-            (WorldObject::Grass, WorldObject::Sand)
+            (WorldObject::GrassTile, WorldObject::SandTile)
         } else {
             (WorldObject::DungeonStone, WorldObject::DungeonStone)
         };
 
-        let mut block_type: [WorldObject; 4] = [WorldObject::Sand; 4];
+        let mut block_type: [WorldObject; 4] = [WorldObject::SandTile; 4];
         block_type[0] = if bits & 0b0001 != 0b0001 {
             used_blocks.0
         } else {
@@ -338,36 +323,36 @@ impl TilePlugin {
         block_type
     }
     fn get_bits_from_block_type(block_type: [WorldObject; 4]) -> (u8, u8) {
-        let offset = if block_type.contains(&WorldObject::Grass) {
+        let offset = if block_type.contains(&WorldObject::GrassTile) {
             16
         } else {
             0
         };
         let mut bits = 0b0000;
 
-        bits |= if block_type[0] == WorldObject::Water
-            || (offset == 16 && block_type[0] == WorldObject::Sand)
+        bits |= if block_type[0] == WorldObject::WaterTile
+            || (offset == 16 && block_type[0] == WorldObject::SandTile)
         {
             0b0001
         } else {
             0b0000
         };
-        bits |= if block_type[1] == WorldObject::Water
-            || (offset == 16 && block_type[1] == WorldObject::Sand)
+        bits |= if block_type[1] == WorldObject::WaterTile
+            || (offset == 16 && block_type[1] == WorldObject::SandTile)
         {
             0b0010
         } else {
             0b0000
         };
-        bits |= if block_type[2] == WorldObject::Water
-            || (offset == 16 && block_type[2] == WorldObject::Sand)
+        bits |= if block_type[2] == WorldObject::WaterTile
+            || (offset == 16 && block_type[2] == WorldObject::SandTile)
         {
             0b0100
         } else {
             0b0000
         };
-        bits |= if block_type[3] == WorldObject::Water
-            || (offset == 16 && block_type[03] == WorldObject::Sand)
+        bits |= if block_type[3] == WorldObject::WaterTile
+            || (offset == 16 && block_type[03] == WorldObject::SandTile)
         {
             0b1000
         } else {
@@ -482,10 +467,7 @@ impl TilePlugin {
     ) {
         let block_type = Self::get_block_type_from_bits(bits, offset);
 
-        let tile_entity_data = game.get_tile_data_mut(TileMapPositionData {
-            chunk_pos,
-            tile_pos,
-        });
+        let tile_entity_data = game.get_tile_data_mut(TileMapPosition::new(chunk_pos, tile_pos, 0));
 
         if let Some(mut tile_entity_data) = tile_entity_data {
             tile_entity_data.block_type = block_type;

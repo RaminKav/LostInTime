@@ -1,18 +1,19 @@
 use crate::animations::AttackAnimationTimer;
-use crate::assets::WorldObjectData;
+use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
 use crate::colors::{BLACK, BLUE, DARK_GREEN, GREEN, GREY, YELLOW};
 use crate::combat::ObjBreakEvent;
 
-use crate::inventory::{Inventory, ItemStack};
+use crate::inventory::ItemStack;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{InventorySlotType, InventoryState};
+use crate::ui::InventorySlotType;
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
-    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, world_pos_to_tile_pos,
+    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
+use crate::world::TileMapPosition;
 
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
 use bevy::prelude::*;
@@ -32,7 +33,6 @@ pub use loot_table::*;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use lazy_static::lazy_static;
 
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
@@ -145,12 +145,12 @@ pub struct Size(pub Vec2);
 pub enum WorldObject {
     #[default]
     None,
-    Grass,
+    GrassTile,
     StoneWall,
     StoneWallBlock,
     DungeonStone,
-    Water,
-    Sand,
+    WaterTile,
+    SandTile,
     Flint,
     Tree,
     Log,
@@ -170,6 +170,8 @@ pub enum WorldObject {
     ChestBlock,
     DungeonEntrance,
     DungeonEntranceBlock,
+    Grass,
+    GrassBlock,
 }
 
 #[derive(
@@ -258,6 +260,12 @@ impl WorldObject {
             WorldObject::DungeonStone => true,
             _ => false,
         }
+    }
+    pub fn should_center_sprite(&self, proto_param: &ProtoParam) -> bool {
+        proto_param
+            .get_component::<SpriteSize, _>(*self)
+            .unwrap()
+            .is_medium()
     }
     pub fn spawn_and_save_block(
         self,
@@ -369,11 +377,11 @@ impl WorldObject {
     pub fn get_minimap_color(&self) -> Color {
         match self {
             WorldObject::None => BLACK,
-            WorldObject::Grass => GREEN,
+            WorldObject::GrassTile => GREEN,
             WorldObject::StoneWall => GREY,
             WorldObject::DungeonStone => BLACK,
-            WorldObject::Water => BLUE,
-            WorldObject::Sand => YELLOW,
+            WorldObject::WaterTile => BLUE,
+            WorldObject::SandTile => YELLOW,
             WorldObject::Tree => DARK_GREEN,
             _ => BLACK,
         }
@@ -416,8 +424,6 @@ pub fn handle_placing_world_object(
     mut proto_param: ProtoParam,
     mut game: GameParam,
     mut commands: Commands,
-    mut inv: Query<&mut Inventory>,
-    inv_state: Res<InventoryState>,
     mut events: EventReader<PlaceItemEvent>,
 ) {
     for place_event in events.iter() {
@@ -464,15 +470,12 @@ pub fn break_item(
         if let Ok(breakable) = breakable_query.get(broken.entity) {
             commands.entity(broken.entity).despawn();
             if let Some(breaks_into) = breakable.0 {
-                let mut rng = rand::thread_rng();
-                let mut base_stack = proto_param.get_item_data(breaks_into).unwrap().clone();
-                base_stack.count = rng.gen_range(1..4);
-                base_stack.spawn_as_drop(
-                    &mut commands,
-                    &mut game,
-                    broken.tile_pos,
-                    broken.chunk_pos,
+                let base_stack = proto_param.get_item_data(breaks_into).unwrap().clone();
+                let pos = tile_pos_to_world_pos(
+                    TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0),
+                    true,
                 );
+                base_stack.spawn_as_drop(&mut commands, &mut game, pos);
             }
         }
 

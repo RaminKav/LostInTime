@@ -7,7 +7,7 @@ use super::WorldGeneration;
 use crate::item::WorldObject;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::world::{noise_helpers, world_helpers, TileMapPositionData, CHUNK_SIZE, TILE_SIZE};
+use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;
@@ -222,13 +222,14 @@ impl GenerationPlugin {
                     }
 
                     let tile = game
-                        .get_tile_data(TileMapPositionData {
+                        .get_tile_data(TileMapPosition::new(
                             chunk_pos,
-                            tile_pos: TilePos {
+                            TilePos {
                                 x: tp.0 as u32,
                                 y: tp.1 as u32,
                             },
-                        })
+                            0,
+                        ))
                         .unwrap()
                         .block_type;
                     let filter = game
@@ -245,24 +246,24 @@ impl GenerationPlugin {
                 })
                 .map(|tp| *tp)
                 .collect::<Vec<(f32, f32, WorldObject)>>();
-
             for obj_data in objs.clone().iter() {
                 let tile_pos = TilePos {
                     x: obj_data.0 as u32,
                     y: obj_data.1 as u32,
                 };
                 if let Some(_existing_object) =
-                    game.get_obj_entity_at_tile(TileMapPositionData::new(chunk_pos, tile_pos))
+                    game.get_obj_entity_at_tile(TileMapPosition::new(chunk_pos, tile_pos, 0))
                 {
                     warn!("obj exists here {chunk_pos}, {tile_pos:?}");
                     continue;
                 }
+
                 let obj = proto_commands.spawn_object_from_proto(
                     obj_data.2,
-                    tile_pos_to_world_pos(TileMapPositionData {
-                        tile_pos,
-                        chunk_pos,
-                    }),
+                    tile_pos_to_world_pos(
+                        TileMapPosition::new(chunk_pos, tile_pos, 0),
+                        obj_data.2.should_center_sprite(&proto_param),
+                    ),
                     &prototypes,
                     &mut proto_param,
                 );
