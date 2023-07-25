@@ -57,11 +57,16 @@ fn mark_new_world_obj_as_schematic(
     mut commands: Commands,
     query: Query<Entity, (Added<Wall>, Without<ItemStack>)>,
     toggle: Res<SchematicToggle>,
+    old_txfms: Query<&GlobalTransform>,
 ) {
     if toggle.enabled {
         for e in query.iter() {
             if let Some(mut entity_cmds) = commands.get_entity(e) {
-                entity_cmds.insert(SchematicBuilderObject);
+                let old_txfm = old_txfms.get(e).unwrap();
+                entity_cmds
+                    .insert(SchematicBuilderObject)
+                    .insert(Transform::from_translation(old_txfm.translation()))
+                    .remove_parent();
             }
         }
     }
@@ -131,7 +136,8 @@ fn load_schematic(
         println!("Loading schematic scene... {}", game.player().position);
         commands
             .spawn(DynamicSceneBundle {
-                scene: asset_server.load("scenes/test.scn.ron"),
+                scene: asset_server.load("scenes/house.scn.ron"),
+                transform: Transform::from_translation(game.player().position),
                 ..default()
             })
             .insert(Name::new("Schematic"));
@@ -141,30 +147,30 @@ fn load_schematic(
 pub fn handle_new_scene_entities_parent_chunk(
     game: GameParam,
     new_scenes: Query<
-        (Entity, &Children, &Transform),
+        (Entity, &Children, &Transform, &GlobalTransform),
         (With<Handle<DynamicScene>>, Added<Children>),
     >,
-    obj_data: Query<(&WorldObject, &GlobalTransform), (With<WorldObject>, Without<Player>)>,
+    obj_data: Query<(&WorldObject, &Transform), (With<WorldObject>, Without<Player>)>,
     mut commands: Commands,
     mut place_item_event: EventWriter<PlaceItemEvent>,
 ) {
-    for (e, children, scene_txfm) in new_scenes.iter() {
+    for (e, children, scene_txfm, scene_g) in new_scenes.iter() {
         let mut x_offset: f32 = 1_000_000_000.;
         let mut y_offset: f32 = 1_000_000_000.;
         for child in children.iter() {
             if let Ok((_, txfm)) = obj_data.get(*child) {
-                if txfm.translation().x < x_offset {
-                    x_offset = txfm.translation().x;
+                if txfm.translation.x < x_offset {
+                    x_offset = txfm.translation.x;
                 }
-                if txfm.translation().y < y_offset {
-                    y_offset = txfm.translation().y;
+                if txfm.translation.y < y_offset {
+                    y_offset = txfm.translation.y;
                 }
             }
         }
         for child in children.iter() {
             if let Ok((obj, txfm)) = obj_data.get(*child) {
-                let pos = scene_txfm.translation.truncate()
-                    + (txfm.translation().truncate() - Vec2::new(x_offset, y_offset));
+                let pos = scene_g.translation().truncate()
+                    + (txfm.translation.truncate() - Vec2::new(x_offset, y_offset));
 
                 let mut is_valid_to_spawn = false;
                 if let Some(tile_data) = game.get_tile_data(world_pos_to_tile_pos(pos)) {
