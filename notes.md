@@ -171,10 +171,12 @@ impl different att styles w seldum_state
 [] Generation: Add random ore clusters in dungeons?
 [] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
 [] Survival: Food system
-[] Aesthetics: Add random animals that don't do anything,
-[] Aesthetics: add randomized full-block types
 [] Items: add lots of items/recipies
 [] UI: add static tooltips on the side of inv
+[] Aesthetics: Add random animals that don't do anything,
+[] Aesthetics: add randomized full-block types
+[] Dungeons: add exit method, add chest generation, etc `Blocked` by below
+[] items: shrink walls, simplify top borders so its easier to add new wall types
 [] save/load/cache
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
@@ -190,4 +192,14 @@ impl different att styles w seldum_state
   - objects like trees or walls take up all 4, grass/flowers/chests take up 1
 - Add world generation for grass/flower clusters
 
-BUG: full inv pick up deletes item
+## Gameloop ideas:
+
+- Player starts weak in a tough environment. Hostile and Neutral Mobs need to be avoided for now.
+- Early game revolves around getting grass/trees/rocksfor early materials (sticks, plant fibre -> string, stone shards)
+  - `Goal:` build first tools/weapons
+- Kill animals for food/wool/leather `Goal:` get beginner armor, food
+- From here options are open: Explore world, Try to kill mobs, Dungeon farming/mining
+  - `Goal:` get progressivly stronger gear
+- Find boss summon keys, various methods (mob drop, crafting, dungeon loot)
+  - `Goal:` kill all bosses
+- World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons

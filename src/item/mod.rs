@@ -172,6 +172,7 @@ pub enum WorldObject {
     DungeonEntranceBlock,
     Grass,
     GrassBlock,
+    Boulder,
 }
 
 #[derive(

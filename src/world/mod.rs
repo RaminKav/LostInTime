@@ -99,6 +99,7 @@ pub struct WorldGeneration {
     pub dirt_frequency: f64,
     pub stone_frequency: f64,
     pub tree_frequency: f64,
+    pub boulder_frequency: f64,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 pub struct WorldPlugin;
