@@ -245,11 +245,14 @@ impl EnemyPlugin {
         }
     }
     fn handle_mob_move_minimap_update(
-        moving_enemies: Query<Entity, (With<Mob>, Changed<GlobalTransform>)>,
+        moving_enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Changed<GlobalTransform>)>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
         if moving_enemies.iter().count() > 0 {
-            minimap_event.send(UpdateMiniMapEvent);
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: None,
+                new_tile: None,
+            });
         }
     }
 }

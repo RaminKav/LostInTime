@@ -212,11 +212,9 @@ impl ChunkPlugin {
     fn register_spawned_chunks(
         mut game: GameParam,
         loaded_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
-        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
     ) {
         for (e, chunk) in loaded_chunks.iter() {
             game.set_chunk_entity(chunk.chunk_pos, e);
-            minimap_update.send(UpdateMiniMapEvent);
         }
     }
     pub fn handle_update_tiles_for_new_chunks(
