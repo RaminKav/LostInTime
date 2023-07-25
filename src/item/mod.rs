@@ -278,25 +278,28 @@ impl WorldObject {
         game: &mut GameParam,
         commands: &mut Commands,
     ) -> Option<Entity> {
-        if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
-            warn!("obj exists here {pos}");
+        let tile_pos = world_pos_to_tile_pos(pos);
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
+            warn!("obj exists here {pos:?}");
             return None;
         }
-        let chunk_pos = camera_pos_to_chunk_pos(&pos);
 
-        if let Some(chunk) = game.get_chunk_entity(chunk_pos) {
+        if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
             let item = proto_commands.spawn_object_from_proto(self, pos, prototypes, proto_param);
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
-                minimap_event.send(UpdateMiniMapEvent);
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(tile_pos),
+                    new_tile: Some([self; 4]),
+                });
 
                 return Some(item);
             }
 
             return None;
         } else {
-            game.add_object_to_chunk_cache(chunk_pos, self, camera_pos_to_tile_pos(&pos));
+            game.add_object_to_chunk_cache(tile_pos.chunk_pos, self, camera_pos_to_tile_pos(&pos));
         }
         None
     }
@@ -429,13 +432,13 @@ pub fn handle_placing_world_object(
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
-        if let Some(_existing_object) = game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos)) {
-            warn!("obj exists here {pos}");
+        let tile_pos = world_pos_to_tile_pos(pos);
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
+            warn!("obj exists here {pos:?}");
             continue;
         }
-        let chunk_pos = camera_pos_to_chunk_pos(&pos);
 
-        if let Some(chunk) = game.get_chunk_entity(chunk_pos) {
+        if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
             let item = proto_commands.spawn_object_from_proto(
                 place_event.obj,
                 pos,
@@ -445,16 +448,15 @@ pub fn handle_placing_world_object(
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
-                minimap_event.send(UpdateMiniMapEvent);
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(tile_pos),
+                    new_tile: Some([place_event.obj; 4]),
+                });
             }
 
             continue;
         } else {
-            game.add_object_to_chunk_cache(
-                chunk_pos,
-                place_event.obj,
-                camera_pos_to_tile_pos(&pos),
-            );
+            game.add_object_to_chunk_cache(tile_pos.chunk_pos, place_event.obj, tile_pos.tile_pos);
         }
     }
 }
@@ -486,6 +488,9 @@ pub fn break_item(
                 tile_pos: broken.tile_pos,
             })
         }
-        minimap_event.send(UpdateMiniMapEvent);
+        minimap_event.send(UpdateMiniMapEvent {
+            pos: Some(TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0)),
+            new_tile: None,
+        });
     }
 }

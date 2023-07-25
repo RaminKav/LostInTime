@@ -248,7 +248,7 @@ fn spawn_player(
             MovementVector::default(),
             YSort,
             Name::new("Player"),
-            Collider::cuboid(7., 5.),
+            Collider::capsule(Vec2::new(0., 2.5), Vec2::new(0., -2.5), 6.),
             KinematicCharacterController {
                 // The character offset is set to 0.01.
                 offset: CharacterLength::Absolute(0.01),

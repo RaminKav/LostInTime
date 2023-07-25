@@ -290,12 +290,16 @@ impl GenerationPlugin {
                     &mut proto_param,
                 );
                 if let Some(spawned_obj) = obj {
+                    minimap_update.send(UpdateMiniMapEvent {
+                        pos: Some(TileMapPosition::new(chunk_pos, tile_pos, 0)),
+                        new_tile: Some([obj_data.2; 4]),
+                    });
+
                     commands
                         .entity(spawned_obj)
                         .set_parent(*game.get_chunk_entity(chunk_pos).unwrap());
                 }
             }
-            minimap_update.send(UpdateMiniMapEvent);
         }
     }
 }

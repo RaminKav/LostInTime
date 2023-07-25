@@ -185,7 +185,10 @@ impl InputsPlugin {
 
         if d.x != 0. || d.y != 0. {
             player_transform.translation = Some(Vec2::new(d.x, d.y));
-            minimap_event.send(UpdateMiniMapEvent);
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: None,
+                new_tile: None,
+            });
         } else {
             player_transform.translation = Some(Vec2::ZERO);
         }
