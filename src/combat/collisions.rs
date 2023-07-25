@@ -2,7 +2,7 @@ use crate::{
     animations::DoneAnimation,
     attributes::{Attack, AttributeModifier},
     enemy::Mob,
-    inventory::{Inventory, ItemStack},
+    inventory::{Inventory, InventoryPlugin, ItemStack},
     item::{
         projectile::{Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
@@ -134,7 +134,11 @@ impl CollisionPlugion {
                 if !allowed_targets.contains(e2) {
                     continue;
                 }
-                // ...and the entity is an item stack, add it to the player's inventory
+                // ...and the entity is an item stack...
+                if InventoryPlugin::get_first_empty_slot(&inv.single().items).is_none() {
+                    return;
+                }
+                // ...and inventory has room, add it to the player's inventory
 
                 let item_stack = items_query.get(e2).unwrap().clone();
                 item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
