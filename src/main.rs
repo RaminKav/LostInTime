@@ -44,7 +44,7 @@ mod schematic;
 mod ui;
 mod world;
 use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, Graphics};
+use assets::{GameAssetsPlugin, Graphics, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
 use client::ClientPlugin;
@@ -62,7 +62,7 @@ use world::{
     chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
-    TileMapPositionData, WorldObjectEntityData, WorldPlugin,
+    TileMapPosition, WorldObjectEntityData, WorldPlugin,
 };
 use world::{ChunkManager, WorldGeneration};
 const ZOOM_SCALE: f32 = 1.;
@@ -192,10 +192,14 @@ pub struct GameParam<'w, 's> {
     pub world_object_query: Query<
         'w,
         's,
-        (Entity, &'static GlobalTransform),
+        (
+            Entity,
+            &'static GlobalTransform,
+            &'static SpriteSize,
+            &'static mut WorldObjectEntityData,
+        ),
         (With<WorldObject>, With<WorldObjectEntityData>),
     >,
-    pub world_obj_data_query: Query<'w, 's, &'static mut WorldObjectEntityData>,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
@@ -204,6 +208,12 @@ pub struct GameParam<'w, 's> {
 }
 
 impl<'w, 's> GameParam<'w, 's> {
+    pub fn player(&self) -> PlayerState {
+        self.game.player_state.clone()
+    }
+    pub fn player_mut(&mut self) -> &mut PlayerState {
+        &mut self.game.player_state
+    }
     pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<&Entity> {
         self.chunk_manager.chunks.get(&chunk_pos.into())
     }
@@ -232,20 +242,20 @@ impl<'w, 's> GameParam<'w, 's> {
         self.chunk_manager.chunks.remove(&chunk_pos.into());
     }
 
-    pub fn get_tile_entity(&self, tile: TileMapPositionData) -> Option<Entity> {
+    pub fn get_tile_entity(&self, tile: TileMapPosition) -> Option<Entity> {
         if let Some(chunk_e) = self.get_chunk_entity(tile.chunk_pos) {
             let tile_collection = self.tile_collection_query.get(*chunk_e).unwrap();
             return tile_collection.map.get(&tile.tile_pos.into()).copied();
         }
         None
     }
-    pub fn get_tile_data_mut(&mut self, tile: TileMapPositionData) -> Option<Mut<TileSpriteData>> {
+    pub fn get_tile_data_mut(&mut self, tile: TileMapPosition) -> Option<Mut<TileSpriteData>> {
         if let Some(tile_e) = self.get_tile_entity(tile) {
             return Some(self.tile_data_query.get_mut(tile_e).unwrap().0);
         }
         None
     }
-    pub fn get_tile_data(&self, tile: TileMapPositionData) -> Option<TileSpriteData> {
+    pub fn get_tile_data(&self, tile: TileMapPosition) -> Option<TileSpriteData> {
         if let Some(tile_e) = self.get_tile_entity(tile) {
             if let Ok(tile_sprite) = self.tile_data_query.get(tile_e) {
                 return Some(tile_sprite.0.clone());
@@ -253,26 +263,30 @@ impl<'w, 's> GameParam<'w, 's> {
         }
         None
     }
-    pub fn get_obj_entity_at_tile(&self, tile: TileMapPositionData) -> Option<Entity> {
-        for (obj_e, g_txm) in self.world_object_query.iter() {
-            if world_pos_to_tile_pos(g_txm.translation().truncate()) == tile {
+    pub fn get_obj_entity_at_tile(&self, tile: TileMapPosition) -> Option<Entity> {
+        for (obj_e, g_txm, size, _) in self.world_object_query.iter() {
+            let pos = world_pos_to_tile_pos(g_txm.translation().truncate());
+
+            if size.is_medium() && pos.matches_tile(&tile) {
+                return Some(obj_e);
+            } else if pos == tile {
                 return Some(obj_e);
             }
         }
         None
     }
-    pub fn get_tile_obj_data(&self, tile: TileMapPositionData) -> Option<WorldObjectEntityData> {
+    pub fn get_tile_obj_data(&self, tile: TileMapPosition) -> Option<WorldObjectEntityData> {
         if let Some(e) = self.get_obj_entity_at_tile(tile) {
-            return Some(self.world_obj_data_query.get(e).unwrap().clone());
+            return Some(self.world_object_query.get(e).unwrap().3.clone());
         }
         None
     }
     pub fn get_tile_obj_data_mut(
         &mut self,
-        tile: TileMapPositionData,
+        tile: TileMapPosition,
     ) -> Option<Mut<WorldObjectEntityData>> {
         if let Some(e) = self.get_obj_entity_at_tile(tile) {
-            return Some(self.world_obj_data_query.get_mut(e).unwrap());
+            return Some(self.world_object_query.get_mut(e).unwrap().3);
         }
         None
     }

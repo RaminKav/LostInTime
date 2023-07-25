@@ -87,7 +87,7 @@
         ),
         Chest: WorldObjectData(
             texture_pos: (0., 9.),
-            size: (32., 32.),
+            size: (16., 16.),
             anchor: None,
         ),
         ChestBlock: WorldObjectData(
@@ -100,8 +100,18 @@
             size: (32., 32.),
             anchor: None,
         ),
-         DungeonEntranceBlock: WorldObjectData(
+        DungeonEntranceBlock: WorldObjectData(
             texture_pos: (2., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GrassBlock: WorldObjectData(
+            texture_pos: (0., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Grass: WorldObjectData(
+            texture_pos: (0., 12.),
             size: (16., 16.),
             anchor: None,
         ),

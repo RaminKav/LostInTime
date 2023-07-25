@@ -15,7 +15,7 @@ use crate::{
         MoveDirection,
     },
     ui::minimap::UpdateMiniMapEvent,
-    world::TileMapPositionData,
+    world::TileMapPosition,
     AppExt, GameParam, GameState,
 };
 
@@ -122,7 +122,7 @@ pub enum PassiveMob {
 
 pub struct EnemySpawnEvent {
     pub enemy: Mob,
-    pub pos: TileMapPositionData,
+    pub pos: TileMapPosition,
 }
 impl EnemyPlugin {
     pub fn handle_new_mob_state_machine(

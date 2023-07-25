@@ -16,8 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use super::tile::TilePlugin;
 use super::{
-    world_helpers, TileMapPositionData, CHUNK_SIZE, MAX_VISIBILITY, NUM_CHUNKS_AROUND_CAMERA,
-    TILE_SIZE,
+    world_helpers, TileMapPosition, CHUNK_SIZE, MAX_VISIBILITY, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
 };
 
 pub struct ChunkPlugin;
@@ -150,7 +149,7 @@ impl ChunkPlugin {
 
             let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
                 CHUNK_SIZE as usize] =
-                [[[WorldObject::Sand; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+                [[[WorldObject::SandTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
             println!("Creating new chunk {chunk_pos:?}");
 
             for y in 0..CHUNK_SIZE {
@@ -235,17 +234,15 @@ impl ChunkPlugin {
             let chunk_pos = e.chunk_pos;
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
-                    let pos = TileMapPositionData {
-                        chunk_pos,
-                        tile_pos: TilePos { x, y },
-                    };
+                    let pos = TileMapPosition::new(chunk_pos, TilePos { x, y }, 0);
                     let tile_data = game.get_tile_data(pos.clone()).unwrap();
 
                     for dy in -1i8..=1 {
                         for dx in -1i8..=1 {
-                            let TileMapPositionData {
+                            let TileMapPosition {
                                 chunk_pos: adjusted_chunk_pos,
                                 tile_pos: neighbour_tile_pos,
+                                ..
                             } = get_neighbours_tile(pos.clone(), (dx, dy));
                             if adjusted_chunk_pos != chunk_pos
                                 && game.get_chunk_entity(adjusted_chunk_pos).is_some()
@@ -253,10 +250,11 @@ impl ChunkPlugin {
                                 TilePlugin::update_this_tile(
                                     &mut commands,
                                     neighbour_tile_pos,
-                                    game.get_tile_data(TileMapPositionData {
-                                        chunk_pos: adjusted_chunk_pos,
-                                        tile_pos: neighbour_tile_pos,
-                                    })
+                                    game.get_tile_data(TileMapPosition::new(
+                                        adjusted_chunk_pos,
+                                        neighbour_tile_pos,
+                                        0,
+                                    ))
                                     .unwrap()
                                     .texture_offset,
                                     &mut game,

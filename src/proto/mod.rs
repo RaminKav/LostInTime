@@ -18,6 +18,7 @@ pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation},
+    assets::SpriteSize,
     attributes::{Attack, ItemAttributes, MaxHealth},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
@@ -68,6 +69,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<EnemyMaterialMesh2DProto>()
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
+            .register_type::<SpriteSize>()
             .register_type::<ItemAction>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
@@ -121,6 +123,8 @@ impl ProtoPlugin {
         prototypes.load("proto/chestblock.prototype.ron");
         prototypes.load("proto/dungeonentrance.prototype.ron");
         prototypes.load("proto/dungeonentranceblock.prototype.ron");
+        prototypes.load("proto/grass.prototype.ron");
+        prototypes.load("proto/grassblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

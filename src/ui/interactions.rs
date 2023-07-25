@@ -122,10 +122,10 @@ pub fn handle_drop_in_world_events(
     asset_server: Res<AssetServer>,
 ) {
     for drop_event in events.iter() {
-        let p = ui_helpers::get_player_chunk_tile_coords(&mut game_param.game);
+        let pos = game_param.player().position.truncate();
         drop_event
             .dropped_item_stack
-            .spawn_as_drop(&mut commands, &mut game_param, p.1, p.0);
+            .spawn_as_drop(&mut commands, &mut game_param, pos);
         commands
             .entity(drop_event.dropped_entity)
             .despawn_recursive();

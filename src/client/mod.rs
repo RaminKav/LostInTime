@@ -1,5 +1,5 @@
 use bevy::{
-    app::AppExit, ecs::system::SystemState, prelude::*, sprite::Mesh2dHandle, utils::HashMap,
+    app::AppExit, ecs::system::SystemState, prelude::*, utils::HashMap,
 };
 use bevy_ecs_tilemap::{
     prelude::{
@@ -22,7 +22,7 @@ use crate::{
             TileEntityCollection, TileSpriteData,
         },
         dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
-        ChunkManager, TileMapPositionData, WorldGeneration, WorldObjectEntityData,
+        ChunkManager, TileMapPosition, WorldGeneration, WorldObjectEntityData,
     },
     CustomFlush, GameParam, GameState, YSort,
 };
@@ -74,7 +74,7 @@ impl Plugin for ClientPlugin {
             .register_saveable::<CurrentHealth>()
             .register_saveable::<WorldObjectEntityData>()
             .register_saveable::<YSort>()
-            .register_saveable::<TileMapPositionData>()
+            .register_saveable::<TileMapPosition>()
             // .register_saveable::<Breakable>()
             .register_saveable::<ColliderReflect>()
             .register_saveable::<Name>()

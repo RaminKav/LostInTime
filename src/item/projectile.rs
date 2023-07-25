@@ -1,5 +1,3 @@
-
-
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
@@ -75,7 +73,7 @@ impl RangedAttackPlugin {
             proto_commands.spawn_projectile_from_proto(
                 proj_event.projectile.clone(),
                 &proto,
-                game.game.player_state.position.truncate(),
+                game.player().position.truncate(),
                 proj_event.direction,
             );
         }

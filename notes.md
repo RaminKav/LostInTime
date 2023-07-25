@@ -164,10 +164,17 @@ impl different att styles w seldum_state
 [x] `Blocked below` Dungeons: add item that tp to dungeon instance, spawned from schematic probably
 [x] Items: add right-click ability items (potion, single use items)
 [x] Items: add right-click interact objects (chests, alter, etc)
-[] Items: add random roll stats, clean up naming of stats too
 [x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
 [x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
+[] Items: add random roll stats, clean up naming of stats too
 [] Add colliders to water (use corners)
+[] Generation: Add random ore clusters in dungeons?
+[] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
+[] Survival: Food system
+[] Aesthetics: Add random animals that don't do anything,
+[] Aesthetics: add randomized full-block types
+[] Items: add lots of items/recipies
+[] UI: add static tooltips on the side of inv
 [] save/load/cache
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
@@ -176,3 +183,11 @@ impl different att styles w seldum_state
 ## Projectile/Magic ideas
 
 - orb that spins around you as you walk, attack fires the orb, then respawns or comes back
+
+## Foliage/object rework notes:
+
+- convert tile object hash to a vec of 4 objects, 1 for each quadrant
+  - objects like trees or walls take up all 4, grass/flowers/chests take up 1
+- Add world generation for grass/flower clusters
+
+BUG: full inv pick up deletes item

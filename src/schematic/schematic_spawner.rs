@@ -1,8 +1,7 @@
 use super::SchematicType;
 use crate::{
     world::{
-        chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPositionData, CHUNK_SIZE,
-        TILE_SIZE,
+        chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
     GameParam,
 };
@@ -26,10 +25,10 @@ pub fn attempt_to_spawn_schematic_in_chunk(
         let mut rng = rand::thread_rng();
         let rng_x = rng.gen_range(0..CHUNK_SIZE);
         let rng_y = rng.gen_range(0..CHUNK_SIZE);
-        let target_pos = tile_pos_to_world_pos(TileMapPositionData::new(
-            chunk.chunk_pos,
-            TilePos::new(rng_x, rng_y),
-        ));
+        let target_pos = tile_pos_to_world_pos(
+            TileMapPosition::new(chunk.chunk_pos, TilePos::new(rng_x, rng_y), 0),
+            true,
+        );
         let tile_pos = Vec2::new(4. * TILE_SIZE.x, 9. * TILE_SIZE.x);
         if let Some(chunk_e) = game.get_chunk_entity(chunk.chunk_pos) {
             println!("Spawning schematic at {:?} {:?}", chunk.chunk_pos, tile_pos);

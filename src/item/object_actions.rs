@@ -1,9 +1,9 @@
 use super::item_actions::ItemActionParam;
-use crate::proto::proto_param::{self, ProtoParam};
+
 use crate::world::dungeon::DungeonPlugin;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
-    world::world_helpers::world_pos_to_tile_pos, Game,
+    world::world_helpers::world_pos_to_tile_pos,
 };
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
@@ -25,7 +25,6 @@ impl ObjectAction {
         &self,
         e: Entity,
         item_action_param: &mut ItemActionParam,
-        game: &Game,
         commands: &mut Commands,
         proto_commands: &mut ProtoCommands,
     ) {

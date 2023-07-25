@@ -256,7 +256,7 @@ impl AnimationsPlugin {
             let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
             let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
 
-            let is_facing_left = game.game.player_state.direction == FacingDirection::Left;
+            let is_facing_left = game.player().direction == FacingDirection::Left;
 
             t.translation.x = PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x
                 + anchor.x * obj_data.size.x
@@ -273,14 +273,14 @@ impl AnimationsPlugin {
         attack_event: EventReader<AttackEvent>,
     ) {
         if let Ok((obj, mut t, mut at)) = tool_query.get_single_mut() {
-            let is_facing_left = if game.game.player_state.direction == FacingDirection::Left {
+            let is_facing_left = if game.player().direction == FacingDirection::Left {
                 1.
             } else {
                 -1.
             };
 
             if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
-                game.game.player_state.is_attacking = true;
+                game.player_mut().is_attacking = true;
 
                 let d = time.delta();
                 at.0.tick(d);
@@ -311,7 +311,7 @@ impl AnimationsPlugin {
                         PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].y + anchor.y * obj_data.size.y;
                 }
             } else {
-                game.game.player_state.is_attacking = false;
+                game.player_mut().is_attacking = false;
             }
         }
     }

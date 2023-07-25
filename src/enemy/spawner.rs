@@ -9,8 +9,8 @@ use crate::{
     custom_commands::CommandsExt,
     world::{
         chunk::Chunk,
-        world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos},
-        TileMapPositionData, CHUNK_SIZE,
+        world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
+        TileMapPosition, CHUNK_SIZE,
     },
     GameParam, GameState,
 };
@@ -105,14 +105,18 @@ impl SpawnerPlugin {
                             x: rng.gen_range(0..CHUNK_SIZE),
                             y: rng.gen_range(0..CHUNK_SIZE),
                         };
-                        let pos = tile_pos_to_world_pos(TileMapPositionData {
-                            tile_pos,
-                            chunk_pos: picked_spawner.chunk_pos,
-                        });
+                        let pos = tile_pos_to_world_pos(
+                            TileMapPosition::new(picked_spawner.chunk_pos, tile_pos, 0),
+                            true,
+                        );
+                        picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
+                        if let Some(_existing_object) =
+                            game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos))
+                        {
+                            return;
+                        }
                         prototypes.is_ready("Slime");
                         proto_commands.spawn_from_proto(NeutralMob::Slime, &prototypes, pos);
-
-                        picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     }
                 }
             }

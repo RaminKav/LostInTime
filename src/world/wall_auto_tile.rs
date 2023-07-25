@@ -5,7 +5,7 @@ use crate::{item::Wall, proto::proto_param::ProtoParam, GameParam};
 use super::{
     generation::WallBreakEvent,
     world_helpers::{get_neighbour_obj_data, get_neighbours_tile, world_pos_to_tile_pos},
-    TileMapPositionData,
+    TileMapPosition,
 };
 #[derive(Component)]
 pub struct Dirty;
@@ -169,10 +169,7 @@ pub fn handle_wall_break(
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let wall_pos = TileMapPositionData {
-                    chunk_pos,
-                    tile_pos: broken_wall.tile_pos,
-                };
+                let wall_pos = TileMapPosition::new(chunk_pos, broken_wall.tile_pos, 0);
                 let pos = get_neighbours_tile(wall_pos.clone(), (dx, dy));
 
                 if let Some(neighbour_block_entity_data) =

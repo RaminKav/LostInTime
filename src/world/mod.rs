@@ -56,19 +56,25 @@ impl ChunkManager {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
+/// A component that represents a position in the tilemap. The `quadrant` is a number from 0 to 3
+/// where 0 is top left, 1 is top right, 2 is bottom left, 3 is bottom right
 #[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect)]
 #[reflect(Component)]
-pub struct TileMapPositionData {
-    //TODO: Add ::new() impl
+pub struct TileMapPosition {
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
+    pub quadrant: u8,
 }
-impl TileMapPositionData {
-    pub fn new(chunk_pos: IVec2, tile_pos: TilePos) -> Self {
+impl TileMapPosition {
+    pub fn new(chunk_pos: IVec2, tile_pos: TilePos, quadrant: u8) -> Self {
         Self {
             chunk_pos,
             tile_pos,
+            quadrant,
         }
+    }
+    pub fn matches_tile(&self, other: &TileMapPosition) -> bool {
+        self.chunk_pos == other.chunk_pos && self.tile_pos == other.tile_pos
     }
 }
 

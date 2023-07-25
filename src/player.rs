@@ -131,7 +131,7 @@ pub fn handle_player_raw_position(
     pos.translation.x += delta.x;
     pos.translation.y += delta.y;
     pos.translation = pos.translation.round();
-    game.game.player_state.position = pos.translation;
+    game.player_mut().position = pos.translation;
 }
 
 fn spawn_player(

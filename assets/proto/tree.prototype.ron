@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": Tree,
   "survival_rogue_like::item::Foliage": Tree,
+  "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::item::Breakable": (Some(Log)),
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 9.),
