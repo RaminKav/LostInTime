@@ -1,9 +1,6 @@
 use super::SchematicType;
-use crate::{
-    world::{
-        chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, CHUNK_SIZE, TILE_SIZE,
-    },
-    GameParam,
+use crate::world::{
+    chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, CHUNK_SIZE,
 };
 use bevy_ecs_tilemap::tiles::TilePos;
 use rand::Rng;
@@ -18,7 +15,6 @@ pub struct SchematicSpawner {
 pub fn attempt_to_spawn_schematic_in_chunk(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    game: GameParam,
     chunks: Query<(Entity, &Chunk, &SchematicSpawner)>,
 ) {
     for (e, chunk, schematic) in chunks.iter() {
@@ -29,20 +25,14 @@ pub fn attempt_to_spawn_schematic_in_chunk(
             TileMapPosition::new(chunk.chunk_pos, TilePos::new(rng_x, rng_y), 0),
             true,
         );
-        let tile_pos = Vec2::new(4. * TILE_SIZE.x, 9. * TILE_SIZE.x);
-        if let Some(chunk_e) = game.get_chunk_entity(chunk.chunk_pos) {
-            println!("Spawning schematic at {:?} {:?}", chunk.chunk_pos, tile_pos);
-
-            commands
-                .spawn(DynamicSceneBundle {
-                    scene: asset_server.load(format!("scenes/{}.scn.ron", schematic.schematic)),
-                    transform: Transform::from_translation(target_pos.extend(0.)),
-                    ..default()
-                })
-                .set_parent(*chunk_e)
-                .insert(Name::new("Schematic"));
-            commands.entity(e).remove::<SchematicSpawner>();
-        }
+        commands
+            .spawn(DynamicSceneBundle {
+                scene: asset_server.load(format!("scenes/{}.scn.ron", schematic.schematic)),
+                transform: Transform::from_translation(target_pos.extend(0.)),
+                ..default()
+            })
+            .insert(Name::new("Schematic"));
+        commands.entity(e).remove::<SchematicSpawner>();
     }
 }
 

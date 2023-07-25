@@ -36,7 +36,7 @@ pub struct UpdateMiniMapEvent;
 pub struct Minimap;
 #[derive(Resource, Default)]
 pub struct MinimapTileCache {
-    _cache: HashMap<TileMapPosition, Arc<[WorldObject; 4]>>,
+    cache: HashMap<TileMapPosition, Arc<[WorldObject; 4]>>,
 }
 
 //TODO: Optimize this to not run if player does not move over a tile, maybe w resource to track
@@ -52,6 +52,7 @@ impl MinimapPlugin {
         p_t: Query<&Transform, With<Player>>,
         mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
         mut meshes: ResMut<Assets<Mesh>>,
+        mut cache: ResMut<MinimapTileCache>,
     ) {
         //NOTES:
         // construct an array of tiles based on whats around the player
@@ -61,7 +62,7 @@ impl MinimapPlugin {
         // check player's C/T + offset.
         // if we pass chunk boundary, get next chunk
 
-        //TODO: for better performance...
+        //TODO: for better performance... ??
         // option 1: Events send a msg with a tile pos and its new color?
         //           need a helper fn to convert the tile pos to data vec index
         // option 2: keep track of every tile color in a vector and update the map every frame with it
@@ -130,25 +131,25 @@ impl MinimapPlugin {
                             x: tile_x as u32,
                             y: (tile_y) as u32,
                         };
-                        // if let Some(cached_tile) = cache
-                        //     .cache
-                        //     .get(&TileMapPosition::new(chunk_pos, tile_pos, 0))
-                        // {
-                        //     for i in 0..2 {
-                        //         let c = cached_tile[i + offset].get_minimap_color();
+                        if let Some(cached_tile) = cache
+                            .cache
+                            .get(&TileMapPosition::new(chunk_pos, tile_pos, 0))
+                        {
+                            for i in 0..2 {
+                                let c = cached_tile[i + offset].get_minimap_color();
 
-                        //         data.push((c.r() * 255.) as u8);
-                        //         data.push((c.g() * 255.) as u8);
-                        //         data.push((c.b() * 255.) as u8);
-                        //         data.push(255);
-                        //     }
-                        //     continue;
-                        // }
+                                data.push((c.r() * 255.) as u8);
+                                data.push((c.g() * 255.) as u8);
+                                data.push((c.b() * 255.) as u8);
+                                data.push(255);
+                            }
+                            continue;
+                        }
 
                         if let Some(tile_data) =
                             game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
                         {
-                            let tile = tile_data.block_type;
+                            let mut tile = tile_data.block_type;
                             if mobs.contains(&(chunk_pos, tile_pos)) {
                                 for _ in 0..2 {
                                     let c = LIGHT_RED;
@@ -158,17 +159,16 @@ impl MinimapPlugin {
                                     data.push(255);
                                 }
                                 continue;
+                            } else if let Some(obj_data) =
+                                game.get_tile_obj_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
+                            {
+                                print!(" NO CACHE ");
+                                tile = [obj_data.object; 4];
+                                cache.cache.insert(
+                                    TileMapPosition::new(chunk_pos, tile_pos, 0),
+                                    tile.into(),
+                                );
                             }
-                            // else if let Some(obj_data) =
-                            //     game.get_tile_obj_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
-                            // {
-                            //     print!(" NO CACHE ");
-                            //     tile = [obj_data.object; 4];
-                            //     cache.cache.insert(
-                            //         TileMapPosition::new(chunk_pos, tile_pos, 0),
-                            //         tile.into(),
-                            //     );
-                            // }
 
                             for i in 0..2 {
                                 //Copy 1 pixel at index 0,1 2,3
