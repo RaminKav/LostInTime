@@ -220,22 +220,17 @@ impl<'w, 's> GameParam<'w, 's> {
     pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
         self.chunk_manager.chunks.insert(chunk_pos.into(), e);
     }
-    pub fn add_object_to_chunk_cache(
-        &mut self,
-        chunk_pos: IVec2,
-        obj: WorldObject,
-        tile_pos: TilePos,
-    ) {
+    pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
         self.chunk_obj_cache
             .cache
-            .entry(chunk_pos.into())
+            .entry(pos.chunk_pos.into())
             .or_insert_with(Vec::new)
-            .push((obj, tile_pos));
+            .push((obj, pos));
     }
     pub fn get_objects_from_chunk_cache(
         &self,
         chunk_pos: IVec2,
-    ) -> Option<&Vec<(WorldObject, TilePos)>> {
+    ) -> Option<&Vec<(WorldObject, TileMapPosition)>> {
         self.chunk_obj_cache.cache.get(&chunk_pos.into())
     }
     pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {

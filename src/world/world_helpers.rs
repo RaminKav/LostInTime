@@ -149,3 +149,31 @@ pub fn get_neighbour_obj_data(
     }
     None
 }
+
+pub fn can_object_be_placed_here(
+    tile_pos: TileMapPosition,
+    game: &mut GameParam,
+    is_medium: bool,
+) -> bool {
+    if is_medium
+        && (game
+            .get_obj_entity_at_tile(tile_pos.set_quadrant(0))
+            .is_some()
+            || game
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(1))
+                .is_some()
+            || game
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(2))
+                .is_some()
+            || game
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(3))
+                .is_some())
+    {
+        warn!("obj exists here {tile_pos:?}");
+        return false;
+    } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
+        warn!("obj exists here {tile_pos:?}");
+        return false;
+    }
+    true
+}

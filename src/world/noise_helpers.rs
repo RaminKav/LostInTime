@@ -45,7 +45,7 @@ pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(
     }
     // TODO: fix this to work w 4 quadrants -/+
     let n = 2.;
-    let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32;
+    let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32 - (TILE_SIZE.x / 2. + 1.) as i32;
     // the final set of points to return
     let mut points: Vec<(f32, f32)> = vec![];
     if k == 0 {

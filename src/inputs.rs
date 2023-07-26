@@ -400,7 +400,7 @@ impl InputsPlugin {
         mut proto_commands: ProtoCommands,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
-        game: GameParam,
+        mut game: GameParam,
         proto_param: ProtoParam,
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
@@ -462,14 +462,18 @@ impl InputsPlugin {
             }
         }
         // Attempt to place block in hand
-        // TODO: Interact
         if mouse_button_input.just_pressed(MouseButton::Right) {
             let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
             if let Some(held_item) = held_item_option {
                 let held_obj = *held_item.get_obj();
                 if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
-                    item_action.run_action(held_obj, &mut item_action_param, &game);
+                    item_action.run_action(
+                        held_obj,
+                        &mut item_action_param,
+                        &mut game,
+                        &proto_param,
+                    );
                 }
             }
 

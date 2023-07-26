@@ -305,14 +305,10 @@ impl ClientPlugin {
         // world.load("game").map_err(|c| {
         // println!("{c:?}");
         let params = WorldGeneration {
-            tree_frequency: 0.,
-            boulder_frequency: 0.,
-            dungeon_stone_frequency: 0.,
             sand_frequency: 0.32,
             water_frequency: 0.15,
-            stone_frequency: 0.0,
-            dirt_frequency: 0.0,
             obj_allowed_tiles_map: HashMap::default(),
+            ..default()
         };
         let mut state: SystemState<EventWriter<DimensionSpawnEvent>> = SystemState::new(world);
         let mut dim_event = state.get_mut(world);
