@@ -8,18 +8,17 @@ use crate::inventory::ItemStack;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::InventorySlotType;
+use crate::ui::{ChestInventory, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
 use crate::world::TileMapPosition;
-
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
+use rand::Rng;
 
 mod crafting;
 pub mod item_actions;
@@ -470,23 +469,51 @@ pub fn handle_placing_world_object(
 }
 pub fn break_item(
     mut commands: Commands,
-    mut game: GameParam,
     proto_param: ProtoParam,
+    mut game_param: GameParam,
+    mut proto_commands: ProtoCommands,
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut wall_break_event: EventWriter<WallBreakEvent>,
-    breakable_query: Query<&Breakable>,
+    loot_tables: Query<&LootTable>,
+    chest_containers: Query<&ChestInventory>,
 ) {
     for broken in obj_break_events.iter() {
-        if let Ok(breakable) = breakable_query.get(broken.entity) {
-            commands.entity(broken.entity).despawn();
-            if let Some(breaks_into) = breakable.0 {
-                let base_stack = proto_param.get_item_data(breaks_into).unwrap().clone();
+        let mut rng = rand::thread_rng();
+        if broken.obj == WorldObject::Chest {
+            if let Ok(chest) = chest_containers.get(broken.entity) {
+                for item_option in chest.items.items.iter() {
+                    if let Some(item) = item_option {
+                        let pos = tile_pos_to_world_pos(
+                            TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0),
+                            true,
+                        );
+                        item.item_stack
+                            .spawn_as_drop(&mut commands, &mut game_param, pos);
+                    }
+                }
+            }
+        }
+        commands.entity(broken.entity).despawn();
+        if let Ok(loot_table) = loot_tables.get(broken.entity) {
+            for drop in LootTablePlugin::get_drops(loot_table) {
                 let pos = tile_pos_to_world_pos(
                     TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0),
                     true,
                 );
-                base_stack.spawn_as_drop(&mut commands, &mut game, pos);
+                let drop_spread = 10.;
+
+                let pos = Vec3::new(
+                    pos.x + rng.gen_range(-drop_spread..drop_spread),
+                    pos.y + rng.gen_range(-drop_spread..drop_spread),
+                    0.,
+                );
+                proto_commands.spawn_item_from_proto(
+                    drop.obj_type,
+                    &proto_param,
+                    pos.truncate(),
+                    drop.count,
+                );
             }
         }
 

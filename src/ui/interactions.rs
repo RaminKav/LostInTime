@@ -122,7 +122,7 @@ pub fn handle_drop_in_world_events(
     asset_server: Res<AssetServer>,
 ) {
     for drop_event in events.iter() {
-        let pos = game_param.player().position.truncate();
+        let pos = game_param.player().position.truncate() + Vec2::new(12., 2.);
         drop_event
             .dropped_item_stack
             .spawn_as_drop(&mut commands, &mut game_param, pos);
@@ -337,7 +337,7 @@ pub fn handle_hovering(
 }
 
 pub fn handle_item_drop_clicks(
-    mouse_input: Res<Input<MouseButton>>,
+    mouse_input: ResMut<Input<MouseButton>>,
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_states: Query<&mut InventorySlotState>,
@@ -348,9 +348,13 @@ pub fn handle_item_drop_clicks(
 
     mut item_stack_query: Query<&mut ItemStack>,
     mut interactables: Query<(Entity, &mut Interactable)>,
+    mut right_clicks: Local<Vec<usize>>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
+    let right_mouse_pressed = mouse_input.pressed(MouseButton::Right);
+    if !right_mouse_pressed {
+        right_clicks.clear();
+    }
     let inv_open = inv_state.open;
     let hit_test = if inv_open {
         ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
@@ -372,6 +376,10 @@ pub fn handle_item_drop_clicks(
                                 stack_empty: true,
                             });
                         } else if right_mouse_pressed {
+                            if right_clicks.contains(&state.slot_index) {
+                                continue;
+                            }
+                            right_clicks.push(state.slot_index);
                             let mut valid_drop = true;
                             if let Some(target_obj_type) = state.obj_type {
                                 if item_stack.obj_type != target_obj_type {
@@ -405,7 +413,7 @@ pub fn handle_item_drop_clicks(
                             parent_interactable_entity: e,
                             stack_empty: true,
                         });
-                    } else if right_mouse_pressed {
+                    } else if mouse_input.just_pressed(MouseButton::Right) {
                         let lonely_item_stack: ItemStack = ItemStack {
                             obj_type: item_stack.obj_type,
                             metadata: item_stack.metadata.clone(),

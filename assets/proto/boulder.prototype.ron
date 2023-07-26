@@ -12,5 +12,13 @@
   "survival_rogue_like::world::y_sort::YSort": (),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: StoneShard,
+                min: 1,
+                max: 2,
+                rate: 1.
+            ),]
+        ),
   }
 )
