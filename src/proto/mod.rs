@@ -78,6 +78,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<AnimationTimerProto>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
+            .register_type::<HashMap<WorldObject, f64>>()
             .register_type::<Vec<WorldObject>>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
@@ -131,6 +132,7 @@ impl ProtoPlugin {
         prototypes.load("proto/slimegoo.prototype.ron");
         prototypes.load("proto/bandage.prototype.ron");
         prototypes.load("proto/string.prototype.ron");
+        prototypes.load("proto/deadsapling.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

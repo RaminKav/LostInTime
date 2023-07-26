@@ -180,6 +180,7 @@ pub enum WorldObject {
     PlantFibre,
     String,
     Bandage,
+    DeadSapling,
 }
 
 #[derive(

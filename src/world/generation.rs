@@ -48,13 +48,13 @@ impl GenerationPlugin {
         let y = tile_pos.y as f64;
         // dont need to use expencive noise fn if it will always
         // result in the same tile
-        if world_generation_params.stone_frequency == 1. {
+        if world_generation_params.stone_wall_frequency == 1. {
             return Some(WorldObject::StoneWall);
         }
         let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
         let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
         let e = noise_helpers::get_perlin_noise_for_tile(nx, ny, seed);
-        if e <= world_generation_params.stone_frequency {
+        if e <= world_generation_params.stone_wall_frequency {
             return Some(WorldObject::StoneWall);
         }
         None
@@ -161,78 +161,56 @@ impl GenerationPlugin {
             let chunk_pos = chunk.chunk_pos;
             let maybe_dungeon = dungeon.get_single();
 
-            let raw_tree_points = noise_helpers::poisson_disk_sampling(
-                2.5 * TILE_SIZE.x as f64,
-                30,
-                game.world_generation_params.tree_frequency,
-                rand::thread_rng(),
-            );
-            let raw_grass_points = noise_helpers::poisson_disk_sampling(
-                (TILE_SIZE.x / 2.) as f64,
-                30,
-                game.world_generation_params.grass_frequency,
-                rand::thread_rng(),
-            );
-            let raw_boulder_points = noise_helpers::poisson_disk_sampling(
-                2.5 * TILE_SIZE.x as f64,
-                30,
-                game.world_generation_params.boulder_frequency,
-                rand::thread_rng(),
-            );
-            let tree_points = raw_tree_points
-                .iter()
-                .map(|tp| {
-                    let tp_vec = Vec2::new(
-                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                    );
-
-                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
-                    (relative_tp, WorldObject::Tree)
-                })
-                .collect::<Vec<(TileMapPosition, WorldObject)>>();
-            let grass_points = raw_grass_points
-                .iter()
-                .map(|tp| {
-                    let tp_vec = Vec2::new(
-                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                    );
-
-                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
-                    (relative_tp, WorldObject::Grass)
-                })
-                .collect::<Vec<(TileMapPosition, WorldObject)>>();
-            let boulder_points = raw_boulder_points
-                .iter()
-                .map(|tp| {
-                    let tp_vec = Vec2::new(
-                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                    );
-
-                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
-                    (relative_tp, WorldObject::Boulder)
-                })
-                .collect::<Vec<(TileMapPosition, WorldObject)>>();
-            let stone_points = Self::generate_stone_for_chunk(
+            // generate stone walls for dungeons
+            let stone = Self::generate_stone_for_chunk(
                 &game.world_generation_params,
                 chunk_pos,
                 seed.single().seed,
             );
-            let mut genned_objs = stone_points
-                .into_iter()
-                .chain(tree_points.into_iter())
-                .chain(boulder_points.into_iter())
-                .chain(grass_points.into_iter())
-                .collect::<Vec<(TileMapPosition, WorldObject)>>();
+
+            // generate all objs
+            let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
+                Box::new(stone.into_iter());
+
+            for (obj, frequency) in game
+                .world_generation_params
+                .object_generation_frequenceis
+                .iter()
+            {
+                let raw_points = noise_helpers::poisson_disk_sampling(
+                    if obj.is_medium_size(&proto_param) {
+                        2.5 * TILE_SIZE.x as f64
+                    } else {
+                        (TILE_SIZE.x / 2.) as f64
+                    },
+                    30,
+                    *frequency,
+                    rand::thread_rng(),
+                );
+                let points = raw_points
+                    .iter()
+                    .map(|tp| {
+                        let tp_vec = Vec2::new(
+                            tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                            tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                        );
+
+                        let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
+                        (relative_tp, *obj)
+                    })
+                    .collect::<Vec<(TileMapPosition, WorldObject)>>();
+                objs_to_spawn = Box::new(objs_to_spawn.chain(points.into_iter()));
+            }
+
+            let mut objs_to_spawn = objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
+
             if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
-                genned_objs = genned_objs
+                objs_to_spawn = objs_to_spawn
                     .into_iter()
                     .chain(cached_objs.into_iter().map(|o| (o.1, o.0)))
                     .collect::<Vec<(TileMapPosition, WorldObject)>>();
             }
-            let objs = genned_objs
+            let objs = objs_to_spawn
                 .iter()
                 .filter(|tp| {
                     // spawn walls in dungeon according to the generated grid layout
@@ -272,6 +250,7 @@ impl GenerationPlugin {
                 .map(|tp| *tp)
                 .collect::<HashMap<_, _>>();
 
+            // now spawn them, keeping track of duplicates on the same tile
             let mut spawned_vec: Vec<TileMapPosition> = vec![];
             for obj_data in objs.clone().iter() {
                 let pos = obj_data.0;
