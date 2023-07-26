@@ -9,14 +9,18 @@
       dungeon_stone_frequency: 1.0,
       sand_frequency: 0.0,
       dirt_frequency: 0.0,
-      stone_frequency: 1.0,
-      tree_frequency: 0.0,
-      boulder_frequency: 0.0,
-      grass_frequency: 0.4,
+      stone_wall_frequency: 1.0,
+      object_generation_frequenceis: {
+        Tree: 0.0,
+        Boulder: 0.0,
+        Grass: 0.0,
+        DeadSapling: 0.0,
+      },
       obj_allowed_tiles_map: {
         Tree: [GrassTile],
         Boulder: [GrassTile],
         Grass: [GrassTile],
+        DeadSapling: [SandTile],
         StoneWall: [GrassTile, DungeonStone]
       }
     ),
