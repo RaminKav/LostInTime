@@ -1,0 +1,15 @@
+(
+  name: "String",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": String,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: String,
+        metadata: (
+            name: "String", 
+            desc: "A String."
+        ),
+        count: 1
+  ),
+  }
+)

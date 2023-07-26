@@ -266,7 +266,7 @@ impl CombatPlugin {
                     }
                     if hit_health.0 <= 0 && game.player_query.single().0 != e {
                         commands.entity(e).insert(MarkedForDeath);
-
+                        println!("SENDING DEATH EVENT {e:?}");
                         enemy_death_events.send(EnemyDeathEvent {
                             entity: e,
                             enemy_pos: t.translation().truncate(),
@@ -285,6 +285,7 @@ impl CombatPlugin {
         dead_query: Query<Entity, With<MarkedForDeath>>,
     ) {
         for e in dead_query.iter() {
+            println!("DESPAWNING {e:?}");
             commands.entity(e).despawn_recursive();
         }
     }

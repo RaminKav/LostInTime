@@ -1,0 +1,15 @@
+(
+  name: "PlantFibre",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PlantFibre,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PlantFibre,
+        metadata: (
+            name: "Plant Fibre", 
+            desc: "Might be able to make some string."
+        ),
+        count: 1
+  ),
+  }
+)

@@ -274,7 +274,7 @@ impl GameAssetsPlugin {
 
         // load recipes
         for (result, recipe) in recipes_desc.recipes_list.iter() {
-            recipes_list.insert(*result, *recipe);
+            recipes_list.insert(*result, (recipe.0, recipe.1.clone()));
             println!("Loaded recipe for {result:?}: {recipe:?}");
         }
 

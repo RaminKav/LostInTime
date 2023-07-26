@@ -1,0 +1,15 @@
+(
+  name: "SlimeGoo",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SlimeGoo,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SlimeGoo,
+        metadata: (
+            name: "Slime Goo", 
+            desc: "A glob of Slime Goo."
+        ),
+        count: 1
+  ),
+  }
+)

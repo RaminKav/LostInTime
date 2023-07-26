@@ -23,12 +23,19 @@ impl Plugin for CraftingPlugin {
             );
     }
 }
+
+#[derive(Resource, Default, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub enum RecipeType {
+    #[default]
+    Shaped,
+    Shapeless,
+}
 #[derive(Resource, Default, Deserialize)]
 pub struct Recipes {
     // map of recipie result and its recipe matrix
     pub recipes_list: RecipeList,
 }
-pub type RecipeList = HashMap<WorldObject, CraftingGrid>;
+pub type RecipeList = HashMap<WorldObject, (CraftingGrid, RecipeType)>;
 
 impl CraftingPlugin {
     fn handle_crafting_slot_update(
@@ -39,13 +46,19 @@ impl CraftingPlugin {
     ) {
         for _ in events.iter() {
             let crafting_slots = &inv.single().crafting_items.items;
-            let mut recipe: CraftingGrid = [[None; 2]; 2];
+            let mut recipe: CraftingGrid = [None; 4];
             for stack_option in crafting_slots.iter() {
                 if let Some(stack) = stack_option {
                     let item = *stack.get_obj();
-                    let x = if stack.slot < 2 { 0 } else { 1 };
-                    let y = if stack.slot % 2 == 0 { 0 } else { 1 };
-                    recipe[x][y] = Some(item);
+                    let i = match stack.slot {
+                        0 => 2,
+                        1 => 3,
+                        2 => 0,
+                        3 => 1,
+                        4 => continue,
+                        _ => unreachable!(),
+                    };
+                    recipe[i] = Some(item);
                 }
             }
 
@@ -65,7 +78,7 @@ impl CraftingPlugin {
                             ..default()
                         })
                         .clone(),
-                    slot: 0,
+                    slot: 4,
                 })
             } else {
                 None
@@ -103,12 +116,27 @@ pub struct CompleteRecipeEvent;
 pub struct CraftingRecipe {
     recipe: CraftingGrid,
 }
-pub type CraftingGrid = [[Option<WorldObject>; 2]; 2];
+pub type CraftingGrid = [Option<WorldObject>; 4];
 
 impl CraftingRecipe {
     fn get_potential_reward(self, recipes_list: Res<Recipes>) -> Option<WorldObject> {
-        for (result, recipe) in recipes_list.recipes_list.iter() {
-            if self == (Self { recipe: *recipe }) {
+        for (result, (recipe, recipe_type)) in recipes_list.recipes_list.iter() {
+            let mut grid = self.recipe.clone();
+            grid.sort_by_key(|v| v.is_some());
+
+            let mut recipe = recipe.clone();
+            recipe.sort_by_key(|v| v.is_some());
+            if recipe_type == &RecipeType::Shapeless {
+                if recipe == grid {
+                    return Some(*result);
+                }
+                continue;
+            }
+            if self
+                == (Self {
+                    recipe: recipe.try_into().unwrap(),
+                })
+            {
                 return Some(*result);
             }
         }

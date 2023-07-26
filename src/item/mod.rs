@@ -140,6 +140,8 @@ pub struct Size(pub Vec2);
     IntoStaticStr,
     Display,
     Default,
+    Ord,
+    PartialOrd,
 )]
 #[reflect(Component, Schematic)]
 pub enum WorldObject {
@@ -151,7 +153,7 @@ pub enum WorldObject {
     DungeonStone,
     WaterTile,
     SandTile,
-    Flint,
+    StoneShard,
     Tree,
     Log,
     Sword,
@@ -173,6 +175,11 @@ pub enum WorldObject {
     Grass,
     GrassBlock,
     Boulder,
+    SlimeGoo,
+    Stick,
+    PlantFibre,
+    String,
+    Bandage,
 }
 
 #[derive(
@@ -383,6 +390,7 @@ impl WorldObject {
             WorldObject::None => BLACK,
             WorldObject::GrassTile => GREEN,
             WorldObject::StoneWall => GREY,
+            WorldObject::Boulder => GREY,
             WorldObject::DungeonStone => BLACK,
             WorldObject::WaterTile => BLUE,
             WorldObject::SandTile => YELLOW,
