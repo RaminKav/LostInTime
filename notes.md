@@ -195,7 +195,7 @@ impl different att styles w seldum_state
 ## Gameloop ideas:
 
 - Player starts weak in a tough environment. Hostile and Neutral Mobs need to be avoided for now.
-- Early game revolves around getting grass/trees/rocksfor early materials (sticks, plant fibre -> string, stone shards)
+- Early game revolves around getting grass/trees/rocks for early materials (sticks, plant fibre -> string, stone shards)
   - `Goal:` build first tools/weapons
 - Kill animals for food/wool/leather `Goal:` get beginner armor, food
 - From here options are open: Explore world, Try to kill mobs, Dungeon farming/mining

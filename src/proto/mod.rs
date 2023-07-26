@@ -113,7 +113,7 @@ impl ProtoPlugin {
         prototypes.load("proto/firestaff.prototype.ron");
         prototypes.load("proto/ring.prototype.ron");
         prototypes.load("proto/pendant.prototype.ron");
-        prototypes.load("proto/flint.prototype.ron");
+        prototypes.load("proto/stoneshard.prototype.ron");
         prototypes.load("proto/smallpotion.prototype.ron");
         prototypes.load("proto/largepotion.prototype.ron");
         prototypes.load("proto/log.prototype.ron");
@@ -126,6 +126,11 @@ impl ProtoPlugin {
         prototypes.load("proto/grass.prototype.ron");
         prototypes.load("proto/grassblock.prototype.ron");
         prototypes.load("proto/boulder.prototype.ron");
+        prototypes.load("proto/stick.prototype.ron");
+        prototypes.load("proto/plantfibre.prototype.ron");
+        prototypes.load("proto/slimegoo.prototype.ron");
+        prototypes.load("proto/bandage.prototype.ron");
+        prototypes.load("proto/string.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

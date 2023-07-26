@@ -1,0 +1,15 @@
+(
+  name: "Stick",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Stick,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Stick,
+        metadata: (
+            name: "Stick", 
+            desc: "A Stick."
+        ),
+        count: 1
+  ),
+  }
+)

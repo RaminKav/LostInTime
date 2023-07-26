@@ -1,5 +1,10 @@
 (
     recipes_list : {
-        StoneWallBlock: ((Some(Flint), Some(Flint)), (Some(Flint), Some(Flint))),
+        StoneWallBlock: ((Some(StoneShard), Some(StoneShard), Some(StoneShard), Some(StoneShard)), Shaped),
+        String: ((Some(PlantFibre), Some(PlantFibre), Some(PlantFibre), Some(PlantFibre)), Shaped),
+        Bandage: ((Some(String), Some(SlimeGoo), Some(SlimeGoo), Some(String)), Shaped),
+        Dagger: ((Some(String), Some(StoneShard), Some(Stick), None), Shaped),
+        Stick: ((Some(Log), Some(Log), None, None), Shapeless),
+        ChestBlock: ((Some(Log), Some(Log), Some(Log), Some(Log)), Shapeless),
     }
 )

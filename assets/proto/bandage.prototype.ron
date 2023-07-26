@@ -1,0 +1,17 @@
+(
+  name: "Bandage",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Bandage,
+  "survival_rogue_like::item::item_actions::ItemAction": ModifyHealth(35),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Bandage,
+        metadata: (
+            name: "Bandage", 
+            desc: "Heals 35 health."
+        ),
+        count: 1
+  ),
+  }
+)

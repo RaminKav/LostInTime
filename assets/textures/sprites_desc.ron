@@ -5,7 +5,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Flint: WorldObjectData(
+        StoneShard: WorldObjectData(
             texture_pos: (0., 4.),
             size: (16., 16.),
             anchor: None,
@@ -118,6 +118,31 @@
         Boulder: WorldObjectData(
             texture_pos: (4., 9.),
             size: (32., 32.),
+            anchor: None,
+        ),
+        Stick: WorldObjectData(
+            texture_pos: (10., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PlantFibre: WorldObjectData(
+            texture_pos: (11., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SlimeGoo: WorldObjectData(
+            texture_pos: (12., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Bandage: WorldObjectData(
+            texture_pos: (13., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        String: WorldObjectData(
+            texture_pos: (14., 4.),
+            size: (16., 16.),
             anchor: None,
         ),
     },
