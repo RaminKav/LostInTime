@@ -73,6 +73,13 @@ impl TileMapPosition {
             quadrant,
         }
     }
+    pub fn set_quadrant(&self, quadrant: u8) -> Self {
+        Self {
+            chunk_pos: self.chunk_pos,
+            tile_pos: self.tile_pos,
+            quadrant,
+        }
+    }
     pub fn matches_tile(&self, other: &TileMapPosition) -> bool {
         self.chunk_pos == other.chunk_pos && self.tile_pos == other.tile_pos
     }
@@ -100,6 +107,7 @@ pub struct WorldGeneration {
     pub stone_frequency: f64,
     pub tree_frequency: f64,
     pub boulder_frequency: f64,
+    pub grass_frequency: f64,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 pub struct WorldPlugin;

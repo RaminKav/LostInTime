@@ -45,7 +45,7 @@ impl Plugin for ChunkPlugin {
 }
 #[derive(Resource, Debug, Clone, Default)]
 pub struct ChunkObjectCache {
-    pub cache: HashMap<IVec2, Vec<(WorldObject, TilePos)>>,
+    pub cache: HashMap<IVec2, Vec<(WorldObject, TileMapPosition)>>,
 }
 #[derive(Component)]
 pub struct SpawnedChunk;

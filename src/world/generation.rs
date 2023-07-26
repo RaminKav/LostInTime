@@ -11,6 +11,7 @@ use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TI
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;
+use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 
@@ -62,8 +63,8 @@ impl GenerationPlugin {
         world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
         seed: u32,
-    ) -> Vec<(f32, f32, WorldObject)> {
-        let mut stone_blocks: Vec<(f32, f32, WorldObject)> = vec![];
+    ) -> Vec<(TileMapPosition, WorldObject)> {
+        let mut stone_blocks: Vec<(TileMapPosition, WorldObject)> = vec![];
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
                 if let Some(block) = Self::get_perlin_block_at_tile(
@@ -72,7 +73,8 @@ impl GenerationPlugin {
                     TilePos { x, y },
                     seed,
                 ) {
-                    stone_blocks.push((x as f32, y as f32, block));
+                    stone_blocks
+                        .push((TileMapPosition::new(chunk_pos, TilePos { x, y }, 0), block));
                 }
             }
         }
@@ -165,6 +167,12 @@ impl GenerationPlugin {
                 game.world_generation_params.tree_frequency,
                 rand::thread_rng(),
             );
+            let raw_grass_points = noise_helpers::poisson_disk_sampling(
+                (TILE_SIZE.x / 2.) as f64,
+                30,
+                game.world_generation_params.grass_frequency,
+                rand::thread_rng(),
+            );
             let raw_boulder_points = noise_helpers::poisson_disk_sampling(
                 2.5 * TILE_SIZE.x as f64,
                 30,
@@ -178,14 +186,23 @@ impl GenerationPlugin {
                         tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                         tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                     );
-                    let relative_tp = world_helpers::camera_pos_to_tile_pos(&tp_vec);
-                    (
-                        relative_tp.x as f32,
-                        relative_tp.y as f32,
-                        WorldObject::Tree,
-                    )
+
+                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
+                    (relative_tp, WorldObject::Tree)
                 })
-                .collect::<Vec<(f32, f32, WorldObject)>>();
+                .collect::<Vec<(TileMapPosition, WorldObject)>>();
+            let grass_points = raw_grass_points
+                .iter()
+                .map(|tp| {
+                    let tp_vec = Vec2::new(
+                        tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                        tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                    );
+
+                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
+                    (relative_tp, WorldObject::Grass)
+                })
+                .collect::<Vec<(TileMapPosition, WorldObject)>>();
             let boulder_points = raw_boulder_points
                 .iter()
                 .map(|tp| {
@@ -193,14 +210,11 @@ impl GenerationPlugin {
                         tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                         tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
                     );
-                    let relative_tp = world_helpers::camera_pos_to_tile_pos(&tp_vec);
-                    (
-                        relative_tp.x as f32,
-                        relative_tp.y as f32,
-                        WorldObject::Boulder,
-                    )
+
+                    let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
+                    (relative_tp, WorldObject::Boulder)
                 })
-                .collect::<Vec<(f32, f32, WorldObject)>>();
+                .collect::<Vec<(TileMapPosition, WorldObject)>>();
             let stone_points = Self::generate_stone_for_chunk(
                 &game.world_generation_params,
                 chunk_pos,
@@ -210,16 +224,13 @@ impl GenerationPlugin {
                 .into_iter()
                 .chain(tree_points.into_iter())
                 .chain(boulder_points.into_iter())
-                .collect::<Vec<(f32, f32, WorldObject)>>();
+                .chain(grass_points.into_iter())
+                .collect::<Vec<(TileMapPosition, WorldObject)>>();
             if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
                 genned_objs = genned_objs
                     .into_iter()
-                    .chain(
-                        cached_objs
-                            .into_iter()
-                            .map(|o| (o.1.x as f32, o.1.y as f32, o.0)),
-                    )
-                    .collect::<Vec<(f32, f32, WorldObject)>>();
+                    .chain(cached_objs.into_iter().map(|o| (o.1, o.0)))
+                    .collect::<Vec<(TileMapPosition, WorldObject)>>();
             }
             let objs = genned_objs
                 .iter()
@@ -233,67 +244,70 @@ impl GenerationPlugin {
                         {
                             return true;
                         }
-                        if dungeon.grid
-                            [(CHUNK_SIZE as i32 * (2 - chunk_pos.y) - 1 - tp.1 as i32) as usize]
-                            [(CHUNK_SIZE as i32 + (chunk_pos.x * CHUNK_SIZE as i32) + tp.0 as i32)
-                                as usize]
+                        if dungeon.grid[(CHUNK_SIZE as i32 * (2 - chunk_pos.y)
+                            - 1
+                            - tp.0.tile_pos.y as i32)
+                            as usize][(CHUNK_SIZE as i32
+                            + (chunk_pos.x * CHUNK_SIZE as i32)
+                            + tp.0.tile_pos.x as i32)
+                            as usize]
                             == 1
                         {
                             return false;
                         }
                     }
-
-                    let tile = game
-                        .get_tile_data(TileMapPosition::new(
-                            chunk_pos,
-                            TilePos {
-                                x: tp.0 as u32,
-                                y: tp.1 as u32,
-                            },
-                            0,
-                        ))
-                        .unwrap()
-                        .block_type;
+                    let tile = game.get_tile_data(tp.0).unwrap().block_type;
                     let filter = game
                         .world_generation_params
                         .obj_allowed_tiles_map
-                        .get(&tp.2)
+                        .get(&tp.1)
                         .unwrap();
                     for allowed_tile in filter.iter() {
-                        if tile.contains(allowed_tile) {
+                        if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
                             return true;
                         }
                     }
                     false
                 })
                 .map(|tp| *tp)
-                .collect::<Vec<(f32, f32, WorldObject)>>();
+                .collect::<HashMap<_, _>>();
+
+            let mut spawned_vec: Vec<TileMapPosition> = vec![];
             for obj_data in objs.clone().iter() {
-                let tile_pos = TilePos {
-                    x: obj_data.0 as u32,
-                    y: obj_data.1 as u32,
-                };
-                if let Some(_existing_object) =
-                    game.get_obj_entity_at_tile(TileMapPosition::new(chunk_pos, tile_pos, 0))
+                let pos = obj_data.0;
+                let is_medium = obj_data.1.is_medium_size(&proto_param);
+                if spawned_vec.contains(pos)
+                    || (is_medium
+                        && (spawned_vec.contains(&pos.set_quadrant(0))
+                            || spawned_vec.contains(&pos.set_quadrant(1))
+                            || spawned_vec.contains(&pos.set_quadrant(2))
+                            || spawned_vec.contains(&pos.set_quadrant(3))))
                 {
-                    warn!("obj exists here {chunk_pos}, {tile_pos:?}");
+                    warn!("obj exists here {:?},", obj_data.0);
                     continue;
+                }
+                if is_medium {
+                    spawned_vec.push(pos.set_quadrant(0));
+                    spawned_vec.push(pos.set_quadrant(1));
+                    spawned_vec.push(pos.set_quadrant(2));
+                    spawned_vec.push(pos.set_quadrant(3));
+                } else {
+                    spawned_vec.push(pos.clone());
                 }
 
                 let obj = proto_commands.spawn_object_from_proto(
-                    obj_data.2,
-                    tile_pos_to_world_pos(
-                        TileMapPosition::new(chunk_pos, tile_pos, 0),
-                        obj_data.2.should_center_sprite(&proto_param),
-                    ),
+                    *obj_data.1,
+                    tile_pos_to_world_pos(*obj_data.0, obj_data.1.is_medium_size(&proto_param)),
                     &prototypes,
                     &mut proto_param,
                 );
                 if let Some(spawned_obj) = obj {
-                    minimap_update.send(UpdateMiniMapEvent {
-                        pos: Some(TileMapPosition::new(chunk_pos, tile_pos, 0)),
-                        new_tile: Some([obj_data.2; 4]),
-                    });
+                    if is_medium {
+                        minimap_update.send(UpdateMiniMapEvent {
+                            pos: Some(*obj_data.0),
+                            new_tile: Some([*obj_data.1; 4]),
+                        });
+                    }
 
                     commands
                         .entity(spawned_obj)

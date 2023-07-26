@@ -11,7 +11,8 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestInventory, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
-    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, tile_pos_to_world_pos, world_pos_to_tile_pos,
+    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, can_object_be_placed_here,
+    tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
 use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
@@ -268,47 +269,13 @@ impl WorldObject {
             _ => false,
         }
     }
-    pub fn should_center_sprite(&self, proto_param: &ProtoParam) -> bool {
+    pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)
             .unwrap()
             .is_medium()
     }
-    pub fn spawn_and_save_block(
-        self,
-        proto_commands: &mut ProtoCommands,
-        prototypes: &Prototypes,
-        pos: Vec2,
-        minimap_event: &mut EventWriter<UpdateMiniMapEvent>,
-        proto_param: &mut ProtoParam,
-        game: &mut GameParam,
-        commands: &mut Commands,
-    ) -> Option<Entity> {
-        let tile_pos = world_pos_to_tile_pos(pos);
-        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
-            warn!("obj exists here {pos:?}");
-            return None;
-        }
 
-        if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
-            let item = proto_commands.spawn_object_from_proto(self, pos, prototypes, proto_param);
-            if let Some(item) = item {
-                //TODO: do what old game data did, add obj to registry
-                commands.entity(item).set_parent(*chunk);
-                minimap_event.send(UpdateMiniMapEvent {
-                    pos: Some(tile_pos),
-                    new_tile: Some([self; 4]),
-                });
-
-                return Some(item);
-            }
-
-            return None;
-        } else {
-            game.add_object_to_chunk_cache(tile_pos.chunk_pos, self, camera_pos_to_tile_pos(&pos));
-        }
-        None
-    }
     pub fn spawn_equipment_on_player(
         self,
         commands: &mut Commands,
@@ -421,6 +388,7 @@ impl Plugin for ItemsPlugin {
             .add_system(
                 handle_placing_world_object
                     .after(handle_new_scene_entities_parent_chunk)
+                    .after(CustomFlush)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_item_action_success.in_set(OnUpdate(GameState::Main)))
@@ -439,9 +407,9 @@ pub fn handle_placing_world_object(
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
+        let is_medium = place_event.obj.is_medium_size(&proto_param);
         let tile_pos = world_pos_to_tile_pos(pos);
-        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
-            warn!("obj exists here {pos:?}");
+        if !can_object_be_placed_here(tile_pos, &mut game, is_medium) {
             continue;
         }
 
@@ -455,15 +423,17 @@ pub fn handle_placing_world_object(
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
-                minimap_event.send(UpdateMiniMapEvent {
-                    pos: Some(tile_pos),
-                    new_tile: Some([place_event.obj; 4]),
-                });
+                if is_medium {
+                    minimap_event.send(UpdateMiniMapEvent {
+                        pos: Some(tile_pos),
+                        new_tile: Some([place_event.obj; 4]),
+                    });
+                }
             }
 
             continue;
         } else {
-            game.add_object_to_chunk_cache(tile_pos.chunk_pos, place_event.obj, tile_pos.tile_pos);
+            game.add_object_to_chunk_cache(tile_pos, place_event.obj);
         }
     }
 }
@@ -523,9 +493,11 @@ pub fn break_item(
                 tile_pos: broken.tile_pos,
             })
         }
-        minimap_event.send(UpdateMiniMapEvent {
-            pos: Some(TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0)),
-            new_tile: None,
-        });
+        if broken.obj.is_medium_size(&proto_param) {
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0)),
+                new_tile: None,
+            });
+        }
     }
 }

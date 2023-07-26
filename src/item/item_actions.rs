@@ -5,9 +5,9 @@ use crate::{
     inputs::CursorPos,
     inventory::Inventory,
     player::MovePlayerEvent,
-    proto::proto_param::ProtoParam,
+    proto::proto_param::{self, ProtoParam},
     ui::{ChestInventory, InventoryState},
-    world::world_helpers::world_pos_to_tile_pos,
+    world::world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
     GameParam,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
@@ -50,7 +50,8 @@ impl ItemAction {
         &self,
         obj: WorldObject,
         item_action_param: &mut ItemActionParam,
-        game: &GameParam,
+        game: &mut GameParam,
+        proto_param: &ProtoParam,
     ) {
         match self {
             ItemAction::ModifyHealth(delta) => {
@@ -72,10 +73,11 @@ impl ItemAction {
                 {
                     return;
                 }
-                if let Some(_existing_object) =
-                    game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos))
-                {
-                    warn!("obj exists here {pos}");
+                if !can_object_be_placed_here(
+                    world_pos_to_tile_pos(pos),
+                    game,
+                    obj.is_medium_size(proto_param),
+                ) {
                     return;
                 }
                 item_action_param

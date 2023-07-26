@@ -14,6 +14,7 @@ use crate::{
     inventory::ItemStack,
     item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
+    proto::proto_param::ProtoParam,
     world::world_helpers::world_pos_to_tile_pos,
     GameParam, GameState,
 };
@@ -146,15 +147,16 @@ fn load_schematic(
 
 pub fn handle_new_scene_entities_parent_chunk(
     game: GameParam,
+    proto_param: ProtoParam,
     new_scenes: Query<
-        (Entity, &Children, &Transform, &GlobalTransform),
+        (Entity, &Children, &GlobalTransform),
         (With<Handle<DynamicScene>>, Added<Children>),
     >,
     obj_data: Query<(&WorldObject, &Transform), (With<WorldObject>, Without<Player>)>,
     mut commands: Commands,
     mut place_item_event: EventWriter<PlaceItemEvent>,
 ) {
-    for (e, children, scene_txfm, scene_g) in new_scenes.iter() {
+    for (e, children, scene_g) in new_scenes.iter() {
         let mut x_offset: f32 = 1_000_000_000.;
         let mut y_offset: f32 = 1_000_000_000.;
         for child in children.iter() {
@@ -191,6 +193,18 @@ pub fn handle_new_scene_entities_parent_chunk(
                     is_valid_to_spawn = true;
                 }
                 if is_valid_to_spawn {
+                    let tile_pos = world_pos_to_tile_pos(pos);
+                    if obj.is_medium_size(&proto_param) {
+                        for q in 0..4 {
+                            if let Some(existing_obj) =
+                                game.get_obj_entity_at_tile(tile_pos.set_quadrant(q))
+                            {
+                                commands.entity(existing_obj).despawn_recursive();
+                            }
+                        }
+                    } else if let Some(existing_obj) = game.get_obj_entity_at_tile(tile_pos) {
+                        commands.entity(existing_obj).despawn_recursive();
+                    }
                     place_item_event.send(PlaceItemEvent { obj: *obj, pos });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);

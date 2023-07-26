@@ -12,9 +12,11 @@
       stone_frequency: 0.0,
       tree_frequency: 0.5,
       boulder_frequency: 0.1,
+      grass_frequency: 0.4,
       obj_allowed_tiles_map: {
         Tree: [GrassTile],
         Boulder: [GrassTile],
+        Grass: [GrassTile],
         StoneWall: [GrassTile, DungeonStone, SandTile]
       }
     ),
