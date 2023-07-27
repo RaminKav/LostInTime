@@ -1,0 +1,17 @@
+(
+  name: "Apple",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Apple,
+  "survival_rogue_like::item::item_actions::ItemAction": Eat(10),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Apple,
+        metadata: (
+            name: "Apple", 
+            desc: "Crunchy!"
+        ),
+        count: 1
+  ),
+  }
+)

@@ -37,6 +37,7 @@ impl Plugin for UIPlugin {
             .add_event::<DropInWorldEvent>()
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
+            .add_startup_system(spawn_fps_text)
             .add_systems((setup_inv_ui.before(CustomFlush).run_if(
                 state_changed::<InventoryUIState>()
                     .and_then(not(in_state(InventoryUIState::Closed))),
@@ -44,6 +45,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_hotbar_hud,
+                    setup_foodbar_ui.after(ClientPlugin::load_on_start),
                     setup_healthbar_ui.after(ClientPlugin::load_on_start),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
@@ -80,7 +82,9 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems((add_inv_to_new_chest_objs,).in_set(OnUpdate(GameState::Main)))
+            .add_systems(
+                (add_inv_to_new_chest_objs, update_foodbar).in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

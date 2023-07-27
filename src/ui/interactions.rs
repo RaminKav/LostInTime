@@ -106,11 +106,6 @@ pub struct DropInWorldEvent {
 pub struct LastHoveredSlot {
     pub slot: Option<usize>,
 }
-#[derive(Component)]
-pub struct HealthBar;
-
-#[derive(Component)]
-pub struct FPSText;
 
 pub fn handle_drop_in_world_events(
     mut events: EventReader<DropInWorldEvent>,

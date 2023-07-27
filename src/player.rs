@@ -11,7 +11,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
-        Attack, AttackCooldown, InvincibilityCooldown, ItemAttributes, MaxHealth,
+        hunger::Hunger, Attack, AttackCooldown, InvincibilityCooldown, ItemAttributes, MaxHealth,
         PlayerAttributeBundle,
     },
     inputs::{FacingDirection, InputsPlugin, MovementVector},
@@ -239,6 +239,7 @@ fn spawn_player(
                 attack: 5,
                 ..default()
             },
+            Hunger::new(100, 12., 20),
             PlayerAttributeBundle {
                 health: MaxHealth(100),
                 attack: Attack(5),

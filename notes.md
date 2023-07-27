@@ -167,16 +167,16 @@ impl different att styles w seldum_state
 [x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
 [x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
 [] Items: add random roll stats, clean up naming of stats too
+[] Items: add lots of items/recipies
+[] Items: shrink walls, simplify top borders so its easier to add new wall types
 [] Add colliders to water (use corners)
 [] Generation: Add random ore clusters in dungeons?
 [] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
-[] Survival: Food system
-[] Items: add lots of items/recipies
+[x] Survival: Food system
 [] UI: add static tooltips on the side of inv
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
 [] Dungeons: add exit method, add chest generation, etc `Blocked` by below
-[] items: shrink walls, simplify top borders so its easier to add new wall types
 [] save/load/cache
 
 - throwable items (ninja star,etc) (spawns proj, deducts 1 item count)

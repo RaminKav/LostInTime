@@ -181,6 +181,7 @@ pub enum WorldObject {
     String,
     Bandage,
     DeadSapling,
+    Apple,
 }
 
 #[derive(

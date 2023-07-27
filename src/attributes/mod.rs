@@ -12,7 +12,8 @@ use crate::{
 };
 
 use modifiers::*;
-
+pub mod hunger;
+use hunger::*;
 pub struct AttributesPlugin;
 
 #[derive(Resource, Reflect, Default, Bundle)]
@@ -130,6 +131,8 @@ impl Plugin for AttributesPlugin {
             .add_systems(
                 (
                     clamp_health,
+                    handle_actions_drain_hunger,
+                    tick_hunger,
                     handle_modify_health_event.before(clamp_health),
                     add_current_health_with_max_health,
                     update_attributes_with_held_item_change,

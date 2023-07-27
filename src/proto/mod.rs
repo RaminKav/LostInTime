@@ -133,6 +133,7 @@ impl ProtoPlugin {
         prototypes.load("proto/bandage.prototype.ron");
         prototypes.load("proto/string.prototype.ron");
         prototypes.load("proto/deadsapling.prototype.ron");
+        prototypes.load("proto/apple.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");
