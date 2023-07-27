@@ -1,4 +1,4 @@
-mod chest_ui;
+pub mod chest_ui;
 mod enemy_health_bar;
 mod fps_text;
 mod interactions;
@@ -64,6 +64,7 @@ impl Plugin for UIPlugin {
                     setup_inv_slots_ui,
                     setup_chest_slots_ui.run_if(in_state(InventoryUIState::Chest)),
                     change_ui_state_to_chest_when_resource_added
+                        .before(CustomFlush)
                         .run_if(resource_added::<ChestInventory>()),
                     text_update_system,
                     toggle_inv_visibility,

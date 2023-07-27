@@ -1,6 +1,7 @@
 use super::SchematicType;
 use crate::world::{
-    chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, CHUNK_SIZE,
+    chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, WorldGeneration,
+    CHUNK_SIZE,
 };
 use bevy_ecs_tilemap::tiles::TilePos;
 use rand::Rng;
@@ -39,16 +40,17 @@ pub fn attempt_to_spawn_schematic_in_chunk(
 pub fn give_chunks_schematic_spawners(
     mut commands: Commands,
     new_chunks: Query<Entity, Added<Chunk>>,
+    world_gen_params: Res<WorldGeneration>,
 ) {
     for e in new_chunks.iter() {
         let mut rng = rand::thread_rng();
-        if rng.gen_ratio(1, 4) == false {
-            continue;
+        for (schematic, frequency) in world_gen_params.schematic_frequencies.iter() {
+            if rng.gen_ratio((100. * frequency) as u32, 100) {
+                println!("Spawning schematic: {}", schematic);
+                commands.entity(e).insert(SchematicSpawner {
+                    schematic: schematic.clone(),
+                });
+            }
         }
-
-        let schematic = match rng.gen_range(0..=1) {
-            _ => SchematicType::House,
-        };
-        commands.entity(e).insert(SchematicSpawner { schematic });
     }
 }

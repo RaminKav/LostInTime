@@ -81,9 +81,11 @@ impl ItemAction {
                 ) {
                     return;
                 }
-                item_action_param
-                    .place_item_event
-                    .send(PlaceItemEvent { obj: *obj, pos });
+                item_action_param.place_item_event.send(PlaceItemEvent {
+                    obj: *obj,
+                    pos,
+                    loot_chest_type: None,
+                });
             }
             ItemAction::Eat(delta) => {
                 for mut hunger in item_action_param.hunger_query.iter_mut() {

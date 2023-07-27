@@ -272,14 +272,20 @@ impl InputsPlugin {
                 game.player().position.truncate(),
                 1,
             );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::DungeonEntranceBlock,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::DungeonEntranceBlock,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
             proto_commands.spawn_item_from_proto(
                 WorldObject::GrassBlock,
+                &proto,
+                game.player().position.truncate(),
+                16,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::StoneWallBlock,
                 &proto,
                 game.player().position.truncate(),
                 16,
