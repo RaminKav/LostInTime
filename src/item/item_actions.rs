@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use crate::{
-    attributes::modifiers::ModifyHealthEvent,
+    attributes::{hunger::Hunger, modifiers::ModifyHealthEvent},
     inputs::CursorPos,
     inventory::Inventory,
     player::MovePlayerEvent,
@@ -23,7 +23,7 @@ pub enum ItemAction {
     ModifyHealth(i32),
     Teleport(Vec2),
     PlacesInto(WorldObject),
-    // Projectile
+    Eat(i8), // Projectile
 }
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
@@ -39,6 +39,7 @@ pub struct ItemActionParam<'w, 's> {
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
     pub cursor_pos: Res<'w, CursorPos>,
+    pub hunger_query: Query<'w, 's, &'static mut Hunger>,
     pub chest_query: Query<'w, 's, &'static ChestInventory>,
 
     #[system_param(ignore)]
@@ -83,6 +84,11 @@ impl ItemAction {
                 item_action_param
                     .place_item_event
                     .send(PlaceItemEvent { obj: *obj, pos });
+            }
+            ItemAction::Eat(delta) => {
+                for mut hunger in item_action_param.hunger_query.iter_mut() {
+                    hunger.modify_hunger(*delta);
+                }
             }
             _ => {}
         }

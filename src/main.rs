@@ -57,7 +57,7 @@ use player::{Player, PlayerPlugin, PlayerState};
 use proto::ProtoPlugin;
 
 use schematic::SchematicPlugin;
-use ui::{FPSText, InventorySlotState, UIPlugin};
+use ui::{InventorySlotState, UIPlugin};
 use world::{
     chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
     world_helpers::world_pos_to_tile_pos,
@@ -499,35 +499,6 @@ fn setup(
         UICamera,
         GameUpscale(HEIGHT / img_size.height as f32),
         second_pass_layer,
-    ));
-
-    // DEBUG FPS
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "FPS: ",
-                TextStyle {
-                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                    font_size: 8.0,
-                    color: Color::Rgba {
-                        red: 75. / 255.,
-                        green: 61. / 255.,
-                        blue: 68. / 255.,
-                        alpha: 1.,
-                    },
-                },
-            )
-            .with_alignment(TextAlignment::Right),
-            transform: Transform {
-                translation: Vec3::new(GAME_WIDTH / 2. - 10., -GAME_HEIGHT / 2. + 10., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        },
-        Name::new("FPS TEXT"),
-        FPSText,
-        RenderLayers::from_layers(&[3]),
     ));
 }
 

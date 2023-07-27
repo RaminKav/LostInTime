@@ -150,6 +150,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Apple: WorldObjectData(
+            texture_pos: (15., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         DungeonStone: SpriteData(
