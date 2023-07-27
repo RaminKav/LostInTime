@@ -14,7 +14,7 @@ use bevy::{prelude::*, utils::HashMap};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::item::WorldObject;
+use crate::{item::WorldObject, schematic::SchematicType};
 
 use self::{
     chunk::{ChunkPlugin, ReflectedPos},
@@ -105,6 +105,7 @@ pub struct WorldGeneration {
     pub sand_frequency: f64,
     pub dirt_frequency: f64,
     pub stone_wall_frequency: f64,
+    pub schematic_frequencies: HashMap<SchematicType, f64>,
     pub object_generation_frequenceis: HashMap<WorldObject, f64>,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }

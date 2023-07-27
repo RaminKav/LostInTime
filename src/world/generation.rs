@@ -262,7 +262,6 @@ impl GenerationPlugin {
                             || spawned_vec.contains(&pos.set_quadrant(2))
                             || spawned_vec.contains(&pos.set_quadrant(3))))
                 {
-                    warn!("obj exists here {:?},", obj_data.0);
                     continue;
                 }
                 if is_medium {

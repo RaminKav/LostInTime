@@ -30,6 +30,7 @@ use crate::{
         Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
         PlacesInto, Wall, WorldObject,
     },
+    schematic::{loot_chests::LootChestType, SchematicType},
     world::WorldObjectEntityData,
     CustomFlush, GameState, YSort,
 };
@@ -69,8 +70,10 @@ impl Plugin for ProtoPlugin {
             .register_type::<EnemyMaterialMesh2DProto>()
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
+            .register_type::<LootChestType>()
             .register_type::<SpriteSize>()
             .register_type::<ItemAction>()
+            .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
             .register_type::<ColliderProto>()
@@ -79,6 +82,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
             .register_type::<HashMap<WorldObject, f64>>()
+            .register_type::<HashMap<SchematicType, f64>>()
             .register_type::<Vec<WorldObject>>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))

@@ -9,30 +9,49 @@ use bevy::{
 };
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use strum_macros::{Display, IntoStaticStr};
+pub mod loot_chests;
 mod schematic_spawner;
 use crate::{
+    assets::SpriteSize,
     inventory::ItemStack,
     item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
+    ui::UIPlugin,
     world::world_helpers::world_pos_to_tile_pos,
-    GameParam, GameState,
+    CustomFlush, GameParam, GameState,
 };
+use loot_chests::*;
 
 use self::schematic_spawner::{
     attempt_to_spawn_schematic_in_chunk, give_chunks_schematic_spawners,
 };
-#[derive(Component, Debug, Clone, Reflect, Default, IntoStaticStr, Display)]
+#[derive(
+    Component,
+    Debug,
+    Hash,
+    Eq,
+    PartialEq,
+    Clone,
+    Reflect,
+    FromReflect,
+    Default,
+    IntoStaticStr,
+    Display,
+)]
 pub enum SchematicType {
     #[default]
     House,
+    DungeonEntrance,
 }
+
 #[derive(Component)]
 pub struct SchematicBuilderObject;
 
 #[derive(Resource, Default, Debug, Reflect, Clone)]
 pub struct SchematicToggle {
     enabled: bool,
+    chest_type: LootChestType,
 }
 pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
@@ -45,6 +64,7 @@ impl Plugin for SchematicPlugin {
                     handle_new_scene_entities_parent_chunk.before(handle_placing_world_object),
                     save_schematic_scene,
                     load_schematic,
+                    handle_new_loot_chest_spawn.after(CustomFlush),
                     clear_schematic_entities,
                     mark_new_world_obj_as_schematic,
                     attempt_to_spawn_schematic_in_chunk,
@@ -56,18 +76,24 @@ impl Plugin for SchematicPlugin {
 }
 fn mark_new_world_obj_as_schematic(
     mut commands: Commands,
-    query: Query<Entity, (Added<Wall>, Without<ItemStack>)>,
+    query: Query<
+        (Entity, &WorldObject),
+        (Added<WorldObject>, With<SpriteSize>, Without<ItemStack>),
+    >,
     toggle: Res<SchematicToggle>,
     old_txfms: Query<&GlobalTransform>,
 ) {
     if toggle.enabled {
-        for e in query.iter() {
+        for (e, obj) in query.iter() {
             if let Some(mut entity_cmds) = commands.get_entity(e) {
                 let old_txfm = old_txfms.get(e).unwrap();
                 entity_cmds
                     .insert(SchematicBuilderObject)
                     .insert(Transform::from_translation(old_txfm.translation()))
                     .remove_parent();
+                if obj == &WorldObject::Chest {
+                    entity_cmds.insert(toggle.chest_type.clone());
+                }
             }
         }
     }
@@ -97,6 +123,7 @@ fn save_schematic_scene(world: &mut World) {
         {
             let mut writer = type_registry.write();
             writer.register::<WorldObject>();
+            writer.register::<LootChestType>();
             writer.register::<Wall>();
             writer.register::<Foliage>();
             writer.register::<Transform>();
@@ -119,7 +146,7 @@ fn save_schematic_scene(world: &mut World) {
         IoTaskPool::get()
             .spawn(async move {
                 // Write the scene RON data to file
-                File::create(format!("assets/scenes/house.scn.ron"))
+                File::create(format!("assets/scenes/test.scn.ron"))
                     .and_then(|mut file| file.write(serialized_scene.as_bytes()))
                     .expect("Error while writing scene to file");
             })
@@ -152,7 +179,10 @@ pub fn handle_new_scene_entities_parent_chunk(
         (Entity, &Children, &GlobalTransform),
         (With<Handle<DynamicScene>>, Added<Children>),
     >,
-    obj_data: Query<(&WorldObject, &Transform), (With<WorldObject>, Without<Player>)>,
+    obj_data: Query<
+        (&WorldObject, &Transform, Option<&LootChestType>),
+        (With<WorldObject>, Without<Player>),
+    >,
     mut commands: Commands,
     mut place_item_event: EventWriter<PlaceItemEvent>,
 ) {
@@ -160,7 +190,7 @@ pub fn handle_new_scene_entities_parent_chunk(
         let mut x_offset: f32 = 1_000_000_000.;
         let mut y_offset: f32 = 1_000_000_000.;
         for child in children.iter() {
-            if let Ok((_, txfm)) = obj_data.get(*child) {
+            if let Ok((_, txfm, _)) = obj_data.get(*child) {
                 if txfm.translation.x < x_offset {
                     x_offset = txfm.translation.x;
                 }
@@ -170,7 +200,7 @@ pub fn handle_new_scene_entities_parent_chunk(
             }
         }
         for child in children.iter() {
-            if let Ok((obj, txfm)) = obj_data.get(*child) {
+            if let Ok((obj, txfm, loot_chest_option)) = obj_data.get(*child) {
                 let pos = scene_g.translation().truncate()
                     + (txfm.translation.truncate() - Vec2::new(x_offset, y_offset));
 
@@ -182,7 +212,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                         .world_generation_params
                         .obj_allowed_tiles_map
                         .get(obj)
-                        .unwrap()
+                        .unwrap_or(&vec![WorldObject::GrassTile, WorldObject::SandTile])
                         .clone();
                     for allowed_tile in filter.iter() {
                         if tile_type.contains(allowed_tile) {
@@ -205,7 +235,11 @@ pub fn handle_new_scene_entities_parent_chunk(
                     } else if let Some(existing_obj) = game.get_obj_entity_at_tile(tile_pos) {
                         commands.entity(existing_obj).despawn_recursive();
                     }
-                    place_item_event.send(PlaceItemEvent { obj: *obj, pos });
+                    place_item_event.send(PlaceItemEvent {
+                        obj: *obj,
+                        pos,
+                        loot_chest_type: loot_chest_option.cloned(),
+                    });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);
                 }

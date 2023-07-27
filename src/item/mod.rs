@@ -7,6 +7,7 @@ use crate::combat::ObjBreakEvent;
 use crate::inventory::ItemStack;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
+use crate::schematic::loot_chests::LootChestType;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestInventory, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
@@ -371,6 +372,7 @@ impl WorldObject {
 pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
+    pub loot_chest_type: Option<LootChestType>,
 }
 
 pub struct ItemsPlugin;
@@ -425,6 +427,9 @@ pub fn handle_placing_world_object(
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(*chunk);
+                if let Some(loot_chest_type) = &place_event.loot_chest_type {
+                    commands.entity(item).insert(loot_chest_type.clone());
+                }
                 if is_medium {
                     minimap_event.send(UpdateMiniMapEvent {
                         pos: Some(tile_pos),

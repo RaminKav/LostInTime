@@ -169,10 +169,10 @@ pub fn can_object_be_placed_here(
                 .get_obj_entity_at_tile(tile_pos.set_quadrant(3))
                 .is_some())
     {
-        warn!("obj exists here {tile_pos:?}");
+        debug!("obj exists here {tile_pos:?}");
         return false;
     } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
-        warn!("obj exists here {tile_pos:?}");
+        debug!("obj exists here {tile_pos:?}");
         return false;
     }
     true

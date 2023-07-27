@@ -16,6 +16,10 @@
         Grass: 0.4,
         DeadSapling: 0.05,
       },
+      schematic_frequencies: {
+        House: 0.1,
+        DungeonEntrance: 0.2
+      },
       obj_allowed_tiles_map: {
         Tree: [GrassTile],
         Boulder: [GrassTile],

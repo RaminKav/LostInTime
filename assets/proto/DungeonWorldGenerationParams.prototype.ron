@@ -10,6 +10,10 @@
       sand_frequency: 0.0,
       dirt_frequency: 0.0,
       stone_wall_frequency: 1.0,
+      schematic_frequencies: {
+        House: 0.0,
+        DungeonEntrance: 0.0
+      },
       object_generation_frequenceis: {
         Tree: 0.0,
         Boulder: 0.0,
