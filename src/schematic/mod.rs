@@ -161,7 +161,11 @@ fn load_schematic(
     game: GameParam,
 ) {
     if key_input.just_pressed(KeyCode::M) {
-        println!("Loading schematic scene... {}", game.player().position);
+        println!(
+            "Loading schematic scene... {} {:?}",
+            game.player().position,
+            world_pos_to_tile_pos(game.player().position.truncate())
+        );
         commands
             .spawn(DynamicSceneBundle {
                 scene: asset_server.load("scenes/house.scn.ron"),
