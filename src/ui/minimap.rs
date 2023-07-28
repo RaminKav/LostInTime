@@ -58,7 +58,7 @@ fn update_minimap_cache(
             let _ = &mut cache.cache;
             continue};
         if let Some(new_tile) = event.new_tile {
-            cache.cache.insert(pos, new_tile);
+            cache.cache.insert(pos.set_quadrant(0), new_tile);
         } else {
             cache.cache.remove(&pos);
         }

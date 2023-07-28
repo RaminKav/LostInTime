@@ -106,7 +106,7 @@ pub fn setup_foodbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
             transform: Transform {
                 translation: Vec3::new(
                     (-GAME_WIDTH + 68.) / 2.,
-                    (GAME_HEIGHT - 11.) / 2. - 11.,
+                    (GAME_HEIGHT - 11.) / 2. - 12.,
                     10.,
                 ),
                 scale: Vec3::new(1., 1., 1.),

@@ -25,6 +25,7 @@
         Boulder: [GrassTile],
         Grass: [GrassTile],
         DeadSapling: [SandTile],
+        Chest: [SandTile,GrassTile, DungeonStone],
         StoneWall: [GrassTile, DungeonStone, SandTile]
       }
     ),
