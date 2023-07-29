@@ -4,7 +4,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use crate::{item::WorldObject, GameParam};
 
 use super::{
-    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbours_tile, TileMapPosition,
+    chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbour_tile, TileMapPosition,
     WorldGeneration, CHUNK_SIZE,
 };
 
@@ -229,7 +229,7 @@ impl TilePlugin {
                     chunk_pos: adjusted_chunk_pos,
                     tile_pos: neighbour_tile_pos,
                     ..
-                } = get_neighbours_tile(TileMapPosition::new(chunk_pos, tile_pos, 0), (dx, dy));
+                } = get_neighbour_tile(TileMapPosition::new(chunk_pos, tile_pos, 0), (dx, dy));
 
                 let neighbour_pos = TileMapPosition::new(adjusted_chunk_pos, neighbour_tile_pos, 0);
                 if !(dx == 0 && dy == 0) {

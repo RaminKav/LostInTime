@@ -1,12 +1,10 @@
 use crate::{
-    assets::SpriteSize,
+    assets::{SpriteAnchor, SpriteSize},
     item::{Foliage, Wall},
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
-        world_helpers::{
-            tile_pos_to_world_pos, world_pos_to_chunk_relative_tile_pos,
-        },
+        world_helpers::{tile_pos_to_world_pos, world_pos_to_chunk_relative_tile_pos},
     },
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
@@ -162,6 +160,11 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     },
                 ))))
                 .insert((*foliage_material).clone());
+        }
+        if let Some(anchor) = proto_param.get_component::<SpriteAnchor, _>(obj.clone()) {
+            spawned_entity_commands.insert(TransformBundle::from_transform(
+                Transform::from_translation(pos + anchor.0.extend(0.)),
+            ));
         }
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj) {
             spawned_entity_commands

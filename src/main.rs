@@ -46,7 +46,7 @@ mod world;
 use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
-use bevy_ecs_tilemap::{tiles::TilePos, TilemapPlugin};
+use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
 use combat::CombatPlugin;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
@@ -54,7 +54,7 @@ use inputs::InputsPlugin;
 use inventory::InventoryPlugin;
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
-use proto::ProtoPlugin;
+use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use ui::{InventorySlotState, UIPlugin};
@@ -65,6 +65,8 @@ use world::{
     TileMapPosition, WorldObjectEntityData, WorldPlugin,
 };
 use world::{ChunkManager, WorldGeneration};
+
+use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
 const PLAYER_MOVE_SPEED: f32 = 2. * ZOOM_SCALE;
 const PLAYER_DASH_SPEED: f32 = 125. * ZOOM_SCALE;
@@ -167,7 +169,7 @@ pub struct ImageAssets {
     pub sprite_sheet: Handle<Image>,
     #[asset(path = "RPGTiles.png")]
     pub tiles_sheet: Handle<Image>,
-    #[asset(path = "WallTextures.png")]
+    #[asset(path = "SmallWallTextures.png")]
     pub walls_sheet: Handle<Image>,
 }
 
@@ -258,10 +260,16 @@ impl<'w, 's> GameParam<'w, 's> {
         }
         None
     }
-    pub fn get_obj_entity_at_tile(&self, tile: TileMapPosition) -> Option<Entity> {
-        for (obj_e, g_txm, size, _) in self.world_object_query.iter() {
-            let pos = world_pos_to_tile_pos(g_txm.translation().truncate());
-
+    pub fn get_obj_entity_at_tile(
+        &self,
+        tile: TileMapPosition,
+        proto_param: &ProtoParam,
+    ) -> Option<Entity> {
+        for (obj_e, g_txm, size, obj_data) in self.world_object_query.iter() {
+            let anchor = proto_param
+                .get_component::<SpriteAnchor, _>(obj_data.object.clone())
+                .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+            let pos = world_pos_to_tile_pos(g_txm.translation().truncate() - anchor.0);
             if size.is_medium() && pos.matches_tile(&tile) {
                 return Some(obj_e);
             } else if pos == tile {
@@ -270,8 +278,12 @@ impl<'w, 's> GameParam<'w, 's> {
         }
         None
     }
-    pub fn get_tile_obj_data(&self, tile: TileMapPosition) -> Option<WorldObjectEntityData> {
-        if let Some(e) = self.get_obj_entity_at_tile(tile) {
+    pub fn get_tile_obj_data(
+        &self,
+        tile: TileMapPosition,
+        proto_param: &ProtoParam,
+    ) -> Option<WorldObjectEntityData> {
+        if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
             return Some(self.world_object_query.get(e).unwrap().3.clone());
         }
         None
@@ -279,8 +291,9 @@ impl<'w, 's> GameParam<'w, 's> {
     pub fn get_tile_obj_data_mut(
         &mut self,
         tile: TileMapPosition,
+        proto_param: &ProtoParam,
     ) -> Option<Mut<WorldObjectEntityData>> {
-        if let Some(e) = self.get_obj_entity_at_tile(tile) {
+        if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
             return Some(self.world_object_query.get_mut(e).unwrap().3);
         }
         None
@@ -331,7 +344,6 @@ pub struct UITextureMaterial {
 
 fn setup(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut game_render_materials: ResMut<Assets<ColorMaterial>>,
     mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,

@@ -5,7 +5,7 @@ use crate::{
     inputs::CursorPos,
     inventory::Inventory,
     player::MovePlayerEvent,
-    proto::proto_param::{self, ProtoParam},
+    proto::proto_param::ProtoParam,
     ui::{ChestInventory, InventoryState},
     world::world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
     GameParam,
@@ -78,6 +78,7 @@ impl ItemAction {
                     world_pos_to_tile_pos(pos),
                     game,
                     obj.is_medium_size(proto_param),
+                    &proto_param,
                 ) {
                     return;
                 }

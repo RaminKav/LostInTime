@@ -27,8 +27,8 @@ impl DungeonPlugin {
     pub fn spawn_new_dungeon_dimension(commands: &mut Commands, protoCommands: &mut ProtoCommands) {
         let cm = ChunkManager::new();
         let grid = gen_new_dungeon(
-            1500,
-            (CHUNK_SIZE * 4) as usize,
+            1500 * 4,
+            (CHUNK_SIZE * 4 * 2) as usize,
             Bias {
                 bias: super::dungeon_generation::Direction::Left,
                 strength: 0,

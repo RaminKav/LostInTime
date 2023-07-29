@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use crate::GameParam;
+use crate::{proto::proto_param::ProtoParam, GameParam};
 
 use super::{TileMapPosition, WorldObjectEntityData, CHUNK_SIZE, TILE_SIZE};
 
@@ -97,7 +97,7 @@ pub fn tile_pos_to_world_pos(pos: TileMapPosition, center: bool) -> Vec2 {
     )
 }
 
-pub fn get_neighbours_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {
+pub fn get_neighbour_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {
     let dx = offset.0;
     let dy = offset.1;
     let x = pos.tile_pos.x as i8;
@@ -124,27 +124,25 @@ pub fn get_neighbours_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPos
     }
     TileMapPosition::new(adjusted_chunk_pos, neighbour_wall_pos, 0)
 }
+pub fn get_neighbour_quadrant(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {
+    let parent_world_pos = tile_pos_to_world_pos(pos, false);
+    let dx = offset.0 as f32 * TILE_SIZE.x / 2.;
+    let dy = offset.1 as f32 * TILE_SIZE.x / 2.;
+    world_pos_to_tile_pos(parent_world_pos + Vec2::new(dx, dy))
+}
 
 pub fn get_neighbour_obj_data(
     pos: TileMapPosition,
     offset: (i8, i8),
     game: &mut GameParam,
+    proto_param: &ProtoParam,
 ) -> Option<WorldObjectEntityData> {
-    let TileMapPosition {
-        chunk_pos: adjusted_chunk_pos,
-        tile_pos: neighbour_wall_pos,
-        ..
-    } = get_neighbours_tile(pos, offset);
+    let pos = get_neighbour_quadrant(pos, offset);
 
-    if game.get_chunk_entity(adjusted_chunk_pos).is_none() {
+    if game.get_chunk_entity(pos.chunk_pos).is_none() {
         return None;
     }
-
-    if let Some(d) = game.get_tile_obj_data(TileMapPosition::new(
-        adjusted_chunk_pos,
-        neighbour_wall_pos,
-        0,
-    )) {
+    if let Some(d) = game.get_tile_obj_data(pos, &proto_param) {
         return Some(d.clone());
     }
     None
@@ -154,24 +152,25 @@ pub fn can_object_be_placed_here(
     tile_pos: TileMapPosition,
     game: &mut GameParam,
     is_medium: bool,
+    proto_param: &ProtoParam,
 ) -> bool {
     if is_medium
         && (game
-            .get_obj_entity_at_tile(tile_pos.set_quadrant(0))
+            .get_obj_entity_at_tile(tile_pos.set_quadrant(0), &proto_param)
             .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(1))
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(1), &proto_param)
                 .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(2))
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(2), &proto_param)
                 .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(3))
+                .get_obj_entity_at_tile(tile_pos.set_quadrant(3), &proto_param)
                 .is_some())
     {
         debug!("obj exists here {tile_pos:?}");
         return false;
-    } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos) {
+    } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
         debug!("obj exists here {tile_pos:?}");
         return false;
     }

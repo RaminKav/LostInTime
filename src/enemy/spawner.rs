@@ -7,6 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     custom_commands::CommandsExt,
+    proto::proto_param::ProtoParam,
     world::{
         chunk::Chunk,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
@@ -85,6 +86,7 @@ impl SpawnerPlugin {
         mut proto_commands: ProtoCommands,
         prototypes: Prototypes,
         mut spawner_trigger_event: EventReader<MobSpawnEvent>,
+        proto_param: ProtoParam,
     ) {
         for e in spawner_trigger_event.iter() {
             if game.get_chunk_entity(e.chunk_pos).is_none() {
@@ -111,7 +113,7 @@ impl SpawnerPlugin {
                         );
                         picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                         if let Some(_existing_object) =
-                            game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos))
+                            game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos), &proto_param)
                         {
                             return;
                         }

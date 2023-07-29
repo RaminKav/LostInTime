@@ -1,28 +1,39 @@
 use bevy::prelude::*;
 
-use crate::{item::Wall, proto::proto_param::ProtoParam, GameParam};
+use crate::{
+    assets::SpriteAnchor,
+    item::{Wall, WorldObject},
+    proto::proto_param::ProtoParam,
+    GameParam,
+};
 
 use super::{
     generation::WallBreakEvent,
-    world_helpers::{get_neighbour_obj_data, get_neighbours_tile, world_pos_to_tile_pos},
-    TileMapPosition,
+    world_helpers::{get_neighbour_obj_data, get_neighbour_quadrant, world_pos_to_tile_pos},
 };
 #[derive(Component)]
 pub struct Dirty;
 pub fn update_wall(
     mut commands: Commands,
     proto_param: ProtoParam,
-    mut walls_to_update: Query<(Entity, &mut TextureAtlasSprite), (With<Wall>, With<Dirty>)>,
+    mut walls_to_update: Query<
+        (Entity, &mut TextureAtlasSprite, &WorldObject),
+        (With<Wall>, With<Dirty>),
+    >,
     mut game: GameParam,
     txns: Query<&GlobalTransform>,
 ) {
-    for (wall_entity, mut wall_sprite) in walls_to_update.iter_mut() {
+    for (wall_entity, mut wall_sprite, obj) in walls_to_update.iter_mut() {
         let mut has_wall_above = false;
         let mut has_wall_below = false;
         let mut has_wall_on_left_side = false;
         let mut has_wall_on_right_side = false;
-        let new_wall_pos =
-            world_pos_to_tile_pos(txns.get(wall_entity).unwrap().translation().truncate());
+        let wall_anchor = proto_param
+            .get_component::<SpriteAnchor, _>(obj.clone())
+            .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+        let new_wall_pos = world_pos_to_tile_pos(
+            txns.get(wall_entity).unwrap().translation().truncate() - wall_anchor.0,
+        );
         commands.entity(wall_entity).remove::<Dirty>();
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
@@ -33,7 +44,7 @@ pub fn update_wall(
                 // only use neighbours that are a wall
                 let mut neighbour_is_wall = false;
                 if let Some(neighbour_block_entity_data) =
-                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
+                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game, &proto_param)
                 {
                     if let Some(_wall) =
                         proto_param.get_component::<Wall, _>(neighbour_block_entity_data.object)
@@ -50,7 +61,10 @@ pub fn update_wall(
                         neighbour_is_wall = true;
                     }
                 }
-                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
+
+                let mut new_wall_data = game
+                    .get_tile_obj_data_mut(new_wall_pos.clone(), &proto_param)
+                    .unwrap();
 
                 let updated_bit_index =
                     compute_wall_index(new_wall_data.obj_bit_index, (dx, dy), !neighbour_is_wall);
@@ -62,18 +76,20 @@ pub fn update_wall(
                 new_wall_data.obj_bit_index = updated_bit_index;
                 (*wall_sprite).index = (updated_bit_index + new_wall_data.texture_offset) as usize;
                 if neighbour_is_wall {
-                    let neighbour_pos = get_neighbours_tile(new_wall_pos.clone(), (dx, dy));
-                    let neighbour_entity = game.get_obj_entity_at_tile(neighbour_pos);
+                    let neighbour_pos = get_neighbour_quadrant(new_wall_pos.clone(), (dx, dy));
+                    let neighbour_entity = game.get_obj_entity_at_tile(neighbour_pos, &proto_param);
                     commands.entity(neighbour_entity.unwrap()).insert(Dirty);
                     // mark corners as dirty too
-                    if let Some(top_left_corner_entity) = game
-                        .get_obj_entity_at_tile(get_neighbours_tile(new_wall_pos.clone(), (-1, 1)))
-                    {
+                    if let Some(top_left_corner_entity) = game.get_obj_entity_at_tile(
+                        get_neighbour_quadrant(new_wall_pos.clone(), (-1, 1)),
+                        &proto_param,
+                    ) {
                         commands.entity(top_left_corner_entity).insert(Dirty);
                     }
-                    if let Some(top_right_corner_entity) = game
-                        .get_obj_entity_at_tile(get_neighbours_tile(new_wall_pos.clone(), (1, 1)))
-                    {
+                    if let Some(top_right_corner_entity) = game.get_obj_entity_at_tile(
+                        get_neighbour_quadrant(new_wall_pos.clone(), (1, 1)),
+                        &proto_param,
+                    ) {
                         commands.entity(top_right_corner_entity).insert(Dirty);
                     }
                 }
@@ -90,13 +106,15 @@ pub fn update_wall(
                 // only use neighbours that are walls
                 let mut this_corner_neighbour_is_wall = false;
                 if let Some(neighbour_block_entity_data) =
-                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game)
+                    get_neighbour_obj_data(new_wall_pos.clone(), (dx, dy), &mut game, &proto_param)
                 {
                     this_corner_neighbour_is_wall = proto_param
                         .get_component::<Wall, _>(neighbour_block_entity_data.object)
                         .is_some();
                 }
-                let mut new_wall_data = game.get_tile_obj_data_mut(new_wall_pos.clone()).unwrap();
+                let mut new_wall_data = game
+                    .get_tile_obj_data_mut(new_wall_pos.clone(), &proto_param)
+                    .unwrap();
 
                 let has_wall_on_this_side = if dx == -1 {
                     has_wall_on_left_side
@@ -161,24 +179,24 @@ pub fn handle_wall_break(
     mut commands: Commands,
 ) {
     for broken_wall in obj_break_events.iter() {
-        let chunk_pos = broken_wall.chunk_pos;
-
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 //skip corner block updates
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let wall_pos = TileMapPosition::new(chunk_pos, broken_wall.tile_pos, 0);
-                let pos = get_neighbours_tile(wall_pos.clone(), (dx, dy));
+                let wall_pos = broken_wall.pos;
+                let pos = get_neighbour_quadrant(wall_pos.clone(), (dx, dy));
 
                 if let Some(neighbour_block_entity_data) =
-                    get_neighbour_obj_data(wall_pos, (dx, dy), &mut game)
+                    get_neighbour_obj_data(wall_pos, (dx, dy), &mut game, &proto_param)
                 {
                     if let Some(_wall) =
                         proto_param.get_component::<Wall, _>(neighbour_block_entity_data.object)
                     {
-                        let new_wall_entity = game.get_obj_entity_at_tile(pos.clone()).unwrap();
+                        let new_wall_entity = game
+                            .get_obj_entity_at_tile(pos.clone(), &proto_param)
+                            .unwrap();
 
                         commands.entity(new_wall_entity).insert(Dirty);
                     }
