@@ -458,7 +458,7 @@ impl InputsPlugin {
             {
                 return;
             }
-            if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos) {
+            if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
                 hit_event.send(HitEvent {
                     hit_entity: hit_obj,
                     damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
@@ -483,7 +483,7 @@ impl InputsPlugin {
                 }
             }
 
-            if let Some(obj) = game.get_obj_entity_at_tile(cursor_tile_pos) {
+            if let Some(obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
                 if let Ok(obj_action) = obj_actions.get(obj) {
                     obj_action.run_action(
                         obj,

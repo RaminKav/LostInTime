@@ -1,7 +1,7 @@
 use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
-use crate::colors::{BLACK, BLUE, DARK_GREEN, GREEN, GREY, YELLOW};
+use crate::colors::{BLACK, BLUE, BROWN, DARK_GREEN, GREEN, GREY, UI_GRASS_GREEN, YELLOW};
 use crate::combat::ObjBreakEvent;
 
 use crate::inventory::ItemStack;
@@ -12,8 +12,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestInventory, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
-    camera_pos_to_chunk_pos, camera_pos_to_tile_pos, can_object_be_placed_here,
-    tile_pos_to_world_pos, world_pos_to_tile_pos,
+    can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
 use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
@@ -357,7 +356,9 @@ impl WorldObject {
     pub fn get_minimap_color(&self) -> Color {
         match self {
             WorldObject::None => BLACK,
+            WorldObject::Grass => UI_GRASS_GREEN,
             WorldObject::GrassTile => GREEN,
+            WorldObject::DeadSapling => BROWN,
             WorldObject::StoneWall => GREY,
             WorldObject::Boulder => GREY,
             WorldObject::DungeonStone => BLACK,
@@ -413,7 +414,7 @@ pub fn handle_placing_world_object(
         let pos = place_event.pos;
         let is_medium = place_event.obj.is_medium_size(&proto_param);
         let tile_pos = world_pos_to_tile_pos(pos);
-        if !can_object_be_placed_here(tile_pos, &mut game, is_medium) {
+        if !can_object_be_placed_here(tile_pos, &mut game, is_medium, &proto_param) {
             continue;
         }
 
@@ -431,9 +432,16 @@ pub fn handle_placing_world_object(
                     commands.entity(item).insert(loot_chest_type.clone());
                 }
                 if is_medium {
+                    for q in 0..4 {
+                        minimap_event.send(UpdateMiniMapEvent {
+                            pos: Some(tile_pos.set_quadrant(q)),
+                            new_tile: Some(place_event.obj),
+                        });
+                    }
+                } else {
                     minimap_event.send(UpdateMiniMapEvent {
                         pos: Some(tile_pos),
-                        new_tile: Some([place_event.obj; 4]),
+                        new_tile: Some(place_event.obj),
                     });
                 }
             }
@@ -461,10 +469,7 @@ pub fn break_item(
             if let Ok(chest) = chest_containers.get(broken.entity) {
                 for item_option in chest.items.items.iter() {
                     if let Some(item) = item_option {
-                        let pos = tile_pos_to_world_pos(
-                            TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0),
-                            true,
-                        );
+                        let pos = tile_pos_to_world_pos(broken.pos, false);
                         item.item_stack
                             .spawn_as_drop(&mut commands, &mut game_param, pos);
                     }
@@ -474,10 +479,14 @@ pub fn break_item(
         commands.entity(broken.entity).despawn();
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
             for drop in LootTablePlugin::get_drops(loot_table) {
-                let pos = tile_pos_to_world_pos(
-                    TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0),
-                    true,
-                );
+                let pos = if broken.obj.is_medium_size(&proto_param) {
+                    tile_pos_to_world_pos(
+                        TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos, 0),
+                        true,
+                    )
+                } else {
+                    tile_pos_to_world_pos(broken.pos, false)
+                };
                 let drop_spread = 10.;
 
                 let pos = Vec3::new(
@@ -495,14 +504,28 @@ pub fn break_item(
         }
 
         if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
-            wall_break_event.send(WallBreakEvent {
-                chunk_pos: broken.chunk_pos,
-                tile_pos: broken.tile_pos,
-            })
+            wall_break_event.send(WallBreakEvent { pos: broken.pos })
         }
         if broken.obj.is_medium_size(&proto_param) {
             minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(TileMapPosition::new(broken.chunk_pos, broken.tile_pos, 0)),
+                pos: Some(broken.pos.set_quadrant(0)),
+                new_tile: None,
+            });
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos.set_quadrant(1)),
+                new_tile: None,
+            });
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos.set_quadrant(2)),
+                new_tile: None,
+            });
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos.set_quadrant(3)),
+                new_tile: None,
+            });
+        } else {
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos),
                 new_tile: None,
             });
         }

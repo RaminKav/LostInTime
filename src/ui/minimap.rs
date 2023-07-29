@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::assets::Graphics;
 use crate::colors::LIGHT_RED;
 use crate::enemy::Mob;
@@ -37,14 +35,14 @@ impl Plugin for MinimapPlugin {
 #[derive(Debug, Clone)]
 pub struct UpdateMiniMapEvent {
     pub pos: Option<TileMapPosition>,
-    pub new_tile: Option<[WorldObject; 4]>,
+    pub new_tile: Option<WorldObject>,
 }
 
 #[derive(Component)]
 pub struct Minimap;
 #[derive(Resource, Default)]
 pub struct MinimapTileCache {
-    cache: HashMap<TileMapPosition, [WorldObject; 4]>,
+    pub cache: HashMap<TileMapPosition, WorldObject>,
 }
 
 //TODO: Optimize this to not run if player does not move over a tile, maybe w resource to track
@@ -58,7 +56,11 @@ fn update_minimap_cache(
             let _ = &mut cache.cache;
             continue};
         if let Some(new_tile) = event.new_tile {
-            cache.cache.insert(pos.set_quadrant(0), new_tile);
+            if new_tile != WorldObject::None {
+                cache.cache.insert(pos, new_tile);
+            } else {
+                cache.cache.remove(&pos);
+            }
         } else {
             cache.cache.remove(&pos);
         }
@@ -78,7 +80,7 @@ fn setup_mini_map(
     mut assets: ResMut<Assets<Image>>,
     mut color_mat: ResMut<Assets<ColorMaterial>>,
     game: GameParam,
-    mut minimap_cache: Res<MinimapTileCache>,
+    minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<Minimap>>,
     p_t: Query<&Transform, With<Player>>,
     mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
@@ -128,89 +130,72 @@ fn setup_mini_map(
         for y in (-(num_tiles as i32 / 2)..num_tiles as i32 / 2).rev() {
             for _ in 0..2 {
                 for x in -(num_tiles as i32 / 2)..num_tiles as i32 / 2 {
-                    if x == 0 && y == 0 {
-                        for _ in 0..2 {
+                    for q in 0..2 {
+                        if x == 0 && y == 0 {
                             data.push(0);
                             data.push(0);
                             data.push(0);
                             data.push(255);
+                            continue;
                         }
-                        continue;
-                    }
-                    let mut chunk_pos = p_cp;
-                    let mut tile_x = p_tp.x as i32 + x;
-                    let mut tile_y = p_tp.y as i32 + y;
+                        let mut chunk_pos = p_cp;
+                        let mut tile_x = p_tp.x as i32 + x;
+                        let mut tile_y = p_tp.y as i32 + y;
 
-                    while tile_x >= CHUNK_SIZE as i32 {
-                        tile_x = tile_x - CHUNK_SIZE as i32;
-                        chunk_pos.x += 1;
-                    }
-                    while tile_x < 0 {
-                        tile_x = CHUNK_SIZE as i32 + tile_x;
-                        chunk_pos.x -= 1;
-                    }
-                    while tile_y >= CHUNK_SIZE as i32 {
-                        tile_y = tile_y - CHUNK_SIZE as i32;
-                        chunk_pos.y += 1;
-                    }
-                    while tile_y < 0 {
-                        tile_y = CHUNK_SIZE as i32 + tile_y;
-                        chunk_pos.y -= 1;
-                    }
-                    let tile_pos = TilePos {
-                        x: tile_x as u32,
-                        y: (tile_y) as u32,
-                    };
-                    if let Some(cached_tile) = minimap_cache
-                        .cache
-                        .get(&TileMapPosition::new(chunk_pos, tile_pos, 0))
-                    {
-                        for i in 0..2 {
-                            let c = cached_tile[i + offset].get_minimap_color();
+                        while tile_x >= CHUNK_SIZE as i32 {
+                            tile_x = tile_x - CHUNK_SIZE as i32;
+                            chunk_pos.x += 1;
+                        }
+                        while tile_x < 0 {
+                            tile_x = CHUNK_SIZE as i32 + tile_x;
+                            chunk_pos.x -= 1;
+                        }
+                        while tile_y >= CHUNK_SIZE as i32 {
+                            tile_y = tile_y - CHUNK_SIZE as i32;
+                            chunk_pos.y += 1;
+                        }
+                        while tile_y < 0 {
+                            tile_y = CHUNK_SIZE as i32 + tile_y;
+                            chunk_pos.y -= 1;
+                        }
+                        let tile_pos = TilePos {
+                            x: tile_x as u32,
+                            y: (tile_y) as u32,
+                        };
+                        if let Some(cached_tile) = minimap_cache.cache.get(&TileMapPosition::new(
+                            chunk_pos,
+                            tile_pos,
+                            q + offset,
+                        )) {
+                            let c = cached_tile.get_minimap_color();
 
                             data.push((c.r() * 255.) as u8);
                             data.push((c.g() * 255.) as u8);
                             data.push((c.b() * 255.) as u8);
                             data.push(255);
+                            continue;
                         }
-                        continue;
-                    }
 
-                    if let Some(tile_data) =
-                        game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
-                    {
-                        let tile = tile_data.block_type;
-                        if mobs.contains(&(chunk_pos, tile_pos)) {
-                            for _ in 0..2 {
+                        if let Some(tile_data) =
+                            game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
+                        {
+                            let tile = tile_data.block_type;
+                            if mobs.contains(&(chunk_pos, tile_pos)) {
                                 let c = LIGHT_RED;
                                 data.push((c.r() * 255.) as u8);
                                 data.push((c.g() * 255.) as u8);
                                 data.push((c.b() * 255.) as u8);
                                 data.push(255);
+                                continue;
                             }
-                            continue;
-                        }
-                        // else if let Some(obj_data) =
-                        //     game.get_tile_obj_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
-                        // {
-                        //     print!(" NO CACHE ");
-                        //     tile = [obj_data.object; 4];
-                        //     cache
-                        //         .cache
-                        //         .insert(TileMapPosition::new(chunk_pos, tile_pos, 0), tile.into());
-                        // }
-
-                        for i in 0..2 {
                             //Copy 1 pixel at index 0,1 2,3
-                            let c = tile[i + offset].get_minimap_color();
+                            let c = tile[(q + offset) as usize].get_minimap_color();
 
                             data.push((c.r() * 255.) as u8);
                             data.push((c.g() * 255.) as u8);
                             data.push((c.b() * 255.) as u8);
                             data.push(255);
-                        }
-                    } else {
-                        for _ in 0..2 {
+                        } else {
                             //Unloaded chunk, spawn nothing for now
                             data.push(0);
                             data.push(0);

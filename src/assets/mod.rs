@@ -58,11 +58,16 @@ pub enum SpriteSize {
     Small,
     Medium,
 }
+
 impl SpriteSize {
     pub fn is_medium(&self) -> bool {
         matches!(self, SpriteSize::Medium)
     }
 }
+
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub struct SpriteAnchor(pub Vec2);
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
 #[derive(Deserialize)]
@@ -204,10 +209,10 @@ impl GameAssetsPlugin {
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
-            Vec2::new(32., 48.),
+            Vec2::new(16., 32.),
             16,
             2,
-            None,
+            Some(Vec2::new(16., 0.)),
             None,
         );
 

@@ -11,14 +11,13 @@ use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TI
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;
-use bevy::utils::{HashMap, HashSet};
+use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
-    pub chunk_pos: IVec2,
-    pub tile_pos: TilePos,
+    pub pos: TileMapPosition,
 }
 pub struct GenerationPlugin;
 
@@ -40,19 +39,18 @@ impl Plugin for GenerationPlugin {
 impl GenerationPlugin {
     fn get_perlin_block_at_tile(
         world_generation_params: &WorldGeneration,
-        chunk_pos: IVec2,
-        tile_pos: TilePos,
+        pos: TileMapPosition,
         seed: u32,
     ) -> Option<WorldObject> {
-        let x = tile_pos.x as f64;
-        let y = tile_pos.y as f64;
+        let x = pos.tile_pos.x as f64 + if pos.quad_is_x_offset() { 0.5 } else { 0. };
+        let y = pos.tile_pos.y as f64 + if pos.quad_is_y_offset() { 0.5 } else { 0. };
         // dont need to use expencive noise fn if it will always
         // result in the same tile
         if world_generation_params.stone_wall_frequency == 1. {
             return Some(WorldObject::StoneWall);
         }
-        let nx = (x as i32 + chunk_pos.x * CHUNK_SIZE as i32) as f64;
-        let ny = (y as i32 + chunk_pos.y * CHUNK_SIZE as i32) as f64;
+        let nx = (x as i32 + pos.chunk_pos.x * CHUNK_SIZE as i32) as f64;
+        let ny = (y as i32 + pos.chunk_pos.y * CHUNK_SIZE as i32) as f64;
         let e = noise_helpers::get_perlin_noise_for_tile(nx, ny, seed);
         if e <= world_generation_params.stone_wall_frequency {
             return Some(WorldObject::StoneWall);
@@ -67,14 +65,13 @@ impl GenerationPlugin {
         let mut stone_blocks: Vec<(TileMapPosition, WorldObject)> = vec![];
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                if let Some(block) = Self::get_perlin_block_at_tile(
-                    world_generation_params,
-                    chunk_pos,
-                    TilePos { x, y },
-                    seed,
-                ) {
-                    stone_blocks
-                        .push((TileMapPosition::new(chunk_pos, TilePos { x, y }, 0), block));
+                for q in 0..4 {
+                    let pos = TileMapPosition::new(chunk_pos, TilePos { x, y }, q);
+                    if let Some(block) =
+                        Self::get_perlin_block_at_tile(world_generation_params, pos, seed)
+                    {
+                        stone_blocks.push((pos, block));
+                    }
                 }
             }
         }
@@ -222,13 +219,15 @@ impl GenerationPlugin {
                         {
                             return true;
                         }
-                        if dungeon.grid[(CHUNK_SIZE as i32 * (2 - chunk_pos.y)
+                        let x_offset = if tp.0.quad_is_x_offset() { 1 } else { 0 };
+                        let y_offset = if tp.0.quad_is_y_offset() { 1 } else { 0 };
+                        if dungeon.grid[(CHUNK_SIZE as i32 * 2 * (2 - chunk_pos.y)
                             - 1
-                            - tp.0.tile_pos.y as i32)
-                            as usize][(CHUNK_SIZE as i32
-                            + (chunk_pos.x * CHUNK_SIZE as i32)
-                            + tp.0.tile_pos.x as i32)
-                            as usize]
+                            - (2 * tp.0.tile_pos.y as i32)
+                            - y_offset) as usize][(2 * CHUNK_SIZE as i32
+                            + (chunk_pos.x * 2 * CHUNK_SIZE as i32)
+                            + 2 * tp.0.tile_pos.x as i32
+                            + x_offset) as usize]
                             == 1
                         {
                             return false;
@@ -281,9 +280,16 @@ impl GenerationPlugin {
                 );
                 if let Some(spawned_obj) = obj {
                     if is_medium {
+                        for q in 0..4 {
+                            minimap_update.send(UpdateMiniMapEvent {
+                                pos: Some(obj_data.0.set_quadrant(q)),
+                                new_tile: Some(*obj_data.1),
+                            });
+                        }
+                    } else {
                         minimap_update.send(UpdateMiniMapEvent {
                             pos: Some(*obj_data.0),
-                            new_tile: Some([*obj_data.1; 4]),
+                            new_tile: Some(*obj_data.1),
                         });
                     }
 

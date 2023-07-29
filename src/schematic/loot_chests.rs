@@ -2,9 +2,7 @@ use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{
-    inventory::{InventoryItemStack, ItemStack},
-    item::WorldObject,
-    proto::proto_param::{self, ProtoParam},
+    inventory::InventoryItemStack, item::WorldObject, proto::proto_param::ProtoParam,
     ui::ChestInventory,
 };
 

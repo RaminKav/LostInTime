@@ -5,8 +5,17 @@ use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use super::{TileMapPosition, CHUNK_SIZE};
+use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 
+use super::{TileMapPosition, CHUNK_SIZE};
+///
+///   grid is indexed as [y][x], where y = 0 is the top row, or chunk.y == 1 && tile.y == 15
+///   and y = 127 is the bottom row, or chunk.y == -2 && tile.y == 0
+///   and  x = 0 is the left col, or chunk.x == -1 && tile.x == 0
+///   and  x = 127  is the right col, or chunk.x == 2 && tile.x == 15
+///
+///   grid has spots for quadrants, so each entry is one of 4 quadrants belonging
+///   to one tile.
 #[derive(Reflect, Resource, Clone, Debug, Default, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub enum Direction {
@@ -88,25 +97,51 @@ impl Direction {
 
 pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
     let grid_size = grid.len() as i32 - 1;
-    for y in 0..grid_size {
-        let g_y = &grid[(grid_size - y) as usize];
+    for mut y in 0..grid_size {
+        //start from bottom row, cy == -2, ty == 0
+        y = grid_size - y;
+        let g_y = &grid[y as usize];
+
         let picked_tile = g_y
             .iter()
             .enumerate()
             .filter(|(_, v)| *v == &1)
             .choose(&mut rand::thread_rng());
+
         if let Some((x, _)) = picked_tile {
-            return Some(TileMapPosition::new(
+            let player_pos = TileMapPosition::new(
                 IVec2::new(
-                    f64::floor((x as u32 - CHUNK_SIZE) as f64 / CHUNK_SIZE as f64) as i32,
-                    -(f64::floor((grid_size - y - 1) as f64 / CHUNK_SIZE as f64) as i32 - 1),
+                    f64::floor((x as f64 - CHUNK_SIZE as f64 * 2.) as f64 / (CHUNK_SIZE * 2) as f64)
+                        as i32,
+                    f64::floor(
+                        ((CHUNK_SIZE as f64 * 2.) - y as f64 - 1.) as f64 / (CHUNK_SIZE * 2) as f64,
+                    ) as i32
+                        + 1,
                 ),
                 TilePos {
-                    x: x as u32 % CHUNK_SIZE,
-                    y: CHUNK_SIZE - ((grid_size - y) as u32 % CHUNK_SIZE) - 1,
+                    x: f64::floor(x as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as u32,
+                    y: f64::ceil(
+                        CHUNK_SIZE as f64 - (y as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as f64,
+                    ) as u32
+                        - 1,
                 },
-                0,
-            ));
+                if y % 2 == 0 {
+                    if x % 2 == 0 {
+                        0
+                    } else {
+                        1
+                    }
+                } else {
+                    if x % 2 == 0 {
+                        2
+                    } else {
+                        3
+                    }
+                },
+            );
+            let temp_world_pos = tile_pos_to_world_pos(player_pos, false) + Vec2::new(0., 9.);
+            let player_pos = world_pos_to_tile_pos(temp_world_pos);
+            return Some(player_pos);
         }
     }
     None
@@ -118,6 +153,7 @@ pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>>
         pos: Vec2::new((grid_size / 2) as f32, (grid_size / 2) as f32),
     };
     let num_steps = steps;
+
     for _ in 0..num_steps {
         let new_dir = Direction::get_next_dir(rand::thread_rng(), bias.clone());
         grid[walker.pos.x as usize][walker.pos.y as usize] = 1;

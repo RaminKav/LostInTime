@@ -83,6 +83,12 @@ impl TileMapPosition {
     pub fn matches_tile(&self, other: &TileMapPosition) -> bool {
         self.chunk_pos == other.chunk_pos && self.tile_pos == other.tile_pos
     }
+    pub fn quad_is_x_offset(&self) -> bool {
+        self.quadrant == 1 || self.quadrant == 3
+    }
+    pub fn quad_is_y_offset(&self) -> bool {
+        self.quadrant == 0 || self.quadrant == 1
+    }
 }
 
 #[derive(

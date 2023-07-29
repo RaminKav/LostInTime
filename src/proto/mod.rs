@@ -18,7 +18,7 @@ pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation},
-    assets::SpriteSize,
+    assets::{SpriteAnchor, SpriteSize},
     attributes::{Attack, ItemAttributes, MaxHealth},
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
@@ -72,6 +72,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<KCC>()
             .register_type::<LootChestType>()
             .register_type::<SpriteSize>()
+            .register_type::<SpriteAnchor>()
             .register_type::<ItemAction>()
             .register_type::<SchematicType>()
             .register_type::<ObjectAction>()

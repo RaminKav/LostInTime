@@ -4,10 +4,11 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": StoneWall,
   "survival_rogue_like::item::Wall": StoneWall,
-  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 8.)),
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::item::Breakable": (Some(StoneWallBlock)),
-  "survival_rogue_like::proto::ColliderProto": (x: 16, y: 11),
+  "survival_rogue_like::proto::ColliderProto": (x: 8, y: 6),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::world::WorldObjectEntityData": (object: StoneWall, obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::world::y_sort::YSort": (),

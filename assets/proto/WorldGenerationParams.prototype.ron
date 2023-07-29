@@ -17,8 +17,8 @@
         DeadSapling: 0.05,
       },
       schematic_frequencies: {
-        House: 0.1,
-        DungeonEntrance: 0.2
+        House: 0.0,
+        DungeonEntrance: 0.0
       },
       obj_allowed_tiles_map: {
         Tree: [GrassTile],

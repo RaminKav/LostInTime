@@ -203,3 +203,4 @@ impl different att styles w seldum_state
 - Find boss summon keys, various methods (mob drop, crafting, dungeon loot)
   - `Goal:` kill all bosses
 - World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons
+  TODO: DESPAWN WALLS LIKE TREES IN RADIUS

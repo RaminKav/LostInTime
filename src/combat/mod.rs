@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::tiles::TilePos;
+
 use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
@@ -7,11 +7,12 @@ mod collisions;
 
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
+    assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown},
     custom_commands::CommandsExt,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     proto::proto_param::ProtoParam,
-    world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos},
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     AppExt, CustomFlush, GameParam, GameState, Player, YSort,
 };
 
@@ -38,8 +39,7 @@ pub struct EnemyDeathEvent {
 pub struct ObjBreakEvent {
     pub entity: Entity,
     pub obj: WorldObject,
-    pub tile_pos: TilePos,
-    pub chunk_pos: IVec2,
+    pub pos: TileMapPosition,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -209,6 +209,7 @@ impl CombatPlugin {
         mut obj_death_events: EventWriter<ObjBreakEvent>,
         in_i_frame: Query<&InvincibilityTimer>,
         breaks_with_query: Query<&BreaksWith>,
+        proto_param: ProtoParam,
     ) {
         for hit in hit_events.iter() {
             // is in invincibility frames from a previous hit
@@ -223,8 +224,10 @@ impl CombatPlugin {
                     continue;
                 }
                 if let Some(obj) = obj_option {
-                    let obj_chunk_pos = camera_pos_to_chunk_pos(&(t.translation().truncate()));
-                    let obj_tile_pos = camera_pos_to_tile_pos(&(t.translation().truncate()));
+                    let anchor = proto_param
+                        .get_component::<SpriteAnchor, _>(obj.clone())
+                        .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+                    let pos = world_pos_to_tile_pos(t.translation().truncate() - anchor.0);
 
                     //TODO: create breaks with tool component, instead of using properties
                     if let Some(main_hand_tool) = hit.hit_with {
@@ -241,8 +244,7 @@ impl CombatPlugin {
                         obj_death_events.send(ObjBreakEvent {
                             entity: e,
                             obj: *obj,
-                            tile_pos: obj_tile_pos,
-                            chunk_pos: obj_chunk_pos,
+                            pos,
                         });
                     }
                 } else {
