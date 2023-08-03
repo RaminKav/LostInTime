@@ -4,7 +4,7 @@ use super::dungeon::Dungeon;
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
-use crate::item::WorldObject;
+use crate::item::{break_item, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
@@ -27,7 +27,7 @@ impl Plugin for GenerationPlugin {
         app.add_event::<WallBreakEvent>()
             .add_systems(
                 (
-                    handle_wall_break.before(CustomFlush),
+                    handle_wall_break.before(CustomFlush).before(break_item),
                     handle_wall_placed.before(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),

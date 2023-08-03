@@ -168,13 +168,17 @@ pub fn handle_wall_break(
     mut obj_break_events: EventReader<WallBreakEvent>,
     mut chunk_wall_cache: Query<&mut ChunkWallCache>,
 ) {
+    let mut removed_wall_pos = Vec::new();
     for broken_wall in obj_break_events.iter() {
         let chunk_e = game.get_chunk_entity(broken_wall.pos.chunk_pos).unwrap();
         if let Ok(mut cache) = chunk_wall_cache.get_mut(*chunk_e) {
             cache.walls.insert(broken_wall.pos.clone(), false);
+            removed_wall_pos.push(broken_wall.pos.clone());
         }
+    }
+    for broken_wall_pos in removed_wall_pos.iter() {
         mark_neighbour_walls_dirty(
-            broken_wall.pos.clone(),
+            broken_wall_pos.clone(),
             &mut game,
             &proto_param,
             &mut commands,
@@ -190,6 +194,7 @@ pub fn handle_wall_placed(
 
     mut chunk_wall_cache: Query<&mut ChunkWallCache>,
 ) {
+    let mut new_walls_pos = Vec::new();
     for PlaceItemEvent {
         obj,
         pos,
@@ -203,9 +208,12 @@ pub fn handle_wall_placed(
         let chunk_e = game.get_chunk_entity(new_wall_pos.chunk_pos).unwrap();
         if let Ok(mut cache) = chunk_wall_cache.get_mut(*chunk_e) {
             cache.walls.insert(world_pos_to_tile_pos(*pos), true);
+            new_walls_pos.push(new_wall_pos.clone());
         }
+    }
+    for new_wall_pos in new_walls_pos.iter() {
         mark_neighbour_walls_dirty(
-            new_wall_pos,
+            new_wall_pos.clone(),
             &mut game,
             &proto_param,
             &mut commands,
