@@ -1,18 +1,14 @@
-use super::chunk::{ChunkPlugin, GenerateObjectsEvent};
+use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
-use super::wall_auto_tile::{
-    handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache, Dirty,
-};
+use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
 use crate::item::WorldObject;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::world::world_helpers::world_pos_to_tile_pos;
-use crate::world::{
-    noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, MAX_VISIBILITY, TILE_SIZE,
-};
+
+use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;

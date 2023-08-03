@@ -1,14 +1,13 @@
-use bevy::{prelude::*, tasks::AsyncComputeTaskPool, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    assets::SpriteAnchor,
-    item::{PlaceItemEvent, Wall, WorldObject},
+    item::{PlaceItemEvent, Wall},
     proto::proto_param::ProtoParam,
     GameParam,
 };
 
 use super::{
-    chunk::{GenerateObjectsEvent, VisibleObject},
+    chunk::GenerateObjectsEvent,
     generation::WallBreakEvent,
     world_helpers::{get_neighbour_obj_data, get_neighbour_quadrant, world_pos_to_tile_pos},
     TileMapPosition,
@@ -47,7 +46,6 @@ pub fn update_wall(
 
         let mut neighbour_walls: HashMap<TileMapPosition, _> = HashMap::new();
         let mut final_sprite_index = 0;
-        let mut final_sprite_offset = 0;
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 //skip corner block updates for walls
@@ -96,7 +94,6 @@ pub fn update_wall(
                 let updated_bit_index =
                     compute_wall_index(final_sprite_index, (dx, dy), !neighbour_is_wall);
 
-                final_sprite_offset = 0;
                 final_sprite_index = updated_bit_index;
             }
         }
@@ -127,30 +124,29 @@ pub fn update_wall(
                         && has_wall_on_right_side
                     {
                         if first_corner_neighbour_is_not_wall && !this_corner_neighbour_is_wall {
-                            10
+                            10 + 16
                         } else if dx == -1 {
-                            14
+                            14 + 16
                         } else {
-                            15
+                            15 + 16
                         }
                     } else if has_wall_above {
                         if dx == -1 {
-                            7
+                            7 + 16
                         } else {
-                            6
+                            6 + 16
                         }
                     } else if !has_wall_above && has_wall_on_left_side && has_wall_on_right_side {
                         if first_corner_neighbour_is_not_wall && !this_corner_neighbour_is_wall {
-                            4
+                            4 + 16
                         } else if dx == -1 {
-                            13
+                            13 + 16
                         } else {
-                            11
+                            11 + 16
                         }
                     } else {
-                        final_sprite_index
+                        final_sprite_index + 16
                     };
-                    final_sprite_offset = 16;
                     final_sprite_index = updated_bit_index;
                     first_corner_neighbour_is_not_wall = true;
                 }
@@ -161,10 +157,8 @@ pub fn update_wall(
             .get_tile_obj_data_mut(new_wall_pos.clone(), &proto_param)
             .unwrap();
 
-        new_wall_data.texture_offset = final_sprite_offset;
-
         new_wall_data.obj_bit_index = final_sprite_index;
-        (*wall_sprite).index = (final_sprite_index + final_sprite_offset) as usize;
+        (*wall_sprite).index = (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
     }
 }
 pub fn handle_wall_break(

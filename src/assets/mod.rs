@@ -210,9 +210,9 @@ impl GameAssetsPlugin {
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
             Vec2::new(16., 32.),
-            16,
+            32,
             2,
-            Some(Vec2::new(16., 0.)),
+            None,
             None,
         );
 
