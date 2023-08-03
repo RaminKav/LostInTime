@@ -59,7 +59,7 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 use schematic::SchematicPlugin;
 use ui::{InventorySlotState, UIPlugin};
 use world::{
-    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
+    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData, VisibleObject},
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPosition, WorldObjectEntityData, WorldPlugin,
@@ -282,9 +282,10 @@ impl<'w, 's> GameParam<'w, 's> {
         &self,
         tile: TileMapPosition,
         proto_param: &ProtoParam,
-    ) -> Option<WorldObjectEntityData> {
+    ) -> Option<(Entity, WorldObjectEntityData)> {
         if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
-            return Some(self.world_object_query.get(e).unwrap().3.clone());
+            let data = self.world_object_query.get(e).unwrap();
+            return Some((data.0, data.3.clone()));
         }
         None
     }

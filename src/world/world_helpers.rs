@@ -136,16 +136,13 @@ pub fn get_neighbour_obj_data(
     offset: (i8, i8),
     game: &mut GameParam,
     proto_param: &ProtoParam,
-) -> Option<WorldObjectEntityData> {
+) -> Option<(Entity, WorldObjectEntityData)> {
     let pos = get_neighbour_quadrant(pos, offset);
 
     if game.get_chunk_entity(pos.chunk_pos).is_none() {
         return None;
     }
-    if let Some(d) = game.get_tile_obj_data(pos, &proto_param) {
-        return Some(d.clone());
-    }
-    None
+    game.get_tile_obj_data(pos, &proto_param)
 }
 
 pub fn can_object_be_placed_here(

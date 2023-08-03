@@ -68,7 +68,6 @@ pub fn tick_hunger(
             } else {
                 hunger.current -= 1;
             }
-            println!("TICK HUNGER: {:?}", hunger.current);
             hunger.timer.reset();
         }
     }
@@ -89,7 +88,6 @@ pub fn handle_actions_drain_hunger(
                 } else {
                     hunger.current -= 1;
                 }
-                println!("FATIGUED: {:?}", hunger.current);
             }
         }
     }

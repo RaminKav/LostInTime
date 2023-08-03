@@ -5,6 +5,7 @@ use crate::{
     world::{
         wall_auto_tile::Dirty,
         world_helpers::{tile_pos_to_world_pos, world_pos_to_chunk_relative_tile_pos},
+        WorldObjectEntityData,
     },
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
@@ -38,6 +39,7 @@ pub trait CommandsExt<'w, 's> {
         pos: Vec2,
         prototypes: &Prototypes,
         proto_param: &mut ProtoParam,
+        is_dirty: bool,
     ) -> Option<Entity>;
 }
 
@@ -125,6 +127,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         pos: Vec2,
         prototypes: &Prototypes,
         proto_param: &mut ProtoParam,
+        is_dirty: bool,
     ) -> Option<Entity> {
         let p = <T as Into<&str>>::into(obj.clone()).to_owned();
         if !prototypes.is_ready(&p) {
@@ -166,7 +169,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 Transform::from_translation(pos + anchor.0.extend(0.)),
             ));
         }
-        if let Some(_wall) = proto_param.get_component::<Wall, _>(obj) {
+        if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
             spawned_entity_commands
                 .insert(
                     proto_param
@@ -176,8 +179,16 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         .unwrap()
                         .clone(),
                 )
-                .insert(TextureAtlasSprite::default())
-                .insert(Dirty);
+                .insert(TextureAtlasSprite {
+                    index: proto_param
+                        .get_component::<WorldObjectEntityData, _>(obj)
+                        .unwrap()
+                        .obj_bit_index as usize,
+                    ..default()
+                });
+            if is_dirty {
+                spawned_entity_commands.insert(Dirty);
+            }
         }
 
         Some(spawned_entity)

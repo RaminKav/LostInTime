@@ -424,6 +424,7 @@ pub fn handle_placing_world_object(
                 pos,
                 &prototypes,
                 &mut proto_param,
+                true,
             );
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry

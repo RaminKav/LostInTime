@@ -1,13 +1,18 @@
-use super::chunk::GenerateObjectsEvent;
+use super::chunk::{ChunkPlugin, GenerateObjectsEvent};
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
-use super::wall_auto_tile::{handle_wall_break, update_wall};
+use super::wall_auto_tile::{
+    handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache, Dirty,
+};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
 use crate::item::WorldObject;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
+use crate::world::world_helpers::world_pos_to_tile_pos;
+use crate::world::{
+    noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, MAX_VISIBILITY, TILE_SIZE,
+};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;
@@ -26,11 +31,12 @@ impl Plugin for GenerationPlugin {
         app.add_event::<WallBreakEvent>()
             .add_systems(
                 (
-                    Self::generate_and_cache_objects.before(CustomFlush),
-                    handle_wall_break.after(CustomFlush),
+                    handle_wall_break.before(CustomFlush),
+                    handle_wall_placed.before(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(Self::generate_and_cache_objects.before(CustomFlush))
             .add_system(update_wall.in_base_set(CoreSet::PostUpdate))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -147,23 +153,21 @@ impl GenerationPlugin {
         mut commands: Commands,
         game: GameParam,
         mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
-        seed: Query<&GenerationSeed, With<ActiveDimension>>,
-        dungeon: Query<&Dungeon, With<ActiveDimension>>,
+        seed: Query<(&GenerationSeed, Option<&Dungeon>), With<ActiveDimension>>,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
+        mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         mut proto_commands: ProtoCommands,
         prototypes: Prototypes,
         mut proto_param: ProtoParam,
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let maybe_dungeon = dungeon.get_single();
+            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
+            let (seed, maybe_dungeon) = seed.single();
 
             // generate stone walls for dungeons
-            let stone = Self::generate_stone_for_chunk(
-                &game.world_generation_params,
-                chunk_pos,
-                seed.single().seed,
-            );
+            let stone =
+                Self::generate_stone_for_chunk(&game.world_generation_params, chunk_pos, seed.seed);
 
             // generate all objs
             let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
@@ -211,12 +215,14 @@ impl GenerationPlugin {
                 .iter()
                 .filter(|tp| {
                     // spawn walls in dungeon according to the generated grid layout
-                    if let Ok(dungeon) = maybe_dungeon {
+                    if let Some(dungeon) = maybe_dungeon {
+                        let mut wall_cache = chunk_wall_cache.get_mut(*chunk_e).unwrap();
                         if chunk_pos.x < -1
                             || chunk_pos.x > 2
                             || chunk_pos.y < -2
                             || chunk_pos.y > 1
                         {
+                            wall_cache.walls.insert(tp.0, true);
                             return true;
                         }
                         let x_offset = if tp.0.quad_is_x_offset() { 1 } else { 0 };
@@ -230,6 +236,7 @@ impl GenerationPlugin {
                             + x_offset) as usize]
                             == 1
                         {
+                            wall_cache.walls.insert(tp.0, false);
                             return false;
                         }
                     }
@@ -272,12 +279,39 @@ impl GenerationPlugin {
                     spawned_vec.push(pos.clone());
                 }
 
+                let mut is_touching_air = false;
+                if let Some(dungeon) = maybe_dungeon {
+                    let x_offset = if obj_data.0.quad_is_x_offset() { 1 } else { 0 };
+                    let y_offset = if obj_data.0.quad_is_y_offset() { 1 } else { 0 };
+
+                    for x in -1..2 {
+                        for y in -1..2 {
+                            let original_y = (CHUNK_SIZE as i32 * 2 * (2 - obj_data.0.chunk_pos.y)
+                                - 1
+                                - (2 * obj_data.0.tile_pos.y as i32)
+                                - y_offset) as usize;
+                            let original_x = (2 * CHUNK_SIZE as i32
+                                + (obj_data.0.chunk_pos.x * 2 * CHUNK_SIZE as i32)
+                                + 2 * obj_data.0.tile_pos.x as i32
+                                + x_offset) as usize;
+                            if dungeon.grid[(original_y + y as usize).clamp(0, 127)]
+                                [(original_x + x as usize).clamp(0, 127)]
+                                == 1
+                            {
+                                is_touching_air = true
+                            }
+                        }
+                    }
+                }
+
                 let obj = proto_commands.spawn_object_from_proto(
                     *obj_data.1,
                     tile_pos_to_world_pos(*obj_data.0, obj_data.1.is_medium_size(&proto_param)),
                     &prototypes,
                     &mut proto_param,
+                    is_touching_air,
                 );
+
                 if let Some(spawned_obj) = obj {
                     if is_medium {
                         for q in 0..4 {
@@ -296,6 +330,11 @@ impl GenerationPlugin {
                     commands
                         .entity(spawned_obj)
                         .set_parent(*game.get_chunk_entity(chunk_pos).unwrap());
+
+                    if let Some(_) = maybe_dungeon {
+                        let mut wall_cache = chunk_wall_cache.get_mut(*chunk_e).unwrap();
+                        wall_cache.walls.insert(*obj_data.0, true);
+                    }
                 }
             }
         }
