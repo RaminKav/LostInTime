@@ -7,14 +7,11 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use super::dimension::{ActiveDimension, GenerationSeed};
 
-use super::dungeon::Dungeon;
-use super::wall_auto_tile::{AutoTileComplete, Dirty};
 use super::world_helpers::get_neighbour_tile;
 
-use crate::item::Wall;
 use crate::world::dimension::ChunkCache;
 use crate::world::wall_auto_tile::ChunkWallCache;
-use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
+use crate::{item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
 use serde::{Deserialize, Serialize};
 

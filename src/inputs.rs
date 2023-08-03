@@ -9,17 +9,17 @@ use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
-use crate::inventory::{Container, Inventory};
+use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemAction, ItemActionParam};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, CHEST_SIZE};
+use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
-use crate::world::wall_auto_tile::{ChunkWallCache, Dirty};
+
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 use crate::world::TileMapPosition;
 use crate::{

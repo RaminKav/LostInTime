@@ -59,7 +59,7 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 use schematic::SchematicPlugin;
 use ui::{InventorySlotState, UIPlugin};
 use world::{
-    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData, VisibleObject},
+    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPosition, WorldObjectEntityData, WorldPlugin,

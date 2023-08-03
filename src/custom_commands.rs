@@ -170,6 +170,9 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             ));
         }
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
+            let sprite_data = proto_param
+                .get_component::<WorldObjectEntityData, _>(obj)
+                .unwrap();
             spawned_entity_commands
                 .insert(
                     proto_param
@@ -180,10 +183,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         .clone(),
                 )
                 .insert(TextureAtlasSprite {
-                    index: proto_param
-                        .get_component::<WorldObjectEntityData, _>(obj)
-                        .unwrap()
-                        .obj_bit_index as usize,
+                    index: (sprite_data.obj_bit_index + sprite_data.texture_offset * 32) as usize,
                     ..default()
                 });
             if is_dirty {
