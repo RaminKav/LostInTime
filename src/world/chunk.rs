@@ -7,9 +7,13 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use super::dimension::{ActiveDimension, GenerationSeed};
 
+use super::dungeon::Dungeon;
+use super::wall_auto_tile::{AutoTileComplete, Dirty};
 use super::world_helpers::get_neighbour_tile;
 
+use crate::item::Wall;
 use crate::world::dimension::ChunkCache;
+use crate::world::wall_auto_tile::ChunkWallCache;
 use crate::{assets::FoliageMaterial, item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
 use serde::{Deserialize, Serialize};
@@ -35,7 +39,7 @@ impl Plugin for ChunkPlugin {
                         .after(Self::register_spawned_chunks)
                         .after(CustomFlush),
                     Self::despawn_outofrange_chunks,
-                    Self::toggle_on_screen_mesh_visibility,
+                    Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
                     Self::register_spawned_chunks.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -70,6 +74,8 @@ pub struct GenerateObjectsEvent {
     pub chunk_pos: IVec2,
 }
 
+#[derive(Component)]
+pub struct VisibleObject;
 #[derive(Clone)]
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
@@ -155,6 +161,7 @@ impl ChunkPlugin {
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
+
                     let (bits, index_shift, blocks) = TilePlugin::get_tile_from_perlin_noise(
                         &game.world_generation_params,
                         chunk_pos,
@@ -190,7 +197,7 @@ impl ChunkPlugin {
                 0.,
             ));
 
-            commands
+            let chunk = commands
                 .entity(tilemap_entity)
                 .insert(TilemapBundle {
                     grid_size,
@@ -204,12 +211,17 @@ impl ChunkPlugin {
                 })
                 .insert(TileEntityCollection { map: tiles })
                 .insert(Chunk { chunk_pos })
-                .insert(Name::new(format!("Pos: {}", chunk_pos)));
+                .insert(Name::new(format!("Pos: {}", chunk_pos)))
+                .id();
+            commands.entity(chunk).insert(ChunkWallCache {
+                walls: HashMap::new(),
+            });
+
             // game.set_chunk_entity(chunk_pos, chunk);
             // minimap_update.send(UpdateMiniMapEvent);
         }
     }
-    fn register_spawned_chunks(
+    pub fn register_spawned_chunks(
         mut game: GameParam,
         loaded_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
     ) {
@@ -347,16 +359,18 @@ impl ChunkPlugin {
             }
         }
     }
+
     fn toggle_on_screen_mesh_visibility(
         camera_query: Query<&Transform, With<TextureCamera>>,
-        mut foliage_query: Query<(&mut Visibility, &GlobalTransform, &Handle<FoliageMaterial>)>,
+        mut obj_query: Query<(&mut Visibility, &GlobalTransform), With<WorldObject>>,
     ) {
         for camera_transform in camera_query.iter() {
-            for (mut v, ft, _) in foliage_query.iter_mut() {
-                let foliage_pos = ft.translation().xy();
-                let distance = camera_transform.translation.xy().distance(foliage_pos);
-
-                if *v == Visibility::Visible && distance > (MAX_VISIBILITY * 2_u32) as f32 {
+            for (mut v, ft) in obj_query.iter_mut() {
+                let pos = ft.translation().xy();
+                let distance = camera_transform.translation.xy().distance(pos);
+                if (*v == Visibility::Visible || *v == Visibility::Inherited)
+                    && distance > (MAX_VISIBILITY * 2_u32) as f32
+                {
                     *v = Visibility::Hidden;
                 } else if *v != Visibility::Visible && distance <= (MAX_VISIBILITY * 2_u32) as f32 {
                     *v = Visibility::Visible;

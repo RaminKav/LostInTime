@@ -204,3 +204,6 @@ impl different att styles w seldum_state
   - `Goal:` kill all bosses
 - World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons
   TODO: DESPAWN WALLS LIKE TREES IN RADIUS
+  TODO: use grid in update_tiles to check if wall touching air, if not ignore it, or remove DIRTY tag before update_wall can touch it
+  TODO: remove WorldObjectData type, turn into wall data only
+  TODO: turn wall spritesheet into one row, change second row to be increments of 1

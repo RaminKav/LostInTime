@@ -19,6 +19,7 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, ChestInventory, InventoryState, CHEST_SIZE};
 use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
+use crate::world::wall_auto_tile::{ChunkWallCache, Dirty};
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
 use crate::world::TileMapPosition;
 use crate::{
@@ -201,20 +202,9 @@ impl InputsPlugin {
         mut proto_commands: ProtoCommands,
         proto: ProtoParam,
         mut inv: Query<&mut Inventory>,
-        chest_query: Query<&ChestInventory>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             inv_state.open = !inv_state.open;
-        }
-        if key_input.just_pressed(KeyCode::C) {
-            let chest = commands.spawn_empty().id();
-            commands.entity(chest).insert(ChestInventory {
-                items: Container::with_size(CHEST_SIZE),
-                parent: chest,
-            });
-        }
-        if key_input.just_pressed(KeyCode::V) {
-            commands.insert_resource(chest_query.single().clone());
         }
 
         if key_input.just_pressed(KeyCode::E) {
@@ -429,11 +419,7 @@ impl InputsPlugin {
 
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
-            // println!(
-            //     "C: {cursor_tile_pos:?} || P: {player_pos:?}  || {:?} {:?}",
-            //     game.get_tile_data(cursor_tile_pos),
-            //     game.get_tile_obj_data(cursor_tile_pos)
-            // );
+            // println!("C: {cursor_tile_pos:?}",);
             if att_cooldown_query.single().1.is_some() {
                 return;
             }
