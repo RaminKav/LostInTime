@@ -1,4 +1,5 @@
 pub mod chest_ui;
+mod damage_numbers;
 mod enemy_health_bar;
 mod fps_text;
 mod interactions;
@@ -21,7 +22,16 @@ use crate::{
     CustomFlush, GameState,
 };
 
-use self::minimap::MinimapPlugin;
+use self::{
+    damage_numbers::{
+        add_previous_health, handle_add_damage_numbers_after_hit, tick_damage_numbers,
+    },
+    minimap::MinimapPlugin,
+};
+
+pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
+pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
+pub const UI_SLOT_SIZE: f32 = 20.0;
 
 pub struct UIPlugin;
 
@@ -53,6 +63,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     create_enemy_health_bar,
+                    add_previous_health,
                     handle_enemy_health_bar_change,
                     handle_add_damage_numbers_after_hit.after(CombatPlugin::handle_hits),
                     tick_damage_numbers,
