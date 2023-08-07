@@ -1,24 +1,33 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use crate::assets::Graphics;
+use crate::{
+    assets::Graphics,
+    colors::{GOLD, LIGHT_GREY},
+};
 
-use super::{ToolTipUpdateEvent, UIElement};
+use super::{
+    InventoryUI, InventoryUIState, ToolTipUpdateEvent, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+};
 
 pub fn handle_spawn_inv_item_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut updates: EventReader<ToolTipUpdateEvent>,
+    inv: Query<Entity, With<InventoryUI>>,
+    cur_inv_state: Res<State<InventoryUIState>>,
 ) {
     for item in updates.iter() {
+        let inv = inv.single();
+        let parent_inv_size = match cur_inv_state.0 {
+            InventoryUIState::Open => INVENTORY_UI_SIZE,
+            InventoryUIState::Chest => CHEST_INVENTORY_UI_SIZE,
+            _ => unreachable!(),
+        };
         let attributes = item.item_stack.attributes.get_tooltips();
         let durability = item.item_stack.attributes.get_durability_tooltip();
         let has_attributes = attributes.len() > 0;
-        let size = if has_attributes {
-            Vec2::new(80., 80.)
-        } else {
-            Vec2::new(64., 24.)
-        };
+        let size = Vec2::new(93., 120.5);
         let tooltip = commands
             .spawn((
                 SpriteBundle {
@@ -26,15 +35,11 @@ pub fn handle_spawn_inv_item_tooltip(
                         .ui_image_handles
                         .as_ref()
                         .unwrap()
-                        .get(if has_attributes {
-                            &UIElement::LargeTooltip
-                        } else {
-                            &UIElement::Tooltip
-                        })
+                        .get(&item.item_stack.rarity.get_tooltip_ui_element())
                         .unwrap()
                         .clone(),
                     transform: Transform {
-                        translation: Vec3::new(0., if has_attributes { 48. } else { 20. }, 2.),
+                        translation: Vec3::new(-(parent_inv_size.x + size.x + 2.) / 2., 0., 2.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -45,7 +50,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
-                UIElement::LargeTooltip,
+                item.item_stack.rarity.get_tooltip_ui_element(),
                 Name::new("TOOLTIP"),
             ))
             .id();
@@ -53,19 +58,29 @@ pub fn handle_spawn_inv_item_tooltip(
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
         // tooltip_text.push(item.item_stack.metadata.desc.clone());
-        for (i, a) in attributes.iter().enumerate().clone() {
-            let d = if i == 0 { 2. } else { 0. };
-            tooltip_text.push((a.to_string(), d));
+        for (_i, a) in attributes.iter().enumerate().clone() {
+            tooltip_text.push((a.to_string(), 0.));
         }
         if has_attributes {
-            tooltip_text.push((durability.clone(), 28.));
+            tooltip_text.push((
+                durability.clone(),
+                size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
+            ));
         }
 
         for (i, (text, d)) in tooltip_text.iter().enumerate() {
-            let text_pos = if has_attributes {
-                Vec3::new(-size.x / 2. + 8., 28. - (i as f32 * 10.) - d, 1.)
+            let text_pos = if i == 0 {
+                Vec3::new(
+                    -(f32::ceil((text.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
+                    size.y / 2. - 12.,
+                    1.,
+                )
             } else {
-                Vec3::new(0., 0., 1.)
+                Vec3::new(
+                    -size.x / 2. + 8.,
+                    size.y / 2. - 12. - (i as f32 * 10.) - d - 2.,
+                    1.,
+                )
             };
             let text = commands
                 .spawn((
@@ -75,19 +90,18 @@ pub fn handle_spawn_inv_item_tooltip(
                             TextStyle {
                                 font: asset_server.load("fonts/Kitchen Sink.ttf"),
                                 font_size: 8.0,
-                                color: Color::Rgba {
-                                    red: 75. / 255.,
-                                    green: 61. / 255.,
-                                    blue: 68. / 255.,
-                                    alpha: 1.,
+                                color: if i == 0 {
+                                    item.item_stack.rarity.get_color()
+                                } else if i > 1 && i == tooltip_text.len() - 1 {
+                                    LIGHT_GREY
+                                } else if i > 2 {
+                                    GOLD
+                                } else {
+                                    LIGHT_GREY
                                 },
                             },
                         ),
-                        text_anchor: if has_attributes {
-                            Anchor::CenterLeft
-                        } else {
-                            Anchor::Center
-                        },
+                        text_anchor: Anchor::CenterLeft,
                         transform: Transform {
                             translation: text_pos,
                             scale: Vec3::new(1., 1., 1.),
@@ -101,6 +115,6 @@ pub fn handle_spawn_inv_item_tooltip(
                 .id();
             commands.entity(tooltip).add_child(text);
         }
-        commands.entity(item.parent_slot_entity).add_child(tooltip);
+        commands.entity(inv).add_child(tooltip);
     }
 }

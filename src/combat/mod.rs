@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
-mod collisions;
+pub mod collisions;
 
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},

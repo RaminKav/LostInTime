@@ -3,13 +3,24 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Dagger,
+    "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        attack: Some((start: 2, end: 10)),
+  ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+        crit_damage: Some((start: 2, end: 20)),
+        crit_chance: Some((start: 4, end: 10)),
+        healing: Some((start: 4, end: 10)),
+        bonus_damage: Some((start: 4, end: 10)),
+        speed: Some((start: 4, end: 10)),
+        lifesteal: Some((start: 4, end: 10)),
+        xp_rate: Some((start: 4, end: 10)),
+        loot_rate: Some((start: 4, end: 10)),
+  ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Dagger,
         attributes: (
-            durability: 100,
             max_durability: 100,
-            attack: 10,
             attack_cooldown: 0.2
         ),
         metadata: (

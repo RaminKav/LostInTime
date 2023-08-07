@@ -1,16 +1,19 @@
+use rand::Rng;
+use std::ops::{Range, RangeInclusive};
+
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
-    inventory::Inventory,
+    colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
+    inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{DropOnSlotEvent, InventoryState, RemoveFromSlotEvent},
+    ui::{DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, UIElement},
     CustomFlush, GameParam, GameState, Player,
 };
-
 use modifiers::*;
 pub mod hunger;
 use hunger::*;
@@ -20,7 +23,7 @@ pub struct AttributesPlugin;
 pub struct BlockAttributeBundle {
     pub health: CurrentHealth,
 }
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Debug)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
 #[reflect(Schematic, Default)]
 pub struct ItemAttributes {
     pub health: i32,
@@ -29,30 +32,68 @@ pub struct ItemAttributes {
     pub max_durability: i32,
     pub attack_cooldown: f32,
     pub invincibility_cooldown: f32,
+    pub crit_chance: i32,
+    pub crit_damage: i32,
+    pub bonus_damage: i32,
+    pub health_regen: i32,
+    pub healing: i32,
+    pub thorns: i32,
+    pub dodge: i32,
+    pub speed: i32,
+    pub lifesteal: i32,
+    pub defence: i32,
+    pub xp_rate: i32,
+    pub loot_rate: i32,
 }
-impl Default for ItemAttributes {
-    fn default() -> Self {
-        Self {
-            health: 0,
-            attack: 0,
-            durability: 0,
-            max_durability: 0,
-            attack_cooldown: 0.,
-            invincibility_cooldown: 0.,
-        }
-    }
-}
+
 impl ItemAttributes {
     pub fn get_tooltips(&self) -> Vec<String> {
         let mut tooltips: Vec<String> = vec![];
         if self.health > 0 {
             tooltips.push(format!("+{} HP", self.health));
         }
+        if self.defence > 0 {
+            tooltips.push(format!("+{} Defence", self.defence));
+        }
         if self.attack > 0 {
             tooltips.push(format!("+{} Att", self.attack));
         }
         if self.attack_cooldown > 0. {
-            tooltips.push(format!("{} Hits/s", 1. / self.attack_cooldown));
+            tooltips.push(format!("{:.2} Hits/s", 1. / self.attack_cooldown));
+        }
+        if self.crit_chance > 0 {
+            tooltips.push(format!("+{}% Crit", self.crit_chance));
+        }
+        if self.crit_damage > 0 {
+            tooltips.push(format!("+{}% Crit DMG", self.crit_damage));
+        }
+        if self.bonus_damage > 0 {
+            tooltips.push(format!("+{}% DMG", self.bonus_damage));
+        }
+        if self.health_regen > 0 {
+            tooltips.push(format!("+{} HP Regen", self.health_regen));
+        }
+        if self.healing > 0 {
+            tooltips.push(format!("+{}% Healing", self.healing));
+        }
+        if self.thorns > 0 {
+            tooltips.push(format!("+{}% Thorns", self.thorns));
+        }
+        if self.dodge > 0 {
+            tooltips.push(format!("+{}% Dodge", self.dodge));
+        }
+        if self.speed > 0 {
+            tooltips.push(format!("+{}% Speed", self.speed));
+        }
+        if self.lifesteal > 0 {
+            tooltips.push(format!("+{} Leech", self.lifesteal));
+        }
+
+        if self.xp_rate > 0 {
+            tooltips.push(format!("+{}% XP", self.xp_rate));
+        }
+        if self.loot_rate > 0 {
+            tooltips.push(format!("+{}% Loot", self.loot_rate));
         }
 
         tooltips
@@ -86,6 +127,204 @@ impl ItemAttributes {
             _ => warn!("Got an unexpected attribute: {:?}", modifier.modifier),
         }
         self
+    }
+    pub fn combine(&self, other: &ItemAttributes) -> ItemAttributes {
+        ItemAttributes {
+            health: self.health + other.health,
+            attack: self.attack + other.attack,
+            durability: self.durability + other.durability,
+            max_durability: self.max_durability + other.max_durability,
+            attack_cooldown: self.attack_cooldown + other.attack_cooldown,
+            invincibility_cooldown: self.invincibility_cooldown + other.invincibility_cooldown,
+            crit_chance: self.crit_chance + other.crit_chance,
+            crit_damage: self.crit_damage + other.crit_damage,
+            bonus_damage: self.bonus_damage + other.bonus_damage,
+            health_regen: self.health_regen + other.health_regen,
+            healing: self.healing + other.healing,
+            thorns: self.thorns + other.thorns,
+            dodge: self.dodge + other.dodge,
+            speed: self.speed + other.speed,
+            lifesteal: self.lifesteal + other.lifesteal,
+            defence: self.defence + other.defence,
+            xp_rate: self.xp_rate + other.xp_rate,
+            loot_rate: self.loot_rate + other.loot_rate,
+        }
+    }
+}
+macro_rules! setup_raw_bonus_attributes {
+    (struct $name:ident {
+        $($field_name:ident: $field_type:ty,)*
+    }) => {
+        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
+        #[reflect(Schematic, Default)]
+        pub struct $name {
+            pub $($field_name: $field_type,)*
+        }
+
+        impl $name {
+
+            fn into_item_attributes(
+                &self,
+                rarity: ItemRarity,
+            ) -> ItemAttributes {
+                // take fields of Range<i32> into one i32
+                let mut rng = rand::thread_rng();
+                let num_attributes = rng.gen_range(rarity.get_num_bonus_attributes());
+                let mut item_attributes = ItemAttributes::default();
+                let valid_attributes = {
+                    let mut v = Vec::new();
+                    $(
+                        if self.$field_name.is_some() {
+                            v.push(stringify!($field_name))
+                        }
+                    )*
+                    v
+                };
+                let num_valid_attributes = valid_attributes.len();
+                let mut already_picked_attributes = Vec::new();
+                for _ in 0..num_attributes {
+                    let picked_attribute_index = rng.gen_range(0..num_valid_attributes);
+                    let mut picked_attribute = valid_attributes[picked_attribute_index];
+                    while already_picked_attributes.contains(&picked_attribute) {
+                        let picked_attribute_index = rng.gen_range(0..num_valid_attributes);
+                        picked_attribute = valid_attributes[picked_attribute_index];
+                    }
+                    already_picked_attributes.push(picked_attribute);
+                    $(
+                        {
+                            if stringify!($field_name) == picked_attribute {
+                                let value = rng.gen_range(self.$field_name.clone().unwrap());
+                                item_attributes.$field_name = value;
+                            }
+                        }
+                    )*
+                }
+
+                item_attributes
+            }
+        }
+    }
+}
+macro_rules! setup_raw_base_attributes {
+    (struct $name:ident {
+        $($field_name:ident: $field_type:ty,)*
+    }) => {
+        #[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
+        #[reflect(Schematic, Default)]
+        pub struct $name {
+            pub $($field_name: $field_type,)*
+        }
+
+        impl $name {
+
+            fn into_item_attributes(
+                &self,
+                attack_cooldown: f32,
+            ) -> ItemAttributes {
+                // take pick an i32 attribute value from fields of Range<i32>
+                let mut rng = rand::thread_rng();
+                let mut item_attributes = ItemAttributes{ attack_cooldown, ..default()};
+                let valid_attributes = {
+                    let mut v = Vec::new();
+                    $(
+                        if self.$field_name.is_some() {
+                            v.push(stringify!($field_name))
+                        }
+                    )*
+                    v
+                };
+                for att in valid_attributes.iter() {
+                    $(
+                        {
+                            if stringify!($field_name) == *att {
+                                let value = rng.gen_range(self.$field_name.clone().unwrap());
+                                item_attributes.$field_name = value;
+                            }
+                        }
+                    )*
+                }
+
+                item_attributes
+            }
+        }
+    }
+}
+
+setup_raw_bonus_attributes! { struct RawItemBonusAttributes {
+    attack: Option<Range<i32>>,
+     health: Option<Range<i32>>,
+     defence: Option<Range<i32>>,
+     durability: Option<Range<i32>>,
+     max_durability: Option<Range<i32>>,
+    //
+     crit_chance: Option<Range<i32>>,
+     crit_damage: Option<Range<i32>>,
+     bonus_damage: Option<Range<i32>>,
+     health_regen: Option<Range<i32>>,
+     healing: Option<Range<i32>>,
+     thorns: Option<Range<i32>>,
+     dodge: Option<Range<i32>>,
+     speed: Option<Range<i32>>,
+     lifesteal: Option<Range<i32>>,
+     xp_rate: Option<Range<i32>>,
+     loot_rate: Option<Range<i32>>,
+}}
+
+setup_raw_base_attributes! { struct RawItemBaseAttributes {
+    attack: Option<Range<i32>>,
+     health: Option<Range<i32>>,
+     defence: Option<Range<i32>>,
+     durability: Option<Range<i32>>,
+     max_durability: Option<Range<i32>>,
+    //
+     crit_chance: Option<Range<i32>>,
+     crit_damage: Option<Range<i32>>,
+     bonus_damage: Option<Range<i32>>,
+     health_regen: Option<Range<i32>>,
+     healing: Option<Range<i32>>,
+     thorns: Option<Range<i32>>,
+     dodge: Option<Range<i32>>,
+     speed: Option<Range<i32>>,
+     lifesteal: Option<Range<i32>>,
+     xp_rate: Option<Range<i32>>,
+     loot_rate: Option<Range<i32>>,
+}}
+
+#[derive(Component, Reflect, FromReflect, Debug, Schematic, Clone, Default, Eq, PartialEq)]
+#[reflect(Component, Schematic)]
+pub enum ItemRarity {
+    #[default]
+    Common,
+    Uncommon,
+    Rare,
+    Legendary,
+}
+
+impl ItemRarity {
+    fn get_num_bonus_attributes(&self) -> RangeInclusive<i32> {
+        match self {
+            ItemRarity::Common => 0..=2,
+            ItemRarity::Uncommon => 1..=3,
+            ItemRarity::Rare => 2..=4,
+            ItemRarity::Legendary => 3..=5,
+        }
+    }
+
+    pub fn get_tooltip_ui_element(&self) -> UIElement {
+        match self {
+            ItemRarity::Common => UIElement::LargeTooltipCommon,
+            ItemRarity::Uncommon => UIElement::LargeTooltipUncommon,
+            ItemRarity::Rare => UIElement::LargeTooltipRare,
+            ItemRarity::Legendary => UIElement::LargeTooltipLegendary,
+        }
+    }
+    pub fn get_color(&self) -> Color {
+        match self {
+            ItemRarity::Common => LIGHT_GREY,
+            ItemRarity::Uncommon => LIGHT_GREEN,
+            ItemRarity::Rare => LIGHT_BLUE,
+            ItemRarity::Legendary => LIGHT_RED,
+        }
     }
 }
 pub struct AttributeModifier {
@@ -138,6 +377,7 @@ impl Plugin for AttributesPlugin {
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_attributes_and_sprite_with_equipment_removed,
+                    handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -304,5 +544,40 @@ fn update_attributes_and_sprite_with_equipment_removed(
                 }
             }
         }
+    }
+}
+fn handle_new_items_raw_attributes(
+    mut commands: Commands,
+    new_items: Query<
+        (
+            Entity,
+            &ItemStack,
+            &RawItemBonusAttributes,
+            &RawItemBaseAttributes,
+        ),
+        Added<RawItemBonusAttributes>,
+    >,
+) {
+    for (e, stack, raw_bonus_att, raw_base_att) in new_items.iter() {
+        let mut rng = rand::thread_rng();
+        let rarity_rng = rng.gen_range(0..40);
+        let rarity = if rarity_rng == 0 {
+            ItemRarity::Legendary
+        } else if rarity_rng < 4 {
+            ItemRarity::Rare
+        } else if rarity_rng < 13 {
+            ItemRarity::Uncommon
+        } else {
+            ItemRarity::Common
+        };
+        let parsed_bonus_att = raw_bonus_att.into_item_attributes(rarity.clone());
+        let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
+        let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
+        final_att.max_durability = stack.attributes.max_durability;
+        final_att.durability =
+            rng.gen_range(final_att.max_durability / 10..final_att.max_durability);
+        let mut new_stack = stack.copy_with_attributes(&final_att);
+        new_stack.rarity = rarity;
+        commands.entity(e).insert(new_stack);
     }
 }

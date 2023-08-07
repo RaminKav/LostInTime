@@ -1,10 +1,8 @@
 use bevy::prelude::*;
-use rand::Rng;
 
 use crate::{
     attributes::{CurrentHealth, MaxHealth},
     colors::{RED, YELLOW},
-    combat::HitEvent,
     enemy::Mob,
 };
 #[derive(Component)]

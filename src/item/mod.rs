@@ -1,7 +1,9 @@
 use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
-use crate::colors::{BLACK, BLUE, BROWN, DARK_GREEN, GREEN, GREY, UI_GRASS_GREEN, YELLOW};
+use crate::colors::{
+    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, UI_GRASS_GREEN, YELLOW,
+};
 use crate::combat::ObjBreakEvent;
 
 use crate::inventory::ItemStack;
@@ -66,6 +68,7 @@ pub enum EquipmentType {
     Ring,
     Pendant,
     Trinket,
+    Weapon,
 }
 impl EquipmentType {
     pub fn get_valid_slots(&self) -> Vec<usize> {
@@ -77,7 +80,7 @@ impl EquipmentType {
             EquipmentType::Ring => vec![3, 2],
             EquipmentType::Pendant => vec![1],
             EquipmentType::Trinket => vec![0],
-            EquipmentType::None => vec![],
+            _ => vec![],
         }
     }
     pub fn get_valid_slot_type(&self) -> InventorySlotType {
@@ -89,7 +92,7 @@ impl EquipmentType {
             EquipmentType::Ring => InventorySlotType::Accessory,
             EquipmentType::Pendant => InventorySlotType::Accessory,
             EquipmentType::Trinket => InventorySlotType::Accessory,
-            EquipmentType::None => InventorySlotType::Normal,
+            _ => InventorySlotType::Normal,
         }
     }
     pub fn is_equipment(&self) -> bool {
@@ -101,7 +104,7 @@ impl EquipmentType {
             EquipmentType::Ring => false,
             EquipmentType::Pendant => false,
             EquipmentType::Trinket => false,
-            EquipmentType::None => false,
+            _ => false,
         }
     }
 }
@@ -357,10 +360,10 @@ impl WorldObject {
         match self {
             WorldObject::None => BLACK,
             WorldObject::Grass => UI_GRASS_GREEN,
-            WorldObject::GrassTile => GREEN,
+            WorldObject::GrassTile => LIGHT_GREEN,
             WorldObject::DeadSapling => BROWN,
-            WorldObject::StoneWall => GREY,
-            WorldObject::Boulder => GREY,
+            WorldObject::StoneWall => LIGHT_GREY,
+            WorldObject::Boulder => LIGHT_GREY,
             WorldObject::DungeonStone => BLACK,
             WorldObject::WaterTile => BLUE,
             WorldObject::SandTile => YELLOW,

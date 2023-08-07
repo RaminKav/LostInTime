@@ -3,7 +3,7 @@ use rand::Rng;
 
 use crate::{
     attributes::{CurrentHealth, MaxHealth},
-    colors::{GREEN, RED, UI_GRASS_GREEN, YELLOW},
+    colors::{RED, UI_GRASS_GREEN},
 };
 
 #[derive(Component)]

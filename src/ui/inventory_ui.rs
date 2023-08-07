@@ -5,13 +5,11 @@ use crate::{
     attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
-    ui::ChestInventory,
+    ui::{ChestInventory, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
-use super::{interactions::Interaction, DropInWorldEvent, Interactable, UIElement};
-
-const UI_SLOT_SIZE: f32 = 20.0;
+use super::{interactions::Interaction, DropInWorldEvent, Interactable, UIElement, UI_SLOT_SIZE};
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
 pub enum InventoryUIState {
@@ -81,7 +79,7 @@ pub fn setup_inv_ui(
 ) {
     let (size, texture, t_offset) = match cur_inv_state.0 {
         InventoryUIState::Open => (
-            Vec2::new(172., 135.),
+            INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
                 .as_ref()
@@ -89,10 +87,10 @@ pub fn setup_inv_ui(
                 .get(&UIElement::Inventory)
                 .unwrap()
                 .clone(),
-            Vec2::new(0., 0.5),
+            Vec2::new(22., 0.5),
         ),
         InventoryUIState::Chest => (
-            Vec2::new(127., 142.),
+            CHEST_INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
                 .as_ref()
@@ -100,7 +98,7 @@ pub fn setup_inv_ui(
                 .get(&UIElement::ChestInventory)
                 .unwrap()
                 .clone(),
-            Vec2::new(0.5, 0.),
+            Vec2::new(22.5, 0.),
         ),
         _ => return,
     };
@@ -113,7 +111,7 @@ pub fn setup_inv_ui(
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 0., -1.),
+                translation: Vec3::new(-t_offset.x, 0., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
