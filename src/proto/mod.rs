@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use bevy::{
     prelude::*,
     reflect::{FromReflect, Reflect},
@@ -19,7 +21,10 @@ use crate::{
     ai::{IdleState, MoveDirection},
     animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation},
     assets::{SpriteAnchor, SpriteSize},
-    attributes::{Attack, ItemAttributes, MaxHealth},
+    attributes::{
+        Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
+        RawItemBonusAttributes,
+    },
     enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
     inventory::ItemStack,
     item::{
@@ -64,6 +69,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<ItemStack>()
             .register_type::<WorldObjectEntityData>()
             .register_type::<ItemAttributes>()
+            .register_type::<RawItemBaseAttributes>()
+            .register_type::<RawItemBonusAttributes>()
             .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
@@ -79,12 +86,16 @@ impl Plugin for ProtoPlugin {
             .register_type::<ConsumableItem>()
             .register_type::<ColliderProto>()
             .register_type::<EquipmentType>()
+            .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
             .register_type::<HashMap<WorldObject, f64>>()
             .register_type::<HashMap<SchematicType, f64>>()
             .register_type::<Vec<WorldObject>>()
+            .register_type::<Option<Range<i32>>>()
+            .register_type::<Range<i32>>()
+            .register_type_data::<Range<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
             .add_startup_system(Self::load_prototypes.before(CustomFlush))

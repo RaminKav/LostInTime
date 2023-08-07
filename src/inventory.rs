@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
-    attributes::{AttributeModifier, ItemAttributes},
+    attributes::{AttributeModifier, ItemAttributes, ItemRarity},
     inputs::FacingDirection,
     item::{
         CompleteRecipeEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData,
@@ -20,7 +20,7 @@ use rand::Rng;
 use bevy::prelude::*;
 
 use bevy_proto::prelude::*;
-use bevy_rapier2d::prelude::{Collider, Sensor};
+use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
@@ -73,6 +73,7 @@ pub struct InventoryPlugin;
 pub struct ItemStack {
     pub obj_type: WorldObject,
     pub count: usize,
+    pub rarity: ItemRarity,
     pub attributes: ItemAttributes,
     pub metadata: ItemDisplayMetaData,
 }
@@ -214,7 +215,11 @@ impl InventoryItemStack {
         item_entity
             .insert(MainHand)
             .insert(Sensor)
-            .insert(Collider::cuboid(obj_data.size.x / 2., obj_data.size.y / 2.))
+            .insert(RigidBody::Fixed)
+            .insert(Collider::cuboid(
+                obj_data.size.x / 2.,
+                obj_data.size.y / 1.5,
+            ))
             .insert(AttackAnimationTimer(
                 Timer::from_seconds(0.125, TimerMode::Once),
                 0.,
@@ -241,12 +246,7 @@ impl InventoryItemStack {
         let (amount_split, remainder_left) = self.item_stack.clone().split();
         let remainder_stack = if remainder_left > 0 {
             Some(InventoryItemStack {
-                item_stack: ItemStack {
-                    obj_type: self.item_stack.obj_type.clone(),
-                    metadata: self.item_stack.metadata.clone(),
-                    attributes: self.item_stack.attributes.clone(),
-                    count: remainder_left,
-                },
+                item_stack: self.item_stack.copy_with_count(remainder_left),
                 slot: self.slot,
             })
         } else {
@@ -254,12 +254,7 @@ impl InventoryItemStack {
         };
         container.items[self.slot] = remainder_stack;
         item_slot_state.dirty = true;
-        ItemStack {
-            obj_type: self.item_stack.obj_type.clone(),
-            metadata: self.item_stack.metadata.clone(),
-            attributes: self.item_stack.attributes.clone(),
-            count: amount_split,
-        }
+        self.item_stack.copy_with_count(amount_split)
     }
 
     pub fn add_to_inventory(
@@ -383,11 +378,18 @@ impl ItemStack {
         Self {
             obj_type: self.obj_type,
             count: self.count,
+            rarity: self.rarity.clone(),
             attributes: attributes.clone(),
-            metadata: ItemDisplayMetaData {
-                name: self.metadata.name.clone(),
-                desc: self.metadata.desc.clone(),
-            },
+            metadata: self.metadata.clone(),
+        }
+    }
+    pub fn copy_with_count(&self, count: usize) -> Self {
+        Self {
+            obj_type: self.obj_type,
+            count,
+            rarity: self.rarity.clone(),
+            attributes: self.attributes.clone(),
+            metadata: self.metadata.clone(),
         }
     }
     pub fn add_to_inventory(
@@ -410,12 +412,7 @@ impl ItemStack {
             let pre_stack_size = inv_item_stack.item_stack.count;
 
             container.items[slot] = Some(InventoryItemStack {
-                item_stack: Self {
-                    obj_type: self.obj_type,
-                    metadata: self.metadata.clone(),
-                    attributes: self.attributes.clone(),
-                    count: min(self.count + pre_stack_size, MAX_STACK_SIZE),
-                },
+                item_stack: self.copy_with_count(min(self.count + pre_stack_size, MAX_STACK_SIZE)),
                 slot,
             });
             InventoryPlugin::mark_slot_dirty(
@@ -426,12 +423,7 @@ impl ItemStack {
 
             if pre_stack_size + self.count > MAX_STACK_SIZE {
                 Self::add_to_empty_inventory_slot(
-                    Self {
-                        obj_type: self.obj_type,
-                        metadata: self.metadata.clone(),
-                        attributes: self.attributes.clone(),
-                        count: pre_stack_size + self.count - MAX_STACK_SIZE,
-                    },
+                    self.copy_with_count(pre_stack_size + self.count - MAX_STACK_SIZE),
                     container,
                     inv_slots,
                 );
@@ -535,12 +527,7 @@ impl InventoryPlugin {
         let item_b_count = merge_into.item_stack.count;
         let combined_size = item_a_count + item_b_count;
         let new_item = Some(InventoryItemStack {
-            item_stack: ItemStack {
-                obj_type: item_type,
-                metadata: to_merge.metadata.clone(),
-                attributes: to_merge.attributes.clone(),
-                count: min(combined_size, MAX_STACK_SIZE),
-            },
+            item_stack: to_merge.copy_with_count(min(combined_size, MAX_STACK_SIZE)),
             slot: merge_into.slot,
         });
 
@@ -548,12 +535,7 @@ impl InventoryPlugin {
 
         // if we overflow, keep remainder where it was
         if combined_size > MAX_STACK_SIZE {
-            return Some(ItemStack {
-                obj_type: item_type,
-                metadata: to_merge.metadata.clone(),
-                attributes: to_merge.attributes.clone(),
-                count: combined_size - MAX_STACK_SIZE,
-            });
+            return Some(to_merge.copy_with_count(combined_size - MAX_STACK_SIZE));
         }
 
         None
@@ -577,23 +559,13 @@ impl InventoryPlugin {
             let item_a_count = dragging_item.count;
             let item_b_count = pickup_item.item_stack.count;
             let combined_size = item_a_count + item_b_count;
-            let new_item = Some(ItemStack {
-                obj_type: item_type,
-                metadata: dragging_item.metadata.clone(),
-                attributes: dragging_item.attributes.clone(),
-                count: min(combined_size, MAX_STACK_SIZE),
-            });
+            let new_item = Some(dragging_item.copy_with_count(min(combined_size, MAX_STACK_SIZE)));
 
             // if we overflow, keep remainder where it was
 
             container.items[4] = if combined_size > MAX_STACK_SIZE {
                 Some(InventoryItemStack {
-                    item_stack: ItemStack {
-                        obj_type: item_type,
-                        metadata: dragging_item.metadata.clone(),
-                        attributes: dragging_item.attributes.clone(),
-                        count: combined_size - MAX_STACK_SIZE,
-                    },
+                    item_stack: dragging_item.copy_with_count(combined_size - MAX_STACK_SIZE),
                     slot: pickup_item.slot,
                 })
             } else {

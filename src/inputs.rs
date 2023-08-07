@@ -214,12 +214,12 @@ impl InputsPlugin {
                 game.player().position.truncate(),
                 1,
             );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::DualStaff,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::DualStaff,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
             proto_commands.spawn_item_from_proto(
                 WorldObject::FireStaff,
                 &proto,
@@ -227,52 +227,34 @@ impl InputsPlugin {
                 1,
             );
             proto_commands.spawn_item_from_proto(
-                WorldObject::Dagger,
+                WorldObject::Chestplate,
                 &proto,
                 game.player().position.truncate(),
                 1,
             );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::Chestplate,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::Pants,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::Ring,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::Pendant,
-            //     &proto,
-            //     game.player().position.truncate(),
-            //     1,
-            // );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Pants,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Ring,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Pendant,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
             proto_commands.spawn_item_from_proto(
                 WorldObject::ChestBlock,
                 &proto,
                 game.player().position.truncate(),
                 1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::DungeonEntranceBlock,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::GrassBlock,
-                &proto,
-                game.player().position.truncate(),
-                16,
             );
             proto_commands.spawn_item_from_proto(
                 WorldObject::StoneWallBlock,

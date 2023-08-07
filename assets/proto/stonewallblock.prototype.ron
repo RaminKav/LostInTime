@@ -8,7 +8,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: StoneWallBlock,
         metadata: (
-            name: "Stone Wall Block", 
+            name: "Stone Wall", 
             desc: "Creates a Stone Wall."
         ),
         count: 1

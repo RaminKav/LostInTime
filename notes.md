@@ -204,3 +204,31 @@ impl different att styles w seldum_state
   - `Goal:` kill all bosses
 - World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons
   TODO: remove or rename WorldObjectData type, turn into wall data only
+  TODO: add parser for desc/names to add new lines dynamically
+  TODO: add way to mark items unstackable, sword stack bug on right click
+
+## Mob Ideas
+
+- Neutral Slime: basic early game slime mob, basic charge attack/follow
+- Goblin archers: basic early game aggro, keep at distance and fire arrows
+- Goblin Fighters(?): aggro, spawn in hordes, sometimes with archers, are faster, fight by slashing a sword when in range
+- Mushroom: basic early game aggro mob, hops towards player, attacks with poison smoke thing (make this into a type of action, use proto for specifications to size of attack and asset), leaves poison cloud when dead that damages?
+
+## Attribute Ideas
+
+- All weapons have Attack (maybe called DMG?): 10 Attack or 11-24 Attack
+- All weapons have Hit Speed (maybe called DMG?): 1.5 Hits/s, etc
+- All armor have Health: +10 Health (or HP)
+- Unbreaking (durability)
+- Crit chance: +3% Crit
+- Crit DMG: +10% Crit DMG
+- Bonus Damage: +10 DMG
+- Health Regen: +10 HP Regen or HP/s
+- Healing: +10% Healing
+- Thorns: +10% Thorns
+- Dodge: +10% Dodge
+- Speed: +10% Speed
+- Lifesteal: +1 Lifesteal
+- Defence: +10 Defence
+- Experience Rate: +10% XP
+- Loot Rate: +10% Loot

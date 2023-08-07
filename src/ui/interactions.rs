@@ -24,7 +24,10 @@ pub enum UIElement {
     InventorySlotHover,
     HealthBarFrame,
     Tooltip,
-    LargeTooltip,
+    LargeTooltipCommon,
+    LargeTooltipUncommon,
+    LargeTooltipRare,
+    LargeTooltipLegendary,
     Minimap,
     LargeMinimap,
 }
@@ -382,12 +385,7 @@ pub fn handle_item_drop_clicks(
                                 }
                             }
                             if valid_drop {
-                                let lonely_item_stack: ItemStack = ItemStack {
-                                    obj_type: item_stack.obj_type,
-                                    metadata: item_stack.metadata.clone(),
-                                    attributes: item_stack.attributes.clone(),
-                                    count: 1,
-                                };
+                                let lonely_item_stack: ItemStack = item_stack.copy_with_count(1);
                                 item_stack.modify_count(-1);
                                 slot_drop_events.send(DropOnSlotEvent {
                                     dropped_entity: *item,
@@ -409,12 +407,7 @@ pub fn handle_item_drop_clicks(
                             stack_empty: true,
                         });
                     } else if mouse_input.just_pressed(MouseButton::Right) {
-                        let lonely_item_stack: ItemStack = ItemStack {
-                            obj_type: item_stack.obj_type,
-                            metadata: item_stack.metadata.clone(),
-                            attributes: item_stack.attributes.clone(),
-                            count: 1,
-                        };
+                        let lonely_item_stack: ItemStack = item_stack.copy_with_count(1);
                         item_stack.modify_count(-1);
                         world_drop_events.send(DropInWorldEvent {
                             dropped_entity: *item,

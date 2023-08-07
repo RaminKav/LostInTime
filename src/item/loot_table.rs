@@ -1,4 +1,4 @@
-use crate::attributes::ItemAttributes;
+use crate::attributes::{ItemAttributes, ItemRarity};
 use crate::inventory::ItemStack;
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -40,6 +40,7 @@ impl LootTablePlugin {
                 let attributes = ItemAttributes::default();
                 loot.push(ItemStack {
                     obj_type: drop.item,
+                    rarity: ItemRarity::Common,
                     count: if drop.min == drop.max {
                         drop.min
                     } else {
