@@ -1,15 +1,20 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::MaterialMesh2dBundle};
 
 use crate::{
+    animations::AnimatedTextureMaterial,
     assets::Graphics,
     attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
+    player::Limb,
     ui::{ChestInventory, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
-use super::{interactions::Interaction, DropInWorldEvent, Interactable, UIElement, UI_SLOT_SIZE};
+use super::{
+    interactions::Interaction, DropInWorldEvent, Interactable, ShowInvPlayerStatsEvent, UIElement,
+    UI_SLOT_SIZE,
+};
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
 pub enum InventoryUIState {
@@ -76,6 +81,12 @@ pub fn setup_inv_ui(
     graphics: Res<Graphics>,
     mut inv_state: ResMut<InventoryState>,
     cur_inv_state: Res<State<InventoryUIState>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
+    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    inv: Query<&Inventory>,
 ) {
     let (size, texture, t_offset) = match cur_inv_state.0 {
         InventoryUIState::Open => (
@@ -102,7 +113,7 @@ pub fn setup_inv_ui(
         ),
         _ => return,
     };
-    println!("Spawning inventory UI {:?}", cur_inv_state.0);
+
     let overlay = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
@@ -120,7 +131,7 @@ pub fn setup_inv_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("overlay"))
         .id();
-    let inv = commands
+    let inv_e = commands
         .spawn(SpriteBundle {
             texture,
             sprite: Sprite {
@@ -132,15 +143,106 @@ pub fn setup_inv_ui(
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            // visibility: Visibility::Hidden,
             ..Default::default()
         })
         .insert(InventoryUI)
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
+    let inv = inv.single();
+    let mut limb_children: Vec<Entity> = vec![];
+    let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
+    let shadow_texture_atlas =
+        TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
+    let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
+
+    let shadow = commands
+        .spawn(SpriteSheetBundle {
+            texture_atlas: shadow_texture_atlas_handle,
+            transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+    limb_children.push(shadow);
+
+    for (i, equipment) in inv.equipment_items.items.iter().enumerate() {
+        let limbs = Limb::from_slot(i);
+        for l in limbs.iter() {
+            let limb_source_handle = asset_server.load(format!(
+                "textures/player/player-run-down/player-{}-run-down-source-0.png",
+                l.to_string().to_lowercase()
+            ));
+
+            let limb_texture_asset = if let Some(equip) = equipment {
+                format!(
+                    "textures/player/{}.png",
+                    equip.item_stack.obj_type.to_string()
+                )
+            } else {
+                format!(
+                    "textures/player/player-texture-{}.png",
+                    if l == &Limb::Torso || l == &Limb::Hands {
+                        Limb::Torso.to_string().to_lowercase()
+                    } else {
+                        l.to_string().to_lowercase()
+                    }
+                )
+            };
+            let limb_texture_handle = asset_server.load(limb_texture_asset);
+
+            let transform = if *l == Limb::Head {
+                Transform::from_translation(Vec3::new(0., 0., 0.))
+            } else {
+                Transform::default()
+            };
+            let limb = commands
+                .spawn((
+                    MaterialMesh2dBundle {
+                        mesh: meshes
+                            .add(
+                                shape::Quad {
+                                    size: Vec2::new(32., 32.),
+                                    ..Default::default()
+                                }
+                                .into(),
+                            )
+                            .into(),
+                        transform,
+                        material: materials.add(AnimatedTextureMaterial {
+                            source_texture: Some(limb_source_handle),
+                            lookup_texture: Some(limb_texture_handle),
+                            opacity: 1.,
+                            flip: 1.,
+                        }),
+                        ..default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    *l,
+                ))
+                .id();
+            limb_children.push(limb);
+        }
+    }
+
+    let p = commands
+        .spawn((
+            SpatialBundle {
+                transform: Transform::from_translation(Vec3::new(
+                    size.x / 2. - 24.,
+                    size.y / 2. - 22.,
+                    2.,
+                )),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("PlayerUIPreview"),
+        ))
+        .push_children(&limb_children)
+        .id();
     inv_state.inv_size = size;
-    commands.entity(inv).push_children(&[overlay]);
+    commands.entity(inv_e).push_children(&[overlay, p]);
+    stats_event.send(ShowInvPlayerStatsEvent);
 }
 
 pub fn setup_inv_slots_ui(

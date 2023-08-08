@@ -44,6 +44,7 @@ impl Plugin for UIPlugin {
             .add_event::<DropOnSlotEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
+            .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DropInWorldEvent>()
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
@@ -65,6 +66,7 @@ impl Plugin for UIPlugin {
                     create_enemy_health_bar,
                     add_previous_health,
                     handle_enemy_health_bar_change,
+                    handle_enemy_health_visibility,
                     handle_add_damage_numbers_after_hit.after(CombatPlugin::handle_hits),
                     tick_damage_numbers,
                 )
@@ -95,7 +97,14 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
-                (add_inv_to_new_chest_objs, update_foodbar).in_set(OnUpdate(GameState::Main)),
+                (
+                    add_inv_to_new_chest_objs,
+                    update_foodbar,
+                    handle_spawn_inv_player_stats
+                        .run_if(in_state(InventoryUIState::Open))
+                        .after(CustomFlush),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
