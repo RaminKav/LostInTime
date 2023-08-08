@@ -14,6 +14,7 @@ use crate::{
 
 use super::{
     spawn_item_stack_icon, ui_helpers, ChestInventory, InventorySlotState, InventoryState,
+    PlayerStatsTooltip,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -97,6 +98,10 @@ pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub parent_slot_entity: Entity,
 }
+#[derive(Debug, Clone)]
+
+pub struct ShowInvPlayerStatsEvent;
+
 #[derive(Debug, Clone)]
 
 pub struct DropInWorldEvent {
@@ -268,7 +273,10 @@ pub fn handle_dragging(
 }
 pub fn handle_hovering(
     mut interactables: Query<(Entity, &UIElement, &mut Interactable, &InventorySlotState)>,
-    tooltips: Query<(Entity, &UIElement, &Parent), Without<InventorySlotState>>,
+    tooltips: Query<
+        (Entity, &UIElement, &Parent),
+        (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
+    >,
     graphics: Res<Graphics>,
     mut commands: Commands,
     inv: Query<&Inventory>,

@@ -26,6 +26,7 @@ pub fn create_enemy_health_bar(
                     color: YELLOW,
                     ..default()
                 },
+                visibility: Visibility::Hidden,
                 ..default()
             })
             .id();
@@ -36,6 +37,7 @@ pub fn create_enemy_health_bar(
                     scale: Vec3::new(BAR_SIZE, 2., 1.),
                     ..default()
                 },
+                visibility: Visibility::Hidden,
                 sprite: Sprite {
                     color: RED,
                     ..default()
@@ -56,6 +58,21 @@ pub fn handle_enemy_health_bar_change(
             let Ok(mut bar_txfm) = query2.get_mut(*child) else {continue;};
             bar_txfm.scale.x = current_health.0 as f32 / max_health.0 as f32 * BAR_SIZE;
             bar_txfm.translation.x = -BAR_SIZE / 2. + bar_txfm.scale.x / 2.;
+        }
+    }
+}
+pub fn handle_enemy_health_visibility(
+    mut query: Query<(&Children, &MaxHealth, &CurrentHealth), (With<Mob>, Changed<CurrentHealth>)>,
+    mut query2: Query<&mut Visibility>,
+) {
+    for (children, max_health, current_health) in query.iter_mut() {
+        for child in children.iter() {
+            let Ok(mut v) = query2.get_mut(*child) else {continue;};
+            if current_health.0 == max_health.0 {
+                *v = Visibility::Hidden;
+            } else {
+                *v = Visibility::Inherited;
+            }
         }
     }
 }

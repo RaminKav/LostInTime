@@ -234,6 +234,7 @@ fn spawn_player(
                 equipment_items: Container::with_size(4),
                 accessory_items: Container::with_size(4),
             },
+            //TODO: remove itematt and construct from components?
             ItemAttributes {
                 health: 100,
                 attack: 5,
@@ -242,8 +243,9 @@ fn spawn_player(
             Hunger::new(100, 12., 20),
             PlayerAttributeBundle {
                 health: MaxHealth(100),
-                attack: Attack(5),
+                attack: Attack(0),
                 attack_cooldown: AttackCooldown(0.4),
+                ..default()
             },
             InvincibilityCooldown(1.),
             MovementVector::default(),

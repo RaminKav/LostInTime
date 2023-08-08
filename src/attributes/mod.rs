@@ -11,7 +11,9 @@ use crate::{
     item::{Equipment, EquipmentType},
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, UIElement},
+    ui::{
+        DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
+    },
     CustomFlush, GameParam, GameState, Player,
 };
 use modifiers::*;
@@ -86,7 +88,7 @@ impl ItemAttributes {
             tooltips.push(format!("+{}% Speed", self.speed));
         }
         if self.lifesteal > 0 {
-            tooltips.push(format!("+{} Leech", self.lifesteal));
+            tooltips.push(format!("+{} Lifesteal", self.lifesteal));
         }
 
         if self.xp_rate > 0 {
@@ -95,6 +97,28 @@ impl ItemAttributes {
         if self.loot_rate > 0 {
             tooltips.push(format!("+{}% Loot", self.loot_rate));
         }
+
+        tooltips
+    }
+    pub fn get_stats_summary(&self) -> Vec<(String, String)> {
+        let mut tooltips: Vec<(String, String)> = vec![];
+        tooltips.push(("HP:       ".to_string(), format!("{}", self.health)));
+        tooltips.push((
+            "Att:      ".to_string(),
+            format!("{}", self.attack + self.bonus_damage),
+        ));
+        tooltips.push(("Defence:  ".to_string(), format!("{}", self.defence)));
+        tooltips.push(("Crit:     ".to_string(), format!("{}", self.crit_chance)));
+        tooltips.push(("Crit DMG: ".to_string(), format!("{}", self.crit_damage)));
+        tooltips.push(("HP Regen: ".to_string(), format!("{}", self.health_regen)));
+        tooltips.push(("Healing:  ".to_string(), format!("{}", self.healing)));
+        tooltips.push(("Thorns:   ".to_string(), format!("{}", self.thorns)));
+        tooltips.push(("Dodge:    ".to_string(), format!("{}", self.dodge)));
+        tooltips.push(("Speed:    ".to_string(), format!("{}", self.speed)));
+        tooltips.push(("Leech:    ".to_string(), format!("{}", self.lifesteal)));
+
+        // tooltips.push(format!("XP: {}", self.xp_rate));
+        // tooltips.push(format!("Loot: {}", self.loot_rate));
 
         tooltips
     }
@@ -114,6 +138,42 @@ impl ItemAttributes {
             entity.insert(AttackCooldown(self.attack_cooldown));
         } else {
             entity.remove::<AttackCooldown>();
+        }
+        if self.crit_chance > 0 {
+            entity.insert(CritChance(self.crit_chance));
+        }
+        if self.crit_damage > 0 {
+            entity.insert(CritDamage(self.crit_damage));
+        }
+        if self.bonus_damage > 0 {
+            entity.insert(BonusDamage(self.bonus_damage));
+        }
+        if self.health_regen > 0 {
+            entity.insert(HealthRegen(self.health_regen));
+        }
+        if self.healing > 0 {
+            entity.insert(Healing(self.healing));
+        }
+        if self.thorns > 0 {
+            entity.insert(Thorns(self.thorns));
+        }
+        if self.dodge > 0 {
+            entity.insert(Dodge(self.dodge));
+        }
+        if self.speed > 0 {
+            entity.insert(Speed(self.speed));
+        }
+        if self.lifesteal > 0 {
+            entity.insert(Lifesteal(self.lifesteal));
+        }
+        if self.defence > 0 {
+            entity.insert(Defence(self.defence));
+        }
+        if self.xp_rate > 0 {
+            entity.insert(XpRateBonus(self.xp_rate));
+        }
+        if self.loot_rate > 0 {
+            entity.insert(LootRateBonus(self.loot_rate));
         }
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
@@ -335,11 +395,23 @@ pub struct AttributeModifier {
 #[derive(Debug, Clone, Default)]
 pub struct AttributeChangeEvent;
 
-#[derive(Reflect, FromReflect, Bundle, Clone, Debug, Copy)]
+#[derive(Bundle, Clone, Debug, Copy, Default)]
 pub struct PlayerAttributeBundle {
     pub health: MaxHealth,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
+    pub defence: Defence,
+    pub crit_chance: CritChance,
+    pub crit_damage: CritDamage,
+    pub bonus_damage: BonusDamage,
+    pub health_regen: HealthRegen,
+    pub healing: Healing,
+    pub thorns: Thorns,
+    pub dodge: Dodge,
+    pub speed: Speed,
+    pub lifesteal: Lifesteal,
+    pub xp_rate: XpRateBonus,
+    pub loot_rate: LootRateBonus,
 }
 
 //TODO: Add max health vs curr health
@@ -362,6 +434,31 @@ pub struct AttackCooldown(pub f32);
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
 pub struct InvincibilityCooldown(pub f32);
+
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct CritChance(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct CritDamage(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct BonusDamage(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct HealthRegen(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Healing(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Thorns(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Dodge(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Speed(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Lifesteal(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct Defence(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct XpRateBonus(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct LootRateBonus(pub i32);
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
@@ -399,6 +496,7 @@ fn handle_player_item_attribute_change_events(
     player: Query<(Entity, &Inventory), With<Player>>,
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
+    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     player_atts: Query<&ItemAttributes, With<Player>>,
 ) {
     for _event in att_events.iter() {
@@ -414,15 +512,13 @@ fn handle_player_item_attribute_change_events(
             .collect();
 
         for a in eqp_attributes.iter().chain(equips.iter()) {
-            new_att.health += a.health;
-            new_att.attack += a.attack;
-            new_att.attack_cooldown += a.attack_cooldown;
-            new_att.invincibility_cooldown += a.invincibility_cooldown;
+            new_att = new_att.combine(a);
         }
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
         new_att.add_attribute_components(&mut commands.entity(player));
+        stats_event.send(ShowInvPlayerStatsEvent);
     }
 }
 
