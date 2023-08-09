@@ -386,8 +386,7 @@ impl InputsPlugin {
         att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         inv: Query<&mut Inventory>,
         inv_state: Res<InventoryState>,
-        parent_attack: Query<&Attack>,
-        tool_query: Query<&RangedAttack, With<Equipment>>,
+        ranged_query: Query<&RangedAttack, With<Equipment>>,
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
         mut item_action_param: ItemActionParam,
         obj_actions: Query<&ObjectAction>,
@@ -411,7 +410,7 @@ impl InputsPlugin {
                 main_hand_option = Some(tool.obj);
             }
 
-            if let Ok(ranged_tool) = tool_query.get_single() {
+            if let Ok(ranged_tool) = ranged_query.get_single() {
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
                     direction: (cursor_pos.world_coords.truncate() - player_pos.truncate())
@@ -423,13 +422,14 @@ impl InputsPlugin {
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
                 > game.player().reach_distance * 32.
+                || ranged_query.get_single().is_ok()
             {
                 return;
             }
             if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
                 hit_event.send(HitEvent {
                     hit_entity: hit_obj,
-                    damage: parent_attack.get(game.game.player).unwrap_or(&Attack(5)).0,
+                    damage: game.calculate_player_damage().0 as i32,
                     dir: Vec2::new(0., 0.),
                     hit_with: main_hand_option,
                 });

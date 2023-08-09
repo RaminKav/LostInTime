@@ -4,7 +4,11 @@ use std::{
 };
 
 use ai::AIPlugin;
-use attributes::AttributesPlugin;
+use attributes::{
+    Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
+    HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
+};
+use rand::Rng;
 
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
@@ -183,6 +187,26 @@ pub struct GameParam<'w, 's> {
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
+    pub player_stats: Query<
+        'w,
+        's,
+        (
+            &'static Attack,
+            &'static MaxHealth,
+            &'static Defence,
+            &'static CritChance,
+            &'static CritDamage,
+            &'static BonusDamage,
+            &'static HealthRegen,
+            &'static Healing,
+            &'static Thorns,
+            &'static Dodge,
+            &'static Speed,
+            &'static Lifesteal,
+            &'static XpRateBonus,
+            &'static LootRateBonus,
+        ),
+    >,
     pub chunk_query: Query<
         'w,
         's,
@@ -298,6 +322,20 @@ impl<'w, 's> GameParam<'w, 's> {
             return Some(self.world_object_query.get_mut(e).unwrap().3);
         }
         None
+    }
+
+    pub fn calculate_player_damage(&self) -> (u32, bool) {
+        let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, ..) = self.player_stats.single();
+        let mut rng = rand::thread_rng();
+        if rng.gen_ratio(u32::min(100, crit_chance.0.try_into().unwrap_or(0)), 100) {
+            (
+                ((attack.0 + bonus_dmg.0) as f32 * (1.5 + f32::abs(crit_dmg.0 as f32) / 100.))
+                    as u32,
+                true,
+            )
+        } else {
+            ((attack.0 + bonus_dmg.0) as u32, false)
+        }
     }
 }
 

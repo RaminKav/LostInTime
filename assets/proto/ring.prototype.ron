@@ -5,8 +5,8 @@
   "survival_rogue_like::item::WorldObject": Ring,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        crit_damage: Some((start: 2, end: 20)),
-        crit_chance: Some((start: 4, end: 10)),
+        crit_damage: Some((start: 20, end: 80)),
+        crit_chance: Some((start: 40, end: 80)),
         healing: Some((start: 4, end: 10)),
         bonus_damage: Some((start: 4, end: 10)),
         speed: Some((start: 4, end: 10)),

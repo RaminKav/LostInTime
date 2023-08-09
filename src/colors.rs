@@ -1,6 +1,9 @@
 use bevy::prelude::Color;
 
 pub const RED: Color = Color::rgba(145. / 255., 54. / 255., 54. / 255., 1.);
+pub const DMG_NUM_RED: Color = Color::rgba(179. / 255., 61. / 255., 61. / 255., 1.);
+pub const DMG_NUM_GREEN: Color = Color::rgba(185. / 255., 185. / 255., 110. / 255., 1.);
+pub const DMG_NUM_YELLOW: Color = Color::rgba(231. / 255., 193. / 255., 111. / 255., 1.);
 pub const GOLD: Color = Color::rgba(200. / 255., 150. / 255., 96. / 255., 1.);
 pub const LIGHT_RED: Color = Color::rgba(173. / 255., 95. / 255., 82. / 255., 1.);
 pub const LIGHT_GREY: Color = Color::rgba(121. / 255., 110. / 255., 99. / 255., 1.);

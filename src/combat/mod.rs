@@ -239,7 +239,7 @@ impl CombatPlugin {
                     }
                     hit_health.0 -= hit.damage as i32;
 
-                    println!("HP {:?}", hit_health.0);
+                    println!("HP {:?} {:?}", e, hit_health.0);
                     if hit_health.0 <= 0 {
                         obj_death_events.send(ObjBreakEvent {
                             entity: e,

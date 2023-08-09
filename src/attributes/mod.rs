@@ -58,7 +58,7 @@ impl ItemAttributes {
             tooltips.push(format!("+{} Defence", self.defence));
         }
         if self.attack > 0 {
-            tooltips.push(format!("+{} Att", self.attack));
+            tooltips.push(format!("+{} DMG", self.attack));
         }
         if self.attack_cooldown > 0. {
             tooltips.push(format!("{:.2} Hits/s", 1. / self.attack_cooldown));
@@ -70,7 +70,7 @@ impl ItemAttributes {
             tooltips.push(format!("+{}% Crit DMG", self.crit_damage));
         }
         if self.bonus_damage > 0 {
-            tooltips.push(format!("+{}% DMG", self.bonus_damage));
+            tooltips.push(format!("+{} DMG", self.bonus_damage));
         }
         if self.health_regen > 0 {
             tooltips.push(format!("+{} HP Regen", self.health_regen));
@@ -139,42 +139,18 @@ impl ItemAttributes {
         } else {
             entity.remove::<AttackCooldown>();
         }
-        if self.crit_chance > 0 {
-            entity.insert(CritChance(self.crit_chance));
-        }
-        if self.crit_damage > 0 {
-            entity.insert(CritDamage(self.crit_damage));
-        }
-        if self.bonus_damage > 0 {
-            entity.insert(BonusDamage(self.bonus_damage));
-        }
-        if self.health_regen > 0 {
-            entity.insert(HealthRegen(self.health_regen));
-        }
-        if self.healing > 0 {
-            entity.insert(Healing(self.healing));
-        }
-        if self.thorns > 0 {
-            entity.insert(Thorns(self.thorns));
-        }
-        if self.dodge > 0 {
-            entity.insert(Dodge(self.dodge));
-        }
-        if self.speed > 0 {
-            entity.insert(Speed(self.speed));
-        }
-        if self.lifesteal > 0 {
-            entity.insert(Lifesteal(self.lifesteal));
-        }
-        if self.defence > 0 {
-            entity.insert(Defence(self.defence));
-        }
-        if self.xp_rate > 0 {
-            entity.insert(XpRateBonus(self.xp_rate));
-        }
-        if self.loot_rate > 0 {
-            entity.insert(LootRateBonus(self.loot_rate));
-        }
+        entity.insert(CritChance(self.crit_chance));
+        entity.insert(CritDamage(self.crit_damage));
+        entity.insert(BonusDamage(self.bonus_damage));
+        entity.insert(HealthRegen(self.health_regen));
+        entity.insert(Healing(self.healing));
+        entity.insert(Thorns(self.thorns));
+        entity.insert(Dodge(self.dodge));
+        entity.insert(Speed(self.speed));
+        entity.insert(Lifesteal(self.lifesteal));
+        entity.insert(Defence(self.defence));
+        entity.insert(XpRateBonus(self.xp_rate));
+        entity.insert(LootRateBonus(self.loot_rate));
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {

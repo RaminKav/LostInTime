@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::{
-    attributes::{CurrentHealth, MaxHealth},
-    colors::{RED, UI_GRASS_GREEN},
+    attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
+    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_RED, DMG_NUM_YELLOW, RED, UI_GRASS_GREEN, YELLOW},
+    Game, GameParam,
 };
 
 #[derive(Component)]
@@ -32,6 +33,8 @@ pub fn handle_add_damage_numbers_after_hit(
     >,
     txfms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
+    raw_dmg: Query<(&Attack, &BonusDamage)>,
+    game: Res<Game>,
 ) {
     for (e, changed_health, mut prev_health) in changed_health.iter_mut() {
         let delta = changed_health.0 - prev_health.0;
@@ -43,30 +46,49 @@ pub fn handle_add_damage_numbers_after_hit(
         let pos_offset = Vec3::new(
             i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
             i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
-            1.,
+            2.,
         );
         prev_health.0 = changed_health.0;
-        commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    if delta < 0 {
-                        format!("{}", delta.abs())
-                    } else {
-                        format!("+{}", delta)
+        let is_crit = e != game.player
+            && delta.abs()
+                > (raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0);
+        for i in 0..2 {
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        if delta < 0 {
+                            format!("{}{}", delta.abs(), if is_crit { "!" } else { "" })
+                        } else {
+                            format!("+{}", delta)
+                        },
+                        TextStyle {
+                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                            font_size: 8.0,
+                            color: if i == 0 {
+                                BLACK
+                            } else if delta > 0 {
+                                DMG_NUM_GREEN
+                            } else if is_crit {
+                                DMG_NUM_YELLOW
+                            } else {
+                                DMG_NUM_RED
+                            },
+                        },
+                    ),
+                    transform: Transform {
+                        translation: txfms.get(e).unwrap().translation()
+                            + pos_offset
+                            + if i == 0 {
+                                Vec3::new(1., -1., -1.)
+                            } else {
+                                Vec3::ZERO
+                            },
+                        ..Default::default()
                     },
-                    TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
-                        color: if delta > 0 { UI_GRASS_GREEN } else { RED },
-                    },
-                ),
-                transform: Transform {
-                    translation: txfms.get(e).unwrap().translation() + pos_offset,
                     ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(DamageNumber(Timer::from_seconds(0.5, TimerMode::Once)));
+                })
+                .insert(DamageNumber(Timer::from_seconds(1.5, TimerMode::Once)));
+        }
     }
 }
 
