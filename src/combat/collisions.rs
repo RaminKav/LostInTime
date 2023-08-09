@@ -23,7 +23,7 @@ impl Plugin for CollisionPlugion {
             (
                 check_melee_hit_collisions,
                 check_mob_to_player_collisions,
-                check_projectile_hit_collisions,
+                check_projectile_hit_collisions.after(CustomFlush),
                 check_item_drop_collisions.after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -35,9 +35,8 @@ fn check_melee_hit_collisions(
     mut commands: Commands,
     context: ResMut<RapierContext>,
     weapons: Query<(Entity, &Parent, &WorldObject), (Without<HitMarker>, With<MainHand>)>,
-    parent_attack: Query<&Attack>,
     mut hit_event: EventWriter<HitEvent>,
-    game: Res<Game>,
+    game: GameParam,
     inv_state: Res<InventoryState>,
     mut inv: Query<&mut Inventory>,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
@@ -49,7 +48,7 @@ fn check_melee_hit_collisions(
                 || (c.1 == weapon.0 && c.0 != weapon_parent.get())
         }) {
             let hit_entity = if hit.0 == weapon.0 { hit.1 } else { hit.0 };
-            if !game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
+            if !game.game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
                 return;
             }
             if let Some(Some(wep)) = inv
@@ -70,7 +69,7 @@ fn check_melee_hit_collisions(
             commands.entity(weapon.0).insert(HitMarker);
             hit_event.send(HitEvent {
                 hit_entity,
-                damage: parent_attack.get(**weapon_parent).unwrap().0,
+                damage: game.calculate_player_damage().0 as i32,
                 dir: Vec2::new(0., 0.),
                 hit_with: Some(*weapon.2),
             });
@@ -79,7 +78,8 @@ fn check_melee_hit_collisions(
 }
 fn check_projectile_hit_collisions(
     mut commands: Commands,
-    player_attack: Query<(Entity, &Attack, &Children), With<Player>>,
+    game: GameParam,
+    player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<Entity, (Without<ItemStack>, Without<MainHand>, Without<Projectile>)>,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
@@ -92,7 +92,7 @@ fn check_projectile_hit_collisions(
         let CollisionEvent::Started(e1, e2, _) = evt else { continue };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let Ok((e, mut state, anim_option)) = projectiles.get_mut(*e1) else {continue};
-            let Ok((player_e, Attack(damage), children)) = player_attack.get_single() else {continue};
+            let Ok((player_e, children)) = player_attack.get_single() else {continue};
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                 continue;
             }
@@ -102,7 +102,7 @@ fn check_projectile_hit_collisions(
             state.hit_entities.push(*e2);
             hit_event.send(HitEvent {
                 hit_entity: *e2,
-                damage: *damage,
+                damage: game.calculate_player_damage().0 as i32,
                 dir: state.direction,
                 hit_with: None,
             });
