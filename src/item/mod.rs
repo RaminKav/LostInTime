@@ -56,7 +56,7 @@ pub struct PlacesInto(pub WorldObject);
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(pub Limb);
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
 pub enum EquipmentType {
     #[default]
@@ -104,6 +104,14 @@ impl EquipmentType {
             EquipmentType::Ring => false,
             EquipmentType::Pendant => false,
             EquipmentType::Trinket => false,
+            _ => false,
+        }
+    }
+    pub fn is_accessory(&self) -> bool {
+        match self {
+            EquipmentType::Ring => true,
+            EquipmentType::Pendant => true,
+            EquipmentType::Trinket => true,
             _ => false,
         }
     }
@@ -389,7 +397,7 @@ impl Plugin for ItemsPlugin {
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
             .add_system(
-                break_item
+                handle_break_object
                     .before(CustomFlush)
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -456,7 +464,7 @@ pub fn handle_placing_world_object(
         }
     }
 }
-pub fn break_item(
+pub fn handle_break_object(
     mut commands: Commands,
     proto_param: ProtoParam,
     mut game_param: GameParam,
@@ -482,7 +490,7 @@ pub fn break_item(
         }
         commands.entity(broken.entity).despawn();
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table) {
+            for drop in LootTablePlugin::get_drops(loot_table, 0) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
                         TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos, 0),

@@ -11,7 +11,8 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
-        hunger::Hunger, Attack, AttackCooldown, InvincibilityCooldown, ItemAttributes, MaxHealth,
+        health_regen::HealthRegenTimer, hunger::Hunger, Attack, AttackCooldown, CritChance,
+        CritDamage, HealthRegen, InvincibilityCooldown, ItemAttributes, MaxHealth,
         PlayerAttributeBundle,
     },
     inputs::{FacingDirection, InputsPlugin, MovementVector},
@@ -237,17 +238,24 @@ fn spawn_player(
             //TODO: remove itematt and construct from components?
             ItemAttributes {
                 health: 100,
-                attack: 5,
+                attack: 0,
+                health_regen: 2,
+                crit_chance: 5,
+                crit_damage: 150,
                 ..default()
             },
             Hunger::new(100, 12., 20),
             PlayerAttributeBundle {
                 health: MaxHealth(100),
                 attack: Attack(0),
+                health_regen: HealthRegen(2),
+                crit_chance: CritChance(5),
+                crit_damage: CritDamage(150),
                 attack_cooldown: AttackCooldown(0.4),
                 ..default()
             },
             InvincibilityCooldown(1.),
+            HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
             MovementVector::default(),
             YSort,
             Name::new("Player"),

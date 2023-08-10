@@ -31,12 +31,12 @@ pub struct Loot {
 }
 
 impl LootTablePlugin {
-    pub fn get_drops(loot_table: &LootTable) -> Vec<ItemStack> {
+    pub fn get_drops(loot_table: &LootTable, loot_bonus: i32) -> Vec<ItemStack> {
         let mut rng = rand::thread_rng();
         let mut loot = vec![];
         for drop in loot_table.drops.iter() {
             let r: f32 = rng.gen();
-            if r <= drop.rate {
+            if r <= drop.rate * (1.0 + loot_bonus as f32 / 100.0) {
                 let attributes = ItemAttributes::default();
                 loot.push(ItemStack {
                     obj_type: drop.item,

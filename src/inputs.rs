@@ -6,7 +6,9 @@ use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth};
+use crate::attributes::{
+    Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth, Speed,
+};
 use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::NeutralMob;
 use crate::inventory::Inventory;
@@ -120,7 +122,11 @@ impl InputsPlugin {
     pub fn move_player(
         mut game: GameParam,
         mut player_query: Query<
-            (&mut KinematicCharacterController, &mut MovementVector),
+            (
+                &mut KinematicCharacterController,
+                &mut MovementVector,
+                &Speed,
+            ),
             (
                 With<Player>,
                 Without<MainCamera>,
@@ -132,10 +138,10 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
-        let (mut player_transform, mut mv) = player_query.single_mut();
+        let (mut player_transform, mut mv, speed) = player_query.single_mut();
         let mut player = game.player_mut();
         let mut d = Vec2::ZERO;
-        let s = PLAYER_MOVE_SPEED;
+        let s = PLAYER_MOVE_SPEED * (1. + speed.0 as f32 / 100.);
 
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;

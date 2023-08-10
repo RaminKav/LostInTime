@@ -7,8 +7,8 @@
    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
    "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
-   "survival_rogue_like::attributes::MaxHealth": (30),
-   "survival_rogue_like::attributes::Attack": (10),
+   "survival_rogue_like::attributes::MaxHealth": (50),
+   "survival_rogue_like::attributes::Attack": (20),
    "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: SmallPotion,
@@ -20,7 +20,7 @@
                 item: LargePotion,
                 min: 1,
                 max: 1,
-                rate: 0.02
+                rate: 0.32
             ),
             (
                 item: SlimeGoo,

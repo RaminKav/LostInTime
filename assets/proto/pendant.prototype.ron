@@ -14,7 +14,7 @@
         thorns: Some((start: 4, end: 10)),
         dodge: Some((start: 4, end: 10)),
         dodge: Some((start: 4, end: 10)),
-        xp_rate: Some((start: 4, end: 10)),
+        // xp_rate: Some((start: 4, end: 10)),
         loot_rate: Some((start: 4, end: 10)),
   ),
   "survival_rogue_like::item::EquipmentType": Pendant,

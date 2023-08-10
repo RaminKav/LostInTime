@@ -1,5 +1,5 @@
 pub mod chest_ui;
-mod damage_numbers;
+pub mod damage_numbers;
 mod enemy_health_bar;
 mod fps_text;
 mod interactions;
@@ -24,7 +24,8 @@ use crate::{
 
 use self::{
     damage_numbers::{
-        add_previous_health, handle_add_damage_numbers_after_hit, tick_damage_numbers,
+        add_previous_health, handle_add_damage_numbers_after_hit, handle_add_dodge_text,
+        tick_damage_numbers, DodgeEvent,
     },
     minimap::MinimapPlugin,
 };
@@ -42,6 +43,7 @@ impl Plugin for UIPlugin {
             .insert_resource(InventoryState::default())
             .add_event::<ActionSuccessEvent>()
             .add_event::<DropOnSlotEvent>()
+            .add_event::<DodgeEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
@@ -68,6 +70,7 @@ impl Plugin for UIPlugin {
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
                     handle_add_damage_numbers_after_hit.after(CombatPlugin::handle_hits),
+                    handle_add_dodge_text,
                     tick_damage_numbers,
                 )
                     .in_set(OnUpdate(GameState::Main)),

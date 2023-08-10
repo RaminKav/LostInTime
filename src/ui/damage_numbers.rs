@@ -3,7 +3,10 @@ use rand::Rng;
 
 use crate::{
     attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
-    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_RED, DMG_NUM_YELLOW, RED, UI_GRASS_GREEN, YELLOW},
+    colors::{
+        BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW, RED, UI_GRASS_GREEN,
+        YELLOW,
+    },
     Game, GameParam,
 };
 
@@ -12,6 +15,10 @@ pub struct DamageNumber(pub Timer);
 
 #[derive(Component)]
 pub struct PreviousHealth(i32);
+
+pub struct DodgeEvent {
+    pub entity: Entity,
+}
 
 pub fn add_previous_health(
     mut commands: Commands,
@@ -49,9 +56,9 @@ pub fn handle_add_damage_numbers_after_hit(
             2.,
         );
         prev_health.0 = changed_health.0;
-        let is_crit = e != game.player
-            && delta.abs()
-                > (raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0);
+        let is_player = e == game.player;
+        let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
+        let is_crit = !is_player && delta.abs() > dmg && dmg != 0;
         for i in 0..2 {
             commands
                 .spawn(Text2dBundle {
@@ -68,6 +75,8 @@ pub fn handle_add_damage_numbers_after_hit(
                                 BLACK
                             } else if delta > 0 {
                                 DMG_NUM_GREEN
+                            } else if is_player {
+                                DMG_NUM_PURPLE
                             } else if is_crit {
                                 DMG_NUM_YELLOW
                             } else {
@@ -77,6 +86,48 @@ pub fn handle_add_damage_numbers_after_hit(
                     ),
                     transform: Transform {
                         translation: txfms.get(e).unwrap().translation()
+                            + pos_offset
+                            + if i == 0 {
+                                Vec3::new(1., -1., -1.)
+                            } else {
+                                Vec3::ZERO
+                            },
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(DamageNumber(Timer::from_seconds(1.5, TimerMode::Once)));
+        }
+    }
+}
+pub fn handle_add_dodge_text(
+    mut commands: Commands,
+    mut dodge_events: EventReader<DodgeEvent>,
+    txfms: Query<&GlobalTransform>,
+    asset_server: Res<AssetServer>,
+) {
+    for event in dodge_events.iter() {
+        let mut rng = rand::thread_rng();
+        let drop_spread = 10.;
+        let pos_offset = Vec3::new(
+            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            2.,
+        );
+
+        for i in 0..2 {
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "Dodge!",
+                        TextStyle {
+                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                            font_size: 8.0,
+                            color: if i == 0 { BLACK } else { DMG_NUM_YELLOW },
+                        },
+                    ),
+                    transform: Transform {
+                        translation: txfms.get(event.entity).unwrap().translation()
                             + pos_offset
                             + if i == 0 {
                                 Vec3::new(1., -1., -1.)

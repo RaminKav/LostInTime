@@ -8,7 +8,7 @@ pub mod collisions;
 use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
-    attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown},
+    attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
     custom_commands::CommandsExt,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     proto::proto_param::ProtoParam,
@@ -109,6 +109,7 @@ impl CombatPlugin {
         mut texture_atlases: ResMut<Assets<TextureAtlas>>,
         loot_tables: Query<&LootTable>,
         mut proto_commands: ProtoCommands,
+        loot_bonus: Query<&LootRateBonus>,
     ) {
         for death_event in death_events.iter() {
             let t = death_event.enemy_pos;
@@ -128,7 +129,7 @@ impl CombatPlugin {
                 Name::new("Hit Spark"),
             ));
             if let Ok(loot_table) = loot_tables.get(death_event.entity) {
-                for drop in LootTablePlugin::get_drops(loot_table) {
+                for drop in LootTablePlugin::get_drops(loot_table, loot_bonus.single().0) {
                     proto_commands.spawn_item_from_proto(
                         drop.obj_type,
                         &proto_param,

@@ -230,5 +230,11 @@ impl different att styles w seldum_state
 - Speed: +10% Speed
 - Lifesteal: +1 Lifesteal
 - Defence: +10 Defence
-- Experience Rate: +10% XP
 - Loot Rate: +10% Loot
+
+- Experience Rate: +10% XP
+
+## Biomes + Mobs + Themes
+
+- [x] Grass Plains biome (Slimes, Slugs, Boar, Pigs, Bees/Bugs)
+- [x] Forest, (Slugs, Mushroom, Goblins, Bugs,)

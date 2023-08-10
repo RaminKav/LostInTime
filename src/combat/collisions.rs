@@ -1,20 +1,23 @@
 use crate::{
     animations::DoneAnimation,
-    attributes::{Attack, AttributeModifier},
+    attributes::{
+        modifiers::ModifyHealthEvent, Attack, AttributeModifier, Defence, Dodge,
+        InvincibilityCooldown, Lifesteal, Thorns,
+    },
     enemy::Mob,
     inventory::{Inventory, InventoryPlugin, ItemStack},
     item::{
         projectile::{Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
     },
-    ui::InventoryState,
-    CustomFlush, Game, GameParam, GameState, Player,
+    ui::{damage_numbers::DodgeEvent, InventoryState},
+    CustomFlush, GameParam, GameState, Player,
 };
 use bevy::prelude::*;
-
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
+use rand::Rng;
 
-use super::{HitEvent, HitMarker};
+use super::{HitEvent, HitMarker, InvincibilityTimer};
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -23,7 +26,7 @@ impl Plugin for CollisionPlugion {
             (
                 check_melee_hit_collisions,
                 check_mob_to_player_collisions,
-                check_projectile_hit_collisions.after(CustomFlush),
+                check_projectile_hit_collisions,
                 check_item_drop_collisions.after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -40,6 +43,8 @@ fn check_melee_hit_collisions(
     inv_state: Res<InventoryState>,
     mut inv: Query<&mut Inventory>,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
+    lifesteal: Query<&Lifesteal>,
+    mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     if let Ok(weapon) = weapons.get_single() {
         let weapon_parent = weapon.1;
@@ -67,9 +72,15 @@ fn check_melee_hit_collisions(
                 );
             }
             commands.entity(weapon.0).insert(HitMarker);
+            let damage = game.calculate_player_damage().0 as i32;
+            if let Ok(lifesteal) = lifesteal.get(game.game.player) {
+                modify_health_events.send(ModifyHealthEvent(f32::floor(
+                    damage as f32 * lifesteal.0 as f32 / 100.,
+                ) as i32));
+            }
             hit_event.send(HitEvent {
                 hit_entity,
-                damage: game.calculate_player_damage().0 as i32,
+                damage,
                 dir: Vec2::new(0., 0.),
                 hit_with: Some(*weapon.2),
             });
@@ -79,7 +90,7 @@ fn check_melee_hit_collisions(
 fn check_projectile_hit_collisions(
     mut commands: Commands,
     game: GameParam,
-    player_attack: Query<(Entity, &Children), With<Player>>,
+    player_attack: Query<(Entity, &Children, Option<&Lifesteal>), With<Player>>,
     allowed_targets: Query<Entity, (Without<ItemStack>, Without<MainHand>, Without<Projectile>)>,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
@@ -87,12 +98,14 @@ fn check_projectile_hit_collisions(
         (Entity, &mut ProjectileState, Option<&DoneAnimation>),
         With<Projectile>,
     >,
+    is_world_obj: Query<&WorldObject>,
+    mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else { continue };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let Ok((e, mut state, anim_option)) = projectiles.get_mut(*e1) else {continue};
-            let Ok((player_e, children)) = player_attack.get_single() else {continue};
+            let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {continue};
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                 continue;
             }
@@ -100,9 +113,17 @@ fn check_projectile_hit_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
+            let damage = game.calculate_player_damage().0 as i32;
+            if let Some(lifesteal) = lifesteal {
+                if !is_world_obj.contains(*e2) {
+                    modify_health_events.send(ModifyHealthEvent(f32::floor(
+                        damage as f32 * lifesteal.0 as f32 / 100.,
+                    ) as i32));
+                }
+            }
             hit_event.send(HitEvent {
                 hit_entity: *e2,
-                damage: game.calculate_player_damage().0 as i32,
+                damage,
                 dir: state.direction,
                 hit_with: None,
             });
@@ -145,14 +166,31 @@ pub fn check_item_drop_collisions(
     }
 }
 fn check_mob_to_player_collisions(
-    player: Query<(Entity, &Transform), With<Player>>,
+    mut commands: Commands,
+    player: Query<
+        (
+            Entity,
+            &Transform,
+            &Thorns,
+            &Defence,
+            &Dodge,
+            &InvincibilityCooldown,
+        ),
+        With<Player>,
+    >,
     mobs: Query<(&Transform, &Attack), (With<Mob>, Without<Player>)>,
     rapier_context: Res<RapierContext>,
     mut hit_event: EventWriter<HitEvent>,
+    mut dodge_event: EventWriter<DodgeEvent>,
+    in_i_frame: Query<&InvincibilityTimer>,
 ) {
-    let (player_e, player_txfm) = player.single();
+    let (player_e, player_txfm, thorns, defence, dodge, i_frames) = player.single();
+    let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
+            if hit_this_frame {
+                continue;
+            }
             //if the player is colliding with an entity...
             let Ok(_) = player.get(e1) else {continue};
             if !mobs.contains(e2) {
@@ -160,12 +198,34 @@ fn check_mob_to_player_collisions(
             }
             let (mob_txfm, attack) = mobs.get(e2).unwrap();
             let delta = player_txfm.translation - mob_txfm.translation;
+            hit_this_frame = true;
+
+            let mut rng = rand::thread_rng();
+            if rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100) && !in_i_frame.contains(e1) {
+                dodge_event.send(DodgeEvent { entity: e1 });
+                commands
+                    .entity(e1)
+                    .insert(InvincibilityTimer(Timer::from_seconds(
+                        i_frames.0,
+                        TimerMode::Once,
+                    )));
+                continue;
+            }
             hit_event.send(HitEvent {
                 hit_entity: e1,
-                damage: attack.0,
+                damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
                 dir: delta.normalize_or_zero().truncate(),
                 hit_with: None,
             });
+            // hit back to attacker if we have Thorns
+            if thorns.0 > 0 && !in_i_frame.contains(e1) {
+                hit_event.send(HitEvent {
+                    hit_entity: e2,
+                    damage: f32::ceil(attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
+                    dir: delta.normalize_or_zero().truncate(),
+                    hit_with: None,
+                });
+            }
         }
     }
 }
