@@ -329,8 +329,7 @@ impl<'w, 's> GameParam<'w, 's> {
         let mut rng = rand::thread_rng();
         if rng.gen_ratio(u32::min(100, crit_chance.0.try_into().unwrap_or(0)), 100) {
             (
-                ((attack.0 + bonus_dmg.0) as f32 * (1.5 + f32::abs(crit_dmg.0 as f32) / 100.))
-                    as u32,
+                ((attack.0 + bonus_dmg.0) as f32 * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
                 true,
             )
         } else {

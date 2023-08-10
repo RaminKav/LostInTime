@@ -3,6 +3,7 @@ use std::ops::{Range, RangeInclusive};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+pub mod health_regen;
 pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
@@ -19,6 +20,8 @@ use crate::{
 use modifiers::*;
 pub mod hunger;
 use hunger::*;
+
+use self::health_regen::handle_health_regen;
 pub struct AttributesPlugin;
 
 #[derive(Resource, Reflect, Default, Bundle)]
@@ -51,50 +54,50 @@ pub struct ItemAttributes {
 impl ItemAttributes {
     pub fn get_tooltips(&self) -> Vec<String> {
         let mut tooltips: Vec<String> = vec![];
-        if self.health > 0 {
+        if self.health != 0 {
             tooltips.push(format!("+{} HP", self.health));
         }
-        if self.defence > 0 {
+        if self.defence != 0 {
             tooltips.push(format!("+{} Defence", self.defence));
         }
-        if self.attack > 0 {
+        if self.attack != 0 {
             tooltips.push(format!("+{} DMG", self.attack));
         }
-        if self.attack_cooldown > 0. {
+        if self.attack_cooldown != 0. {
             tooltips.push(format!("{:.2} Hits/s", 1. / self.attack_cooldown));
         }
-        if self.crit_chance > 0 {
+        if self.crit_chance != 0 {
             tooltips.push(format!("+{}% Crit", self.crit_chance));
         }
-        if self.crit_damage > 0 {
+        if self.crit_damage != 0 {
             tooltips.push(format!("+{}% Crit DMG", self.crit_damage));
         }
-        if self.bonus_damage > 0 {
+        if self.bonus_damage != 0 {
             tooltips.push(format!("+{} DMG", self.bonus_damage));
         }
-        if self.health_regen > 0 {
+        if self.health_regen != 0 {
             tooltips.push(format!("+{} HP Regen", self.health_regen));
         }
-        if self.healing > 0 {
+        if self.healing != 0 {
             tooltips.push(format!("+{}% Healing", self.healing));
         }
-        if self.thorns > 0 {
+        if self.thorns != 0 {
             tooltips.push(format!("+{}% Thorns", self.thorns));
         }
-        if self.dodge > 0 {
+        if self.dodge != 0 {
             tooltips.push(format!("+{}% Dodge", self.dodge));
         }
-        if self.speed > 0 {
+        if self.speed != 0 {
             tooltips.push(format!("+{}% Speed", self.speed));
         }
-        if self.lifesteal > 0 {
+        if self.lifesteal != 0 {
             tooltips.push(format!("+{} Lifesteal", self.lifesteal));
         }
 
-        if self.xp_rate > 0 {
+        if self.xp_rate != 0 {
             tooltips.push(format!("+{}% XP", self.xp_rate));
         }
-        if self.loot_rate > 0 {
+        if self.loot_rate != 0 {
             tooltips.push(format!("+{}% Loot", self.loot_rate));
         }
 
@@ -129,16 +132,12 @@ impl ItemAttributes {
         if self.health > 0 {
             entity.insert(MaxHealth(self.health));
         }
-        if self.attack > 0 {
-            entity.insert(Attack(self.attack));
-        } else {
-            entity.remove::<Attack>();
-        }
         if self.attack_cooldown > 0. {
             entity.insert(AttackCooldown(self.attack_cooldown));
         } else {
             entity.remove::<AttackCooldown>();
         }
+        entity.insert(Attack(self.attack));
         entity.insert(CritChance(self.crit_chance));
         entity.insert(CritDamage(self.crit_damage));
         entity.insert(BonusDamage(self.bonus_damage));
@@ -202,10 +201,11 @@ macro_rules! setup_raw_bonus_attributes {
             fn into_item_attributes(
                 &self,
                 rarity: ItemRarity,
+                item_type: &EquipmentType
             ) -> ItemAttributes {
                 // take fields of Range<i32> into one i32
                 let mut rng = rand::thread_rng();
-                let num_attributes = rng.gen_range(rarity.get_num_bonus_attributes());
+                let num_attributes = rng.gen_range(rarity.get_num_bonus_attributes(item_type));
                 let mut item_attributes = ItemAttributes::default();
                 let valid_attributes = {
                     let mut v = Vec::new();
@@ -337,12 +337,13 @@ pub enum ItemRarity {
 }
 
 impl ItemRarity {
-    fn get_num_bonus_attributes(&self) -> RangeInclusive<i32> {
+    fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
+        let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
         match self {
-            ItemRarity::Common => 0..=2,
-            ItemRarity::Uncommon => 1..=3,
-            ItemRarity::Rare => 2..=4,
-            ItemRarity::Legendary => 3..=5,
+            ItemRarity::Common => (0 + acc_offset)..=(2 + acc_offset),
+            ItemRarity::Uncommon => (1 + acc_offset)..=(3 + acc_offset),
+            ItemRarity::Rare => (2 + acc_offset)..=(4 + acc_offset),
+            ItemRarity::Legendary => (3 + acc_offset)..=(5 + acc_offset),
         }
     }
 
@@ -447,6 +448,7 @@ impl Plugin for AttributesPlugin {
                     tick_hunger,
                     handle_modify_health_event.before(clamp_health),
                     add_current_health_with_max_health,
+                    handle_health_regen,
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_attributes_and_sprite_with_equipment_removed,
@@ -570,15 +572,6 @@ fn update_attributes_and_sprite_with_equipment_change(
             if drop.drop_target_slot_state.r#type.is_equipment() {
                 for (mat, limb) in player_limbs.iter() {
                     if Limb::from_slot(slot).contains(limb) {
-                        println!(
-                            "change {:?} {:?} {:?}",
-                            slot,
-                            limb,
-                            format!(
-                                "textures/player/{}.png",
-                                drop.dropped_item_stack.obj_type.to_string()
-                            )
-                        );
                         let mut mat = materials.get_mut(mat).unwrap();
                         let armor_texture_handle = asset_server.load(format!(
                             "textures/player/{}.png",
@@ -626,11 +619,12 @@ fn handle_new_items_raw_attributes(
             &ItemStack,
             &RawItemBonusAttributes,
             &RawItemBaseAttributes,
+            &EquipmentType,
         ),
         Added<RawItemBonusAttributes>,
     >,
 ) {
-    for (e, stack, raw_bonus_att, raw_base_att) in new_items.iter() {
+    for (e, stack, raw_bonus_att, raw_base_att, eqp_type) in new_items.iter() {
         let mut rng = rand::thread_rng();
         let rarity_rng = rng.gen_range(0..40);
         let rarity = if rarity_rng == 0 {
@@ -642,7 +636,7 @@ fn handle_new_items_raw_attributes(
         } else {
             ItemRarity::Common
         };
-        let parsed_bonus_att = raw_bonus_att.into_item_attributes(rarity.clone());
+        let parsed_bonus_att = raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type);
         let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
         let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
         final_att.max_durability = stack.attributes.max_durability;

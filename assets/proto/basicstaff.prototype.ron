@@ -3,7 +3,8 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": BasicStaff,
-    "survival_rogue_like::attributes::RawItemBaseAttributes": (
+  "survival_rogue_like::item::EquipmentType": Weapon,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
         attack: Some((start: 4, end: 12)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
@@ -13,7 +14,7 @@
         bonus_damage: Some((start: 4, end: 10)),
         speed: Some((start: 4, end: 10)),
         lifesteal: Some((start: 4, end: 10)),
-        xp_rate: Some((start: 4, end: 10)),
+      //   xp_rate: Some((start: 4, end: 10)),
         loot_rate: Some((start: 4, end: 10)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
