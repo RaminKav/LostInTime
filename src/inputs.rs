@@ -421,6 +421,7 @@ impl InputsPlugin {
                     projectile: ranged_tool.0.clone(),
                     direction: (cursor_pos.world_coords.truncate() - player_pos.truncate())
                         .normalize_or_zero(),
+                    from_enemy: None,
                 })
             }
             attack_event.send(AttackEvent);

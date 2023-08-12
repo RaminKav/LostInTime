@@ -10,7 +10,7 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use interpolation::lerp;
 
-use crate::ai::AttackState;
+use crate::ai::LeapAttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
 use crate::item::projectile::{ArcProjectileData, ProjectileState};
@@ -170,7 +170,7 @@ impl AnimationsPlugin {
             &mut AnimationTimer,
             &Handle<EnemyMaterial>,
             &Mob,
-            Option<&AttackState>,
+            Option<&LeapAttackState>,
         )>,
     ) {
         for (mut tracker, mut timer, enemy_handle, _enemy, att_option) in enemy_query.iter_mut() {

@@ -1,11 +1,12 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::{
-    KinematicCharacterController,
-};
+use bevy_rapier2d::prelude::KinematicCharacterController;
 use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
 
-use crate::{combat::HitEvent};
+use crate::{
+    combat::HitEvent,
+    item::projectile::{Projectile, RangedAttackEvent},
+};
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
@@ -57,7 +58,7 @@ pub struct AttackDistance {
 
 impl Trigger for AttackDistance {
     type Param<'w, 's> = (
-        Query<'w, 's, (&'static Transform, Option<&'static AttackState>)>,
+        Query<'w, 's, (&'static Transform, Option<&'static LeapAttackState>)>,
         Res<'w, Time>,
     );
     type Ok = f32;
@@ -150,13 +151,24 @@ pub struct FollowState {
 // Entities in the `Attack` state should move towards the given entity at the given speed
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
-pub struct AttackState {
+pub struct LeapAttackState {
     pub target: Entity,
     pub attack_startup_timer: Timer,
     pub attack_duration_timer: Timer,
     pub attack_cooldown_timer: Timer,
     pub speed: f32,
     pub dir: Option<Vec2>,
+}
+
+// Entities in the `Attack` state should move towards the given entity at the given speed
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct ProjectileAttackState {
+    pub target: Entity,
+    pub attack_startup_timer: Timer,
+    pub attack_cooldown_timer: Timer,
+    pub dir: Option<Vec2>,
+    pub projectile: Projectile,
 }
 
 pub fn follow(
@@ -180,9 +192,13 @@ pub fn follow(
     }
 }
 
-pub fn attack(
+pub fn leap_attack(
     mut transforms: Query<&mut Transform>,
-    mut attacks: Query<(Entity, &mut KinematicCharacterController, &mut AttackState)>,
+    mut attacks: Query<(
+        Entity,
+        &mut KinematicCharacterController,
+        &mut LeapAttackState,
+    )>,
     time: Res<Time>,
 ) {
     for (entity, mut kcc, mut attack) in attacks.iter_mut() {
@@ -197,7 +213,6 @@ pub fn attack(
             if attack.dir.is_none() {
                 attack.dir = Some(delta.normalize_or_zero().truncate() * attack.speed);
             }
-
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
         }
@@ -215,6 +230,43 @@ pub fn attack(
         } else {
             attack.attack_startup_timer.tick(time.delta());
         }
+    }
+}
+pub fn projectile_attack(
+    mut transforms: Query<&mut Transform>,
+    mut attacks: Query<(Entity, &mut ProjectileAttackState)>,
+    mut events: EventWriter<RangedAttackEvent>,
+    time: Res<Time>,
+) {
+    for (entity, mut attack) in attacks.iter_mut() {
+        // Get the positions of the attacker and target
+        let target_translation = transforms.get(attack.target).unwrap().translation;
+        let attack_transform = transforms.get_mut(entity).unwrap();
+        let attack_translation = attack_transform.translation;
+
+        if attack.attack_startup_timer.finished() && attack.attack_cooldown_timer.percent() == 0. {
+            let delta = target_translation - attack_translation;
+            if attack.dir.is_none() {
+                attack.dir = Some(delta.normalize_or_zero().truncate());
+            }
+
+            events.send(RangedAttackEvent {
+                projectile: attack.projectile.clone(),
+                direction: attack.dir.unwrap(),
+                from_enemy: Some(entity),
+            });
+        }
+        if attack.attack_startup_timer.finished() {
+            attack.attack_cooldown_timer.tick(time.delta());
+        }
+
+        if attack.attack_cooldown_timer.finished() {
+            attack.attack_startup_timer.reset();
+            attack.attack_cooldown_timer.reset();
+        }
+
+        attack.dir = None;
+        attack.attack_startup_timer.tick(time.delta());
     }
 }
 pub fn idle(

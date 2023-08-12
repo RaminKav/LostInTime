@@ -7,7 +7,6 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
-use bevy_rapier2d::prelude::Collider;
 use bevy_save::prelude::*;
 
 use crate::{
@@ -100,7 +99,6 @@ impl Plugin for ClientPlugin {
                     Self::despawn_non_saveable_entities.before(CustomFlush),
                     Self::close_and_save_on_esc.after(CustomFlush),
                     Self::load_chunk.before(CustomFlush),
-                    Self::handle_add_collider_to_loaded_entity.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -161,16 +159,6 @@ impl ClientPlugin {
         // }
     }
 
-    fn handle_add_collider_to_loaded_entity(
-        mut commands: Commands,
-        loaded_entities: Query<(Entity, &ColliderReflect), Added<ColliderReflect>>,
-    ) {
-        for (e, collider) in loaded_entities.iter() {
-            commands
-                .entity(e)
-                .insert(Collider::cuboid(collider.collider.x, collider.collider.y));
-        }
-    }
     // fn handle_add_visuals_to_loaded_objects(
     //     game: GameParam,
     //     mut commands: Commands,

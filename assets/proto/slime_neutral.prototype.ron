@@ -3,6 +3,8 @@
   templates: ["mob_basic"],
   schematics: {
    "survival_rogue_like::enemy::Mob": Neutral(Slime),
+   "survival_rogue_like::enemy::LeapAttack": (activation_distance: 50., duration: 0.25, speed: 2.),
+   "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: Fireball),
    "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
