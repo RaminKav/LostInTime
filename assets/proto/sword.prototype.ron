@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": Sword,
   "survival_rogue_like::item::EquipmentType": Weapon,
+  "survival_rogue_like::item::projectile::RangedAttack": (SwordProj),
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
         attack: Some((start: 4, end: 15)),
   ),

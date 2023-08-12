@@ -2,12 +2,8 @@
   name: "Projectile",
   templates: [],
   schematics: {
-  "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
   "survival_rogue_like::proto::SensorProto": (),
-//   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
-//    "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
   "survival_rogue_like::world::y_sort::YSort": (),
-  // "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
   "survival_rogue_like::proto::SpriteSheetProto": (asset: "bevy_survival_sprites.png", size: (x: 16., y: 16.), cols: 1, rows: 1),
 
   }

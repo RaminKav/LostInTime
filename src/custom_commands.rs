@@ -1,6 +1,6 @@
 use crate::{
     assets::{SpriteAnchor, SpriteSize},
-    item::{Foliage, Wall},
+    item::{projectile::ArcProjectileData, Foliage, Wall},
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -10,8 +10,9 @@ use crate::{
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
-use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents};
+use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
 use core::fmt::Display;
+use std::f32::consts::PI;
 pub trait CommandsExt<'w, 's> {
     fn spawn_item_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
@@ -74,30 +75,56 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
 
-            let Some(proto_data) = params.get_projectile_state(obj.clone()) else {return None};
+            let Some(proj_state) = params.get_projectile_state(obj.clone()) else {return None};
             // modify the direction and offset of projectile
-            let mut proto_data = proto_data.clone();
+            let mut proto_data = proj_state.clone();
             proto_data.direction = dir;
             let angle = proto_data.direction.y.atan2(proto_data.direction.x);
-            let sprite_size = if let Some(sprite_data) = params.get_sprite_sheet_data(obj) {
+            let sprite_size = if let Some(sprite_data) = params.get_sprite_sheet_data(obj.clone()) {
                 sprite_data.size
             } else {
                 Vec2::new(16., 16.)
             };
             let x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
             let y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
-
             //TODO: make these prototype data
             spawned_entity_commands
                 .insert(proto_data)
                 .insert(Transform {
-                    translation: pos.extend(0.) + Vec3::new(x_offset, y_offset, 0.),
+                    translation: pos.extend(0.)
+                        + Vec3::new(
+                            x_offset + (angle.cos() * proj_state.spawn_offset.x),
+                            y_offset + (angle.sin() * proj_state.spawn_offset.y),
+                            0.,
+                        ),
                     rotation: Quat::from_rotation_z(angle),
                     ..default()
                 })
                 .insert(ActiveEvents::COLLISION_EVENTS)
                 .insert(Name::new("Projectile"))
                 .insert(ActiveCollisionTypes::all());
+            if let Some(arc_data) = params.get_component::<ArcProjectileData, _>(obj.clone()) {
+                spawned_entity_commands.with_children(|parent| {
+                    let angle = arc_data.col_points[0];
+                    parent.spawn((
+                        TransformBundle::from_transform(Transform {
+                            translation: (Vec3::new(
+                                (angle.cos() * (arc_data.size.x) + angle.cos() * (arc_data.size.y))
+                                    / 2.,
+                                (angle.sin() * (arc_data.size.x) + angle.sin() * (arc_data.size.y))
+                                    / 2.,
+                                0.,
+                            )),
+                            rotation: Quat::from_rotation_z((arc_data.col_points[0]) - PI / 2.),
+                            ..default()
+                        }),
+                        Sensor,
+                        Collider::cuboid(arc_data.col_size.x, arc_data.col_size.y),
+                        ActiveEvents::COLLISION_EVENTS,
+                        ActiveCollisionTypes::all(),
+                    ));
+                });
+            }
 
             return Some(spawned_entity);
         }
