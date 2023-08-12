@@ -11,9 +11,10 @@ use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
     ai::{
-        AttackDistance, AttackState, FollowState, HurtByPlayer, IdleState, LineOfSight,
-        MoveDirection,
+        AttackDistance, FollowState, HurtByPlayer, IdleState, LeapAttackState, LineOfSight,
+        MoveDirection, ProjectileAttackState,
     },
+    item::projectile::Projectile,
     ui::minimap::UpdateMiniMapEvent,
     world::TileMapPosition,
     AppExt, GameParam, GameState,
@@ -124,124 +125,157 @@ pub struct EnemySpawnEvent {
     pub enemy: Mob,
     pub pos: TileMapPosition,
 }
+
+#[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct LeapAttack {
+    pub activation_distance: f32,
+    pub duration: f32,
+    pub speed: f32,
+}
+
+#[derive(FromReflect, Default, Reflect, Clone, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct ProjectileAttack {
+    pub activation_distance: f32,
+    pub cooldown: f32,
+    pub projectile: Projectile,
+}
 impl EnemyPlugin {
     pub fn handle_new_mob_state_machine(
         mut commands: Commands,
         game: GameParam,
-        spawn_events: Query<(Entity, &Mob), Added<Mob>>,
+        spawn_events: Query<
+            (Entity, &Mob, Option<&LeapAttack>, Option<&ProjectileAttack>),
+            Added<Mob>,
+        >,
     ) {
-        for (e, mob) in spawn_events.iter() {
+        for (e, mob, leap_attack_option, proj_attack_option) in spawn_events.iter() {
             let mut e_cmds = commands.entity(e);
+            let mut state_machine = StateMachine::default().set_trans_logging(false);
             match mob {
                 Mob::Neutral(_) => {
-                    e_cmds.insert(
-                        StateMachine::default()
-                            .set_trans_logging(false)
-                            .trans::<IdleState>(
-                                HurtByPlayer,
-                                FollowState {
-                                    target: game.game.player,
-                                    speed: 0.7,
-                                },
-                            )
-                            .trans::<FollowState>(
-                                AttackDistance {
-                                    target: game.game.player,
-                                    range: 50.,
-                                },
-                                AttackState {
-                                    target: game.game.player,
-                                    attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                                    attack_duration_timer: Timer::from_seconds(
-                                        0.3,
-                                        TimerMode::Once,
-                                    ),
-                                    attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
-                                    dir: None,
-                                    speed: 1.4,
-                                },
-                            )
-                            .trans::<FollowState>(
-                                Trigger::not(LineOfSight {
-                                    target: game.game.player,
-                                    range: 130.,
-                                }),
-                                IdleState {
-                                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                                    speed: 0.5,
-                                },
-                            )
-                            .trans::<AttackState>(
-                                Trigger::not(AttackDistance {
-                                    target: game.game.player,
-                                    range: 20.,
-                                }),
-                                FollowState {
-                                    target: game.game.player,
-                                    speed: 0.7,
-                                },
-                            ),
-                    );
+                    state_machine = state_machine
+                        .trans::<IdleState>(
+                            HurtByPlayer,
+                            FollowState {
+                                target: game.game.player,
+                                speed: 0.7,
+                            },
+                        )
+                        .trans::<FollowState>(
+                            Trigger::not(LineOfSight {
+                                target: game.game.player,
+                                range: 130.,
+                            }),
+                            IdleState {
+                                walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                                direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                speed: 0.5,
+                            },
+                        );
                 }
                 Mob::Hostile(_) => {
-                    e_cmds.insert(
-                        StateMachine::default()
-                            .trans::<IdleState>(
-                                LineOfSight {
-                                    target: game.game.player,
-                                    range: 130.,
-                                },
-                                FollowState {
-                                    target: game.game.player,
-                                    speed: 0.7,
-                                },
-                            )
-                            .trans::<FollowState>(
-                                AttackDistance {
-                                    target: game.game.player,
-                                    range: 50.,
-                                },
-                                AttackState {
-                                    target: game.game.player,
-                                    attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
-                                    attack_duration_timer: Timer::from_seconds(
-                                        0.3,
-                                        TimerMode::Once,
-                                    ),
-                                    attack_cooldown_timer: Timer::from_seconds(1., TimerMode::Once),
-                                    dir: None,
-                                    speed: 1.4,
-                                },
-                            )
-                            .trans::<FollowState>(
-                                Trigger::not(LineOfSight {
-                                    target: game.game.player,
-                                    range: 130.,
-                                }),
-                                IdleState {
-                                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                                    direction: MoveDirection::new_rand_dir(rand::thread_rng()),
-                                    speed: 0.5,
-                                },
-                            )
-                            .trans::<AttackState>(
-                                Trigger::not(AttackDistance {
-                                    target: game.game.player,
-                                    range: 50.,
-                                }),
-                                FollowState {
-                                    target: game.game.player,
-                                    speed: 0.7,
-                                },
-                            ),
-                    );
+                    state_machine = state_machine
+                        .trans::<IdleState>(
+                            LineOfSight {
+                                target: game.game.player,
+                                range: 130.,
+                            },
+                            FollowState {
+                                target: game.game.player,
+                                speed: 0.7,
+                            },
+                        )
+                        .trans::<FollowState>(
+                            Trigger::not(LineOfSight {
+                                target: game.game.player,
+                                range: 130.,
+                            }),
+                            IdleState {
+                                walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                                direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                speed: 0.5,
+                            },
+                        );
                 }
                 Mob::Passive(_) => {
                     //TODO: impl run away
                 }
                 _ => {}
             }
+            if let Some(leap_attack) = leap_attack_option {
+                state_machine = state_machine
+                    .trans::<FollowState>(
+                        AttackDistance {
+                            target: game.game.player,
+                            range: leap_attack.activation_distance,
+                        },
+                        LeapAttackState {
+                            target: game.game.player,
+                            attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                            attack_duration_timer: Timer::from_seconds(
+                                leap_attack.duration,
+                                TimerMode::Once,
+                            ),
+                            attack_cooldown_timer: Timer::from_seconds(0.2, TimerMode::Once),
+                            dir: None,
+                            speed: leap_attack.speed,
+                        },
+                    )
+                    .trans::<LeapAttackState>(
+                        Trigger::not(AttackDistance {
+                            target: game.game.player,
+                            range: 20.,
+                        }),
+                        FollowState {
+                            target: game.game.player,
+                            speed: 0.7,
+                        },
+                    );
+            }
+            if let Some(proj_attack) = proj_attack_option {
+                state_machine = state_machine
+                    .trans::<FollowState>(
+                        AttackDistance {
+                            target: game.game.player,
+                            range: proj_attack.activation_distance,
+                        },
+                        ProjectileAttackState {
+                            target: game.game.player,
+                            attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                            attack_cooldown_timer: Timer::from_seconds(
+                                proj_attack.cooldown,
+                                TimerMode::Once,
+                            ),
+                            dir: None,
+                            projectile: proj_attack.projectile.clone(),
+                        },
+                    )
+                    .trans::<ProjectileAttackState>(
+                        Trigger::not(AttackDistance {
+                            target: game.game.player,
+                            range: proj_attack.activation_distance + 30.,
+                        }),
+                        FollowState {
+                            target: game.game.player,
+                            speed: 1.,
+                        },
+                    );
+                if let Some(leap_attack) = leap_attack_option {
+                    state_machine = state_machine.trans::<ProjectileAttackState>(
+                        AttackDistance {
+                            target: game.game.player,
+                            range: leap_attack.activation_distance,
+                        },
+                        FollowState {
+                            target: game.game.player,
+                            speed: 0.7,
+                        },
+                    );
+                }
+            }
+            e_cmds.insert(state_machine);
         }
     }
     fn handle_mob_move_minimap_update(

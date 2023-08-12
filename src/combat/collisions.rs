@@ -7,7 +7,7 @@ use crate::{
     enemy::Mob,
     inventory::{Inventory, InventoryPlugin, ItemStack},
     item::{
-        projectile::{Projectile, ProjectileState},
+        projectile::{EnemyProjectile, Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
     },
     ui::{damage_numbers::DodgeEvent, InventoryState},
@@ -26,7 +26,8 @@ impl Plugin for CollisionPlugion {
             (
                 check_melee_hit_collisions,
                 check_mob_to_player_collisions,
-                check_projectile_hit_collisions,
+                check_projectile_hit_mob_collisions,
+                check_projectile_hit_player_collisions,
                 check_item_drop_collisions.after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -87,7 +88,7 @@ fn check_melee_hit_collisions(
         }
     }
 }
-fn check_projectile_hit_collisions(
+fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
     game: GameParam,
     player_attack: Query<(Entity, &Children, Option<&Lifesteal>), With<Player>>,
@@ -96,15 +97,26 @@ fn check_projectile_hit_collisions(
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
         (Entity, &mut ProjectileState, Option<&DoneAnimation>),
-        With<Projectile>,
+        (With<Projectile>, Without<EnemyProjectile>),
     >,
     is_world_obj: Query<&WorldObject>,
+    mut children: Query<&Parent>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else { continue };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let Ok((e, mut state, anim_option)) = projectiles.get_mut(*e1) else {continue};
+            let (proj_entity, mut state, anim_option) = if let Ok(e) = children.get_mut(*e1) {
+                if let Ok((proj_entity, state, anim_option)) = projectiles.get_mut(e.get()) {
+                    (proj_entity, state, anim_option)
+                } else {
+                    continue;
+                }
+            } else if let Ok((proj_entity, state, anim_option)) = projectiles.get_mut(*e1) {
+                (proj_entity, state, anim_option)
+            } else {
+                continue;
+            };
             let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {continue};
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                 continue;
@@ -127,10 +139,69 @@ fn check_projectile_hit_collisions(
                 dir: state.direction,
                 hit_with: None,
             });
-            if let Some(_) = anim_option {
+            if anim_option.is_none() {
+                commands.entity(proj_entity).despawn_recursive();
+            }
+        }
+    }
+}
+fn check_projectile_hit_player_collisions(
+    mut commands: Commands,
+    game: GameParam,
+    enemy_attack: Query<(Entity, &Attack), With<Mob>>,
+    allowed_targets: Query<Entity, With<Player>>,
+    mut hit_event: EventWriter<HitEvent>,
+    mut collisions: EventReader<CollisionEvent>,
+    mut projectiles: Query<
+        (
+            Entity,
+            &mut ProjectileState,
+            Option<&DoneAnimation>,
+            &EnemyProjectile,
+        ),
+        With<EnemyProjectile>,
+    >,
+    is_world_obj: Query<&WorldObject>,
+    mut children: Query<&Parent>,
+    mut modify_health_events: EventWriter<ModifyHealthEvent>,
+) {
+    for evt in collisions.iter() {
+        let CollisionEvent::Started(e1, e2, _) = evt else { continue };
+        for (e1, e2) in [(e1, e2), (e2, e1)] {
+            let (proj_entity, mut state, anim_option, enemy_proj) =
+                if let Ok(e) = children.get_mut(*e1) {
+                    if let Ok((proj_entity, state, anim_option, enemy_proj)) =
+                        projectiles.get_mut(e.get())
+                    {
+                        (proj_entity, state, anim_option, enemy_proj)
+                    } else {
+                        continue;
+                    }
+                } else if let Ok((proj_entity, state, anim_option, enemy_proj)) =
+                    projectiles.get_mut(*e1)
+                {
+                    (proj_entity, state, anim_option, enemy_proj)
+                } else {
+                    continue;
+                };
+            let Ok((enemy_e, attack)) = enemy_attack.get(enemy_proj.entity) else {continue};
+            if enemy_e == *e2 || !allowed_targets.contains(*e2) {
                 continue;
             }
-            commands.entity(e).despawn()
+            if state.hit_entities.contains(e2) {
+                continue;
+            }
+            state.hit_entities.push(*e2);
+
+            hit_event.send(HitEvent {
+                hit_entity: *e2,
+                damage: attack.0,
+                dir: state.direction,
+                hit_with: None,
+            });
+            if anim_option.is_none() {
+                commands.entity(proj_entity).despawn_recursive();
+            }
         }
     }
 }

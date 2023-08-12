@@ -28,7 +28,7 @@ use crate::{
         Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
         RawItemBonusAttributes,
     },
-    enemy::{EnemyMaterial, HostileMob, Mob, NeutralMob, PassiveMob},
+    enemy::{EnemyMaterial, HostileMob, LeapAttack, Mob, NeutralMob, PassiveMob, ProjectileAttack},
     inventory::ItemStack,
     item::{
         item_actions::{ConsumableItem, ItemAction},
@@ -92,6 +92,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<LeapAttack>()
+            .register_type::<ProjectileAttack>()
             .register_type::<CharacterAnimationSpriteSheetData>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
