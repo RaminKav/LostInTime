@@ -4,6 +4,7 @@
   schematics: {
         "survival_rogue_like::item::WorldObject": StoneShard,
         "survival_rogue_like::item::projectile::Projectile": Rock,
+        "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 2., direction: (x: 0., y: 0.), hit_entities: []),
   }
 )

@@ -35,11 +35,21 @@ pub enum Projectile {
     Electricity,
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
-#[reflect(Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
 pub struct ProjectileState {
     pub speed: f32,
     pub direction: Vec2,
     pub hit_entities: Vec<Entity>,
+    pub spawn_offset: Vec2,
+}
+
+#[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
+#[reflect(Component, Schematic, Default)]
+pub struct ArcProjectileData {
+    pub size: Vec2,
+    pub col_size: Vec2,
+    pub arc: Vec2,
+    pub col_points: Vec<f32>,
 }
 
 pub struct RangedAttackEvent {

@@ -96,7 +96,7 @@ pub fn handle_add_damage_numbers_after_hit(
                     },
                     ..Default::default()
                 })
-                .insert(DamageNumber(Timer::from_seconds(1.5, TimerMode::Once)));
+                .insert(DamageNumber(Timer::from_seconds(0.75, TimerMode::Once)));
         }
     }
 }
@@ -138,7 +138,7 @@ pub fn handle_add_dodge_text(
                     },
                     ..Default::default()
                 })
-                .insert(DamageNumber(Timer::from_seconds(1.5, TimerMode::Once)));
+                .insert(DamageNumber(Timer::from_seconds(0.75, TimerMode::Once)));
         }
     }
 }

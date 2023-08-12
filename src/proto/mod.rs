@@ -19,7 +19,10 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilter
 pub mod proto_param;
 use crate::{
     ai::{IdleState, MoveDirection},
-    animations::{AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation},
+    animations::{
+        enemy_sprites::CharacterAnimationSpriteSheetData, AnimationFrameTracker,
+        AnimationPosTracker, AnimationTimer, DoneAnimation,
+    },
     assets::{SpriteAnchor, SpriteSize},
     attributes::{
         Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
@@ -31,7 +34,7 @@ use crate::{
         item_actions::{ConsumableItem, ItemAction},
         melee::MeleeAttack,
         object_actions::ObjectAction,
-        projectile::{Projectile, ProjectileState, RangedAttack},
+        projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
         Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
         PlacesInto, Wall, WorldObject,
     },
@@ -84,15 +87,19 @@ impl Plugin for ProtoPlugin {
             .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
+            .register_type::<ArcProjectileData>()
             .register_type::<ColliderProto>()
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<CharacterAnimationSpriteSheetData>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
             .register_type::<HashMap<WorldObject, f64>>()
             .register_type::<HashMap<SchematicType, f64>>()
             .register_type::<Vec<WorldObject>>()
+            .register_type::<Vec<u8>>()
+            .register_type::<Vec<f32>>()
             .register_type::<Option<Range<i32>>>()
             .register_type::<Range<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
@@ -215,7 +222,7 @@ impl From<AnimationTimerProto> for AnimationTimer {
 #[derive(Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
 #[schematic(into = Collider)]
-struct ColliderProto {
+pub struct ColliderProto {
     x: f32,
     y: f32,
 }

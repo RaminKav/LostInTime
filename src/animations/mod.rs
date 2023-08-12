@@ -1,3 +1,5 @@
+pub mod enemy_sprites;
+
 use std::f32::consts::PI;
 use std::{cmp::max, time::Duration};
 
@@ -11,11 +13,17 @@ use interpolation::lerp;
 use crate::ai::AttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
+use crate::item::projectile::{ArcProjectileData, ProjectileState};
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
 use crate::{GameParam, GameState, RawPosition};
+
+use self::enemy_sprites::{
+    animate_character_spritesheet_animations,
+    change_anim_offset_when_character_action_state_changes, CharacterAnimationSpriteSheetData,
+};
 
 pub struct AnimationsPlugin;
 
@@ -76,6 +84,8 @@ impl Plugin for AnimationsPlugin {
         app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
             .add_systems(
                 (
+                    change_anim_offset_when_character_action_state_changes,
+                    animate_character_spritesheet_animations,
                     Self::animate_limbs,
                     Self::animate_enemies,
                     Self::animate_dropped_items,
@@ -325,21 +335,57 @@ impl AnimationsPlugin {
                 &mut AnimationTimer,
                 &mut TextureAtlasSprite,
                 &Handle<TextureAtlas>,
+                Option<&Children>,
+                Option<&ArcProjectileData>,
                 Option<&DoneAnimation>,
             ),
-            Without<ItemStack>,
+            (
+                Without<ItemStack>,
+                Without<CharacterAnimationSpriteSheetData>,
+            ),
         >,
+        mut children_txfm_query: Query<&mut Transform>,
     ) {
-        for (e, mut timer, mut sprite, texture_atlas_handle, remove_me_option) in &mut query {
+        for (
+            e,
+            mut timer,
+            mut sprite,
+            texture_atlas_handle,
+            children_option,
+            proj_arc_option,
+            remove_me_option,
+        ) in &mut query
+        {
             timer.tick(time.delta());
             if timer.just_finished() {
                 let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
-                if sprite.index == texture_atlas.textures.len() - 1 && remove_me_option.is_some() {
-                    commands.entity(e).despawn();
+                let num_frame = texture_atlas.textures.len();
+                if sprite.index == num_frame - 1 && remove_me_option.is_some() {
+                    commands.entity(e).despawn_recursive();
                     continue;
                 }
 
-                sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
+                sprite.index = (sprite.index + 1) % num_frame;
+                if let Some(children) = children_option {
+                    for child in children.iter() {
+                        let Some(arc_data) = proj_arc_option else {
+                            continue
+                        };
+
+                        let angle = arc_data.col_points[sprite.index];
+                        let x_offset = (angle.cos() * (arc_data.size.x)
+                            + angle.cos() * (arc_data.size.y))
+                            / 2.;
+                        let y_offset = ((angle.sin() * (arc_data.size.x))
+                            + (angle.sin() * (arc_data.size.y)))
+                            / 2.;
+                        let mut t = children_txfm_query.get_mut(*child).unwrap();
+                        t.translation.x = x_offset; //* (angle.cos() * arc_data.arc.x) - arc_data.size.x / 2.;
+                        t.translation.y = y_offset;
+                        t.rotation =
+                            Quat::from_rotation_z((arc_data.col_points[sprite.index] - PI / 2.));
+                    }
+                }
                 timer.reset();
             }
         }
