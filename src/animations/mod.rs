@@ -22,7 +22,8 @@ use crate::{GameParam, GameState, RawPosition};
 
 use self::enemy_sprites::{
     animate_character_spritesheet_animations,
-    change_anim_offset_when_character_action_state_changes, CharacterAnimationSpriteSheetData,
+    change_anim_offset_when_character_action_state_changes, change_character_anim_direction,
+    CharacterAnimationSpriteSheetData, EnemyAnimationState,
 };
 
 pub struct AnimationsPlugin;
@@ -86,6 +87,7 @@ impl Plugin for AnimationsPlugin {
                 (
                     change_anim_offset_when_character_action_state_changes,
                     animate_character_spritesheet_animations,
+                    change_character_anim_direction,
                     Self::animate_limbs,
                     Self::animate_enemies,
                     Self::animate_dropped_items,
@@ -231,12 +233,22 @@ impl AnimationsPlugin {
     fn animate_hit(
         mut commands: Commands,
         mut transforms: Query<&mut Transform>,
-        mut hit_tracker: Query<(Entity, &mut HitAnimationTracker)>,
+        mut hit_tracker: Query<(
+            Entity,
+            &mut HitAnimationTracker,
+            Option<&EnemyAnimationState>,
+        )>,
         mut player: Query<(Entity, &mut RawPosition, &mut MovementVector), With<Player>>,
+        anim_state: Query<(&CharacterAnimationSpriteSheetData, &TextureAtlasSprite)>,
         time: Res<Time>,
     ) {
         let (p_e, mut p_rp, mut mv) = player.single_mut();
-        for (e, mut hit) in hit_tracker.iter_mut() {
+        for (e, mut hit, mob_option) in hit_tracker.iter_mut() {
+            if let Some(state) = mob_option {
+                if state != &EnemyAnimationState::Hit {
+                    commands.entity(e).insert(EnemyAnimationState::Hit);
+                }
+            }
             hit.timer.tick(time.delta());
 
             if hit.timer.percent() <= 0.25 {
@@ -253,7 +265,20 @@ impl AnimationsPlugin {
             }
 
             if hit.timer.finished() {
-                commands.entity(e).remove::<HitAnimationTracker>();
+                if mob_option.is_some() {
+                    let (anim_data, sprite) = anim_state.get(e).unwrap();
+                    if sprite.index
+                        == anim_data.get_starting_frame_for_animation(mob_option.unwrap()) as usize
+                        && mob_option.unwrap() == &EnemyAnimationState::Hit
+                    {
+                        commands
+                            .entity(e)
+                            .remove::<HitAnimationTracker>()
+                            .insert(EnemyAnimationState::Walk);
+                    }
+                } else {
+                    commands.entity(e).remove::<HitAnimationTracker>();
+                }
             }
         }
         //TODO: move to hit_handler fn

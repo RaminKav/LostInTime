@@ -1,8 +1,10 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::ProtoCommands;
+use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
+use rand::rngs::ThreadRng;
+use rand::Rng;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
@@ -10,7 +12,8 @@ use crate::attributes::{
     Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth, Speed,
 };
 use crate::combat::{AttackTimer, HitEvent};
-use crate::enemy::NeutralMob;
+
+use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemAction, ItemActionParam};
 use crate::item::object_actions::ObjectAction;
@@ -48,18 +51,62 @@ pub struct CursorPos {
 #[derive(Component, Default)]
 pub struct MovementVector(pub Vec2);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Component, Eq, Default, Schematic, FromReflect, Reflect)]
+#[reflect(Component, Schematic, Default)]
 
 pub enum FacingDirection {
     Left,
+    #[default]
     Right,
-    // Up,
-    // Down,
+    Up,
+    Down,
 }
+impl FacingDirection {
+    pub fn from_translation(translation: Vec2) -> Self {
+        if translation.x.abs() > translation.y.abs() {
+            if translation.x > 0. {
+                return Self::Right;
+            } else {
+                return Self::Left;
+            }
+        } else {
+            if translation.y > 0. {
+                return Self::Up;
+            } else {
+                return Self::Down;
+            }
+        }
+    }
+    pub fn get_next_rand_dir(&self, mut rng: ThreadRng) -> &Self {
+        let mut new_dir = self;
+        while new_dir == self {
+            let rng = rng.gen_range(0..=4);
+            if rng <= 1 {
+                new_dir = &Self::Left;
+            } else if rng <= 2 {
+                new_dir = &Self::Right;
+            } else if rng <= 3 {
+                new_dir = &Self::Up;
+            } else if rng <= 4 {
+                new_dir = &Self::Down;
+            }
+        }
+        new_dir
+    }
+    pub fn new_rand_dir(mut rng: ThreadRng) -> Self {
+        let mut new_dir = Self::Left;
 
-impl Default for FacingDirection {
-    fn default() -> Self {
-        Self::Right
+        let rng = rng.gen_range(0..=4);
+        if rng <= 1 {
+            new_dir = Self::Left;
+        } else if rng <= 2 {
+            new_dir = Self::Right;
+        } else if rng <= 3 {
+            new_dir = Self::Up;
+        } else if rng <= 4 {
+            new_dir = Self::Down;
+        }
+        new_dir
     }
 }
 
@@ -278,7 +325,9 @@ impl InputsPlugin {
                 TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
                 true,
             );
-            proto_commands.spawn_from_proto(NeutralMob::Slime, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
         }
         if key_input.just_pressed(KeyCode::M) {
             let item = inv.single().items.items[0].clone();

@@ -12,8 +12,9 @@ use strum_macros::{Display, IntoStaticStr};
 use crate::{
     ai::{
         AttackDistance, FollowState, HurtByPlayer, IdleState, LeapAttackState, LineOfSight,
-        MoveDirection, ProjectileAttackState,
+        ProjectileAttackState,
     },
+    inputs::FacingDirection,
     item::projectile::Projectile,
     ui::minimap::UpdateMiniMapEvent,
     world::TileMapPosition,
@@ -56,69 +57,17 @@ impl Plugin for EnemyPlugin {
 pub enum Mob {
     #[default]
     None,
-    Neutral(NeutralMob),
-    Hostile(HostileMob),
-    Passive(PassiveMob),
-}
-#[derive(
-    Component,
-    Default,
-    Deserialize,
-    Debug,
-    Clone,
-    Hash,
-    Display,
-    IntoStaticStr,
-    Eq,
-    PartialEq,
-    Schematic,
-    Reflect,
-    FromReflect,
-)]
-#[reflect(Schematic)]
-pub enum NeutralMob {
-    #[default]
     Slime,
+    SpikeSlime,
+    FurDevil,
 }
-#[derive(
-    Component,
-    Default,
-    Deserialize,
-    Debug,
-    Clone,
-    Hash,
-    Display,
-    IntoStaticStr,
-    Eq,
-    PartialEq,
-    Schematic,
-    Reflect,
-    FromReflect,
-)]
+#[derive(Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
-pub enum HostileMob {
+pub enum CombatAlignment {
     #[default]
-    Slime,
-}
-#[derive(
-    Component,
-    Default,
-    Deserialize,
-    Debug,
-    Clone,
-    Hash,
-    Display,
-    IntoStaticStr,
-    Eq,
-    PartialEq,
-    Schematic,
-    Reflect,
-    FromReflect,
-)]
-#[reflect(Schematic)]
-pub enum PassiveMob {
-    #[default]
-    Slime,
+    Passive,
+    Neutral,
+    Hostile,
 }
 
 pub struct EnemySpawnEvent {
@@ -131,6 +80,7 @@ pub struct EnemySpawnEvent {
 pub struct LeapAttack {
     pub activation_distance: f32,
     pub duration: f32,
+    pub cooldown: f32,
     pub speed: f32,
 }
 
@@ -146,15 +96,21 @@ impl EnemyPlugin {
         mut commands: Commands,
         game: GameParam,
         spawn_events: Query<
-            (Entity, &Mob, Option<&LeapAttack>, Option<&ProjectileAttack>),
+            (
+                Entity,
+                &Mob,
+                &CombatAlignment,
+                Option<&LeapAttack>,
+                Option<&ProjectileAttack>,
+            ),
             Added<Mob>,
         >,
     ) {
-        for (e, mob, leap_attack_option, proj_attack_option) in spawn_events.iter() {
+        for (e, mob, alignment, leap_attack_option, proj_attack_option) in spawn_events.iter() {
             let mut e_cmds = commands.entity(e);
             let mut state_machine = StateMachine::default().set_trans_logging(false);
-            match mob {
-                Mob::Neutral(_) => {
+            match alignment {
+                CombatAlignment::Neutral => {
                     state_machine = state_machine
                         .trans::<IdleState>(
                             HurtByPlayer,
@@ -170,12 +126,12 @@ impl EnemyPlugin {
                             }),
                             IdleState {
                                 walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                                direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                direction: FacingDirection::new_rand_dir(rand::thread_rng()),
                                 speed: 0.5,
                             },
                         );
                 }
-                Mob::Hostile(_) => {
+                CombatAlignment::Hostile => {
                     state_machine = state_machine
                         .trans::<IdleState>(
                             LineOfSight {
@@ -194,15 +150,14 @@ impl EnemyPlugin {
                             }),
                             IdleState {
                                 walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                                direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+                                direction: FacingDirection::new_rand_dir(rand::thread_rng()),
                                 speed: 0.5,
                             },
                         );
                 }
-                Mob::Passive(_) => {
+                CombatAlignment::Passive => {
                     //TODO: impl run away
                 }
-                _ => {}
             }
             if let Some(leap_attack) = leap_attack_option {
                 state_machine = state_machine
@@ -218,7 +173,10 @@ impl EnemyPlugin {
                                 leap_attack.duration,
                                 TimerMode::Once,
                             ),
-                            attack_cooldown_timer: Timer::from_seconds(0.2, TimerMode::Once),
+                            attack_cooldown_timer: Timer::from_seconds(
+                                leap_attack.cooldown,
+                                TimerMode::Once,
+                            ),
                             dir: None,
                             speed: leap_attack.speed,
                         },
@@ -226,7 +184,7 @@ impl EnemyPlugin {
                     .trans::<LeapAttackState>(
                         Trigger::not(AttackDistance {
                             target: game.game.player,
-                            range: 20.,
+                            range: leap_attack.activation_distance,
                         }),
                         FollowState {
                             target: game.game.player,

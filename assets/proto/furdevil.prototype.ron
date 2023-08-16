@@ -1,16 +1,17 @@
 (
-  name: "Slime",
+  name: "FurDevil",
   templates: ["mob_basic"],
   schematics: {
-   "survival_rogue_like::enemy::Mob": Neutral(Slime),
-   "survival_rogue_like::enemy::LeapAttack": (activation_distance: 50., duration: 0.25, speed: 2.),
-   "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: Fireball),
-   "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
+   "survival_rogue_like::enemy::Mob": FurDevil,
+   "survival_rogue_like::enemy::CombatAlignment": Neutral,
+   "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
+   "survival_rogue_like::enemy::LeapAttack": (activation_distance: 80., duration: 0.3, cooldown: 2., speed: 2.),
    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
-   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
-   "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
+   "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/furdevil/furdevil_down.png", size: (x: 32., y: 32.), cols: 8, rows: 6),
+   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+   "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,6,4,8,7], valid_directions: [0,1,2,3], anim_offset: 0),
    "survival_rogue_like::attributes::MaxHealth": (50),
-   "survival_rogue_like::attributes::Attack": (20),
+   "survival_rogue_like::attributes::Attack": (7),
    "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: SmallPotion,

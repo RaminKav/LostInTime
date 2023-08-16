@@ -4,8 +4,11 @@ use rand::{rngs::ThreadRng, Rng};
 use seldom_state::prelude::*;
 
 use crate::{
+    animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
     combat::HitEvent,
+    inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
+    Game,
 };
 
 // This trigger checks if the enemy is within the the given range of the target
@@ -14,6 +17,8 @@ pub struct LineOfSight {
     pub target: Entity,
     pub range: f32,
 }
+#[derive(Component)]
+pub struct EnemyAttackCooldown(Timer);
 
 impl Trigger for LineOfSight {
     type Param<'w, 's> = (Query<'w, 's, &'static Transform>, Res<'w, Time>);
@@ -26,11 +31,15 @@ impl Trigger for LineOfSight {
         entity: Entity,
         (transforms, _time): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        let delta = transforms.get(self.target).unwrap().translation.truncate()
-            - transforms.get(entity).unwrap().translation.truncate();
+        if let Ok(tfxm) = transforms.get(entity) {
+            let delta = transforms.get(self.target).unwrap().translation.truncate()
+                - tfxm.translation.truncate();
 
-        let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-        (distance <= self.range).then_some(distance).ok_or(distance)
+            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+            return (distance <= self.range).then_some(distance).ok_or(distance);
+        } else {
+            Err(0.)
+        }
     }
 }
 // This trigger checks if the enemy is within the the given range of the target
@@ -58,7 +67,7 @@ pub struct AttackDistance {
 
 impl Trigger for AttackDistance {
     type Param<'w, 's> = (
-        Query<'w, 's, (&'static Transform, Option<&'static LeapAttackState>)>,
+        Query<'w, 's, (&'static Transform, Option<&'static EnemyAttackCooldown>)>,
         Res<'w, Time>,
     );
     type Ok = f32;
@@ -70,10 +79,8 @@ impl Trigger for AttackDistance {
         entity: Entity,
         (transforms, _time): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        if let Some(attack) = transforms.get(entity).unwrap().1 {
-            if !attack.attack_cooldown_timer.finished() {
-                return Ok(0.);
-            }
+        if let Some(_) = transforms.get(entity).unwrap().1 {
+            return Err(0.);
         }
         let delta = transforms
             .get(self.target)
@@ -94,51 +101,8 @@ impl Trigger for AttackDistance {
 #[component(storage = "SparseSet")]
 pub struct IdleState {
     pub walk_timer: Timer,
-    pub direction: MoveDirection,
+    pub direction: FacingDirection,
     pub speed: f32,
-}
-#[derive(Clone, Copy, Debug, Reflect, PartialEq, Eq)]
-pub enum MoveDirection {
-    Left,
-    Right,
-    Up,
-    Down,
-}
-impl MoveDirection {
-    fn get_next_rand_dir(self, mut rng: ThreadRng) -> Self {
-        let mut new_dir = self;
-        while new_dir == self {
-            let rng = rng.gen_range(0..=4);
-            if rng <= 1 {
-                new_dir = Self::Left;
-            } else if rng <= 2 {
-                new_dir = Self::Right;
-            } else if rng <= 3 {
-                new_dir = Self::Up;
-            } else if rng <= 4 {
-                new_dir = Self::Down;
-            }
-        }
-        new_dir
-    }
-    pub fn new_rand_dir(mut rng: ThreadRng) -> Self {
-        let mut new_dir = Self::Left;
-
-        let rng = rng.gen_range(0..=4);
-        if rng <= 1 {
-            new_dir = Self::Left;
-        } else if rng <= 2 {
-            new_dir = Self::Right;
-        } else if rng <= 3 {
-            new_dir = Self::Up;
-        } else if rng <= 4 {
-            new_dir = Self::Down;
-        }
-        new_dir
-    }
-    // pub fn from_translation(t: Vec2) -> Self {
-
-    // }
 }
 
 // Entities in the `Follow` state should move towards the given entity at the given speed
@@ -174,21 +138,33 @@ pub struct ProjectileAttackState {
 pub fn follow(
     mut transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
-    follows: Query<(Entity, &FollowState)>,
+    follows: Query<(
+        Entity,
+        &FollowState,
+        &TextureAtlasSprite,
+        &CharacterAnimationSpriteSheetData,
+        &EnemyAnimationState,
+    )>,
+    mut commands: Commands,
 ) {
-    for (entity, follow) in &follows {
+    for (entity, follow, sprite, anim_data, anim_state) in &follows {
         // Get the positions of the follower and target
         let target_translation = transforms.get(follow.target).unwrap().translation;
         let follow_transform = &mut transforms.get_mut(entity).unwrap();
         let follow_translation = follow_transform.translation;
+        let delta = (target_translation - follow_translation)
+            .normalize_or_zero()
+            .truncate();
         // Find the direction from the follower to the target and go that way
-        mover.get_mut(entity).unwrap().translation = Some(
-            (target_translation - follow_translation)
-                .normalize_or_zero()
-                .truncate()
-                * follow.speed,
-        );
-        // * time.delta_seconds();
+        mover.get_mut(entity).unwrap().translation = Some(delta * follow.speed);
+        commands
+            .entity(entity)
+            .insert(FacingDirection::from_translation(delta));
+        if sprite.index == anim_data.get_starting_frame_for_animation(anim_state)
+            && anim_state != &EnemyAnimationState::Hit
+        {
+            commands.entity(entity).insert(EnemyAnimationState::Walk);
+        }
     }
 }
 
@@ -198,10 +174,15 @@ pub fn leap_attack(
         Entity,
         &mut KinematicCharacterController,
         &mut LeapAttackState,
+        &mut TextureAtlasSprite,
+        &CharacterAnimationSpriteSheetData,
+        &EnemyAnimationState,
     )>,
+    mut commands: Commands,
     time: Res<Time>,
+    game: Res<Game>,
 ) {
-    for (entity, mut kcc, mut attack) in attacks.iter_mut() {
+    for (entity, mut kcc, mut attack, sprite, anim_data, anim_state) in attacks.iter_mut() {
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
@@ -215,35 +196,45 @@ pub fn leap_attack(
             }
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
-        }
-
-        if attack.attack_cooldown_timer.finished() {
-            attack.attack_startup_timer.reset();
-            attack.attack_duration_timer.reset();
-            attack.attack_cooldown_timer.reset();
+            if anim_state != &EnemyAnimationState::Attack {
+                commands.entity(entity).insert(EnemyAnimationState::Attack);
+            }
         }
 
         if hit || attack.attack_duration_timer.finished() {
             //start attack cooldown timer
             attack.dir = None;
-            attack.attack_cooldown_timer.tick(time.delta());
+            if anim_data.is_done_current_animation(sprite.index) {
+                commands
+                    .entity(entity)
+                    .insert(EnemyAnimationState::Walk)
+                    .insert(FollowState {
+                        target: attack.target,
+                        speed: 1.,
+                    })
+                    .remove::<LeapAttackState>()
+                    .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
+            }
         } else {
             attack.attack_startup_timer.tick(time.delta());
         }
     }
 }
 pub fn projectile_attack(
+    mut commands: Commands,
     mut transforms: Query<&mut Transform>,
-    mut attacks: Query<(Entity, &mut ProjectileAttackState)>,
+    mut attacks: Query<(Entity, &mut ProjectileAttackState, &EnemyAnimationState)>,
     mut events: EventWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
-    for (entity, mut attack) in attacks.iter_mut() {
+    for (entity, mut attack, anim_state) in attacks.iter_mut() {
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
-
+        if anim_state != &EnemyAnimationState::Attack {
+            commands.entity(entity).insert(EnemyAnimationState::Attack);
+        }
         if attack.attack_startup_timer.finished() && attack.attack_cooldown_timer.percent() == 0. {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
@@ -255,14 +246,15 @@ pub fn projectile_attack(
                 direction: attack.dir.unwrap(),
                 from_enemy: Some(entity),
             });
-        }
-        if attack.attack_startup_timer.finished() {
-            attack.attack_cooldown_timer.tick(time.delta());
-        }
-
-        if attack.attack_cooldown_timer.finished() {
-            attack.attack_startup_timer.reset();
-            attack.attack_cooldown_timer.reset();
+            commands
+                .entity(entity)
+                .insert(EnemyAnimationState::Walk)
+                .insert(FollowState {
+                    target: attack.target,
+                    speed: 1.,
+                })
+                .remove::<ProjectileAttackState>()
+                .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
         }
 
         attack.dir = None;
@@ -272,6 +264,7 @@ pub fn projectile_attack(
 pub fn idle(
     mut transforms: Query<&mut KinematicCharacterController>,
     mut idles: Query<(Entity, &mut IdleState)>,
+    mut commands: Commands,
     time: Res<Time>,
 ) {
     for (entity, mut idle) in idles.iter_mut() {
@@ -281,14 +274,31 @@ pub fn idle(
 
         let s = idle.speed; //* time.delta_seconds();
         match idle.direction {
-            MoveDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
-            MoveDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
-            MoveDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
-            MoveDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
+            FacingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
+            FacingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
+            FacingDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
+            FacingDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
         }
 
         if idle.walk_timer.just_finished() {
-            idle.direction = idle.direction.get_next_rand_dir(rand::thread_rng());
+            let new_dir = idle.direction.get_next_rand_dir(rand::thread_rng()).clone();
+            idle.direction = new_dir.clone();
+            commands
+                .entity(entity)
+                .insert(new_dir)
+                .insert(EnemyAnimationState::Walk);
+        }
+    }
+}
+pub fn tick_enemy_attack_cooldowns(
+    mut commands: Commands,
+    mut attacks: Query<(Entity, &mut EnemyAttackCooldown)>,
+    time: Res<Time>,
+) {
+    for (e, mut attack) in attacks.iter_mut() {
+        attack.0.tick(time.delta());
+        if attack.0.finished() {
+            commands.entity(e).remove::<EnemyAttackCooldown>();
         }
     }
 }
