@@ -18,17 +18,18 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilter
 
 pub mod proto_param;
 use crate::{
-    ai::{IdleState, MoveDirection},
+    ai::IdleState,
     animations::{
-        enemy_sprites::CharacterAnimationSpriteSheetData, AnimationFrameTracker,
-        AnimationPosTracker, AnimationTimer, DoneAnimation,
+        enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
+        AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation,
     },
     assets::{SpriteAnchor, SpriteSize},
     attributes::{
         Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
         RawItemBonusAttributes,
     },
-    enemy::{EnemyMaterial, HostileMob, LeapAttack, Mob, NeutralMob, PassiveMob, ProjectileAttack},
+    enemy::{CombatAlignment, EnemyMaterial, LeapAttack, Mob, ProjectileAttack},
+    inputs::FacingDirection,
     inventory::ItemStack,
     item::{
         item_actions::{ConsumableItem, ItemAction},
@@ -47,11 +48,10 @@ pub struct ProtoPlugin;
 impl Plugin for ProtoPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.register_type::<Mob>()
-            .register_type::<NeutralMob>()
             .register_type::<SensorProto>()
-            .register_type::<PassiveMob>()
-            .register_type::<HostileMob>()
+            .register_type::<CombatAlignment>()
             .register_type::<AnimationFrameTracker>()
+            .register_type::<EnemyAnimationState>()
             .register_type::<MaxHealth>()
             .register_type::<LootTable>()
             .register_type::<Loot>()
@@ -92,6 +92,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<FacingDirection>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
             .register_type::<CharacterAnimationSpriteSheetData>()
@@ -144,7 +145,9 @@ impl ProtoPlugin {
         prototypes.load("proto/largepotion.prototype.ron");
         prototypes.load("proto/log.prototype.ron");
         prototypes.load("proto/mob_basic.prototype.ron");
-        prototypes.load("proto/slime_neutral.prototype.ron");
+        prototypes.load("proto/slime.prototype.ron");
+        prototypes.load("proto/spikeslime.prototype.ron");
+        prototypes.load("proto/furdevil.prototype.ron");
         prototypes.load("proto/chest.prototype.ron");
         prototypes.load("proto/chestblock.prototype.ron");
         prototypes.load("proto/dungeonentrance.prototype.ron");
@@ -202,7 +205,7 @@ impl From<IdleStateProto> for IdleState {
     fn from(idle_state: IdleStateProto) -> IdleState {
         IdleState {
             walk_timer: Timer::from_seconds(idle_state.walk_dir_change_time, TimerMode::Repeating),
-            direction: MoveDirection::new_rand_dir(rand::thread_rng()),
+            direction: FacingDirection::new_rand_dir(rand::thread_rng()),
             speed: idle_state.speed,
         }
     }

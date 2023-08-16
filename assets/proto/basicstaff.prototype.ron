@@ -18,7 +18,7 @@
         loot_rate: Some((start: 4, end: 10)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
-  "survival_rogue_like::item::projectile::RangedAttack": (TestProj),
+  "survival_rogue_like::item::projectile::RangedAttack": (Electricity),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: BasicStaff,
         attributes: (

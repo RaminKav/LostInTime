@@ -289,7 +289,7 @@ fn check_mob_to_player_collisions(
                 hit_with: None,
             });
             // hit back to attacker if we have Thorns
-            if thorns.0 > 0 && !in_i_frame.contains(e1) {
+            if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
                 hit_event.send(HitEvent {
                     hit_entity: e2,
                     damage: f32::ceil(attack.0 as f32 * thorns.0 as f32 / 100.) as i32,

@@ -12,7 +12,10 @@ use crate::{
     custom_commands::CommandsExt,
     item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
+    world::{
+        world_helpers::{camera_pos_to_chunk_pos, world_pos_to_tile_pos},
+        TileMapPosition,
+    },
     AppExt, CustomFlush, GameParam, GameState, Player, YSort,
 };
 
@@ -249,6 +252,7 @@ impl CombatPlugin {
                         });
                     }
                 } else {
+                    let is_player = game.game.player == e;
                     hit_health.0 -= hit.damage as i32;
                     println!("HP {:?}", hit_health.0);
 
@@ -259,7 +263,7 @@ impl CombatPlugin {
                             0.2,
                             TimerMode::Once,
                         ),
-                        knockback: 400.,
+                        knockback: if is_player { 400. } else { 200. },
                         dir: hit.dir,
                     });
                     if let Some(i_frames) = i_frame_option {
