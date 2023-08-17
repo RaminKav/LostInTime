@@ -206,6 +206,9 @@ impl different att styles w seldum_state
   TODO: remove or rename WorldObjectData type, turn into wall data only
   TODO: add parser for desc/names to add new lines dynamically
   TODO: add way to mark items unstackable, sword stack bug on right click
+  TODO: Maybe there is a way to tick all timers in one system rather than each handle their own timers?
+  BUG: 0 att does no dmg, default to 1 or 5
+  BUG: crafted items have no stats, integrate proto raw stats
 
 ## Mob Ideas
 
@@ -238,3 +241,4 @@ impl different att styles w seldum_state
 
 - [x] Grass Plains biome (Slimes, Slugs, Boar, Pigs, Bees/Bugs)
 - [x] Forest, (Slugs, Mushroom, Goblins, Bugs,)
+- [xx] Desert,

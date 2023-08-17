@@ -1,0 +1,15 @@
+(
+  name: "WoodPlank",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": WoodPlank,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: WoodPlank,
+        metadata: (
+            name: "Wood Plank", 
+            desc: "Builds into a wood log."
+        ),
+        count: 1
+  ),
+  }
+)

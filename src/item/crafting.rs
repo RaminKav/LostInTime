@@ -122,11 +122,11 @@ impl CraftingRecipe {
     fn get_potential_reward(self, recipes_list: Res<Recipes>) -> Option<WorldObject> {
         for (result, (recipe, recipe_type)) in recipes_list.recipes_list.iter() {
             let mut grid = self.recipe.clone();
-            grid.sort_by_key(|v| v.is_some());
 
             let mut recipe = recipe.clone();
-            recipe.sort_by_key(|v| v.is_some());
             if recipe_type == &RecipeType::Shapeless {
+                recipe.sort_by_key(|v| v.is_some());
+                grid.sort_by_key(|v| v.is_some());
                 if recipe == grid {
                     return Some(*result);
                 }

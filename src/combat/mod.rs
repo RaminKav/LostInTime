@@ -10,7 +10,10 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
     custom_commands::CommandsExt,
-    item::{BreaksWith, LootTable, LootTablePlugin, MainHand, WorldObject},
+    item::{
+        BreaksWith, EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType,
+        WorldObject,
+    },
     proto::proto_param::ProtoParam,
     world::{
         world_helpers::{camera_pos_to_chunk_pos, world_pos_to_tile_pos},
@@ -206,13 +209,13 @@ impl CombatPlugin {
             &mut CurrentHealth,
             &GlobalTransform,
             Option<&WorldObject>,
+            Option<&RequiredEquipmentType>,
             Option<&InvincibilityCooldown>,
         )>,
         mut hit_events: EventReader<HitEvent>,
         mut enemy_death_events: EventWriter<EnemyDeathEvent>,
         mut obj_death_events: EventWriter<ObjBreakEvent>,
         in_i_frame: Query<&InvincibilityTimer>,
-        breaks_with_query: Query<&BreaksWith>,
         proto_param: ProtoParam,
     ) {
         for hit in hit_events.iter() {
@@ -220,7 +223,7 @@ impl CombatPlugin {
             if in_i_frame.get(hit.hit_entity).is_ok() {
                 return;
             }
-            if let Ok((e, mut hit_health, t, obj_option, i_frame_option)) =
+            if let Ok((e, mut hit_health, t, obj_option, hit_req_option, i_frame_option)) =
                 health.get_mut(hit.hit_entity)
             {
                 // don't shoot a dead horse...
@@ -234,11 +237,17 @@ impl CombatPlugin {
                     let pos = world_pos_to_tile_pos(t.translation().truncate() - anchor.0);
 
                     //TODO: create breaks with tool component, instead of using properties
-                    if let Some(main_hand_tool) = hit.hit_with {
-                        if let Ok(breaks_with) = breaks_with_query.get(hit.hit_entity) {
-                            if main_hand_tool != breaks_with.0 {
+                    if let Some(item_type_req) = hit_req_option {
+                        if let Some(hit_item_type) = hit.hit_with {
+                            if proto_param
+                                .get_component::<EquipmentType, _>(hit_item_type)
+                                .unwrap()
+                                != &item_type_req.0
+                            {
                                 continue;
                             }
+                        } else {
+                            continue;
                         }
                     }
                     hit_health.0 -= hit.damage as i32;

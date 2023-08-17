@@ -37,7 +37,7 @@ use crate::{
         object_actions::ObjectAction,
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
         Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
-        PlacesInto, Wall, WorldObject,
+        PlacesInto, RequiredEquipmentType, Wall, WorldObject,
     },
     schematic::{loot_chests::LootChestType, SchematicType},
     world::WorldObjectEntityData,
@@ -92,6 +92,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<RequiredEquipmentType>()
             .register_type::<FacingDirection>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
@@ -149,6 +150,7 @@ impl ProtoPlugin {
         prototypes.load("proto/spikeslime.prototype.ron");
         prototypes.load("proto/furdevil.prototype.ron");
         prototypes.load("proto/chest.prototype.ron");
+        prototypes.load("proto/pebble.prototype.ron");
         prototypes.load("proto/chestblock.prototype.ron");
         prototypes.load("proto/dungeonentrance.prototype.ron");
         prototypes.load("proto/dungeonentranceblock.prototype.ron");
@@ -156,12 +158,18 @@ impl ProtoPlugin {
         prototypes.load("proto/grassblock.prototype.ron");
         prototypes.load("proto/boulder.prototype.ron");
         prototypes.load("proto/stick.prototype.ron");
+        prototypes.load("proto/woodplank.prototype.ron");
+        prototypes.load("proto/woodaxe.prototype.ron");
         prototypes.load("proto/plantfibre.prototype.ron");
         prototypes.load("proto/slimegoo.prototype.ron");
         prototypes.load("proto/bandage.prototype.ron");
         prototypes.load("proto/string.prototype.ron");
         prototypes.load("proto/deadsapling.prototype.ron");
         prototypes.load("proto/apple.prototype.ron");
+        prototypes.load("proto/magicwhip.prototype.ron");
+        prototypes.load("proto/woodbow.prototype.ron");
+        prototypes.load("proto/arrow.prototype.ron");
+        prototypes.load("proto/greenwhip.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         println!("Spawning proto resources...");

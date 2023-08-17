@@ -241,7 +241,10 @@ pub fn setup_inv_ui(
         .push_children(&limb_children)
         .id();
     inv_state.inv_size = size;
-    commands.entity(inv_e).push_children(&[overlay, p]);
+    commands.entity(inv_e).push_children(&[overlay]);
+    if cur_inv_state.0 == InventoryUIState::Open {
+        commands.entity(inv_e).push_children(&[p]);
+    }
     stats_event.send(ShowInvPlayerStatsEvent);
 }
 
