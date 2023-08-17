@@ -65,6 +65,26 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        WoodAxe: WorldObjectData(
+            texture_pos: (8., 3.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
+        WoodBow: WorldObjectData(
+            texture_pos: (8., 5.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
+        Arrow: WorldObjectData(
+            texture_pos: (9., 5.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
+        MagicWhip: WorldObjectData(
+            texture_pos: (11., 5.),
+            size: (16., 16.),
+            anchor: Some((0.2, 0.23)),
+        ),
         Ring: WorldObjectData(
             texture_pos: (4., 2.),
             size: (16., 16.),
@@ -95,7 +115,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-         DungeonEntrance: WorldObjectData(
+        DungeonEntrance: WorldObjectData(
             texture_pos: (2., 9.),
             size: (32., 32.),
             anchor: None,
@@ -130,6 +150,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        WoodPlank: WorldObjectData(
+            texture_pos: (9., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         PlantFibre: WorldObjectData(
             texture_pos: (11., 4.),
             size: (16., 16.),
@@ -137,6 +162,11 @@
         ),
         SlimeGoo: WorldObjectData(
             texture_pos: (12., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Pebble: WorldObjectData(
+            texture_pos: (12., 3.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -183,6 +213,14 @@
         ),
         DualStaff: SpriteData(
             texture_pos: (7., 5.),
+            size: (16., 16.),
+        ),
+        WoodAxe: SpriteData(
+            texture_pos: (8., 4.),
+            size: (16., 16.),
+        ),
+        MagicWhip: SpriteData(
+            texture_pos: (10., 5.),
             size: (16., 16.),
         ),
     }

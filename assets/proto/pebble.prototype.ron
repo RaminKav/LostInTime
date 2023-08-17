@@ -1,0 +1,15 @@
+(
+  name: "Pebble",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Pebble,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Pebble,
+        metadata: (
+            name: "Pebble", 
+            desc: "A small rock."
+        ),
+        count: 1
+  ),
+  }
+)

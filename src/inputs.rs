@@ -304,13 +304,13 @@ impl InputsPlugin {
                 1,
             );
             proto_commands.spawn_item_from_proto(
-                WorldObject::ChestBlock,
+                WorldObject::MagicWhip,
                 &proto,
                 game.player().position.truncate(),
                 1,
             );
             proto_commands.spawn_item_from_proto(
-                WorldObject::StoneWallBlock,
+                WorldObject::WoodBow,
                 &proto,
                 game.player().position.truncate(),
                 16,

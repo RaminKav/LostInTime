@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Boulder,
   "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::item::Block": (),
-  "survival_rogue_like::item::Breakable": (Some(StoneShard)),
+  "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::world::WorldObjectEntityData": (object: Boulder, obj_bit_index: 0, texture_offset: 0),
@@ -14,9 +14,9 @@
   "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: StoneShard,
+                item: Pebble,
                 min: 1,
-                max: 2,
+                max: 3,
                 rate: 1.
             ),]
         ),

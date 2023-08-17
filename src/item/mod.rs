@@ -56,7 +56,7 @@ pub struct PlacesInto(pub WorldObject);
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(pub Limb);
-#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default)]
+#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default, Eq, PartialEq)]
 #[reflect(Component, Schematic)]
 pub enum EquipmentType {
     #[default]
@@ -69,7 +69,12 @@ pub enum EquipmentType {
     Pendant,
     Trinket,
     Weapon,
+    Axe,
 }
+#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub struct RequiredEquipmentType(pub EquipmentType);
+
 impl EquipmentType {
     pub fn get_valid_slots(&self) -> Vec<usize> {
         match self {
@@ -193,6 +198,13 @@ pub enum WorldObject {
     Bandage,
     DeadSapling,
     Apple,
+    WoodBow,
+    Arrow,
+    ThrowingStar,
+    MagicWhip,
+    WoodPlank,
+    WoodAxe,
+    Pebble,
 }
 
 #[derive(

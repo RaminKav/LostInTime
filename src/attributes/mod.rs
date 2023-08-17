@@ -617,14 +617,14 @@ fn handle_new_items_raw_attributes(
         (
             Entity,
             &ItemStack,
-            &RawItemBonusAttributes,
+            Option<&RawItemBonusAttributes>,
             &RawItemBaseAttributes,
             &EquipmentType,
         ),
-        Added<RawItemBonusAttributes>,
+        Or<(Added<RawItemBaseAttributes>, Added<RawItemBonusAttributes>)>,
     >,
 ) {
-    for (e, stack, raw_bonus_att, raw_base_att, eqp_type) in new_items.iter() {
+    for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type) in new_items.iter() {
         let mut rng = rand::thread_rng();
         let rarity_rng = rng.gen_range(0..40);
         let rarity = if rarity_rng == 0 {
@@ -636,7 +636,11 @@ fn handle_new_items_raw_attributes(
         } else {
             ItemRarity::Common
         };
-        let parsed_bonus_att = raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type);
+        let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
+            raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type)
+        } else {
+            ItemAttributes::default()
+        };
         let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
         let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
         final_att.max_durability = stack.attributes.max_durability;

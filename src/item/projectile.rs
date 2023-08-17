@@ -33,6 +33,8 @@ pub enum Projectile {
     Rock,
     Fireball,
     Electricity,
+    GreenWhip,
+    Arrow,
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
