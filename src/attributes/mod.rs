@@ -198,7 +198,7 @@ macro_rules! setup_raw_bonus_attributes {
 
         impl $name {
 
-            fn into_item_attributes(
+            pub fn into_item_attributes(
                 &self,
                 rarity: ItemRarity,
                 item_type: &EquipmentType
@@ -253,7 +253,7 @@ macro_rules! setup_raw_base_attributes {
 
         impl $name {
 
-            fn into_item_attributes(
+            pub fn into_item_attributes(
                 &self,
                 attack_cooldown: f32,
             ) -> ItemAttributes {

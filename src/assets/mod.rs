@@ -11,6 +11,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
+use crate::animations::AnimationTimer;
 use crate::item::{
     Equipment, Foliage, RecipeList, Recipes, Wall, WorldObject, WorldObjectResource,
 };
@@ -307,7 +308,12 @@ impl GameAssetsPlugin {
     pub fn update_graphics(
         mut to_update_query: Query<
             (Entity, &mut TextureAtlasSprite, &WorldObject),
-            (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
+            (
+                Changed<WorldObject>,
+                Without<Wall>,
+                Without<Equipment>,
+                Without<AnimationTimer>,
+            ),
         >,
         game: GameParam,
         mut commands: Commands,

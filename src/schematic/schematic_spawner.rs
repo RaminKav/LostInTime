@@ -46,7 +46,6 @@ pub fn give_chunks_schematic_spawners(
         let mut rng = rand::thread_rng();
         for (schematic, frequency) in world_gen_params.schematic_frequencies.iter() {
             if rng.gen_ratio((100. * frequency) as u32, 100) {
-                println!("Spawning schematic: {}", schematic);
                 commands.entity(e).insert(SchematicSpawner {
                     schematic: schematic.clone(),
                 });

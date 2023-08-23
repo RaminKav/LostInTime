@@ -1,5 +1,7 @@
 use crate::{
+    animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
+    inventory::ItemStack,
     item::{projectile::ArcProjectileData, Foliage, Wall},
     proto::proto_param::ProtoParam,
     world::{
@@ -59,7 +61,9 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
-                spawned_entity_commands.insert(proto_data);
+                spawned_entity_commands
+                    .insert(proto_data)
+                    .remove::<AnimationTimer>();
             }
             return Some(spawned_entity);
         }
@@ -85,8 +89,12 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             } else {
                 Vec2::new(16., 16.)
             };
-            let x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
-            let y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
+            let mut x_offset = 0.;
+            let mut y_offset = 0.;
+            if dir != Vec2::ZERO {
+                x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
+                y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
+            }
             //TODO: make these prototype data
             spawned_entity_commands
                 .insert(proto_data)
@@ -102,7 +110,8 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 })
                 .insert(ActiveEvents::COLLISION_EVENTS)
                 .insert(Name::new("Projectile"))
-                .insert(ActiveCollisionTypes::all());
+                .insert(ActiveCollisionTypes::all())
+                .remove::<ItemStack>();
             if let Some(arc_data) = params.get_component::<ArcProjectileData, _>(obj.clone()) {
                 spawned_entity_commands.with_children(|parent| {
                     let angle = arc_data.col_points[0];

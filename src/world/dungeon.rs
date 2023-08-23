@@ -8,7 +8,7 @@ use crate::{
 
 use super::{
     dimension::{ActiveDimension, ChunkCache},
-    dungeon_generation::{gen_new_dungeon, get_player_spawn_tile, Bias},
+    dungeon_generation::{add_dungeon_chests, gen_new_dungeon, get_player_spawn_tile, Bias},
     ChunkManager, CHUNK_SIZE,
 };
 
@@ -19,7 +19,8 @@ pub struct Dungeon {
 pub struct DungeonPlugin;
 impl Plugin for DungeonPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(Self::handle_move_player_after_dungeon_gen);
+        app.add_system(Self::handle_move_player_after_dungeon_gen)
+            .add_system(add_dungeon_chests);
     }
 }
 

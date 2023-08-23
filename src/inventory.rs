@@ -24,7 +24,7 @@ use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
-pub const MAX_STACK_SIZE: usize = 16;
+pub const MAX_STACK_SIZE: usize = 64;
 
 #[derive(Component, Debug, Clone)]
 pub struct Inventory {
@@ -506,6 +506,16 @@ impl InventoryPlugin {
     pub fn get_first_empty_slot(container: &Container) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
         (0..INVENTORY_SIZE).find(|&i| container.items[i].is_none())
+    }
+    pub fn get_slot_for_item_in_container(
+        container: &Container,
+        obj: &WorldObject,
+    ) -> Option<usize> {
+        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
+        (0..INVENTORY_SIZE).find(|&i| {
+            container.items[i].is_some()
+                && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
+        })
     }
     /// Attempt to merge item at slot a into b. Panics if
     /// either slot is empty, or not matching WorldObject types.

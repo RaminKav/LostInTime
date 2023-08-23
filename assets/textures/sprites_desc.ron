@@ -80,6 +80,16 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        Claw: WorldObjectData(
+            texture_pos: (5., 7.),
+            size: (16., 16.),
+            anchor: Some((0.25,-0.2)),
+        ),
+        ThrowingStar: WorldObjectData(
+            texture_pos: (4., 6.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
         MagicWhip: WorldObjectData(
             texture_pos: (11., 5.),
             size: (16., 16.),
@@ -142,6 +152,11 @@
         ),
         Boulder: WorldObjectData(
             texture_pos: (4., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        FireExplosionAOE: WorldObjectData(
+            texture_pos: (6., 9.),
             size: (32., 32.),
             anchor: None,
         ),
@@ -221,6 +236,10 @@
         ),
         MagicWhip: SpriteData(
             texture_pos: (10., 5.),
+            size: (16., 16.),
+        ),
+        Claw: SpriteData(
+            texture_pos: (4., 7.),
             size: (16., 16.),
         ),
     }

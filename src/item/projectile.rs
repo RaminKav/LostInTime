@@ -4,9 +4,16 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    combat::AttackTimer, custom_commands::CommandsExt, enemy::Mob, player::Player,
-    proto::proto_param::ProtoParam, GameParam, GameState,
+    combat::AttackTimer,
+    custom_commands::CommandsExt,
+    enemy::Mob,
+    inventory::{Inventory, InventoryPlugin},
+    player::Player,
+    proto::proto_param::ProtoParam,
+    GameParam, GameState,
 };
+
+use super::{item_actions::ConsumableItem, item_upgrades::ArrowSpeedUpgrade, WorldObject};
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
@@ -25,6 +32,9 @@ pub struct RangedAttackPlugin;
     Schematic,
     IntoStaticStr,
     Display,
+    Debug,
+    PartialEq,
+    Eq,
 )]
 #[reflect(Component, Schematic)]
 pub enum Projectile {
@@ -35,6 +45,19 @@ pub enum Projectile {
     Electricity,
     GreenWhip,
     Arrow,
+    ThrowingStar,
+    FireExplosionAOE,
+}
+
+impl Projectile {
+    fn get_world_object(&self) -> WorldObject {
+        match self {
+            Projectile::Fireball => WorldObject::Fireball,
+            Projectile::Arrow => WorldObject::Arrow,
+            Projectile::ThrowingStar => WorldObject::ThrowingStar,
+            _ => panic!("Projectile {:?} not implemented", self),
+        }
+    }
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
@@ -43,6 +66,7 @@ pub struct ProjectileState {
     pub direction: Vec2,
     pub hit_entities: Vec<Entity>,
     pub spawn_offset: Vec2,
+    pub rotating: bool,
 }
 
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
@@ -58,6 +82,7 @@ pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
     pub from_enemy: Option<Entity>,
+    pub is_followup_proj: bool,
 }
 
 #[derive(Clone, Component)]
@@ -82,11 +107,27 @@ fn handle_ranged_attack_event(
     game: GameParam,
     proto: ProtoParam,
     mut commands: Commands,
+    mut inv: Query<&mut Inventory>,
 ) {
     for proj_event in events.iter() {
         // if proj is from the player, check if the player is on cooldown
         if proj_event.from_enemy.is_none() {
-            if att_cooldown_query.single().1.is_some() {
+            if att_cooldown_query.single().1.is_some() && !proj_event.is_followup_proj {
+                continue;
+            }
+        }
+        if proto
+            .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
+            .is_some()
+        {
+            if let Some(proj_slot) = InventoryPlugin::get_slot_for_item_in_container(
+                &inv.single().items,
+                &proj_event.projectile.get_world_object(),
+            ) {
+                let held_item_option = inv.single().items.items[proj_slot].clone();
+                inv.single_mut().items.items[proj_slot] =
+                    held_item_option.unwrap().modify_count(-1);
+            } else {
                 continue;
             }
         }
@@ -113,10 +154,19 @@ fn handle_ranged_attack_event(
     }
 }
 fn handle_translate_projectiles(
-    mut query: Query<(&mut Transform, &ProjectileState), With<Projectile>>,
+    mut query: Query<(&mut Transform, &ProjectileState, &Projectile), With<Projectile>>,
+    speed_modifiers: Query<&ArrowSpeedUpgrade>,
 ) {
-    for (mut transform, state) in query.iter_mut() {
-        let delta = state.direction * state.speed;
+    for (mut transform, state, proj) in query.iter_mut() {
+        let arrow_speed_upgrade = if proj == &Projectile::Arrow {
+            speed_modifiers
+                .get_single()
+                .unwrap_or(&ArrowSpeedUpgrade(0.))
+                .0
+        } else {
+            0.
+        };
+        let delta = state.direction * (state.speed + arrow_speed_upgrade);
         transform.translation += delta.extend(0.0);
     }
 }

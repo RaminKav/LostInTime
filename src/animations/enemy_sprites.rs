@@ -5,12 +5,12 @@
 // 4 - Death animation
 // L, U, R, D -> 0, 1, 2, 3
 
-use bevy::{input::keyboard::KeyboardInput, prelude::*};
+use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{enemy::Mob, inputs::FacingDirection};
 
-use super::{AnimationTimer, DoneAnimation};
+use super::AnimationTimer;
 
 #[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
 #[reflect(Schematic, Default)]
@@ -149,7 +149,7 @@ pub fn animate_character_spritesheet_animations(
         &mut TextureAtlasSprite,
     )>,
 ) {
-    for (e, mut timer, sprite_sheet_data, mut sprite) in &mut query {
+    for (_e, mut timer, sprite_sheet_data, mut sprite) in &mut query {
         timer.tick(time.delta());
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
