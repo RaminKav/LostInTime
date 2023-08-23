@@ -106,7 +106,7 @@ impl EnemyPlugin {
             Added<Mob>,
         >,
     ) {
-        for (e, mob, alignment, leap_attack_option, proj_attack_option) in spawn_events.iter() {
+        for (e, _mob, alignment, leap_attack_option, proj_attack_option) in spawn_events.iter() {
             let mut e_cmds = commands.entity(e);
             let mut state_machine = StateMachine::default().set_trans_logging(false);
             match alignment {

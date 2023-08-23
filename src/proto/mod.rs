@@ -33,6 +33,7 @@ use crate::{
     inventory::ItemStack,
     item::{
         item_actions::{ConsumableItem, ItemAction},
+        item_upgrades::ClawUpgradeMultiThrow,
         melee::MeleeAttack,
         object_actions::ObjectAction,
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
@@ -93,6 +94,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
             .register_type::<RequiredEquipmentType>()
+            .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<FacingDirection>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
@@ -170,9 +172,11 @@ impl ProtoPlugin {
         prototypes.load("proto/woodbow.prototype.ron");
         prototypes.load("proto/arrow.prototype.ron");
         prototypes.load("proto/greenwhip.prototype.ron");
+        prototypes.load("proto/claw.prototype.ron");
+        prototypes.load("proto/throwingstar.prototype.ron");
+        prototypes.load("proto/fireexplosionaoe.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
-        println!("Spawning proto resources...");
         commands.apply("WorldGenerationParams");
     }
 }

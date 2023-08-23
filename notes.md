@@ -166,21 +166,27 @@ impl different att styles w seldum_state
 [x] Items: add right-click interact objects (chests, alter, etc)
 [x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
 [x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
-[] Items: add random roll stats, clean up naming of stats too
+[x] Items: add random roll stats, clean up naming of stats too
 [] Items: add lots of items/recipies
-[] Items: shrink walls, simplify top borders so its easier to add new wall types
+[x] Items: shrink walls, simplify top borders so its easier to add new wall types
 [] Add colliders to water (use corners)
 [] Generation: Add random ore clusters in dungeons?
 [] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
 [x] Survival: Food system
-[] UI: add static tooltips on the side of inv
+[x] UI: add static tooltips on the side of inv
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
-[] Dungeons: add exit method, add chest generation, etc `Blocked` by below
+[] Aesthetics: Particle system for easy non-damaging animations/particles
+[] Dungeons: add exit method, add chest generation
+[] Gameplay: mana system
+[] Gameplay: offhands
+[] Items: Trinkets
+[] Gameplay: weapon upgrades
+[] Gameplay: weapon scrolls
+[] Gameplay: weapon orbs of alteration
+[] FIX: fix dash
+[] FIX: lag in dungeons
 [] save/load/cache
-
-- throwable items (ninja star,etc) (spawns proj, deducts 1 item count)
-- new types of projectile
 
 ## Projectile/Magic ideas
 
@@ -209,6 +215,8 @@ impl different att styles w seldum_state
   TODO: Maybe there is a way to tick all timers in one system rather than each handle their own timers?
   BUG: 0 att does no dmg, default to 1 or 5
   BUG: crafted items have no stats, integrate proto raw stats
+  TODO: upgrade collider animation proto to use more detail: each frame can take a [shape, size, rotation, position]
+  BUG: flip sprite of weapons when turning
 
 ## Mob Ideas
 
@@ -234,11 +242,135 @@ impl different att styles w seldum_state
 - Lifesteal: +1 Lifesteal
 - Defence: +10 Defence
 - Loot Rate: +10% Loot
+- Venom
+- Burn
+- Mana
+- Mana Leech
 
 - Experience Rate: +10% XP
 
 ## Biomes + Mobs + Themes
 
-- [x] Grass Plains biome (Slimes, Slugs, Boar, Pigs, Bees/Bugs)
-- [x] Forest, (Slugs, Mushroom, Goblins, Bugs,)
-- [xx] Desert,
+- [x] Grass Plains biome (Slimes, Slugs, Boar, Pigs, Bees/Bugs), gather pebbles on ground
+  - rare healing flower
+- [x] Forest, (Slugs, Mushroom, Goblins, Bugs,), gather pebbles on ground
+  - rare healing flower
+- [xx] Desert, a little more dangerous, but has dead branch that gives sticks early on
+  - rare burried treasure, digs up random item from loottable
+
+## New Weapons
+
+[] Spear - melee, hits a pierce animation in a straight line
+[] Iron/Wood Sword - stronger, slightly slower
+[] continuous beam magic weapon
+[] venom bow
+[] multi-throwing projectile
+[] claw arch-type: Throws ninja stars, can be upgraded to throw multi stars (MS style)
+
+## Weapon Upgrades
+
+# lightning staff
+
+[] longer lightning - new art, new proto stuff
+[x] chain lightning - match to find direction angle
+[] faster cast speed - ez
+
+# fire staff
+
+[] leave burn field DoT - new art, new type of hitbox with ticking timer?
+[x] AoE - new on-proj-hit event, new art, spawn hitbox/proj anim
+[] faster cast speed
+
+# magic whip
+
+[] faster cast speed
+[] larger whip - new art, proto stuff
+[x] whip hits proc venom? - same as AoE, no hitbox
+
+# bow
+
+[x] Spread shot - similar to claw multi shot
+[x] Faster Arrows - easy
+[] piercing arrows
+[] arrow bounce off objects
+[] Faster hit speed
+[] Homing Arrows? - math stuff
+
+# sword
+
+[] faster hit speed
+[] attacks send a sonic wave - easy, new projectile
+[x] attacks proc burn DoT - same as AoE
+[] attacks do leech? - easy, add more leech stat
+[] attacks multi-hit
+
+# dagger
+
+[] faster hit rate
+[x] hits proc venom - same as AoE
+[x] change to lethal hit targets below 25% HP ? - Same as AoE
+[] attacks multi-hit - similar to claw
+[] more crit ?
+
+# claw
+
+[] faster attack rate
+[x] multi-star - done
+[] large piercing star (Avenger <3) - new art, same as big lightning
+
+## Progression Notes
+
+# Mats/Drops/Gear Aquisition
+
+- Limited weapon types: 6-8 (2-3 meleee, 2 ranged, 3 magic)
+- Weapons drop at random from mobs, some have higher rates to drop specific ones
+- armor/trinkets/accessories drop at random as well from mobs
+- some armor can be crafted from materials or mob drops
+- weapons can be crafted from mat/drops too,
+- Dungeons will have ores, overworld other mats like leather/wood
+- Wooden sword will be everyones starter weapon, mats to craft found in overworld
+  - maybe rebrand this to a `sturdy stick`
+- out-of-run progression could be you get to pick a new starter weapon
+- generic armor can be crafted fairly early on (leather, chain)
+  - leather from animals, chain from metal fragments from boulders?
+- how can weapons be crafted?
+  - swords/daggers/bows are easy, what about magic weapons?
+- magic runes or w/e drop from mobs rarely, each maps to one elemental magic weapon
+
+# Upgrades
+
+- weapons/armor can be upgraded with scrolls to boost base dmg
+  - scrolls are rare drops from mobs/chests/merchants/bosses
+- Orbs of alteration - can reconfigure bonus stats on anything
+  - also rare drop
+- Maybe both of these can be applied at an anvil-like item
+  - 2 slots, first for scrolls/orbs, second for the item
+  - same UI can be used for repairs maybe
+
+# Level Progression
+
+- Mobs give exp. Leveling increasingly harder as mob exp will generally not increase.
+- After every boss, world gets harder and mob exp increases
+- Encourages player to fight bosses eventually as grinding levels increasingly less rewarding
+- Each Level grants an opportunity to increase stats
+  - STR: dmg, armor, DEX: crit, crit dmg, AGI: speed, dodge, VIT: hp, hp/s
+- Leveling makes player decently stronger. All stats are applicable to all weapons, but some might benefit from certain stats more
+
+# Trinkets
+
+- Give larger buffs, boss drops, dungeon loot, very rare mob drops (elites)
+- things like: bonus leech, crit, dmg, DoT stuff, dash modifiers, etc
+
+# World Difficulty Progression
+
+- clearing a boss makes the world harder
+- mobs have more hp, speed, dmg, maybe new mechanics
+- maybe new mobs can be found
+- higher chance for elites
+
+# World Generation Progression
+
+- start in plains/dessert/beach areas
+- forrest is next, maybe swamp,
+- snow/lava?
+- dungeons change theme too based on the biome theyre from?

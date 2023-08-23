@@ -3,11 +3,8 @@ use rand::Rng;
 
 use crate::{
     attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
-    colors::{
-        BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW, RED, UI_GRASS_GREEN,
-        YELLOW,
-    },
-    Game, GameParam,
+    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
+    Game,
 };
 
 #[derive(Component)]

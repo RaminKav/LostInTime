@@ -1,0 +1,21 @@
+(
+  name: "ThrowingStar",
+  templates: ["projectile"],
+  schematics: {
+        "survival_rogue_like::item::WorldObject": ThrowingStar,
+        "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
+        "survival_rogue_like::item::projectile::Projectile": ThrowingStar,
+        "survival_rogue_like::item::item_actions::ConsumableItem": (),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 3., direction: (x: 0., y: 0.), hit_entities: []),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/throwingstar.png", size: (x: 16., y: 16.), cols: 4, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+        "survival_rogue_like::inventory::ItemStack": (
+            obj_type: ThrowingStar,
+            metadata: (
+                name: "Throwing Star", 
+                desc: "A throwing star."
+            ),
+            count: 1
+      ),
+  }
+)

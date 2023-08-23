@@ -1,0 +1,12 @@
+(
+  name: "FireExplosionAOE",
+  templates: ["projectile"],
+  schematics: {
+        "survival_rogue_like::item::projectile::Projectile": FireExplosionAOE,
+        "survival_rogue_like::proto::ColliderProto": (x: 32., y: 32.),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: []),
+        "survival_rogue_like::animations::DoneAnimation": (),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/fireexplosionaoe.png", size: (x: 64., y: 64.), cols: 4, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+  }
+)

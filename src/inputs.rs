@@ -16,6 +16,10 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemAction, ItemActionParam};
+use crate::item::item_upgrades::{
+    ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
+    FireStaffAOEUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade, VenomOnHitUpgrade,
+};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
@@ -313,12 +317,45 @@ impl InputsPlugin {
                 WorldObject::WoodBow,
                 &proto,
                 game.player().position.truncate(),
-                16,
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Claw,
+                &proto,
+                game.player().position.truncate(),
+                1,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::ThrowingStar,
+                &proto,
+                game.player().position.truncate(),
+                64,
+            );
+            proto_commands.spawn_item_from_proto(
+                WorldObject::Arrow,
+                &proto,
+                game.player().position.truncate(),
+                64,
             );
         }
 
         if key_input.just_pressed(KeyCode::P) {
             DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
+        }
+        if key_input.just_pressed(KeyCode::U) {
+            commands
+                .entity(game.game.player)
+                .insert(FireStaffAOEUpgrade)
+                .insert(LightningStaffChainUpgrade)
+                .insert(BowUpgradeSpread(2))
+                .insert(ArrowSpeedUpgrade(1.))
+                .insert(BurnOnHitUpgrade)
+                .insert(VenomOnHitUpgrade)
+                .insert(LethalHitUpgrade)
+                .insert(ClawUpgradeMultiThrow(
+                    Timer::from_seconds(0.1, TimerMode::Once),
+                    2,
+                ));
         }
         if key_input.just_pressed(KeyCode::L) {
             let pos = tile_pos_to_world_pos(
@@ -471,6 +508,7 @@ impl InputsPlugin {
                     direction: (cursor_pos.world_coords.truncate() - player_pos.truncate())
                         .normalize_or_zero(),
                     from_enemy: None,
+                    is_followup_proj: false,
                 })
             }
             attack_event.send(AttackEvent);
@@ -487,7 +525,8 @@ impl InputsPlugin {
                     hit_entity: hit_obj,
                     damage: game.calculate_player_damage().0 as i32,
                     dir: Vec2::new(0., 0.),
-                    hit_with: main_hand_option,
+                    hit_with_melee: main_hand_option,
+                    hit_with_projectile: None,
                 });
             }
         }

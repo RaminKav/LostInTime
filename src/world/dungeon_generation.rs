@@ -5,9 +5,13 @@ use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
+use crate::{
+    item::{PlaceItemEvent, WorldObject},
+    schematic::loot_chests::LootChestType,
+    world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
+};
 
-use super::{TileMapPosition, CHUNK_SIZE};
+use super::{dimension::ActiveDimension, dungeon::Dungeon, TileMapPosition, CHUNK_SIZE};
 ///
 ///   grid is indexed as [y][x], where y = 0 is the top row, or chunk.y == 1 && tile.y == 15
 ///   and y = 127 is the bottom row, or chunk.y == -2 && tile.y == 0
@@ -171,4 +175,72 @@ pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>>
         }
     }
     grid
+}
+pub fn add_dungeon_chests(
+    new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
+    mut place_item_event: EventWriter<PlaceItemEvent>,
+) {
+    let Ok(dungeon) = new_dungeon.get_single() else {return};
+    let mut rng = rand::thread_rng();
+    let grid_size = dungeon.grid.len();
+    let mut picked_x;
+    let mut picked_y;
+    let mut num_chests_left_to_spawn = if rng.gen_ratio(1, 2) { 2 } else { 1 };
+    let mut chest_positions = vec![];
+
+    while num_chests_left_to_spawn > 0 {
+        picked_x = rng.gen_range(0..grid_size - 1);
+        picked_y = rng.gen_range(0..grid_size - 1);
+        if dungeon.grid[picked_y][picked_x] == 1 {
+            if dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
+                let pos = TileMapPosition::new(
+                    IVec2::new(
+                        f64::floor(
+                            (picked_x as f64 - CHUNK_SIZE as f64 * 2.) as f64
+                                / (CHUNK_SIZE * 2) as f64,
+                        ) as i32,
+                        f64::floor(
+                            ((CHUNK_SIZE as f64 * 2.) - picked_y as f64 - 1.) as f64
+                                / (CHUNK_SIZE * 2) as f64,
+                        ) as i32
+                            + 1,
+                    ),
+                    TilePos {
+                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as u32,
+                        y: f64::ceil(
+                            CHUNK_SIZE as f64
+                                - (picked_y as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as f64,
+                        ) as u32
+                            - 1,
+                    },
+                    if picked_y % 2 == 0 {
+                        if picked_x % 2 == 0 {
+                            0
+                        } else {
+                            1
+                        }
+                    } else {
+                        if picked_x % 2 == 0 {
+                            2
+                        } else {
+                            3
+                        }
+                    },
+                );
+                chest_positions.push(pos);
+                num_chests_left_to_spawn -= 1;
+            }
+        }
+    }
+    for (i, pos) in chest_positions.iter().enumerate() {
+        place_item_event.send(PlaceItemEvent {
+            obj: WorldObject::Chest,
+            pos: tile_pos_to_world_pos(*pos, false),
+            loot_chest_type: Some(if i == 0 {
+                LootChestType::Rare
+            } else {
+                LootChestType::Common
+            }),
+        });
+    }
 }

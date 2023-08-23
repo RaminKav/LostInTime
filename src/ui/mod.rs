@@ -18,8 +18,8 @@ pub use tooltips::*;
 pub use ui_helpers::*;
 
 use crate::{
-    client::ClientPlugin, combat::CombatPlugin, item::item_actions::ActionSuccessEvent,
-    CustomFlush, GameState,
+    client::ClientPlugin, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
+    GameState,
 };
 
 use self::{
@@ -69,7 +69,7 @@ impl Plugin for UIPlugin {
                     add_previous_health,
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
-                    handle_add_damage_numbers_after_hit.after(CombatPlugin::handle_hits),
+                    handle_add_damage_numbers_after_hit.after(handle_hits),
                     handle_add_dodge_text,
                     tick_damage_numbers,
                 )

@@ -1,5 +1,5 @@
 use crate::assets::Graphics;
-use crate::colors::LIGHT_RED;
+
 use crate::enemy::Mob;
 use crate::item::WorldObject;
 use crate::world::dimension::SpawnDimension;
@@ -83,7 +83,7 @@ fn setup_mini_map(
     minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<Minimap>>,
     p_t: Query<&Transform, With<Player>>,
-    mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
+    _mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut cache: ResMut<MinimapTileCache>,
 ) {

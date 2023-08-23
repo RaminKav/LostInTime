@@ -4,7 +4,7 @@ use crate::attributes::ItemAttributes;
 use crate::colors::{
     BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, UI_GRASS_GREEN, YELLOW,
 };
-use crate::combat::ObjBreakEvent;
+use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::inventory::ItemStack;
 use crate::proto::proto_param::ProtoParam;
@@ -25,6 +25,8 @@ use rand::Rng;
 
 mod crafting;
 pub mod item_actions;
+
+pub mod item_upgrades;
 mod loot_table;
 pub mod melee;
 pub mod object_actions;
@@ -40,6 +42,10 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use self::crafting::CraftingPlugin;
 use self::item_actions::handle_item_action_success;
+use self::item_upgrades::{
+    handle_burning_ticks, handle_delayed_ranged_attack, handle_on_hit_upgrades,
+    handle_spread_arrows_attack,
+};
 use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
@@ -205,6 +211,8 @@ pub enum WorldObject {
     WoodPlank,
     WoodAxe,
     Pebble,
+    Claw,
+    FireExplosionAOE,
 }
 
 #[derive(
@@ -419,7 +427,16 @@ impl Plugin for ItemsPlugin {
                     .after(CustomFlush)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(handle_item_action_success.in_set(OnUpdate(GameState::Main)))
+            .add_systems(
+                (
+                    handle_item_action_success,
+                    handle_delayed_ranged_attack,
+                    handle_spread_arrows_attack.after(CustomFlush),
+                    handle_burning_ticks,
+                    handle_on_hit_upgrades.after(handle_hits),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -502,7 +519,7 @@ pub fn handle_break_object(
         }
         commands.entity(broken.entity).despawn();
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table, 0) {
+            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
                         TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos, 0),

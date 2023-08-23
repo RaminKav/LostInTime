@@ -97,7 +97,6 @@ fn handle_spawn_mobs(
     prototypes: Prototypes,
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
-    test: Query<&Mob>,
 ) {
     for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
@@ -135,7 +134,6 @@ fn handle_spawn_mobs(
                 return;
             }
             // prototypes.is_ready("Slime");
-            println!("spawning {:?} cur: {:?}", mob, test.iter().count());
             game.chunk_query
                 .get_mut(*game.get_chunk_entity(e.chunk_pos).unwrap())
                 .unwrap()

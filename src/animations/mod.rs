@@ -13,7 +13,7 @@ use interpolation::lerp;
 use crate::ai::LeapAttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{FacingDirection, InputsPlugin, MovementVector};
-use crate::item::projectile::{ArcProjectileData, ProjectileState};
+use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::world::chunk::Chunk;
@@ -408,7 +408,7 @@ impl AnimationsPlugin {
                         t.translation.x = x_offset; //* (angle.cos() * arc_data.arc.x) - arc_data.size.x / 2.;
                         t.translation.y = y_offset;
                         t.rotation =
-                            Quat::from_rotation_z((arc_data.col_points[sprite.index] - PI / 2.));
+                            Quat::from_rotation_z(arc_data.col_points[sprite.index] - PI / 2.);
                     }
                 }
                 timer.reset();

@@ -83,7 +83,8 @@ fn check_melee_hit_collisions(
                 hit_entity,
                 damage,
                 dir: Vec2::new(0., 0.),
-                hit_with: Some(*weapon.2),
+                hit_with_melee: Some(*weapon.2),
+                hit_with_projectile: None,
             });
         }
     }
@@ -96,8 +97,13 @@ fn check_projectile_hit_mob_collisions(
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
-        (Entity, &mut ProjectileState, Option<&DoneAnimation>),
-        (With<Projectile>, Without<EnemyProjectile>),
+        (
+            Entity,
+            &mut ProjectileState,
+            &Projectile,
+            Option<&DoneAnimation>,
+        ),
+        Without<EnemyProjectile>,
     >,
     is_world_obj: Query<&WorldObject>,
     mut children: Query<&Parent>,
@@ -106,14 +112,14 @@ fn check_projectile_hit_mob_collisions(
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else { continue };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, anim_option) = if let Ok(e) = children.get_mut(*e1) {
-                if let Ok((proj_entity, state, anim_option)) = projectiles.get_mut(e.get()) {
-                    (proj_entity, state, anim_option)
+            let (proj_entity, mut state, proj, anim_option) = if let Ok(e) = children.get_mut(*e1) {
+                if let Ok((proj_entity, state, proj, anim_option)) = projectiles.get_mut(e.get()) {
+                    (proj_entity, state, proj, anim_option)
                 } else {
                     continue;
                 }
-            } else if let Ok((proj_entity, state, anim_option)) = projectiles.get_mut(*e1) {
-                (proj_entity, state, anim_option)
+            } else if let Ok((proj_entity, state, proj, anim_option)) = projectiles.get_mut(*e1) {
+                (proj_entity, state, proj, anim_option)
             } else {
                 continue;
             };
@@ -137,7 +143,8 @@ fn check_projectile_hit_mob_collisions(
                 hit_entity: *e2,
                 damage,
                 dir: state.direction,
-                hit_with: None,
+                hit_with_melee: None,
+                hit_with_projectile: Some(proj.clone()),
             });
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
@@ -147,7 +154,6 @@ fn check_projectile_hit_mob_collisions(
 }
 fn check_projectile_hit_player_collisions(
     mut commands: Commands,
-    game: GameParam,
     enemy_attack: Query<(Entity, &Attack), With<Mob>>,
     allowed_targets: Query<Entity, With<Player>>,
     mut hit_event: EventWriter<HitEvent>,
@@ -157,30 +163,29 @@ fn check_projectile_hit_player_collisions(
             Entity,
             &mut ProjectileState,
             Option<&DoneAnimation>,
+            &Projectile,
             &EnemyProjectile,
         ),
         With<EnemyProjectile>,
     >,
-    is_world_obj: Query<&WorldObject>,
     mut children: Query<&Parent>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else { continue };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, anim_option, enemy_proj) =
+            let (proj_entity, mut state, anim_option, proj, enemy_proj) =
                 if let Ok(e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, anim_option, enemy_proj)) =
+                    if let Ok((proj_entity, state, anim_option, proj, enemy_proj)) =
                         projectiles.get_mut(e.get())
                     {
-                        (proj_entity, state, anim_option, enemy_proj)
+                        (proj_entity, state, anim_option, proj, enemy_proj)
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, anim_option, enemy_proj)) =
+                } else if let Ok((proj_entity, state, anim_option, proj, enemy_proj)) =
                     projectiles.get_mut(*e1)
                 {
-                    (proj_entity, state, anim_option, enemy_proj)
+                    (proj_entity, state, anim_option, proj, enemy_proj)
                 } else {
                     continue;
                 };
@@ -197,7 +202,8 @@ fn check_projectile_hit_player_collisions(
                 hit_entity: *e2,
                 damage: attack.0,
                 dir: state.direction,
-                hit_with: None,
+                hit_with_melee: None,
+                hit_with_projectile: Some(proj.clone()),
             });
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
@@ -286,7 +292,8 @@ fn check_mob_to_player_collisions(
                 hit_entity: e1,
                 damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
                 dir: delta.normalize_or_zero().truncate(),
-                hit_with: None,
+                hit_with_melee: None,
+                hit_with_projectile: None,
             });
             // hit back to attacker if we have Thorns
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
@@ -294,7 +301,8 @@ fn check_mob_to_player_collisions(
                     hit_entity: e2,
                     damage: f32::ceil(attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
                     dir: delta.normalize_or_zero().truncate(),
-                    hit_with: None,
+                    hit_with_melee: None,
+                    hit_with_projectile: None,
                 });
             }
         }

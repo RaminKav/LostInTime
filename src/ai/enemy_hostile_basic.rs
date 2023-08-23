@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::KinematicCharacterController;
-use rand::{rngs::ThreadRng, Rng};
+
 use seldom_state::prelude::*;
 
 use crate::{
@@ -180,7 +180,7 @@ pub fn leap_attack(
     )>,
     mut commands: Commands,
     time: Res<Time>,
-    game: Res<Game>,
+    _game: Res<Game>,
 ) {
     for (entity, mut kcc, mut attack, sprite, anim_data, anim_state) in attacks.iter_mut() {
         // Get the positions of the attacker and target
@@ -245,6 +245,7 @@ pub fn projectile_attack(
                 projectile: attack.projectile.clone(),
                 direction: attack.dir.unwrap(),
                 from_enemy: Some(entity),
+                is_followup_proj: false,
             });
             commands
                 .entity(entity)

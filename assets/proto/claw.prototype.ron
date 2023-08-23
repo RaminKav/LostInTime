@@ -1,0 +1,37 @@
+(
+  name: "Claw",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Claw,
+  "survival_rogue_like::item::EquipmentType": Weapon,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        attack: Some((start: 5, end: 10)),
+  ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+         crit_damage: Some((start: 2, end: 20)),
+        crit_chance: Some((start: 4, end: 10)),
+        healing: Some((start: 8, end: 20)),
+        bonus_damage: Some((start: 1, end: 5)),
+        speed: Some((start: 4, end: 10)),
+        health_regen: Some((start: 1, end: 4)),
+        thorns: Some((start: 4, end: 10)),
+        dodge: Some((start: 1, end: 11)),
+      //   xp_rate: Some((start: 4, end: 10)),
+        loot_rate: Some((start: 4, end: 10)),
+  ),
+  "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::item::projectile::RangedAttack": (ThrowingStar),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Claw,
+        attributes: (
+            max_durability: 100,
+            attack_cooldown: 0.6
+        ),
+        metadata: (
+            name: "Claw", 
+            desc: "A claw."
+        ),
+        count: 1
+  ),
+  }
+)

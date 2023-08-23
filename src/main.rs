@@ -52,7 +52,7 @@ use assets::{GameAssetsPlugin, Graphics, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
-use combat::CombatPlugin;
+use combat::*;
 use enemy::{spawner::ChunkSpawners, EnemyPlugin};
 use inputs::InputsPlugin;
 use inventory::InventoryPlugin;

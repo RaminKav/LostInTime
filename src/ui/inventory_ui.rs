@@ -150,101 +150,103 @@ pub fn setup_inv_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .id();
     let inv = inv.single();
-    let mut limb_children: Vec<Entity> = vec![];
-    let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
-    let shadow_texture_atlas =
-        TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
-    let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
 
-    let shadow = commands
-        .spawn(SpriteSheetBundle {
-            texture_atlas: shadow_texture_atlas_handle,
-            transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
-    limb_children.push(shadow);
+    if cur_inv_state.0 == InventoryUIState::Open {
+        let mut limb_children: Vec<Entity> = vec![];
+        let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
+        let shadow_texture_atlas =
+            TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
+        let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
 
-    for (i, equipment) in inv.equipment_items.items.iter().enumerate() {
-        let limbs = Limb::from_slot(i);
-        for l in limbs.iter() {
-            let limb_source_handle = asset_server.load(format!(
-                "textures/player/player-run-down/player-{}-run-down-source-0.png",
-                l.to_string().to_lowercase()
-            ));
+        let shadow = commands
+            .spawn(SpriteSheetBundle {
+                texture_atlas: shadow_texture_atlas_handle,
+                transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
+        limb_children.push(shadow);
 
-            let limb_texture_asset = if let Some(equip) = equipment {
-                format!(
-                    "textures/player/{}.png",
-                    equip.item_stack.obj_type.to_string()
-                )
-            } else {
-                format!(
-                    "textures/player/player-texture-{}.png",
-                    if l == &Limb::Torso || l == &Limb::Hands {
-                        Limb::Torso.to_string().to_lowercase()
-                    } else {
-                        l.to_string().to_lowercase()
-                    }
-                )
-            };
-            let limb_texture_handle = asset_server.load(limb_texture_asset);
+        for (i, equipment) in inv.equipment_items.items.iter().enumerate() {
+            let limbs = Limb::from_slot(i);
+            for l in limbs.iter() {
+                let limb_source_handle = asset_server.load(format!(
+                    "textures/player/player-run-down/player-{}-run-down-source-0.png",
+                    l.to_string().to_lowercase()
+                ));
 
-            let transform = if *l == Limb::Head {
-                Transform::from_translation(Vec3::new(0., 0., 0.))
-            } else {
-                Transform::default()
-            };
-            let limb = commands
-                .spawn((
-                    MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Quad {
-                                    size: Vec2::new(32., 32.),
-                                    ..Default::default()
-                                }
+                let limb_texture_asset = if let Some(equip) = equipment {
+                    format!(
+                        "textures/player/{}.png",
+                        equip.item_stack.obj_type.to_string()
+                    )
+                } else {
+                    format!(
+                        "textures/player/player-texture-{}.png",
+                        if l == &Limb::Torso || l == &Limb::Hands {
+                            Limb::Torso.to_string().to_lowercase()
+                        } else {
+                            l.to_string().to_lowercase()
+                        }
+                    )
+                };
+                let limb_texture_handle = asset_server.load(limb_texture_asset);
+
+                let transform = if *l == Limb::Head {
+                    Transform::from_translation(Vec3::new(0., 0., 0.))
+                } else {
+                    Transform::default()
+                };
+                let limb = commands
+                    .spawn((
+                        MaterialMesh2dBundle {
+                            mesh: meshes
+                                .add(
+                                    shape::Quad {
+                                        size: Vec2::new(32., 32.),
+                                        ..Default::default()
+                                    }
+                                    .into(),
+                                )
                                 .into(),
-                            )
-                            .into(),
-                        transform,
-                        material: materials.add(AnimatedTextureMaterial {
-                            source_texture: Some(limb_source_handle),
-                            lookup_texture: Some(limb_texture_handle),
-                            opacity: 1.,
-                            flip: 1.,
-                        }),
-                        ..default()
-                    },
-                    RenderLayers::from_layers(&[3]),
-                    *l,
-                ))
-                .id();
-            limb_children.push(limb);
+                            transform,
+                            material: materials.add(AnimatedTextureMaterial {
+                                source_texture: Some(limb_source_handle),
+                                lookup_texture: Some(limb_texture_handle),
+                                opacity: 1.,
+                                flip: 1.,
+                            }),
+                            ..default()
+                        },
+                        RenderLayers::from_layers(&[3]),
+                        *l,
+                    ))
+                    .id();
+                limb_children.push(limb);
+            }
         }
+        let player_ui_preview_e = commands
+            .spawn((
+                SpatialBundle {
+                    transform: Transform::from_translation(Vec3::new(
+                        size.x / 2. - 24.,
+                        size.y / 2. - 22.,
+                        2.,
+                    )),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                Name::new("PlayerUIPreview"),
+            ))
+            .push_children(&limb_children)
+            .id();
+        commands.entity(inv_e).push_children(&[player_ui_preview_e]);
     }
 
-    let p = commands
-        .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(Vec3::new(
-                    size.x / 2. - 24.,
-                    size.y / 2. - 22.,
-                    2.,
-                )),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            Name::new("PlayerUIPreview"),
-        ))
-        .push_children(&limb_children)
-        .id();
     inv_state.inv_size = size;
     commands.entity(inv_e).push_children(&[overlay]);
-    if cur_inv_state.0 == InventoryUIState::Open {
-        commands.entity(inv_e).push_children(&[p]);
-    }
+
     stats_event.send(ShowInvPlayerStatsEvent);
 }
 
