@@ -59,6 +59,7 @@ impl Plugin for UIPlugin {
                 (
                     setup_hotbar_hud,
                     setup_foodbar_ui.after(ClientPlugin::load_on_start),
+                    setup_xp_bar_ui.after(ClientPlugin::load_on_start),
                     setup_healthbar_ui.after(ClientPlugin::load_on_start),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
@@ -67,6 +68,7 @@ impl Plugin for UIPlugin {
                 (
                     create_enemy_health_bar,
                     add_previous_health,
+                    update_xp_bar,
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
                     handle_add_damage_numbers_after_hit.after(handle_hits),

@@ -72,7 +72,6 @@ impl Plugin for ClientPlugin {
             .register_saveable::<WorldObjectEntityData>()
             .register_saveable::<YSort>()
             .register_saveable::<TileMapPosition>()
-            // .register_saveable::<Breakable>()
             .register_saveable::<ColliderReflect>()
             .register_saveable::<Name>()
             .register_saveable::<Parent>()

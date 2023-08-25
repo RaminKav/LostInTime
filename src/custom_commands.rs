@@ -1,5 +1,4 @@
 use crate::{
-    animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
     inventory::ItemStack,
     item::{projectile::ArcProjectileData, Foliage, Wall},
@@ -61,9 +60,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
-                spawned_entity_commands
-                    .insert(proto_data)
-                    .remove::<AnimationTimer>();
+                spawned_entity_commands.insert(proto_data);
             }
             return Some(spawned_entity);
         }

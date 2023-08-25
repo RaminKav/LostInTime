@@ -15,6 +15,7 @@
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,6,4], valid_directions: [0,1,2,3], anim_offset: 0),
     "survival_rogue_like::attributes::MaxHealth": (50),
     "survival_rogue_like::attributes::Attack": (5),
+    "survival_rogue_like::levels::ExperienceReward": (15),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: SmallPotion,

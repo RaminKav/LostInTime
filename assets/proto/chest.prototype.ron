@@ -6,7 +6,6 @@
   "survival_rogue_like::item::object_actions::ObjectAction": Chest,
   "survival_rogue_like::item::Block": (),
   "survival_rogue_like::assets::SpriteSize": Small,
-  "survival_rogue_like::item::Breakable": (Some(ChestBlock)),
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::world::WorldObjectEntityData": (object: Chest, obj_bit_index: 0, texture_offset: 0),
