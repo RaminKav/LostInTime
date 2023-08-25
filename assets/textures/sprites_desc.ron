@@ -200,6 +200,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Crate: WorldObjectData(
+            texture_pos: (1., 9.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CrateBlock: WorldObjectData(
+            texture_pos: (1., 9.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         DungeonStone: SpriteData(

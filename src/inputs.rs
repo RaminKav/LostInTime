@@ -302,7 +302,7 @@ impl InputsPlugin {
                 1,
             );
             proto_commands.spawn_item_from_proto(
-                WorldObject::Pendant,
+                WorldObject::CrateBlock,
                 &proto,
                 game.player().position.truncate(),
                 1,

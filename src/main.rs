@@ -42,6 +42,7 @@ mod enemy;
 mod inputs;
 mod inventory;
 mod item;
+mod levels;
 mod player;
 mod proto;
 mod schematic;

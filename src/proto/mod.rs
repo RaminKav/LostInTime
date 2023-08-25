@@ -37,9 +37,10 @@ use crate::{
         melee::MeleeAttack,
         object_actions::ObjectAction,
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
-        Block, Breakable, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable,
-        PlacesInto, RequiredEquipmentType, Wall, WorldObject,
+        Block, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable, PlacesInto,
+        RequiredEquipmentType, Wall, WorldObject,
     },
+    levels::ExperienceReward,
     schematic::{loot_chests::LootChestType, SchematicType},
     world::WorldObjectEntityData,
     CustomFlush, GameState, YSort,
@@ -59,7 +60,6 @@ impl Plugin for ProtoPlugin {
             .register_type::<Vec<Loot>>()
             .register_type::<WorldObject>()
             .register_type::<Option<WorldObject>>()
-            .register_type::<Breakable>()
             .register_type::<PlacesInto>()
             .register_type::<BreaksWith>()
             .register_type::<Block>()
@@ -75,6 +75,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<ItemAttributes>()
             .register_type::<RawItemBaseAttributes>()
             .register_type::<RawItemBonusAttributes>()
+            .register_type::<ExperienceReward>()
             .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
@@ -175,6 +176,8 @@ impl ProtoPlugin {
         prototypes.load("proto/claw.prototype.ron");
         prototypes.load("proto/throwingstar.prototype.ron");
         prototypes.load("proto/fireexplosionaoe.prototype.ron");
+        prototypes.load("proto/crate.prototype.ron");
+        prototypes.load("proto/crateblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

@@ -14,6 +14,7 @@ use crate::{
         projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
         RequiredEquipmentType, WorldObject,
     },
+    levels::{ExperienceReward, PlayerLevel},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     AppExt, CustomFlush, GameParam, GameState, Player, YSort,
@@ -111,6 +112,8 @@ fn handle_enemy_death(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     loot_tables: Query<&LootTable>,
+    mob_xp: Query<&ExperienceReward>,
+    mut player_xp: Query<&mut PlayerLevel>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
 ) {
@@ -131,6 +134,8 @@ fn handle_enemy_death(
             DoneAnimation,
             Name::new("Hit Spark"),
         ));
+
+        // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, loot_bonus.single().0)
             {
@@ -142,6 +147,10 @@ fn handle_enemy_death(
                 );
             }
         }
+
+        //give player xp
+        let mut player_level = player_xp.single_mut();
+        player_level.add_xp(mob_xp.get(death_event.entity).unwrap().0);
     }
 }
 fn handle_invincibility_frames(
@@ -228,6 +237,11 @@ pub fn handle_hits(
             if hit_health.0 <= 0 {
                 continue;
             }
+            let dmg = if hit.damage == 0 && hit.hit_entity != game.game.player {
+                1
+            } else {
+                hit.damage as i32
+            };
             if let Some(obj) = obj_option {
                 let anchor = proto_param
                     .get_component::<SpriteAnchor, _>(obj.clone())
@@ -239,7 +253,7 @@ pub fn handle_hits(
                     if let Some(hit_item_type) = hit.hit_with_melee {
                         if proto_param
                             .get_component::<EquipmentType, _>(hit_item_type)
-                            .unwrap()
+                            .unwrap_or(&EquipmentType::None)
                             != &item_type_req.0
                         {
                             continue;
@@ -248,7 +262,7 @@ pub fn handle_hits(
                         continue;
                     }
                 }
-                hit_health.0 -= hit.damage as i32;
+                hit_health.0 -= dmg;
 
                 println!("HP {:?} {:?}", e, hit_health.0);
                 if hit_health.0 <= 0 {
@@ -260,7 +274,7 @@ pub fn handle_hits(
                 }
             } else {
                 let is_player = game.game.player == e;
-                hit_health.0 -= hit.damage as i32;
+                hit_health.0 -= dmg;
                 println!("HP {:?}", hit_health.0);
 
                 // let has_i_frames = has_i_frames.get(hit.hit_entity);
@@ -293,7 +307,7 @@ pub fn handle_hits(
         }
     }
 }
-fn cleanup_marked_for_death_entities(
+pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
     dead_query: Query<Entity, With<MarkedForDeath>>,
 ) {

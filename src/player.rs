@@ -18,6 +18,7 @@ use crate::{
     inputs::{FacingDirection, InputsPlugin, MovementVector},
     inventory::{Container, Inventory, INVENTORY_SIZE},
     item::EquipmentData,
+    levels::PlayerLevel,
     world::{y_sort::YSort, CHUNK_SIZE},
     AppExt, CoreGameSet, Game, GameParam, RawPosition,
 };
@@ -269,6 +270,7 @@ fn spawn_player(
             RawPosition::default(),
         ))
         .insert(ActiveEvents::COLLISION_EVENTS)
+        .insert(PlayerLevel::new(1))
         .insert(RigidBody::KinematicPositionBased)
         .push_children(&limb_children)
         .id();

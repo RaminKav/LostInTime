@@ -323,19 +323,32 @@ impl different att styles w seldum_state
 # Mats/Drops/Gear Aquisition
 
 - Limited weapon types: 6-8 (2-3 meleee, 2 ranged, 3 magic)
-- Weapons drop at random from mobs, some have higher rates to drop specific ones
-- armor/trinkets/accessories drop at random as well from mobs
+  <!-- - Weapons drop at random from mobs, some have higher rates to drop specific ones -->
+  <!-- - armor/trinkets/accessories drop at random as well from mobs -->
 - some armor can be crafted from materials or mob drops
-- weapons can be crafted from mat/drops too,
+<!-- - weapons can be crafted from mat/drops too, -->
 - Dungeons will have ores, overworld other mats like leather/wood
 - Wooden sword will be everyones starter weapon, mats to craft found in overworld
   - maybe rebrand this to a `sturdy stick`
 - out-of-run progression could be you get to pick a new starter weapon
 - generic armor can be crafted fairly early on (leather, chain)
   - leather from animals, chain from metal fragments from boulders?
-- how can weapons be crafted?
-  - swords/daggers/bows are easy, what about magic weapons?
-- magic runes or w/e drop from mobs rarely, each maps to one elemental magic weapon
+  <!-- - how can weapons be crafted?
+  - swords/daggers/bows are easy, what about magic weapons? -->
+  <!-- - magic runes or w/e drop from mobs rarely, each maps to one elemental magic weapon -->
+- loot drops as unidentified weapons -> need to be identified in a block with money?
+
+# What Will Be Crafting
+
+- Bandages
+- Utility Blocks: Chest, anvils, upgrading stone, Identification stone
+- Tools,
+- Building: Walls, doors, presure plate, bed, walking planks, boats,
+- Utility blocks: WarpStone
+- plant/farming/food related things
+- towns can have quests for items -> get money
+- perhapse armor can be crafted in unique block
+- fishing?
 
 # Upgrades
 

@@ -50,9 +50,6 @@ use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
 #[reflect(Schematic)]
-pub struct Breakable(pub Option<WorldObject>);
-#[derive(Component, Reflect, FromReflect, Schematic)]
-#[reflect(Schematic)]
 pub struct BreaksWith(pub WorldObject);
 #[derive(Component, Reflect, FromReflect, Schematic)]
 #[reflect(Schematic)]
@@ -213,6 +210,8 @@ pub enum WorldObject {
     Pebble,
     Claw,
     FireExplosionAOE,
+    Crate,
+    CrateBlock,
 }
 
 #[derive(

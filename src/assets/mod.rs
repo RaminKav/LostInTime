@@ -11,7 +11,6 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::animations::AnimationTimer;
 use crate::item::{
     Equipment, Foliage, RecipeList, Recipes, Wall, WorldObject, WorldObjectResource,
 };
@@ -307,21 +306,27 @@ impl GameAssetsPlugin {
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
     pub fn update_graphics(
         mut to_update_query: Query<
-            (Entity, &mut TextureAtlasSprite, &WorldObject),
             (
-                Changed<WorldObject>,
-                Without<Wall>,
-                Without<Equipment>,
-                Without<AnimationTimer>,
+                Entity,
+                &mut TextureAtlasSprite,
+                &Handle<TextureAtlas>,
+                &WorldObject,
             ),
+            (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
         >,
         game: GameParam,
         mut commands: Commands,
         graphics: Res<Graphics>,
+        texture_atlases: Res<Assets<TextureAtlas>>,
     ) {
         let item_map = &&graphics.spritesheet_map;
         if let Some(item_map) = item_map {
-            for (e, mut sprite, world_object) in to_update_query.iter_mut() {
+            for (e, mut sprite, spritesheet, world_object) in to_update_query.iter_mut() {
+                if let Some(texture_atlas) = texture_atlases.get(&spritesheet) {
+                    if texture_atlas.textures.len() < 40 {
+                        continue;
+                    }
+                }
                 let has_icon = graphics.icons.as_ref().unwrap().get(&world_object);
                 let new_sprite = if let Some(icon) = has_icon {
                     icon
