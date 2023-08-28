@@ -14,6 +14,7 @@
         Tree: 0.5,
         Boulder: 0.1,
         Grass: 0.4,
+        Crate: 0.0001,
         DeadSapling: 0.05,
       },
       schematic_frequencies: {
@@ -26,7 +27,8 @@
         Grass: [GrassTile],
         DeadSapling: [SandTile],
         Chest: [SandTile,GrassTile, DungeonStone],
-        StoneWall: [GrassTile, DungeonStone, SandTile]
+        StoneWall: [GrassTile, DungeonStone, SandTile],
+        Crate: [GrassTile, DungeonStone, SandTile],
       }
     ),
   }

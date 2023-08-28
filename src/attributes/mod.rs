@@ -10,7 +10,7 @@ use crate::{
     colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
-    player::Limb,
+    player::{stats::PlayerStats, Limb},
     proto::proto_param::ProtoParam,
     ui::{
         DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
@@ -451,7 +451,7 @@ impl Plugin for AttributesPlugin {
                     handle_health_regen,
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
-                    update_attributes_and_sprite_with_equipment_removed,
+                    update_sprite_with_equipment_removed,
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
@@ -471,7 +471,7 @@ fn clamp_health(mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>
 }
 fn handle_player_item_attribute_change_events(
     mut commands: Commands,
-    player: Query<(Entity, &Inventory), With<Player>>,
+    player: Query<(Entity, &Inventory, &PlayerStats), With<Player>>,
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
@@ -479,7 +479,7 @@ fn handle_player_item_attribute_change_events(
 ) {
     for _event in att_events.iter() {
         let mut new_att = player_atts.single().clone();
-        let (player, inv) = player.single();
+        let (player, inv, stats) = player.single();
         let equips: Vec<ItemAttributes> = inv
             .equipment_items
             .items
@@ -495,6 +495,7 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
+        new_att = stats.apply_stats_to_player_attributes(new_att.clone());
         new_att.add_attribute_components(&mut commands.entity(player));
         stats_event.send(ShowInvPlayerStatsEvent);
     }
@@ -586,7 +587,7 @@ fn update_attributes_and_sprite_with_equipment_change(
 }
 ///Tracks player equip or accessory inventory slot changes,
 ///spawns new held equipment entity, and updates player attributes
-fn update_attributes_and_sprite_with_equipment_removed(
+fn update_sprite_with_equipment_removed(
     mut removed_inv_item: EventReader<RemoveFromSlotEvent>,
     player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
     asset_server: Res<AssetServer>,

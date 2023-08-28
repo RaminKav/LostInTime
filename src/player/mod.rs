@@ -7,7 +7,8 @@ use bevy_rapier2d::prelude::{
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-
+pub mod levels;
+pub mod stats;
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
@@ -18,9 +19,13 @@ use crate::{
     inputs::{FacingDirection, InputsPlugin, MovementVector},
     inventory::{Container, Inventory, INVENTORY_SIZE},
     item::EquipmentData,
-    levels::PlayerLevel,
     world::{y_sort::YSort, CHUNK_SIZE},
     AppExt, CoreGameSet, Game, GameParam, RawPosition,
+};
+
+use self::{
+    levels::{handle_level_up, spawn_particles_when_leveling, PlayerLevel},
+    stats::{send_attribute_event_on_stats_update, PlayerStats, SkillPoints},
 };
 pub struct PlayerPlugin;
 
@@ -82,7 +87,11 @@ impl Plugin for PlayerPlugin {
             app.add_event::<MovePlayerEvent>();
         })
         .add_startup_system(spawn_player)
-        .add_system(test_swap_armor_texture)
+        .add_systems((
+            send_attribute_event_on_stats_update,
+            handle_level_up,
+            spawn_particles_when_leveling,
+        ))
         .add_system(
             handle_move_player
                 .in_set(CoreGameSet::Main)
@@ -271,24 +280,10 @@ fn spawn_player(
         ))
         .insert(ActiveEvents::COLLISION_EVENTS)
         .insert(PlayerLevel::new(1))
+        .insert(PlayerStats::new())
+        .insert(SkillPoints { count: 0 })
         .insert(RigidBody::KinematicPositionBased)
         .push_children(&limb_children)
         .id();
     game.player = p;
-}
-pub fn test_swap_armor_texture(
-    player_limbs: Query<(&mut Handle<AnimatedTextureMaterial>, &Limb)>,
-    asset_server: Res<AssetServer>,
-    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-    keys: Res<Input<KeyCode>>,
-) {
-    if keys.just_pressed(KeyCode::F) {
-        for (mat, limb) in player_limbs.iter() {
-            if limb == &Limb::Torso || limb == &Limb::Hands {
-                let mut mat = materials.get_mut(mat).unwrap();
-                let armor_texture_handle = asset_server.load("textures/player/armor-torso.png");
-                mat.lookup_texture = Some(armor_texture_handle);
-            }
-        }
-    }
 }

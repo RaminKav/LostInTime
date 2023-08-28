@@ -2,7 +2,7 @@ use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
 use crate::colors::{
-    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, UI_GRASS_GREEN, YELLOW,
+    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, RED, UI_GRASS_GREEN, YELLOW,
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 
@@ -395,6 +395,7 @@ impl WorldObject {
             WorldObject::WaterTile => BLUE,
             WorldObject::SandTile => YELLOW,
             WorldObject::Tree => DARK_GREEN,
+            WorldObject::Crate => RED,
             _ => BLACK,
         }
     }

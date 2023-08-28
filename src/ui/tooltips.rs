@@ -8,11 +8,12 @@ use crate::{
     },
     colors::{BLACK, GOLD, LIGHT_GREEN, LIGHT_GREY},
     player::Player,
+    ui::{STATS_UI_SIZE, TOOLTIP_UI_SIZE},
 };
 
 use super::{
-    InventorySlotState, InventoryUI, InventoryUIState, ShowInvPlayerStatsEvent, ToolTipUpdateEvent,
-    UIElement, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    stats_ui::StatsUI, InventorySlotState, InventoryUI, ShowInvPlayerStatsEvent,
+    ToolTipUpdateEvent, UIElement, UIState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -23,7 +24,7 @@ pub fn handle_spawn_inv_item_tooltip(
     asset_server: Res<AssetServer>,
     mut updates: EventReader<ToolTipUpdateEvent>,
     inv: Query<Entity, With<InventoryUI>>,
-    cur_inv_state: Res<State<InventoryUIState>>,
+    cur_inv_state: Res<State<UIState>>,
     old_tooltips: Query<
         (Entity, &UIElement, &Parent),
         (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
@@ -35,8 +36,8 @@ pub fn handle_spawn_inv_item_tooltip(
         }
         let inv = inv.single();
         let parent_inv_size = match cur_inv_state.0 {
-            InventoryUIState::Open => INVENTORY_UI_SIZE,
-            InventoryUIState::Chest => CHEST_INVENTORY_UI_SIZE,
+            UIState::Open => INVENTORY_UI_SIZE,
+            UIState::Chest => CHEST_INVENTORY_UI_SIZE,
             _ => unreachable!(),
         };
         let attributes = item.item_stack.attributes.get_tooltips();
@@ -139,6 +140,7 @@ pub fn handle_spawn_inv_player_stats(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut updates: EventReader<ShowInvPlayerStatsEvent>,
+    curr_ui_state: Res<State<UIState>>,
     player_stats: Query<
         (
             &Attack,
@@ -159,6 +161,7 @@ pub fn handle_spawn_inv_player_stats(
         With<Player>,
     >,
     inv: Query<Entity, With<InventoryUI>>,
+    stats: Query<Entity, With<StatsUI>>,
     old_tooltips: Query<
         (Entity, &UIElement, &Parent),
         (Without<InventorySlotState>, With<PlayerStatsTooltip>),
@@ -168,7 +171,14 @@ pub fn handle_spawn_inv_player_stats(
         for tooltip in old_tooltips.iter() {
             commands.entity(tooltip.0).despawn_recursive();
         }
-        let inv = inv.single();
+
+        let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Open {
+            (inv.get_single(), Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.))
+        } else if curr_ui_state.0 == UIState::Stats {
+            (stats.get_single(),Vec3::new(-(STATS_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.))
+        } else {
+            return;
+        }) else {return};
         let (
             attack,
             max_health,
@@ -204,7 +214,6 @@ pub fn handle_spawn_inv_player_stats(
         }
         .get_stats_summary();
 
-        let size = Vec2::new(93., 120.5);
         let tooltip = commands
             .spawn((
                 SpriteBundle {
@@ -216,12 +225,12 @@ pub fn handle_spawn_inv_player_stats(
                         .unwrap()
                         .clone(),
                     transform: Transform {
-                        translation: Vec3::new(-(INVENTORY_UI_SIZE.x + size.x + 2.) / 2., 0., 2.),
+                        translation,
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
                     sprite: Sprite {
-                        custom_size: Some(size),
+                        custom_size: Some(TOOLTIP_UI_SIZE),
                         ..Default::default()
                     },
                     ..Default::default()
@@ -243,13 +252,13 @@ pub fn handle_spawn_inv_player_stats(
             let text_pos = if i == 0 {
                 Vec3::new(
                     -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
-                    size.y / 2. - 12.,
+                    TOOLTIP_UI_SIZE.y / 2. - 12.,
                     1.,
                 )
             } else {
                 Vec3::new(
-                    -size.x / 2. + 8.,
-                    size.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
+                    -TOOLTIP_UI_SIZE.x / 2. + 8.,
+                    TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
                     1.,
                 )
             };
@@ -288,6 +297,6 @@ pub fn handle_spawn_inv_player_stats(
                 .id();
             commands.entity(tooltip).add_child(text);
         }
-        commands.entity(inv).add_child(tooltip);
+        commands.entity(parent_e).add_child(tooltip);
     }
 }
