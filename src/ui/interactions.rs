@@ -7,14 +7,15 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::{CompleteRecipeEvent, CraftingSlotUpdateEvent},
+    player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
     ui::InventorySlotType,
     GameParam,
 };
 
 use super::{
-    spawn_item_stack_icon, ui_helpers, ChestInventory, InventorySlotState, InventoryState,
-    PlayerStatsTooltip,
+    spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers, ChestInventory,
+    InventorySlotState, InventoryState, PlayerStatsTooltip,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -32,6 +33,9 @@ pub enum UIElement {
     LargeTooltipLegendary,
     Minimap,
     LargeMinimap,
+    LevelUpStats,
+    StatsButton,
+    StatsButtonHover,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -273,7 +277,12 @@ pub fn handle_dragging(
     }
 }
 pub fn handle_hovering(
-    mut interactables: Query<(Entity, &UIElement, &mut Interactable, &InventorySlotState)>,
+    mut interactables: Query<(
+        Entity,
+        &UIElement,
+        &mut Interactable,
+        Option<&InventorySlotState>,
+    )>,
     tooltips: Query<
         (Entity, &UIElement, &Parent),
         (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
@@ -286,9 +295,10 @@ pub fn handle_hovering(
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
-    for (e, ui, interactable, state) in interactables.iter_mut() {
+    for (e, ui, interactable, state_option) in interactables.iter_mut() {
         if let Interaction::Hovering = interactable.current() {
             if ui == &UIElement::InventorySlot {
+                let state = state_option.unwrap();
                 // swap to hover img
                 commands.entity(e).insert(UIElement::InventorySlotHover);
                 commands.entity(e).insert(
@@ -320,6 +330,20 @@ pub fn handle_hovering(
                     });
                 }
             }
+            if ui == &UIElement::StatsButton {
+                // swap to hover img
+                commands.entity(e).insert(UIElement::StatsButtonHover);
+                commands.entity(e).insert(
+                    graphics
+                        .ui_image_handles
+                        .as_ref()
+                        .unwrap()
+                        .get(&UIElement::StatsButtonHover)
+                        .unwrap()
+                        .clone()
+                        .to_owned(),
+                );
+            }
         }
         if let Interaction::Hovering = interactable.previous() {
             if ui == &UIElement::InventorySlotHover {
@@ -338,6 +362,19 @@ pub fn handle_hovering(
                 for tooltip in tooltips.iter() {
                     commands.entity(tooltip.0).despawn_recursive();
                 }
+            }
+            if ui == &UIElement::StatsButtonHover {
+                // swap to base img
+                commands.entity(e).insert(UIElement::StatsButton).insert(
+                    graphics
+                        .ui_image_handles
+                        .as_ref()
+                        .unwrap()
+                        .get(&UIElement::StatsButton)
+                        .unwrap()
+                        .clone()
+                        .to_owned(),
+                );
             }
         }
     }
@@ -525,6 +562,62 @@ pub fn handle_cursor_update(
                                 commands.entity(e).insert(DraggedItem);
                                 interactable.change(Interaction::Dragging { item: e });
                                 mouse_input.clear();
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                // reset hovering states if we stop hovering ?
+                let Interaction::Hovering = interactable.current() else {continue};
+
+                interactable.change(Interaction::None);
+            }
+        }
+    }
+}
+
+pub fn handle_cursor_stats_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut stats_buttons: Query<
+        (Entity, &mut Interactable, &StatsButtonState),
+        Without<InventorySlotState>,
+    >,
+    dragging_query: Query<&DraggedItem>,
+    mut player_stats: Query<(&mut PlayerStats, &mut SkillPoints)>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let currently_dragging = dragging_query.iter().len() > 0;
+
+    for (e, mut interactable, state) in stats_buttons.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed && !currently_dragging {
+                        let (mut stats, mut sp) = player_stats.single_mut();
+                        if sp.count > 0 {
+                            sp.count -= 1;
+                            match state.index {
+                                0 => {
+                                    stats.str += 1;
+                                }
+                                1 => {
+                                    stats.dex += 1;
+                                }
+                                2 => {
+                                    stats.agi += 1;
+                                }
+                                3 => {
+                                    stats.vit += 1;
+                                }
+                                _ => {}
                             }
                         }
                     }

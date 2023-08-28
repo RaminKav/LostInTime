@@ -12,17 +12,18 @@ use crate::{
 };
 
 use super::{
-    interactions::Interaction, DropInWorldEvent, Interactable, ShowInvPlayerStatsEvent, UIElement,
-    UI_SLOT_SIZE,
+    interactions::Interaction, stats_ui::StatsUI, DropInWorldEvent, Interactable,
+    ShowInvPlayerStatsEvent, UIElement, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
-pub enum InventoryUIState {
+pub enum UIState {
     #[default]
     Closed,
     Open,
     NPC,
     Chest,
+    Stats,
 }
 
 #[derive(Component, Default, Clone)]
@@ -80,7 +81,7 @@ pub fn setup_inv_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut inv_state: ResMut<InventoryState>,
-    cur_inv_state: Res<State<InventoryUIState>>,
+    cur_inv_state: Res<State<UIState>>,
     mut meshes: ResMut<Assets<Mesh>>,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
@@ -89,7 +90,7 @@ pub fn setup_inv_ui(
     inv: Query<&Inventory>,
 ) {
     let (size, texture, t_offset) = match cur_inv_state.0 {
-        InventoryUIState::Open => (
+        UIState::Open => (
             INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
@@ -100,7 +101,7 @@ pub fn setup_inv_ui(
                 .clone(),
             Vec2::new(22., 0.5),
         ),
-        InventoryUIState::Chest => (
+        UIState::Chest => (
             CHEST_INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
@@ -151,7 +152,7 @@ pub fn setup_inv_ui(
         .id();
     let inv = inv.single();
 
-    if cur_inv_state.0 == InventoryUIState::Open {
+    if cur_inv_state.0 == UIState::Open {
         let mut limb_children: Vec<Entity> = vec![];
         let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
         let shadow_texture_atlas =
@@ -255,7 +256,7 @@ pub fn setup_inv_slots_ui(
     graphics: Res<Graphics>,
     inv_query: Query<Entity, With<InventoryUI>>,
     inv_state_res: Res<InventoryState>,
-    inv_state: Res<State<InventoryUIState>>,
+    inv_state: Res<State<UIState>>,
     inv_spawn_check: Query<Entity, Added<InventoryUI>>,
 
     asset_server: Res<AssetServer>,
@@ -265,8 +266,8 @@ pub fn setup_inv_slots_ui(
         return;
     }
     let (should_spawn_equipment, should_spawn_crafting) = match inv_state.0 {
-        InventoryUIState::Open => (true, true),
-        InventoryUIState::Chest => (false, false),
+        UIState::Open => (true, true),
+        UIState::Chest => (false, false),
         _ => return,
     };
     for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
@@ -352,15 +353,17 @@ pub fn toggle_inv_visibility(
     crafting_slots: Query<(Entity, &InventorySlotState), With<Interactable>>,
     crafting_item_stacks: Query<&ItemStack>,
     mut inv: Query<&mut Inventory>,
-    mut next_inv_state: ResMut<NextState<InventoryUIState>>,
-    curr_inv_state: Res<State<InventoryUIState>>,
+    mut next_inv_state: ResMut<NextState<UIState>>,
+    curr_inv_state: Res<State<UIState>>,
     mut world_drop_events: EventWriter<DropInWorldEvent>,
     inv_query: Query<Entity, With<InventoryUI>>,
     mut commands: Commands,
     chest_option: Option<Res<ChestInventory>>,
+    stats_query: Query<Entity, With<StatsUI>>,
 ) {
-    if !inv_state.open && curr_inv_state.0 != InventoryUIState::Closed {
-        next_inv_state.set(InventoryUIState::Closed);
+    if !inv_state.open && (curr_inv_state.0 == UIState::Open || curr_inv_state.0 == UIState::Chest)
+    {
+        next_inv_state.set(UIState::Closed);
         if let Ok(e) = inv_query.get_single() {
             if let Some(chest) = chest_option {
                 if let Some(mut chest_parent) = commands.get_entity(chest.parent) {
@@ -371,10 +374,15 @@ pub fn toggle_inv_visibility(
             commands.entity(e).despawn_recursive();
         }
     } else if inv_state.open
-        && curr_inv_state.0 == InventoryUIState::Closed
+        && (curr_inv_state.0 == UIState::Closed || curr_inv_state.0 == UIState::Stats)
         && !next_inv_state.is_changed()
     {
-        next_inv_state.set(InventoryUIState::Open);
+        next_inv_state.set(UIState::Open);
+
+        // close stats ui if its open
+        if let Ok(e) = stats_query.get_single() {
+            commands.entity(e).despawn_recursive();
+        }
     }
     for mut hbv in hotbar_slots.iter_mut() {
         *hbv = if inv_state.open {
@@ -404,7 +412,7 @@ pub fn toggle_inv_visibility(
 }
 pub fn spawn_inv_slot(
     commands: &mut Commands,
-    inv_ui_state: &Res<State<InventoryUIState>>,
+    inv_ui_state: &Res<State<UIState>>,
     graphics: &Graphics,
     slot_index: usize,
     interactable_state: Interaction,
@@ -417,7 +425,7 @@ pub fn spawn_inv_slot(
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
     let inv_slot_offset = match inv_ui_state.0 {
-        InventoryUIState::Chest => Vec2::new(0., 0.),
+        UIState::Chest => Vec2::new(0., 0.),
         _ => Vec2::new(0., 0.),
     };
 
@@ -614,7 +622,7 @@ pub fn update_inventory_ui(
     mut ui_elements: Query<(Entity, &InventorySlotState)>,
     interactables: Query<&Interactable>,
     inv_state: Res<InventoryState>,
-    inv_ui_state: Res<State<InventoryUIState>>,
+    inv_ui_state: Res<State<UIState>>,
     inv_query: Query<Entity, With<InventoryUI>>,
     asset_server: Res<AssetServer>,
     inv: Query<&mut Inventory>,

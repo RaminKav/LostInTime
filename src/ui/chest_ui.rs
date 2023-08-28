@@ -4,7 +4,7 @@ use crate::{assets::Graphics, inventory::Container, item::WorldObject};
 
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
-    InventoryUIState,
+    UIState,
 };
 
 pub const CHEST_SIZE: usize = 6 * 2;
@@ -20,7 +20,7 @@ pub fn setup_chest_slots_ui(
     graphics: Res<Graphics>,
     inv_query: Query<Entity, With<InventoryUI>>,
     inv_state_res: Res<InventoryState>,
-    inv_state: Res<State<InventoryUIState>>,
+    inv_state: Res<State<UIState>>,
     inv_spawn_check: Query<Entity, Added<InventoryUI>>,
 
     asset_server: Res<AssetServer>,
@@ -29,7 +29,7 @@ pub fn setup_chest_slots_ui(
     if inv_spawn_check.get_single().is_err() {
         return;
     }
-    if inv_state.0 != InventoryUIState::Chest {
+    if inv_state.0 != UIState::Chest {
         return;
     };
     for (slot_index, item) in inv.items.items.iter().enumerate() {
@@ -48,11 +48,11 @@ pub fn setup_chest_slots_ui(
     }
 }
 pub fn change_ui_state_to_chest_when_resource_added(
-    mut inv_ui_state: ResMut<NextState<InventoryUIState>>,
+    mut inv_ui_state: ResMut<NextState<UIState>>,
     mut inv_state: ResMut<InventoryState>,
 ) {
     inv_state.open = true;
-    inv_ui_state.set(InventoryUIState::Chest);
+    inv_ui_state.set(UIState::Chest);
 }
 
 pub fn add_inv_to_new_chest_objs(

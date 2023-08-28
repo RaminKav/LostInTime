@@ -14,7 +14,7 @@ use crate::{
         projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
         RequiredEquipmentType, WorldObject,
     },
-    levels::{ExperienceReward, PlayerLevel},
+    player::levels::{ExperienceReward, PlayerLevel},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     AppExt, CustomFlush, GameParam, GameState, Player, YSort,
@@ -69,7 +69,7 @@ impl Plugin for CombatPlugin {
         .add_systems(
             (
                 handle_hits,
-                cleanup_marked_for_death_entities,
+                cleanup_marked_for_death_entities.after(handle_enemy_death),
                 handle_attack_cooldowns.before(CustomFlush),
                 spawn_hit_spark_effect.after(handle_hits),
                 handle_invincibility_frames.after(handle_hits),

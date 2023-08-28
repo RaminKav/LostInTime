@@ -40,7 +40,7 @@ use crate::{
         Block, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable, PlacesInto,
         RequiredEquipmentType, Wall, WorldObject,
     },
-    levels::ExperienceReward,
+    player::levels::ExperienceReward,
     schematic::{loot_chests::LootChestType, SchematicType},
     world::WorldObjectEntityData,
     CustomFlush, GameState, YSort,

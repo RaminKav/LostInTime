@@ -6,6 +6,7 @@ mod interactions;
 mod inventory_ui;
 pub mod minimap;
 mod player_hud;
+mod stats_ui;
 mod tooltips;
 mod ui_helpers;
 pub use chest_ui::*;
@@ -28,9 +29,12 @@ use self::{
         tick_damage_numbers, DodgeEvent,
     },
     minimap::MinimapPlugin,
+    stats_ui::{setup_stats_ui, toggle_stats_visibility, update_sp_text, update_stats_text},
 };
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
+pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
+pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const UI_SLOT_SIZE: f32 = 20.0;
 
@@ -38,7 +42,7 @@ pub struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_state::<InventoryUIState>()
+        app.add_state::<UIState>()
             .insert_resource(LastHoveredSlot { slot: None })
             .insert_resource(InventoryState::default())
             .add_event::<ActionSuccessEvent>()
@@ -51,10 +55,14 @@ impl Plugin for UIPlugin {
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_startup_system(spawn_fps_text)
-            .add_systems((setup_inv_ui.before(CustomFlush).run_if(
-                state_changed::<InventoryUIState>()
-                    .and_then(not(in_state(InventoryUIState::Closed))),
-            ),))
+            .add_systems((
+                setup_inv_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Open))),
+                setup_inv_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Chest))),
+            ))
             .add_systems(
                 (
                     setup_hotbar_hud,
@@ -80,7 +88,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_inv_slots_ui,
-                    setup_chest_slots_ui.run_if(in_state(InventoryUIState::Chest)),
+                    setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     change_ui_state_to_chest_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<ChestInventory>()),
@@ -93,7 +101,7 @@ impl Plugin for UIPlugin {
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
                     handle_cursor_update
                         .before(handle_item_drop_clicks)
-                        .run_if(not(in_state(InventoryUIState::Closed))),
+                        .run_if(not(in_state(UIState::Closed))),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     update_healthbar,
@@ -105,9 +113,14 @@ impl Plugin for UIPlugin {
                 (
                     add_inv_to_new_chest_objs,
                     update_foodbar,
-                    handle_spawn_inv_player_stats
-                        .run_if(in_state(InventoryUIState::Open))
-                        .after(CustomFlush),
+                    handle_spawn_inv_player_stats.after(CustomFlush),
+                    handle_cursor_stats_buttons.run_if(in_state(UIState::Stats)),
+                    toggle_stats_visibility,
+                    setup_stats_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Stats))),
+                    update_stats_text.run_if(in_state(UIState::Stats)),
+                    update_sp_text.run_if(in_state(UIState::Stats)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

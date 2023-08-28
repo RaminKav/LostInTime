@@ -5,14 +5,13 @@ use crate::{
     attributes::{hunger::Hunger, CurrentHealth, MaxHealth},
     colors::{BLACK, RED, YELLOW},
     inventory::Inventory,
-    levels::PlayerLevel,
-    player::Player,
+    player::{levels::PlayerLevel, Player},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
-    InventoryUIState, UIElement,
+    UIElement, UIState,
 };
 
 #[derive(Component)]
@@ -34,7 +33,7 @@ pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-62. / 2., 0., 10.),
+                translation: Vec3::new(-62. / 2., 0., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -85,7 +84,7 @@ pub fn setup_foodbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-62. / 2., 0., 10.),
+                translation: Vec3::new(-62. / 2., 0., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -246,7 +245,7 @@ pub fn setup_hotbar_hud(
     inv_state: Res<InventoryState>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
-    inv_ui_state: Res<State<InventoryUIState>>,
+    inv_ui_state: Res<State<UIState>>,
 ) {
     for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
         // hotbar slots
