@@ -1,0 +1,17 @@
+(
+  name: "PebbleBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PebbleBlock,
+  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(Pebble),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PebbleBlock,
+        metadata: (
+            name: "Pebble", 
+            desc: "A Pebble."
+        ),
+        count: 1
+  ),
+  }
+)

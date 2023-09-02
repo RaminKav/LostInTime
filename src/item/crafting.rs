@@ -2,8 +2,8 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
-    inventory::{Inventory, InventoryItemStack, ItemStack},
-    item::{ItemDisplayMetaData, WorldObject},
+    inventory::{Inventory, InventoryItemStack},
+    item::WorldObject,
     proto::proto_param::ProtoParam,
     GameState,
 };
@@ -66,18 +66,10 @@ impl CraftingPlugin {
             let result_option = if let Some(result) =
                 recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
             {
-                let item_data = proto.get_item_data(result);
+                let item_stack = proto.get_item_data(result).unwrap();
+
                 Some(InventoryItemStack {
-                    item_stack: item_data
-                        .unwrap_or(&ItemStack {
-                            count: 1,
-                            metadata: ItemDisplayMetaData {
-                                name: "Null".to_string(),
-                                ..default()
-                            },
-                            ..default()
-                        })
-                        .clone(),
+                    item_stack: item_stack.clone(),
                     slot: 4,
                 })
             } else {

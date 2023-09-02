@@ -13,18 +13,24 @@
       object_generation_frequenceis: {
         Tree: 0.5,
         Boulder: 0.1,
+        CoalBoulder: 0.03,
+        MetalBoulder: 0.5,
         Grass: 0.4,
-        Crate: 0.0001,
+        Pebble: 0.004,
+        Crate: 0.00015,
         DeadSapling: 0.05,
       },
       schematic_frequencies: {
-        House: 0.0,
-        DungeonEntrance: 0.0
+        House: 0.08,
+        DungeonEntrance: 0.15
       },
       obj_allowed_tiles_map: {
         Tree: [GrassTile],
         Boulder: [GrassTile],
+        CoalBoulder: [GrassTile],
+        MetalBoulder: [GrassTile],
         Grass: [GrassTile],
+        Pebble: [GrassTile, SandTile],
         DeadSapling: [SandTile],
         Chest: [SandTile,GrassTile, DungeonStone],
         StoneWall: [GrassTile, DungeonStone, SandTile],

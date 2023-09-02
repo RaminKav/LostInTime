@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use rand::rngs::ThreadRng;
@@ -8,9 +9,7 @@ use rand::Rng;
 
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
-use crate::attributes::{
-    Attack, AttackCooldown, AttributeModifier, CurrentHealth, MaxHealth, Speed,
-};
+use crate::attributes::Speed;
 use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
@@ -45,7 +44,8 @@ const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key5,
     KeyCode::Key6,
 ];
-#[derive(Default, Resource, Debug)]
+#[derive(Default, Reflect, Resource, Debug)]
+#[reflect(Resource)]
 pub struct CursorPos {
     pub world_coords: Vec3,
     pub screen_coords: Vec3,
@@ -119,6 +119,8 @@ pub struct InputsPlugin;
 impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
+            .register_type::<CursorPos>()
+            .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<AttackEvent>();
             })
@@ -127,7 +129,6 @@ impl Plugin for InputsPlugin {
                     Self::turn_player,
                     Self::move_player,
                     Self::move_camera_with_player.after(Self::move_player),
-                    Self::test_take_damage,
                 )
                     .in_set(CoreGameSet::Main)
                     .in_schedule(CoreSchedule::FixedUpdate),
@@ -258,7 +259,7 @@ impl InputsPlugin {
         mut commands: Commands,
         mut proto_commands: ProtoCommands,
         proto: ProtoParam,
-        mut inv: Query<&mut Inventory>,
+        _inv: Query<&mut Inventory>,
     ) {
         if key_input.just_pressed(KeyCode::I) {
             inv_state.open = !inv_state.open;
@@ -266,77 +267,77 @@ impl InputsPlugin {
 
         if key_input.just_pressed(KeyCode::E) {
             proto_commands.spawn_item_from_proto(
-                WorldObject::BasicStaff,
+                WorldObject::WoodSword,
                 &proto,
                 game.player().position.truncate(),
                 1,
             );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::DualStaff,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::FireStaff,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::Chestplate,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::Pants,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::Ring,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::CrateBlock,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::MagicWhip,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::WoodBow,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::Claw,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::ThrowingStar,
-                &proto,
-                game.player().position.truncate(),
-                64,
-            );
-            proto_commands.spawn_item_from_proto(
-                WorldObject::Arrow,
-                &proto,
-                game.player().position.truncate(),
-                64,
-            );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::BasicStaff,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::DualStaff,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::FireStaff,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::Chestplate,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::Pants,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::Ring,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::CrateBlock,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::MagicWhip,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::WoodBow,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::Claw,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::ThrowingStar,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     64,
+            // );
         }
 
         if key_input.just_pressed(KeyCode::P) {
@@ -365,33 +366,7 @@ impl InputsPlugin {
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-        }
-        if key_input.just_pressed(KeyCode::M) {
-            let item = inv.single().items.items[0].clone();
-            if let Some(item) = item {
-                item.modify_attributes(
-                    AttributeModifier {
-                        modifier: "attack".to_owned(),
-                        delta: 10,
-                    },
-                    &mut inv,
-                );
-            }
-        }
-    }
-    pub fn test_take_damage(
-        // mut player_health_query: Query<&mut Health, With<Player>>,
-        key_input: ResMut<Input<KeyCode>>,
-        att_query: Query<(&mut CurrentHealth, &MaxHealth, &Attack, &AttackCooldown), With<Player>>,
-    ) {
-        if key_input.just_pressed(KeyCode::X) {
-            // att_query.single_mut().0 -= 20;
-        }
-        if key_input.just_pressed(KeyCode::Z) {
-            // att_query.single_mut().0 += 20;
-        }
-        if key_input.just_pressed(KeyCode::T) {
-            println!("STATS: {:?}", att_query.single());
+            proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }
     }
     fn handle_hotbar_key_input(
@@ -573,27 +548,28 @@ impl InputsPlugin {
             (&mut Transform, &mut RawPosition),
             (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
         >,
-        mut screen_camera: Query<
-            (&mut Transform, &GameUpscale),
-            (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
-        >,
+        // _screen_camera: Query<
+        //     (&mut Transform, &GameUpscale),
+        //     (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
+        // >,
     ) {
-        let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
+        let (mut game_camera_transform, _raw_camera_pos) = game_camera.single_mut();
+        let (player_pos, _player_movement_vec) = player_query.single_mut();
+        game_camera_transform.translation.x = player_pos.translation.x;
+        game_camera_transform.translation.y = player_pos.translation.y;
 
-        let (player_pos, player_movement_vec) = player_query.single_mut();
-
-        let camera_lookahead_scale = 15.0;
-        raw_camera_pos.0 = raw_camera_pos
-            .0
-            .lerp(player_movement_vec.0 * camera_lookahead_scale, 0.08);
-        let camera_final_pos = Vec2::new(
-            player_pos.translation.x - raw_camera_pos.x,
-            player_pos.translation.y - raw_camera_pos.y,
-        );
-        game_camera_transform.translation.x = camera_final_pos.x.trunc();
-        game_camera_transform.translation.y = camera_final_pos.y.trunc();
-        let (mut screen_camera_transform, game_upscale) = screen_camera.single_mut();
-        screen_camera_transform.translation.x = camera_final_pos.x.fract() * game_upscale.0;
-        screen_camera_transform.translation.y = camera_final_pos.y.fract() * game_upscale.0;
+        // let camera_lookahead_scale = 15.0;
+        // raw_camera_pos.0 = raw_camera_pos
+        //     .0
+        //     .lerp(player_movement_vec.0 * camera_lookahead_scale, 0.08);
+        // let camera_final_pos = Vec2::new(
+        //     player_pos.translation.x - raw_camera_pos.x,
+        //     player_pos.translation.y - raw_camera_pos.y,
+        // );
+        // game_camera_transform.translation.x = camera_final_pos.x.trunc();
+        // game_camera_transform.translation.y = camera_final_pos.y.trunc();
+        // let (mut screen_camera_transform, game_upscale) = screen_camera.single_mut();
+        // screen_camera_transform.translation.x = camera_final_pos.x.fract() * game_upscale.0;
+        // screen_camera_transform.translation.y = camera_final_pos.y.fract() * game_upscale.0;
     }
 }

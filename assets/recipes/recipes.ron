@@ -1,13 +1,13 @@
 (
     recipes_list : {
-        StoneWallBlock: ((Some(StoneShard), Some(StoneShard), Some(StoneShard), Some(StoneShard)), Shaped),
+        StoneWallBlock: ((Some(StoneChunk), Some(StoneChunk), Some(StoneChunk), Some(StoneChunk)), Shaped),
         String: ((Some(PlantFibre), Some(PlantFibre), Some(PlantFibre), Some(PlantFibre)), Shaped),
         Bandage: ((Some(String), Some(SlimeGoo), Some(SlimeGoo), Some(String)), Shaped),
-        WoodAxe: ((Some(String), Some(StoneShard), Some(Stick), Some(StoneShard)), Shaped),
+        WoodAxe: ((Some(String), Some(StoneChunk), Some(Stick), None), Shaped),
         Stick: ((Some(Log), Some(Log), None, None), Shapeless),
         ChestBlock: ((Some(Log), Some(Log), Some(Log), Some(Log)), Shapeless),
         Log: ((Some(WoodPlank), Some(WoodPlank), Some(WoodPlank), Some(WoodPlank)), Shapeless),
-        StoneShard: ((Some(Pebble), Some(Pebble), Some(Pebble), Some(Pebble)), Shapeless),
-        Dagger: ((Some(String), Some(StoneShard), Some(Stick), None), Shaped),
+        StoneChunk: ((Some(PebbleBlock), Some(PebbleBlock), Some(PebbleBlock), Some(PebbleBlock)), Shapeless),
+        // Dagger: ((Some(String), Some(Flint), Some(Stick), None), Shaped),
     }
 )

@@ -1,0 +1,15 @@
+(
+  name: "MetalShard",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MetalShard,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: MetalShard,
+        metadata: (
+            name: "Metal Shard", 
+            desc: "A metal shard."
+        ),
+        count: 1
+  ),
+  }
+)

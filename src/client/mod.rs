@@ -95,6 +95,7 @@ impl Plugin for ClientPlugin {
             .add_systems(
                 (
                     Self::save_chunk,
+                    Self::despawn_saved_chunks.after(Self::save_chunk),
                     Self::despawn_non_saveable_entities.before(CustomFlush),
                     Self::close_and_save_on_esc.after(CustomFlush),
                     Self::load_chunk.before(CustomFlush),
@@ -209,8 +210,8 @@ impl ClientPlugin {
         let (chunk_manager, mut save_events, children) = local.get_mut(world);
         let mut saved_chunks = HashMap::default();
         for saves in save_events.iter() {
-            println!("SAVING {:?}...", saves.chunk_pos);
             let chunk_e = *chunk_manager.chunks.get(&saves.chunk_pos.into()).unwrap();
+
             let mut entities = children.iter_descendants(chunk_e).collect::<Vec<_>>();
             entities.push(chunk_e);
             saved_chunks.insert(saves.chunk_pos, entities);
@@ -237,11 +238,10 @@ impl ClientPlugin {
         }
         let mut state: SystemState<(GameParam, Commands)> = SystemState::new(world);
         for (chunk_pos, _) in saved_chunks.iter() {
-            let (mut game, mut commands) = state.get_mut(world);
+            let (game, mut commands) = state.get_mut(world);
             commands
                 .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
                 .despawn_recursive();
-            game.remove_chunk_entity(*chunk_pos);
         }
 
         // let (mut game, mut commands, mut dim_query) = state.get_mut(world);
@@ -257,6 +257,18 @@ impl ClientPlugin {
         //         .despawn_recursive();
         //     game.remove_chunk_entity(*chunk_pos);
         // }
+    }
+    fn despawn_saved_chunks(
+        mut commands: Commands,
+        mut game: GameParam,
+        mut events: EventReader<DespawnChunkEvent>,
+    ) {
+        for event in events.iter() {
+            commands
+                .entity(*game.get_chunk_entity(event.chunk_pos).unwrap())
+                .despawn_recursive();
+            game.remove_chunk_entity(event.chunk_pos);
+        }
     }
     pub fn despawn_non_saveable_entities(
         _commands: Commands,

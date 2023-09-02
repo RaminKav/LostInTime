@@ -30,7 +30,7 @@ pub fn handle_new_loot_chest_spawn(
         let loot_table = match chest_type {
             LootChestType::Common => LootTable {
                 drops: vec![
-                    Loot::new(WorldObject::StoneShard, 1, 2, 0.15),
+                    Loot::new(WorldObject::Flint, 1, 2, 0.15),
                     Loot::new(WorldObject::Log, 1, 2, 0.15),
                     Loot::new(WorldObject::SmallPotion, 1, 1, 0.09),
                     Loot::new(WorldObject::GrassBlock, 1, 4, 0.25),
@@ -48,7 +48,7 @@ pub fn handle_new_loot_chest_spawn(
             },
             LootChestType::Uncommon => LootTable {
                 drops: vec![
-                    Loot::new(WorldObject::StoneShard, 1, 2, 0.2),
+                    Loot::new(WorldObject::Flint, 1, 2, 0.2),
                     Loot::new(WorldObject::Log, 1, 2, 0.2),
                     Loot::new(WorldObject::SmallPotion, 1, 2, 0.2),
                     Loot::new(WorldObject::String, 1, 2, 0.2),
@@ -73,7 +73,7 @@ pub fn handle_new_loot_chest_spawn(
             },
             LootChestType::Rare => LootTable {
                 drops: vec![
-                    Loot::new(WorldObject::StoneShard, 1, 2, 0.2),
+                    Loot::new(WorldObject::Flint, 1, 2, 0.2),
                     Loot::new(WorldObject::Log, 1, 2, 0.2),
                     Loot::new(WorldObject::SmallPotion, 1, 4, 0.35),
                     Loot::new(WorldObject::String, 1, 2, 0.2),
@@ -120,7 +120,7 @@ pub fn handle_new_loot_chest_spawn(
     }
 }
 
-fn create_new_random_item_stack_with_attributes(
+pub fn create_new_random_item_stack_with_attributes(
     stack: &ItemStack,
     proto: &ProtoParam,
 ) -> ItemStack {

@@ -12,7 +12,7 @@ use strum_macros::{Display, IntoStaticStr};
 use crate::{
     ai::{
         AttackDistance, FollowState, HurtByPlayer, IdleState, LeapAttackState, LineOfSight,
-        ProjectileAttackState,
+        NightTimeAggro, ProjectileAttackState,
     },
     inputs::FacingDirection,
     item::projectile::Projectile,
@@ -233,6 +233,13 @@ impl EnemyPlugin {
                     );
                 }
             }
+            state_machine = state_machine.trans::<IdleState>(
+                NightTimeAggro,
+                FollowState {
+                    target: game.game.player,
+                    speed: 0.7,
+                },
+            );
             e_cmds.insert(state_machine);
         }
     }

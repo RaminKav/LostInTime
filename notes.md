@@ -387,3 +387,58 @@ impl different att styles w seldum_state
 - forrest is next, maybe swamp,
 - snow/lava?
 - dungeons change theme too based on the biome theyre from?
+
+# Recipes and Drops
+
+- Rocks: flint, rock shard, coal*, metal*?
+  - Walls, arrows,
+- Coal: Coal
+  - smelt things, lighting later
+- Metal: rock, metal
+  - armor, throwing stars, etc
+
+Melee weapons == starter weapons/unlimited resource weapons
+bow/claw are op bc of range, but need resources (Arrow/stars)
+magic needs mana??
+
+mob drops = make potions? (mana/hp) -> this is the mats to get magic resources
+
+Night cycle?? night time mobs become hostile or start to spawn more hostile ones?
+some type of daily market event => most reliable way to get scrolls + orbs, rare item drop?
+
+Interactable chests spawn mobs to kill which give loot
+Dungeons are smaller, with an unbreakable wall barrier around them, might reduce lag
+
+- should they have a timer?
+
+# Crafting
+
+## Crafting Table
+
+- Stick
+- Wood Wall
+- Bandage
+- Stone Wall
+- Chest,
+- String
+- Door,
+- Arrow,
+- Small Potion
+- Large Potion
+- Wood Axe
+- Wood Pickaxe
+
+## Furnace
+
+- Metal Shard -> Metal Bar
+- Raw Food -> Cooked Food
+
+## Anvil
+
+- Armor Sets (4 slots each x 3 total = 12)
+- Bow
+- Sword
+- Dagger
+- Throwing Star
+
+##

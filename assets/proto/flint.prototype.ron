@@ -1,10 +1,10 @@
 (
-  name: "StoneShard",
+  name: "Flint",
   templates: ["world_object"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": StoneShard,
+  "survival_rogue_like::item::WorldObject": Flint,
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: StoneShard,
+        obj_type: Flint,
         metadata: (
             name: "Stone Shard", 
             desc: "A chipped piece of Stone."

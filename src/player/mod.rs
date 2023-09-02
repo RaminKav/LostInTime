@@ -58,8 +58,8 @@ impl Default for PlayerState {
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 1.5,
-            player_dash_cooldown: Timer::from_seconds(0.5, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.1, TimerMode::Once),
+            player_dash_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.125, TimerMode::Once),
         }
     }
 }
@@ -269,7 +269,7 @@ fn spawn_player(
             MovementVector::default(),
             YSort,
             Name::new("Player"),
-            Collider::capsule(Vec2::new(0., 2.5), Vec2::new(0., -2.5), 6.),
+            Collider::capsule(Vec2::new(0., -4.0), Vec2::new(0., -4.5), 5.),
             KinematicCharacterController {
                 // The character offset is set to 0.01.
                 offset: CharacterLength::Absolute(0.01),

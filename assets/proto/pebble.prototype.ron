@@ -1,15 +1,22 @@
 (
   name: "Pebble",
-  templates: ["world_object"],
+  templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": Pebble,
-  "survival_rogue_like::inventory::ItemStack": (
-        obj_type: Pebble,
-        metadata: (
-            name: "Pebble", 
-            desc: "A small rock."
+  "survival_rogue_like::item::Block": (),
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::attributes::MaxHealth": (1),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: Pebble, obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: PebbleBlock,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),]
         ),
-        count: 1
-  ),
   }
 )
