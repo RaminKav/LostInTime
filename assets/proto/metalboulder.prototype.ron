@@ -20,7 +20,7 @@
                 rate: 1.
             ),
             (
-                item: Pebble,
+                item: PebbleBlock,
                 min: 1,
                 max: 4,
                 rate: 0.6

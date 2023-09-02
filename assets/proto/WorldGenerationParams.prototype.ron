@@ -14,15 +14,15 @@
         Tree: 0.5,
         Boulder: 0.1,
         CoalBoulder: 0.03,
-        MetalBoulder: 0.5,
+        MetalBoulder: 0.05,
         Grass: 0.4,
-        Pebble: 0.004,
-        Crate: 0.00015,
+        Pebble: 0.005,
+        Crate: 0.00012,
         DeadSapling: 0.05,
       },
       schematic_frequencies: {
-        House: 0.08,
-        DungeonEntrance: 0.15
+        // House: 0.08,
+        DungeonEntrance: 0.05
       },
       obj_allowed_tiles_map: {
         Tree: [GrassTile],
