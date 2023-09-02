@@ -75,7 +75,7 @@ use world::{ChunkManager, WorldGeneration};
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
 const PLAYER_MOVE_SPEED: f32 = 1.5 * ZOOM_SCALE;
-const PLAYER_DASH_SPEED: f32 = 125. * ZOOM_SCALE;
+const PLAYER_DASH_SPEED: f32 = 475. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;

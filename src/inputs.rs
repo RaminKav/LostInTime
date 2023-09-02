@@ -1,13 +1,13 @@
+use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
+use interpolation::Lerp;
 use rand::rngs::ThreadRng;
 use rand::Rng;
-
-use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 
 use crate::attributes::Speed;
 use crate::combat::{AttackTimer, HitEvent};
@@ -142,7 +142,6 @@ impl Plugin for InputsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
-        // .add_system(Self::toggle_inventory);
     }
 }
 
@@ -190,7 +189,7 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
-        let (mut player_transform, mut mv, speed) = player_query.single_mut();
+        let (mut player_kcc, mut mv, speed) = player_query.single_mut();
         let mut player = game.player_mut();
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED * (1. + speed.0 as f32 / 100.);
@@ -218,7 +217,6 @@ impl InputsPlugin {
             player.is_dashing = true;
 
             player.player_dash_cooldown.reset();
-            player.player_dash_duration.reset();
         }
         if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
             && !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]))
@@ -232,24 +230,46 @@ impl InputsPlugin {
 
         if player.is_dashing {
             player.player_dash_duration.tick(time.delta());
+            let is_speeding_up = player.player_dash_duration.percent() < 0.5;
+            d.x = if is_speeding_up {
+                d.x.lerp(
+                    &(d.x * PLAYER_DASH_SPEED * TIME_STEP),
+                    &(player.player_dash_duration.percent() * 2.),
+                )
+            } else {
+                d.x.lerp(
+                    &(d.x * PLAYER_DASH_SPEED * TIME_STEP),
+                    &(1. - (player.player_dash_duration.percent())),
+                )
+            };
+            d.y = if is_speeding_up {
+                d.y.lerp(
+                    &(d.y * PLAYER_DASH_SPEED * TIME_STEP),
+                    &(player.player_dash_duration.percent() * 2.),
+                )
+            } else {
+                d.y.lerp(
+                    &(d.y * PLAYER_DASH_SPEED * TIME_STEP),
+                    &(1. - (player.player_dash_duration.percent())),
+                )
+            };
 
-            d.x += d.x * PLAYER_DASH_SPEED * TIME_STEP;
-            d.y += d.y * PLAYER_DASH_SPEED * TIME_STEP;
             if player.player_dash_duration.just_finished() {
+                player.player_dash_duration.reset();
                 player.is_dashing = false;
             }
         }
-
         mv.0 = d;
 
         if d.x != 0. || d.y != 0. {
-            player_transform.translation = Some(Vec2::new(d.x, d.y));
+            player_kcc.translation = Some(Vec2::new(d.x, d.y));
+
             minimap_event.send(UpdateMiniMapEvent {
                 pos: None,
                 new_tile: None,
             });
         } else {
-            player_transform.translation = Some(Vec2::ZERO);
+            player_kcc.translation = Some(Vec2::ZERO);
         }
     }
     pub fn toggle_inventory(
@@ -535,10 +555,11 @@ impl InputsPlugin {
     }
 
     pub fn move_camera_with_player(
-        mut player_query: Query<
+        player_query: Query<
             (&Transform, &MovementVector),
             (
                 With<Player>,
+                Changed<Transform>,
                 Without<MainCamera>,
                 Without<TextureCamera>,
                 Without<UICamera>,
@@ -553,10 +574,11 @@ impl InputsPlugin {
         //     (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
         // >,
     ) {
-        let (mut game_camera_transform, _raw_camera_pos) = game_camera.single_mut();
-        let (player_pos, _player_movement_vec) = player_query.single_mut();
-        game_camera_transform.translation.x = player_pos.translation.x;
-        game_camera_transform.translation.y = player_pos.translation.y;
+        for (player_pos, _player_movement_vec) in player_query.iter() {
+            let (mut game_camera_transform, _raw_camera_pos) = game_camera.single_mut();
+            game_camera_transform.translation.x = player_pos.translation.x;
+            game_camera_transform.translation.y = player_pos.translation.y;
+        }
 
         // let camera_lookahead_scale = 15.0;
         // raw_camera_pos.0 = raw_camera_pos
