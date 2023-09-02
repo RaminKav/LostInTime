@@ -17,7 +17,7 @@ use crate::{
     player::levels::{ExperienceReward, PlayerLevel},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
-    AppExt, CustomFlush, GameParam, GameState, Player, YSort,
+    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
 };
 
 use self::collisions::CollisionPlugion;
@@ -167,15 +167,15 @@ fn handle_invincibility_frames(
 }
 fn spawn_hit_spark_effect(
     mut commands: Commands,
-    hits: Query<(Entity, Added<JustGotHit>, Option<&Player>)>,
+    mut hit_events: EventReader<HitEvent>,
+    game: Res<Game>,
     transforms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
     // add spark animation entity as child, will animate once and remove itself.
-    for hit in hits.iter() {
-        if hit.2.is_some() {
-            commands.entity(hit.0).remove::<JustGotHit>();
+    for hit in hit_events.iter() {
+        if hit.hit_entity == game.player {
             continue;
         }
         let texture_handle = asset_server.load("textures/effects/hit-particles.png");
@@ -186,7 +186,7 @@ fn spawn_hit_spark_effect(
         let s = 5;
         let x_rng = rng.gen_range(-s..s);
         let y_rng = rng.gen_range(-s..s);
-        let hit_pos = transforms.get(hit.0).unwrap().translation();
+        let hit_pos = transforms.get(hit.hit_entity).unwrap().translation();
 
         commands.spawn((
             SpriteSheetBundle {
@@ -204,7 +204,7 @@ fn spawn_hit_spark_effect(
             Name::new("Hit Spark"),
         ));
 
-        commands.entity(hit.0).remove::<JustGotHit>();
+        commands.entity(hit.hit_entity).remove::<JustGotHit>();
     }
 }
 

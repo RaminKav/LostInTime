@@ -7,7 +7,7 @@ use bevy::{
     prelude::*,
     tasks::IoTaskPool,
 };
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
+
 use strum_macros::{Display, IntoStaticStr};
 pub mod loot_chests;
 mod schematic_spawner;
@@ -57,7 +57,7 @@ impl Plugin for SchematicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SchematicToggle::default())
             .register_type::<SchematicToggle>()
-            .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
+            // .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
             .add_systems(
                 (
                     handle_new_scene_entities_parent_chunk.before(handle_placing_world_object),

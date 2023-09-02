@@ -8,6 +8,7 @@ use attributes::{
     Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
+use night::NightPlugin;
 use rand::Rng;
 
 use bevy::{
@@ -42,6 +43,7 @@ mod enemy;
 mod inputs;
 mod inventory;
 mod item;
+mod night;
 mod player;
 mod proto;
 mod schematic;
@@ -72,7 +74,7 @@ use world::{ChunkManager, WorldGeneration};
 
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
-const PLAYER_MOVE_SPEED: f32 = 2. * ZOOM_SCALE;
+const PLAYER_MOVE_SPEED: f32 = 1.5 * ZOOM_SCALE;
 const PLAYER_DASH_SPEED: f32 = 125. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
@@ -124,6 +126,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
+        .add_plugin(NightPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)

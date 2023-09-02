@@ -1,0 +1,15 @@
+(
+  name: "StoneChunk",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": StoneChunk,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: StoneChunk,
+        metadata: (
+            name: "Stone Chunk", 
+            desc: "A big chunk of stone."
+        ),
+        count: 1
+  ),
+  }
+)

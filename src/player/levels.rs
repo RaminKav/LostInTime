@@ -1,12 +1,9 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{
-    animations::{AnimationTimer, DoneAnimation},
-    world::y_sort::YSort,
-};
+use crate::{animations::AnimationTimer, world::y_sort::YSort};
 
-use super::stats::{PlayerStats, SkillPoints};
+use super::stats::SkillPoints;
 
 #[derive(Component, Debug)]
 pub struct PlayerLevel {

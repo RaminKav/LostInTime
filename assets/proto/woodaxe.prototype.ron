@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": WoodAxe,
   "survival_rogue_like::item::EquipmentType": Axe,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 25, end: 26)),
+        attack: Some((start: 5, end: 12)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::inventory::ItemStack": (

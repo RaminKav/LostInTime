@@ -1,0 +1,15 @@
+(
+  name: "Coal",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Coal,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Coal,
+        metadata: (
+            name: "Coal", 
+            desc: "A chunk of coal."
+        ),
+        count: 1
+  ),
+  }
+)

@@ -47,6 +47,7 @@ pub enum Projectile {
     Arrow,
     ThrowingStar,
     FireExplosionAOE,
+    SlimeGooProjectile,
 }
 
 impl Projectile {

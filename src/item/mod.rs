@@ -172,7 +172,7 @@ pub enum WorldObject {
     DungeonStone,
     WaterTile,
     SandTile,
-    StoneShard,
+    Flint,
     Tree,
     Log,
     Sword,
@@ -208,10 +208,18 @@ pub enum WorldObject {
     WoodPlank,
     WoodAxe,
     Pebble,
+    PebbleBlock,
     Claw,
     FireExplosionAOE,
     Crate,
     CrateBlock,
+    Coal,
+    MetalShard,
+    CoalBoulder,
+    MetalBoulder,
+    SlimeGooProjectile,
+    StoneChunk,
+    WoodSword,
 }
 
 #[derive(
@@ -517,7 +525,7 @@ pub fn handle_break_object(
                 }
             }
         }
-        commands.entity(broken.entity).despawn();
+        commands.entity(broken.entity).despawn_recursive();
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {

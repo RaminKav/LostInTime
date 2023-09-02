@@ -91,6 +91,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<ConsumableItem>()
             .register_type::<ArcProjectileData>()
             .register_type::<ColliderProto>()
+            .register_type::<ColliderCapsulProto>()
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
@@ -144,7 +145,7 @@ impl ProtoPlugin {
         prototypes.load("proto/firestaff.prototype.ron");
         prototypes.load("proto/ring.prototype.ron");
         prototypes.load("proto/pendant.prototype.ron");
-        prototypes.load("proto/stoneshard.prototype.ron");
+        prototypes.load("proto/flint.prototype.ron");
         prototypes.load("proto/smallpotion.prototype.ron");
         prototypes.load("proto/largepotion.prototype.ron");
         prototypes.load("proto/log.prototype.ron");
@@ -178,6 +179,14 @@ impl ProtoPlugin {
         prototypes.load("proto/fireexplosionaoe.prototype.ron");
         prototypes.load("proto/crate.prototype.ron");
         prototypes.load("proto/crateblock.prototype.ron");
+        prototypes.load("proto/coal.prototype.ron");
+        prototypes.load("proto/metalshard.prototype.ron");
+        prototypes.load("proto/coalboulder.prototype.ron");
+        prototypes.load("proto/metalboulder.prototype.ron");
+        prototypes.load("proto/slimegooprojectile.prototype.ron");
+        prototypes.load("proto/stonechunk.prototype.ron");
+        prototypes.load("proto/woodsword.prototype.ron");
+        prototypes.load("proto/pebbleblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");
@@ -250,6 +259,20 @@ pub struct ColliderProto {
 impl From<ColliderProto> for Collider {
     fn from(col_state: ColliderProto) -> Collider {
         Collider::cuboid(col_state.x, col_state.y)
+    }
+}
+#[derive(Schematic, Reflect, FromReflect)]
+#[reflect(Schematic)]
+#[schematic(into = Collider)]
+pub struct ColliderCapsulProto {
+    x: f32,
+    y: f32,
+    r: f32,
+}
+
+impl From<ColliderCapsulProto> for Collider {
+    fn from(c: ColliderCapsulProto) -> Collider {
+        Collider::capsule(Vec2::new(0., c.x), Vec2::new(0., c.y), c.r)
     }
 }
 

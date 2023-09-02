@@ -8,6 +8,7 @@ use crate::{
     combat::HitEvent,
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
+    night::NightTracker,
     Game,
 };
 
@@ -37,6 +38,25 @@ impl Trigger for LineOfSight {
 
             let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
             return (distance <= self.range).then_some(distance).ok_or(distance);
+        } else {
+            Err(0.)
+        }
+    }
+}
+
+// This trigger checks if the enemy is within the the given range of the target
+#[derive(Clone, Copy, Reflect)]
+pub struct NightTimeAggro;
+
+impl Trigger for NightTimeAggro {
+    type Param<'w, 's> = Res<'w, NightTracker>;
+    type Ok = f32;
+    type Err = f32;
+
+    // Return `Ok` to trigger and `Err` to not trigger
+    fn trigger(&self, _entity: Entity, night_tracker: Self::Param<'_, '_>) -> Result<f32, f32> {
+        if (night_tracker.time - 12.) >= 12. {
+            Ok(1.)
         } else {
             Err(0.)
         }

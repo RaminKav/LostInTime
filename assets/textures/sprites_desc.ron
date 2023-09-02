@@ -5,7 +5,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-        StoneShard: WorldObjectData(
+        Flint: WorldObjectData(
             texture_pos: (0., 4.),
             size: (16., 16.),
             anchor: None,
@@ -42,6 +42,11 @@
         ),
         Sword: WorldObjectData(
             texture_pos: (3., 4.),
+            size: (16., 16.),
+            anchor: Some((0.25, 0.25)),
+        ),
+        WoodSword: WorldObjectData(
+            texture_pos: (3., 6.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
         ),
@@ -155,6 +160,16 @@
             size: (32., 32.),
             anchor: None,
         ),
+        CoalBoulder: WorldObjectData(
+            texture_pos: (6., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        MetalBoulder: WorldObjectData(
+            texture_pos: (8., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
         FireExplosionAOE: WorldObjectData(
             texture_pos: (6., 9.),
             size: (32., 32.),
@@ -180,8 +195,33 @@
             size: (16., 16.),
             anchor: None,
         ),
+        SlimeGooProjectile: WorldObjectData(
+            texture_pos: (12., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PebbleBlock: WorldObjectData(
+            texture_pos: (12., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Pebble: WorldObjectData(
             texture_pos: (12., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Coal: WorldObjectData(
+            texture_pos: (11., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        StoneChunk: WorldObjectData(
+            texture_pos: (10., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MetalShard: WorldObjectData(
+            texture_pos: (13., 3.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -242,6 +282,10 @@
         ),
         WoodAxe: SpriteData(
             texture_pos: (8., 4.),
+            size: (16., 16.),
+        ),
+        WoodSword: SpriteData(
+            texture_pos: (3., 7.),
             size: (16., 16.),
         ),
         MagicWhip: SpriteData(

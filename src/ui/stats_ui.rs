@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
-    colors::{BLACK, LIGHT_GREEN},
+    colors::BLACK,
     player::stats::{PlayerStats, SkillPoints},
     GAME_HEIGHT, GAME_WIDTH,
 };

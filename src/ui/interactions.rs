@@ -9,6 +9,7 @@ use crate::{
     item::{CompleteRecipeEvent, CraftingSlotUpdateEvent},
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
+    schematic::loot_chests::create_new_random_item_stack_with_attributes,
     ui::InventorySlotType,
     GameParam,
 };
@@ -485,6 +486,7 @@ pub fn handle_cursor_update(
     mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
     mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
     mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
+    proto: ProtoParam,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -529,6 +531,12 @@ pub fn handle_cursor_update(
                                     crafting_slot_event.send(CraftingSlotUpdateEvent);
                                 }
                                 if state.r#type.is_crafting_result() {
+                                    commands.entity(item_icon.0).insert(
+                                        create_new_random_item_stack_with_attributes(
+                                            item_icon.2,
+                                            &proto,
+                                        ),
+                                    );
                                     complete_recipe_event.send(CompleteRecipeEvent);
                                 } else {
                                     container_items.items[state.slot_index] = None;

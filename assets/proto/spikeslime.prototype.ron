@@ -6,28 +6,28 @@
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 50., duration: 0.25, cooldown: 1.0, speed: 1.7),
-    "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: Fireball),
+    "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: SlimeGooProjectile),
 //    "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/spikeslime/spikeslime_down.png", size: (x: 32., y: 32.), cols: 6, rows: 5),
-    "survival_rogue_like::proto::ColliderProto": (x: 10., y: 8.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x: -4., y: -4.5, r: 10.),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
     "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,6,4], valid_directions: [0,1,2,3], anim_offset: 0),
     "survival_rogue_like::attributes::MaxHealth": (50),
     "survival_rogue_like::attributes::Attack": (5),
-    "survival_rogue_like::player::levels::ExperienceReward": (75),
+    "survival_rogue_like::player::levels::ExperienceReward": (37),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: SmallPotion,
                 min: 1,
                 max: 1,
-                rate: 0.05
+                rate: 0.065
             ),
             (
                 item: LargePotion,
                 min: 1,
                 max: 1,
-                rate: 0.32
+                rate: 0.035
             ),
             (
                 item: SlimeGoo,
@@ -36,23 +36,83 @@
                 rate: 0.5
             ),
             (
+                item: Arrow,
+                min: 1,
+                max: 3,
+                rate: 0.25
+            ),
+            (
+                item: ThrowingStar,
+                min: 1,
+                max: 3,
+                rate: 0.25
+            ),
+            (
                 item: Sword,
                 min: 1,
                 max: 1,
-                rate: 0.95
+                rate: 0.008
+            ),
+            (
+                item: Dagger,
+                min: 1,
+                max: 1,
+                rate: 0.008
+            ),
+            (
+                item: BasicStaff,
+                min: 1,
+                max: 1,
+                rate: 0.008
+            ),
+            (
+                item: FireStaff,
+                min: 1,
+                max: 1,
+                rate: 0.008
             ),
             (
                 item: MagicWhip,
                 min: 1,
                 max: 1,
-                rate: 1.
+                rate: 0.008
             ),
             (
-                item: WoodAxe,
+                item: WoodBow,
                 min: 1,
                 max: 1,
-                rate: 0.95
-            )
+                rate: 0.008
+            ),
+            (
+                item: Claw,
+                min: 1,
+                max: 1,
+                rate: 0.008
+            ),
+            (
+                item: Ring,
+                min: 1,
+                max: 1,
+                rate: 0.0095
+            ),
+            (
+                item: Pendant,
+                min: 1,
+                max: 1,
+                rate: 0.008
+            ),
+            (
+                item: Chestplate,
+                min: 1,
+                max: 1,
+                rate: 0.009
+            ),
+            (
+                item: Pants,
+                min: 1,
+                max: 1,
+                rate: 0.009
+            ),
             ]
         ),
   }
