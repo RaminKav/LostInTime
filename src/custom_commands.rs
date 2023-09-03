@@ -80,7 +80,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             // modify the direction and offset of projectile
             let mut proto_data = proj_state.clone();
             proto_data.direction = dir;
-            let angle = proto_data.direction.y.atan2(proto_data.direction.x);
             let sprite_size = if let Some(sprite_data) = params.get_sprite_sheet_data(obj.clone()) {
                 sprite_data.size
             } else {
@@ -88,6 +87,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             };
             let mut x_offset = 0.;
             let mut y_offset = 0.;
+            let angle = proto_data.direction.y.atan2(proto_data.direction.x);
             if dir != Vec2::ZERO {
                 x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
                 y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;

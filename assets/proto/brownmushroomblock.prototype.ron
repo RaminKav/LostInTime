@@ -1,0 +1,17 @@
+(
+  name: "BrownMushroomBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BrownMushroomBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BrownMushroomBlock,
+        metadata: (
+            name: "Brown Mushroom", 
+            desc: "Mmmm!"
+        ),
+        count: 1
+  ),
+  }
+)

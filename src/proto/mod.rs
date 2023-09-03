@@ -32,7 +32,7 @@ use crate::{
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
-        item_actions::{ConsumableItem, ItemAction},
+        item_actions::{ConsumableItem, ItemAction, ItemActions},
         item_upgrades::ClawUpgradeMultiThrow,
         melee::MeleeAttack,
         object_actions::ObjectAction,
@@ -86,6 +86,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<SpriteSize>()
             .register_type::<SpriteAnchor>()
             .register_type::<ItemAction>()
+            .register_type::<ItemActions>()
             .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
@@ -108,6 +109,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Vec<WorldObject>>()
             .register_type::<Vec<u8>>()
             .register_type::<Vec<f32>>()
+            .register_type::<Vec<ItemAction>>()
             .register_type::<Option<Range<i32>>>()
             .register_type::<Range<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
@@ -187,6 +189,14 @@ impl ProtoPlugin {
         prototypes.load("proto/stonechunk.prototype.ron");
         prototypes.load("proto/woodsword.prototype.ron");
         prototypes.load("proto/pebbleblock.prototype.ron");
+        prototypes.load("proto/redmushroom.prototype.ron");
+        prototypes.load("proto/redmushroomblock.prototype.ron");
+        prototypes.load("proto/brownmushroom.prototype.ron");
+        prototypes.load("proto/brownmushroomblock.prototype.ron");
+        prototypes.load("proto/berrybush.prototype.ron");
+        prototypes.load("proto/berries.prototype.ron");
+        prototypes.load("proto/feather.prototype.ron");
+        prototypes.load("proto/woodpickaxe.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

@@ -25,6 +25,12 @@ pub enum ItemAction {
     PlacesInto(WorldObject),
     Eat(i8), // Projectile
 }
+
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub struct ItemActions {
+    pub actions: Vec<ItemAction>,
+}
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
 pub struct ConsumableItem;
@@ -46,7 +52,7 @@ pub struct ItemActionParam<'w, 's> {
     marker: PhantomData<&'s ()>,
 }
 
-impl ItemAction {
+impl ItemActions {
     pub fn run_action(
         &self,
         obj: WorldObject,
@@ -54,47 +60,50 @@ impl ItemAction {
         game: &mut GameParam,
         proto_param: &ProtoParam,
     ) {
-        match self {
-            ItemAction::ModifyHealth(delta) => {
-                item_action_param
-                    .modify_health_event
-                    .send(ModifyHealthEvent(*delta));
-            }
-            ItemAction::Teleport(pos) => {
-                let pos = world_pos_to_tile_pos(*pos);
-                item_action_param.move_player_event.send(MovePlayerEvent {
-                    chunk_pos: pos.chunk_pos,
-                    tile_pos: pos.tile_pos,
-                });
-            }
-            ItemAction::PlacesInto(obj) => {
-                let pos = item_action_param.cursor_pos.world_coords.truncate();
-                if game.player().position.truncate().distance(pos)
-                    > game.player().reach_distance * 32.
-                {
-                    return;
+        for action in &self.actions {
+            match action {
+                ItemAction::ModifyHealth(delta) => {
+                    item_action_param
+                        .modify_health_event
+                        .send(ModifyHealthEvent(*delta));
                 }
-                if !can_object_be_placed_here(
-                    world_pos_to_tile_pos(pos),
-                    game,
-                    obj.is_medium_size(proto_param),
-                    &proto_param,
-                ) {
-                    return;
+                ItemAction::Teleport(pos) => {
+                    let pos = world_pos_to_tile_pos(*pos);
+                    item_action_param.move_player_event.send(MovePlayerEvent {
+                        chunk_pos: pos.chunk_pos,
+                        tile_pos: pos.tile_pos,
+                    });
                 }
-                item_action_param.place_item_event.send(PlaceItemEvent {
-                    obj: *obj,
-                    pos,
-                    loot_chest_type: None,
-                });
-            }
-            ItemAction::Eat(delta) => {
-                for mut hunger in item_action_param.hunger_query.iter_mut() {
-                    hunger.modify_hunger(*delta);
+                ItemAction::PlacesInto(obj) => {
+                    let pos = item_action_param.cursor_pos.world_coords.truncate();
+                    if game.player().position.truncate().distance(pos)
+                        > game.player().reach_distance * 32.
+                    {
+                        return;
+                    }
+                    if !can_object_be_placed_here(
+                        world_pos_to_tile_pos(pos),
+                        game,
+                        obj.is_medium_size(proto_param),
+                        &proto_param,
+                    ) {
+                        return;
+                    }
+                    item_action_param.place_item_event.send(PlaceItemEvent {
+                        obj: *obj,
+                        pos,
+                        loot_chest_type: None,
+                    });
                 }
+                ItemAction::Eat(delta) => {
+                    for mut hunger in item_action_param.hunger_query.iter_mut() {
+                        hunger.modify_hunger(*delta);
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
+
         item_action_param
             .action_success_event
             .send(ActionSuccessEvent { obj });

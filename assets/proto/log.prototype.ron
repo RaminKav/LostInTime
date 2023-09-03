@@ -4,7 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": Log,
   "survival_rogue_like::item::PlacesInto": (Tree),
-  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(Tree),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Tree)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Log,

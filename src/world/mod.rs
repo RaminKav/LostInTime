@@ -112,7 +112,7 @@ pub struct WorldGeneration {
     pub dirt_frequency: f64,
     pub stone_wall_frequency: f64,
     pub schematic_frequencies: HashMap<SchematicType, f64>,
-    pub object_generation_frequenceis: HashMap<WorldObject, f64>,
+    pub object_generation_frequencies: HashMap<WorldObject, f64>,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }
 pub struct WorldPlugin;

@@ -1,0 +1,15 @@
+(
+  name: "MetalBar",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MetalBar,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: MetalBar,
+        metadata: (
+            name: "Metal Bar", 
+            desc: "A metal Bar."
+        ),
+        count: 1
+  ),
+  }
+)

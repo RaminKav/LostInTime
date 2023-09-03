@@ -284,6 +284,7 @@ impl ClientPlugin {
     pub fn close_and_save_on_esc(world: &mut World) {
         let input = world.resource::<Input<KeyCode>>();
         if input.just_pressed(KeyCode::Escape) {
+            return;
             // const PATH: &str = "example2.json";
 
             // let file = File::create(PATH).expect("Could not open file for serialization");

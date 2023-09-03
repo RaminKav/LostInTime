@@ -1,5 +1,6 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use bevy_ecs_tilemap::tiles::TilePos;
+use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{
     ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
     KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
@@ -16,11 +17,13 @@ use crate::{
         CritDamage, HealthRegen, InvincibilityCooldown, ItemAttributes, MaxHealth,
         PlayerAttributeBundle,
     },
+    custom_commands::CommandsExt,
     inputs::{FacingDirection, InputsPlugin, MovementVector},
     inventory::{Container, Inventory, INVENTORY_SIZE},
-    item::EquipmentData,
+    item::{EquipmentData, WorldObject},
+    proto::proto_param::ProtoParam,
     world::{y_sort::YSort, CHUNK_SIZE},
-    AppExt, CoreGameSet, Game, GameParam, RawPosition,
+    AppExt, CoreGameSet, Game, GameParam, GameState, RawPosition,
 };
 
 use self::{
@@ -91,6 +94,7 @@ impl Plugin for PlayerPlugin {
             send_attribute_event_on_stats_update,
             handle_level_up,
             spawn_particles_when_leveling,
+            give_player_starting_items.in_schedule(OnEnter(GameState::Main)),
         ))
         .add_system(
             handle_move_player
@@ -149,9 +153,8 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-
+    mut meshes: ResMut<Assets<Mesh>>,
     mut game: ResMut<Game>,
     _images: ResMut<Assets<Image>>,
 ) {
@@ -254,7 +257,7 @@ fn spawn_player(
                 crit_damage: 150,
                 ..default()
             },
-            Hunger::new(100, 12., 20),
+            Hunger::new(100, 5., 8),
             PlayerAttributeBundle {
                 health: MaxHealth(100),
                 attack: Attack(0),
@@ -286,4 +289,8 @@ fn spawn_player(
         .push_children(&limb_children)
         .id();
     game.player = p;
+}
+
+fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
+    proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
 }
