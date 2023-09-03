@@ -173,7 +173,7 @@ impl GenerationPlugin {
 
             for (obj, frequency) in game
                 .world_generation_params
-                .object_generation_frequenceis
+                .object_generation_frequencies
                 .iter()
             {
                 let raw_points = noise_helpers::poisson_disk_sampling(

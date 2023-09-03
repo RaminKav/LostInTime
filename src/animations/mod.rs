@@ -54,7 +54,9 @@ pub struct AttackAnimationTimer(pub Timer, pub f32);
 pub struct DoneAnimation;
 
 #[derive(Debug, Clone, Default)]
-pub struct AttackEvent;
+pub struct AttackEvent {
+    pub direction: Vec2,
+}
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056f0"]
 pub struct AnimatedTextureMaterial {
@@ -285,9 +287,12 @@ impl AnimationsPlugin {
     }
     fn handle_held_item_direction_change(
         game: GameParam,
-        mut tool_query: Query<(&WorldObject, &mut Transform), (With<MainHand>, Without<Chunk>)>,
+        mut tool_query: Query<
+            (&WorldObject, &mut Transform, &mut TextureAtlasSprite),
+            (With<MainHand>, Without<Chunk>),
+        >,
     ) {
-        if let Ok((obj, mut t)) = tool_query.get_single_mut() {
+        if let Ok((obj, mut t, mut sprite)) = tool_query.get_single_mut() {
             let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
             let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
 
@@ -295,7 +300,12 @@ impl AnimationsPlugin {
 
             t.translation.x = PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x
                 + anchor.x * obj_data.size.x
-                + if is_facing_left { 0. } else { 11. }
+                + if is_facing_left { 0. } else { 11. };
+            if is_facing_left {
+                sprite.flip_x = true;
+            } else {
+                sprite.flip_x = false;
+            }
         }
     }
     fn animate_attack(
@@ -305,7 +315,8 @@ impl AnimationsPlugin {
             (&WorldObject, &mut Transform, &mut AttackAnimationTimer),
             (With<Equipment>, Without<Chunk>),
         >,
-        attack_event: EventReader<AttackEvent>,
+        mut attack_event: EventReader<AttackEvent>,
+        mut dir_state: Local<Vec2>,
     ) {
         if let Ok((obj, mut t, mut at)) = tool_query.get_single_mut() {
             let is_facing_left = if game.player().direction == FacingDirection::Left {
@@ -313,28 +324,44 @@ impl AnimationsPlugin {
             } else {
                 -1.
             };
+            let attack_option = attack_event.iter().next();
+            if let Some(attack) = attack_option {
+                *dir_state = attack.direction;
+            }
 
-            if attack_event.len() > 0 || !at.0.elapsed().is_zero() {
+            if attack_option.is_some() || !at.0.elapsed().is_zero() {
                 game.player_mut().is_attacking = true;
 
                 let d = time.delta();
                 at.0.tick(d);
                 if !at.0.just_finished() {
                     at.1 = PI / 2.;
-                    // at.1 = lerp(
-                    //     &0.,
-                    //     &PI,
-                    //     &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
-                    // );
-                    t.rotation = Quat::from_rotation_z(is_facing_left * at.1);
+                    let mut x_offset = 0.;
+                    let mut y_offset = 0.;
+                    let angle = dir_state.y.atan2(dir_state.x);
+
+                    if *dir_state != Vec2::ZERO {
+                        x_offset = (angle.cos() * (16.) + angle.cos() * (16.)) / 2.;
+                        y_offset = (angle.sin() * (16.) + angle.sin() * (16.)) / 2.;
+                    }
+                    t.rotation = Quat::from_rotation_z(angle - PI / 2.);
                     // t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);
-                    t.translation.y = -4.;
+                    // t.translation.y = -4.;
+                    t.translation.y = lerp(
+                        &(-4.),
+                        &y_offset,
+                        // &(-15. * is_facing_left),
+                        &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
+                    );
                     t.translation.x = lerp(
                         &(-5. * is_facing_left),
-                        &(-15. * is_facing_left),
+                        &x_offset,
+                        // &(-15. * is_facing_left),
                         &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     );
                 } else {
+                    println!("DONE ATTACK");
+
                     at.0.reset();
                     at.1 = 0.;
                     t.rotation = Quat::from_rotation_z(-at.1);
@@ -347,6 +374,7 @@ impl AnimationsPlugin {
                 }
             } else {
                 game.player_mut().is_attacking = false;
+                *dir_state = Vec2::ZERO;
             }
         }
     }

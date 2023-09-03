@@ -1,0 +1,17 @@
+(
+  name: "RedMushroomBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": RedMushroomBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ModifyHealth(5)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: RedMushroomBlock,
+        metadata: (
+            name: "Red Mushroom", 
+            desc: "Mmmm!"
+        ),
+        count: 1
+  ),
+  }
+)

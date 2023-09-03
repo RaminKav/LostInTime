@@ -14,7 +14,7 @@
         House: 0.0,
         DungeonEntrance: 0.0
       },
-      object_generation_frequenceis: {
+      object_generation_frequencies: {
         Tree: 0.0,
         Boulder: 0.0,
         Grass: 0.0,

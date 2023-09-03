@@ -3,7 +3,7 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": CrateBlock,
-  "survival_rogue_like::item::item_actions::ItemAction": PlacesInto(Crate),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ PlacesInto(Crate)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: CrateBlock,

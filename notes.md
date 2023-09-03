@@ -170,6 +170,7 @@ impl different att styles w seldum_state
 [] Items: add lots of items/recipies
 [x] Items: shrink walls, simplify top borders so its easier to add new wall types
 [] Add colliders to water (use corners)
+[] Make grass foliage shader
 [] Generation: Add random ore clusters in dungeons?
 [] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
 [x] Survival: Food system

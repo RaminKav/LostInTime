@@ -35,7 +35,7 @@ pub struct Recipes {
     // map of recipie result and its recipe matrix
     pub recipes_list: RecipeList,
 }
-pub type RecipeList = HashMap<WorldObject, (CraftingGrid, RecipeType)>;
+pub type RecipeList = HashMap<WorldObject, (CraftingGrid, RecipeType, usize)>;
 
 impl CraftingPlugin {
     fn handle_crafting_slot_update(
@@ -63,10 +63,10 @@ impl CraftingPlugin {
             }
 
             let recipe = CraftingRecipe { recipe };
-            let result_option = if let Some(result) =
+            let result_option = if let Some((result, count)) =
                 recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
             {
-                let item_stack = proto.get_item_data(result).unwrap();
+                let item_stack = proto.get_item_data(result).unwrap().copy_with_count(count);
 
                 Some(InventoryItemStack {
                     item_stack: item_stack.clone(),
@@ -111,8 +111,8 @@ pub struct CraftingRecipe {
 pub type CraftingGrid = [Option<WorldObject>; 4];
 
 impl CraftingRecipe {
-    fn get_potential_reward(self, recipes_list: Res<Recipes>) -> Option<WorldObject> {
-        for (result, (recipe, recipe_type)) in recipes_list.recipes_list.iter() {
+    fn get_potential_reward(self, recipes_list: Res<Recipes>) -> Option<(WorldObject, usize)> {
+        for (result, (recipe, recipe_type, count)) in recipes_list.recipes_list.iter() {
             let mut grid = self.recipe.clone();
 
             let mut recipe = recipe.clone();
@@ -120,7 +120,7 @@ impl CraftingRecipe {
                 recipe.sort_by_key(|v| v.is_some());
                 grid.sort_by_key(|v| v.is_some());
                 if recipe == grid {
-                    return Some(*result);
+                    return Some((*result, *count));
                 }
                 continue;
             }
@@ -129,7 +129,7 @@ impl CraftingRecipe {
                     recipe: recipe.try_into().unwrap(),
                 })
             {
-                return Some(*result);
+                return Some((*result, *count));
             }
         }
         None

@@ -1,14 +1,14 @@
 (
-  name: "Apple",
+  name: "Berries",
   templates: ["world_object"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": Apple,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(20)]),
+  "survival_rogue_like::item::WorldObject": Berries,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(5), ModifyHealth(5)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: Apple,
+        obj_type: Berries,
         metadata: (
-            name: "Apple", 
+            name: "Berries", 
             desc: "Crunchy!"
         ),
         count: 1

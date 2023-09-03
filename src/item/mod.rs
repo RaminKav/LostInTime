@@ -73,6 +73,7 @@ pub enum EquipmentType {
     Trinket,
     Weapon,
     Axe,
+    Pickaxe,
 }
 #[derive(Component, Reflect, Debug, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
@@ -220,6 +221,15 @@ pub enum WorldObject {
     SlimeGooProjectile,
     StoneChunk,
     WoodSword,
+    RedMushroom,
+    BrownMushroom,
+    RedMushroomBlock,
+    BrownMushroomBlock,
+    BerryBush,
+    Berries,
+    MetalBar,
+    WoodPickaxe,
+    Feather,
 }
 
 #[derive(
@@ -395,15 +405,20 @@ impl WorldObject {
         match self {
             WorldObject::None => BLACK,
             WorldObject::Grass => UI_GRASS_GREEN,
+            WorldObject::RedMushroom => UI_GRASS_GREEN,
+            WorldObject::BrownMushroom => UI_GRASS_GREEN,
+            WorldObject::BerryBush => UI_GRASS_GREEN,
             WorldObject::GrassTile => LIGHT_GREEN,
             WorldObject::DeadSapling => BROWN,
             WorldObject::StoneWall => LIGHT_GREY,
             WorldObject::Boulder => LIGHT_GREY,
+            WorldObject::CoalBoulder => LIGHT_GREY,
+            WorldObject::MetalBoulder => LIGHT_GREY,
             WorldObject::DungeonStone => BLACK,
             WorldObject::WaterTile => BLUE,
             WorldObject::SandTile => YELLOW,
             WorldObject::Tree => DARK_GREEN,
-            WorldObject::Crate => RED,
+            WorldObject::Crate => UI_GRASS_GREEN,
             _ => BLACK,
         }
     }

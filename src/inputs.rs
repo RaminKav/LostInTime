@@ -1,4 +1,5 @@
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
+use crate::attributes::hunger::Hunger;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -14,7 +15,7 @@ use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
-use crate::item::item_actions::{ItemAction, ItemActionParam};
+use crate::item::item_actions::{ItemAction, ItemActionParam, ItemActions};
 use crate::item::item_upgrades::{
     ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
     FireStaffAOEUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade, VenomOnHitUpgrade,
@@ -177,6 +178,7 @@ impl InputsPlugin {
                 &mut KinematicCharacterController,
                 &mut MovementVector,
                 &Speed,
+                &Hunger,
             ),
             (
                 With<Player>,
@@ -189,10 +191,12 @@ impl InputsPlugin {
         key_input: ResMut<Input<KeyCode>>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     ) {
-        let (mut player_kcc, mut mv, speed) = player_query.single_mut();
+        let (mut player_kcc, mut mv, speed, hunger) = player_query.single_mut();
         let mut player = game.player_mut();
         let mut d = Vec2::ZERO;
-        let s = PLAYER_MOVE_SPEED * (1. + speed.0 as f32 / 100.);
+        let s = PLAYER_MOVE_SPEED
+            * (1. + speed.0 as f32 / 100.)
+            * (if hunger.is_starving() { 0.7 } else { 1. });
 
         if key_input.pressed(KeyCode::A) {
             d.x -= 1.;
@@ -286,12 +290,12 @@ impl InputsPlugin {
         }
 
         if key_input.just_pressed(KeyCode::E) {
-            proto_commands.spawn_item_from_proto(
-                WorldObject::WoodSword,
-                &proto,
-                game.player().position.truncate(),
-                1,
-            );
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::WoodSword,
+            //     &proto,
+            //     game.player().position.truncate(),
+            //     1,
+            // );
             // proto_commands.spawn_item_from_proto(
             //     WorldObject::BasicStaff,
             //     &proto,
@@ -360,9 +364,9 @@ impl InputsPlugin {
             // );
         }
 
-        if key_input.just_pressed(KeyCode::P) {
-            DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
-        }
+        // if key_input.just_pressed(KeyCode::P) {
+        //     DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
+        // }
         if key_input.just_pressed(KeyCode::U) {
             commands
                 .entity(game.game.player)
@@ -378,16 +382,16 @@ impl InputsPlugin {
                     2,
                 ));
         }
-        if key_input.just_pressed(KeyCode::L) {
-            let pos = tile_pos_to_world_pos(
-                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
-                true,
-            );
-            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-        }
+        // if key_input.just_pressed(KeyCode::L) {
+        //     let pos = tile_pos_to_world_pos(
+        //         TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
+        //         true,
+        //     );
+        //     // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+        //     proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+        //     proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+        //     proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+        // }
     }
     fn handle_hotbar_key_input(
         mut game: GameParam,
@@ -496,17 +500,17 @@ impl InputsPlugin {
             if let Some(tool) = &game.player().main_hand_slot {
                 main_hand_option = Some(tool.obj);
             }
-
+            let direction =
+                (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
             if let Ok(ranged_tool) = ranged_query.get_single() {
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
-                    direction: (cursor_pos.world_coords.truncate() - player_pos.truncate())
-                        .normalize_or_zero(),
+                    direction,
                     from_enemy: None,
                     is_followup_proj: false,
                 })
             }
-            attack_event.send(AttackEvent);
+            attack_event.send(AttackEvent { direction });
             if player_pos
                 .truncate()
                 .distance(cursor_pos.world_coords.truncate())
@@ -531,8 +535,8 @@ impl InputsPlugin {
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
             if let Some(held_item) = held_item_option {
                 let held_obj = *held_item.get_obj();
-                if let Some(item_action) = proto_param.get_component::<ItemAction, _>(held_obj) {
-                    item_action.run_action(
+                if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
+                    item_actions.run_action(
                         held_obj,
                         &mut item_action_param,
                         &mut game,

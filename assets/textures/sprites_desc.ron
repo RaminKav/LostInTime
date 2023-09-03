@@ -75,6 +75,11 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        WoodPickaxe: WorldObjectData(
+            texture_pos: (6., 3.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
         WoodBow: WorldObjectData(
             texture_pos: (8., 5.),
             size: (16., 16.),
@@ -155,6 +160,36 @@
             size: (16., 16.),
             anchor: None,
         ),
+        RedMushroom: WorldObjectData(
+            texture_pos: (2., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BrownMushroom: WorldObjectData(
+            texture_pos: (3., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedMushroomBlock: WorldObjectData(
+            texture_pos: (2., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BrownMushroomBlock: WorldObjectData(
+            texture_pos: (3., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BerryBush: WorldObjectData(
+            texture_pos: (4., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Berries: WorldObjectData(
+            texture_pos: (5., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Boulder: WorldObjectData(
             texture_pos: (4., 9.),
             size: (32., 32.),
@@ -220,6 +255,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Feather: WorldObjectData(
+            texture_pos: (9., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MetalShard: WorldObjectData(
             texture_pos: (13., 3.),
             size: (16., 16.),
@@ -282,6 +322,10 @@
         ),
         WoodAxe: SpriteData(
             texture_pos: (8., 4.),
+            size: (16., 16.),
+        ),
+        WoodPickaxe: SpriteData(
+            texture_pos: (7., 3.),
             size: (16., 16.),
         ),
         WoodSword: SpriteData(

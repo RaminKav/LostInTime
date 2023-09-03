@@ -1,0 +1,24 @@
+(
+  name: "WoodPickaxe",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": WoodPickaxe,
+  "survival_rogue_like::item::EquipmentType": Pickaxe,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        attack: Some((start: 5, end: 12)),
+  ),
+  "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: WoodPickaxe,
+        attributes: (
+            max_durability: 100,
+            attack_cooldown: 0.4
+        ),
+        metadata: (
+            name: "Wood Pickaxe", 
+            desc: "A rusty wood pickaxe."
+        ),
+        count: 1
+  ),
+  }
+)

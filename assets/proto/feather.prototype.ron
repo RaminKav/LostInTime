@@ -1,0 +1,15 @@
+(
+  name: "Feather",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Feather,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Feather,
+        metadata: (
+            name: "Feather", 
+            desc: "A feather."
+        ),
+        count: 1
+  ),
+  }
+)
