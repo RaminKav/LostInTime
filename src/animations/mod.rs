@@ -404,6 +404,10 @@ impl AnimationsPlugin {
             if timer.just_finished() {
                 let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
                 let num_frame = texture_atlas.textures.len();
+                //hack to fix soem projectiles animating
+                if num_frame >= 50 {
+                    continue;
+                }
                 if sprite.index == num_frame - 1 && remove_me_option.is_some() {
                     commands.entity(e).despawn_recursive();
                     continue;

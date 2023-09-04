@@ -9,6 +9,7 @@
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 3., direction: (x: 0., y: 0.), hit_entities: []),
         "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/throwingstar.png", size: (x: 16., y: 16.), cols: 4, rows: 1),
         "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+        "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
         "survival_rogue_like::inventory::ItemStack": (
             obj_type: ThrowingStar,
             metadata: (
