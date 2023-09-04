@@ -32,6 +32,8 @@ impl Plugin for SpawnerPlugin {
                 check_mob_count,
                 spawn_one_time_enemies_at_day,
                 reduce_chunk_mob_count_on_mob_death,
+                test,
+                despawn_out_of_range_mobs,
             )
                 .in_set(OnUpdate(GameState::Main)),
         );
@@ -183,17 +185,38 @@ fn check_mob_count(
         spawn_event.send(MobSpawnEvent { chunk_pos });
     }
 }
-// fn test(q: Query<&Mob, Added<Mob>>, mut t: Local<(u8, u8, u8)>) {
-//     for m in q.iter() {
-//         match m {
-//             Mob::Slime => t.0 += 1,
-//             Mob::FurDevil => t.1 += 1,
-//             Mob::SpikeSlime => t.2 += 1,
-//             _ => {}
-//         }
-//         println!("{t:?}");
-//     }
-// }
+fn test(
+    q: Query<&Mob, Added<Mob>>,
+    q2: Query<Entity, Added<Chunk>>,
+    q3: Query<&Chunk>,
+    q4: Query<Entity>,
+    mut t: Local<(u8, u8, u8)>,
+) {
+    for m in q.iter() {
+        match m {
+            Mob::Slime => t.0 += 1,
+            Mob::FurDevil => t.1 += 1,
+            Mob::SpikeSlime => t.2 += 1,
+            _ => {}
+        }
+        println!("{t:?} {:?}", q4.iter().len());
+    }
+    for c in q2.iter() {
+        println! {"c {:?}", q3.iter().len()};
+    }
+}
+fn despawn_out_of_range_mobs(
+    mut game: GameParam,
+    mut commands: Commands,
+    mut query: Query<(Entity, &Transform), With<Mob>>,
+) {
+    for (e, t) in query.iter_mut() {
+        let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
+        if game.get_chunk_entity(chunk_pos).is_none() {
+            commands.entity(e).despawn_recursive();
+        }
+    }
+}
 fn spawn_one_time_enemies_at_day(
     game: GameParam,
     night_tracker: ResMut<NightTracker>,

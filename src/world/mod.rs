@@ -29,7 +29,7 @@ use self::{
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
 pub const CHUNK_SIZE: u32 = 16;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
-pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 2;
+pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
 #[derive(Debug, Component, Resource, Reflect, Default, Clone)]
 #[reflect(Resource)]

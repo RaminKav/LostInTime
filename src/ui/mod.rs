@@ -66,9 +66,8 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_hotbar_hud,
-                    setup_foodbar_ui.after(ClientPlugin::load_on_start),
                     setup_xp_bar_ui.after(ClientPlugin::load_on_start),
-                    setup_healthbar_ui.after(ClientPlugin::load_on_start),
+                    setup_bars_ui.after(ClientPlugin::load_on_start),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -113,6 +112,7 @@ impl Plugin for UIPlugin {
                 (
                     add_inv_to_new_chest_objs,
                     update_foodbar,
+                    update_mana_bar,
                     handle_spawn_inv_player_stats.after(CustomFlush),
                     handle_cursor_stats_buttons.run_if(in_state(UIState::Stats)),
                     toggle_stats_visibility,

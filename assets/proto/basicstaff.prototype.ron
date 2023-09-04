@@ -19,6 +19,7 @@
         loot_rate: Some((start: 3, end: 7)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::item::item_actions::ManaCost": (10),
   "survival_rogue_like::item::projectile::RangedAttack": (Electricity),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: BasicStaff,

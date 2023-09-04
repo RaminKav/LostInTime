@@ -120,14 +120,7 @@ impl AnimationsPlugin {
     ) {
         for (mut timer, limb_children) in &mut player_query {
             let d = time.delta();
-            timer.tick(if game.player_state.is_dashing {
-                Duration::new(
-                    (d.as_secs() as f32 * 4.) as u64,
-                    (d.subsec_nanos() as f32 * 4.) as u32,
-                )
-            } else {
-                d
-            });
+            timer.tick(d);
             // if timer.just_finished() && game.player.is_moving {
             for l in limb_children {
                 if let Ok((mut tracker, limb_handle, limb)) = limb_query.get_mut(*l) {
@@ -360,8 +353,6 @@ impl AnimationsPlugin {
                         &(at.0.elapsed().as_secs_f32() / at.0.duration().as_secs_f32()),
                     );
                 } else {
-                    println!("DONE ATTACK");
-
                     at.0.reset();
                     at.1 = 0.;
                     t.rotation = Quat::from_rotation_z(-at.1);

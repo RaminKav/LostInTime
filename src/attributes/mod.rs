@@ -21,7 +21,7 @@ use modifiers::*;
 pub mod hunger;
 use hunger::*;
 
-use self::health_regen::handle_health_regen;
+use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
 
 #[derive(Resource, Reflect, Default, Bundle)]
@@ -375,6 +375,7 @@ pub struct AttributeChangeEvent;
 #[derive(Bundle, Clone, Debug, Copy, Default)]
 pub struct PlayerAttributeBundle {
     pub health: MaxHealth,
+    pub mana: Mana,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
     pub defence: Defence,
@@ -388,6 +389,7 @@ pub struct PlayerAttributeBundle {
     pub speed: Speed,
     pub lifesteal: Lifesteal,
     pub xp_rate: XpRateBonus,
+    pub mana_regen: ManaRegen,
     pub loot_rate: LootRateBonus,
 }
 
@@ -395,6 +397,18 @@ pub struct PlayerAttributeBundle {
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct CurrentHealth(pub i32);
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct Mana {
+    pub max: i32,
+    pub current: i32,
+}
+impl Mana {
+    pub fn new(max: i32) -> Self {
+        Self { max, current: max }
+    }
+}
+
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct MaxHealth(pub i32);
@@ -437,18 +451,26 @@ pub struct XpRateBonus(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct LootRateBonus(pub i32);
 
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct ManaRegen(pub i32);
+
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AttributeChangeEvent>()
             .add_event::<ModifyHealthEvent>()
+            .add_event::<ModifyManaEvent>()
             .add_systems(
                 (
                     clamp_health,
+                    clamp_mana,
                     handle_actions_drain_hunger,
                     tick_hunger,
                     handle_modify_health_event.before(clamp_health),
+                    handle_modify_mana_event.before(clamp_mana),
                     add_current_health_with_max_health,
                     handle_health_regen,
+                    handle_mana_regen,
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_sprite_with_equipment_removed,
@@ -466,6 +488,15 @@ fn clamp_health(mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>
             h.0 = 0;
         } else if h.0 > max_h.0 {
             h.0 = max_h.0;
+        }
+    }
+}
+fn clamp_mana(mut health: Query<(&mut Mana), With<Player>>) {
+    for mut m in health.iter_mut() {
+        if m.current < 0 {
+            m.current = 0;
+        } else if m.current > m.max {
+            m.current = m.max;
         }
     }
 }

@@ -32,7 +32,7 @@ use crate::{
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
-        item_actions::{ConsumableItem, ItemAction, ItemActions},
+        item_actions::{ConsumableItem, ItemAction, ItemActions, ManaCost},
         item_upgrades::ClawUpgradeMultiThrow,
         melee::MeleeAttack,
         object_actions::ObjectAction,
@@ -98,6 +98,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<AnimationTimerProto>()
             .register_type::<RequiredEquipmentType>()
             .register_type::<ClawUpgradeMultiThrow>()
+            .register_type::<ManaCost>()
             .register_type::<FacingDirection>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
@@ -183,6 +184,7 @@ impl ProtoPlugin {
         prototypes.load("proto/crateblock.prototype.ron");
         prototypes.load("proto/coal.prototype.ron");
         prototypes.load("proto/metalshard.prototype.ron");
+        prototypes.load("proto/metalbar.prototype.ron");
         prototypes.load("proto/coalboulder.prototype.ron");
         prototypes.load("proto/metalboulder.prototype.ron");
         prototypes.load("proto/slimegooprojectile.prototype.ron");

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
+    attributes::{modifiers::ModifyManaEvent, Mana},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -82,6 +83,7 @@ pub struct ArcProjectileData {
 pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
+    pub mana_cost: Option<i32>,
     pub from_enemy: Option<Entity>,
     pub is_followup_proj: bool,
 }
@@ -102,20 +104,28 @@ impl Plugin for RangedAttackPlugin {
 
 fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
-    att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
+    player_query: Query<(Entity, &Mana, Option<&AttackTimer>), With<Player>>,
     mut proto_commands: ProtoCommands,
     enemy_transforms: Query<&GlobalTransform, With<Mob>>,
     game: GameParam,
     proto: ProtoParam,
     mut commands: Commands,
     mut inv: Query<&mut Inventory>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
     for proj_event in events.iter() {
+        let (_player_e, mana, player_cooldown) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
         if proj_event.from_enemy.is_none() {
-            if att_cooldown_query.single().1.is_some() && !proj_event.is_followup_proj {
+            if player_cooldown.is_some() && !proj_event.is_followup_proj {
                 continue;
             }
+        }
+        if let Some(mana_cost) = proj_event.mana_cost {
+            if mana_cost.abs() > mana.current {
+                continue;
+            }
+            modify_mana_event.send(ModifyManaEvent(mana_cost));
         }
         if proto
             .get_component::<ConsumableItem, _>(proj_event.projectile.clone())

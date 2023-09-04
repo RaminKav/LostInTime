@@ -2,8 +2,8 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
-    attributes::{hunger::Hunger, CurrentHealth, MaxHealth},
-    colors::{BLACK, RED, YELLOW},
+    attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
+    colors::{BLACK, BLUE, RED, YELLOW},
     inventory::Inventory,
     player::{levels::PlayerLevel, Player},
     GAME_HEIGHT, GAME_WIDTH,
@@ -19,21 +19,52 @@ pub struct HealthBar;
 #[derive(Component)]
 pub struct FoodBar;
 #[derive(Component)]
+pub struct ManaBar;
+#[derive(Component)]
 pub struct XPBar;
 #[derive(Component)]
 pub struct XPBarText;
 
-pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
+const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(60.0, 6.0);
+
+pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
+    let hud_bar_frame = commands
+        .spawn(SpriteBundle {
+            texture: graphics
+                .ui_image_handles
+                .as_ref()
+                .unwrap()
+                .get(&UIElement::PlayerHUDBars)
+                .unwrap()
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(76.5, 32.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    (-GAME_WIDTH + 78.) / 2.,
+                    (GAME_HEIGHT - 11.) / 2. - 12.,
+                    10.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Name::new("HUD FRAME"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
     let inner_health = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: RED,
-                custom_size: Some(Vec2::new(62.0, 7.0)),
+                custom_size: Some(INNER_HUD_BAR_SIZE),
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-62. / 2., 0., 1.),
+                translation: Vec3::new(-27., 9., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -43,48 +74,35 @@ pub fn setup_healthbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
         .insert(HealthBar)
         .insert(Name::new("inner health bar"))
         .id();
-    let health_bar_frame = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::HealthBarFrame)
-                .unwrap()
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(64., 9.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(
-                    (-GAME_WIDTH + 68.) / 2.,
-                    (GAME_HEIGHT - 11.) / 2. - 2.,
-                    10.,
-                ),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(Name::new("HEALTH BAR"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
-    commands
-        .entity(health_bar_frame)
-        .push_children(&[inner_health]);
-}
-pub fn setup_foodbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
-    let inner_food = commands
+    let inner_mana = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: YELLOW,
-                custom_size: Some(Vec2::new(62.0, 7.0)),
+                color: BLUE,
+                custom_size: Some(INNER_HUD_BAR_SIZE),
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-62. / 2., 0., 1.),
+                translation: Vec3::new(-27., 0., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ManaBar)
+        .insert(Name::new("inner mana bar"))
+        .id();
+    let inner_food = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: YELLOW,
+                custom_size: Some(INNER_HUD_BAR_SIZE),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-27., -9., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -94,35 +112,12 @@ pub fn setup_foodbar_ui(mut commands: Commands, graphics: Res<Graphics>) {
         .insert(FoodBar)
         .insert(Name::new("inner food bar"))
         .id();
-    let food_bar_frame = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::HealthBarFrame)
-                .unwrap()
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(64., 9.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(
-                    (-GAME_WIDTH + 68.) / 2.,
-                    (GAME_HEIGHT - 11.) / 2. - 12.,
-                    10.,
-                ),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(Name::new("FOOD BAR"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
-    commands.entity(food_bar_frame).push_children(&[inner_food]);
+
+    commands
+        .entity(hud_bar_frame)
+        .push_children(&[inner_health, inner_food, inner_mana]);
 }
+
 pub fn setup_xp_bar_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -211,7 +206,7 @@ pub fn update_healthbar(
     let Ok((player_health, player_max_health)) = player_health_query.get_single() else {return};
     health_bar_query.single_mut().custom_size = Some(Vec2 {
         x: 62. * player_health.0 as f32 / player_max_health.0 as f32,
-        y: 7.,
+        y: INNER_HUD_BAR_SIZE.y,
     });
 }
 pub fn update_xp_bar(
@@ -234,7 +229,7 @@ pub fn update_foodbar(
     let Ok(hunger) = player_hunger_query.get_single() else {return};
     food_bar_query.single_mut().custom_size = Some(Vec2 {
         x: 62. * hunger.current as f32 / hunger.max as f32,
-        y: 7.,
+        y: INNER_HUD_BAR_SIZE.y,
     });
 }
 
@@ -264,4 +259,15 @@ pub fn setup_hotbar_hud(
             );
         }
     }
+}
+
+pub fn update_mana_bar(
+    player_mana: Query<&Mana, (With<Player>, Changed<Mana>)>,
+    mut mana_bar_query: Query<&mut Sprite, With<ManaBar>>,
+) {
+    let Ok(mana) = player_mana.get_single() else {return};
+    mana_bar_query.single_mut().custom_size = Some(Vec2 {
+        x: 62. * mana.current as f32 / mana.max as f32,
+        y: INNER_HUD_BAR_SIZE.y,
+    });
 }

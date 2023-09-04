@@ -194,8 +194,23 @@ impl GameAssetsPlugin {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
         let wall_image_handle = sprite_sheet.walls_sheet.clone();
-        let sprite_desc = fs::read_to_string("assets/textures/sprites_desc.ron").unwrap();
-        let recipe_desc = fs::read_to_string("assets/recipes/recipes.ron").unwrap();
+
+        #[cfg(feature = "release-bundle")]
+        {
+            std::env::set_current_dir(
+                std::env::current_exe()
+                    .map(|path| {
+                        path.parent()
+                            .map(|exe_parent_path| exe_parent_path.to_owned())
+                            .unwrap()
+                    })
+                    .unwrap(),
+            )
+            .unwrap();
+        }
+
+        let sprite_desc = fs::read_to_string("./assets/textures/sprites_desc.ron").unwrap();
+        let recipe_desc = fs::read_to_string("./assets/recipes/recipes.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
             println!("Failed to load config for graphics: {e}");

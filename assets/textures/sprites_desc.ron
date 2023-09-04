@@ -265,6 +265,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        MetalBar: WorldObjectData(
+            texture_pos: (14., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Bandage: WorldObjectData(
             texture_pos: (13., 4.),
             size: (16., 16.),

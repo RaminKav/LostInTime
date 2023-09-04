@@ -307,10 +307,10 @@ impl ChunkPlugin {
         let transform = camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
-            ..(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
+            ..=(camera_chunk_pos.y + NUM_CHUNKS_AROUND_CAMERA)
         {
             for x in (camera_chunk_pos.x - NUM_CHUNKS_AROUND_CAMERA)
-                ..(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
+                ..=(camera_chunk_pos.x + NUM_CHUNKS_AROUND_CAMERA)
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
@@ -331,7 +331,6 @@ impl ChunkPlugin {
         mut events: EventWriter<DespawnChunkEvent>,
         camera_query: Query<&Transform, With<TextureCamera>>,
     ) {
-        let mut removed_chunks = vec![];
         for camera_transform in camera_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
@@ -346,8 +345,6 @@ impl ChunkPlugin {
                 if distance > max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
                     && game.get_chunk_entity(IVec2::new(x, y)).is_some()
                 {
-                    println!("despawning chunk at {x:?} {y:?} d === {distance:?}");
-                    removed_chunks.push(IVec2::new(x, y));
                     // commands.entity(entity).despawn_recursive();
                     events.send(DespawnChunkEvent {
                         chunk_pos: IVec2::new(x, y),
