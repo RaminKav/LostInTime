@@ -396,7 +396,7 @@ pub fn handle_item_drop_clicks(
     mut right_clicks: Local<Vec<usize>>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let right_mouse_pressed = mouse_input.pressed(MouseButton::Right);
+    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
     if !right_mouse_pressed {
         right_clicks.clear();
     }
@@ -594,12 +594,10 @@ pub fn handle_cursor_stats_buttons(
         (Entity, &mut Interactable, &StatsButtonState),
         Without<InventorySlotState>,
     >,
-    dragging_query: Query<&DraggedItem>,
     mut player_stats: Query<(&mut PlayerStats, &mut SkillPoints)>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let currently_dragging = dragging_query.iter().len() > 0;
 
     for (e, mut interactable, state) in stats_buttons.iter_mut() {
         match hit_test {
@@ -608,7 +606,7 @@ pub fn handle_cursor_stats_buttons(
                     interactable.change(Interaction::Hovering);
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && !currently_dragging {
+                    if left_mouse_pressed {
                         let (mut stats, mut sp) = player_stats.single_mut();
                         if sp.count > 0 {
                             sp.count -= 1;
