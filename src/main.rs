@@ -8,6 +8,7 @@ use attributes::{
     Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
+use bevy_diagnostics_explorer::DiagnosticExplorerAgentPlugin;
 use night::NightPlugin;
 use rand::Rng;
 
@@ -15,6 +16,7 @@ use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::{schedule::ScheduleLabel, system::SystemParam},
+    log::LogPlugin,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -118,7 +120,7 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(WorldInspectorPlugin::new())
+        // .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)

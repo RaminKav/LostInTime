@@ -13,9 +13,10 @@ pub mod stats;
 use crate::{
     animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
     attributes::{
-        health_regen::HealthRegenTimer, hunger::Hunger, Attack, AttackCooldown, CritChance,
-        CritDamage, HealthRegen, InvincibilityCooldown, ItemAttributes, MaxHealth,
-        PlayerAttributeBundle,
+        health_regen::{HealthRegenTimer, ManaRegenTimer},
+        hunger::Hunger,
+        Attack, AttackCooldown, CritChance, CritDamage, HealthRegen, InvincibilityCooldown,
+        ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
     custom_commands::CommandsExt,
     inputs::{FacingDirection, InputsPlugin, MovementVector},
@@ -260,8 +261,10 @@ fn spawn_player(
             Hunger::new(100, 5., 8),
             PlayerAttributeBundle {
                 health: MaxHealth(100),
+                mana: Mana::new(100),
                 attack: Attack(0),
                 health_regen: HealthRegen(2),
+                mana_regen: ManaRegen(1),
                 crit_chance: CritChance(5),
                 crit_damage: CritDamage(150),
                 attack_cooldown: AttackCooldown(0.4),
@@ -282,6 +285,7 @@ fn spawn_player(
             RawPosition::default(),
         ))
         .insert(ActiveEvents::COLLISION_EVENTS)
+        .insert(ManaRegenTimer(Timer::from_seconds(0.5, TimerMode::Once)))
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
         .insert(SkillPoints { count: 0 })

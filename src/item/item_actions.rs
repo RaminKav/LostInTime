@@ -1,7 +1,10 @@
 use std::marker::PhantomData;
 
 use crate::{
-    attributes::{hunger::Hunger, modifiers::ModifyHealthEvent},
+    attributes::{
+        hunger::Hunger,
+        modifiers::{ModifyHealthEvent, ModifyManaEvent},
+    },
     inputs::CursorPos,
     inventory::Inventory,
     player::MovePlayerEvent,
@@ -21,6 +24,7 @@ pub enum ItemAction {
     #[default]
     None,
     ModifyHealth(i32),
+    ModifyMana(i32),
     Teleport(Vec2),
     PlacesInto(WorldObject),
     Eat(i8), // Projectile
@@ -33,6 +37,9 @@ pub struct ItemActions {
 }
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
+pub struct ManaCost(pub i32);
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
 pub struct ConsumableItem;
 
 pub struct ActionSuccessEvent {
@@ -42,6 +49,7 @@ pub struct ActionSuccessEvent {
 pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
+    pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
     pub cursor_pos: Res<'w, CursorPos>,
@@ -66,6 +74,11 @@ impl ItemActions {
                     item_action_param
                         .modify_health_event
                         .send(ModifyHealthEvent(*delta));
+                }
+                ItemAction::ModifyMana(delta) => {
+                    item_action_param
+                        .modify_mana_event
+                        .send(ModifyManaEvent(*delta));
                 }
                 ItemAction::Teleport(pos) => {
                     let pos = world_pos_to_tile_pos(*pos);

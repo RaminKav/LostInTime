@@ -25,7 +25,6 @@ pub enum UIElement {
     ChestInventory,
     InventorySlot,
     InventorySlotHover,
-    HealthBarFrame,
     XPBarFrame,
     Tooltip,
     LargeTooltipCommon,
@@ -37,6 +36,7 @@ pub enum UIElement {
     LevelUpStats,
     StatsButton,
     StatsButtonHover,
+    PlayerHUDBars,
 }
 
 #[derive(Component, Debug, Clone)]

@@ -266,6 +266,7 @@ pub fn projectile_attack(
                 direction: attack.dir.unwrap(),
                 from_enemy: Some(entity),
                 is_followup_proj: false,
+                mana_cost: None,
             });
             commands
                 .entity(entity)

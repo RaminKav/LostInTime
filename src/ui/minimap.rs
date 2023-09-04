@@ -20,15 +20,16 @@ impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MinimapTileCache::default())
             .add_event::<UpdateMiniMapEvent>()
-            .add_systems(
-                (update_minimap_cache, clear_cache_for_new_dimensions)
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                setup_mini_map
-                    .after(CustomFlush)
-                    .in_set(OnUpdate(GameState::Main)),
-            );
+            // .add_systems(
+            //     (update_minimap_cache, clear_cache_for_new_dimensions)
+            //         .in_set(OnUpdate(GameState::Main)),
+            // )
+            // .add_system(
+            //     setup_mini_map
+            //         .after(CustomFlush)
+            //         .in_set(OnUpdate(GameState::Main)),
+            // )
+            ;
     }
 }
 

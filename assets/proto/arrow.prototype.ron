@@ -7,6 +7,7 @@
         "survival_rogue_like::item::projectile::Projectile": Arrow,
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 2., direction: (x: 0., y: 0.), hit_entities: []),
         "survival_rogue_like::item::item_actions::ConsumableItem": (),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
         "survival_rogue_like::inventory::ItemStack": (
           obj_type: Arrow,
           metadata: (

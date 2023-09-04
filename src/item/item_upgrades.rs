@@ -94,6 +94,7 @@ pub fn handle_delayed_ranged_attack(
                     .normalize_or_zero(),
                 from_enemy: None,
                 is_followup_proj: true,
+                mana_cost: None,
             });
 
             delayed_ranged_attack.0.reset();
@@ -134,6 +135,7 @@ pub fn handle_spread_arrows_attack(
             .normalize_or_zero(),
             from_enemy: None,
             is_followup_proj: true,
+            mana_cost: None,
         });
     }
 }

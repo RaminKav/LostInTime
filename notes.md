@@ -188,6 +188,8 @@ impl different att styles w seldum_state
 [] FIX: fix dash
 [] FIX: lag in dungeons
 [] save/load/cache
+[] Passive mobs that give leather
+[] add leather armor
 
 ## Projectile/Magic ideas
 
@@ -443,3 +445,9 @@ Dungeons are smaller, with an unbreakable wall barrier around them, might reduce
 - Throwing Star
 
 ##
+
+bugs:
+shapeless recipes dont work
+splitting stacks when they are 2 does not work
+arrows do not float for some reason
+make mana cost more

@@ -15,7 +15,7 @@ use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
-use crate::item::item_actions::{ItemAction, ItemActionParam, ItemActions};
+use crate::item::item_actions::{ItemAction, ItemActionParam, ItemActions, ManaCost};
 use crate::item::item_upgrades::{
     ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
     FireStaffAOEUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade, VenomOnHitUpgrade,
@@ -121,7 +121,7 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
             .register_type::<CursorPos>()
-            .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
+            // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<AttackEvent>();
             })
@@ -130,14 +130,9 @@ impl Plugin for InputsPlugin {
                     Self::turn_player,
                     Self::move_player,
                     Self::move_camera_with_player.after(Self::move_player),
-                )
-                    .in_set(CoreGameSet::Main)
-                    .in_schedule(CoreSchedule::FixedUpdate),
-            )
-            .add_systems(
-                (
                     Self::mouse_click_system.after(CustomFlush),
                     Self::handle_hotbar_key_input,
+                    Self::tick_dash_timer,
                     Self::update_cursor_pos.after(Self::move_player),
                     Self::toggle_inventory,
                 )
@@ -233,7 +228,6 @@ impl InputsPlugin {
         }
 
         if player.is_dashing {
-            player.player_dash_duration.tick(time.delta());
             let is_speeding_up = player.player_dash_duration.percent() < 0.5;
             d.x = if is_speeding_up {
                 d.x.lerp(
@@ -257,11 +251,6 @@ impl InputsPlugin {
                     &(1. - (player.player_dash_duration.percent())),
                 )
             };
-
-            if player.player_dash_duration.just_finished() {
-                player.player_dash_duration.reset();
-                player.is_dashing = false;
-            }
         }
         mv.0 = d;
 
@@ -274,6 +263,16 @@ impl InputsPlugin {
             });
         } else {
             player_kcc.translation = Some(Vec2::ZERO);
+        }
+    }
+    pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
+        let mut player = game.player_mut();
+        if player.is_dashing {
+            player.player_dash_duration.tick(time.delta());
+            if player.player_dash_duration.just_finished() {
+                player.player_dash_duration.reset();
+                player.is_dashing = false;
+            }
         }
     }
     pub fn toggle_inventory(
@@ -503,11 +502,14 @@ impl InputsPlugin {
             let direction =
                 (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
             if let Ok(ranged_tool) = ranged_query.get_single() {
+                let mana_cost_option =
+                    proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
                     direction,
                     from_enemy: None,
                     is_followup_proj: false,
+                    mana_cost: mana_cost_option.map(|m| -m.0),
                 })
             }
             attack_event.send(AttackEvent { direction });
