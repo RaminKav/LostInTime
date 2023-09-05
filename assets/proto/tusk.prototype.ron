@@ -1,0 +1,15 @@
+(
+  name: "Tusk",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Tusk,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Tusk,
+        metadata: (
+            name: "Tusk", 
+            desc: "strong!"
+        ),
+        count: 1
+  ),
+  }
+)

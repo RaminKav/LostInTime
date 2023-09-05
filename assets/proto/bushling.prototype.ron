@@ -1,17 +1,17 @@
 (
-  name: "FurDevil",
+  name: "Bushling",
   templates: ["mob_basic"],
   schematics: {
-    "survival_rogue_like::enemy::Mob": FurDevil,
+    "survival_rogue_like::enemy::Mob": Bushling,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 35., duration: 0.4, cooldown: 0.2, speed: 1.5),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 100., duration: 0.3, cooldown: 2., speed: 2.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.5),
-    "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/furdevil/furdevil_down.png", size: (x: 32., y: 32.), cols: 8, rows: 6),
-    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.06),
-    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,6,4,8,7], valid_directions: [0,1,2,3], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (28),
-    "survival_rogue_like::attributes::Attack": (7),
+    "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/bushling/bushling_down.png", size: (x: 38., y: 38.), cols: 9, rows: 5),
+    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,9,6], valid_directions: [0,1,2,3], anim_offset: 0),
+    "survival_rogue_like::attributes::MaxHealth": (45),
+    "survival_rogue_like::attributes::Attack": (6),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
@@ -114,5 +114,3 @@
         ),
   }
 )
-// sword, dagger, claw, WoodBow, basicstaff, firestaff, magicwhip, ring, pendant, chestplate, pants, boots
-// 9/
