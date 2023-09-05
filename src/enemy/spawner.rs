@@ -76,18 +76,39 @@ fn add_spawners_to_new_chunks(
     for new_chunk in new_chunk_query.iter() {
         let mut spawners = vec![];
         spawners.push(Spawner {
+            enemy: Mob::SpikeSlime,
             chunk_pos: new_chunk.1.chunk_pos,
             weight: 100.,
             spawn_timer: Timer::from_seconds(30., TimerMode::Once),
             min_days_to_spawn: 0,
-            enemy: Mob::SpikeSlime,
         });
         spawners.push(Spawner {
+            enemy: Mob::FurDevil,
             chunk_pos: new_chunk.1.chunk_pos,
             weight: 100.,
             spawn_timer: Timer::from_seconds(30., TimerMode::Once),
             min_days_to_spawn: 0,
-            enemy: Mob::FurDevil,
+        });
+        spawners.push(Spawner {
+            enemy: Mob::Hog,
+            chunk_pos: new_chunk.1.chunk_pos,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(30., TimerMode::Once),
+            min_days_to_spawn: 0,
+        });
+        spawners.push(Spawner {
+            enemy: Mob::StingFly,
+            chunk_pos: new_chunk.1.chunk_pos,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(15., TimerMode::Once),
+            min_days_to_spawn: 0,
+        });
+        spawners.push(Spawner {
+            enemy: Mob::Bushling,
+            chunk_pos: new_chunk.1.chunk_pos,
+            weight: 100.,
+            spawn_timer: Timer::from_seconds(15., TimerMode::Once),
+            min_days_to_spawn: 0,
         });
         commands.entity(new_chunk.0).insert(ChunkSpawners {
             spawners,
@@ -190,20 +211,23 @@ fn test(
     q2: Query<Entity, Added<Chunk>>,
     q3: Query<&Chunk>,
     q4: Query<Entity>,
-    mut t: Local<(u8, u8, u8)>,
+    mut t: Local<(u8, u8, u8, u8, u8, u8)>,
 ) {
     for m in q.iter() {
         match m {
-            Mob::Slime => t.0 += 1,
+            Mob::StingFly => t.0 += 1,
             Mob::FurDevil => t.1 += 1,
-            Mob::SpikeSlime => t.2 += 1,
+            Mob::Bushling => t.2 += 1,
+            Mob::SpikeSlime => t.3 += 1,
+            Mob::Hog => t.4 += 1,
+            Mob::Slime => t.5 += 1,
             _ => {}
         }
         println!("{t:?} {:?}", q4.iter().len());
     }
-    for c in q2.iter() {
-        println! {"c {:?}", q3.iter().len()};
-    }
+    // for c in q2.iter() {
+    //     println! {"c {:?}", q3.iter().len()};
+    // }
 }
 fn despawn_out_of_range_mobs(
     mut game: GameParam,

@@ -381,16 +381,17 @@ impl InputsPlugin {
                     2,
                 ));
         }
-        // if key_input.just_pressed(KeyCode::L) {
-        //     let pos = tile_pos_to_world_pos(
-        //         TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
-        //         true,
-        //     );
-        //     // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-        //     proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
-        //     proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-        //     proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-        // }
+        if key_input.just_pressed(KeyCode::L) {
+            let pos = tile_pos_to_world_pos(
+                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
+                true,
+            );
+            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+        }
     }
     fn handle_hotbar_key_input(
         mut game: GameParam,

@@ -22,6 +22,9 @@ pub enum EnemyAnimationState {
     Hit,
     Death,
 }
+#[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
+#[reflect(Schematic, Default)]
+pub struct LeftFacingSideProfile;
 
 #[derive(Component, Clone, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
@@ -92,13 +95,16 @@ pub fn change_character_anim_direction(
             &mut TextureAtlasSprite,
             &mut Handle<TextureAtlas>,
             &Mob,
+            Option<&LeftFacingSideProfile>,
         ),
         With<Mob>,
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
 ) {
-    for (facing_direction, mut sprite, texture_atlas_handle, mob) in mob_query.iter_mut() {
+    for (facing_direction, mut sprite, texture_atlas_handle, mob, left_side_profile_option) in
+        mob_query.iter_mut()
+    {
         let mut texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
 
         match facing_direction {
@@ -109,7 +115,7 @@ pub fn change_character_anim_direction(
                     mob.to_string().to_lowercase(),
                     "side"
                 ));
-                sprite.flip_x = true;
+                sprite.flip_x = left_side_profile_option.is_none();
             }
             FacingDirection::Up => {
                 texture_atlas.texture = asset_server.load(format!(
@@ -126,7 +132,7 @@ pub fn change_character_anim_direction(
                     mob.to_string().to_lowercase(),
                     "side"
                 ));
-                sprite.flip_x = false;
+                sprite.flip_x = left_side_profile_option.is_some();
             }
             FacingDirection::Down => {
                 texture_atlas.texture = asset_server.load(format!(

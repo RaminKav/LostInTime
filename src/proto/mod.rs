@@ -20,7 +20,9 @@ pub mod proto_param;
 use crate::{
     ai::IdleState,
     animations::{
-        enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
+        enemy_sprites::{
+            CharacterAnimationSpriteSheetData, EnemyAnimationState, LeftFacingSideProfile,
+        },
         AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation,
     },
     assets::{SpriteAnchor, SpriteSize},
@@ -96,6 +98,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()
             .register_type::<AnimationTimerProto>()
+            .register_type::<LeftFacingSideProfile>()
             .register_type::<RequiredEquipmentType>()
             .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<ManaCost>()
@@ -199,6 +202,14 @@ impl ProtoPlugin {
         prototypes.load("proto/berries.prototype.ron");
         prototypes.load("proto/feather.prototype.ron");
         prototypes.load("proto/woodpickaxe.prototype.ron");
+        prototypes.load("proto/hog.prototype.ron");
+        prototypes.load("proto/mob_passive.prototype.ron");
+        prototypes.load("proto/tusk.prototype.ron");
+        prototypes.load("proto/leather.prototype.ron");
+        prototypes.load("proto/rawmeat.prototype.ron");
+        prototypes.load("proto/cookedmeat.prototype.ron");
+        prototypes.load("proto/stingfly.prototype.ron");
+        prototypes.load("proto/bushling.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");
