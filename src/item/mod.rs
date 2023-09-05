@@ -230,6 +230,10 @@ pub enum WorldObject {
     MetalBar,
     WoodPickaxe,
     Feather,
+    Tusk,
+    RawMeat,
+    CookedMeat,
+    Leather,
 }
 
 #[derive(

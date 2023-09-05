@@ -1,0 +1,15 @@
+(
+  name: "Leather",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Leather,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Leather,
+        metadata: (
+            name: "Leather", 
+            desc: "strong!"
+        ),
+        count: 1
+  ),
+  }
+)

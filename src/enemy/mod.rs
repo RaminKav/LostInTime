@@ -60,6 +60,9 @@ pub enum Mob {
     Slime,
     SpikeSlime,
     FurDevil,
+    Hog,
+    StingFly,
+    Bushling,
 }
 #[derive(Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]

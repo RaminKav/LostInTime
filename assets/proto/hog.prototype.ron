@@ -1,0 +1,37 @@
+(
+  name: "Hog",
+  templates: ["mob_passive"],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": Hog,
+    "survival_rogue_like::enemy::CombatAlignment": Passive,
+    "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
+    "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.5),
+    "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/hog/hog_down.png", size: (x: 64., y: 64.), cols: 4, rows: 6),
+    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,4,4], valid_directions: [0,1,2,3], anim_offset: 0),
+    "survival_rogue_like::attributes::MaxHealth": (28),
+    "survival_rogue_like::player::levels::ExperienceReward": (15),
+    "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: Leather,
+                min: 1,
+                max: 2,
+                rate: 0.65
+            ),
+            (
+                item: Tusk,
+                min: 1,
+                max: 1,
+                rate: 0.1
+            ),
+            (
+                item: RawMeat,
+                min: 1,
+                max: 2,
+                rate: 0.65
+            ),
+            ]
+        ),
+  }
+)

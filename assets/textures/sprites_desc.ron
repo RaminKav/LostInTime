@@ -235,6 +235,26 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Leather: WorldObjectData(
+            texture_pos: (15., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Tusk: WorldObjectData(
+            texture_pos: (15., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RawMeat: WorldObjectData(
+            texture_pos: (13., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CookedMeat: WorldObjectData(
+            texture_pos: (14., 5.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         PebbleBlock: WorldObjectData(
             texture_pos: (12., 3.),
             size: (16., 16.),
