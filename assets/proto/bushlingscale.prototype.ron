@@ -1,0 +1,15 @@
+(
+  name: "BushlingScale",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BushlingScale,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BushlingScale,
+        metadata: (
+            name: "Bushling Scale", 
+            desc: "strong!"
+        ),
+        count: 1
+  ),
+  }
+)

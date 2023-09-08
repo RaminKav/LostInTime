@@ -23,7 +23,7 @@ pub fn attempt_to_spawn_schematic_in_chunk(
         let rng_x = rng.gen_range(0..CHUNK_SIZE);
         let rng_y = rng.gen_range(0..CHUNK_SIZE);
         let target_pos = tile_pos_to_world_pos(
-            TileMapPosition::new(chunk.chunk_pos, TilePos::new(rng_x, rng_y), 0),
+            TileMapPosition::new(chunk.chunk_pos, TilePos::new(rng_x, rng_y)),
             true,
         );
         commands

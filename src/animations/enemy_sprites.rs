@@ -8,7 +8,7 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{enemy::Mob, inputs::FacingDirection};
+use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection};
 
 use super::AnimationTimer;
 
@@ -21,6 +21,7 @@ pub enum EnemyAnimationState {
     Attack,
     Hit,
     Death,
+    Dash,
 }
 #[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
 #[reflect(Schematic, Default)]
@@ -30,7 +31,6 @@ pub struct LeftFacingSideProfile;
 #[reflect(Schematic)]
 pub struct CharacterAnimationSpriteSheetData {
     pub animation_frames: Vec<u8>,
-    pub valid_directions: Vec<u8>,
     pub anim_offset: usize,
 }
 impl CharacterAnimationSpriteSheetData {
@@ -39,7 +39,7 @@ impl CharacterAnimationSpriteSheetData {
         match animation {
             EnemyAnimationState::Idle => 0,
             EnemyAnimationState::Walk => (max_frames * 1.) as usize,
-            EnemyAnimationState::Hit => (max_frames * 2.) as usize,
+            EnemyAnimationState::Hit | EnemyAnimationState::Dash => (max_frames * 2.) as usize,
             EnemyAnimationState::Death => (max_frames * 3.) as usize,
             EnemyAnimationState::Attack => (max_frames * 4.) as usize,
         }
@@ -73,7 +73,7 @@ pub fn change_anim_offset_when_character_action_state_changes(
                 sprite_sheet_data.anim_offset = 1;
                 sprite.index = (max_frames * 1.) as usize;
             }
-            EnemyAnimationState::Hit => {
+            EnemyAnimationState::Hit | EnemyAnimationState::Dash => {
                 sprite_sheet_data.anim_offset = 2;
                 sprite.index = (max_frames * 2.) as usize;
             }
@@ -94,53 +94,69 @@ pub fn change_character_anim_direction(
             &FacingDirection,
             &mut TextureAtlasSprite,
             &mut Handle<TextureAtlas>,
-            &Mob,
+            Option<&Mob>,
             Option<&LeftFacingSideProfile>,
         ),
-        With<Mob>,
+        Changed<FacingDirection>,
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
 ) {
-    for (facing_direction, mut sprite, texture_atlas_handle, mob, left_side_profile_option) in
-        mob_query.iter_mut()
+    for (
+        facing_direction,
+        mut sprite,
+        texture_atlas_handle,
+        mob_option,
+        left_side_profile_option,
+    ) in mob_query.iter_mut()
     {
-        let mut texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
-
+        let texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
+        let entity_name = mob_option
+            .map(|m| m.to_string().to_lowercase())
+            .unwrap_or("player".to_owned());
         match facing_direction {
             FacingDirection::Left => {
-                texture_atlas.texture = asset_server.load(format!(
-                    "textures/{}/{}_{}.png",
-                    mob.to_string().to_lowercase(),
-                    mob.to_string().to_lowercase(),
-                    "side"
-                ));
+                texture_atlas.texture = if let Some(_) = mob_option {
+                    asset_server.load(format!(
+                        "textures/{}/{}_{}.png",
+                        entity_name, entity_name, "side"
+                    ))
+                } else {
+                    graphics.player_spritesheets.as_ref().unwrap()[0].clone()
+                };
                 sprite.flip_x = left_side_profile_option.is_none();
             }
             FacingDirection::Up => {
-                texture_atlas.texture = asset_server.load(format!(
-                    "textures/{}/{}_{}.png",
-                    mob.to_string().to_lowercase(),
-                    mob.to_string().to_lowercase(),
-                    "up"
-                ));
+                texture_atlas.texture = if let Some(_) = mob_option {
+                    asset_server.load(format!(
+                        "textures/{}/{}_{}.png",
+                        entity_name, entity_name, "up"
+                    ))
+                } else {
+                    graphics.player_spritesheets.as_ref().unwrap()[1].clone()
+                };
             }
             FacingDirection::Right => {
-                texture_atlas.texture = asset_server.load(format!(
-                    "textures/{}/{}_{}.png",
-                    mob.to_string().to_lowercase(),
-                    mob.to_string().to_lowercase(),
-                    "side"
-                ));
+                texture_atlas.texture = if let Some(_) = mob_option {
+                    asset_server.load(format!(
+                        "textures/{}/{}_{}.png",
+                        entity_name, entity_name, "side"
+                    ))
+                } else {
+                    graphics.player_spritesheets.as_ref().unwrap()[0].clone()
+                };
                 sprite.flip_x = left_side_profile_option.is_some();
             }
             FacingDirection::Down => {
-                texture_atlas.texture = asset_server.load(format!(
-                    "textures/{}/{}_{}.png",
-                    mob.to_string().to_lowercase(),
-                    mob.to_string().to_lowercase(),
-                    "down"
-                ));
+                texture_atlas.texture = if let Some(_) = mob_option {
+                    asset_server.load(format!(
+                        "textures/{}/{}_{}.png",
+                        entity_name, entity_name, "down"
+                    ))
+                } else {
+                    graphics.player_spritesheets.as_ref().unwrap()[2].clone()
+                };
             }
         }
     }

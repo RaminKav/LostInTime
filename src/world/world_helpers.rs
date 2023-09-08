@@ -42,24 +42,8 @@ pub fn camera_pos_to_tile_pos(camera_pos: &Vec2) -> TilePos {
 pub fn world_pos_to_tile_pos(pos: Vec2) -> TileMapPosition {
     let chunk_pos = camera_pos_to_chunk_pos(&pos);
     let tile_pos = camera_pos_to_tile_pos(&pos);
-    let x_remainder = pos.x
-        - (tile_pos.x as f32 * TILE_SIZE.x)
-        - chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x;
-    let y_remainder = pos.y
-        - (tile_pos.y as f32 * TILE_SIZE.x)
-        - chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x;
-    let quadrant = if x_remainder >= 0. {
-        if y_remainder >= 0. {
-            1
-        } else {
-            3
-        }
-    } else if y_remainder >= 0. {
-        0
-    } else {
-        2
-    };
-    TileMapPosition::new(chunk_pos, tile_pos, quadrant)
+
+    TileMapPosition::new(chunk_pos, tile_pos)
 }
 pub fn world_pos_to_chunk_relative_world_pos(pos: Vec2) -> Vec2 {
     let chunk_pos = camera_pos_to_chunk_pos(&pos);
@@ -71,29 +55,13 @@ pub fn world_pos_to_chunk_relative_tile_pos(pos: Vec2) -> TileMapPosition {
     world_pos_to_tile_pos(chunk_relative_pos)
 }
 
-pub fn tile_pos_to_world_pos(pos: TileMapPosition, center: bool) -> Vec2 {
-    let mut quadrant_offset = Vec2::new(
-        if pos.quadrant == 1 || pos.quadrant == 3 {
-            TILE_SIZE.x / 4.
-        } else {
-            -TILE_SIZE.x / 4.
-        },
-        if pos.quadrant == 0 || pos.quadrant == 1 {
-            TILE_SIZE.x / 4.
-        } else {
-            -TILE_SIZE.x / 4.
-        },
-    );
-    if center {
-        quadrant_offset = Vec2::ZERO;
-    }
+//TODO: remove center, old code
+pub fn tile_pos_to_world_pos(pos: TileMapPosition, _center: bool) -> Vec2 {
     Vec2::new(
         pos.tile_pos.x as f32 * TILE_SIZE.x
-            + pos.chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x
-            + quadrant_offset.x,
+            + pos.chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
         pos.tile_pos.y as f32 * TILE_SIZE.x
-            + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x
-            + quadrant_offset.y,
+            + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
     )
 }
 
@@ -122,7 +90,7 @@ pub fn get_neighbour_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosi
         adjusted_chunk_pos.y = chunk_pos.y + 1;
         neighbour_wall_pos.y = 0;
     }
-    TileMapPosition::new(adjusted_chunk_pos, neighbour_wall_pos, 0)
+    TileMapPosition::new(adjusted_chunk_pos, neighbour_wall_pos)
 }
 pub fn get_neighbour_quadrant(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {
     let parent_world_pos = tile_pos_to_world_pos(pos, false);
@@ -153,16 +121,25 @@ pub fn can_object_be_placed_here(
 ) -> bool {
     if is_medium
         && (game
-            .get_obj_entity_at_tile(tile_pos.set_quadrant(0), &proto_param)
+            .get_obj_entity_at_tile(tile_pos, &proto_param)
             .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(1), &proto_param)
+                .get_obj_entity_at_tile(
+                    tile_pos.get_neighbour_tiles_for_medium_objects()[0],
+                    &proto_param,
+                )
                 .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(2), &proto_param)
+                .get_obj_entity_at_tile(
+                    tile_pos.get_neighbour_tiles_for_medium_objects()[1],
+                    &proto_param,
+                )
                 .is_some()
             || game
-                .get_obj_entity_at_tile(tile_pos.set_quadrant(3), &proto_param)
+                .get_obj_entity_at_tile(
+                    tile_pos.get_neighbour_tiles_for_medium_objects()[2],
+                    &proto_param,
+                )
                 .is_some())
     {
         debug!("obj exists here {tile_pos:?}");

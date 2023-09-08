@@ -1,7 +1,7 @@
 use crate::{
     assets::{SpriteAnchor, SpriteSize},
     inventory::ItemStack,
-    item::{projectile::ArcProjectileData, Foliage, Wall},
+    item::{projectile::ArcProjectileData, Foliage, FoliageSize, Wall},
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -188,10 +188,14 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 .unwrap()
                 .get(foliage)
                 .unwrap();
+            let size = proto_param
+                .get_component::<FoliageSize, _>(obj.clone())
+                .unwrap()
+                .0;
             spawned_entity_commands
                 .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
                     shape::Quad {
-                        size: Vec2::new(32., 40.),
+                        size,
                         ..Default::default()
                     },
                 ))))

@@ -1,0 +1,39 @@
+(
+  name: "MediumGreenTree",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MediumGreenTree,
+  "survival_rogue_like::item::Foliage": MediumGreenTree,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::item::FoliageSize": ((x: 64., y: 96.)),
+   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
+  "survival_rogue_like::item::RequiredEquipmentType": (Axe),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x: -28., y: -16., r: 4.5),
+  "survival_rogue_like::attributes::MaxHealth": (50),
+  "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: MediumGreenTree, obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: WoodPlank,
+                min: 1,
+                max: 3,
+                rate: 1.
+            ),
+            (
+                item: Stick,
+                min: 1,
+                max: 3,
+                rate: 0.3
+            ),
+            (
+                item: Apple,
+                min: 1,
+                max: 3,
+                rate: 1.
+            )]
+        ),
+  }
+)

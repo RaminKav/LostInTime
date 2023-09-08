@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = {version = "0.10.1", features = ["trace"]}
+bevy = {version = "0.10.1"}
 bevy_asset_loader = "0.16.0"
 bevy_rapier2d = {git = "https://github.com/dimforge/bevy_rapier.git", branch = "master", features = ["simd-stable","parallel"]  }
 bevy_ecs_tilemap = "0.10.0"
@@ -29,3 +29,11 @@ lazy_static = "1.4.0"
 
 [features]
 release-bundle = []
+
+[target.x86_64-pc-windows-msvc]
+linker = "/usr/local/bin/lld"
+rustflags = [
+  "-Lnative=/Users/ramin/xwin/crt/lib/x86_64",
+  "-Lnative=/Users/ramin/xwin/sdk/lib/um/x86_64",
+  "-Lnative=/Users/ramin/xwin/sdk/lib/ucrt/x86_64"
+]

@@ -39,8 +39,8 @@ use crate::{
         melee::MeleeAttack,
         object_actions::ObjectAction,
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
-        Block, BreaksWith, EquipmentType, ItemDisplayMetaData, Loot, LootTable, PlacesInto,
-        RequiredEquipmentType, Wall, WorldObject,
+        Block, BreaksWith, EquipmentType, FoliageSize, ItemDisplayMetaData, Loot, LootTable,
+        PlacesInto, RequiredEquipmentType, Wall, WorldObject,
     },
     player::levels::ExperienceReward,
     schematic::{loot_chests::LootChestType, SchematicType},
@@ -92,6 +92,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
+            .register_type::<FoliageSize>()
             .register_type::<ArcProjectileData>()
             .register_type::<ColliderProto>()
             .register_type::<ColliderCapsulProto>()
@@ -132,7 +133,11 @@ impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
         println!("Loading prototypes...");
         //TODO: automate this
-        prototypes.load("proto/tree.prototype.ron");
+        prototypes.load("proto/smallgreentree.prototype.ron");
+        prototypes.load("proto/smallyellowtree.prototype.ron");
+        prototypes.load("proto/smallyellowtree.prototype.ron");
+        prototypes.load("proto/mediumyellowtree.prototype.ron");
+        prototypes.load("proto/mediumgreentree.prototype.ron");
         prototypes.load("proto/WorldGenerationParams.prototype.ron");
         prototypes.load("proto/DungeonWorldGenerationParams.prototype.ron");
         prototypes.load("proto/stonewall.prototype.ron");
@@ -165,6 +170,8 @@ impl ProtoPlugin {
         prototypes.load("proto/dungeonentrance.prototype.ron");
         prototypes.load("proto/dungeonentranceblock.prototype.ron");
         prototypes.load("proto/grass.prototype.ron");
+        prototypes.load("proto/grass2.prototype.ron");
+        prototypes.load("proto/grass3.prototype.ron");
         prototypes.load("proto/grassblock.prototype.ron");
         prototypes.load("proto/boulder.prototype.ron");
         prototypes.load("proto/stick.prototype.ron");
@@ -210,6 +217,25 @@ impl ProtoPlugin {
         prototypes.load("proto/cookedmeat.prototype.ron");
         prototypes.load("proto/stingfly.prototype.ron");
         prototypes.load("proto/bushling.prototype.ron");
+        prototypes.load("proto/crate2.prototype.ron");
+        prototypes.load("proto/bushlingscale.prototype.ron");
+        prototypes.load("proto/bush.prototype.ron");
+        prototypes.load("proto/bush2.prototype.ron");
+        prototypes.load("proto/boulder2.prototype.ron");
+        prototypes.load("proto/largestump.prototype.ron");
+        prototypes.load("proto/largemushroomstump.prototype.ron");
+        prototypes.load("proto/yellowflower.prototype.ron");
+        prototypes.load("proto/yellowflowerblock.prototype.ron");
+        prototypes.load("proto/redflower.prototype.ron");
+        prototypes.load("proto/redflowerblock.prototype.ron");
+        prototypes.load("proto/pinkflower.prototype.ron");
+        prototypes.load("proto/pinkflowerblock.prototype.ron");
+        prototypes.load("proto/stump.prototype.ron");
+        prototypes.load("proto/stump2.prototype.ron");
+        prototypes.load("proto/cattail.prototype.ron");
+        prototypes.load("proto/lillypad.prototype.ron");
+        prototypes.load("proto/waterboulder.prototype.ron");
+        prototypes.load("proto/waterboulder2.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

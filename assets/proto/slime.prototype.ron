@@ -12,7 +12,7 @@
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -16., y: -16.5, r: 34.),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
     "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
-    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [7,7,7,7,7], valid_directions: [0,1,2,3], anim_offset: 0),
+    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [7,7,7,7,7], anim_offset: 0),
     "survival_rogue_like::attributes::MaxHealth": (500),
     "survival_rogue_like::attributes::Attack": (25),
     "survival_rogue_like::player::levels::ExperienceReward": (275),
