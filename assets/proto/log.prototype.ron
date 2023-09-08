@@ -3,8 +3,8 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Log,
-  "survival_rogue_like::item::PlacesInto": (Tree),
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Tree)]),
+  // "survival_rogue_like::item::PlacesInto": (Sma),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(SmallGreenTree)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Log,

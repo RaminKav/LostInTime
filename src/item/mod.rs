@@ -174,7 +174,10 @@ pub enum WorldObject {
     WaterTile,
     SandTile,
     Flint,
-    Tree,
+    SmallYellowTree,
+    SmallGreenTree,
+    MediumGreenTree,
+    MediumYellowTree,
     Log,
     Sword,
     BasicStaff,
@@ -193,6 +196,8 @@ pub enum WorldObject {
     DungeonEntrance,
     DungeonEntranceBlock,
     Grass,
+    Grass2,
+    Grass3,
     GrassBlock,
     Boulder,
     SlimeGoo,
@@ -213,6 +218,7 @@ pub enum WorldObject {
     Claw,
     FireExplosionAOE,
     Crate,
+    Crate2,
     CrateBlock,
     Coal,
     MetalShard,
@@ -234,6 +240,24 @@ pub enum WorldObject {
     RawMeat,
     CookedMeat,
     Leather,
+    BushlingScale,
+    Bush,
+    Bush2,
+    Boulder2,
+    LargeStump,
+    LargeMushroomStump,
+    YellowFlower,
+    YellowFlowerBlock,
+    RedFlower,
+    RedFlowerBlock,
+    PinkFlower,
+    PinkFlowerBlock,
+    Stump,
+    Stump2,
+    Cattail,
+    Lillypad,
+    WaterBoulder,
+    WaterBoulder2,
 }
 
 #[derive(
@@ -255,13 +279,20 @@ pub enum WorldObject {
 )]
 #[reflect(Component, Schematic)]
 pub enum Foliage {
-    Tree,
+    SmallGreenTree,
+    SmallYellowTree,
+    MediumGreenTree,
+    MediumYellowTree,
 }
 impl Default for Foliage {
     fn default() -> Self {
-        Self::Tree
+        Self::SmallGreenTree
     }
 }
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct FoliageSize(pub Vec2);
+
 #[derive(
     Debug,
     Reflect,
@@ -421,7 +452,7 @@ impl WorldObject {
             WorldObject::DungeonStone => BLACK,
             WorldObject::WaterTile => BLUE,
             WorldObject::SandTile => YELLOW,
-            WorldObject::Tree => DARK_GREEN,
+            WorldObject::SmallGreenTree => DARK_GREEN,
             WorldObject::Crate => UI_GRASS_GREEN,
             _ => BLACK,
         }
@@ -499,19 +530,11 @@ pub fn handle_placing_world_object(
                 if let Some(loot_chest_type) = &place_event.loot_chest_type {
                     commands.entity(item).insert(loot_chest_type.clone());
                 }
-                if is_medium {
-                    for q in 0..4 {
-                        minimap_event.send(UpdateMiniMapEvent {
-                            pos: Some(tile_pos.set_quadrant(q)),
-                            new_tile: Some(place_event.obj),
-                        });
-                    }
-                } else {
-                    minimap_event.send(UpdateMiniMapEvent {
-                        pos: Some(tile_pos),
-                        new_tile: Some(place_event.obj),
-                    });
-                }
+
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(tile_pos),
+                    new_tile: Some(place_event.obj),
+                });
             }
 
             continue;
@@ -549,7 +572,7 @@ pub fn handle_break_object(
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
-                        TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos, 0),
+                        TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
                         true,
                     )
                 } else {
@@ -574,28 +597,10 @@ pub fn handle_break_object(
         if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
             wall_break_event.send(WallBreakEvent { pos: broken.pos })
         }
-        if broken.obj.is_medium_size(&proto_param) {
-            minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(broken.pos.set_quadrant(0)),
-                new_tile: None,
-            });
-            minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(broken.pos.set_quadrant(1)),
-                new_tile: None,
-            });
-            minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(broken.pos.set_quadrant(2)),
-                new_tile: None,
-            });
-            minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(broken.pos.set_quadrant(3)),
-                new_tile: None,
-            });
-        } else {
-            minimap_event.send(UpdateMiniMapEvent {
-                pos: Some(broken.pos),
-                new_tile: None,
-            });
-        }
+
+        minimap_event.send(UpdateMiniMapEvent {
+            pos: Some(broken.pos),
+            new_tile: None,
+        });
     }
 }

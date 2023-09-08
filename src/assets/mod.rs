@@ -86,6 +86,7 @@ impl Plugin for GameAssetsPlugin {
                 icons: None,
                 foliage_material_map: None,
                 ui_image_handles: None,
+                player_spritesheets: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -135,11 +136,12 @@ pub struct Graphics {
     pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub foliage_material_map: Option<HashMap<Foliage, Handle<FoliageMaterial>>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
+    pub player_spritesheets: Option<Vec<Handle<Image>>>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
 /// Copies sprite data pixel by pixel, needed to render things in UI
-fn convert_to_image(
+fn _convert_to_image(
     sprite_desc: WorldObjectData,
     original_image: Handle<Image>,
     assets: &mut ResMut<Assets<Image>>,
@@ -235,7 +237,11 @@ impl GameAssetsPlugin {
         let mut icon_map = HashMap::default();
         let mut ui_image_handles = HashMap::default();
         let mut foliage_material_map = HashMap::default();
-
+        let player_spritesheets = vec![
+            asset_server.load("textures/player/player_side.png"),
+            asset_server.load("textures/player/player_up.png"),
+            asset_server.load("textures/player/player_down.png"),
+        ];
         let mut recipes_list = RecipeList::default();
 
         for (item, rect) in sprite_desc.items.iter() {
@@ -316,6 +322,7 @@ impl GameAssetsPlugin {
             foliage_material_map: Some(foliage_material_map),
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
+            player_spritesheets: Some(player_spritesheets),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
@@ -359,6 +366,6 @@ impl GameAssetsPlugin {
     }
 }
 
-pub fn get_index_from_pixel_cords(p: WorldObjectData) -> usize {
+pub fn _get_index_from_pixel_cords(p: WorldObjectData) -> usize {
     (p.texture_pos.y + (p.texture_pos.x / 16.)) as usize
 }

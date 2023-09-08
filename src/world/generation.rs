@@ -46,8 +46,8 @@ impl GenerationPlugin {
         pos: TileMapPosition,
         seed: u32,
     ) -> Option<WorldObject> {
-        let x = pos.tile_pos.x as f64 + if pos.quad_is_x_offset() { 0.5 } else { 0. };
-        let y = pos.tile_pos.y as f64 + if pos.quad_is_y_offset() { 0.5 } else { 0. };
+        let x = pos.tile_pos.x as f64;
+        let y = pos.tile_pos.y as f64;
         // dont need to use expencive noise fn if it will always
         // result in the same tile
         if world_generation_params.stone_wall_frequency == 1. {
@@ -69,13 +69,11 @@ impl GenerationPlugin {
         let mut stone_blocks: Vec<(TileMapPosition, WorldObject)> = vec![];
         for x in 0..CHUNK_SIZE {
             for y in 0..CHUNK_SIZE {
-                for q in 0..4 {
-                    let pos = TileMapPosition::new(chunk_pos, TilePos { x, y }, q);
-                    if let Some(block) =
-                        Self::get_perlin_block_at_tile(world_generation_params, pos, seed)
-                    {
-                        stone_blocks.push((pos, block));
-                    }
+                let pos = TileMapPosition::new(chunk_pos, TilePos { x, y });
+                if let Some(block) =
+                    Self::get_perlin_block_at_tile(world_generation_params, pos, seed)
+                {
+                    stone_blocks.push((pos, block));
                 }
             }
         }
@@ -223,15 +221,14 @@ impl GenerationPlugin {
                             wall_cache.walls.insert(tp.0, true);
                             return true;
                         }
-                        let x_offset = if tp.0.quad_is_x_offset() { 1 } else { 0 };
-                        let y_offset = if tp.0.quad_is_y_offset() { 1 } else { 0 };
+
                         if dungeon.grid[(CHUNK_SIZE as i32 * 2 * (2 - chunk_pos.y)
                             - 1
-                            - (2 * tp.0.tile_pos.y as i32)
-                            - y_offset) as usize][(2 * CHUNK_SIZE as i32
+                            - (2 * tp.0.tile_pos.y as i32))
+                            as usize][(2 * CHUNK_SIZE as i32
                             + (chunk_pos.x * 2 * CHUNK_SIZE as i32)
-                            + 2 * tp.0.tile_pos.x as i32
-                            + x_offset) as usize]
+                            + 2 * tp.0.tile_pos.x as i32)
+                            as usize]
                             == 1
                         {
                             wall_cache.walls.insert(tp.0, false);
@@ -261,37 +258,37 @@ impl GenerationPlugin {
                 let is_medium = obj_data.1.is_medium_size(&proto_param);
                 if spawned_vec.contains(pos)
                     || (is_medium
-                        && (spawned_vec.contains(&pos.set_quadrant(0))
-                            || spawned_vec.contains(&pos.set_quadrant(1))
-                            || spawned_vec.contains(&pos.set_quadrant(2))
-                            || spawned_vec.contains(&pos.set_quadrant(3))))
+                        && (spawned_vec.contains(&pos)
+                            || spawned_vec
+                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[0])
+                            || spawned_vec
+                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[1])
+                            || spawned_vec
+                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[2])))
                 {
                     continue;
                 }
                 if is_medium {
-                    spawned_vec.push(pos.set_quadrant(0));
-                    spawned_vec.push(pos.set_quadrant(1));
-                    spawned_vec.push(pos.set_quadrant(2));
-                    spawned_vec.push(pos.set_quadrant(3));
+                    spawned_vec.push(*pos);
+                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[0]);
+                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[1]);
+                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[2]);
                 } else {
                     spawned_vec.push(pos.clone());
                 }
 
                 let mut is_touching_air = false;
                 if let Some(dungeon) = maybe_dungeon {
-                    let x_offset = if obj_data.0.quad_is_x_offset() { 1 } else { 0 };
-                    let y_offset = if obj_data.0.quad_is_y_offset() { 1 } else { 0 };
-
                     for x in -1..2 {
                         for y in -1..2 {
                             let original_y = (CHUNK_SIZE as i32 * 2 * (2 - obj_data.0.chunk_pos.y)
                                 - 1
-                                - (2 * obj_data.0.tile_pos.y as i32)
-                                - y_offset) as usize;
+                                - (2 * obj_data.0.tile_pos.y as i32))
+                                as usize;
                             let original_x = (2 * CHUNK_SIZE as i32
                                 + (obj_data.0.chunk_pos.x * 2 * CHUNK_SIZE as i32)
-                                + 2 * obj_data.0.tile_pos.x as i32
-                                + x_offset) as usize;
+                                + 2 * obj_data.0.tile_pos.x as i32)
+                                as usize;
                             if dungeon.grid[(original_y + y as usize).clamp(0, 127)]
                                 [(original_x + x as usize).clamp(0, 127)]
                                 == 1
@@ -312,9 +309,13 @@ impl GenerationPlugin {
 
                 if let Some(spawned_obj) = obj {
                     if is_medium {
-                        for q in 0..4 {
+                        minimap_update.send(UpdateMiniMapEvent {
+                            pos: Some(*obj_data.0),
+                            new_tile: Some(*obj_data.1),
+                        });
+                        for q in 0..3 {
                             minimap_update.send(UpdateMiniMapEvent {
-                                pos: Some(obj_data.0.set_quadrant(q)),
+                                pos: Some(obj_data.0.get_neighbour_tiles_for_medium_objects()[q]),
                                 new_tile: Some(*obj_data.1),
                             });
                         }

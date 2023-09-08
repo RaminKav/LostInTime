@@ -11,7 +11,10 @@ use strum_macros::{Display, EnumIter};
 pub mod levels;
 pub mod stats;
 use crate::{
-    animations::{AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer},
+    animations::{
+        enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
+        AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer,
+    },
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::Hunger,
@@ -139,7 +142,9 @@ pub fn handle_player_raw_position(
     >,
     mut game: GameParam,
 ) {
-    let Ok((mut raw_pos, mut pos,  kcc)) = player_pos.get_single_mut() else {return};
+    let Ok((mut raw_pos, mut pos, kcc)) = player_pos.get_single_mut() else {
+        return;
+    };
     raw_pos.0 += kcc.effective_translation;
 
     let delta = raw_pos.0 - pos.translation.truncate();
@@ -154,94 +159,23 @@ fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
     mut game: ResMut<Game>,
     _images: ResMut<Assets<Image>>,
 ) {
-    let mut limb_children: Vec<Entity> = vec![];
-    //player shadow
-    let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
-    let shadow_texture_atlas =
-        TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
-    let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
-
-    let shadow = commands
-        .spawn(SpriteSheetBundle {
-            texture_atlas: shadow_texture_atlas_handle,
-            transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
-            ..default()
-        })
-        .id();
-    limb_children.push(shadow);
-
-    //player
-    for l in Limb::iter() {
-        let limb_source_handle = asset_server.load(format!(
-            "textures/player/player-run-down/player-{}-run-down-source-0.png",
-            l.to_string().to_lowercase()
-        ));
-
-        let limb_texture_asset = format!(
-            "textures/player/player-texture-{}.png",
-            if l == Limb::Torso || l == Limb::Hands {
-                Limb::Torso.to_string().to_lowercase()
-            } else {
-                l.to_string().to_lowercase()
-            }
-        );
-        let limb_texture_handle = asset_server.load(limb_texture_asset);
-        // let limb_texture_atlas =
-        //     TextureAtlas::from_grid(limb_texture_handle, Vec2::new(32., 32.), 5, 1, None, None);
-
-        // let limb_texture_atlas_handle = texture_atlases.add(limb_texture_atlas);
-        let transform = if l == Limb::Head {
-            Transform::from_translation(Vec3::new(0., 0., 0.))
-        } else {
-            Transform::default()
-        };
-        let limb = commands
-            .spawn((
-                MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(32., 32.),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
-                    transform,
-                    material: materials.add(AnimatedTextureMaterial {
-                        source_texture: Some(limb_source_handle),
-                        lookup_texture: Some(limb_texture_handle),
-                        opacity: 1.,
-                        flip: 1.,
-                    }),
-                    ..default()
-                },
-                l,
-                AnimationFrameTracker(0, 5),
-            ))
-            .id();
-        // .spawn(SpriteSheetBundle {
-        //     texture_atlas: limb_texture_atlas_handle,
-        //     transform,
-        //     ..default()
-        // })
-        // .id();
-        limb_children.push(limb);
-    }
-
     //spawn player entity with limb spritesheets as children
+    let player_texture_handle = asset_server.load("textures/player/player_down.png");
+    let player_texture_atlas =
+        TextureAtlas::from_grid(player_texture_handle, Vec2::new(64., 64.), 7, 5, None, None);
+    let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
+
     let p = commands
         .spawn((
-            SpatialBundle {
+            SpriteSheetBundle {
+                texture_atlas: player_texture_atlas_handle,
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                ..Default::default()
+                ..default()
             },
-            AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
@@ -284,13 +218,18 @@ fn spawn_player(
             },
             RawPosition::default(),
         ))
+        .insert(CharacterAnimationSpriteSheetData {
+            animation_frames: vec![6, 6, 4, 6, 7],
+            anim_offset: 0,
+        })
+        .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
+        .insert(EnemyAnimationState::Idle)
         .insert(ManaRegenTimer(Timer::from_seconds(0.5, TimerMode::Once)))
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
         .insert(SkillPoints { count: 0 })
         .insert(RigidBody::KinematicPositionBased)
-        .push_children(&limb_children)
         .id();
     game.player = p;
 }

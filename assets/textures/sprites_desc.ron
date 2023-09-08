@@ -100,6 +100,11 @@
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
+        BushlingScale: WorldObjectData(
+            texture_pos: (6., 6.),
+            size: (16., 16.),
+            anchor: Some((0.2,0.0)),
+        ),
         MagicWhip: WorldObjectData(
             texture_pos: (11., 5.),
             size: (16., 16.),
@@ -155,6 +160,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Grass2: WorldObjectData(
+            texture_pos: (2., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Grass3: WorldObjectData(
+            texture_pos: (3., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         DeadSapling: WorldObjectData(
             texture_pos: (1., 12.),
             size: (16., 16.),
@@ -200,9 +215,94 @@
             size: (32., 32.),
             anchor: None,
         ),
+        Bush: WorldObjectData(
+            texture_pos: (6., 7.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        Bush2: WorldObjectData(
+            texture_pos: (8., 7.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        Boulder2: WorldObjectData(
+            texture_pos: (10., 7.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        LargeStump: WorldObjectData(
+            texture_pos: (12., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        LargeMushroomStump: WorldObjectData(
+            texture_pos: (10., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
         MetalBoulder: WorldObjectData(
             texture_pos: (8., 9.),
             size: (32., 32.),
+            anchor: None,
+        ),
+        YellowFlower: WorldObjectData(
+            texture_pos: (8., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PinkFlower: WorldObjectData(
+            texture_pos: (9., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedFlower: WorldObjectData(
+            texture_pos: (10., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        YellowFlowerBlock: WorldObjectData(
+            texture_pos: (8., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PinkFlowerBlock: WorldObjectData(
+            texture_pos: (9., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedFlowerBlock: WorldObjectData(
+            texture_pos: (10., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Stump: WorldObjectData(
+            texture_pos: (6., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Stump2: WorldObjectData(
+            texture_pos: (6., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Cattail: WorldObjectData(
+            texture_pos: (11., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Lillypad: WorldObjectData(
+            texture_pos: (12., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        WaterBoulder: WorldObjectData(
+            texture_pos: (13., 12.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        WaterBoulder2: WorldObjectData(
+            texture_pos: (14., 11.),
+            size: (16., 24.),
             anchor: None,
         ),
         FireExplosionAOE: WorldObjectData(
@@ -261,7 +361,7 @@
             anchor: None,
         ),
         Pebble: WorldObjectData(
-            texture_pos: (12., 3.),
+            texture_pos: (10., 2.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -306,8 +406,13 @@
             anchor: None,
         ),
         Crate: WorldObjectData(
-            texture_pos: (1., 9.),
-            size: (16., 16.),
+            texture_pos: (0., 10.),
+            size: (16., 22.),
+            anchor: None,
+        ),
+        Crate2: WorldObjectData(
+            texture_pos: (1., 10.),
+            size: (16., 20.),
             anchor: None,
         ),
         CrateBlock: WorldObjectData(

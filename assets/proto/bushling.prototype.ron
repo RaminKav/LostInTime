@@ -9,8 +9,8 @@
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.5),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/bushling/bushling_down.png", size: (x: 38., y: 38.), cols: 9, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
-    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,9,6], valid_directions: [0,1,2,3], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (45),
+    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,9,6], anim_offset: 0),
+    "survival_rogue_like::attributes::MaxHealth": (55),
     "survival_rogue_like::attributes::Attack": (6),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
@@ -27,9 +27,9 @@
                 rate: 0.035
             ),
             (
-                item: Feather,
+                item: BushlingScale,
                 min: 1,
-                max: 3,
+                max: 2,
                 rate: 0.65
             ),
             (

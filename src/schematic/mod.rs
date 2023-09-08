@@ -228,10 +228,16 @@ pub fn handle_new_scene_entities_parent_chunk(
                 if is_valid_to_spawn {
                     let tile_pos = world_pos_to_tile_pos(pos);
                     if obj.is_medium_size(&proto_param) {
-                        for q in 0..4 {
-                            if let Some(existing_obj) =
-                                game.get_obj_entity_at_tile(tile_pos.set_quadrant(q), &proto_param)
-                            {
+                        if let Some(existing_obj) =
+                            game.get_obj_entity_at_tile(tile_pos, &proto_param)
+                        {
+                            commands.entity(existing_obj).despawn_recursive();
+                        }
+                        for q in 0..3 {
+                            if let Some(existing_obj) = game.get_obj_entity_at_tile(
+                                tile_pos.get_neighbour_tiles_for_medium_objects()[q],
+                                &proto_param,
+                            ) {
                                 commands.entity(existing_obj).despawn_recursive();
                             }
                         }

@@ -8,6 +8,7 @@ use bevy_ecs_tilemap::{
     FrustumCulling,
 };
 use bevy_save::prelude::*;
+use rand::Rng;
 
 use crate::{
     attributes::CurrentHealth,
@@ -30,7 +31,7 @@ pub struct ColliderReflect {
     collider: Vec2,
 }
 pub struct ClientPlugin;
-
+//TODO: Temp does not work, Save/Load WIP
 impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(SavePlugins)
@@ -312,10 +313,10 @@ impl ClientPlugin {
         };
         let mut state: SystemState<EventWriter<DimensionSpawnEvent>> = SystemState::new(world);
         let mut dim_event = state.get_mut(world);
-
+        let mut rng = rand::thread_rng();
         dim_event.send(DimensionSpawnEvent {
             generation_params: params,
-            seed: Some(0),
+            seed: Some(rng.gen_range(0..100000)),
             swap_to_dim_now: true,
         });
         // });

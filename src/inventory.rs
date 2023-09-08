@@ -191,9 +191,7 @@ impl InventoryItemStack {
 
         //spawn new item entity
         let item = commands
-            .spawn(SpriteSheetBundle {
-                sprite,
-                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
+            .spawn(SpatialBundle {
                 transform: Transform {
                     translation: position,
                     scale: Vec3::new(1., 1., 1.),

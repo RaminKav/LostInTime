@@ -1,7 +1,7 @@
 pub mod enemy_sprites;
 
+use std::cmp::max;
 use std::f32::consts::PI;
-use std::{cmp::max, time::Duration};
 
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
@@ -90,7 +90,6 @@ impl Plugin for AnimationsPlugin {
                     change_anim_offset_when_character_action_state_changes,
                     animate_character_spritesheet_animations,
                     change_character_anim_direction,
-                    Self::animate_limbs,
                     Self::animate_enemies,
                     Self::animate_dropped_items,
                     Self::handle_held_item_direction_change,
@@ -104,59 +103,6 @@ impl Plugin for AnimationsPlugin {
 }
 
 impl AnimationsPlugin {
-    fn animate_limbs(
-        time: Res<Time>,
-        game: Res<Game>,
-        asset_server: Res<AssetServer>,
-        mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-        mut player_query: Query<(&mut AnimationTimer, &Children), With<Player>>,
-        is_hit: Query<&HitAnimationTracker, With<Player>>,
-        mut limb_query: Query<(
-            &mut AnimationFrameTracker,
-            &Handle<AnimatedTextureMaterial>,
-            &Limb,
-        )>,
-        // mut eq_query: Query<&mut Transform, With<Equipment>>,
-    ) {
-        for (mut timer, limb_children) in &mut player_query {
-            let d = time.delta();
-            timer.tick(d);
-            // if timer.just_finished() && game.player.is_moving {
-            for l in limb_children {
-                if let Ok((mut tracker, limb_handle, limb)) = limb_query.get_mut(*l) {
-                    let limb_material = materials.get_mut(limb_handle);
-                    if let Some(mat) = limb_material {
-                        if timer.just_finished() && game.player_state.is_moving {
-                            tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
-                        } else if !game.player_state.is_moving {
-                            tracker.0 = 0;
-                        }
-                        mat.source_texture = Some(asset_server.load(format!(
-                            "textures/player/player-run-down/player-{}-run-down-source-{}.png",
-                            limb.to_string().to_lowercase(),
-                            tracker.0
-                        )));
-                        mat.opacity = if is_hit.get_single().is_ok() { 0.5 } else { 1. };
-                    }
-                }
-                // else if let Ok(mut t) = eq_query.get_mut(*l) {
-                //     // t.translation.y = (t.translation.y + 1.) % 2.;
-                //     // t.translation.x = (t.translation.y + 1.) % 2.;
-                // }
-            }
-
-            // } else if !game.player.is_moving {
-            //     for l in limb_children {
-            //         if let Ok((mut limb_sprite, _)) = limb_query.get_mut(*l) {
-            //             limb_sprite.index = 0
-            //         } else if let Ok(mut t) = eq_query.get_mut(*l) {
-            //             // t.translation.y = -1.;
-            //             // t.translation.x = 0.;
-            //         }
-            //     }
-            // }
-        }
-    }
     fn animate_enemies(
         time: Res<Time>,
         _game: Res<Game>,
@@ -208,7 +154,7 @@ impl AnimationsPlugin {
                 &mut AnimationTimer,
                 &mut AnimationPosTracker,
             ),
-            &ItemStack,
+            With<ItemStack>,
         >,
     ) {
         for (mut transform, mut timer, mut tracker) in &mut drop_query {
@@ -417,7 +363,7 @@ impl AnimationsPlugin {
                 if let Some(children) = children_option {
                     for child in children.iter() {
                         let Some(arc_data) = proj_arc_option else {
-                            continue
+                            continue;
                         };
 
                         let angle = arc_data.col_points[sprite.index];

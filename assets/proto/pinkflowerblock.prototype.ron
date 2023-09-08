@@ -1,0 +1,17 @@
+(
+  name: "PinkFlowerBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PinkFlowerBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(PinkFlower)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PinkFlowerBlock,
+        metadata: (
+            name: "Pink Flower", 
+            desc: "Mmmm!"
+        ),
+        count: 1
+  ),
+  }
+)
