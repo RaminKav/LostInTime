@@ -445,3 +445,9 @@ Dungeons are smaller, with an unbreakable wall barrier around them, might reduce
 - Throwing Star
 
 ##
+
+juice the game -> hit objectgs shake depending on health left
+add velocity to dmg numbers, and fade out
+add acceleration to player
+fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
+cape + clothes

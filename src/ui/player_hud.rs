@@ -25,7 +25,7 @@ pub struct XPBar;
 #[derive(Component)]
 pub struct XPBarText;
 
-const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(60.0, 6.0);
+const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
     let hud_bar_frame = commands
@@ -38,13 +38,13 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 .unwrap()
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(76.5, 32.)),
+                custom_size: Some(Vec2::new(84.5, 33.)),
                 ..Default::default()
             },
             transform: Transform {
                 translation: Vec3::new(
-                    (-GAME_WIDTH + 78.) / 2.,
-                    (GAME_HEIGHT - 11.) / 2. - 12.,
+                    (-GAME_WIDTH + 91.) / 2.,
+                    (GAME_HEIGHT - 15.) / 2. - 12.,
                     10.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -64,7 +64,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-27., 9., 1.),
+                translation: Vec3::new(-25., 10., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -83,7 +83,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-27., 0., 1.),
+                translation: Vec3::new(-25., 2., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -102,7 +102,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-27., -9., 1.),
+                translation: Vec3::new(-25., -6., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -152,11 +152,11 @@ pub fn setup_xp_bar_ui(
                 .unwrap()
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(120., 13.)),
+                custom_size: Some(Vec2::new(119.5, 24.)),
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(10., -58.5, 5.),
+                translation: Vec3::new(10., -56., 5.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -178,7 +178,7 @@ pub fn setup_xp_bar_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-3., 0., 1.),
+                    translation: Vec3::new(-3., 3., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -205,7 +205,7 @@ pub fn update_healthbar(
 ) {
     let Ok((player_health, player_max_health)) = player_health_query.get_single() else {return};
     health_bar_query.single_mut().custom_size = Some(Vec2 {
-        x: 62. * player_health.0 as f32 / player_max_health.0 as f32,
+        x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
 }
@@ -228,7 +228,7 @@ pub fn update_foodbar(
 ) {
     let Ok(hunger) = player_hunger_query.get_single() else {return};
     food_bar_query.single_mut().custom_size = Some(Vec2 {
-        x: 62. * hunger.current as f32 / hunger.max as f32,
+        x: 53. * hunger.current as f32 / hunger.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
 }
@@ -267,7 +267,7 @@ pub fn update_mana_bar(
 ) {
     let Ok(mana) = player_mana.get_single() else {return};
     mana_bar_query.single_mut().custom_size = Some(Vec2 {
-        x: 62. * mana.current as f32 / mana.max as f32,
+        x: 60. * mana.current as f32 / mana.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
 }

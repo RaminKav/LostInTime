@@ -1,3 +1,4 @@
+use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::{AnimatedTextureMaterial, AttackEvent};
 use crate::attributes::hunger::Hunger;
 use bevy::prelude::*;
@@ -30,12 +31,12 @@ use crate::world::chunk::Chunk;
 use crate::world::dungeon::DungeonPlugin;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
-use crate::world::TileMapPosition;
+use crate::world::{TileMapPosition, WorldObjectEntityData};
 use crate::{
     custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
     GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
-use crate::{Game, Player, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, Player, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -144,34 +145,52 @@ impl Plugin for InputsPlugin {
 impl InputsPlugin {
     fn turn_player(
         mut game: ResMut<Game>,
-        mut player_query: Query<&Children, With<Player>>,
-        mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
-        mut limb_query: Query<&Handle<AnimatedTextureMaterial>>,
+        player_query: Query<&FacingDirection, With<Player>>,
         cursor_pos: Res<CursorPos>,
+        mut commands: Commands,
     ) {
-        let (flip, dir) = if cursor_pos.screen_coords.x > WIDTH / 2. {
-            (0., FacingDirection::Right)
+        let dir = if cursor_pos.screen_coords.x > WIDTH / 2. {
+            if cursor_pos.screen_coords.x < 3. * WIDTH / 4.
+                && cursor_pos.screen_coords.y > HEIGHT * 0.65
+            {
+                FacingDirection::Up
+            } else if cursor_pos.screen_coords.x < 3. * WIDTH / 4.
+                && cursor_pos.screen_coords.y < HEIGHT * 0.35
+            {
+                FacingDirection::Down
+            } else {
+                FacingDirection::Right
+            }
         } else {
-            (1., FacingDirection::Left)
+            if cursor_pos.screen_coords.x > WIDTH / 4. && cursor_pos.screen_coords.y > HEIGHT * 0.65
+            {
+                FacingDirection::Up
+            } else if cursor_pos.screen_coords.x > WIDTH / 4.
+                && cursor_pos.screen_coords.y < HEIGHT * 0.35
+            {
+                FacingDirection::Down
+            } else {
+                FacingDirection::Left
+            }
         };
         //TODO: make center point based on player pos on screen?
         //TODO: add some way for attack to know dir
-        if let Ok(c) = player_query.get_single_mut() {
-            for l in c.iter() {
-                if let Ok(limb_handle) = limb_query.get_mut(*l) {
-                    let limb_material = materials.get_mut(limb_handle).unwrap();
-                    limb_material.flip = flip;
-                    game.player_state.direction = dir.clone();
-                }
-            }
+        let curr_dir = player_query.single();
+        if &dir != curr_dir {
+            commands.entity(game.player).insert(dir.clone());
+            game.player_state.direction = dir.clone();
         }
     }
     pub fn move_player(
         mut game: GameParam,
         mut player_query: Query<
             (
+                Entity,
                 &mut KinematicCharacterController,
                 &mut MovementVector,
+                &EnemyAnimationState,
+                &CharacterAnimationSpriteSheetData,
+                &TextureAtlasSprite,
                 &Speed,
                 &Hunger,
             ),
@@ -185,9 +204,11 @@ impl InputsPlugin {
         time: Res<Time>,
         key_input: ResMut<Input<KeyCode>>,
         mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+        mut commands: Commands,
     ) {
-        let (mut player_kcc, mut mv, speed, hunger) = player_query.single_mut();
-        let mut player = game.player_mut();
+        let (player_e, mut player_kcc, mut mv, curr_anim, anim_state, sprite, speed, hunger) =
+            player_query.single_mut();
+        let player = game.player_mut();
         let mut d = Vec2::ZERO;
         let s = PLAYER_MOVE_SPEED
             * (1. + speed.0 as f32 / 100.)
@@ -229,6 +250,12 @@ impl InputsPlugin {
 
         if player.is_dashing {
             let is_speeding_up = player.player_dash_duration.percent() < 0.5;
+            if curr_anim != &EnemyAnimationState::Dash
+                && (anim_state.is_done_current_animation(sprite.index)
+                    || curr_anim != &EnemyAnimationState::Attack)
+            {
+                commands.entity(player_e).insert(EnemyAnimationState::Dash);
+            }
             d.x = if is_speeding_up {
                 d.x.lerp(
                     &(d.x * PLAYER_DASH_SPEED * TIME_STEP),
@@ -256,17 +283,28 @@ impl InputsPlugin {
 
         if d.x != 0. || d.y != 0. {
             player_kcc.translation = Some(Vec2::new(d.x, d.y));
-
+            if curr_anim != &EnemyAnimationState::Walk
+                && !player.is_dashing
+                && anim_state.is_done_current_animation(sprite.index)
+            {
+                commands.entity(player_e).insert(EnemyAnimationState::Walk);
+            }
             minimap_event.send(UpdateMiniMapEvent {
                 pos: None,
                 new_tile: None,
             });
         } else {
+            if curr_anim != &EnemyAnimationState::Idle
+                && anim_state.is_done_current_animation(sprite.index)
+            {
+                commands.entity(player_e).insert(EnemyAnimationState::Idle);
+            }
+
             player_kcc.translation = Some(Vec2::ZERO);
         }
     }
     pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
-        let mut player = game.player_mut();
+        let player = game.player_mut();
         if player.is_dashing {
             player.player_dash_duration.tick(time.delta());
             if player.player_dash_duration.just_finished() {
@@ -383,7 +421,7 @@ impl InputsPlugin {
         }
         if key_input.just_pressed(KeyCode::L) {
             let pos = tile_pos_to_world_pos(
-                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }, 0),
+                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }),
                 true,
             );
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
@@ -474,7 +512,7 @@ impl InputsPlugin {
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
-        att_cooldown_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
+        player_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
         inv: Query<&mut Inventory>,
         inv_state: Res<InventoryState>,
         ranged_query: Query<&RangedAttack, With<Equipment>>,
@@ -488,11 +526,11 @@ impl InputsPlugin {
 
         let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
         let player_pos = game.player().position;
-
+        let (player_e, attack_timer_option) = player_query.single();
         // Hit Item, send attack event
         if mouse_button_input.pressed(MouseButton::Left) {
             // println!("C: {cursor_tile_pos:?}",);
-            if att_cooldown_query.single().1.is_some() {
+            if attack_timer_option.is_some() {
                 return;
             }
             let mut main_hand_option = None;
@@ -513,6 +551,9 @@ impl InputsPlugin {
                     mana_cost: mana_cost_option.map(|m| -m.0),
                 })
             }
+            commands
+                .entity(player_e)
+                .insert(EnemyAnimationState::Attack);
             attack_event.send(AttackEvent { direction });
             if player_pos
                 .truncate()

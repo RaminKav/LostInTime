@@ -15,7 +15,7 @@ use bevy_ecs_tilemap::prelude::*;
 
 use super::UIElement;
 pub struct MinimapPlugin;
-
+//TODO: temp disable minimap
 impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MinimapTileCache::default())
@@ -55,7 +55,8 @@ fn update_minimap_cache(
         let Some(pos) = event.pos else {
             //TODO: find another way to trigger change detection
             let _ = &mut cache.cache;
-            continue};
+            continue;
+        };
         if let Some(new_tile) = event.new_tile {
             if new_tile != WorldObject::None {
                 cache.cache.insert(pos, new_tile);
@@ -163,11 +164,10 @@ fn setup_mini_map(
                             x: tile_x as u32,
                             y: (tile_y) as u32,
                         };
-                        if let Some(cached_tile) = minimap_cache.cache.get(&TileMapPosition::new(
-                            chunk_pos,
-                            tile_pos,
-                            q + offset,
-                        )) {
+                        if let Some(cached_tile) = minimap_cache
+                            .cache
+                            .get(&TileMapPosition::new(chunk_pos, tile_pos))
+                        {
                             let c = cached_tile.get_minimap_color();
 
                             data.push((c.r() * 255.) as u8);
@@ -178,7 +178,7 @@ fn setup_mini_map(
                         }
 
                         if let Some(tile_data) =
-                            game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos, 0))
+                            game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos))
                         {
                             let tile = tile_data.block_type;
                             // if mobs.contains(&(chunk_pos, tile_pos)) {

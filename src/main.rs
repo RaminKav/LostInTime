@@ -120,7 +120,7 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        // .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(ItemsPlugin)
@@ -176,7 +176,7 @@ struct CustomFlush;
 pub struct ImageAssets {
     #[asset(path = "bevy_survival_sprites.png")]
     pub sprite_sheet: Handle<Image>,
-    #[asset(path = "RPGTiles.png")]
+    #[asset(path = "NewTiles.png")]
     pub tiles_sheet: Handle<Image>,
     #[asset(path = "SmallWallTextures.png")]
     pub walls_sheet: Handle<Image>,

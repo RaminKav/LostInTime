@@ -129,19 +129,6 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
                     ) as u32
                         - 1,
                 },
-                if y % 2 == 0 {
-                    if x % 2 == 0 {
-                        0
-                    } else {
-                        1
-                    }
-                } else {
-                    if x % 2 == 0 {
-                        2
-                    } else {
-                        3
-                    }
-                },
             );
             let temp_world_pos = tile_pos_to_world_pos(player_pos, false) + Vec2::new(0., 9.);
             let player_pos = world_pos_to_tile_pos(temp_world_pos);
@@ -212,19 +199,6 @@ pub fn add_dungeon_chests(
                                 - (picked_y as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as f64,
                         ) as u32
                             - 1,
-                    },
-                    if picked_y % 2 == 0 {
-                        if picked_x % 2 == 0 {
-                            0
-                        } else {
-                            1
-                        }
-                    } else {
-                        if picked_x % 2 == 0 {
-                            2
-                        } else {
-                            3
-                        }
                     },
                 );
                 chest_positions.push(pos);

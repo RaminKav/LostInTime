@@ -29,7 +29,7 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u32) -> f64 {
     // let _noise_m2 = Simplex::new(5 + seed);
     // let _noise_m3 = Simplex::new(6 + seed);
 
-    let base_oct = 1. / 10. / 8.;
+    let base_oct = 1. / 80.;
 
     let e1 = (n1.get([x * base_oct, y * base_oct]) + 1.) / 2.;
     let e2 = (n2.get([x * base_oct * 8., y * base_oct * 8.]) + 1.) / 2.;

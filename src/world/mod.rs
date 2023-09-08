@@ -23,12 +23,13 @@ use self::{
     dungeon_generation::{Bias, GridSize, NumSteps},
     generation::GenerationPlugin,
     tile::TilePlugin,
+    world_helpers::get_neighbour_tile,
     y_sort::YSortPlugin,
 };
 
-pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 32., y: 32. };
+pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
 pub const CHUNK_SIZE: u32 = 16;
-pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 3) * TILE_SIZE.x as u32;
+pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 2) * TILE_SIZE.x as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
 #[derive(Debug, Component, Resource, Reflect, Default, Clone)]
@@ -63,31 +64,24 @@ pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 pub struct TileMapPosition {
     pub chunk_pos: IVec2,
     pub tile_pos: TilePos,
-    pub quadrant: u8,
 }
 impl TileMapPosition {
-    pub fn new(chunk_pos: IVec2, tile_pos: TilePos, quadrant: u8) -> Self {
+    pub fn new(chunk_pos: IVec2, tile_pos: TilePos) -> Self {
         Self {
             chunk_pos,
             tile_pos,
-            quadrant,
         }
     }
-    pub fn set_quadrant(&self, quadrant: u8) -> Self {
-        Self {
-            chunk_pos: self.chunk_pos,
-            tile_pos: self.tile_pos,
-            quadrant,
-        }
-    }
+
     pub fn matches_tile(&self, other: &TileMapPosition) -> bool {
         self.chunk_pos == other.chunk_pos && self.tile_pos == other.tile_pos
     }
-    pub fn quad_is_x_offset(&self) -> bool {
-        self.quadrant == 1 || self.quadrant == 3
-    }
-    pub fn quad_is_y_offset(&self) -> bool {
-        self.quadrant == 0 || self.quadrant == 1
+    pub fn get_neighbour_tiles_for_medium_objects(&self) -> Vec<Self> {
+        vec![
+            get_neighbour_tile(*self, (1, 1)),
+            get_neighbour_tile(*self, (0, 1)),
+            get_neighbour_tile(*self, (1, 0)),
+        ]
     }
 }
 

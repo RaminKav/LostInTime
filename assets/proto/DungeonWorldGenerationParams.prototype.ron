@@ -15,13 +15,11 @@
         DungeonEntrance: 0.0
       },
       object_generation_frequencies: {
-        Tree: 0.0,
         Boulder: 0.0,
         Grass: 0.0,
         DeadSapling: 0.0,
       },
       obj_allowed_tiles_map: {
-        Tree: [GrassTile],
         Boulder: [GrassTile],
         Grass: [GrassTile],
         DeadSapling: [SandTile],

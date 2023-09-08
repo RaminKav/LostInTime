@@ -32,7 +32,6 @@ impl Plugin for SpawnerPlugin {
                 check_mob_count,
                 spawn_one_time_enemies_at_day,
                 reduce_chunk_mob_count_on_mob_death,
-                test,
                 despawn_out_of_range_mobs,
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -155,7 +154,7 @@ fn handle_spawn_mobs(
                         y: rng.gen_range(0..CHUNK_SIZE),
                     };
                     let pos = tile_pos_to_world_pos(
-                        TileMapPosition::new(picked_spawner.chunk_pos, tile_pos, 0),
+                        TileMapPosition::new(picked_spawner.chunk_pos, tile_pos),
                         true,
                     );
                     picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
@@ -206,31 +205,8 @@ fn check_mob_count(
         spawn_event.send(MobSpawnEvent { chunk_pos });
     }
 }
-fn test(
-    q: Query<&Mob, Added<Mob>>,
-    q2: Query<Entity, Added<Chunk>>,
-    q3: Query<&Chunk>,
-    q4: Query<Entity>,
-    mut t: Local<(u8, u8, u8, u8, u8, u8)>,
-) {
-    for m in q.iter() {
-        match m {
-            Mob::StingFly => t.0 += 1,
-            Mob::FurDevil => t.1 += 1,
-            Mob::Bushling => t.2 += 1,
-            Mob::SpikeSlime => t.3 += 1,
-            Mob::Hog => t.4 += 1,
-            Mob::Slime => t.5 += 1,
-            _ => {}
-        }
-        println!("{t:?} {:?}", q4.iter().len());
-    }
-    // for c in q2.iter() {
-    //     println! {"c {:?}", q3.iter().len()};
-    // }
-}
 fn despawn_out_of_range_mobs(
-    mut game: GameParam,
+    game: GameParam,
     mut commands: Commands,
     mut query: Query<(Entity, &Transform), With<Mob>>,
 ) {
@@ -257,7 +233,7 @@ fn spawn_one_time_enemies_at_day(
                 x: rng.gen_range(0..CHUNK_SIZE),
                 y: rng.gen_range(0..CHUNK_SIZE),
             };
-            pos = tile_pos_to_world_pos(TileMapPosition::new(IVec2::new(0, 0), tile_pos, 0), true);
+            pos = tile_pos_to_world_pos(TileMapPosition::new(IVec2::new(0, 0), tile_pos), true);
             if let Some(_existing_object) =
                 game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos), &proto_param)
             {

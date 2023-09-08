@@ -152,7 +152,7 @@ impl ChunkPlugin {
 
             let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
                 CHUNK_SIZE as usize] =
-                [[[WorldObject::SandTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+                [[[WorldObject::GrassTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
             println!("Creating new chunk {chunk_pos:?}");
 
             for y in 0..CHUNK_SIZE {
@@ -241,7 +241,7 @@ impl ChunkPlugin {
             let chunk_pos = e.chunk_pos;
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
-                    let pos = TileMapPosition::new(chunk_pos, TilePos { x, y }, 0);
+                    let pos = TileMapPosition::new(chunk_pos, TilePos { x, y });
                     let tile_data = game.get_tile_data(pos.clone()).unwrap();
 
                     for dy in -1i8..=1 {
@@ -260,7 +260,6 @@ impl ChunkPlugin {
                                     game.get_tile_data(TileMapPosition::new(
                                         adjusted_chunk_pos,
                                         neighbour_tile_pos,
-                                        0,
                                     ))
                                     .unwrap()
                                     .texture_offset,

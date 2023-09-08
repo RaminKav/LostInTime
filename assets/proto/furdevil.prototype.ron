@@ -9,8 +9,8 @@
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.5),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/furdevil/furdevil_down.png", size: (x: 32., y: 32.), cols: 8, rows: 6),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.06),
-    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,6,4,8,7], valid_directions: [0,1,2,3], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (28),
+    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,6,4,8,7], anim_offset: 0),
+    "survival_rogue_like::attributes::MaxHealth": (38),
     "survival_rogue_like::attributes::Attack": (7),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (

@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
+use crate::assets::SpriteAnchor;
+
 pub struct YSortPlugin;
 
 impl Plugin for YSortPlugin {
@@ -14,11 +16,15 @@ impl Plugin for YSortPlugin {
 pub struct YSort;
 
 impl YSortPlugin {
-    fn y_sort(mut q: Query<(&mut Transform, &GlobalTransform), With<YSort>>) {
-        for (mut tf, gtf) in q.iter_mut() {
+    fn y_sort(
+        mut q: Query<(&mut Transform, &GlobalTransform, Option<&SpriteAnchor>), With<YSort>>,
+    ) {
+        for (mut tf, gtf, anchor_option) in q.iter_mut() {
             // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
-            tf.translation.z =
-                900. - 900.0f32 / (1.0f32 + (2.0f32.powf(-0.00001 * gtf.translation().y)));
+            let anchor_offset = anchor_option.map(|a| a.0.y).unwrap_or(0.);
+            tf.translation.z = 900.
+                - 900.0f32
+                    / (1.0f32 + (2.0f32.powf(-0.00001 * (gtf.translation().y - anchor_offset))));
         }
     }
 }

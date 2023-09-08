@@ -1,0 +1,17 @@
+(
+  name: "YellowFlowerBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": YellowFlowerBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(YellowFlower)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: YellowFlowerBlock,
+        metadata: (
+            name: "Yellow Flower", 
+            desc: "Mmmm!"
+        ),
+        count: 1
+  ),
+  }
+)

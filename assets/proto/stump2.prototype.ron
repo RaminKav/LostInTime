@@ -1,0 +1,33 @@
+(
+  name: "Stump2",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Stump2,
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::item::RequiredEquipmentType": (Axe),
+  "survival_rogue_like::proto::ColliderProto": (x: 5., y: 5),
+  "survival_rogue_like::attributes::MaxHealth": (20),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: Stump2, obj_bit_index: 0, texture_offset: 0),
+  "survival_rogue_like::world::y_sort::YSort": (),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+            item: WoodPlank,
+                min: 1,
+                max: 4,
+                rate: 1.
+            ),(
+                item: Log,
+                min: 1,
+                max: 1,
+                rate: 0.5
+            ),(
+                item: Stick,
+                min: 1,
+                max: 1,
+                rate: 0.3
+            )]
+        ),
+  }
+)
