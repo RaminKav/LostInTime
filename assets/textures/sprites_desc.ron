@@ -176,22 +176,22 @@
             anchor: None,
         ),
         RedMushroom: WorldObjectData(
-            texture_pos: (2., 12.),
+            texture_pos: (10., 13.),
             size: (16., 16.),
             anchor: None,
         ),
         BrownMushroom: WorldObjectData(
-            texture_pos: (3., 12.),
+            texture_pos: (10., 12.),
             size: (16., 16.),
             anchor: None,
         ),
         RedMushroomBlock: WorldObjectData(
-            texture_pos: (2., 12.),
+            texture_pos: (10., 13.),
             size: (16., 16.),
             anchor: None,
         ),
         BrownMushroomBlock: WorldObjectData(
-            texture_pos: (3., 12.),
+            texture_pos: (10., 12.),
             size: (16., 16.),
             anchor: None,
         ),
