@@ -1,0 +1,17 @@
+(
+  name: "FurnaceBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": FurnaceBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Furnace)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: FurnaceBlock,
+        metadata: (
+            name: "Furnace", 
+            desc: "Stores items."
+        ),
+        count: 1
+  ),
+  }
+)

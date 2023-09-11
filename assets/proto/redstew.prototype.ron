@@ -1,0 +1,17 @@
+(
+  name: "RedStew",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": RedStew,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(65), ModifyHealth(10)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: RedStew,
+        metadata: (
+            name: "Red Stew", 
+            desc: "Crunchy!"
+        ),
+        count: 1
+  ),
+  }
+)

@@ -1,0 +1,17 @@
+(
+  name: "AlchemyTableBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": AlchemyTableBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(AlchemyTable)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: AlchemyTableBlock,
+        metadata: (
+            name: "Alchemy Table", 
+            desc: "Stores items."
+        ),
+        count: 1
+  ),
+  }
+)

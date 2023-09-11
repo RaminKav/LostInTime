@@ -6,8 +6,8 @@ use crate::{
     attributes::{AttributeModifier, ItemAttributes, ItemRarity},
     inputs::FacingDirection,
     item::{
-        CompleteRecipeEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData,
-        MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS,
+        Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
+        PLAYER_EQUIPMENT_POSITIONS,
     },
     player::Limb,
     proto::proto_param::ProtoParam,
@@ -40,7 +40,6 @@ impl Inventory {
             InventorySlotType::Equipment => &self.equipment_items,
             InventorySlotType::Accessory => &self.accessory_items,
             InventorySlotType::Crafting => &self.crafting_items,
-            InventorySlotType::CraftingResult => &self.crafting_items,
             _ => &self.items,
         }
     }
@@ -49,7 +48,6 @@ impl Inventory {
             InventorySlotType::Equipment => &mut self.equipment_items,
             InventorySlotType::Accessory => &mut self.accessory_items,
             InventorySlotType::Crafting => &mut self.crafting_items,
-            InventorySlotType::CraftingResult => &mut self.crafting_items,
             _ => &mut self.items,
         }
     }
@@ -131,7 +129,7 @@ impl InventoryItemStack {
         } else if self
             .item_stack
             .clone()
-            .try_add_to_target_inventory_slot(self.slot, container, inv_slots, slot_type)
+            .try_add_to_target_inventory_slot(self.slot, container, inv_slots)
             .is_err()
         {
             panic!("Failed to drop item on stot");
@@ -159,7 +157,7 @@ impl InventoryItemStack {
         } else {
             None
         };
-        let sprite = if let Some(icon) = has_icon {
+        let _sprite = if let Some(icon) = has_icon {
             icon.clone()
         } else {
             game.graphics
@@ -449,7 +447,6 @@ impl ItemStack {
         slot: usize,
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
-        slot_type: InventorySlotType,
     ) -> Result<(), InventoryError> {
         let inv_or_crafting = container.items[slot].clone();
         if let Some(mut existing_stack) = inv_or_crafting {
@@ -465,12 +462,9 @@ impl ItemStack {
                 item_stack: self,
                 slot,
             };
-            if slot_type.is_crafting() {
-                container.items[slot] = Some(item);
-                InventoryPlugin::mark_slot_dirty(slot, slot_type, inv_slots);
-            } else {
-                item.add_to_inventory(container, inv_slots);
-            }
+
+            item.add_to_inventory(container, inv_slots);
+
             Ok(())
         }
     }
@@ -515,6 +509,17 @@ impl InventoryPlugin {
                 && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
         })
     }
+    pub fn get_item_count_in_container(container: &Container, obj: WorldObject) -> usize {
+        let mut count = 0;
+        for item in container.items.clone() {
+            if let Some(item_stack) = item {
+                if item_stack.item_stack.obj_type == obj {
+                    count += item_stack.item_stack.count;
+                }
+            }
+        }
+        count
+    }
     /// Attempt to merge item at slot a into b. Panics if
     /// either slot is empty, or not matching WorldObject types.
     /// Keeps remainder where it was, if overflow.
@@ -550,11 +555,10 @@ impl InventoryPlugin {
     }
     pub fn pick_up_and_merge_crafting_result_stack(
         dragging_item: ItemStack,
+        dropped_slot: usize,
         container: &mut Container,
-
-        complete_recipe_event: &mut EventWriter<CompleteRecipeEvent>,
     ) -> Option<ItemStack> {
-        let pickup_item_option = container.items[4].clone();
+        let pickup_item_option = container.items[dropped_slot].clone();
         if let Some(pickup_item) = pickup_item_option {
             let item_type = dragging_item.obj_type;
             //TODO: should this return  None, or the original stack??
@@ -568,18 +572,6 @@ impl InventoryPlugin {
             let item_b_count = pickup_item.item_stack.count;
             let combined_size = item_a_count + item_b_count;
             let new_item = Some(dragging_item.copy_with_count(min(combined_size, MAX_STACK_SIZE)));
-
-            // if we overflow, keep remainder where it was
-
-            container.items[4] = if combined_size > MAX_STACK_SIZE {
-                Some(InventoryItemStack {
-                    item_stack: dragging_item.copy_with_count(combined_size - MAX_STACK_SIZE),
-                    slot: pickup_item.slot,
-                })
-            } else {
-                None
-            };
-            complete_recipe_event.send(CompleteRecipeEvent);
 
             return new_item;
         } else {

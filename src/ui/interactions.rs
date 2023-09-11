@@ -6,7 +6,7 @@ use crate::{
     assets::Graphics,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
-    item::{CompleteRecipeEvent, CraftingSlotUpdateEvent},
+    item::{CraftedItemEvent, CraftingTracker},
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
     schematic::loot_chests::create_new_random_item_stack_with_attributes,
@@ -15,8 +15,8 @@ use crate::{
 };
 
 use super::{
-    spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers, ChestInventory,
-    InventorySlotState, InventoryState, PlayerStatsTooltip,
+    crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
+    ChestInventory, InventorySlotState, InventoryState, PlayerStatsTooltip,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -175,24 +175,26 @@ pub fn handle_drop_on_slot_events(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut chest_option: Option<ResMut<ChestInventory>>,
-    mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
-    mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
+    craft_tracker: Res<CraftingTracker>,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
         let no_more_dragging: bool;
         let slot_type = drop_event.drop_target_slot_state.r#type;
-        let return_item = if drop_event
-            .drop_target_slot_state
-            .r#type
-            .is_crafting_result()
+        let return_item = if slot_type.is_crafting()
+            && craft_tracker
+                .craftable
+                .contains(&drop_event.dropped_item_stack.obj_type)
         {
             InventoryPlugin::pick_up_and_merge_crafting_result_stack(
                 drop_event.dropped_item_stack.clone(),
+                drop_event.drop_target_slot_state.slot_index,
                 &mut inv.single_mut().crafting_items,
-                &mut complete_recipe_event,
             )
         } else {
+            if slot_type.is_crafting() {
+                continue;
+            }
             let mut inv = inv.single_mut();
             let container = if slot_type == InventorySlotType::Chest {
                 &mut chest_option.as_mut().unwrap().items
@@ -219,10 +221,6 @@ pub fn handle_drop_on_slot_events(
         } else {
             updated_drag_item = item_stacks.get(drop_event.dropped_entity).unwrap().clone();
             no_more_dragging = drop_event.stack_empty;
-        }
-
-        if slot_type.is_crafting() {
-            crafting_slot_event.send(CraftingSlotUpdateEvent);
         }
 
         // if nothing left on cursor and dragging is done
@@ -292,6 +290,7 @@ pub fn handle_hovering(
     mut commands: Commands,
     inv: Query<&Inventory>,
     chest_option: Option<Res<ChestInventory>>,
+    crafting_option: Option<Res<CraftingContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     // iter all interactables, find ones in hover state.
@@ -320,10 +319,18 @@ pub fn handle_hovering(
                             .unwrap()
                             .item_stack
                     } else {
-                        inv.single().get_items_from_slot_type(state.r#type).items[state.slot_index]
-                            .clone()
-                            .unwrap()
-                            .item_stack
+                        if state.r#type.is_crafting() && crafting_option.is_some() {
+                            crafting_option.as_ref().unwrap().items.items[state.slot_index]
+                                .clone()
+                                .unwrap()
+                                .item_stack
+                        } else {
+                            inv.single().get_items_from_slot_type(state.r#type).items
+                                [state.slot_index]
+                                .clone()
+                                .unwrap()
+                                .item_stack
+                        }
                     };
                     tooltip_update_events.send(ToolTipUpdateEvent {
                         item_stack: item,
@@ -470,7 +477,7 @@ pub fn handle_item_drop_clicks(
         };
     }
 }
-pub fn handle_cursor_update(
+pub fn handle_interaction_clicks(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mut mouse_input: ResMut<Input<MouseButton>>,
@@ -483,10 +490,10 @@ pub fn handle_cursor_update(
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut chest_option: Option<ResMut<ChestInventory>>,
-    mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
-    mut complete_recipe_event: EventWriter<CompleteRecipeEvent>,
     mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
     proto: ProtoParam,
+    craft_tracker: Res<CraftingTracker>,
+    mut crafted_event: EventWriter<CraftedItemEvent>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -509,6 +516,11 @@ pub fn handle_cursor_update(
                         //send drag event
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
+                                if state.r#type.is_crafting()
+                                    && !craft_tracker.craftable.contains(&item_icon.2.obj_type)
+                                {
+                                    continue;
+                                }
                                 commands
                                     .entity(item_icon.0)
                                     .remove_parent()
@@ -528,16 +540,15 @@ pub fn handle_cursor_update(
                                 };
 
                                 if state.r#type.is_crafting() {
-                                    crafting_slot_event.send(CraftingSlotUpdateEvent);
-                                }
-                                if state.r#type.is_crafting_result() {
                                     commands.entity(item_icon.0).insert(
                                         create_new_random_item_stack_with_attributes(
                                             item_icon.2,
                                             &proto,
                                         ),
                                     );
-                                    complete_recipe_event.send(CompleteRecipeEvent);
+                                    crafted_event.send(CraftedItemEvent {
+                                        obj: state.obj_type.unwrap(),
+                                    });
                                 } else {
                                     container_items.items[state.slot_index] = None;
                                 }
@@ -547,6 +558,9 @@ pub fn handle_cursor_update(
                             }
                         }
                     } else if right_mouse_pressed && !currently_dragging {
+                        if state.r#type.is_crafting() {
+                            continue;
+                        }
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
                                 let mut inv = inv.single_mut();
@@ -578,7 +592,9 @@ pub fn handle_cursor_update(
             },
             _ => {
                 // reset hovering states if we stop hovering ?
-                let Interaction::Hovering = interactable.current() else {continue};
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
 
                 interactable.change(Interaction::None);
             }
@@ -632,7 +648,9 @@ pub fn handle_cursor_stats_buttons(
             },
             _ => {
                 // reset hovering states if we stop hovering ?
-                let Interaction::Hovering = interactable.current() else {continue};
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
 
                 interactable.change(Interaction::None);
             }

@@ -196,7 +196,7 @@ impl TilePlugin {
             .get_tile_data(TileMapPosition::new(chunk_pos, tile_pos))
             .unwrap();
         let mut updated_bits = target_block_entity_data.tile_bit_index;
-        let mut updated_index = tile_index_offset;
+        let updated_index = tile_index_offset;
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 // only use neighbours that have at least one water bitt

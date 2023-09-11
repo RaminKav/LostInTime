@@ -136,7 +136,37 @@
             anchor: None,
         ),
         ChestBlock: WorldObjectData(
-            texture_pos: (0., 6.),
+            texture_pos: (0., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Anvil: WorldObjectData(
+            texture_pos: (1., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        AnvilBlock: WorldObjectData(
+            texture_pos: (1., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Cauldron: WorldObjectData(
+            texture_pos: (2., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CauldronBlock: WorldObjectData(
+            texture_pos: (2., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Furnace: WorldObjectData(
+            texture_pos: (3., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FurnaceBlock: WorldObjectData(
+            texture_pos: (3., 8.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -228,6 +258,26 @@
         Boulder2: WorldObjectData(
             texture_pos: (10., 7.),
             size: (32., 32.),
+            anchor: None,
+        ),
+        CraftingTable: WorldObjectData(
+            texture_pos: (12., 7.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        CraftingTableBlock: WorldObjectData(
+            texture_pos: (4., 8.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        AlchemyTable: WorldObjectData(
+            texture_pos: (14., 7.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        AlchemyTableBlock: WorldObjectData(
+            texture_pos: (5., 8.),
+            size: (16., 16.),
             anchor: None,
         ),
         LargeStump: WorldObjectData(
@@ -342,6 +392,11 @@
         ),
         Tusk: WorldObjectData(
             texture_pos: (15., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedStew: WorldObjectData(
+            texture_pos: (14., 6.),
             size: (16., 16.),
             anchor: None,
         ),

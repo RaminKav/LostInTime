@@ -2,7 +2,7 @@ use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
 use crate::colors::{
-    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, RED, UI_GRASS_GREEN, YELLOW,
+    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, UI_GRASS_GREEN, YELLOW,
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 
@@ -258,6 +258,17 @@ pub enum WorldObject {
     Lillypad,
     WaterBoulder,
     WaterBoulder2,
+    CraftingTable,
+    CraftingTableBlock,
+    Anvil,
+    AnvilBlock,
+    Cauldron,
+    CauldronBlock,
+    Furnace,
+    FurnaceBlock,
+    AlchemyTable,
+    AlchemyTableBlock,
+    RedStew,
 }
 
 #[derive(

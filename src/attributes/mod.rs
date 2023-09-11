@@ -491,7 +491,7 @@ fn clamp_health(mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>
         }
     }
 }
-fn clamp_mana(mut health: Query<(&mut Mana), With<Player>>) {
+fn clamp_mana(mut health: Query<&mut Mana, With<Player>>) {
     for mut m in health.iter_mut() {
         if m.current < 0 {
             m.current = 0;
@@ -554,7 +554,7 @@ fn update_attributes_with_held_item_change(
 ) {
     let active_hotbar_slot = inv_state.active_hotbar_slot;
     let active_hotbar_item = inv.single_mut().items.items[active_hotbar_slot].clone();
-    let mut player_data = game_param.player_mut();
+    let player_data = game_param.player_mut();
     let prev_held_item_data = &player_data.main_hand_slot;
     if let Some(new_item) = active_hotbar_item {
         let new_item_obj = new_item.get_obj();
@@ -596,7 +596,10 @@ fn update_attributes_and_sprite_with_equipment_change(
         {
             let slot = drop.drop_target_slot_state.slot_index;
             let Some(eqp_type) =
-                proto_param.get_component::<EquipmentType, _>(drop.dropped_item_stack.obj_type) else {continue};
+                proto_param.get_component::<EquipmentType, _>(drop.dropped_item_stack.obj_type)
+            else {
+                continue;
+            };
             if !eqp_type.is_equipment() || !eqp_type.get_valid_slots().contains(&slot) {
                 continue;
             }
@@ -604,7 +607,7 @@ fn update_attributes_and_sprite_with_equipment_change(
             if drop.drop_target_slot_state.r#type.is_equipment() {
                 for (mat, limb) in player_limbs.iter() {
                     if Limb::from_slot(slot).contains(limb) {
-                        let mut mat = materials.get_mut(mat).unwrap();
+                        let mat = materials.get_mut(mat).unwrap();
                         let armor_texture_handle = asset_server.load(format!(
                             "textures/player/{}.png",
                             drop.dropped_item_stack.obj_type.to_string()
@@ -628,7 +631,7 @@ fn update_sprite_with_equipment_removed(
         if item.removed_slot_state.r#type.is_equipment() {
             for (mat, limb) in player_limbs.iter() {
                 if Limb::from_slot(item.removed_slot_state.slot_index).contains(limb) {
-                    let mut mat = materials.get_mut(mat).unwrap();
+                    let mat = materials.get_mut(mat).unwrap();
                     let armor_texture_handle = asset_server.load(format!(
                         "textures/player/player-texture-{}.png",
                         if limb == &Limb::Torso || limb == &Limb::Hands {

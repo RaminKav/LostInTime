@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{
@@ -6,14 +6,13 @@ use bevy_rapier2d::prelude::{
     KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
 };
 use serde::Deserialize;
-use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 pub mod levels;
 pub mod stats;
 use crate::{
     animations::{
         enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
-        AnimatedTextureMaterial, AnimationFrameTracker, AnimationTimer,
+        AnimationTimer,
     },
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
@@ -23,7 +22,7 @@ use crate::{
     },
     custom_commands::CommandsExt,
     inputs::{FacingDirection, InputsPlugin, MovementVector},
-    inventory::{Container, Inventory, INVENTORY_SIZE},
+    inventory::{Container, Inventory, InventoryItemStack, ItemStack, INVENTORY_SIZE},
     item::{EquipmentData, WorldObject},
     proto::proto_param::ProtoParam,
     world::{y_sort::YSort, CHUNK_SIZE},
@@ -179,7 +178,35 @@ fn spawn_player(
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
-                crafting_items: Container::with_size(5),
+                crafting_items: Container {
+                    items: vec![
+                        Some(InventoryItemStack::new(
+                            ItemStack {
+                                obj_type: WorldObject::String,
+                                count: 1,
+                                ..default()
+                            },
+                            0,
+                        )),
+                        Some(InventoryItemStack::new(
+                            ItemStack {
+                                obj_type: WorldObject::WoodAxe,
+                                count: 1,
+                                ..default()
+                            },
+                            1,
+                        )),
+                        Some(InventoryItemStack::new(
+                            ItemStack {
+                                obj_type: WorldObject::CraftingTableBlock,
+                                count: 1,
+                                ..default()
+                            },
+                            1,
+                        )),
+                    ],
+                    ..default()
+                },
                 equipment_items: Container::with_size(4),
                 accessory_items: Container::with_size(4),
             },
