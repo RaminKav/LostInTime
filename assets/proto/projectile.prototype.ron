@@ -3,7 +3,7 @@
   templates: [],
   schematics: {
   "survival_rogue_like::proto::SensorProto": (),
-  "survival_rogue_like::world::y_sort::YSort": (),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
   "survival_rogue_like::proto::SpriteSheetProto": (asset: "bevy_survival_sprites.png", size: (x: 16., y: 16.), cols: 16, rows: 16),
 
   }

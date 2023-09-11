@@ -190,6 +190,7 @@ impl different att styles w seldum_state
 [] save/load/cache
 [] Passive mobs that give leather
 [] add leather armor
+[] cleanup proto obj files, add parent
 
 ## Projectile/Magic ideas
 

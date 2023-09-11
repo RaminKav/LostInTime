@@ -89,7 +89,7 @@ pub fn spawn_particles_when_leveling(
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
-            YSort,
+            YSort(0.),
             LevelUpParticles,
             RenderLayers::from_layers(&[3]),
             Name::new("Level Particles"),

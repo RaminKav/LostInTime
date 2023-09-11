@@ -6,7 +6,7 @@
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::attributes::MaxHealth": (1),
   "survival_rogue_like::world::WorldObjectEntityData": (object: RedMushroom, obj_bit_index: 0, texture_offset: 0),
-  "survival_rogue_like::world::y_sort::YSort": (),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
   "survival_rogue_like::item::loot_table::LootTable": (
