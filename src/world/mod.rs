@@ -43,6 +43,7 @@ pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 // may not need to add obj data as comp to tile??
 pub struct ChunkManager {
     pub chunks: HashMap<ReflectedPos, Entity>,
+    pub objects: HashMap<IVec2, HashMap<TileMapPosition, WorldObject>>,
     // turn into comp for each tile
 }
 
@@ -50,6 +51,7 @@ impl ChunkManager {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
+            objects: HashMap::new(),
         }
     }
 }
@@ -59,7 +61,7 @@ pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
 /// A component that represents a position in the tilemap. The `quadrant` is a number from 0 to 3
 /// where 0 is top left, 1 is top right, 2 is bottom left, 3 is bottom right
-#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect)]
+#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect, FromReflect)]
 #[reflect(Component)]
 pub struct TileMapPosition {
     pub chunk_pos: IVec2,
