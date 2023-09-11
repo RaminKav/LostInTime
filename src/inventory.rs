@@ -357,7 +357,7 @@ impl ItemStack {
                 TimerMode::Repeating,
             )))
             .insert(AnimationPosTracker(0., 0., 0.3))
-            .insert(YSort)
+            .insert(YSort(0.))
             .insert(obj)
             .id();
 

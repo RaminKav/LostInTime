@@ -234,7 +234,7 @@ fn spawn_player(
             InvincibilityCooldown(1.),
             HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
             MovementVector::default(),
-            YSort,
+            YSort(0.),
             Name::new("Player"),
             Collider::capsule(Vec2::new(0., -4.0), Vec2::new(0., -4.5), 5.),
             KinematicCharacterController {

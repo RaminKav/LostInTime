@@ -130,7 +130,7 @@ fn handle_enemy_death(
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-            YSort,
+            YSort(0.),
             DoneAnimation,
             Name::new("Hit Spark"),
         ));
@@ -199,7 +199,7 @@ fn spawn_hit_spark_effect(
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-            YSort,
+            YSort(0.),
             DoneAnimation,
             Name::new("Hit Spark"),
         ));

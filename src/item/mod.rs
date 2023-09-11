@@ -424,7 +424,7 @@ impl WorldObject {
                 desc: "A cool piece of Equipment".to_string(),
             })
             .insert(Equipment(Limb::Hands))
-            .insert(YSort)
+            .insert(YSort(0.))
             .insert(Name::new("EquipItem"))
             .insert(self)
             .id();

@@ -9,7 +9,7 @@
   "survival_rogue_like::proto::ColliderProto": (x: 8, y: 6),
   "survival_rogue_like::attributes::MaxHealth": (100),
   "survival_rogue_like::world::WorldObjectEntityData": (object: StoneWall, obj_bit_index: 15, texture_offset: 0),
-  "survival_rogue_like::world::y_sort::YSort": (),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

@@ -517,6 +517,7 @@ impl InputsPlugin {
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
         mut item_action_param: ItemActionParam,
         obj_actions: Query<&ObjectAction>,
+        test: Query<&GlobalTransform>,
     ) {
         if inv_state.open {
             return;
@@ -587,10 +588,11 @@ impl InputsPlugin {
                 }
             }
 
-            if let Some(obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
-                if let Ok(obj_action) = obj_actions.get(obj) {
+            if let Some(obj_e) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+                println!("{:?}", test.get(obj_e).unwrap().translation());
+                if let Ok(obj_action) = obj_actions.get(obj_e) {
                     obj_action.run_action(
-                        obj,
+                        obj_e,
                         &mut item_action_param,
                         &mut commands,
                         &mut proto_param,

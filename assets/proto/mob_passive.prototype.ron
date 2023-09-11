@@ -3,6 +3,6 @@
   schematics: {
     "survival_rogue_like::proto::KCC": (),
     "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 2., speed: 0.5),
-    "survival_rogue_like::world::y_sort::YSort": (),
+    "survival_rogue_like::world::y_sort::YSort": (0.),
   }
 )

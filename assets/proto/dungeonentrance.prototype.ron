@@ -7,7 +7,7 @@
   "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::proto::ColliderProto": (x: 12., y: 12),
   "survival_rogue_like::world::WorldObjectEntityData": (object: DungeonEntrance, obj_bit_index: 0, texture_offset: 0),
-  "survival_rogue_like::world::y_sort::YSort": (),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
   }
