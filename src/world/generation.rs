@@ -147,7 +147,7 @@ impl GenerationPlugin {
 
     pub fn generate_and_cache_objects(
         mut commands: Commands,
-        game: GameParam,
+        mut game: GameParam,
         mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
         seed: Query<(&GenerationSeed, Option<&Dungeon>), With<ActiveDimension>>,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
@@ -204,7 +204,7 @@ impl GenerationPlugin {
             if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
                 objs_to_spawn = objs_to_spawn
                     .into_iter()
-                    .chain(cached_objs.into_iter().map(|o| (o.1, o.0)))
+                    .chain(cached_objs.to_owned().into_iter())
                     .collect::<Vec<(TileMapPosition, WorldObject)>>();
             }
             let objs = objs_to_spawn
@@ -252,29 +252,32 @@ impl GenerationPlugin {
                 .collect::<HashMap<_, _>>();
 
             // now spawn them, keeping track of duplicates on the same tile
-            let mut spawned_vec: Vec<TileMapPosition> = vec![];
+            let mut spawned_vec: HashMap<TileMapPosition, WorldObject> = HashMap::new();
             for obj_data in objs.clone().iter() {
-                let pos = obj_data.0;
+                let (pos, obj) = obj_data;
                 let is_medium = obj_data.1.is_medium_size(&proto_param);
-                if spawned_vec.contains(pos)
+                if spawned_vec.contains_key(pos)
                     || (is_medium
-                        && (spawned_vec.contains(&pos)
+                        && (spawned_vec.contains_key(&pos)
                             || spawned_vec
-                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[0])
+                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[0])
                             || spawned_vec
-                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[1])
+                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[1])
                             || spawned_vec
-                                .contains(&pos.get_neighbour_tiles_for_medium_objects()[2])))
+                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[2])))
                 {
                     continue;
                 }
                 if is_medium {
-                    spawned_vec.push(*pos);
-                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[0]);
-                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[1]);
-                    spawned_vec.push(pos.get_neighbour_tiles_for_medium_objects()[2]);
+                    spawned_vec.insert(*pos, obj.clone());
+                    spawned_vec
+                        .insert(pos.get_neighbour_tiles_for_medium_objects()[0], obj.clone());
+                    spawned_vec
+                        .insert(pos.get_neighbour_tiles_for_medium_objects()[1], obj.clone());
+                    spawned_vec
+                        .insert(pos.get_neighbour_tiles_for_medium_objects()[2], obj.clone());
                 } else {
-                    spawned_vec.push(pos.clone());
+                    spawned_vec.insert(pos.clone(), obj.clone());
                 }
 
                 let mut is_touching_air = false;
@@ -336,6 +339,7 @@ impl GenerationPlugin {
                     }
                 }
             }
+            game.set_chunk_objects_cache(chunk_pos, spawned_vec);
         }
     }
 }

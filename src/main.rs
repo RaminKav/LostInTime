@@ -27,6 +27,7 @@ use bevy::{
         view::RenderLayers,
     },
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
+    utils::HashMap,
     window::{PresentMode, WindowResolution},
 };
 
@@ -250,21 +251,36 @@ impl<'w, 's> GameParam<'w, 's> {
     pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
         self.chunk_manager.chunks.insert(chunk_pos.into(), e);
     }
+    pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
+        self.chunk_manager.chunks.remove(&chunk_pos.into());
+    }
+
+    pub fn set_chunk_objects_cache(
+        &mut self,
+        chunk_pos: IVec2,
+        objects: HashMap<TileMapPosition, WorldObject>,
+    ) {
+        self.chunk_obj_cache.cache.insert(chunk_pos, objects);
+    }
+
     pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
         self.chunk_obj_cache
             .cache
             .entry(pos.chunk_pos.into())
-            .or_insert_with(Vec::new)
-            .push((obj, pos));
+            .or_insert_with(HashMap::new)
+            .insert(pos, obj);
     }
     pub fn get_objects_from_chunk_cache(
         &self,
         chunk_pos: IVec2,
-    ) -> Option<&Vec<(WorldObject, TileMapPosition)>> {
+    ) -> Option<&HashMap<TileMapPosition, WorldObject>> {
         self.chunk_obj_cache.cache.get(&chunk_pos.into())
     }
-    pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
-        self.chunk_manager.chunks.remove(&chunk_pos.into());
+    pub fn get_object_from_chunk_cache(&self, pos: TileMapPosition) -> Option<WorldObject> {
+        if let Some(cache) = self.chunk_obj_cache.cache.get(&pos.chunk_pos) {
+            return cache.get(&pos).copied();
+        }
+        None
     }
 
     pub fn get_tile_entity(&self, tile: TileMapPosition) -> Option<Entity> {
@@ -298,12 +314,21 @@ impl<'w, 's> GameParam<'w, 's> {
                 .get_component::<SpriteAnchor, _>(obj_data.object.clone())
                 .unwrap_or(&SpriteAnchor(Vec2::ZERO));
             let pos = world_pos_to_tile_pos(g_txm.translation().truncate() - anchor.0);
-            if size.is_medium() && pos.matches_tile(&tile) {
-                return Some(obj_e);
+            if size.is_medium() {
+                for neighbour_pos in pos
+                    .get_neighbour_tiles_for_medium_objects()
+                    .iter()
+                    .chain(vec![pos].iter())
+                {
+                    if neighbour_pos == &tile {
+                        return Some(obj_e);
+                    }
+                }
             } else if pos == tile {
                 return Some(obj_e);
             }
         }
+
         None
     }
     pub fn get_tile_obj_data(

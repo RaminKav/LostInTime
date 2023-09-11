@@ -23,7 +23,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::Equipment;
+use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
@@ -517,7 +517,6 @@ impl InputsPlugin {
         mut ranged_attack_event: EventWriter<RangedAttackEvent>,
         mut item_action_param: ItemActionParam,
         obj_actions: Query<&ObjectAction>,
-        test: Query<&GlobalTransform>,
     ) {
         if inv_state.open {
             return;
@@ -587,9 +586,7 @@ impl InputsPlugin {
                     );
                 }
             }
-
             if let Some(obj_e) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
-                println!("{:?}", test.get(obj_e).unwrap().translation());
                 if let Ok(obj_action) = obj_actions.get(obj_e) {
                     obj_action.run_action(
                         obj_e,
