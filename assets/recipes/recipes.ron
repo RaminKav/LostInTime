@@ -1,16 +1,17 @@
-(
-    recipes_list : {
-        StoneWallBlock: ((Some(StoneChunk), Some(StoneChunk), Some(StoneChunk), Some(StoneChunk)), Shaped, 4),
-        String: ((Some(PlantFibre), Some(PlantFibre), Some(PlantFibre), Some(PlantFibre)), Shaped, 1),
-        Bandage: ((Some(String), Some(SlimeGoo), Some(SlimeGoo), Some(String)), Shaped, 1),
-        WoodAxe: ((Some(String), Some(StoneChunk), Some(Stick), None), Shaped, 1),
-        WoodPickaxe: ((Some(StoneChunk), Some(String), Some(Stick), Some(StoneChunk)), Shaped, 1),
-        Stick: ((Some(WoodPlank), Some(WoodPlank), None, None), Shapeless, 1),
-        MetalBar: ((Some(MetalShard), Some(Coal), None, None), Shapeless, 2),
-        ThrowingStar: ((Some(MetalBar), None, None, None), Shapeless, 16),
-        Arrow: ((Some(Stick), Some(Flint), Some(Feather), None), Shapeless, 16),
-        ChestBlock: ((Some(Log), Some(Log), Some(Log), Some(Log)), Shapeless, 1),
-        Log: ((Some(WoodPlank), Some(WoodPlank), Some(WoodPlank), Some(WoodPlank)), Shapeless, 4),
-        StoneChunk: ((Some(PebbleBlock), Some(PebbleBlock), Some(PebbleBlock), Some(PebbleBlock)), Shapeless, 1),
-    }
-)
+[
+    (String, ([(item: PlantFibre, count: 4)], Inventory, 1)),
+    (WoodAxe, ([(item: String, count: 1),(item: StoneChunk, count: 1),(item: Stick, count: 1)], Inventory, 1)),
+    (CraftingTableBlock, ([(item: WoodPlank, count: 1),(item: Log, count: 1),], Inventory, 1)),
+    (ChestBlock, ([(item: WoodPlank, count: 4),(item: Log, count: 2)], CraftingTable, 1)),
+    (Arrow, ([(item: Flint, count: 1),(item: Stick, count: 1),(item: Feather, count: 1)], CraftingTable, 4)),
+    (CauldronBlock, ([(item: StoneChunk, count: 10),(item: Coal, count: 2),(item: PlantFibre, count: 4)], CraftingTable, 1)),
+    (AnvilBlock, ([(item: StoneChunk, count: 15),(item: MetalBar, count: 10)], CraftingTable, 1)),
+    (FurnaceBlock, ([(item: StoneChunk, count: 15),(item: Coal, count: 4)], CraftingTable, 1)),
+    (AlchemyTableBlock, ([(item: WoodPlank, count: 8),(item: Log, count: 4),(item: Stick, count: 2),(item: LargePotion, count: 1),], CraftingTable, 1)),
+    (RedStew, ([(item: RedMushroomBlock, count: 1),(item: Berries, count: 1),(item: RedFlower, count: 1)], Cauldron, 1)),
+    (Chestplate, ([(item: MetalBar, count: 20)], Anvil, 1)),
+    (LargePotion, ([(item: PinkFlower, count: 4),(item: RedFlower, count: 4),(item: SlimeGoo, count: 4)], AlchemyTable, 1)),
+    (SmallPotion, ([(item: PinkFlower, count: 3),(item: RedFlower, count: 3),(item: SlimeGoo, count: 2)], AlchemyTable, 1)),
+    (MetalBar, ([(item: MetalShard, count: 4),(item: Coal, count: 1)], Furnace, 4)),
+    (CookedMeat, ([(item: RawMeat, count: 4),(item: Coal, count: 1)], Furnace, 4)),
+]

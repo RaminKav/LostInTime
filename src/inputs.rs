@@ -1,10 +1,10 @@
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
-use crate::animations::{AnimatedTextureMaterial, AttackEvent};
+use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
+
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use interpolation::Lerp;
@@ -16,25 +16,24 @@ use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
-use crate::item::item_actions::{ItemAction, ItemActionParam, ItemActions, ManaCost};
+use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::item_upgrades::{
     ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
     FireStaffAOEUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade, VenomOnHitUpgrade,
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, WorldObject};
+use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
-use crate::world::dungeon::DungeonPlugin;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
-use crate::world::{TileMapPosition, WorldObjectEntityData};
+use crate::world::TileMapPosition;
 use crate::{
-    custom_commands::CommandsExt, AppExt, CoreGameSet, CustomFlush, GameParam, GameState,
-    GameUpscale, MainCamera, RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
+    custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
+    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
 use crate::{Game, Player, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
 
@@ -427,7 +426,7 @@ impl InputsPlugin {
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }
     }
@@ -504,11 +503,10 @@ impl InputsPlugin {
 
     pub fn mouse_click_system(
         mut commands: Commands,
-        mut proto_commands: ProtoCommands,
         mouse_button_input: Res<Input<MouseButton>>,
         cursor_pos: Res<CursorPos>,
         mut game: GameParam,
-        proto_param: ProtoParam,
+        mut proto_param: ProtoParam,
         mut attack_event: EventWriter<AttackEvent>,
         mut hit_event: EventWriter<HitEvent>,
 
@@ -595,7 +593,7 @@ impl InputsPlugin {
                         obj,
                         &mut item_action_param,
                         &mut commands,
-                        &mut proto_commands,
+                        &mut proto_param,
                     );
                 }
             }

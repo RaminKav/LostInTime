@@ -5,7 +5,7 @@ use crate::item::WorldObject;
 use crate::world::dimension::SpawnDimension;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE};
-use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH};
+use crate::{GameParam, Player, GAME_HEIGHT, GAME_WIDTH};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;

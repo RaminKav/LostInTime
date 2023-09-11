@@ -1,0 +1,17 @@
+(
+  name: "CauldronBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CauldronBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Cauldron)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: CauldronBlock,
+        metadata: (
+            name: "Cauldron", 
+            desc: "Stores items."
+        ),
+        count: 1
+  ),
+  }
+)

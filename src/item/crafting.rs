@@ -2,136 +2,115 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
-    inventory::{Inventory, InventoryItemStack},
+    inventory::{Inventory, InventoryPlugin},
     item::WorldObject,
-    proto::proto_param::ProtoParam,
+    ui::crafting_ui::CraftingContainerType,
     GameState,
 };
 
 pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<CraftingSlotUpdateEvent>()
-            .add_event::<CompleteRecipeEvent>()
-            .insert_resource(Recipes::default())
+        app.insert_resource(Recipes::default())
+            .insert_resource(CraftingTracker::default())
+            .add_event::<CraftedItemEvent>()
             .add_systems(
-                (
-                    Self::handle_crafting_slot_update,
-                    Self::handle_recipe_complete,
-                )
+                (handle_crafting_update_when_inv_changes, handle_crafted_item)
                     .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
 
-#[derive(Resource, Default, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub enum RecipeType {
-    #[default]
-    Shaped,
-    Shapeless,
-}
 #[derive(Resource, Default, Deserialize)]
 pub struct Recipes {
     // map of recipie result and its recipe matrix
     pub recipes_list: RecipeList,
 }
-pub type RecipeList = HashMap<WorldObject, (CraftingGrid, RecipeType, usize)>;
 
-impl CraftingPlugin {
-    fn handle_crafting_slot_update(
-        mut events: EventReader<CraftingSlotUpdateEvent>,
-        mut inv: Query<&mut Inventory>,
-        recipes_list: Res<Recipes>,
-        proto: ProtoParam,
-    ) {
-        for _ in events.iter() {
-            let crafting_slots = &inv.single().crafting_items.items;
-            let mut recipe: CraftingGrid = [None; 4];
-            for stack_option in crafting_slots.iter() {
-                if let Some(stack) = stack_option {
-                    let item = *stack.get_obj();
-                    let i = match stack.slot {
-                        0 => 2,
-                        1 => 3,
-                        2 => 0,
-                        3 => 1,
-                        4 => continue,
-                        _ => unreachable!(),
-                    };
-                    recipe[i] = Some(item);
-                }
-            }
+#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct RecipeItem {
+    pub item: WorldObject,
+    pub count: usize,
+}
 
-            let recipe = CraftingRecipe { recipe };
-            let result_option = if let Some((result, count)) =
-                recipe.get_potential_reward(bevy::prelude::Res::<'_, Recipes>::clone(&recipes_list))
-            {
-                let item_stack = proto.get_item_data(result).unwrap().copy_with_count(count);
+pub type RecipeList = HashMap<WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize)>;
+pub type RecipeListProto = Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>;
 
-                Some(InventoryItemStack {
-                    item_stack: item_stack.clone(),
-                    slot: 4,
-                })
-            } else {
-                None
-            };
-            inv.single_mut().crafting_items.items[4] = result_option;
-        }
+#[derive(Resource, Default, Deserialize)]
+pub struct CraftingTracker {
+    // map of recipie result and its recipe matrix
+    pub craftable: Vec<WorldObject>,
+    pub discovered: Vec<WorldObject>,
+    pub crafting_type_map: HashMap<CraftingContainerType, Vec<WorldObject>>,
+}
+
+pub struct CraftedItemEvent {
+    pub obj: WorldObject,
+}
+
+// there will be N craftable items in a given Crafting UI.
+// each has a required list of items to craft it.
+// each time the inventory changes, we re-calculate if any of the craftable items can be crafted.
+// if so, we update the UI to show the item as craftable.
+pub fn handle_crafting_update_when_inv_changes(
+    inv: Query<&Inventory, Changed<Inventory>>,
+    recipes: Res<Recipes>,
+    mut craft_tracker: ResMut<CraftingTracker>,
+) {
+    if inv.get_single().is_err() {
+        return;
     }
-    fn handle_recipe_complete(
-        mut events: EventReader<CompleteRecipeEvent>,
-        mut crafting_slot_event: EventWriter<CraftingSlotUpdateEvent>,
-        mut inv: Query<&mut Inventory>,
-    ) {
-        for _ in events.iter() {
-            inv.single_mut().crafting_items.items[4] = None;
-            for crafting_item_option in inv.single_mut().crafting_items.items.iter_mut() {
-                if let Some(crafting_item) = crafting_item_option.as_mut() {
-                    if let Some(remaining_item) = crafting_item.modify_count(-1) {
-                        *crafting_item = remaining_item;
-                    } else {
-                        *crafting_item_option = None;
-                    }
-                }
+
+    for (result, recipe) in recipes.recipes_list.clone() {
+        let mut can_craft = true;
+        let inv = inv.single();
+        for ingredient in recipe.0.clone() {
+            if InventoryPlugin::get_item_count_in_container(&inv.items, ingredient.item)
+                < ingredient.count
+            {
+                can_craft = false;
+                break;
             }
-            crafting_slot_event.send(CraftingSlotUpdateEvent);
+        }
+        if can_craft {
+            craft_tracker.craftable.push(result);
+        } else {
+            craft_tracker.craftable.retain(|x| x != &result);
         }
     }
 }
-
-#[derive(Clone, Debug, Default)]
-pub struct CraftingSlotUpdateEvent;
-#[derive(Clone, Debug, Default)]
-pub struct CompleteRecipeEvent;
-
-#[derive(PartialEq)]
-pub struct CraftingRecipe {
-    recipe: CraftingGrid,
-}
-pub type CraftingGrid = [Option<WorldObject>; 4];
-
-impl CraftingRecipe {
-    fn get_potential_reward(self, recipes_list: Res<Recipes>) -> Option<(WorldObject, usize)> {
-        for (result, (recipe, recipe_type, count)) in recipes_list.recipes_list.iter() {
-            let mut grid = self.recipe.clone();
-
-            let mut recipe = recipe.clone();
-            if recipe_type == &RecipeType::Shapeless {
-                recipe.sort_by_key(|v| v.is_some());
-                grid.sort_by_key(|v| v.is_some());
-                if recipe == grid {
-                    return Some((*result, *count));
+pub fn handle_crafted_item(
+    mut inv: Query<&mut Inventory>,
+    mut events: EventReader<CraftedItemEvent>,
+    recipes: Res<Recipes>,
+) {
+    for event in events.iter() {
+        let mut inv = inv.single_mut();
+        let mut remaining_cost = recipes
+            .recipes_list
+            .get(&event.obj)
+            .expect("crafted item does not have recipe?")
+            .0
+            .clone();
+        while remaining_cost.len() > 0 {
+            for item in remaining_cost.clone().iter() {
+                let ingredient_slot =
+                    InventoryPlugin::get_slot_for_item_in_container(&inv.items, &item.item)
+                        .expect("player crafted item but does not have the required ingredients?");
+                let stack = inv.items.items[ingredient_slot].as_mut().unwrap();
+                if stack.item_stack.count >= item.count {
+                    inv.items.items[ingredient_slot] = stack.modify_count(-(item.count as i8));
+                    remaining_cost.retain(|x| x != item);
+                } else {
+                    let count = stack.item_stack.count;
+                    inv.items.items[ingredient_slot] = None;
+                    remaining_cost.retain(|x| x != item);
+                    remaining_cost.push(RecipeItem {
+                        item: item.item.clone(),
+                        count: (item.count - count) as usize,
+                    });
                 }
-                continue;
-            }
-            if self
-                == (Self {
-                    recipe: recipe.try_into().unwrap(),
-                })
-            {
-                return Some((*result, *count));
             }
         }
-        None
     }
 }

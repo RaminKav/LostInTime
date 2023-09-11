@@ -12,7 +12,8 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::item::{
-    Equipment, Foliage, RecipeList, Recipes, Wall, WorldObject, WorldObjectResource,
+    CraftingTracker, Equipment, Foliage, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
+    WorldObjectResource,
 };
 use crate::ui::UIElement;
 use crate::GameParam;
@@ -192,6 +193,7 @@ impl GameAssetsPlugin {
         mut world_obj_data: ResMut<WorldObjectResource>,
         mut materials: ResMut<Assets<FoliageMaterial>>,
         asset_server: Res<AssetServer>,
+        mut crafting_tracker: ResMut<CraftingTracker>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -218,7 +220,7 @@ impl GameAssetsPlugin {
             println!("Failed to load config for graphics: {e}");
             std::process::exit(1);
         });
-        let recipes_desc: Recipes = from_str(&recipe_desc).unwrap_or_else(|e| {
+        let recipes_desc: RecipeListProto = from_str(&recipe_desc).unwrap_or_else(|e| {
             println!("Failed to load config for recipes: {e}");
             std::process::exit(1);
         });
@@ -299,8 +301,14 @@ impl GameAssetsPlugin {
         }
 
         // load recipes
-        for (result, recipe) in recipes_desc.recipes_list.iter() {
-            recipes_list.insert(*result, (recipe.0, recipe.1.clone(), recipe.2));
+        for (result, recipe) in recipes_desc.iter() {
+            recipes_list.insert(*result, (recipe.0.clone(), recipe.1.clone(), recipe.2));
+            crafting_tracker
+                .crafting_type_map
+                .entry(recipe.1.clone())
+                .or_default()
+                .push(*result);
+
             println!("Loaded recipe for {result:?}: {recipe:?}");
         }
 

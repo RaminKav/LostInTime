@@ -13,7 +13,8 @@ use crate::{
 
 use super::{
     stats_ui::StatsUI, InventorySlotState, InventoryUI, ShowInvPlayerStatsEvent,
-    ToolTipUpdateEvent, UIElement, UIState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    ToolTipUpdateEvent, UIElement, UIState, CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE,
+    INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -36,8 +37,9 @@ pub fn handle_spawn_inv_item_tooltip(
         }
         let inv = inv.single();
         let parent_inv_size = match cur_inv_state.0 {
-            UIState::Open => INVENTORY_UI_SIZE,
+            UIState::Inventory => INVENTORY_UI_SIZE,
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,
+            UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             _ => unreachable!(),
         };
         let attributes = item.item_stack.attributes.get_tooltips();
@@ -172,13 +174,21 @@ pub fn handle_spawn_inv_player_stats(
             commands.entity(tooltip.0).despawn_recursive();
         }
 
-        let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Open {
-            (inv.get_single(), Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.))
+        let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
+            (
+                inv.get_single(),
+                Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),
+            )
         } else if curr_ui_state.0 == UIState::Stats {
-            (stats.get_single(),Vec3::new(-(STATS_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.))
+            (
+                stats.get_single(),
+                Vec3::new(-(STATS_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),
+            )
         } else {
             return;
-        }) else {return};
+        }) else {
+            return;
+        };
         let (
             attack,
             max_health,

@@ -127,12 +127,12 @@ pub fn setup_xp_bar_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: YELLOW,
-                custom_size: Some(Vec2::new(118., 2.)),
+                custom_size: Some(Vec2::new(111., 1.)),
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-118. / 2., -5., 1.),
+                translation: Vec3::new(-111. / 2., -6., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -203,7 +203,9 @@ pub fn update_healthbar(
     >,
     mut health_bar_query: Query<&mut Sprite, With<HealthBar>>,
 ) {
-    let Ok((player_health, player_max_health)) = player_health_query.get_single() else {return};
+    let Ok((player_health, player_max_health)) = player_health_query.get_single() else {
+        return;
+    };
     health_bar_query.single_mut().custom_size = Some(Vec2 {
         x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
@@ -214,10 +216,12 @@ pub fn update_xp_bar(
     mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
     mut xp_bar_text_query: Query<&mut Text, With<XPBarText>>,
 ) {
-    let Ok(level) = player_hunger_query.get_single() else {return};
+    let Ok(level) = player_hunger_query.get_single() else {
+        return;
+    };
     xp_bar_query.single_mut().custom_size = Some(Vec2 {
-        x: 118. * level.xp as f32 / level.next_level_xp as f32,
-        y: 2.,
+        x: 111. * level.xp as f32 / level.next_level_xp as f32,
+        y: 1.,
     });
     xp_bar_text_query.single_mut().sections[0].value = format!("{:}", level.level);
 }
@@ -226,7 +230,9 @@ pub fn update_foodbar(
     player_hunger_query: Query<&Hunger, (With<Player>, Changed<Hunger>)>,
     mut food_bar_query: Query<&mut Sprite, With<FoodBar>>,
 ) {
-    let Ok(hunger) = player_hunger_query.get_single() else {return};
+    let Ok(hunger) = player_hunger_query.get_single() else {
+        return;
+    };
     food_bar_query.single_mut().custom_size = Some(Vec2 {
         x: 53. * hunger.current as f32 / hunger.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
@@ -265,7 +271,9 @@ pub fn update_mana_bar(
     player_mana: Query<&Mana, (With<Player>, Changed<Mana>)>,
     mut mana_bar_query: Query<&mut Sprite, With<ManaBar>>,
 ) {
-    let Ok(mana) = player_mana.get_single() else {return};
+    let Ok(mana) = player_mana.get_single() else {
+        return;
+    };
     mana_bar_query.single_mut().custom_size = Some(Vec2 {
         x: 60. * mana.current as f32 / mana.max as f32,
         y: INNER_HUD_BAR_SIZE.y,

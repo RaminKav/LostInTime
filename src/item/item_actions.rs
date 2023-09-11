@@ -16,7 +16,7 @@ use crate::{
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use super::{PlaceItemEvent, WorldObject};
+use super::{CraftingTracker, PlaceItemEvent, Recipes, WorldObject};
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
@@ -55,6 +55,8 @@ pub struct ItemActionParam<'w, 's> {
     pub cursor_pos: Res<'w, CursorPos>,
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
     pub chest_query: Query<'w, 's, &'static ChestInventory>,
+    pub crafting_tracker: Res<'w, CraftingTracker>,
+    pub recipes: Res<'w, Recipes>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

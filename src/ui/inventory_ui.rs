@@ -1,29 +1,28 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::MaterialMesh2dBundle};
+use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    animations::AnimatedTextureMaterial,
     assets::Graphics,
     attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
-    player::Limb,
     ui::{ChestInventory, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{
-    interactions::Interaction, stats_ui::StatsUI, DropInWorldEvent, Interactable,
-    ShowInvPlayerStatsEvent, UIElement, UI_SLOT_SIZE,
+    crafting_ui::CraftingContainer, interactions::Interaction, stats_ui::StatsUI, Interactable,
+    ShowInvPlayerStatsEvent, UIElement, CRAFTING_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
 pub enum UIState {
     #[default]
     Closed,
-    Open,
+    Inventory,
     NPC,
     Chest,
     Stats,
+    Crafting,
 }
 
 #[derive(Component, Default, Clone)]
@@ -49,7 +48,6 @@ pub enum InventorySlotType {
     Normal,
     Hotbar,
     Crafting,
-    CraftingResult,
     Equipment,
     Accessory,
     Chest,
@@ -60,9 +58,6 @@ impl InventorySlotType {
     }
     pub fn is_hotbar(self) -> bool {
         self == InventorySlotType::Hotbar
-    }
-    pub fn is_crafting_result(self) -> bool {
-        self == InventorySlotType::CraftingResult
     }
     pub fn is_equipment(self) -> bool {
         self == InventorySlotType::Equipment
@@ -82,15 +77,10 @@ pub fn setup_inv_ui(
     graphics: Res<Graphics>,
     mut inv_state: ResMut<InventoryState>,
     cur_inv_state: Res<State<UIState>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    mut materials: ResMut<Assets<AnimatedTextureMaterial>>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
-    inv: Query<&Inventory>,
 ) {
     let (size, texture, t_offset) = match cur_inv_state.0 {
-        UIState::Open => (
+        UIState::Inventory => (
             INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
@@ -103,6 +93,17 @@ pub fn setup_inv_ui(
         ),
         UIState::Chest => (
             CHEST_INVENTORY_UI_SIZE,
+            graphics
+                .ui_image_handles
+                .as_ref()
+                .unwrap()
+                .get(&UIElement::ChestInventory)
+                .unwrap()
+                .clone(),
+            Vec2::new(22.5, 0.),
+        ),
+        UIState::Crafting => (
+            CRAFTING_INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
                 .as_ref()
@@ -150,100 +151,6 @@ pub fn setup_inv_ui(
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
-    let inv = inv.single();
-
-    if cur_inv_state.0 == UIState::Open {
-        let mut limb_children: Vec<Entity> = vec![];
-        let shadow_texture_handle = asset_server.load("textures/player/player-shadow.png");
-        let shadow_texture_atlas =
-            TextureAtlas::from_grid(shadow_texture_handle, Vec2::new(32., 32.), 1, 1, None, None);
-        let shadow_texture_atlas_handle = texture_atlases.add(shadow_texture_atlas);
-
-        let shadow = commands
-            .spawn(SpriteSheetBundle {
-                texture_atlas: shadow_texture_atlas_handle,
-                transform: Transform::from_translation(Vec3::new(0., 0., -0.00000001)),
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .id();
-        limb_children.push(shadow);
-
-        for (i, equipment) in inv.equipment_items.items.iter().enumerate() {
-            let limbs = Limb::from_slot(i);
-            for l in limbs.iter() {
-                let limb_source_handle = asset_server.load(format!(
-                    "textures/player/player-run-down/player-{}-run-down-source-0.png",
-                    l.to_string().to_lowercase()
-                ));
-
-                let limb_texture_asset = if let Some(equip) = equipment {
-                    format!(
-                        "textures/player/{}.png",
-                        equip.item_stack.obj_type.to_string()
-                    )
-                } else {
-                    format!(
-                        "textures/player/player-texture-{}.png",
-                        if l == &Limb::Torso || l == &Limb::Hands {
-                            Limb::Torso.to_string().to_lowercase()
-                        } else {
-                            l.to_string().to_lowercase()
-                        }
-                    )
-                };
-                let limb_texture_handle = asset_server.load(limb_texture_asset);
-
-                let transform = if *l == Limb::Head {
-                    Transform::from_translation(Vec3::new(0., 0., 0.))
-                } else {
-                    Transform::default()
-                };
-                let limb = commands
-                    .spawn((
-                        MaterialMesh2dBundle {
-                            mesh: meshes
-                                .add(
-                                    shape::Quad {
-                                        size: Vec2::new(32., 32.),
-                                        ..Default::default()
-                                    }
-                                    .into(),
-                                )
-                                .into(),
-                            transform,
-                            material: materials.add(AnimatedTextureMaterial {
-                                source_texture: Some(limb_source_handle),
-                                lookup_texture: Some(limb_texture_handle),
-                                opacity: 1.,
-                                flip: 1.,
-                            }),
-                            ..default()
-                        },
-                        RenderLayers::from_layers(&[3]),
-                        *l,
-                    ))
-                    .id();
-                limb_children.push(limb);
-            }
-        }
-        let player_ui_preview_e = commands
-            .spawn((
-                SpatialBundle {
-                    transform: Transform::from_translation(Vec3::new(
-                        size.x / 2. - 24.,
-                        size.y / 2. - 22.,
-                        2.,
-                    )),
-                    ..Default::default()
-                },
-                RenderLayers::from_layers(&[3]),
-                Name::new("PlayerUIPreview"),
-            ))
-            .push_children(&limb_children)
-            .id();
-        commands.entity(inv_e).push_children(&[player_ui_preview_e]);
-    }
 
     inv_state.inv_size = size;
     commands.entity(inv_e).push_children(&[overlay]);
@@ -261,13 +168,15 @@ pub fn setup_inv_slots_ui(
 
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
+    crafting_container: Option<Res<CraftingContainer>>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
     }
-    let (should_spawn_equipment, should_spawn_crafting) = match inv_state.0 {
-        UIState::Open => (true, true),
-        UIState::Chest => (false, false),
+    let (should_spawn_equipment, crafting_items_option) = match inv_state.0 {
+        UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
+        UIState::Crafting => (false, Some(crafting_container.unwrap().items.clone())),
+        UIState::Chest => (false, None),
         _ => return,
     };
     for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
@@ -284,36 +193,6 @@ pub fn setup_inv_slots_ui(
             item.clone(),
         );
 
-        // crafting slots
-        if slot_index < 4 && should_spawn_crafting {
-            spawn_inv_slot(
-                &mut commands,
-                &inv_state,
-                &graphics,
-                slot_index,
-                Interaction::None,
-                &inv_state_res,
-                &inv_query,
-                &asset_server,
-                InventorySlotType::Crafting,
-                None,
-            );
-        }
-        // crafting result slot
-        if slot_index == 4 && should_spawn_crafting {
-            spawn_inv_slot(
-                &mut commands,
-                &inv_state,
-                &graphics,
-                slot_index,
-                Interaction::None,
-                &inv_state_res,
-                &inv_query,
-                &asset_server,
-                InventorySlotType::CraftingResult,
-                None,
-            );
-        }
         // equipment slots
         if slot_index < 4 && should_spawn_equipment {
             spawn_inv_slot(
@@ -345,23 +224,38 @@ pub fn setup_inv_slots_ui(
             );
         }
     }
+    if let Some(crafting_items) = crafting_items_option {
+        for (slot_index, item) in crafting_items.items.iter().enumerate() {
+            spawn_inv_slot(
+                &mut commands,
+                &inv_state,
+                &graphics,
+                slot_index,
+                Interaction::None,
+                &inv_state_res,
+                &inv_query,
+                &asset_server,
+                InventorySlotType::Crafting,
+                item.to_owned(),
+            );
+        }
+    }
 }
 
 pub fn toggle_inv_visibility(
     inv_state: Res<InventoryState>,
     mut hotbar_slots: Query<&mut Visibility, (Without<Interactable>, With<InventorySlotState>)>,
-    crafting_slots: Query<(Entity, &InventorySlotState), With<Interactable>>,
-    crafting_item_stacks: Query<&ItemStack>,
-    mut inv: Query<&mut Inventory>,
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_inv_state: Res<State<UIState>>,
-    mut world_drop_events: EventWriter<DropInWorldEvent>,
     inv_query: Query<Entity, With<InventoryUI>>,
     mut commands: Commands,
     chest_option: Option<Res<ChestInventory>>,
     stats_query: Query<Entity, With<StatsUI>>,
 ) {
-    if !inv_state.open && (curr_inv_state.0 == UIState::Open || curr_inv_state.0 == UIState::Chest)
+    if !inv_state.open
+        && (curr_inv_state.0 == UIState::Inventory
+            || curr_inv_state.0 == UIState::Chest
+            || curr_inv_state.0 == UIState::Crafting)
     {
         next_inv_state.set(UIState::Closed);
         if let Ok(e) = inv_query.get_single() {
@@ -371,13 +265,14 @@ pub fn toggle_inv_visibility(
                 }
                 commands.remove_resource::<ChestInventory>();
             }
+            commands.remove_resource::<CraftingContainer>();
             commands.entity(e).despawn_recursive();
         }
     } else if inv_state.open
         && (curr_inv_state.0 == UIState::Closed || curr_inv_state.0 == UIState::Stats)
         && !next_inv_state.is_changed()
     {
-        next_inv_state.set(UIState::Open);
+        next_inv_state.set(UIState::Inventory);
 
         // close stats ui if its open
         if let Ok(e) = stats_query.get_single() {
@@ -393,21 +288,6 @@ pub fn toggle_inv_visibility(
     }
     if inv_state.open {
         return;
-    }
-    // if closing inv, drop all items in crafting slot
-    for (e, state) in crafting_slots.iter() {
-        if state.r#type.is_crafting() && state.item.is_some() {
-            world_drop_events.send(DropInWorldEvent {
-                dropped_entity: state.item.unwrap(),
-                dropped_item_stack: crafting_item_stacks
-                    .get(state.item.unwrap())
-                    .unwrap()
-                    .clone(),
-                parent_interactable_entity: e,
-                stack_empty: true,
-            });
-            inv.single_mut().crafting_items.items[state.slot_index] = None;
-        }
     }
 }
 pub fn spawn_inv_slot(
@@ -442,17 +322,10 @@ pub fn spawn_inv_slot(
         y = -GAME_HEIGHT / 2. + 14.;
         x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
     } else if slot_type.is_crafting() {
-        x = ((slot_index % 2) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
+        x = (slot_index as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
             + UI_SLOT_SIZE / 2.
-            + 4.
-            + 1. * UI_SLOT_SIZE;
-        y = ((slot_index / 2) as f32).trunc() * UI_SLOT_SIZE
-            - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
-            + 5. * UI_SLOT_SIZE
-            + 10.;
-    } else if slot_type.is_crafting_result() {
-        x = 6. + (4. * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.;
-        y = 5. * UI_SLOT_SIZE + 18. - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.;
+            + 4.;
+        y = -(inv_state.inv_size.y + UI_SLOT_SIZE) / 2. + 6. * UI_SLOT_SIZE + 10.;
     } else if slot_type.is_equipment() {
         x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 7. + 5. * UI_SLOT_SIZE;
         y = slot_index as f32 * UI_SLOT_SIZE - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
@@ -527,8 +400,6 @@ pub fn spawn_inv_slot(
         .insert(UIElement::InventorySlot)
         .insert(Name::new(if slot_type.is_crafting() {
             "CRAFTING SLOT"
-        } else if slot_type.is_crafting_result() {
-            "CRAFT RESULT"
         } else {
             "SLOT"
         }));
@@ -627,6 +498,7 @@ pub fn update_inventory_ui(
     asset_server: Res<AssetServer>,
     inv: Query<&mut Inventory>,
     chest_option: Option<Res<ChestInventory>>,
+    crafting_option: Option<Res<CraftingContainer>>,
 ) {
     for (e, slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
@@ -641,6 +513,8 @@ pub fn update_inventory_ui(
         let interactable_option = interactables.get(e);
         let item_option = if slot_state.r#type.is_chest() {
             chest_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+        } else if slot_state.r#type.is_crafting() && crafting_option.is_some() {
+            crafting_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else {
             inv.single()
                 .get_items_from_slot_type(slot_state.r#type)

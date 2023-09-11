@@ -44,6 +44,7 @@ use crate::{
     },
     player::levels::ExperienceReward,
     schematic::{loot_chests::LootChestType, SchematicType},
+    ui::crafting_ui::CraftingContainerType,
     world::WorldObjectEntityData,
     CustomFlush, GameState, YSort,
 };
@@ -104,6 +105,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<ManaCost>()
             .register_type::<FacingDirection>()
+            .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
             .register_type::<CharacterAnimationSpriteSheetData>()
@@ -236,6 +238,17 @@ impl ProtoPlugin {
         prototypes.load("proto/lillypad.prototype.ron");
         prototypes.load("proto/waterboulder.prototype.ron");
         prototypes.load("proto/waterboulder2.prototype.ron");
+        prototypes.load("proto/craftingtable.prototype.ron");
+        prototypes.load("proto/alchemytable.prototype.ron");
+        prototypes.load("proto/anvil.prototype.ron");
+        prototypes.load("proto/cauldron.prototype.ron");
+        prototypes.load("proto/furnace.prototype.ron");
+        prototypes.load("proto/craftingtableblock.prototype.ron");
+        prototypes.load("proto/alchemytableblock.prototype.ron");
+        prototypes.load("proto/anvilblock.prototype.ron");
+        prototypes.load("proto/cauldronblock.prototype.ron");
+        prototypes.load("proto/furnaceblock.prototype.ron");
+        prototypes.load("proto/redstew.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

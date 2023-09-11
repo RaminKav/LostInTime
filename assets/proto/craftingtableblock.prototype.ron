@@ -1,0 +1,17 @@
+(
+  name: "CraftingTableBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": CraftingTableBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(CraftingTable)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: CraftingTableBlock,
+        metadata: (
+            name: "Crafting Table", 
+            desc: "Stores items."
+        ),
+        count: 1
+  ),
+  }
+)
