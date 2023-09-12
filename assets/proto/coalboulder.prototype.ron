@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": CoalBoulder,
   "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::item::RequiredEquipmentType": (Pickaxe),
-  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 6),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 7.),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
   "survival_rogue_like::attributes::MaxHealth": (85),
   "survival_rogue_like::world::WorldObjectEntityData": (object: CoalBoulder, obj_bit_index: 0, texture_offset: 0),

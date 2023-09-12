@@ -6,10 +6,11 @@ use seldom_state::prelude::*;
 use crate::{
     animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
     combat::HitEvent,
+    enemy::FollowSpeed,
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
-    Game,
+    Game, PLAYER_MOVE_SPEED,
 };
 
 // This trigger checks if the enemy is within the the given range of the target
@@ -166,6 +167,7 @@ pub fn follow(
         &EnemyAnimationState,
     )>,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
     for (entity, follow, sprite, anim_data, anim_state) in &follows {
         // Get the positions of the follower and target
@@ -176,7 +178,16 @@ pub fn follow(
             .normalize_or_zero()
             .truncate();
         // Find the direction from the follower to the target and go that way
-        mover.get_mut(entity).unwrap().translation = Some(delta * follow.speed);
+        // println!(
+        //     "{:?}, {:?}, {:?} {:?} -> {:?}",
+        //     delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds(),
+        //     follow.speed,
+        //     target_translation.y,
+        //     follow_translation.y,
+        //     target_translation.y - follow_translation.y,
+        // );
+        mover.get_mut(entity).unwrap().translation =
+            Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
         commands
             .entity(entity)
             .insert(FacingDirection::from_translation(delta));
@@ -194,6 +205,7 @@ pub fn leap_attack(
         Entity,
         &mut KinematicCharacterController,
         &mut LeapAttackState,
+        &FollowSpeed,
         &mut TextureAtlasSprite,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
@@ -202,17 +214,21 @@ pub fn leap_attack(
     time: Res<Time>,
     _game: Res<Game>,
 ) {
-    for (entity, mut kcc, mut attack, sprite, anim_data, anim_state) in attacks.iter_mut() {
+    for (entity, mut kcc, mut attack, follow_speed, sprite, anim_data, anim_state) in
+        attacks.iter_mut()
+    {
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
-
         let hit = false;
-        if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+        //attack.attack_startup_timer.finished() &&  also u gotta reset the timer
+        if !attack.attack_duration_timer.finished() {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
-                attack.dir = Some(delta.normalize_or_zero().truncate() * attack.speed);
+                attack.dir = Some(
+                    delta.normalize_or_zero().truncate() * attack.speed * time.delta_seconds(),
+                );
             }
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
@@ -230,7 +246,7 @@ pub fn leap_attack(
                     .insert(EnemyAnimationState::Walk)
                     .insert(FollowState {
                         target: attack.target,
-                        speed: 1.,
+                        speed: follow_speed.0,
                     })
                     .remove::<LeapAttackState>()
                     .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
@@ -243,11 +259,16 @@ pub fn leap_attack(
 pub fn projectile_attack(
     mut commands: Commands,
     mut transforms: Query<&mut Transform>,
-    mut attacks: Query<(Entity, &mut ProjectileAttackState, &EnemyAnimationState)>,
+    mut attacks: Query<(
+        Entity,
+        &FollowSpeed,
+        &mut ProjectileAttackState,
+        &EnemyAnimationState,
+    )>,
     mut events: EventWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
-    for (entity, mut attack, anim_state) in attacks.iter_mut() {
+    for (entity, follow_speed, mut attack, anim_state) in attacks.iter_mut() {
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
@@ -273,7 +294,7 @@ pub fn projectile_attack(
                 .insert(EnemyAnimationState::Walk)
                 .insert(FollowState {
                     target: attack.target,
-                    speed: 1.,
+                    speed: follow_speed.0,
                 })
                 .remove::<ProjectileAttackState>()
                 .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
@@ -294,7 +315,7 @@ pub fn idle(
         idle.walk_timer.tick(time.delta());
         let mut idle_transform = transforms.get_mut(entity).unwrap();
 
-        let s = idle.speed; //* time.delta_seconds();
+        let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_seconds();
         match idle.direction {
             FacingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
             FacingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
