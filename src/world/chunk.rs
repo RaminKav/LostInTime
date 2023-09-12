@@ -4,6 +4,7 @@ use bevy::math::Vec3Swizzles;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
+use bevy_rapier2d::prelude::Collider;
 
 use super::dimension::{ActiveDimension, GenerationSeed};
 
@@ -149,7 +150,7 @@ impl ChunkPlugin {
             };
             let grid_size = tile_size.into();
             let map_type = TilemapType::default();
-
+            let mut water_colliders = vec![];
             let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
                 CHUNK_SIZE as usize] =
                 [[[WorldObject::GrassTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
@@ -186,6 +187,27 @@ impl ChunkPlugin {
                     tiles.insert(tile_pos.into(), tile_entity);
                     commands.entity(tilemap_entity).add_child(tile_entity);
                     tile_storage.set(&tile_pos, tile_entity);
+
+                    // spawn water colliders
+                    if blocks.contains(&WorldObject::WaterTile)
+                        && blocks.contains(&WorldObject::GrassTile)
+                    {
+                        water_colliders.push(
+                            commands
+                                .spawn((
+                                    SpatialBundle::from_transform(Transform::from_translation(
+                                        Vec3::new(
+                                            x as f32 * TILE_SIZE.x,
+                                            y as f32 * TILE_SIZE.y,
+                                            0.,
+                                        ),
+                                    )),
+                                    Collider::cuboid(TILE_SIZE.x / 2. - 2., TILE_SIZE.y / 2. - 2.),
+                                    Name::new("WATER"),
+                                ))
+                                .id(),
+                        );
+                    }
                 }
             }
             let transform = Transform::from_translation(Vec3::new(
@@ -209,6 +231,7 @@ impl ChunkPlugin {
                 .insert(TileEntityCollection { map: tiles })
                 .insert(Chunk { chunk_pos })
                 .insert(Name::new(format!("Pos: {}", chunk_pos)))
+                .push_children(&water_colliders)
                 .id();
             commands.entity(chunk).insert(ChunkWallCache {
                 walls: HashMap::new(),

@@ -4,8 +4,9 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": SpikeSlime,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
+    "survival_rogue_like::enemy::FollowSpeed": (1.1),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 50., duration: 0.25, cooldown: 1.0, speed: 1.7),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 50., duration: 0.25, cooldown: 1.0, speed: 80.),
     "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: SlimeGooProjectile),
 //    "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/spikeslime/spikeslime_down.png", size: (x: 32., y: 32.), cols: 6, rows: 5),

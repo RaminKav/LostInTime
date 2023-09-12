@@ -167,30 +167,33 @@ impl different att styles w seldum_state
 [x] Equipment: UI to equip, visuals pipeline, add restrictions for slots
 [x] UI: Containers, allow different UI inventory states to allow for chests, npcs, icons for acc/equip slots, maybe change ui slot colors to be unique
 [x] Items: add random roll stats, clean up naming of stats too
-[] Items: add lots of items/recipies
+[x] Items: add lots of items/recipies
 [x] Items: shrink walls, simplify top borders so its easier to add new wall types
-[] Add colliders to water (use corners)
-[] Make grass foliage shader
-[] Generation: Add random ore clusters in dungeons?
-[] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
+[x] Add colliders to water (use corners)
+[x] Mobs: Add more mob types, maybe a boss, goblins, passive mobs
 [x] Survival: Food system
 [x] UI: add static tooltips on the side of inv
+[x] Gameplay: mana system
+[] Make grass foliage shader
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
 [] Aesthetics: Particle system for easy non-damaging animations/particles
 [] Dungeons: add exit method, add chest generation
-[] Gameplay: mana system
-[] Gameplay: offhands
-[] Items: Trinkets
-[] Gameplay: weapon upgrades
-[] Gameplay: weapon scrolls
-[] Gameplay: weapon orbs of alteration
-[] FIX: fix dash
-[] FIX: lag in dungeons
-[] save/load/cache
-[] Passive mobs that give leather
+[] ## Items: Trinkets
+[] ## Gameplay: weapon upgrades
+[] # Gameplay: weapon scrolls
+[] # Gameplay: weapon orbs of alteration
+[x] FIX: fix dash
+[] ### FIX: lag in dungeons
+[] ### save/load/cache
+[x] Passive mobs that give leather
 [] add leather armor
 [] cleanup proto obj files, add parent
+[] # mobs dont spawn around player
+[] # bushlings have chance to spawn from bush
+[] # add elite mobs
+[] ### add resource UI (furnace, item upgrade station)
+[] add cursor tile highlight/world tooltip
 
 ## Projectile/Magic ideas
 

@@ -235,7 +235,11 @@ impl GenerationPlugin {
                             return false;
                         }
                     }
-                    let tile = game.get_tile_data(tp.0).unwrap().block_type;
+                    let tile = if let Some(tile_data) = game.get_tile_data(tp.0) {
+                        tile_data.block_type
+                    } else {
+                        return false;
+                    };
                     let filter = game
                         .world_generation_params
                         .obj_allowed_tiles_map

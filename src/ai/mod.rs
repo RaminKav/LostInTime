@@ -1,6 +1,6 @@
 mod enemy_hostile_basic;
 
-use crate::{CoreGameSet, Plugin};
+use crate::{CoreGameSet, GameState, Plugin};
 
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;
@@ -18,8 +18,7 @@ impl Plugin for AIPlugin {
                 tick_enemy_attack_cooldowns,
                 idle,
             )
-                .in_set(CoreGameSet::Main)
-                .in_schedule(CoreSchedule::FixedUpdate),
+                .in_set(OnUpdate(GameState::Main)),
         );
     }
 }

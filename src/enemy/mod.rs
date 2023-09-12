@@ -64,7 +64,9 @@ pub enum Mob {
     StingFly,
     Bushling,
 }
-#[derive(Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
+#[derive(
+    Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect, PartialEq, Eq,
+)]
 #[reflect(Schematic)]
 pub enum CombatAlignment {
     #[default]
@@ -72,6 +74,9 @@ pub enum CombatAlignment {
     Neutral,
     Hostile,
 }
+#[derive(Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect)]
+#[reflect(Schematic)]
+pub struct FollowSpeed(pub f32);
 
 pub struct EnemySpawnEvent {
     pub enemy: Mob,
@@ -103,13 +108,16 @@ impl EnemyPlugin {
                 Entity,
                 &Mob,
                 &CombatAlignment,
+                &FollowSpeed,
                 Option<&LeapAttack>,
                 Option<&ProjectileAttack>,
             ),
             Added<Mob>,
         >,
     ) {
-        for (e, _mob, alignment, leap_attack_option, proj_attack_option) in spawn_events.iter() {
+        for (e, _mob, alignment, follow_speed, leap_attack_option, proj_attack_option) in
+            spawn_events.iter()
+        {
             let mut e_cmds = commands.entity(e);
             let mut state_machine = StateMachine::default().set_trans_logging(false);
             match alignment {
@@ -119,7 +127,7 @@ impl EnemyPlugin {
                             HurtByPlayer,
                             FollowState {
                                 target: game.game.player,
-                                speed: 0.7,
+                                speed: follow_speed.0,
                             },
                         )
                         .trans::<FollowState>(
@@ -143,7 +151,7 @@ impl EnemyPlugin {
                             },
                             FollowState {
                                 target: game.game.player,
-                                speed: 0.7,
+                                speed: follow_speed.0,
                             },
                         )
                         .trans::<FollowState>(
@@ -187,11 +195,11 @@ impl EnemyPlugin {
                     .trans::<LeapAttackState>(
                         Trigger::not(AttackDistance {
                             target: game.game.player,
-                            range: leap_attack.activation_distance,
+                            range: leap_attack.activation_distance + 32.,
                         }),
                         FollowState {
                             target: game.game.player,
-                            speed: 0.7,
+                            speed: follow_speed.0,
                         },
                     );
             }
@@ -220,7 +228,7 @@ impl EnemyPlugin {
                         }),
                         FollowState {
                             target: game.game.player,
-                            speed: 1.,
+                            speed: follow_speed.0,
                         },
                     );
                 if let Some(leap_attack) = leap_attack_option {
@@ -231,18 +239,20 @@ impl EnemyPlugin {
                         },
                         FollowState {
                             target: game.game.player,
-                            speed: 0.7,
+                            speed: follow_speed.0,
                         },
                     );
                 }
             }
-            state_machine = state_machine.trans::<IdleState>(
-                NightTimeAggro,
-                FollowState {
-                    target: game.game.player,
-                    speed: 0.7,
-                },
-            );
+            if alignment != &CombatAlignment::Passive {
+                state_machine = state_machine.trans::<IdleState>(
+                    NightTimeAggro,
+                    FollowState {
+                        target: game.game.player,
+                        speed: follow_speed.0,
+                    },
+                );
+            }
             e_cmds.insert(state_machine);
         }
     }

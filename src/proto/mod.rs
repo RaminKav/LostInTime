@@ -30,7 +30,7 @@ use crate::{
         Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
         RawItemBonusAttributes,
     },
-    enemy::{CombatAlignment, EnemyMaterial, LeapAttack, Mob, ProjectileAttack},
+    enemy::{CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack, Mob, ProjectileAttack},
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
@@ -96,6 +96,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<FoliageSize>()
             .register_type::<ArcProjectileData>()
             .register_type::<ColliderProto>()
+            .register_type::<FollowSpeed>()
             .register_type::<ColliderCapsulProto>()
             .register_type::<EquipmentType>()
             .register_type::<ItemRarity>()

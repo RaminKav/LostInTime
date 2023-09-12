@@ -21,7 +21,7 @@ use crate::{
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
     custom_commands::CommandsExt,
-    inputs::{FacingDirection, InputsPlugin, MovementVector},
+    inputs::{move_player, FacingDirection, InputsPlugin, MovementVector},
     inventory::{Container, Inventory, InventoryItemStack, ItemStack, INVENTORY_SIZE},
     item::{EquipmentData, WorldObject},
     proto::proto_param::ProtoParam,
@@ -99,16 +99,11 @@ impl Plugin for PlayerPlugin {
             spawn_particles_when_leveling,
             give_player_starting_items.in_schedule(OnEnter(GameState::Main)),
         ))
-        .add_system(
-            handle_move_player
-                .in_set(CoreGameSet::Main)
-                .in_schedule(CoreSchedule::FixedUpdate),
-        )
+        .add_system(handle_move_player.in_set(OnUpdate(GameState::Main)))
         .add_system(
             handle_player_raw_position
-                .before(InputsPlugin::move_player)
-                .in_set(CoreGameSet::Main)
-                .in_schedule(CoreSchedule::FixedUpdate),
+                .before(move_player)
+                .in_set(OnUpdate(GameState::Main)),
         );
     }
 }
@@ -131,26 +126,23 @@ pub fn handle_move_player(
 /// Updates the player's [RawPosition] based on the [KinematicCharacterControllerOutput]
 /// we store the un-rounded raw position, and then round the [Transform] position.
 pub fn handle_player_raw_position(
-    mut player_pos: Query<
-        (
-            &mut RawPosition,
-            &mut Transform,
-            &KinematicCharacterControllerOutput,
-        ),
+    mut player_pos: Query<(&mut RawPosition, &mut Transform), With<Player>>,
+    kcc: Query<
+        &KinematicCharacterControllerOutput,
         (With<Player>, Changed<KinematicCharacterControllerOutput>),
     >,
     mut game: GameParam,
 ) {
-    let Ok((mut raw_pos, mut pos, kcc)) = player_pos.get_single_mut() else {
-        return;
+    let (mut raw_pos, mut pos) = player_pos.single_mut();
+    if let Ok(kcc) = kcc.get_single() {
+        raw_pos.0 += kcc.effective_translation;
     };
-    raw_pos.0 += kcc.effective_translation;
 
     let delta = raw_pos.0 - pos.translation.truncate();
-
     pos.translation.x += delta.x;
     pos.translation.y += delta.y;
-    pos.translation = pos.translation.round();
+    pos.translation.x = pos.translation.x.round();
+    pos.translation.y = pos.translation.y.round();
     game.player_mut().position = pos.translation;
 }
 
@@ -234,7 +226,7 @@ fn spawn_player(
             InvincibilityCooldown(1.),
             HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
             MovementVector::default(),
-            YSort(0.),
+            YSort(0.001),
             Name::new("Player"),
             Collider::capsule(Vec2::new(0., -4.0), Vec2::new(0., -4.5), 5.),
             KinematicCharacterController {
@@ -271,4 +263,5 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::LargePotion, &proto, Vec2::ZERO, 64);
 }
