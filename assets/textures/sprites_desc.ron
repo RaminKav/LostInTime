@@ -15,8 +15,43 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Pants: WorldObjectData(
+        MetalPants: WorldObjectData(
             texture_pos: (0., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MetalShoes: WorldObjectData(
+            texture_pos: (0., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LeatherTunic: WorldObjectData(
+            texture_pos: (1., 1.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LeatherPants: WorldObjectData(
+            texture_pos: (1., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LeatherShoes: WorldObjectData(
+            texture_pos: (1., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ForestShirt: WorldObjectData(
+            texture_pos: (2., 1.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ForestPants: WorldObjectData(
+            texture_pos: (2., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ForestShoes: WorldObjectData(
+            texture_pos: (2., 3.),
             size: (16., 16.),
             anchor: None,
         ),

@@ -9,7 +9,7 @@
         obj_type: CookedMeat,
         metadata: (
             name: "Cooked Meat", 
-            desc: "Crunchy!"
+            desc: ["Crunchy!"]
         ),
         count: 1
   ),

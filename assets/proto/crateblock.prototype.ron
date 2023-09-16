@@ -9,7 +9,7 @@
         obj_type: CrateBlock,
         metadata: (
             name: "Crate", 
-            desc: "crate."
+            desc: ["crate."]
         ),
         count: 1
   ),

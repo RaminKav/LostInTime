@@ -9,7 +9,7 @@
         obj_type: CraftingTableBlock,
         metadata: (
             name: "Crafting Table", 
-            desc: "Stores items."
+            desc: ["Stores items."]
         ),
         count: 1
   ),

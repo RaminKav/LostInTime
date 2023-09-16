@@ -10,7 +10,7 @@
         obj_type: Log,
         metadata: (
             name: "Log", 
-            desc: "A Long Log."
+            desc: ["A Long Log."]
         ),
         count: 1
   ),

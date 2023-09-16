@@ -9,7 +9,7 @@
         obj_type: DungeonEntranceBlock,
         metadata: (
             name: "Dungeon Entrance", 
-            desc: "spooky."
+            desc: ["spooky."]
         ),
         count: 1
   ),

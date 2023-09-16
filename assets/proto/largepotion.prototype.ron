@@ -3,14 +3,14 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": LargePotion,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyHealth(25)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyHealth(35)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: LargePotion,
         rarity: Uncommon,
         metadata: (
             name: "Large Potion", 
-            desc: "Heals 25 health."
+            desc: ["Heals 35 health."]
         ),
         count: 1
   ),

@@ -7,7 +7,7 @@
         obj_type: SlimeGoo,
         metadata: (
             name: "Slime Goo", 
-            desc: "A glob of Slime Goo."
+            desc: ["A glob of Slime Goo."]
         ),
         count: 1
   ),

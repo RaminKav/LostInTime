@@ -9,7 +9,7 @@
         obj_type: FurnaceBlock,
         metadata: (
             name: "Furnace", 
-            desc: "Stores items."
+            desc: ["Stores items."]
         ),
         count: 1
   ),

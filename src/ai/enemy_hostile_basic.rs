@@ -222,8 +222,8 @@ pub fn leap_attack(
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
         let hit = false;
-        //attack.attack_startup_timer.finished() &&  also u gotta reset the timer
-        if !attack.attack_duration_timer.finished() {
+
+        if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
                 attack.dir = Some(

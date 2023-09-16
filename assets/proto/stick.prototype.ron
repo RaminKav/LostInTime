@@ -7,7 +7,7 @@
         obj_type: Stick,
         metadata: (
             name: "Stick", 
-            desc: "A Stick."
+            desc: ["A Stick."]
         ),
         count: 1
   ),

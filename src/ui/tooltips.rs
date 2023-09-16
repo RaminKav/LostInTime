@@ -14,7 +14,7 @@ use crate::{
 use super::{
     stats_ui::StatsUI, InventorySlotState, InventoryUI, ShowInvPlayerStatsEvent,
     ToolTipUpdateEvent, UIElement, UIState, CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE,
-    INVENTORY_UI_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -40,6 +40,7 @@ pub fn handle_spawn_inv_item_tooltip(
             UIState::Inventory => INVENTORY_UI_SIZE,
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
+            UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
             _ => unreachable!(),
         };
         let attributes = item.item_stack.attributes.get_tooltips();
@@ -76,14 +77,19 @@ pub fn handle_spawn_inv_item_tooltip(
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
         // tooltip_text.push(item.item_stack.metadata.desc.clone());
-        for (_i, a) in attributes.iter().enumerate().clone() {
+        for a in attributes.iter().clone() {
             tooltip_text.push((a.to_string(), 0.));
         }
+
         if has_attributes {
             tooltip_text.push((
                 durability.clone(),
                 size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
             ));
+        } else {
+            for desc_string in item.item_stack.metadata.desc.iter().clone() {
+                tooltip_text.push((desc_string.to_string(), 0.));
+            }
         }
 
         for (i, (text, d)) in tooltip_text.iter().enumerate() {

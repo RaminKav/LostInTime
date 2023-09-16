@@ -1,0 +1,35 @@
+(
+  name: "LeatherShoes",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": LeatherShoes,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        health: Some((start: 2, end: 6)),
+        defence: Some((start: 2, end: 6)),
+  ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+        crit_damage: Some((start: 2, end: 20)),
+        crit_chance: Some((start: 4, end: 10)),
+        healing: Some((start: 8, end: 20)),
+        bonus_damage: Some((start: 1, end: 5)),
+        speed: Some((start: 4, end: 10)),
+        health_regen: Some((start: 1, end: 4)),
+        thorns: Some((start: 4, end: 10)),
+        dodge: Some((start: 1, end: 11)),
+      //   xp_rate: Some((start: 4, end: 10)),
+        loot_rate: Some((start: 4, end: 10)),
+  ),
+  "survival_rogue_like::item::EquipmentType": Feet,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: LeatherShoes,
+        attributes: (
+            max_durability: 100,
+        ),
+        metadata: (
+            name: "Leather Shoes", 
+            desc: ["Nice."]
+        ),
+        count: 1
+  ),
+  }
+)

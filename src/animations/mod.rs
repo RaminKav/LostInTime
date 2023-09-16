@@ -13,13 +13,15 @@ use interpolation::lerp;
 
 use crate::ai::LeapAttackState;
 use crate::enemy::{EnemyMaterial, Mob};
-use crate::inputs::{mouse_click_system, FacingDirection, InputsPlugin, MovementVector};
+use crate::inputs::{
+    mouse_click_system, move_player, FacingDirection, InputsPlugin, MovementVector,
+};
 use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
-use crate::{CoreGameSet, GameParam, GameState, RawPosition};
+use crate::{CoreGameSet, CustomFlush, GameParam, GameState, RawPosition};
 
 use self::enemy_sprites::{
     animate_character_spritesheet_animations,
@@ -40,7 +42,7 @@ pub struct AnimationFrameTracker(pub i32, pub i32);
 #[derive(Component, Clone, Deref, DerefMut, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
 pub struct AnimationTimer(pub Timer);
-#[derive(Component, Clone)]
+#[derive(Component, Debug, Clone)]
 pub struct HitAnimationTracker {
     pub timer: Timer,
     pub knockback: f32,
@@ -207,8 +209,6 @@ fn animate_hit(
             if e == p_e {
                 let d = hit.dir * hit.knockback * time.delta_seconds();
                 kcc.translation = Some(d);
-
-                mv.0 = d;
             } else {
                 if let Ok(mut hit_t) = transforms.get_mut(e) {
                     hit_t.translation += hit.dir.extend(0.) * hit.knockback * time.delta_seconds();

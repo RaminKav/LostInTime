@@ -1,0 +1,36 @@
+(
+  name: "ForestPants",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ForestPants,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        health: Some((start: 2, end: 6)),
+        defence: Some((start: 2, end: 6)),
+        dodge: Some((start: 4, end: 14)),
+  ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+        crit_damage: Some((start: 8, end: 35)),
+        crit_chance: Some((start: 5, end: 11)),
+        healing: Some((start: 2, end: 5)),
+        bonus_damage: Some((start: 1, end: 2)),
+        speed: Some((start: 4, end: 15)),
+        health_regen: Some((start: 1, end: 2)),
+        thorns: Some((start: 4, end: 13)),
+        
+      //   xp_rate: Some((start: 4, end: 10)),
+        loot_rate: Some((start: 4, end: 10)),
+  ),
+  "survival_rogue_like::item::EquipmentType": Legs,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ForestPants,
+        attributes: (
+            max_durability: 100,
+        ),
+        metadata: (
+            name: "Forest Pants", 
+            desc: ["Nice."]
+        ),
+        count: 1
+  ),
+  }
+)

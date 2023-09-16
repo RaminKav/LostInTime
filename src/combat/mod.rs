@@ -10,6 +10,7 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
     custom_commands::CommandsExt,
+    enemy::Mob,
     item::{
         projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
         RequiredEquipmentType, WorldObject,
@@ -172,10 +173,14 @@ fn spawn_hit_spark_effect(
     transforms: Query<&GlobalTransform>,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    is_mob: Query<&Mob>,
 ) {
     // add spark animation entity as child, will animate once and remove itself.
     for hit in hit_events.iter() {
         if hit.hit_entity == game.player {
+            continue;
+        }
+        if is_mob.get(hit.hit_entity).is_ok() {
             continue;
         }
         let texture_handle = asset_server.load("textures/effects/hit-particles.png");

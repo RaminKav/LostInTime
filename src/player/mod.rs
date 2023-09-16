@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::prelude::ProtoCommands;
+use bevy_proto::{backend::proto, prelude::ProtoCommands};
 use bevy_rapier2d::prelude::{
     ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
     KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
@@ -23,7 +23,7 @@ use crate::{
     custom_commands::CommandsExt,
     inputs::{move_player, FacingDirection, InputsPlugin, MovementVector},
     inventory::{Container, Inventory, InventoryItemStack, ItemStack, INVENTORY_SIZE},
-    item::{EquipmentData, WorldObject},
+    item::{get_crafting_inventory_item_stacks, EquipmentData, RecipeList, Recipes, WorldObject},
     proto::proto_param::ProtoParam,
     world::{y_sort::YSort, CHUNK_SIZE},
     AppExt, CoreGameSet, Game, GameParam, GameState, RawPosition,
@@ -95,6 +95,7 @@ impl Plugin for PlayerPlugin {
         .add_startup_system(spawn_player)
         .add_systems((
             send_attribute_event_on_stats_update,
+            load_recipes_into_inventory_container_on_startup.run_if(resource_changed::<Recipes>()),
             handle_level_up,
             spawn_particles_when_leveling,
             give_player_starting_items.in_schedule(OnEnter(GameState::Main)),
@@ -145,13 +146,36 @@ pub fn handle_player_raw_position(
     pos.translation.y = pos.translation.y.round();
     game.player_mut().position = pos.translation;
 }
-
+fn load_recipes_into_inventory_container_on_startup(
+    mut added_inv: Query<&mut Inventory>,
+    recipes: Res<Recipes>,
+    proto: ProtoParam,
+) {
+    if recipes.recipes_list.len() == 0 {
+        return;
+    }
+    for mut inv in added_inv.iter_mut() {
+        inv.crafting_items = Container {
+            items: get_crafting_inventory_item_stacks(
+                vec![
+                    WorldObject::String,
+                    WorldObject::Log,
+                    WorldObject::StoneChunk,
+                    WorldObject::WoodAxe,
+                    WorldObject::CraftingTableBlock,
+                ],
+                &recipes,
+                &proto,
+            ),
+            ..default()
+        };
+    }
+}
 fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut game: ResMut<Game>,
-    _images: ResMut<Assets<Image>>,
 ) {
     //spawn player entity with limb spritesheets as children
     let player_texture_handle = asset_server.load("textures/player/player_down.png");
@@ -166,41 +190,13 @@ fn spawn_player(
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..default()
             },
-            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            AnimationTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
-                crafting_items: Container {
-                    items: vec![
-                        Some(InventoryItemStack::new(
-                            ItemStack {
-                                obj_type: WorldObject::String,
-                                count: 1,
-                                ..default()
-                            },
-                            0,
-                        )),
-                        Some(InventoryItemStack::new(
-                            ItemStack {
-                                obj_type: WorldObject::WoodAxe,
-                                count: 1,
-                                ..default()
-                            },
-                            1,
-                        )),
-                        Some(InventoryItemStack::new(
-                            ItemStack {
-                                obj_type: WorldObject::CraftingTableBlock,
-                                count: 1,
-                                ..default()
-                            },
-                            1,
-                        )),
-                    ],
-                    ..default()
-                },
                 equipment_items: Container::with_size(4),
                 accessory_items: Container::with_size(4),
+                ..default()
             },
             //TODO: remove itematt and construct from components?
             ItemAttributes {
@@ -255,7 +251,7 @@ fn spawn_player(
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64);
@@ -264,4 +260,8 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::LargePotion, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::Leather, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::Feather, &proto, Vec2::ZERO, 64);
 }

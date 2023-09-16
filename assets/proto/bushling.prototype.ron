@@ -4,9 +4,9 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": Bushling,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
-    "survival_rogue_like::enemy::FollowSpeed": (1.05),
+    "survival_rogue_like::enemy::FollowSpeed": (0.50),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 64., duration: 0.3, cooldown: 2., speed: 64.),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 64., startup: 0.2, duration: 0.3, cooldown: 1.8, speed: 75.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/bushling/bushling_down.png", size: (x: 38., y: 38.), cols: 9, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
@@ -106,7 +106,7 @@
                 rate: 0.009
             ),
             (
-                item: Pants,
+                item: MetalPants,
                 min: 1,
                 max: 1,
                 rate: 0.009

@@ -27,7 +27,7 @@
         ),
         metadata: (
             name: "Dual Staff", 
-            desc: "A double sided staff."
+            desc: ["A double sided staff."]
         ),
         count: 1
   ),

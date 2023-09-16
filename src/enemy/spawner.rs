@@ -8,6 +8,7 @@ use rand::{seq::SliceRandom, Rng};
 use crate::{
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
+    item::WorldObject,
     night::NightTracker,
     proto::proto_param::ProtoParam,
     world::{
@@ -18,9 +19,10 @@ use crate::{
     GameParam, GameState,
 };
 
-use super::Mob;
+use super::{CombatAlignment, EliteMob, Mob};
 
 pub const MAX_MOB_PER_CHUNK: i32 = 6;
+pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
@@ -118,6 +120,7 @@ fn add_spawners_to_new_chunks(
 fn handle_spawn_mobs(
     mut game: GameParam,
     mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     prototypes: Prototypes,
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
@@ -163,8 +166,15 @@ fn handle_spawn_mobs(
             }
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
-            if let Some(_existing_object) =
-                game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos), &proto_param)
+            let tile_pos = world_pos_to_tile_pos(pos);
+            if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+                return;
+            }
+            if game
+                .get_tile_data(tile_pos)
+                .expect("spawned mob but tile does not exist?")
+                .block_type
+                .contains(&WorldObject::WaterTile)
             {
                 return;
             }
@@ -174,7 +184,18 @@ fn handle_spawn_mobs(
                 .unwrap()
                 .2
                 .spawned_mobs += 1;
-            proto_commands.spawn_from_proto(mob, &prototypes, pos);
+            if let Some(spawned_mob) =
+                proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
+            {
+                if rng.gen::<f32>() < ELITE_SPAWN_RATE
+                    && !(proto_param
+                        .get_component::<CombatAlignment, _>(mob)
+                        .expect("mob has no alignment")
+                        == &CombatAlignment::Passive)
+                {
+                    commands.entity(spawned_mob).insert(EliteMob);
+                }
+            }
         }
     }
 }

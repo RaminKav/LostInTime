@@ -16,7 +16,8 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestInventory, InventorySlotState, InventoryState, PlayerStatsTooltip,
+    ChestInventory, FurnaceContainer, InventorySlotState, InventoryState, PlayerStatsTooltip,
+    UIContainersParam,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -37,6 +38,7 @@ pub enum UIElement {
     StatsButton,
     StatsButtonHover,
     PlayerHUDBars,
+    EliteStar,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -174,15 +176,15 @@ pub fn handle_drop_on_slot_events(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
-    mut chest_option: Option<ResMut<ChestInventory>>,
-    craft_tracker: Res<CraftingTracker>,
+    mut cont_param: UIContainersParam,
 ) {
     for drop_event in events.iter() {
         // all we need to do here is swap spots in the inventory
         let no_more_dragging: bool;
         let slot_type = drop_event.drop_target_slot_state.r#type;
         let return_item = if slot_type.is_crafting()
-            && craft_tracker
+            && cont_param
+                .crafting_tracker
                 .craftable
                 .contains(&drop_event.dropped_item_stack.obj_type)
         {
@@ -196,8 +198,10 @@ pub fn handle_drop_on_slot_events(
                 continue;
             }
             let mut inv = inv.single_mut();
-            let container = if slot_type == InventorySlotType::Chest {
-                &mut chest_option.as_mut().unwrap().items
+            let container = if slot_type.is_chest() {
+                &mut cont_param.chest_option.as_mut().unwrap().items
+            } else if slot_type.is_furnace() {
+                &mut cont_param.furnace_option.as_mut().unwrap().items
             } else {
                 inv.get_mut_items_from_slot_type(slot_type)
             };
@@ -291,6 +295,7 @@ pub fn handle_hovering(
     inv: Query<&Inventory>,
     chest_option: Option<Res<ChestInventory>>,
     crafting_option: Option<Res<CraftingContainer>>,
+    furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     // iter all interactables, find ones in hover state.
@@ -315,6 +320,11 @@ pub fn handle_hovering(
                 if let Some(_item_e) = state.item {
                     let item = if state.r#type.is_chest() {
                         chest_option.as_ref().unwrap().items.items[state.slot_index]
+                            .clone()
+                            .unwrap()
+                            .item_stack
+                    } else if state.r#type.is_furnace() {
+                        furnace_option.as_ref().unwrap().items.items[state.slot_index]
                             .clone()
                             .unwrap()
                             .item_stack
@@ -489,11 +499,9 @@ pub fn handle_interaction_clicks(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
-    mut chest_option: Option<ResMut<ChestInventory>>,
     mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
+    mut container_param: UIContainersParam,
     proto: ProtoParam,
-    craft_tracker: Res<CraftingTracker>,
-    mut crafted_event: EventWriter<CraftedItemEvent>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -517,7 +525,10 @@ pub fn handle_interaction_clicks(
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
                                 if state.r#type.is_crafting()
-                                    && !craft_tracker.craftable.contains(&item_icon.2.obj_type)
+                                    && !container_param
+                                        .crafting_tracker
+                                        .craftable
+                                        .contains(&item_icon.2.obj_type)
                                 {
                                     continue;
                                 }
@@ -534,7 +545,9 @@ pub fn handle_interaction_clicks(
                                 interactable.change(Interaction::Dragging { item: item_icon.0 });
                                 let mut inv = inv.single_mut();
                                 let container_items = if state.r#type.is_chest() {
-                                    &mut chest_option.as_mut().unwrap().items
+                                    &mut container_param.chest_option.as_mut().unwrap().items
+                                } else if state.r#type.is_furnace() {
+                                    &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
                                     inv.get_mut_items_from_slot_type(state.r#type)
                                 };
@@ -546,7 +559,7 @@ pub fn handle_interaction_clicks(
                                             &proto,
                                         ),
                                     );
-                                    crafted_event.send(CraftedItemEvent {
+                                    container_param.crafted_event.send(CraftedItemEvent {
                                         obj: state.obj_type.unwrap(),
                                     });
                                 } else {
@@ -564,8 +577,10 @@ pub fn handle_interaction_clicks(
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
                                 let mut inv = inv.single_mut();
-                                let container = if state.r#type == InventorySlotType::Chest {
-                                    &mut chest_option.as_mut().unwrap().items
+                                let container = if state.r#type.is_chest() {
+                                    &mut container_param.chest_option.as_mut().unwrap().items
+                                } else if state.r#type.is_furnace() {
+                                    &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
                                     inv.get_mut_items_from_slot_type(state.r#type)
                                 };

@@ -23,11 +23,11 @@
         obj_type: WoodSword,
         attributes: (
             max_durability: 300,
-            attack_cooldown: 0.4
+            attack_cooldown: 0.65
         ),
         metadata: (
             name: "WoodSword", 
-            desc: "A wood sword."
+            desc: ["A wood sword."]
         ),
         count: 1
   ),

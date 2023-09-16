@@ -139,7 +139,7 @@ pub struct EquipmentData {
 #[reflect(Schematic)]
 pub struct ItemDisplayMetaData {
     pub name: String,
-    pub desc: String,
+    pub desc: Vec<String>,
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -183,7 +183,14 @@ pub enum WorldObject {
     BasicStaff,
     FireStaff,
     Chestplate,
-    Pants,
+    MetalPants,
+    MetalShoes,
+    LeatherTunic,
+    LeatherPants,
+    LeatherShoes,
+    ForestShirt,
+    ForestPants,
+    ForestShoes,
     DualStaff,
     Dagger,
     Fireball,
@@ -421,7 +428,7 @@ impl WorldObject {
             .insert(attributes)
             .insert(ItemDisplayMetaData {
                 name: self.to_string(),
-                desc: "A cool piece of Equipment".to_string(),
+                desc: vec!["A cool piece of Equipment".to_string()],
             })
             .insert(Equipment(Limb::Hands))
             .insert(YSort(0.))

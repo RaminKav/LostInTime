@@ -12,11 +12,11 @@
         obj_type: WoodAxe,
         attributes: (
             max_durability: 100,
-            attack_cooldown: 0.4
+            attack_cooldown: 0.8
         ),
         metadata: (
             name: "Wood Axe", 
-            desc: "A rusty Wood Axe."
+            desc: ["A rusty Wood Axe."]
         ),
         count: 1
   ),

@@ -9,7 +9,7 @@
         obj_type: Bandage,
         metadata: (
             name: "Bandage", 
-            desc: "Heals 35 health."
+            desc: ["Heals 35 health."]
         ),
         count: 1
   ),

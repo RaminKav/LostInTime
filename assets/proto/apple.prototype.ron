@@ -9,7 +9,7 @@
         obj_type: Apple,
         metadata: (
             name: "Apple", 
-            desc: "Crunchy!"
+            desc: ["Crunchy!"]
         ),
         count: 1
   ),

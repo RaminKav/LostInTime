@@ -3,13 +3,13 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": SmallPotion,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyHealth(10)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyHealth(20)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: SmallPotion,
         metadata: (
             name: "Small Potion", 
-            desc: "Heals 10 health."
+            desc: ["Heals 20 health."]
         ),
         count: 1
   ),

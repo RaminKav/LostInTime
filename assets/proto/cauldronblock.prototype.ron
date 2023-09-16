@@ -9,7 +9,7 @@
         obj_type: CauldronBlock,
         metadata: (
             name: "Cauldron", 
-            desc: "Stores items."
+            desc: ["Stores items."]
         ),
         count: 1
   ),

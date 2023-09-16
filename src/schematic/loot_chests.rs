@@ -61,7 +61,7 @@ pub fn handle_new_loot_chest_spawn(
                     Loot::new(WorldObject::BasicStaff, 1, 1, 0.05),
                     Loot::new(WorldObject::FireStaff, 1, 1, 0.05),
                     Loot::new(WorldObject::Chestplate, 1, 1, 0.05),
-                    Loot::new(WorldObject::Pants, 1, 1, 0.05),
+                    Loot::new(WorldObject::MetalPants, 1, 1, 0.05),
                     Loot::new(WorldObject::Dagger, 1, 1, 0.05),
                     Loot::new(WorldObject::Ring, 1, 1, 0.05),
                     Loot::new(WorldObject::Pendant, 1, 1, 0.05),
@@ -86,7 +86,7 @@ pub fn handle_new_loot_chest_spawn(
                     Loot::new(WorldObject::BasicStaff, 1, 1, 0.15),
                     Loot::new(WorldObject::FireStaff, 1, 1, 0.15),
                     Loot::new(WorldObject::Chestplate, 1, 1, 0.15),
-                    Loot::new(WorldObject::Pants, 1, 1, 0.15),
+                    Loot::new(WorldObject::MetalPants, 1, 1, 0.15),
                     Loot::new(WorldObject::Dagger, 1, 1, 0.15),
                     Loot::new(WorldObject::Ring, 1, 1, 0.15),
                     Loot::new(WorldObject::Pendant, 1, 1, 0.15),
@@ -124,7 +124,9 @@ pub fn create_new_random_item_stack_with_attributes(
     stack: &ItemStack,
     proto: &ProtoParam,
 ) -> ItemStack {
-    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {return stack.clone()};
+    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
+        return stack.clone();
+    };
     let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
     let raw_base_att = proto
         .get_component::<RawItemBaseAttributes, _>(stack.obj_type)

@@ -55,7 +55,7 @@ pub struct CursorPos {
     pub ui_coords: Vec3,
 }
 
-#[derive(Component, Default)]
+#[derive(Component, Debug, Default)]
 pub struct MovementVector(pub Vec2);
 
 #[derive(Debug, Clone, PartialEq, Component, Eq, Default, Schematic, FromReflect, Reflect)]
@@ -210,6 +210,10 @@ pub fn move_player(
     let (player_e, mut player_kcc, mut mv, curr_anim, anim_state, sprite, speed, hunger) =
         player_query.single_mut();
     let player = game.player_mut();
+    if player.is_attacking {
+        mv.0 = Vec2::ZERO;
+        return;
+    }
     let mut d = Vec2::ZERO;
     let s = PLAYER_MOVE_SPEED
         * time.delta_seconds()
@@ -300,8 +304,6 @@ pub fn move_player(
         {
             commands.entity(player_e).insert(EnemyAnimationState::Idle);
         }
-
-        player_kcc.translation = Some(Vec2::ZERO);
     }
 }
 pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
