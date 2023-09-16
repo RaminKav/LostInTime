@@ -10,8 +10,9 @@ use crate::{
 };
 
 use super::{
-    crafting_ui::CraftingContainer, interactions::Interaction, stats_ui::StatsUI, Interactable,
-    ShowInvPlayerStatsEvent, UIElement, CRAFTING_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
+    crafting_ui::CraftingContainer, interactions::Interaction, stats_ui::StatsUI, FurnaceContainer,
+    Interactable, ShowInvPlayerStatsEvent, UIContainersParam, UIElement,
+    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
@@ -23,6 +24,7 @@ pub enum UIState {
     Chest,
     Stats,
     Crafting,
+    Furnace,
 }
 
 #[derive(Component, Default, Clone)]
@@ -51,10 +53,14 @@ pub enum InventorySlotType {
     Equipment,
     Accessory,
     Chest,
+    Furnace,
 }
 impl InventorySlotType {
     pub fn is_crafting(self) -> bool {
         self == InventorySlotType::Crafting
+    }
+    pub fn is_furnace(self) -> bool {
+        self == InventorySlotType::Furnace
     }
     pub fn is_hotbar(self) -> bool {
         self == InventorySlotType::Hotbar
@@ -104,6 +110,17 @@ pub fn setup_inv_ui(
         ),
         UIState::Crafting => (
             CRAFTING_INVENTORY_UI_SIZE,
+            graphics
+                .ui_image_handles
+                .as_ref()
+                .unwrap()
+                .get(&UIElement::ChestInventory)
+                .unwrap()
+                .clone(),
+            Vec2::new(22.5, 0.),
+        ),
+        UIState::Furnace => (
+            FURNACE_INVENTORY_UI_SIZE,
             graphics
                 .ui_image_handles
                 .as_ref()
@@ -177,6 +194,7 @@ pub fn setup_inv_slots_ui(
         UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
         UIState::Crafting => (false, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
+        UIState::Furnace => (false, None),
         _ => return,
     };
     for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
@@ -255,7 +273,8 @@ pub fn toggle_inv_visibility(
     if !inv_state.open
         && (curr_inv_state.0 == UIState::Inventory
             || curr_inv_state.0 == UIState::Chest
-            || curr_inv_state.0 == UIState::Crafting)
+            || curr_inv_state.0 == UIState::Crafting
+            || curr_inv_state.0 == UIState::Furnace)
     {
         next_inv_state.set(UIState::Closed);
         if let Ok(e) = inv_query.get_single() {
@@ -266,6 +285,7 @@ pub fn toggle_inv_visibility(
                 commands.remove_resource::<ChestInventory>();
             }
             commands.remove_resource::<CraftingContainer>();
+            commands.remove_resource::<FurnaceContainer>();
             commands.entity(e).despawn_recursive();
         }
     } else if inv_state.open
@@ -321,11 +341,13 @@ pub fn spawn_inv_slot(
     if slot_type.is_hotbar() {
         y = -GAME_HEIGHT / 2. + 14.;
         x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
-    } else if slot_type.is_crafting() {
-        x = (slot_index as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
+    } else if slot_type.is_crafting() || slot_type.is_furnace() {
+        x = ((slot_index % 8) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
             + UI_SLOT_SIZE / 2.
             + 4.;
-        y = -(inv_state.inv_size.y + UI_SLOT_SIZE) / 2. + 6. * UI_SLOT_SIZE + 10.;
+        y = -((slot_index / 8) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
+            + 6. * UI_SLOT_SIZE
+            + 0.;
     } else if slot_type.is_equipment() {
         x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 7. + 5. * UI_SLOT_SIZE;
         y = slot_index as f32 * UI_SLOT_SIZE - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
@@ -497,8 +519,7 @@ pub fn update_inventory_ui(
     inv_query: Query<Entity, With<InventoryUI>>,
     asset_server: Res<AssetServer>,
     inv: Query<&mut Inventory>,
-    chest_option: Option<Res<ChestInventory>>,
-    crafting_option: Option<Res<CraftingContainer>>,
+    cont_param: UIContainersParam,
 ) {
     for (e, slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
@@ -512,9 +533,11 @@ pub fn update_inventory_ui(
 
         let interactable_option = interactables.get(e);
         let item_option = if slot_state.r#type.is_chest() {
-            chest_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
-        } else if slot_state.r#type.is_crafting() && crafting_option.is_some() {
-            crafting_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+            cont_param.chest_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+        } else if slot_state.r#type.is_furnace() {
+            cont_param.furnace_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+        } else if slot_state.r#type.is_crafting() && cont_param.crafting_option.is_some() {
+            cont_param.crafting_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else {
             inv.single()
                 .get_items_from_slot_type(slot_state.r#type)
@@ -566,8 +589,7 @@ pub fn handle_update_inv_item_entities(
                 let item = inv_item.item_stack.clone();
                 for slot_state in inv_slot_state.iter_mut() {
                     if slot_state.slot_index == inv_item.slot
-                        && (slot_state.r#type == InventorySlotType::Normal
-                            || slot_state.r#type == InventorySlotType::Hotbar)
+                        && (slot_state.r#type.is_normal() || slot_state.r#type.is_hotbar())
                     {
                         if let Some(item_e) = slot_state.item {
                             commands.entity(item_e).insert(item.clone());

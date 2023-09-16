@@ -533,7 +533,7 @@ fn handle_player_item_attribute_change_events(
 }
 
 /// Adds a current health component to all entities with a max health component
-fn add_current_health_with_max_health(
+pub fn add_current_health_with_max_health(
     mut commands: Commands,
     mut health: Query<(Entity, &MaxHealth), (Changed<MaxHealth>, Without<CurrentHealth>)>,
 ) {

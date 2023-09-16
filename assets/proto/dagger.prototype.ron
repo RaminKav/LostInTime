@@ -27,7 +27,7 @@
         ),
         metadata: (
             name: "Dagger", 
-            desc: "A small dagger."
+            desc: ["A small dagger."]
         ),
         count: 1
   ),

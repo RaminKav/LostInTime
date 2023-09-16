@@ -7,7 +7,7 @@
         obj_type: WoodPlank,
         metadata: (
             name: "Wood Plank", 
-            desc: "Builds into a wood log."
+            desc: ["Builds into a wood log."]
         ),
         count: 1
   ),

@@ -23,11 +23,11 @@
         obj_type: Sword,
         attributes: (
             max_durability: 100,
-            attack_cooldown: 0.4
+            attack_cooldown: 0.65
         ),
         metadata: (
             name: "Sword", 
-            desc: "A rusty sword."
+            desc: ["A rusty sword."]
         ),
         count: 1
   ),

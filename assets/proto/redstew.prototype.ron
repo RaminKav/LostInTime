@@ -9,7 +9,7 @@
         obj_type: RedStew,
         metadata: (
             name: "Red Stew", 
-            desc: "Crunchy!"
+            desc: ["Crunchy!"]
         ),
         count: 1
   ),

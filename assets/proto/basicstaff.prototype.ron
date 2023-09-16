@@ -29,7 +29,7 @@
         ),
         metadata: (
             name: "Basic Staff", 
-            desc: "A basic staff."
+            desc: ["A basic staff."]
         ),
         count: 1
   ),

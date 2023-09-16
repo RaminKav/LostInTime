@@ -1,8 +1,11 @@
 pub mod chest_ui;
 pub mod crafting_ui;
 pub mod damage_numbers;
+pub mod ui_container_param;
+pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
+pub mod furnace_ui;
 mod interactions;
 mod inventory_ui;
 pub mod minimap;
@@ -13,6 +16,7 @@ mod ui_helpers;
 pub use chest_ui::*;
 pub use enemy_health_bar::*;
 use fps_text::*;
+pub use furnace_ui::*;
 pub use interactions::*;
 pub use inventory_ui::*;
 pub use player_hud::*;
@@ -40,6 +44,7 @@ pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
+pub const FURNACE_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const UI_SLOT_SIZE: f32 = 20.0;
 
 pub struct UIPlugin;
@@ -69,6 +74,9 @@ impl Plugin for UIPlugin {
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Crafting))),
+                setup_inv_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Furnace))),
             ))
             .add_systems(
                 (
@@ -85,6 +93,7 @@ impl Plugin for UIPlugin {
                     update_xp_bar,
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
+                    add_ui_icon_for_elite_mobs,
                     handle_add_damage_numbers_after_hit.after(handle_hits),
                     handle_add_dodge_text,
                     tick_damage_numbers,
@@ -118,6 +127,8 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     add_inv_to_new_chest_objs,
+                    add_container_to_new_furnace_objs,
+                    setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     update_foodbar,
                     update_mana_bar,
                     handle_spawn_inv_player_stats.after(CustomFlush),
@@ -129,6 +140,9 @@ impl Plugin for UIPlugin {
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<CraftingContainer>()),
+                    change_ui_state_to_furnace_when_resource_added
+                        .before(CustomFlush)
+                        .run_if(resource_added::<FurnaceContainer>()),
                     update_stats_text.run_if(in_state(UIState::Stats)),
                     update_sp_text.run_if(in_state(UIState::Stats)),
                 )

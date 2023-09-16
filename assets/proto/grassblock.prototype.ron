@@ -9,7 +9,7 @@
         obj_type: GrassBlock,
         metadata: (
             name: "Grass", 
-            desc: "grass."
+            desc: ["grass."]
         ),
         count: 1
   ),

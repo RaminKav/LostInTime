@@ -28,7 +28,7 @@
         ),
         metadata: (
             name: "Wood Bow", 
-            desc: "A wood bow."
+            desc: ["A wood bow."]
         ),
         count: 1
   ),

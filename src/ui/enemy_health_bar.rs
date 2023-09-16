@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 
 use crate::{
+    assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
     colors::{RED, YELLOW},
-    enemy::Mob,
+    enemy::{EliteMob, Mob},
 };
+
+use super::UIElement;
 #[derive(Component)]
 pub struct EnemyHealthBar;
 
@@ -55,7 +58,9 @@ pub fn handle_enemy_health_bar_change(
 ) {
     for (children, max_health, current_health) in query.iter_mut() {
         for child in children.iter() {
-            let Ok(mut bar_txfm) = query2.get_mut(*child) else {continue;};
+            let Ok(mut bar_txfm) = query2.get_mut(*child) else {
+                continue;
+            };
             bar_txfm.scale.x = current_health.0 as f32 / max_health.0 as f32 * BAR_SIZE;
             bar_txfm.translation.x = -BAR_SIZE / 2. + bar_txfm.scale.x / 2.;
         }
@@ -67,12 +72,43 @@ pub fn handle_enemy_health_visibility(
 ) {
     for (children, max_health, current_health) in query.iter_mut() {
         for child in children.iter() {
-            let Ok(mut v) = query2.get_mut(*child) else {continue;};
+            let Ok(mut v) = query2.get_mut(*child) else {
+                continue;
+            };
             if current_health.0 == max_health.0 {
                 *v = Visibility::Hidden;
             } else {
                 *v = Visibility::Inherited;
             }
         }
+    }
+}
+pub fn add_ui_icon_for_elite_mobs(
+    elites: Query<Entity, With<EliteMob>>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    for elite in elites.iter() {
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics
+                    .ui_image_handles
+                    .as_ref()
+                    .unwrap()
+                    .get(&UIElement::EliteStar)
+                    .unwrap()
+                    .clone(),
+                transform: Transform {
+                    translation: Vec3::new(0., 13., 0.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(5., 5.)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .set_parent(elite);
     }
 }

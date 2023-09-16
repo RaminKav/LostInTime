@@ -2,9 +2,15 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
-    inventory::{Inventory, InventoryPlugin},
+    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
-    ui::crafting_ui::CraftingContainerType,
+    proto::proto_param::ProtoParam,
+    schematic::loot_chests::create_new_random_item_stack_with_attributes,
+    ui::{
+        crafting_ui::CraftingContainerType,
+        ui_container_param::{self, UIContainersParam},
+        FurnaceContainer,
+    },
     GameState,
 };
 
@@ -15,7 +21,11 @@ impl Plugin for CraftingPlugin {
             .insert_resource(CraftingTracker::default())
             .add_event::<CraftedItemEvent>()
             .add_systems(
-                (handle_crafting_update_when_inv_changes, handle_crafted_item)
+                (
+                    handle_crafting_update_when_inv_changes,
+                    handle_crafted_item,
+                    handle_furnace_slot_update,
+                )
                     .in_set(OnUpdate(GameState::Main)),
             );
     }
@@ -111,6 +121,76 @@ pub fn handle_crafted_item(
                     });
                 }
             }
+        }
+    }
+}
+
+pub fn get_crafting_inventory_item_stacks(
+    objs: Vec<WorldObject>,
+    rec: &Recipes,
+    proto: &ProtoParam,
+) -> Vec<Option<InventoryItemStack>> {
+    let mut list = vec![];
+    for (slot, obj) in objs.iter().enumerate() {
+        println!("TRYING TO GET REC FOR {obj:?}");
+        let recipe = rec.recipes_list.get(&obj).expect("no recipe for item?");
+        let mut default_stack = proto.get_item_data(*obj).unwrap().clone();
+        let stack_count = recipe.2;
+        let desc = recipe
+            .0
+            .iter()
+            .map(|ingredient| {
+                format!(
+                    "{}x {}",
+                    ingredient.count,
+                    proto
+                        .get_item_data(ingredient.item.clone())
+                        .unwrap()
+                        .metadata
+                        .name
+                )
+            })
+            .collect();
+        default_stack.metadata.desc = desc;
+        list.push(Some(InventoryItemStack::new(
+            default_stack.copy_with_count(stack_count),
+            slot,
+        )));
+    }
+    list
+}
+
+pub fn handle_furnace_slot_update(
+    furnace_option: Option<ResMut<FurnaceContainer>>,
+    proto: ProtoParam,
+    time: Res<Time>,
+) {
+    if let Some(mut furnace) = furnace_option {
+        if furnace.timer.percent() == 0. {
+            if furnace.items.items[1].is_some() && furnace.items.items[0].is_some() {
+                let updated_fuel = furnace.items.items[0].as_mut().unwrap().modify_count(-1);
+                furnace.items.items[0] = updated_fuel;
+                furnace.timer.tick(time.delta());
+            }
+        } else {
+            furnace.timer.tick(time.delta());
+        }
+
+        if furnace.timer.just_finished() && furnace.items.items[1].is_some() {
+            let updated_result = if let Some(mut existing_result) = furnace.items.items[2].clone() {
+                existing_result.modify_count(1).unwrap()
+            } else {
+                InventoryItemStack::new(
+                    proto.get_item_data(WorldObject::MetalBar).unwrap().clone(),
+                    0,
+                )
+            };
+            furnace.items.items[2] = Some(updated_result);
+
+            let updated_resource = furnace.items.items[1].as_mut().unwrap().modify_count(-1);
+            furnace.items.items[1] = updated_resource;
+
+            furnace.timer.reset();
         }
     }
 }

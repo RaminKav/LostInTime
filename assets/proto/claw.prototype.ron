@@ -28,7 +28,7 @@
         ),
         metadata: (
             name: "Claw", 
-            desc: "A claw."
+            desc: ["A claw."]
         ),
         count: 1
   ),

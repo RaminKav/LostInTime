@@ -24,7 +24,7 @@
         ),
         metadata: (
             name: "Ring", 
-            desc: "shiny!"
+            desc: ["shiny!"]
         ),
         count: 1
   ),

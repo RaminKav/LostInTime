@@ -26,7 +26,7 @@ pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
 pub const MAX_STACK_SIZE: usize = 64;
 
-#[derive(Component, Debug, Clone)]
+#[derive(Component, Debug, Default, Clone)]
 pub struct Inventory {
     pub items: Container,
     pub equipment_items: Container,
@@ -217,7 +217,7 @@ impl InventoryItemStack {
                 obj_data.size.y / 1.5,
             ))
             .insert(AttackAnimationTimer(
-                Timer::from_seconds(0.125, TimerMode::Once),
+                Timer::from_seconds(0.18, TimerMode::Once),
                 0.,
             ));
         game.player_mut().main_hand_slot = Some(EquipmentData { obj, entity: item });

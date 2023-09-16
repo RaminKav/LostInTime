@@ -7,7 +7,7 @@
         obj_type: MetalBar,
         metadata: (
             name: "Metal Bar", 
-            desc: "A metal Bar."
+            desc: ["A metal Bar."]
         ),
         count: 1
   ),

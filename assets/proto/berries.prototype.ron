@@ -9,7 +9,7 @@
         obj_type: Berries,
         metadata: (
             name: "Berries", 
-            desc: "Crunchy!"
+            desc: ["Crunchy!"]
         ),
         count: 1
   ),

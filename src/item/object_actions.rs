@@ -1,3 +1,4 @@
+use super::get_crafting_inventory_item_stacks;
 use super::item_actions::ItemActionParam;
 
 use crate::inventory::{Container, InventoryItemStack};
@@ -21,6 +22,7 @@ pub enum ObjectAction {
     DungeonTeleport,
     Chest,
     Crafting(CraftingContainerType), //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
+    Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
 }
 
 impl ObjectAction {
@@ -62,29 +64,18 @@ impl ObjectAction {
                     .unwrap();
                 let crafting_container_res = CraftingContainer {
                     items: Container {
-                        items: crafting_items
-                            .iter()
-                            .enumerate()
-                            .map(|(i, item)| {
-                                Some(InventoryItemStack {
-                                    item_stack: proto_param
-                                        .get_item_data(*item)
-                                        .unwrap()
-                                        .copy_with_count(
-                                            item_action_param
-                                                .recipes
-                                                .recipes_list
-                                                .get(item)
-                                                .unwrap()
-                                                .2,
-                                        ),
-                                    slot: i,
-                                })
-                            })
-                            .collect::<Vec<Option<InventoryItemStack>>>(),
+                        items: get_crafting_inventory_item_stacks(
+                            crafting_items.to_vec(),
+                            &item_action_param.recipes,
+                            proto_param,
+                        ),
                     },
                 };
                 commands.insert_resource(crafting_container_res.clone());
+            }
+            ObjectAction::Furnace => {
+                let furnace_res = item_action_param.furnace_query.get(e).unwrap();
+                commands.insert_resource(furnace_res.clone());
             }
             _ => {}
         }

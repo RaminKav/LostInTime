@@ -29,7 +29,7 @@
         ),
         metadata: (
             name: "Fire Staff", 
-            desc: "A fire staff."
+            desc: ["A fire staff."]
         ),
         count: 1
   ),

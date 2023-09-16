@@ -117,6 +117,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Vec<WorldObject>>()
             .register_type::<Vec<u8>>()
             .register_type::<Vec<f32>>()
+            .register_type::<Vec<String>>()
             .register_type::<Vec<ItemAction>>()
             .register_type::<Option<Range<i32>>>()
             .register_type::<Range<i32>>()
@@ -152,7 +153,14 @@ impl ProtoPlugin {
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/chestplate.prototype.ron");
-        prototypes.load("proto/pants.prototype.ron");
+        prototypes.load("proto/metalpants.prototype.ron");
+        prototypes.load("proto/metalshoes.prototype.ron");
+        prototypes.load("proto/leatherpants.prototype.ron");
+        prototypes.load("proto/forestpants.prototype.ron");
+        prototypes.load("proto/forestshirt.prototype.ron");
+        prototypes.load("proto/forestshoes.prototype.ron");
+        prototypes.load("proto/leathertunic.prototype.ron");
+        prototypes.load("proto/leathershoes.prototype.ron");
         prototypes.load("proto/dagger.prototype.ron");
         prototypes.load("proto/basicstaff.prototype.ron");
         prototypes.load("proto/dualstaff.prototype.ron");

@@ -9,7 +9,7 @@
         obj_type: ChestBlock,
         metadata: (
             name: "Chest", 
-            desc: "Stores items."
+            desc: ["Stores items."]
         ),
         count: 1
   ),

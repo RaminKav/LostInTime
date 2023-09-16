@@ -174,10 +174,11 @@ impl different att styles w seldum_state
 [x] Survival: Food system
 [x] UI: add static tooltips on the side of inv
 [x] Gameplay: mana system
-[] Make grass foliage shader
+[] Aesthetics: Make grass foliage shader
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
 [] Aesthetics: Particle system for easy non-damaging animations/particles
+-> use bevy_honabi and color maps
 [] Dungeons: add exit method, add chest generation
 [] ## Items: Trinkets
 [] ## Gameplay: weapon upgrades
@@ -187,13 +188,15 @@ impl different att styles w seldum_state
 [] ### FIX: lag in dungeons
 [] ### save/load/cache
 [x] Passive mobs that give leather
-[] add leather armor
+[x] add leather armor
 [] cleanup proto obj files, add parent
 [] # mobs dont spawn around player
 [] # bushlings have chance to spawn from bush
 [] # add elite mobs
 [] ### add resource UI (furnace, item upgrade station)
 [] add cursor tile highlight/world tooltip
+[] enemy attack hit indicator/colliders
+[] multi attack swings player animations, bow anim, etc
 
 ## Projectile/Magic ideas
 
@@ -217,13 +220,9 @@ impl different att styles w seldum_state
   - `Goal:` kill all bosses
 - World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons
   TODO: remove or rename WorldObjectData type, turn into wall data only
-  TODO: add parser for desc/names to add new lines dynamically
   TODO: add way to mark items unstackable, sword stack bug on right click
   TODO: Maybe there is a way to tick all timers in one system rather than each handle their own timers?
-  BUG: 0 att does no dmg, default to 1 or 5
-  BUG: crafted items have no stats, integrate proto raw stats
   TODO: upgrade collider animation proto to use more detail: each frame can take a [shape, size, rotation, position]
-  BUG: flip sprite of weapons when turning
 
 ## Mob Ideas
 
@@ -455,3 +454,16 @@ add velocity to dmg numbers, and fade out
 add acceleration to player
 fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
 cape + clothes
+add is_recipe bool to tool tips
+fix desc of all items
+bunch of recipes are missing, of course
+inv full cant pick up items you have room for in stacks, bug
+checking if obj can be spawned there bug (grass spawning behind boulder)
+
+opening a furnace ui when inserting Furnace resource
+use resource to read how many slots we need. each slot maps to a vec of accepted item types
+when dropping item in crafting furnace slots, check if the slot accepts that item from the resource
+TODO: make furnaces persist their items liek chests
+fix camera, add acceleration
+add "recipes" to furnace,
+safety featurs for furnace (swapping types, locking slots to types etc)

@@ -6,6 +6,7 @@
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
         health: Some((start: 2, end: 15)),
         defence: Some((start: 2, end: 15)),
+        speed: Some((start: -12, end: -8)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 2, end: 20)),
@@ -27,7 +28,7 @@
         ),
         metadata: (
             name: "Chestplate", 
-            desc: "Nice."
+            desc: ["Nice."]
         ),
         count: 1
   ),

@@ -9,7 +9,7 @@
         obj_type: AnvilBlock,
         metadata: (
             name: "Anvil", 
-            desc: "Stores items."
+            desc: ["Stores items."]
         ),
         count: 1
   ),

@@ -12,11 +12,11 @@
         obj_type: WoodPickaxe,
         attributes: (
             max_durability: 100,
-            attack_cooldown: 0.4
+            attack_cooldown: 0.8
         ),
         metadata: (
             name: "Wood Pickaxe", 
-            desc: "A rusty wood pickaxe."
+            desc: ["A rusty wood pickaxe."]
         ),
         count: 1
   ),

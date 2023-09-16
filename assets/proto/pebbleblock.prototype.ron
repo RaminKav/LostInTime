@@ -9,7 +9,7 @@
         obj_type: PebbleBlock,
         metadata: (
             name: "Pebble", 
-            desc: "A Pebble."
+            desc: ["A Pebble."]
         ),
         count: 1
   ),
