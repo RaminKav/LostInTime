@@ -11,7 +11,7 @@ use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::schematic::loot_chests::LootChestType;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{ChestInventory, InventorySlotType};
+use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
@@ -570,7 +570,7 @@ pub fn handle_break_object(
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut wall_break_event: EventWriter<WallBreakEvent>,
     loot_tables: Query<&LootTable>,
-    chest_containers: Query<&ChestInventory>,
+    chest_containers: Query<&ChestContainer>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();

@@ -9,7 +9,7 @@ use crate::{
     inventory::Inventory,
     player::MovePlayerEvent,
     proto::proto_param::ProtoParam,
-    ui::{ChestInventory, FurnaceContainer, InventoryState},
+    ui::{ChestContainer, FurnaceContainer, InventoryState},
     world::world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
     GameParam,
 };
@@ -54,7 +54,7 @@ pub struct ItemActionParam<'w, 's> {
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
     pub cursor_pos: Res<'w, CursorPos>,
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
-    pub chest_query: Query<'w, 's, &'static ChestInventory>,
+    pub chest_query: Query<'w, 's, &'static ChestContainer>,
     pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
     pub crafting_tracker: Res<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,

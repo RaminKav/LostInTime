@@ -34,7 +34,8 @@ impl Plugin for CraftingPlugin {
 #[derive(Resource, Default, Deserialize)]
 pub struct Recipes {
     // map of recipie result and its recipe matrix
-    pub recipes_list: RecipeList,
+    pub crafting_list: RecipeList,
+    pub furnace_list: FurnaceRecipeList,
 }
 
 #[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -44,7 +45,11 @@ pub struct RecipeItem {
 }
 
 pub type RecipeList = HashMap<WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize)>;
-pub type RecipeListProto = Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>;
+pub type FurnaceRecipeList = HashMap<WorldObject, WorldObject>;
+pub type RecipeListProto = (
+    Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>,
+    Vec<(WorldObject, WorldObject)>,
+);
 
 #[derive(Resource, Default, Deserialize)]
 pub struct CraftingTracker {
@@ -71,7 +76,7 @@ pub fn handle_crafting_update_when_inv_changes(
         return;
     }
 
-    for (result, recipe) in recipes.recipes_list.clone() {
+    for (result, recipe) in recipes.crafting_list.clone() {
         let mut can_craft = true;
         let inv = inv.single();
         for ingredient in recipe.0.clone() {
@@ -97,7 +102,7 @@ pub fn handle_crafted_item(
     for event in events.iter() {
         let mut inv = inv.single_mut();
         let mut remaining_cost = recipes
-            .recipes_list
+            .crafting_list
             .get(&event.obj)
             .expect("crafted item does not have recipe?")
             .0
@@ -132,8 +137,7 @@ pub fn get_crafting_inventory_item_stacks(
 ) -> Vec<Option<InventoryItemStack>> {
     let mut list = vec![];
     for (slot, obj) in objs.iter().enumerate() {
-        println!("TRYING TO GET REC FOR {obj:?}");
-        let recipe = rec.recipes_list.get(&obj).expect("no recipe for item?");
+        let recipe = rec.crafting_list.get(&obj).expect("no recipe for item?");
         let mut default_stack = proto.get_item_data(*obj).unwrap().clone();
         let stack_count = recipe.2;
         let desc = recipe
@@ -162,35 +166,59 @@ pub fn get_crafting_inventory_item_stacks(
 
 pub fn handle_furnace_slot_update(
     furnace_option: Option<ResMut<FurnaceContainer>>,
+    mut furnace_objects: Query<&mut FurnaceContainer>,
     proto: ProtoParam,
     time: Res<Time>,
+    recipes: Res<Recipes>,
 ) {
-    if let Some(mut furnace) = furnace_option {
-        if furnace.timer.percent() == 0. {
-            if furnace.items.items[1].is_some() && furnace.items.items[0].is_some() {
-                let updated_fuel = furnace.items.items[0].as_mut().unwrap().modify_count(-1);
-                furnace.items.items[0] = updated_fuel;
-                furnace.timer.tick(time.delta());
+    let process_furnace = |furnace: &mut FurnaceContainer| {
+        if !(furnace.items.items[1].is_some()
+            && (furnace.items.items[0].is_some() || furnace.timer.percent() != 0.))
+        {
+            furnace.timer.reset();
+            return;
+        }
+        let ingredient = furnace.items.items[1].as_ref().unwrap();
+        let curr_result_obj = furnace.items.items[2].clone();
+
+        let expected_result = recipes
+            .furnace_list
+            .get(&ingredient.item_stack.obj_type)
+            .expect("incorrect furnace recipe?");
+        if let Some(curr_result) = curr_result_obj {
+            if curr_result.item_stack.obj_type != expected_result.clone() {
+                // the ingredient in slot 1 does not match the current output in slot 2
+                furnace.timer.reset();
+                return;
             }
+        }
+
+        if furnace.timer.percent() == 0. {
+            let updated_fuel = furnace.items.items[0].as_mut().unwrap().modify_count(-1);
+            furnace.items.items[0] = updated_fuel;
+            furnace.timer.tick(time.delta());
         } else {
             furnace.timer.tick(time.delta());
         }
 
-        if furnace.timer.just_finished() && furnace.items.items[1].is_some() {
+        if furnace.timer.just_finished() {
             let updated_result = if let Some(mut existing_result) = furnace.items.items[2].clone() {
                 existing_result.modify_count(1).unwrap()
             } else {
-                InventoryItemStack::new(
-                    proto.get_item_data(WorldObject::MetalBar).unwrap().clone(),
-                    0,
-                )
+                InventoryItemStack::new(proto.get_item_data(*expected_result).unwrap().clone(), 0)
             };
             furnace.items.items[2] = Some(updated_result);
 
             let updated_resource = furnace.items.items[1].as_mut().unwrap().modify_count(-1);
             furnace.items.items[1] = updated_resource;
-
             furnace.timer.reset();
         }
+    };
+
+    if let Some(mut furnace) = furnace_option {
+        process_furnace(&mut furnace);
+    }
+    for mut furnace in furnace_objects.iter_mut() {
+        process_furnace(&mut furnace);
     }
 }

@@ -10,7 +10,7 @@ use super::{
 pub const CHEST_SIZE: usize = 6 * 2;
 
 #[derive(Component, Resource, Debug, Clone)]
-pub struct ChestInventory {
+pub struct ChestContainer {
     pub items: Container,
     pub parent: Entity,
 }
@@ -24,7 +24,7 @@ pub fn setup_chest_slots_ui(
     inv_spawn_check: Query<Entity, Added<InventoryUI>>,
 
     asset_server: Res<AssetServer>,
-    inv: Res<ChestInventory>,
+    inv: Res<ChestContainer>,
 ) {
     if inv_spawn_check.get_single().is_err() {
         return;
@@ -61,7 +61,7 @@ pub fn add_inv_to_new_chest_objs(
 ) {
     for e in new_chests.iter() {
         if e.1 == &WorldObject::Chest {
-            commands.entity(e.0).insert(ChestInventory {
+            commands.entity(e.0).insert(ChestContainer {
                 items: Container::with_size(CHEST_SIZE),
                 parent: e.0,
             });

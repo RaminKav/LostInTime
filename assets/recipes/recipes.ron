@@ -1,4 +1,4 @@
-[
+([
     (String, ([(item: PlantFibre, count: 4)], Inventory, 1)),
     (StoneChunk, ([(item: PebbleBlock, count: 4)], Inventory, 1)),
     (WoodAxe, ([(item: String, count: 1),(item: StoneChunk, count: 1),(item: Stick, count: 1)], Inventory, 1)),
@@ -29,6 +29,10 @@
     (LeatherShoes, ([(item: Leather, count: 6),(item: Feather, count: 2)], CraftingTable, 1)),
     (LargePotion, ([(item: PinkFlowerBlock, count: 4),(item: RedFlowerBlock, count: 4),(item: SlimeGoo, count: 4)], AlchemyTable, 1)),
     (SmallPotion, ([(item: PinkFlowerBlock, count: 3),(item: RedFlowerBlock, count: 3),(item: SlimeGoo, count: 2)], AlchemyTable, 1)),
-    (MetalBar, ([(item: MetalShard, count: 4),(item: Coal, count: 1)], Furnace, 4)),
-    (CookedMeat, ([(item: RawMeat, count: 4),(item: Coal, count: 1)], Furnace, 4)),
+    
+],
+[
+    (MetalShard, MetalBar),
+    (RawMeat, CookedMeat),
 ]
+)

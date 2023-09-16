@@ -12,8 +12,8 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::item::{
-    CraftingTracker, Equipment, Foliage, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
-    WorldObjectResource,
+    CraftingTracker, Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes,
+    Wall, WorldObject, WorldObjectResource,
 };
 use crate::ui::UIElement;
 use crate::GameParam;
@@ -245,6 +245,7 @@ impl GameAssetsPlugin {
             asset_server.load("textures/player/player_down.png"),
         ];
         let mut recipes_list = RecipeList::default();
+        let mut furnace_list = FurnaceRecipeList::default();
 
         for (item, rect) in sprite_desc.items.iter() {
             println!("Found graphic {item:?} {:?}", rect.to_atlas_rect());
@@ -301,7 +302,7 @@ impl GameAssetsPlugin {
         }
 
         // load recipes
-        for (result, recipe) in recipes_desc.iter() {
+        for (result, recipe) in recipes_desc.0.iter() {
             recipes_list.insert(*result, (recipe.0.clone(), recipe.1.clone(), recipe.2));
             crafting_tracker
                 .crafting_type_map
@@ -311,8 +312,16 @@ impl GameAssetsPlugin {
 
             println!("Loaded recipe for {result:?}: {recipe:?}");
         }
+        // load furnace recipes
+        for (result, recipe) in recipes_desc.1.iter() {
+            furnace_list.insert(*result, recipe.clone());
+            println!("Loaded recipe for {result:?}: {recipe:?}");
+        }
 
-        *recipes = Recipes { recipes_list };
+        *recipes = Recipes {
+            crafting_list: recipes_list,
+            furnace_list,
+        };
         // load UI
         for u in UIElement::iter() {
             println!("LOADED UI ASSET {:?}", u.to_string());

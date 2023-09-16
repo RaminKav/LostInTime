@@ -5,7 +5,7 @@ use crate::{
     attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
-    ui::{ChestInventory, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
+    ui::{ChestContainer, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
@@ -267,7 +267,8 @@ pub fn toggle_inv_visibility(
     curr_inv_state: Res<State<UIState>>,
     inv_query: Query<Entity, With<InventoryUI>>,
     mut commands: Commands,
-    chest_option: Option<Res<ChestInventory>>,
+    chest_option: Option<Res<ChestContainer>>,
+    furnace_option: Option<Res<FurnaceContainer>>,
     stats_query: Query<Entity, With<StatsUI>>,
 ) {
     if !inv_state.open
@@ -282,7 +283,13 @@ pub fn toggle_inv_visibility(
                 if let Some(mut chest_parent) = commands.get_entity(chest.parent) {
                     chest_parent.insert(chest.to_owned());
                 }
-                commands.remove_resource::<ChestInventory>();
+                commands.remove_resource::<ChestContainer>();
+            }
+            if let Some(furnace) = furnace_option {
+                if let Some(mut furnace_parent) = commands.get_entity(furnace.parent) {
+                    furnace_parent.insert(furnace.to_owned());
+                }
+                commands.remove_resource::<ChestContainer>();
             }
             commands.remove_resource::<CraftingContainer>();
             commands.remove_resource::<FurnaceContainer>();
