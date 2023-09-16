@@ -459,11 +459,6 @@ fix desc of all items
 bunch of recipes are missing, of course
 inv full cant pick up items you have room for in stacks, bug
 checking if obj can be spawned there bug (grass spawning behind boulder)
+speed up player attack animation as an exception, keep other anims the same speed
 
-opening a furnace ui when inserting Furnace resource
-use resource to read how many slots we need. each slot maps to a vec of accepted item types
-when dropping item in crafting furnace slots, check if the slot accepts that item from the resource
-TODO: make furnaces persist their items liek chests
 fix camera, add acceleration
-add "recipes" to furnace,
-safety featurs for furnace (swapping types, locking slots to types etc)

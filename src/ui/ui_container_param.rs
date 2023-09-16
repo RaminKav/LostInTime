@@ -7,11 +7,11 @@ use bevy::{
 
 use crate::item::{CraftedItemEvent, CraftingTracker, Recipes};
 
-use super::{crafting_ui::CraftingContainer, ChestInventory, FurnaceContainer};
+use super::{crafting_ui::CraftingContainer, ChestContainer, FurnaceContainer};
 
 #[derive(SystemParam)]
 pub struct UIContainersParam<'w, 's> {
-    pub chest_option: Option<ResMut<'w, ChestInventory>>,
+    pub chest_option: Option<ResMut<'w, ChestContainer>>,
     pub furnace_option: Option<ResMut<'w, FurnaceContainer>>,
     pub crafting_option: Option<ResMut<'w, CraftingContainer>>,
 

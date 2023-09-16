@@ -151,7 +151,7 @@ fn load_recipes_into_inventory_container_on_startup(
     recipes: Res<Recipes>,
     proto: ProtoParam,
 ) {
-    if recipes.recipes_list.len() == 0 {
+    if recipes.crafting_list.len() == 0 {
         return;
     }
     for mut inv in added_inv.iter_mut() {
@@ -252,6 +252,7 @@ fn spawn_player(
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64);

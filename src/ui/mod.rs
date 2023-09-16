@@ -106,7 +106,7 @@ impl Plugin for UIPlugin {
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     change_ui_state_to_chest_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<ChestInventory>()),
+                        .run_if(resource_added::<ChestContainer>()),
                     text_update_system,
                     toggle_inv_visibility,
                     handle_item_drop_clicks,

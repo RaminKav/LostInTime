@@ -7,7 +7,7 @@ use crate::{
     inventory::{InventoryItemStack, ItemStack},
     item::{EquipmentType, Loot, LootTable, LootTablePlugin, WorldObject},
     proto::proto_param::ProtoParam,
-    ui::ChestInventory,
+    ui::ChestContainer,
 };
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default, Debug, Clone)]
@@ -21,7 +21,7 @@ pub enum LootChestType {
 }
 
 pub fn handle_new_loot_chest_spawn(
-    mut loot_chests: Query<(&LootChestType, &mut ChestInventory), Added<LootChestType>>,
+    mut loot_chests: Query<(&LootChestType, &mut ChestContainer), Added<LootChestType>>,
     proto_param: ProtoParam,
 ) {
     let mut rng = rand::thread_rng();

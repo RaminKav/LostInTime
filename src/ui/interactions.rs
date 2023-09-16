@@ -16,7 +16,7 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestInventory, FurnaceContainer, InventorySlotState, InventoryState, PlayerStatsTooltip,
+    ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, PlayerStatsTooltip,
     UIContainersParam,
 };
 
@@ -197,6 +197,13 @@ pub fn handle_drop_on_slot_events(
             if slot_type.is_crafting() {
                 continue;
             }
+            let inv_stack = InventoryItemStack {
+                item_stack: drop_event.dropped_item_stack.clone(),
+                slot: drop_event.drop_target_slot_state.slot_index,
+            };
+            if !inv_stack.validate(slot_type, &proto_param, &cont_param) {
+                return;
+            }
             let mut inv = inv.single_mut();
             let container = if slot_type.is_chest() {
                 &mut cont_param.chest_option.as_mut().unwrap().items
@@ -205,17 +212,8 @@ pub fn handle_drop_on_slot_events(
             } else {
                 inv.get_mut_items_from_slot_type(slot_type)
             };
-            let inv_stack = InventoryItemStack {
-                item_stack: drop_event.dropped_item_stack.clone(),
-                slot: drop_event.drop_target_slot_state.slot_index,
-            };
 
-            inv_stack.drop_item_on_slot(
-                container,
-                &mut game.inv_slot_query,
-                slot_type,
-                &proto_param,
-            )
+            inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
         };
 
         let updated_drag_item;
@@ -293,7 +291,7 @@ pub fn handle_hovering(
     graphics: Res<Graphics>,
     mut commands: Commands,
     inv: Query<&Inventory>,
-    chest_option: Option<Res<ChestInventory>>,
+    chest_option: Option<Res<ChestContainer>>,
     crafting_option: Option<Res<CraftingContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,

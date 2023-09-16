@@ -11,7 +11,7 @@ use crate::{
     },
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{InventorySlotState, InventorySlotType},
+    ui::{FurnaceContainer, InventorySlotState, InventorySlotType, UIContainersParam},
     world::y_sort::YSort,
     GameParam,
 };
@@ -98,11 +98,7 @@ impl InventoryItemStack {
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
         slot_type: InventorySlotType,
-        proto_param: &ProtoParam,
     ) -> Option<ItemStack> {
-        if !self.validate(slot_type, proto_param) {
-            return Some(self.item_stack.clone());
-        }
         let obj_type = self.item_stack.obj_type;
         let target_item_option = container.items[self.slot].clone();
         if let Some(target_item) = target_item_option {
@@ -288,7 +284,16 @@ impl InventoryItemStack {
         }
         Some(self.clone())
     }
-    pub fn validate(&self, slot_type: InventorySlotType, proto_param: &ProtoParam) -> bool {
+    pub fn validate(
+        &self,
+        slot_type: InventorySlotType,
+        proto_param: &ProtoParam,
+        ui_cont_param: &UIContainersParam,
+    ) -> bool {
+        if slot_type.is_furnace() {
+            return ui_cont_param.furnace_option.as_ref().unwrap().slot_map[self.slot]
+                .contains(&self.item_stack.obj_type);
+        }
         if !(slot_type.is_accessory() || slot_type.is_equipment()) {
             return true;
         }

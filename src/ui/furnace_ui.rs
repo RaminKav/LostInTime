@@ -1,10 +1,14 @@
 pub use bevy::prelude::*;
 
-use crate::{assets::Graphics, inventory::Container, item::WorldObject};
+use crate::{
+    assets::Graphics,
+    inventory::Container,
+    item::{CraftingTracker, Recipes, WorldObject},
+};
 
 use super::{
-    interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
-    UIState,
+    crafting_ui::CraftingContainerType, interactions::Interaction, spawn_inv_slot,
+    InventorySlotType, InventoryState, InventoryUI, UIState,
 };
 
 #[derive(Component, Resource, Debug, Clone)]
@@ -58,18 +62,25 @@ pub fn change_ui_state_to_furnace_when_resource_added(
 pub fn add_container_to_new_furnace_objs(
     mut commands: Commands,
     new_furnace: Query<(Entity, &WorldObject), Added<WorldObject>>,
+    recipes: Res<Recipes>,
 ) {
     for e in new_furnace.iter() {
         match e.1 {
             WorldObject::Furnace => {
+                let ing: Vec<_> = recipes
+                    .furnace_list
+                    .iter()
+                    .map(|(k, _)| k.clone())
+                    .collect();
+                let results: Vec<_> = recipes
+                    .furnace_list
+                    .iter()
+                    .map(|(_, v)| v.clone())
+                    .collect();
                 commands.entity(e.0).insert(FurnaceContainer {
                     items: Container::with_size(3),
                     parent: e.0,
-                    slot_map: vec![
-                        vec![WorldObject::Coal],
-                        vec![WorldObject::MetalShard],
-                        vec![],
-                    ],
+                    slot_map: vec![vec![WorldObject::Coal], ing.clone(), results.clone()],
                     timer: Timer::from_seconds(3., TimerMode::Once),
                 });
             }
