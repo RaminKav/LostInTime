@@ -8,7 +8,7 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection};
+use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::Player};
 
 use super::AnimationTimer;
 
@@ -50,6 +50,16 @@ impl CharacterAnimationSpriteSheetData {
         let current_animation = self.anim_offset as f32;
         let current_animation_frames = self.animation_frames[current_animation as usize] as f32;
         current_frame >= current_animation_frames + max_frames * (current_animation) - 1.
+    }
+    pub fn get_anim_state(&self) -> EnemyAnimationState {
+        match self.anim_offset {
+            0 => EnemyAnimationState::Idle,
+            1 => EnemyAnimationState::Walk,
+            2 => EnemyAnimationState::Hit,
+            3 => EnemyAnimationState::Death,
+            4 => EnemyAnimationState::Attack,
+            _ => EnemyAnimationState::Idle,
+        }
     }
 }
 
@@ -169,10 +179,18 @@ pub fn animate_character_spritesheet_animations(
         &mut AnimationTimer,
         &CharacterAnimationSpriteSheetData,
         &mut TextureAtlasSprite,
+        Option<&Player>,
     )>,
 ) {
-    for (_e, mut timer, sprite_sheet_data, mut sprite) in &mut query {
-        timer.tick(time.delta());
+    for (_e, mut timer, sprite_sheet_data, mut sprite, is_player) in &mut query {
+        let mult = if is_player.is_some()
+            && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Attack
+        {
+            3
+        } else {
+            1
+        };
+        timer.tick(time.delta() * mult);
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
             let frames =

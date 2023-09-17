@@ -10,11 +10,12 @@ use crate::{
     custom_commands::CommandsExt,
     item::WorldObject,
     night::NightTracker,
+    player::Player,
     proto::proto_param::ProtoParam,
     world::{
         chunk::Chunk,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
-        TileMapPosition, CHUNK_SIZE,
+        TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
     GameParam, GameState,
 };
@@ -125,6 +126,7 @@ fn handle_spawn_mobs(
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
     night_tracker: Res<NightTracker>,
+    player_t: Query<&GlobalTransform, With<Player>>,
 ) {
     for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
@@ -152,14 +154,18 @@ fn handle_spawn_mobs(
                 if picked_spawner.spawn_timer.percent() == 0.
                     && picked_spawner.min_days_to_spawn <= night_tracker.days
                 {
-                    let tile_pos = TilePos {
-                        x: rng.gen_range(0..CHUNK_SIZE),
-                        y: rng.gen_range(0..CHUNK_SIZE),
-                    };
-                    let pos = tile_pos_to_world_pos(
-                        TileMapPosition::new(picked_spawner.chunk_pos, tile_pos),
-                        true,
-                    );
+                    let player_pos = player_t.single().translation().truncate();
+                    let mut pos = player_pos.clone();
+                    while pos.distance(player_pos) <= TILE_SIZE.x * 10. {
+                        let tile_pos = TilePos {
+                            x: rng.gen_range(0..CHUNK_SIZE),
+                            y: rng.gen_range(0..CHUNK_SIZE),
+                        };
+                        pos = tile_pos_to_world_pos(
+                            TileMapPosition::new(picked_spawner.chunk_pos, tile_pos),
+                            true,
+                        );
+                    }
                     picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     picked_mob_to_spawn = Some((picked_spawner.enemy.clone(), pos));
                 }

@@ -4,12 +4,10 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": Slime,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
-    "survival_rogue_like::enemy::FollowSpeed": (1.05),
+    "survival_rogue_like::enemy::FollowSpeed": (0.55),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 100., startup: 1., duration: 0.6, cooldown: 3.0, speed: 2.5),
-    // "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 100., cooldown: 2.0, projectile: SlimeGooProjectile),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/slime/slime_down.png", size: (x: 96., y: 96.), cols: 7, rows: 5),
-    // "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/spikeslime/spikeslime_down.png", size: (x: 32., y: 32.), cols: 6, rows: 5),
     "survival_rogue_like::proto::ColliderCapsulProto": (x: -16., y: -16.5, r: 34.),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
     "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),

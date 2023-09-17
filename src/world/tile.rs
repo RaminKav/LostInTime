@@ -30,7 +30,7 @@ impl TilePlugin {
         world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
         tile_pos: TilePos,
-        seed: u32,
+        seed: u64,
     ) -> ([u8; 4], u8, [WorldObject; 4]) {
         let x = tile_pos.x as f64;
         let y = tile_pos.y as f64;

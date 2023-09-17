@@ -309,13 +309,10 @@ impl GameAssetsPlugin {
                 .entry(recipe.1.clone())
                 .or_default()
                 .push(*result);
-
-            println!("Loaded recipe for {result:?}: {recipe:?}");
         }
         // load furnace recipes
         for (result, recipe) in recipes_desc.1.iter() {
             furnace_list.insert(*result, recipe.clone());
-            println!("Loaded recipe for {result:?}: {recipe:?}");
         }
 
         *recipes = Recipes {

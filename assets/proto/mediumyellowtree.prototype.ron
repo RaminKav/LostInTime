@@ -8,7 +8,7 @@
   "survival_rogue_like::item::FoliageSize": ((x: 64., y: 96.)),
     "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
-  "survival_rogue_like::proto::ColliderCapsulProto": (x: -28., y: -16., r: 4.5),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x: -30., y: -22., r: 2.5),
   "survival_rogue_like::attributes::MaxHealth": (50),
   "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
   "survival_rogue_like::world::WorldObjectEntityData": (object: MediumYellowTree, obj_bit_index: 0, texture_offset: 0),
