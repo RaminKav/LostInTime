@@ -69,7 +69,7 @@ fn check_melee_hit_collisions(
                         modifier: "durability".to_owned(),
                         delta: -1,
                     },
-                    &mut inv,
+                    &mut inv.single_mut().items,
                 );
             }
             commands.entity(weapon.0).insert(HitMarker);
@@ -110,7 +110,9 @@ fn check_projectile_hit_mob_collisions(
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     for evt in collisions.iter() {
-        let CollisionEvent::Started(e1, e2, _) = evt else { continue };
+        let CollisionEvent::Started(e1, e2, _) = evt else {
+            continue;
+        };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let (proj_entity, mut state, proj, anim_option) = if let Ok(e) = children.get_mut(*e1) {
                 if let Ok((proj_entity, state, proj, anim_option)) = projectiles.get_mut(e.get()) {
@@ -123,7 +125,9 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 continue;
             };
-            let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {continue};
+            let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {
+                continue;
+            };
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
                 continue;
             }
@@ -171,7 +175,9 @@ fn check_projectile_hit_player_collisions(
     mut children: Query<&Parent>,
 ) {
     for evt in collisions.iter() {
-        let CollisionEvent::Started(e1, e2, _) = evt else { continue };
+        let CollisionEvent::Started(e1, e2, _) = evt else {
+            continue;
+        };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             let (proj_entity, mut state, anim_option, proj, enemy_proj) =
                 if let Ok(e) = children.get_mut(*e1) {
@@ -189,7 +195,9 @@ fn check_projectile_hit_player_collisions(
                 } else {
                     continue;
                 };
-            let Ok((enemy_e, attack)) = enemy_attack.get(enemy_proj.entity) else {continue};
+            let Ok((enemy_e, attack)) = enemy_attack.get(enemy_proj.entity) else {
+                continue;
+            };
             if enemy_e == *e2 || !allowed_targets.contains(*e2) {
                 continue;
             }
@@ -224,7 +232,7 @@ pub fn check_item_drop_collisions(
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //if the player is colliding with an entity...
-            let Ok(_) = player.get(e1) else {continue};
+            let Ok(_) = player.get(e1) else { continue };
             if !allowed_targets.contains(e2) {
                 continue;
             }
@@ -269,7 +277,7 @@ fn check_mob_to_player_collisions(
                 continue;
             }
             //if the player is colliding with an entity...
-            let Ok(_) = player.get(e1) else {continue};
+            let Ok(_) = player.get(e1) else { continue };
             if !mobs.contains(e2) {
                 continue;
             }

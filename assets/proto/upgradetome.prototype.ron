@@ -1,0 +1,15 @@
+(
+  name: "UpgradeTome",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": UpgradeTome,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: UpgradeTome,
+        metadata: (
+            name: "Upgrade Tome", 
+            desc: ["A Upgrade Tome."]
+        ),
+        count: 1
+  ),
+  }
+)

@@ -18,7 +18,6 @@ pub enum CraftingContainerType {
     Anvil,
     Cauldron,
     AlchemyTable,
-    Furnace,
 }
 
 pub fn change_ui_state_to_crafting_when_resource_added(

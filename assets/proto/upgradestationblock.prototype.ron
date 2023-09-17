@@ -1,0 +1,17 @@
+(
+  name: "UpgradeStationBlock",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": UpgradeStationBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(UpgradeStation)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: UpgradeStationBlock,
+        metadata: (
+            name: "Upgrade Station", 
+            desc: ["Upgrades items."]
+        ),
+        count: 1
+  ),
+  }
+)

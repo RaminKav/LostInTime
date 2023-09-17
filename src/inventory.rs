@@ -263,7 +263,7 @@ impl InventoryItemStack {
     pub fn modify_attributes(
         &self,
         modifier: AttributeModifier,
-        inv: &mut Query<&mut Inventory>,
+        container: &mut Container,
     ) -> Self {
         let new_item_stack = self
             .item_stack
@@ -274,7 +274,7 @@ impl InventoryItemStack {
             item_stack: new_item_stack,
             slot: self.slot,
         };
-        inv.single_mut().items.items[self.slot] = Some(inv_stack.clone());
+        container.items[self.slot] = Some(inv_stack.clone());
         inv_stack
     }
     pub fn modify_count(&mut self, amount: i8) -> Option<Self> {

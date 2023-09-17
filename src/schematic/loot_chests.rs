@@ -3,7 +3,10 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 
 use crate::{
-    attributes::{ItemAttributes, ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes},
+    attributes::{
+        attribute_helpers::create_new_random_item_stack_with_attributes, ItemAttributes,
+        ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes,
+    },
     inventory::{InventoryItemStack, ItemStack},
     item::{EquipmentType, Loot, LootTable, LootTablePlugin, WorldObject},
     proto::proto_param::ProtoParam,
@@ -118,43 +121,4 @@ pub fn handle_new_loot_chest_spawn(
             }
         }
     }
-}
-
-pub fn create_new_random_item_stack_with_attributes(
-    stack: &ItemStack,
-    proto: &ProtoParam,
-) -> ItemStack {
-    let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
-        return stack.clone();
-    };
-    let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
-    let raw_base_att = proto
-        .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
-        .unwrap();
-    let mut rng = rand::thread_rng();
-    let rarity_rng = rng.gen_range(0..40);
-    let rarity = if rarity_rng == 0 {
-        ItemRarity::Legendary
-    } else if rarity_rng < 4 {
-        ItemRarity::Rare
-    } else if rarity_rng < 13 {
-        ItemRarity::Uncommon
-    } else {
-        ItemRarity::Common
-    };
-    let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
-        raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type)
-    } else {
-        ItemAttributes::default()
-    };
-    let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
-    let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
-    final_att.max_durability = stack.attributes.max_durability;
-    if final_att.max_durability > 0 {
-        final_att.durability =
-            rng.gen_range(final_att.max_durability / 10..final_att.max_durability);
-    }
-    let mut new_stack = stack.copy_with_attributes(&final_att);
-    new_stack.rarity = rarity;
-    new_stack
 }

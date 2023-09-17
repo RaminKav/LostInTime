@@ -17,6 +17,23 @@ pub struct FurnaceContainer {
     pub parent: Entity,
     pub slot_map: Vec<Vec<WorldObject>>,
     pub timer: Timer,
+    pub state: Option<FurnaceState>,
+}
+#[derive(Debug, Clone)]
+pub struct FurnaceState {
+    pub current_fuel_type: WorldObject,
+    pub current_fuel_left: Timer,
+}
+impl FurnaceState {
+    pub fn from_fuel(fuel: WorldObject) -> Self {
+        Self {
+            current_fuel_type: fuel,
+            current_fuel_left: Timer::from_seconds(
+                if fuel == WorldObject::Coal { 9. } else { 3. },
+                TimerMode::Once,
+            ),
+        }
+    }
 }
 
 pub fn setup_furnace_slots_ui(
@@ -82,6 +99,19 @@ pub fn add_container_to_new_furnace_objs(
                     parent: e.0,
                     slot_map: vec![vec![WorldObject::Coal], ing.clone(), results.clone()],
                     timer: Timer::from_seconds(3., TimerMode::Once),
+                    state: None,
+                });
+            }
+            WorldObject::UpgradeStation => {
+                commands.entity(e.0).insert(FurnaceContainer {
+                    items: Container::with_size(2),
+                    parent: e.0,
+                    slot_map: vec![
+                        vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
+                        vec![WorldObject::WoodSword],
+                    ],
+                    timer: Timer::from_seconds(3., TimerMode::Once),
+                    state: None,
                 });
             }
             _ => {}

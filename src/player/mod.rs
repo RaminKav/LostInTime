@@ -252,6 +252,9 @@ fn spawn_player(
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeStationBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::OrbOfTransformation, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64);

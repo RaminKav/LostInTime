@@ -165,6 +165,26 @@
             size: (16., 16.),
             anchor: None,
         ),
+        UpgradeStation: WorldObjectData(
+            texture_pos: (0., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        UpgradeStationBlock: WorldObjectData(
+            texture_pos: (0., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        UpgradeTome: WorldObjectData(
+            texture_pos: (2., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        OrbOfTransformation: WorldObjectData(
+            texture_pos: (7., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Chest: WorldObjectData(
             texture_pos: (0., 9.),
             size: (16., 16.),
