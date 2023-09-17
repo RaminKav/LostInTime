@@ -291,8 +291,8 @@ fn animate_attack(
                 let angle = dir_state.y.atan2(dir_state.x);
 
                 if *dir_state != Vec2::ZERO {
-                    x_offset = (angle.cos() * (16.) + angle.cos() * (16.)) / 2.;
-                    y_offset = (angle.sin() * (16.) + angle.sin() * (16.)) / 2.;
+                    x_offset = (angle.cos() * (8.) + angle.cos() * (8.)) / 2.;
+                    y_offset = (angle.sin() * (8.) + angle.sin() * (8.)) / 2.;
                 }
                 t.rotation = Quat::from_rotation_z(angle - PI / 2.);
                 // t.translation.x = f32::min(t.translation.x.lerp(&5., &at.1), 5.);

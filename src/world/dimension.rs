@@ -13,14 +13,14 @@ impl Dimension {}
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct GenerationSeed {
-    pub seed: u32,
+    pub seed: u64,
 }
 
 #[derive(Component, Debug)]
 pub struct SpawnDimension;
 pub struct DimensionSpawnEvent {
     pub generation_params: WorldGeneration,
-    pub seed: Option<u32>,
+    pub seed: Option<u64>,
     pub swap_to_dim_now: bool,
 }
 #[derive(Component, Reflect, Default, Debug, Clone)]

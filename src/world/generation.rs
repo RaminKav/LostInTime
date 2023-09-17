@@ -1,6 +1,7 @@
 use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
+use super::noise_helpers::get_object_points_for_chunk;
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
@@ -15,6 +16,7 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
+use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -44,7 +46,7 @@ impl GenerationPlugin {
     fn get_perlin_block_at_tile(
         world_generation_params: &WorldGeneration,
         pos: TileMapPosition,
-        seed: u32,
+        seed: u64,
     ) -> Option<WorldObject> {
         let x = pos.tile_pos.x as f64;
         let y = pos.tile_pos.y as f64;
@@ -64,7 +66,7 @@ impl GenerationPlugin {
     fn generate_stone_for_chunk(
         world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
-        seed: u32,
+        seed: u64,
     ) -> Vec<(TileMapPosition, WorldObject)> {
         let mut stone_blocks: Vec<(TileMapPosition, WorldObject)> = vec![];
         for x in 0..CHUNK_SIZE {
@@ -174,16 +176,7 @@ impl GenerationPlugin {
                 .object_generation_frequencies
                 .iter()
             {
-                let raw_points = noise_helpers::poisson_disk_sampling(
-                    if obj.is_medium_size(&proto_param) {
-                        2.5 * TILE_SIZE.x as f64
-                    } else {
-                        (TILE_SIZE.x / 2.) as f64
-                    },
-                    30,
-                    *frequency,
-                    rand::thread_rng(),
-                );
+                let raw_points = get_object_points_for_chunk(seed.seed, *frequency);
                 let points = raw_points
                     .iter()
                     .map(|tp| {

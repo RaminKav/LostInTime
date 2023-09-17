@@ -262,6 +262,8 @@ impl ProtoPlugin {
         prototypes.load("proto/upgradestationblock.prototype.ron");
         prototypes.load("proto/upgradetome.prototype.ron");
         prototypes.load("proto/orboftransformation.prototype.ron");
+        prototypes.load("proto/bridge.prototype.ron");
+        prototypes.load("proto/bridgeblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

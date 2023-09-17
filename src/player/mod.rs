@@ -190,7 +190,7 @@ fn spawn_player(
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..default()
             },
-            AnimationTimer(Timer::from_seconds(0.05, TimerMode::Repeating)),
+            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
@@ -224,7 +224,7 @@ fn spawn_player(
             MovementVector::default(),
             YSort(0.001),
             Name::new("Player"),
-            Collider::capsule(Vec2::new(0., -4.0), Vec2::new(0., -4.5), 5.),
+            Collider::capsule(Vec2::new(0., -4.0), Vec2::new(0., -4.5), 4.5),
             KinematicCharacterController {
                 // The character offset is set to 0.01.
                 offset: CharacterLength::Absolute(0.01),
@@ -251,6 +251,7 @@ fn spawn_player(
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeStationBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64);

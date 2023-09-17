@@ -18,6 +18,8 @@ ron = "0.8.0"
 serde = "1.0.136"
 serde_with = "2.1.0"
 rand = "0.8.5"
+rand_xorshift = "^0.3"
+itertools = "^0.8"
 noise = "0.8.2"
 bevy_save = { git = "https://github.com/hankjordan/bevy_save.git", branch = "master" }
 bevy_pkv = "0.6"

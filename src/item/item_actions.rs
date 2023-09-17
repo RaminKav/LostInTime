@@ -100,7 +100,7 @@ impl ItemActions {
                     if !can_object_be_placed_here(
                         world_pos_to_tile_pos(pos),
                         game,
-                        obj.is_medium_size(proto_param),
+                        *obj,
                         &proto_param,
                     ) {
                         return;

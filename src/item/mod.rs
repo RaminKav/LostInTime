@@ -6,7 +6,9 @@ use crate::colors::{
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 
+use crate::enemy::Mob;
 use crate::inventory::ItemStack;
+use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::schematic::loot_chests::LootChestType;
@@ -280,6 +282,8 @@ pub enum WorldObject {
     OrbOfTransformation,
     UpgradeStation,
     UpgradeStationBlock,
+    BridgeBlock,
+    Bridge,
 }
 
 #[derive(
@@ -529,12 +533,16 @@ pub fn handle_placing_world_object(
     mut game: GameParam,
     mut commands: Commands,
     mut events: EventReader<PlaceItemEvent>,
+    water_colliders: Query<
+        (Entity, &Collider, &GlobalTransform),
+        (Without<WorldObject>, Without<Mob>, Without<Player>),
+    >,
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
-        let is_medium = place_event.obj.is_medium_size(&proto_param);
+
         let tile_pos = world_pos_to_tile_pos(pos);
-        if !can_object_be_placed_here(tile_pos, &mut game, is_medium, &proto_param) {
+        if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param) {
             continue;
         }
 
@@ -557,6 +565,18 @@ pub fn handle_placing_world_object(
                     pos: Some(tile_pos),
                     new_tile: Some(place_event.obj),
                 });
+
+                if place_event.obj == WorldObject::Bridge {
+                    for (e, _c, t) in water_colliders.iter() {
+                        if t.translation()
+                            .truncate()
+                            .distance(tile_pos_to_world_pos(tile_pos, false))
+                            <= 6.
+                        {
+                            commands.entity(e).despawn();
+                        }
+                    }
+                }
             }
 
             continue;

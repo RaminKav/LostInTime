@@ -182,21 +182,22 @@ impl different att styles w seldum_state
 [] Dungeons: add exit method, add chest generation
 [] ## Items: Trinkets
 [] ## Gameplay: weapon upgrades
-[] # Gameplay: weapon scrolls
-[] # Gameplay: weapon orbs of alteration
+[x] # Gameplay: weapon scrolls
+[x] # Gameplay: weapon orbs of alteration
 [x] FIX: fix dash
-[] ### FIX: lag in dungeons
+[] ### FIX: lag in dungeons use bevy_spacial?
 [] ### save/load/cache
 [x] Passive mobs that give leather
 [x] add leather armor
 [] cleanup proto obj files, add parent
-[] # mobs dont spawn around player
+[x] # mobs dont spawn around player
 [] # bushlings have chance to spawn from bush
-[] # add elite mobs
-[] ### add resource UI (furnace, item upgrade station)
+[x] # add elite mobs
+[x] ### add resource UI (furnace, item upgrade station)
 [] add cursor tile highlight/world tooltip
 [] enemy attack hit indicator/colliders
 [] multi attack swings player animations, bow anim, etc
+[x] bridges to cross water
 
 ## Projectile/Magic ideas
 
@@ -462,3 +463,4 @@ checking if obj can be spawned there bug (grass spawning behind boulder)
 speed up player attack animation as an exception, keep other anims the same speed
 
 fix camera, add acceleration
+use a more simple object gen algo for small objects, instead of PDS

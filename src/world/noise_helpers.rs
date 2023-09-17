@@ -1,11 +1,14 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand::{rngs::ThreadRng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
-pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u32) -> f64 {
+pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
+    //TODO: make sure this seed cast to u32 is ok
+    let seed = seed as u32;
     let n1 = Perlin::new(1 + seed);
     let n2 = Perlin::new(2 + seed);
     let n3 = Perlin::new(3 + seed);
@@ -98,7 +101,12 @@ pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(
     };
 
     insert_point(&mut grid, p0);
-    points.push(p0);
+    let success = rng.gen::<f64>() < f;
+
+    if success {
+        points.push(p0);
+    }
+
     active.push(p0);
     while !active.is_empty() {
         let i = rng.gen_range(0..=(active.len() - 1));
@@ -120,7 +128,8 @@ pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(
             }
 
             //add the new point to our lists and break
-            let success = rng.gen_ratio((f * 100.) as u32, 100);
+            let success = rng.gen::<f64>() < f;
+
             if success {
                 points.push(new_p);
             }
@@ -135,5 +144,21 @@ pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(
         }
     }
 
+    points
+}
+
+pub fn get_object_points_for_chunk(_seed: u64, f: f64) -> Vec<(f32, f32)> {
+    //TODO: figure out seeded rng
+    // let mut rng = XorShiftRng::seed_from_u64(seed);
+    let mut rng = rand::thread_rng();
+    let mut points = vec![];
+    for x in 0..CHUNK_SIZE {
+        for y in 0..CHUNK_SIZE {
+            let r = rng.gen::<f64>();
+            if r < f {
+                points.push((x as f32 * TILE_SIZE.x, y as f32 * TILE_SIZE.y));
+            }
+        }
+    }
     points
 }

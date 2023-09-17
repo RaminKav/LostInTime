@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use crate::{proto::proto_param::ProtoParam, GameParam};
+use crate::{item::WorldObject, proto::proto_param::ProtoParam, GameParam};
 
 use super::{TileMapPosition, WorldObjectEntityData, CHUNK_SIZE, TILE_SIZE};
 
@@ -116,9 +116,16 @@ pub fn get_neighbour_obj_data(
 pub fn can_object_be_placed_here(
     tile_pos: TileMapPosition,
     game: &mut GameParam,
-    is_medium: bool,
+    obj: WorldObject,
     proto_param: &ProtoParam,
 ) -> bool {
+    let tile_data = game.get_tile_data(tile_pos).expect("no tile here");
+    if tile_data.block_type.contains(&WorldObject::WaterTile) && obj != WorldObject::Bridge {
+        debug!("water here {tile_pos:?}");
+        return false;
+    }
+
+    let is_medium = obj.is_medium_size(proto_param);
     if is_medium
         && (game
             .get_obj_entity_at_tile(tile_pos, &proto_param)

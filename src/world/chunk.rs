@@ -189,9 +189,21 @@ impl ChunkPlugin {
                     tile_storage.set(&tile_pos, tile_entity);
 
                     // spawn water colliders
-                    if blocks.contains(&WorldObject::WaterTile)
-                        && blocks.contains(&WorldObject::GrassTile)
-                    {
+                    if blocks.contains(&WorldObject::WaterTile) {
+                        let mut pos_offset = Vec2::ZERO;
+                        if blocks[0] == WorldObject::WaterTile {
+                            pos_offset += Vec2::new(-3., 3.);
+                        }
+                        if blocks[1] == WorldObject::WaterTile {
+                            pos_offset += Vec2::new(3., 3.);
+                        }
+                        if blocks[2] == WorldObject::WaterTile {
+                            pos_offset += Vec2::new(-3., -3.);
+                        }
+                        if blocks[3] == WorldObject::WaterTile {
+                            pos_offset += Vec2::new(3., -3.);
+                        }
+                        pos_offset = pos_offset.clamp(Vec2::new(-3., -3.), Vec2::new(3., 3.));
                         water_colliders.push(
                             commands
                                 .spawn((
@@ -200,7 +212,7 @@ impl ChunkPlugin {
                                             x as f32 * TILE_SIZE.x,
                                             y as f32 * TILE_SIZE.y,
                                             0.,
-                                        ),
+                                        ) + pos_offset.extend(0.),
                                     )),
                                     Collider::cuboid(TILE_SIZE.x / 2. - 2., TILE_SIZE.y / 2. - 2.),
                                     Name::new("WATER"),
