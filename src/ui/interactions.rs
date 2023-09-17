@@ -4,12 +4,12 @@ use strum_macros::{Display, EnumIter};
 
 use crate::{
     assets::Graphics,
+    attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::{CraftedItemEvent, CraftingTracker},
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
-    schematic::loot_chests::create_new_random_item_stack_with_attributes,
     ui::InventorySlotType,
     GameParam,
 };

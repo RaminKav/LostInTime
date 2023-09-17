@@ -258,6 +258,10 @@ impl ProtoPlugin {
         prototypes.load("proto/cauldronblock.prototype.ron");
         prototypes.load("proto/furnaceblock.prototype.ron");
         prototypes.load("proto/redstew.prototype.ron");
+        prototypes.load("proto/upgradestation.prototype.ron");
+        prototypes.load("proto/upgradestationblock.prototype.ron");
+        prototypes.load("proto/upgradetome.prototype.ron");
+        prototypes.load("proto/orboftransformation.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

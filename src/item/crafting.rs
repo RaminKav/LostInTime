@@ -2,14 +2,15 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::Deserialize;
 
 use crate::{
+    attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
     item::WorldObject,
     proto::proto_param::ProtoParam,
-    schematic::loot_chests::create_new_random_item_stack_with_attributes,
     ui::{
         crafting_ui::CraftingContainerType,
+        handle_hovering,
         ui_container_param::{self, UIContainersParam},
-        FurnaceContainer,
+        FurnaceContainer, FurnaceState, InventorySlotState, InventorySlotType,
     },
     GameState,
 };
@@ -24,7 +25,7 @@ impl Plugin for CraftingPlugin {
                 (
                     handle_crafting_update_when_inv_changes,
                     handle_crafted_item,
-                    handle_furnace_slot_update,
+                    handle_furnace_slot_update.after(handle_hovering),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -170,21 +171,35 @@ pub fn handle_furnace_slot_update(
     proto: ProtoParam,
     time: Res<Time>,
     recipes: Res<Recipes>,
+    mut inv_slots: Query<&mut InventorySlotState>,
 ) {
-    let process_furnace = |furnace: &mut FurnaceContainer| {
-        if !(furnace.items.items[1].is_some()
-            && (furnace.items.items[0].is_some() || furnace.timer.percent() != 0.))
-        {
+    let mut process_furnace = |furnace: &mut FurnaceContainer| {
+        let is_upgrade_furnace = furnace.items.items.len() == 2;
+        let mut needs_fuel = false;
+        if let Some(fuel_state) = furnace.state.as_mut() {
+            fuel_state.current_fuel_left.tick(time.delta());
+        } else {
+            needs_fuel = true;
+        }
+        if furnace.items.items[1].is_none() || (furnace.items.items[0].is_none() && needs_fuel) {
             furnace.timer.reset();
             return;
         }
         let ingredient = furnace.items.items[1].as_ref().unwrap();
-        let curr_result_obj = furnace.items.items[2].clone();
+        let curr_result_obj = if is_upgrade_furnace {
+            None
+        } else {
+            furnace.items.items[2].clone()
+        };
 
-        let expected_result = recipes
-            .furnace_list
-            .get(&ingredient.item_stack.obj_type)
-            .expect("incorrect furnace recipe?");
+        let expected_result = if is_upgrade_furnace {
+            &WorldObject::None
+        } else {
+            recipes
+                .furnace_list
+                .get(&ingredient.item_stack.obj_type)
+                .expect("incorrect furnace recipe?")
+        };
         if let Some(curr_result) = curr_result_obj {
             if curr_result.item_stack.obj_type != expected_result.clone() {
                 // the ingredient in slot 1 does not match the current output in slot 2
@@ -193,24 +208,68 @@ pub fn handle_furnace_slot_update(
             }
         }
 
-        if furnace.timer.percent() == 0. {
-            let updated_fuel = furnace.items.items[0].as_mut().unwrap().modify_count(-1);
+        if needs_fuel {
+            let fuel = furnace.items.items[0].as_mut().unwrap();
+            let mut fuel_state = FurnaceState::from_fuel(*fuel.get_obj());
+            fuel_state.current_fuel_left.tick(time.delta());
+            furnace.state = Some(fuel_state);
+            let updated_fuel = fuel.modify_count(-1);
             furnace.items.items[0] = updated_fuel;
-            furnace.timer.tick(time.delta());
-        } else {
-            furnace.timer.tick(time.delta());
         }
 
-        if furnace.timer.just_finished() {
-            let updated_result = if let Some(mut existing_result) = furnace.items.items[2].clone() {
-                existing_result.modify_count(1).unwrap()
-            } else {
-                InventoryItemStack::new(proto.get_item_data(*expected_result).unwrap().clone(), 0)
-            };
-            furnace.items.items[2] = Some(updated_result);
+        furnace.timer.tick(time.delta());
 
-            let updated_resource = furnace.items.items[1].as_mut().unwrap().modify_count(-1);
-            furnace.items.items[1] = updated_resource;
+        if furnace.timer.just_finished() {
+            if !is_upgrade_furnace {
+                let updated_result =
+                    if let Some(mut existing_result) = furnace.items.items[2].clone() {
+                        existing_result.modify_count(1).unwrap()
+                    } else {
+                        InventoryItemStack::new(
+                            proto.get_item_data(*expected_result).unwrap().clone(),
+                            0,
+                        )
+                    };
+                furnace.items.items[2] = Some(updated_result);
+                let updated_resource = furnace.items.items[1].as_mut().unwrap().modify_count(-1);
+                furnace.items.items[1] = updated_resource;
+            } else {
+                match furnace
+                    .state
+                    .as_ref()
+                    .expect("no furnace state")
+                    .current_fuel_type
+                {
+                    WorldObject::UpgradeTome => {
+                        furnace.items.items[1]
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                            .modify_attributes(
+                                AttributeModifier {
+                                    modifier: "attack".to_owned(),
+                                    delta: 1,
+                                },
+                                &mut furnace.items,
+                            );
+                    }
+                    WorldObject::OrbOfTransformation => {
+                        let old_item = furnace.items.items[1].as_ref().unwrap();
+                        furnace.items.items[1] = Some(InventoryItemStack::new(
+                            reroll_item_bonus_attributes(&old_item.item_stack, &proto),
+                            old_item.slot,
+                        ));
+                    }
+                    _ => {}
+                }
+                InventoryPlugin::mark_slot_dirty(1, InventorySlotType::Furnace, &mut inv_slots);
+            }
+
+            if let Some(state) = furnace.state.as_ref() {
+                if state.current_fuel_left.finished() {
+                    furnace.state = None;
+                }
+            }
             furnace.timer.reset();
         }
     };

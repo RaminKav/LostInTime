@@ -18,6 +18,7 @@ use crate::{
     CustomFlush, GameParam, GameState, Player,
 };
 use modifiers::*;
+pub mod attribute_helpers;
 pub mod hunger;
 use hunger::*;
 
@@ -361,6 +362,14 @@ impl ItemRarity {
             ItemRarity::Uncommon => LIGHT_GREEN,
             ItemRarity::Rare => LIGHT_BLUE,
             ItemRarity::Legendary => LIGHT_RED,
+        }
+    }
+    pub fn get_next_rarity(&self) -> ItemRarity {
+        match self {
+            ItemRarity::Common => ItemRarity::Uncommon,
+            ItemRarity::Uncommon => ItemRarity::Rare,
+            ItemRarity::Rare => ItemRarity::Legendary,
+            ItemRarity::Legendary => ItemRarity::Legendary,
         }
     }
 }

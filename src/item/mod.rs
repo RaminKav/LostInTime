@@ -276,6 +276,10 @@ pub enum WorldObject {
     AlchemyTable,
     AlchemyTableBlock,
     RedStew,
+    UpgradeTome,
+    OrbOfTransformation,
+    UpgradeStation,
+    UpgradeStationBlock,
 }
 
 #[derive(
