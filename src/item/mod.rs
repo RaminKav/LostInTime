@@ -1,9 +1,7 @@
 use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
-use crate::colors::{
-    BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, UI_GRASS_GREEN, YELLOW,
-};
+use crate::colors::{BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, RED, UI_GRASS_GREEN};
 use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::enemy::Mob;
@@ -164,17 +162,17 @@ pub struct Size(pub Vec2);
     Default,
     Ord,
     PartialOrd,
+    EnumIter,
 )]
 #[reflect(Component, Schematic)]
 pub enum WorldObject {
     #[default]
     None,
     GrassTile,
+    StoneTile,
     StoneWall,
     StoneWallBlock,
-    DungeonStone,
     WaterTile,
-    SandTile,
     Flint,
     SmallYellowTree,
     SmallGreenTree,
@@ -376,7 +374,6 @@ impl WorldObject {
     pub fn is_block(&self) -> bool {
         match self {
             WorldObject::StoneWall => true,
-            WorldObject::DungeonStone => true,
             _ => false,
         }
     }
@@ -462,24 +459,29 @@ impl WorldObject {
         item
     }
 
-    pub fn get_minimap_color(&self) -> Color {
+    pub fn get_obj_color(&self) -> Color {
         match self {
             WorldObject::None => BLACK,
             WorldObject::Grass => UI_GRASS_GREEN,
-            WorldObject::RedMushroom => UI_GRASS_GREEN,
-            WorldObject::BrownMushroom => UI_GRASS_GREEN,
-            WorldObject::BerryBush => UI_GRASS_GREEN,
+            WorldObject::Grass2 => UI_GRASS_GREEN,
+            WorldObject::Grass3 => UI_GRASS_GREEN,
+            WorldObject::RedMushroom => RED,
+            WorldObject::BrownMushroom => BROWN,
+            WorldObject::BerryBush => DARK_GREEN,
             WorldObject::GrassTile => LIGHT_GREEN,
             WorldObject::DeadSapling => BROWN,
             WorldObject::StoneWall => LIGHT_GREY,
             WorldObject::Boulder => LIGHT_GREY,
             WorldObject::CoalBoulder => LIGHT_GREY,
             WorldObject::MetalBoulder => LIGHT_GREY,
-            WorldObject::DungeonStone => BLACK,
             WorldObject::WaterTile => BLUE,
-            WorldObject::SandTile => YELLOW,
             WorldObject::SmallGreenTree => DARK_GREEN,
-            WorldObject::Crate => UI_GRASS_GREEN,
+            WorldObject::Crate => BROWN,
+            WorldObject::Crate2 => BROWN,
+            WorldObject::SmallYellowTree => DARK_GREEN,
+            WorldObject::MediumYellowTree => DARK_GREEN,
+            WorldObject::MediumGreenTree => DARK_GREEN,
+
             _ => BLACK,
         }
     }

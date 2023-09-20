@@ -38,7 +38,10 @@ impl Plugin for CollisionPlugion {
 fn check_melee_hit_collisions(
     mut commands: Commands,
     context: ResMut<RapierContext>,
-    weapons: Query<(Entity, &Parent, &WorldObject), (Without<HitMarker>, With<MainHand>)>,
+    weapons: Query<
+        (Entity, &Parent, &GlobalTransform, &WorldObject),
+        (Without<HitMarker>, With<MainHand>),
+    >,
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
     inv_state: Res<InventoryState>,
@@ -46,14 +49,14 @@ fn check_melee_hit_collisions(
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     lifesteal: Query<&Lifesteal>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    mob_txfms: Query<&GlobalTransform, With<Mob>>,
 ) {
-    if let Ok(weapon) = weapons.get_single() {
-        let weapon_parent = weapon.1;
+    if let Ok((weapon_e, weapon_parent, weapon_t, weapon_obj)) = weapons.get_single() {
         if let Some(hit) = context.intersection_pairs().find(|c| {
-            (c.0 == weapon.0 && c.1 != weapon_parent.get())
-                || (c.1 == weapon.0 && c.0 != weapon_parent.get())
+            (c.0 == weapon_e && c.1 != weapon_parent.get())
+                || (c.1 == weapon_e && c.0 != weapon_parent.get())
         }) {
-            let hit_entity = if hit.0 == weapon.0 { hit.1 } else { hit.0 };
+            let hit_entity = if hit.0 == weapon_e { hit.1 } else { hit.0 };
             if !game.game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
                 return;
             }
@@ -72,8 +75,12 @@ fn check_melee_hit_collisions(
                     &mut inv.single_mut().items,
                 );
             }
-            commands.entity(weapon.0).insert(HitMarker);
+            commands.entity(weapon_e).insert(HitMarker);
             let damage = game.calculate_player_damage().0 as i32;
+            let Ok(mob_txfm) = mob_txfms.get(hit_entity) else {
+                return;
+            };
+            let delta = weapon_t.translation() - mob_txfm.translation();
             if let Ok(lifesteal) = lifesteal.get(game.game.player) {
                 modify_health_events.send(ModifyHealthEvent(f32::floor(
                     damage as f32 * lifesteal.0 as f32 / 100.,
@@ -82,8 +89,8 @@ fn check_melee_hit_collisions(
             hit_event.send(HitEvent {
                 hit_entity,
                 damage,
-                dir: Vec2::new(0., 0.),
-                hit_with_melee: Some(*weapon.2),
+                dir: delta.normalize_or_zero().truncate() * -1.,
+                hit_with_melee: Some(*weapon_obj),
                 hit_with_projectile: None,
             });
         }

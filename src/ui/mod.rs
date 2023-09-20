@@ -43,8 +43,8 @@ pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
 pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
-pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
-pub const FURNACE_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
+pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
+pub const FURNACE_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
 pub const UI_SLOT_SIZE: f32 = 20.0;
 
 pub struct UIPlugin;
@@ -130,6 +130,7 @@ impl Plugin for UIPlugin {
                     add_container_to_new_furnace_objs,
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     update_foodbar,
+                    update_furnace_bar,
                     update_mana_bar,
                     handle_spawn_inv_player_stats.after(CustomFlush),
                     handle_cursor_stats_buttons.run_if(in_state(UIState::Stats)),

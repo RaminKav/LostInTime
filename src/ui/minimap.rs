@@ -168,7 +168,7 @@ fn setup_mini_map(
                             .cache
                             .get(&TileMapPosition::new(chunk_pos, tile_pos))
                         {
-                            let c = cached_tile.get_minimap_color();
+                            let c = cached_tile.get_obj_color();
 
                             data.push((c.r() * 255.) as u8);
                             data.push((c.g() * 255.) as u8);
@@ -190,7 +190,7 @@ fn setup_mini_map(
                             //     continue;
                             // }
                             //Copy 1 pixel at index 0,1 2,3
-                            let c = tile[(q + offset) as usize].get_minimap_color();
+                            let c = tile[(q + offset) as usize].get_obj_color();
 
                             data.push((c.r() * 255.) as u8);
                             data.push((c.g() * 255.) as u8);

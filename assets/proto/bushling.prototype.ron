@@ -7,7 +7,7 @@
     "survival_rogue_like::enemy::FollowSpeed": (0.50),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 64., startup: 0.2, duration: 0.3, cooldown: 1.8, speed: 75.),
-    "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/bushling/bushling_down.png", size: (x: 38., y: 38.), cols: 9, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,9,6], anim_offset: 0),

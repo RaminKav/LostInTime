@@ -9,7 +9,7 @@ use crate::{
 use super::{
     chunk::GenerateObjectsEvent,
     generation::WallBreakEvent,
-    world_helpers::{get_neighbour_obj_data, get_neighbour_quadrant, world_pos_to_tile_pos},
+    world_helpers::{get_neighbour_obj_data, get_neighbour_tile, world_pos_to_tile_pos},
     TileMapPosition,
 };
 #[derive(Component)]
@@ -29,7 +29,7 @@ pub fn update_wall(
     mut game: GameParam,
     txns: Query<&GlobalTransform>,
     chunk_wall_cache: Query<&mut ChunkWallCache>,
-    gen_check: Res<Events<GenerateObjectsEvent>>,
+    gen_check: EventReader<GenerateObjectsEvent>,
 ) {
     if !gen_check.is_empty() {
         return;
@@ -44,6 +44,7 @@ pub fn update_wall(
             txns.get(wall_entity).unwrap().translation().truncate() - Vec2::new(0., 8.),
         );
 
+        //collect information about neighbour walls into a hashmap for later use
         let mut neighbour_walls: HashMap<TileMapPosition, _> = HashMap::new();
         let mut final_sprite_index = 0;
         for dy in -1i8..=1 {
@@ -52,9 +53,10 @@ pub fn update_wall(
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let neighbour_pos = get_neighbour_quadrant(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
                 let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
-                    continue 'outer;};
+                    continue 'outer;
+                };
                 if let Ok(cache) = chunk_wall_cache.get(*neighbour_chunk_e) {
                     if let Some(cached_wall) = cache.walls.get(&neighbour_pos) {
                         neighbour_walls.insert(neighbour_pos, *cached_wall);
@@ -75,7 +77,7 @@ pub fn update_wall(
 
                 // only use neighbours that are a wall
                 let mut neighbour_is_wall = false;
-                let neighbour_pos = get_neighbour_quadrant(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
 
                 if let Some(is_wall) = neighbour_walls.get(&neighbour_pos) {
                     if *is_wall {
@@ -105,7 +107,7 @@ pub fn update_wall(
                     continue;
                 }
                 // only use neighbours that are walls
-                let neighbour_pos = get_neighbour_quadrant(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
 
                 let mut this_corner_neighbour_is_wall = false;
 
@@ -152,7 +154,6 @@ pub fn update_wall(
                 }
             }
         }
-
         let mut new_wall_data = game
             .get_tile_obj_data_mut(new_wall_pos.clone(), &proto_param)
             .unwrap();
@@ -236,7 +237,7 @@ pub fn mark_neighbour_walls_dirty(
                 continue;
             }
             let wall_pos = target_pos;
-            let neighbour_pos = get_neighbour_quadrant(wall_pos.clone(), (dx, dy));
+            let neighbour_pos = get_neighbour_tile(wall_pos.clone(), (dx, dy));
             let neighbour_chunk_e = game.get_chunk_entity(neighbour_pos.chunk_pos).unwrap();
             if let Ok(cache) = chunk_wall_cache.get(*neighbour_chunk_e) {
                 if let Some(true) = cache.walls.get(&neighbour_pos).cloned() {

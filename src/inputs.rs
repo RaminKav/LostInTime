@@ -1,13 +1,15 @@
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
+use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::handle_player_raw_position;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 
+use bevy_hanabi::EffectSpawner;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
-use bevy_rapier2d::prelude::systems::update_character_controls;
+
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use interpolation::Lerp;
 use rand::rngs::ThreadRng;
@@ -25,7 +27,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, WorldObject};
+use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
@@ -37,7 +39,7 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
-use crate::{CoreGameSet, Game, GameUpscale, Player, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, GameUpscale, Player, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -69,6 +71,14 @@ pub enum FacingDirection {
     Down,
 }
 impl FacingDirection {
+    pub fn get_dir_vec(&self) -> Vec2 {
+        match self {
+            Self::Left => Vec2::new(-1., 0.),
+            Self::Right => Vec2::new(1., 0.),
+            Self::Up => Vec2::new(0., 1.),
+            Self::Down => Vec2::new(0., -1.),
+        }
+    }
     pub fn from_translation(translation: Vec2) -> Self {
         if translation.x.abs() > translation.y.abs() {
             if translation.x > 0. {
@@ -194,6 +204,7 @@ pub fn move_player(
             &TextureAtlasSprite,
             &Speed,
             &Hunger,
+            &mut RunDustTimer,
         ),
         (
             With<Player>,
@@ -206,9 +217,19 @@ pub fn move_player(
     key_input: ResMut<Input<KeyCode>>,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut commands: Commands,
+    mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
 ) {
-    let (player_e, mut player_kcc, mut mv, curr_anim, anim_state, sprite, speed, hunger) =
-        player_query.single_mut();
+    let (
+        player_e,
+        mut player_kcc,
+        mut mv,
+        curr_anim,
+        anim_state,
+        sprite,
+        speed,
+        hunger,
+        mut run_dust_timer,
+    ) = player_query.single_mut();
     let player = game.player_mut();
     if player.is_attacking {
         mv.0 = Vec2::ZERO;
@@ -298,6 +319,15 @@ pub fn move_player(
             pos: None,
             new_tile: None,
         });
+        if run_dust_timer.0.percent() == 0. {
+            particle.single_mut().reset();
+            run_dust_timer.0.tick(time.delta());
+        } else {
+            run_dust_timer.0.tick(time.delta());
+            if run_dust_timer.0.finished() {
+                run_dust_timer.0.reset()
+            }
+        }
     } else {
         if curr_anim != &EnemyAnimationState::Idle
             && anim_state.is_done_current_animation(sprite.index)

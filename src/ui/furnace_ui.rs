@@ -1,14 +1,16 @@
 pub use bevy::prelude::*;
+use bevy::{render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
+    colors::YELLOW,
     inventory::Container,
-    item::{CraftingTracker, Recipes, WorldObject},
+    item::{Recipes, WorldObject},
 };
 
 use super::{
-    crafting_ui::CraftingContainerType, interactions::Interaction, spawn_inv_slot,
-    InventorySlotType, InventoryState, InventoryUI, UIState,
+    interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
+    UIState,
 };
 
 #[derive(Component, Resource, Debug, Clone)]
@@ -35,6 +37,8 @@ impl FurnaceState {
         }
     }
 }
+#[derive(Component)]
+pub struct FurnaceProgBar;
 
 pub fn setup_furnace_slots_ui(
     mut commands: Commands,
@@ -67,6 +71,39 @@ pub fn setup_furnace_slots_ui(
             item.clone(),
         );
     }
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: YELLOW,
+                custom_size: Some(Vec2::new(18., 2.)),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-8., 47., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(FurnaceProgBar)
+        .insert(Name::new("inner xp bar"))
+        .set_parent(inv_query.single());
+}
+pub fn update_furnace_bar(
+    furnace_option: Option<ResMut<FurnaceContainer>>,
+    mut furnace_bar_query: Query<&mut Sprite, With<FurnaceProgBar>>,
+) {
+    let Some(furnace) = furnace_option else {
+        return;
+    };
+    if let Ok(mut furnace_bar) = furnace_bar_query.get_single_mut() {
+        furnace_bar.custom_size = Some(Vec2 {
+            x: 18. * furnace.timer.percent(),
+            y: 2.,
+        })
+    };
 }
 pub fn change_ui_state_to_furnace_when_resource_added(
     mut inv_ui_state: ResMut<NextState<UIState>>,

@@ -7,14 +7,15 @@ use bevy::{
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
-use strum_macros::{Display, IntoStaticStr};
+use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use crate::{
     ai::{
         AttackDistance, FollowState, HurtByPlayer, IdleState, LeapAttackState, LineOfSight,
         NightTimeAggro, ProjectileAttackState,
     },
-    attributes::{add_current_health_with_max_health, Attack, CurrentHealth, MaxHealth},
+    attributes::{add_current_health_with_max_health, Attack, MaxHealth},
+    colors::{BLACK, DMG_NUM_PURPLE, UI_GRASS_GREEN},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     player::levels::ExperienceReward,
@@ -60,6 +61,7 @@ impl Plugin for EnemyPlugin {
     Reflect,
     FromReflect,
     IntoStaticStr,
+    EnumIter,
 )]
 #[reflect(Schematic)]
 pub enum Mob {
@@ -71,6 +73,20 @@ pub enum Mob {
     Hog,
     StingFly,
     Bushling,
+}
+
+impl Mob {
+    pub fn get_mob_color(&self) -> Color {
+        match self {
+            Mob::None => BLACK,
+            Mob::Slime => UI_GRASS_GREEN,
+            Mob::SpikeSlime => UI_GRASS_GREEN,
+            Mob::Bushling => UI_GRASS_GREEN,
+            Mob::StingFly => UI_GRASS_GREEN,
+            Mob::FurDevil => DMG_NUM_PURPLE,
+            _ => BLACK,
+        }
+    }
 }
 #[derive(
     Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect, PartialEq, Eq,
@@ -295,7 +311,7 @@ fn juice_up_spawned_elite_mobs(
         Added<EliteMob>,
     >,
 ) {
-    for (mut e, mut hp, mut att, mut exp, mut loot) in elites.iter_mut() {
+    for (_e, mut hp, mut att, mut exp, mut loot) in elites.iter_mut() {
         hp.0 *= 2;
         att.0 *= 2;
         exp.0 *= 4;

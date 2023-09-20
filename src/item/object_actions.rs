@@ -1,7 +1,7 @@
 use super::get_crafting_inventory_item_stacks;
 use super::item_actions::ItemActionParam;
 
-use crate::inventory::{Container, InventoryItemStack};
+use crate::inventory::Container;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dungeon::DungeonPlugin;
@@ -41,10 +41,9 @@ impl ObjectAction {
             }
             ObjectAction::Teleport(pos) => {
                 let pos = world_pos_to_tile_pos(*pos);
-                item_action_param.move_player_event.send(MovePlayerEvent {
-                    chunk_pos: pos.chunk_pos,
-                    tile_pos: pos.tile_pos,
-                });
+                item_action_param
+                    .move_player_event
+                    .send(MovePlayerEvent { pos });
             }
             ObjectAction::DungeonTeleport => {
                 DungeonPlugin::spawn_new_dungeon_dimension(

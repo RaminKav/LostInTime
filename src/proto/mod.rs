@@ -10,11 +10,12 @@ use bevy::{
 use bevy_proto::{
     backend::schematics::FromSchematicInput,
     prelude::{
-        prototype_ready, ProtoCommands, PrototypesMut, ReflectSchematic, Schematic,
+        prototype_ready, ProtoCommands, Prototypes, PrototypesMut, ReflectSchematic, Schematic,
         SchematicContext,
     },
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
+use strum::IntoEnumIterator;
 
 pub mod proto_param;
 use crate::{
@@ -124,7 +125,12 @@ impl Plugin for ProtoPlugin {
             .register_type_data::<Range<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
-            .add_startup_system(Self::load_prototypes.before(CustomFlush))
+            .add_system(Self::load_prototypes.in_set(OnUpdate(GameState::Loading)))
+            .add_system(
+                Self::check_proto_ready
+                    .after(Self::load_prototypes)
+                    .in_set(OnUpdate(GameState::Loading)),
+            )
             .add_system(
                 Self::spawn_proto_resources
                     .in_schedule(OnEnter(GameState::Main))
@@ -268,6 +274,36 @@ impl ProtoPlugin {
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");
     }
+    fn check_proto_ready(prototypes: Prototypes, mut next_state: ResMut<NextState<GameState>>) {
+        for obj in WorldObject::iter() {
+            if obj == WorldObject::None
+                || obj == WorldObject::WaterTile
+                || obj == WorldObject::GrassTile
+                || obj == WorldObject::StoneTile
+            {
+                continue;
+            }
+            let p = <WorldObject as Into<&str>>::into(obj.clone()).to_owned();
+
+            if !prototypes.is_ready(&p) {
+                println!("proto {p:?} not ready");
+                return;
+            }
+        }
+        for mob in Mob::iter() {
+            if mob == Mob::None {
+                continue;
+            }
+            let p = <Mob as Into<&str>>::into(mob.clone()).to_owned();
+
+            if !prototypes.is_ready(&p) {
+                println!("proto {p:?} not ready");
+                return;
+            }
+        }
+        println!("READY, ENTERING GAME STATE");
+        next_state.0 = Some(GameState::Main);
+    }
 }
 #[derive(Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
@@ -342,14 +378,16 @@ impl From<ColliderProto> for Collider {
 #[reflect(Schematic)]
 #[schematic(into = Collider)]
 pub struct ColliderCapsulProto {
-    x: f32,
-    y: f32,
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
     r: f32,
 }
 
 impl From<ColliderCapsulProto> for Collider {
     fn from(c: ColliderCapsulProto) -> Collider {
-        Collider::capsule(Vec2::new(0., c.x), Vec2::new(0., c.y), c.r)
+        Collider::capsule(Vec2::new(c.x1, c.y1), Vec2::new(c.x2, c.y2), c.r)
     }
 }
 

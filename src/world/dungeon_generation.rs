@@ -113,24 +113,21 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
             .choose(&mut rand::thread_rng());
 
         if let Some((x, _)) = picked_tile {
-            let player_pos = TileMapPosition::new(
+            let player_tile_pos = TileMapPosition::new(
                 IVec2::new(
-                    f64::floor((x as f64 - CHUNK_SIZE as f64 * 2.) as f64 / (CHUNK_SIZE * 2) as f64)
-                        as i32,
-                    f64::floor(
-                        ((CHUNK_SIZE as f64 * 2.) - y as f64 - 1.) as f64 / (CHUNK_SIZE * 2) as f64,
-                    ) as i32
+                    f64::floor((x as f64 - CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64) as i32,
+                    f64::floor(((CHUNK_SIZE as f64) - y as f64 - 1.) as f64 / (CHUNK_SIZE) as f64)
+                        as i32
                         + 1,
                 ),
                 TilePos {
-                    x: f64::floor(x as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as u32,
-                    y: f64::ceil(
-                        CHUNK_SIZE as f64 - (y as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as f64,
-                    ) as u32
+                    x: f64::floor(x as f64 % (CHUNK_SIZE) as f64) as u32,
+                    y: f64::ceil(CHUNK_SIZE as f64 - (y as f64 % (CHUNK_SIZE) as f64) as f64)
+                        as u32
                         - 1,
                 },
             );
-            let temp_world_pos = tile_pos_to_world_pos(player_pos, false) + Vec2::new(0., 9.);
+            let temp_world_pos = tile_pos_to_world_pos(player_tile_pos, false) + Vec2::new(0., 9.);
             let player_pos = world_pos_to_tile_pos(temp_world_pos);
             return Some(player_pos);
         }
@@ -167,7 +164,9 @@ pub fn add_dungeon_chests(
     new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
     mut place_item_event: EventWriter<PlaceItemEvent>,
 ) {
-    let Ok(dungeon) = new_dungeon.get_single() else {return};
+    let Ok(dungeon) = new_dungeon.get_single() else {
+        return;
+    };
     let mut rng = rand::thread_rng();
     let grid_size = dungeon.grid.len();
     let mut picked_x;

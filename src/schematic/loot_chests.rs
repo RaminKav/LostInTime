@@ -3,12 +3,9 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 
 use crate::{
-    attributes::{
-        attribute_helpers::create_new_random_item_stack_with_attributes, ItemAttributes,
-        ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes,
-    },
-    inventory::{InventoryItemStack, ItemStack},
-    item::{EquipmentType, Loot, LootTable, LootTablePlugin, WorldObject},
+    attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
+    inventory::InventoryItemStack,
+    item::{Loot, LootTable, LootTablePlugin, WorldObject},
     proto::proto_param::ProtoParam,
     ui::ChestContainer,
 };
@@ -45,7 +42,7 @@ pub fn handle_new_loot_chest_spawn(
                     Loot::new(WorldObject::Arrow, 11, 48, 0.85),
                     Loot::new(WorldObject::ThrowingStar, 11, 48, 0.85),
                     Loot::new(WorldObject::WoodPlank, 1, 4, 0.25),
-                    Loot::new(WorldObject::Pebble, 1, 4, 0.25),
+                    Loot::new(WorldObject::PebbleBlock, 1, 4, 0.25),
                     Loot::new(WorldObject::Bandage, 1, 1, 0.09),
                 ],
             },

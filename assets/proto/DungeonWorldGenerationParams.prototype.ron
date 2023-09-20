@@ -6,7 +6,7 @@
   schematics: {
     "survival_rogue_like::world::WorldGeneration": (
       water_frequency: 0.0,
-      dungeon_stone_frequency: 1.0,
+      stone_frequency: 1.0,
       sand_frequency: 0.0,
       dirt_frequency: 0.0,
       stone_wall_frequency: 1.0,
@@ -20,11 +20,11 @@
         DeadSapling: 0.0,
       },
       obj_allowed_tiles_map: {
-        Boulder: [GrassTile],
-        Grass: [GrassTile],
-        DeadSapling: [SandTile],
-        Chest: [SandTile,GrassTile, DungeonStone],
-        StoneWall: [GrassTile, DungeonStone]
+        Boulder: [GrassTile, StoneTile],
+        Grass: [GrassTile, StoneTile],
+        DeadSapling: [GrassTile, StoneTile],
+        Chest: [GrassTile, StoneTile],
+        StoneWall: [GrassTile, StoneTile]
       }
     ),
   }

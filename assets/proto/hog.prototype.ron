@@ -6,7 +6,7 @@
     "survival_rogue_like::enemy::CombatAlignment": Passive,
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),
-    "survival_rogue_like::proto::ColliderCapsulProto": (x: -1., y: -1.5, r: 7.5),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.5),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/hog/hog_down.png", size: (x: 64., y: 64.), cols: 4, rows: 6),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,4,4], anim_offset: 0),

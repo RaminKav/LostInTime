@@ -9,6 +9,7 @@ use attributes::{
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
 
+use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
 
@@ -31,6 +32,7 @@ use bevy::{
     window::{PresentMode, WindowResolution},
 };
 
+mod juice;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rapier2d::prelude::*;
 mod ai;
@@ -77,7 +79,7 @@ use world::{ChunkManager, WorldGeneration};
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
 const PLAYER_MOVE_SPEED: f32 = 64. * ZOOM_SCALE;
-const PLAYER_DASH_SPEED: f32 = 475. * ZOOM_SCALE;
+const PLAYER_DASH_SPEED: f32 = 275. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
@@ -138,9 +140,10 @@ fn main() {
         .add_plugin(ClientPlugin)
         .add_plugin(ProtoPlugin)
         .add_plugin(SchematicPlugin)
+        .add_plugin(JuicePlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
-        .add_loading_state(LoadingState::new(GameState::Loading).continue_to_state(GameState::Main))
+        .add_loading_state(LoadingState::new(GameState::Loading))
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .run();
 }

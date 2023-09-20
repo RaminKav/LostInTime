@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::tiles::TilePos;
-use bevy_proto::{backend::proto, prelude::ProtoCommands};
+
+use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{
     ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
     KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
@@ -21,12 +21,14 @@ use crate::{
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
     custom_commands::CommandsExt,
-    inputs::{move_player, FacingDirection, InputsPlugin, MovementVector},
-    inventory::{Container, Inventory, InventoryItemStack, ItemStack, INVENTORY_SIZE},
-    item::{get_crafting_inventory_item_stacks, EquipmentData, RecipeList, Recipes, WorldObject},
+    inputs::{move_player, FacingDirection, MovementVector},
+    inventory::{Container, Inventory, INVENTORY_SIZE},
+    item::{get_crafting_inventory_item_stacks, EquipmentData, Recipes, WorldObject},
+    juice::RunDustTimer,
     proto::proto_param::ProtoParam,
-    world::{y_sort::YSort, CHUNK_SIZE},
-    AppExt, CoreGameSet, Game, GameParam, GameState, RawPosition,
+    ui::crafting_ui::CraftingContainerType,
+    world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
+    AppExt, Game, GameParam, GameState, RawPosition,
 };
 
 use self::{
@@ -36,8 +38,7 @@ use self::{
 pub struct PlayerPlugin;
 
 pub struct MovePlayerEvent {
-    pub chunk_pos: IVec2,
-    pub tile_pos: TilePos,
+    pub pos: TileMapPosition,
 }
 #[derive(Component, Debug)]
 pub struct Player;
@@ -114,14 +115,12 @@ pub fn handle_move_player(
 ) {
     for m in move_events.iter() {
         //TODO: Add world helper to get chunk -> world pos, lots of copy code in item.rs
-        let new_pos = Vec3::new(
-            (m.tile_pos.x as i32 * 32 + m.chunk_pos.x * CHUNK_SIZE as i32 * 32) as f32,
-            (m.tile_pos.y as i32 * 32 + m.chunk_pos.y * CHUNK_SIZE as i32 * 32) as f32,
-            0.,
-        );
+
+        let world_pos = tile_pos_to_world_pos(m.pos, false);
+
         let (mut raw_pos, mut pos) = player.single_mut();
-        raw_pos.0 = new_pos.truncate();
-        pos.translation = new_pos;
+        raw_pos.0 = world_pos;
+        pos.translation = world_pos.extend(0.);
     }
 }
 /// Updates the player's [RawPosition] based on the [KinematicCharacterControllerOutput]
@@ -155,18 +154,15 @@ fn load_recipes_into_inventory_container_on_startup(
         return;
     }
     for mut inv in added_inv.iter_mut() {
+        //TODO: fix this to read from recipes not a hardcoded list
+        let objs = recipes
+            .crafting_list
+            .iter()
+            .filter(|r| r.1 .1 == CraftingContainerType::Inventory)
+            .map(|r| *r.0)
+            .collect();
         inv.crafting_items = Container {
-            items: get_crafting_inventory_item_stacks(
-                vec![
-                    WorldObject::String,
-                    WorldObject::Log,
-                    WorldObject::StoneChunk,
-                    WorldObject::WoodAxe,
-                    WorldObject::CraftingTableBlock,
-                ],
-                &recipes,
-                &proto,
-            ),
+            items: get_crafting_inventory_item_stacks(objs, &recipes, &proto),
             ..default()
         };
     }
@@ -243,6 +239,8 @@ fn spawn_player(
         .insert(ManaRegenTimer(Timer::from_seconds(0.5, TimerMode::Once)))
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
+        .insert(PlayerStats::new())
+        .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(SkillPoints { count: 0 })
         .insert(RigidBody::KinematicPositionBased)
         .id();
@@ -257,6 +255,7 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::OrbOfTransformation, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64);
@@ -269,4 +268,9 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Leather, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::Feather, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::CraftingTableBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeStation, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64);
 }
