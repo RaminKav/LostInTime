@@ -177,7 +177,7 @@ impl different att styles w seldum_state
 [] Aesthetics: Make grass foliage shader
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
-[] Aesthetics: Particle system for easy non-damaging animations/particles
+[x] Aesthetics: Particle system for easy non-damaging animations/particles
 -> use bevy_honabi and color maps
 [] Dungeons: add exit method, add chest generation
 [] ## Items: Trinkets
@@ -185,16 +185,16 @@ impl different att styles w seldum_state
 [x] # Gameplay: weapon scrolls
 [x] # Gameplay: weapon orbs of alteration
 [x] FIX: fix dash
-[] ### FIX: lag in dungeons use bevy_spacial?
-[] ### save/load/cache
 [x] Passive mobs that give leather
 [x] add leather armor
-[] cleanup proto obj files, add parent
 [x] # mobs dont spawn around player
-[] # bushlings have chance to spawn from bush
 [x] # add elite mobs
 [x] ### add resource UI (furnace, item upgrade station)
-[] add cursor tile highlight/world tooltip
+[] ### FIX: lag in dungeons use bevy_spacial?
+[] ### save/load/cache
+[] cleanup proto obj files, add parent
+[] # bushlings have chance to spawn from bush
+[] ## add cursor tile highlight/world tooltip
 [] enemy attack hit indicator/colliders
 [] multi attack swings player animations, bow anim, etc
 [x] bridges to cross water
@@ -459,8 +459,14 @@ add is_recipe bool to tool tips
 fix desc of all items
 bunch of recipes are missing, of course
 inv full cant pick up items you have room for in stacks, bug
-checking if obj can be spawned there bug (grass spawning behind boulder)
-speed up player attack animation as an exception, keep other anims the same speed
 
 fix camera, add acceleration
 use a more simple object gen algo for small objects, instead of PDS
+use tile coordinate multiplied by big number and module down to check if obj spawns. deterministic spawning.
+use air blocks to determin a broken tile, regen world
+add mana potions
+cleanup crafting/furnace ui
+red mushrooms dont stack for some reason
+somehow make recipe icons deterministic order
+chests in dungeons are spawning in walls...
+add in the remaining colors for obj/mobs

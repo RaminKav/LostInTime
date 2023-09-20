@@ -1,8 +1,7 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use rand::rngs::ThreadRng;
 use rand::Rng;
-use rand::{rngs::ThreadRng, SeedableRng};
-use rand_xorshift::XorShiftRng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
@@ -42,7 +41,7 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
     e
 }
 
-pub fn poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(f32, f32)> {
+pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(f32, f32)> {
     if f <= 0. {
         return vec![];
     }

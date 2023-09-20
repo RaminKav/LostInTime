@@ -7,10 +7,9 @@ use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
-    item::{CraftedItemEvent, CraftingTracker},
+    item::CraftedItemEvent,
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
-    ui::InventorySlotType,
     GameParam,
 };
 
@@ -39,6 +38,8 @@ pub enum UIElement {
     StatsButtonHover,
     PlayerHUDBars,
     EliteStar,
+    CraftingInventory,
+    FurnaceInventory,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -182,39 +183,41 @@ pub fn handle_drop_on_slot_events(
         // all we need to do here is swap spots in the inventory
         let no_more_dragging: bool;
         let slot_type = drop_event.drop_target_slot_state.r#type;
-        let return_item = if slot_type.is_crafting()
-            && cont_param
-                .crafting_tracker
-                .craftable
-                .contains(&drop_event.dropped_item_stack.obj_type)
-        {
-            InventoryPlugin::pick_up_and_merge_crafting_result_stack(
-                drop_event.dropped_item_stack.clone(),
-                drop_event.drop_target_slot_state.slot_index,
-                &mut inv.single_mut().crafting_items,
-            )
-        } else {
-            if slot_type.is_crafting() {
-                continue;
-            }
-            let inv_stack = InventoryItemStack {
-                item_stack: drop_event.dropped_item_stack.clone(),
-                slot: drop_event.drop_target_slot_state.slot_index,
-            };
-            if !inv_stack.validate(slot_type, &proto_param, &cont_param) {
-                return;
-            }
-            let mut inv = inv.single_mut();
-            let container = if slot_type.is_chest() {
-                &mut cont_param.chest_option.as_mut().unwrap().items
-            } else if slot_type.is_furnace() {
-                &mut cont_param.furnace_option.as_mut().unwrap().items
+        let obj = drop_event.dropped_item_stack.obj_type;
+        if slot_type.is_crafting() && !cont_param.crafting_tracker.craftable.contains(&obj) {
+            continue;
+        } else if slot_type.is_crafting() {
+            cont_param.crafted_event.send(CraftedItemEvent { obj });
+        }
+        let return_item =
+            if slot_type.is_crafting() && cont_param.crafting_tracker.craftable.contains(&obj) {
+                InventoryPlugin::pick_up_and_merge_crafting_result_stack(
+                    drop_event.dropped_item_stack.clone(),
+                    drop_event.drop_target_slot_state.slot_index,
+                    &mut inv.single_mut().crafting_items,
+                )
             } else {
-                inv.get_mut_items_from_slot_type(slot_type)
-            };
+                if slot_type.is_crafting() {
+                    continue;
+                }
+                let inv_stack = InventoryItemStack {
+                    item_stack: drop_event.dropped_item_stack.clone(),
+                    slot: drop_event.drop_target_slot_state.slot_index,
+                };
+                if !inv_stack.validate(slot_type, &proto_param, &cont_param) {
+                    return;
+                }
+                let mut inv = inv.single_mut();
+                let container = if slot_type.is_chest() {
+                    &mut cont_param.chest_option.as_mut().unwrap().items
+                } else if slot_type.is_furnace() {
+                    &mut cont_param.furnace_option.as_mut().unwrap().items
+                } else {
+                    inv.get_mut_items_from_slot_type(slot_type)
+                };
 
-            inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
-        };
+                inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
+            };
 
         let updated_drag_item;
         if let Some(return_item) = return_item {
@@ -411,7 +414,7 @@ pub fn handle_item_drop_clicks(
     mut right_clicks: Local<Vec<usize>>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-    let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
+    let right_mouse_pressed = mouse_input.pressed(MouseButton::Right);
     if !right_mouse_pressed {
         right_clicks.clear();
     }
@@ -489,6 +492,7 @@ pub fn handle_interaction_clicks(
     mut commands: Commands,
     cursor_pos: Res<CursorPos>,
     mut mouse_input: ResMut<Input<MouseButton>>,
+    key_input: ResMut<Input<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut inv_slots: Query<(Entity, &mut Interactable, &mut InventorySlotState)>,
     mut inv_item_icons: Query<(Entity, &mut Transform, &ItemStack)>,
@@ -509,7 +513,9 @@ pub fn handle_interaction_clicks(
 
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let left_mouse_pressing = mouse_input.pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.just_pressed(MouseButton::Right);
+    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
     let currently_dragging = dragging_query.iter().len() > 0;
     for (e, mut interactable, mut state) in inv_slots.iter_mut() {
         match hit_test {
@@ -518,7 +524,7 @@ pub fn handle_interaction_clicks(
                     interactable.change(Interaction::Hovering);
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && !currently_dragging {
+                    if left_mouse_pressed && !currently_dragging && !shift_key_pressed {
                         //send drag event
                         if let Some(item) = state.item {
                             if let Ok(item_icon) = inv_item_icons.get_mut(item) {
@@ -568,7 +574,7 @@ pub fn handle_interaction_clicks(
                                 mouse_input.clear();
                             }
                         }
-                    } else if right_mouse_pressed && !currently_dragging {
+                    } else if right_mouse_pressed && !currently_dragging && !shift_key_pressed {
                         if state.r#type.is_crafting() {
                             continue;
                         }
@@ -597,6 +603,25 @@ pub fn handle_interaction_clicks(
                                 commands.entity(e).insert(DraggedItem);
                                 interactable.change(Interaction::Dragging { item: e });
                                 mouse_input.clear();
+                            }
+                        }
+                    } else if shift_key_pressed && left_mouse_pressing {
+                        let mut inv = inv.single_mut();
+                        if let Some(active_container) =
+                            container_param.get_active_ui_container_mut()
+                        {
+                            if state.r#type.is_inventory() {
+                                InventoryPlugin::move_item_between_containers(
+                                    &mut inv.items,
+                                    active_container,
+                                    state.slot_index,
+                                )
+                            } else {
+                                InventoryPlugin::move_item_between_containers(
+                                    active_container,
+                                    &mut inv.items,
+                                    state.slot_index,
+                                )
                             }
                         }
                     }

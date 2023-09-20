@@ -72,7 +72,7 @@ impl Plugin for CombatPlugin {
                 handle_hits,
                 cleanup_marked_for_death_entities.after(handle_enemy_death),
                 handle_attack_cooldowns.before(CustomFlush),
-                spawn_hit_spark_effect.after(handle_hits),
+                // spawn_hit_spark_effect.after(handle_hits),
                 handle_invincibility_frames.after(handle_hits),
                 handle_enemy_death.after(handle_hits),
             )
@@ -107,11 +107,11 @@ pub fn handle_attack_cooldowns(
     }
 }
 fn handle_enemy_death(
-    mut commands: Commands,
+    _commands: Commands,
     proto_param: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
-    asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    _asset_server: Res<AssetServer>,
+    _texture_atlases: ResMut<Assets<TextureAtlas>>,
     loot_tables: Query<&LootTable>,
     mob_xp: Query<&ExperienceReward>,
     mut player_xp: Query<&mut PlayerLevel>,
@@ -119,22 +119,22 @@ fn handle_enemy_death(
     loot_bonus: Query<&LootRateBonus>,
 ) {
     for death_event in death_events.iter() {
-        let t = death_event.enemy_pos;
-        let texture_handle = asset_server.load("textures/effects/hit-particles.png");
-        let texture_atlas =
-            TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
-        let texture_atlas_handle = texture_atlases.add(texture_atlas);
-        commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas_handle,
-                transform: Transform::from_translation(t.extend(0.)),
-                ..default()
-            },
-            AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-            YSort(1.),
-            DoneAnimation,
-            Name::new("Hit Spark"),
-        ));
+        // let t = death_event.enemy_pos;
+        // let texture_handle = asset_server.load("textures/effects/hit-particles.png");
+        // let texture_atlas =
+        //     TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
+        // let texture_atlas_handle = texture_atlases.add(texture_atlas);
+        // commands.spawn((
+        //     SpriteSheetBundle {
+        //         texture_atlas: texture_atlas_handle,
+        //         transform: Transform::from_translation(t.extend(0.)),
+        //         ..default()
+        //     },
+        //     AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
+        //     YSort(1.),
+        //     DoneAnimation,
+        //     Name::new("Hit Spark"),
+        // ));
 
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
@@ -166,7 +166,7 @@ fn handle_invincibility_frames(
         }
     }
 }
-fn spawn_hit_spark_effect(
+fn _spawn_hit_spark_effect(
     mut commands: Commands,
     mut hit_events: EventReader<HitEvent>,
     game: Res<Game>,

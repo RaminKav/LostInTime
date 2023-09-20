@@ -119,10 +119,11 @@ pub fn can_object_be_placed_here(
     obj: WorldObject,
     proto_param: &ProtoParam,
 ) -> bool {
-    let tile_data = game.get_tile_data(tile_pos).expect("no tile here");
-    if tile_data.block_type.contains(&WorldObject::WaterTile) && obj != WorldObject::Bridge {
-        debug!("water here {tile_pos:?}");
-        return false;
+    if let Some(tile_data) = game.get_tile_data(tile_pos) {
+        if tile_data.block_type.contains(&WorldObject::WaterTile) && obj != WorldObject::Bridge {
+            debug!("water here {tile_pos:?}");
+            return false;
+        }
     }
 
     let is_medium = obj.is_medium_size(proto_param);

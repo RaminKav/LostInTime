@@ -1,6 +1,6 @@
 mod enemy_hostile_basic;
 
-use crate::{CoreGameSet, GameState, Plugin};
+use crate::{GameState, Plugin};
 
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;

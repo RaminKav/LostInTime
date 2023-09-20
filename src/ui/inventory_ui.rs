@@ -71,7 +71,7 @@ impl InventorySlotType {
     pub fn is_accessory(self) -> bool {
         self == InventorySlotType::Accessory
     }
-    pub fn is_normal(self) -> bool {
+    pub fn is_inventory(self) -> bool {
         self == InventorySlotType::Normal
     }
     pub fn is_chest(self) -> bool {
@@ -85,7 +85,7 @@ pub fn setup_inv_ui(
     cur_inv_state: Res<State<UIState>>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
 ) {
-    let (size, texture, t_offset) = match cur_inv_state.0 {
+    let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory => (
             INVENTORY_UI_SIZE,
             graphics
@@ -114,7 +114,7 @@ pub fn setup_inv_ui(
                 .ui_image_handles
                 .as_ref()
                 .unwrap()
-                .get(&UIElement::ChestInventory)
+                .get(&UIElement::CraftingInventory)
                 .unwrap()
                 .clone(),
             Vec2::new(22.5, 0.),
@@ -125,7 +125,7 @@ pub fn setup_inv_ui(
                 .ui_image_handles
                 .as_ref()
                 .unwrap()
-                .get(&UIElement::ChestInventory)
+                .get(&UIElement::FurnaceInventory)
                 .unwrap()
                 .clone(),
             Vec2::new(22.5, 0.),
@@ -141,7 +141,7 @@ pub fn setup_inv_ui(
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-t_offset.x, 0., -1.),
+                translation: Vec3::new(-pos_offset.x, 0., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -158,7 +158,7 @@ pub fn setup_inv_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(t_offset.x, t_offset.y, 10.),
+                translation: Vec3::new(pos_offset.x, pos_offset.y, 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -192,9 +192,9 @@ pub fn setup_inv_slots_ui(
     }
     let (should_spawn_equipment, crafting_items_option) = match inv_state.0 {
         UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
-        UIState::Crafting => (false, Some(crafting_container.unwrap().items.clone())),
+        UIState::Crafting => (true, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
-        UIState::Furnace => (false, None),
+        UIState::Furnace => (true, None),
         _ => return,
     };
     for (slot_index, item) in inv.single_mut().items.items.iter().enumerate() {
@@ -348,13 +348,18 @@ pub fn spawn_inv_slot(
     if slot_type.is_hotbar() {
         y = -GAME_HEIGHT / 2. + 14.;
         x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
-    } else if slot_type.is_crafting() || slot_type.is_furnace() {
+    } else if slot_type.is_crafting() {
         x = ((slot_index % 8) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
             + UI_SLOT_SIZE / 2.
-            + 4.;
+            + 6.;
+
         y = -((slot_index / 8) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
-            + 6. * UI_SLOT_SIZE
-            + 0.;
+            + 7. * UI_SLOT_SIZE
+            + 10.;
+        if inv_ui_state.0 == UIState::Inventory {
+            x -= 2.;
+            y -= 29.;
+        }
     } else if slot_type.is_equipment() {
         x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 7. + 5. * UI_SLOT_SIZE;
         y = slot_index as f32 * UI_SLOT_SIZE - (inv_state.inv_size.y + UI_SLOT_SIZE) / 2.
@@ -369,6 +374,18 @@ pub fn spawn_inv_slot(
             + 4.;
     } else if slot_type.is_chest() {
         y += 4. * UI_SLOT_SIZE + 11.;
+    } else if slot_type.is_furnace() {
+        println!("SLOT INDEX {slot_index:?}");
+        if slot_index == 0 {
+            x = -20.5;
+            y = 26.;
+        } else if slot_index == 1 {
+            x = -20.5;
+            y = 68.;
+        } else if slot_index == 2 {
+            x = 21.5;
+            y = 47.;
+        }
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
@@ -596,7 +613,7 @@ pub fn handle_update_inv_item_entities(
                 let item = inv_item.item_stack.clone();
                 for slot_state in inv_slot_state.iter_mut() {
                     if slot_state.slot_index == inv_item.slot
-                        && (slot_state.r#type.is_normal() || slot_state.r#type.is_hotbar())
+                        && (slot_state.r#type.is_inventory() || slot_state.r#type.is_hotbar())
                     {
                         if let Some(item_e) = slot_state.item {
                             commands.entity(item_e).insert(item.clone());

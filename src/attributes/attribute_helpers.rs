@@ -1,12 +1,10 @@
-use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 
 use crate::{
     attributes::{ItemAttributes, ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes},
-    inventory::{InventoryItemStack, ItemStack},
-    item::{EquipmentType, Loot, LootTable, LootTablePlugin, WorldObject},
+    inventory::ItemStack,
+    item::EquipmentType,
     proto::proto_param::ProtoParam,
-    ui::ChestContainer,
 };
 pub fn create_new_random_item_stack_with_attributes(
     stack: &ItemStack,

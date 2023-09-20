@@ -8,7 +8,7 @@
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 100., startup: 1., duration: 0.6, cooldown: 3.0, speed: 2.5),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/slime/slime_down.png", size: (x: 96., y: 96.), cols: 7, rows: 5),
-    "survival_rogue_like::proto::ColliderCapsulProto": (x: -16., y: -16.5, r: 34.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -16., x2: 0., y2: -16.5, r: 34.),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.2),
     "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [7,7,7,7,7], anim_offset: 0),

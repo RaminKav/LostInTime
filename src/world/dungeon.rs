@@ -30,7 +30,7 @@ impl DungeonPlugin {
         let grid = gen_new_dungeon(
             1500 * 2,
             // 250,
-            (CHUNK_SIZE * 4 * 2) as usize,
+            (CHUNK_SIZE * 4) as usize,
             Bias {
                 bias: super::dungeon_generation::Direction::Left,
                 strength: 0,
@@ -58,10 +58,7 @@ impl DungeonPlugin {
         if let Ok(dungeon) = new_dungeon.get_single() {
             let grid = &dungeon.grid;
             if let Some(pos) = get_player_spawn_tile(grid.clone()) {
-                move_player_event.send(MovePlayerEvent {
-                    chunk_pos: pos.chunk_pos,
-                    tile_pos: pos.tile_pos,
-                });
+                move_player_event.send(MovePlayerEvent { pos });
             }
         }
     }

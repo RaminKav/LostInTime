@@ -3,14 +3,12 @@ use serde::Deserialize;
 
 use crate::{
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
+    inventory::{Inventory, InventoryItemStack, InventoryPlugin},
     item::WorldObject,
     proto::proto_param::ProtoParam,
     ui::{
-        crafting_ui::CraftingContainerType,
-        handle_hovering,
-        ui_container_param::{self, UIContainersParam},
-        FurnaceContainer, FurnaceState, InventorySlotState, InventorySlotType,
+        crafting_ui::CraftingContainerType, handle_hovering, FurnaceContainer, FurnaceState,
+        InventorySlotState, InventorySlotType,
     },
     GameState,
 };

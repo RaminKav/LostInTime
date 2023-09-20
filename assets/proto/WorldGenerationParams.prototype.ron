@@ -6,7 +6,7 @@
   schematics: {
     "survival_rogue_like::world::WorldGeneration": (
       water_frequency: 0.25,
-      dungeon_stone_frequency: 0.0,
+      stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       stone_wall_frequency: 0.0,
@@ -46,7 +46,7 @@
       },
       schematic_frequencies: {
         // House: 0.08,
-        DungeonEntrance: 0.05
+        DungeonEntrance: 0.1
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],
@@ -63,7 +63,7 @@
         BerryBush: [GrassTile],
         RedMushroom: [GrassTile],
         BrownMushroom: [GrassTile],
-        Pebble: [GrassTile, SandTile],
+        Pebble: [GrassTile],
         DeadSapling: [GrassTile],
         Bush: [GrassTile],
         Bush2: [GrassTile],
@@ -78,10 +78,10 @@
         Lillypad: [WaterTile],
         WaterBoulder: [WaterTile],
         WaterBoulder2: [WaterTile],
-        Chest: [SandTile,GrassTile, DungeonStone],
-        StoneWall: [GrassTile, DungeonStone, SandTile],
-        Crate: [GrassTile, DungeonStone, SandTile],
-        Crate2: [GrassTile, DungeonStone, SandTile],
+        Chest: [GrassTile, ],
+        StoneWall: [GrassTile,],
+        Crate: [GrassTile, ],
+        Crate2: [GrassTile, ],
       }
     ),
   }

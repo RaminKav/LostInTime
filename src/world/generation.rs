@@ -16,7 +16,6 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -193,12 +192,13 @@ impl GenerationPlugin {
             }
 
             let mut objs_to_spawn = objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
-
-            if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
-                objs_to_spawn = objs_to_spawn
-                    .into_iter()
-                    .chain(cached_objs.to_owned().into_iter())
-                    .collect::<Vec<(TileMapPosition, WorldObject)>>();
+            if maybe_dungeon.is_none() {
+                if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
+                    objs_to_spawn = objs_to_spawn
+                        .into_iter()
+                        .chain(cached_objs.to_owned().into_iter())
+                        .collect::<Vec<(TileMapPosition, WorldObject)>>();
+                }
             }
             let objs = objs_to_spawn
                 .iter()
@@ -215,12 +215,12 @@ impl GenerationPlugin {
                             return true;
                         }
 
-                        if dungeon.grid[(CHUNK_SIZE as i32 * 2 * (2 - chunk_pos.y)
+                        if dungeon.grid[(CHUNK_SIZE as i32 * (2 - chunk_pos.y)
                             - 1
-                            - (2 * tp.0.tile_pos.y as i32))
-                            as usize][(2 * CHUNK_SIZE as i32
-                            + (chunk_pos.x * 2 * CHUNK_SIZE as i32)
-                            + 2 * tp.0.tile_pos.x as i32)
+                            - (tp.0.tile_pos.y as i32))
+                            as usize][(CHUNK_SIZE as i32
+                            + (chunk_pos.x * CHUNK_SIZE as i32)
+                            + tp.0.tile_pos.x as i32)
                             as usize]
                             == 1
                         {
@@ -233,6 +233,7 @@ impl GenerationPlugin {
                     } else {
                         return false;
                     };
+
                     let filter = game
                         .world_generation_params
                         .obj_allowed_tiles_map
@@ -281,16 +282,16 @@ impl GenerationPlugin {
                 if let Some(dungeon) = maybe_dungeon {
                     for x in -1..2 {
                         for y in -1..2 {
-                            let original_y = (CHUNK_SIZE as i32 * 2 * (2 - obj_data.0.chunk_pos.y)
+                            let original_y = (CHUNK_SIZE as i32 * (2 - obj_data.0.chunk_pos.y)
                                 - 1
-                                - (2 * obj_data.0.tile_pos.y as i32))
+                                - (obj_data.0.tile_pos.y as i32))
                                 as usize;
-                            let original_x = (2 * CHUNK_SIZE as i32
-                                + (obj_data.0.chunk_pos.x * 2 * CHUNK_SIZE as i32)
-                                + 2 * obj_data.0.tile_pos.x as i32)
+                            let original_x = (CHUNK_SIZE as i32
+                                + (obj_data.0.chunk_pos.x * CHUNK_SIZE as i32)
+                                + obj_data.0.tile_pos.x as i32)
                                 as usize;
-                            if dungeon.grid[(original_y + y as usize).clamp(0, 127)]
-                                [(original_x + x as usize).clamp(0, 127)]
+                            if dungeon.grid[(original_y + y as usize).clamp(0, 63)]
+                                [(original_x + x as usize).clamp(0, 63)]
                                 == 1
                             {
                                 is_touching_air = true

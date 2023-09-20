@@ -11,7 +11,7 @@ use crate::{
     },
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{FurnaceContainer, InventorySlotState, InventorySlotType, UIContainersParam},
+    ui::{InventorySlotState, InventorySlotType, UIContainersParam},
     world::y_sort::YSort,
     GameParam,
 };
@@ -284,6 +284,10 @@ impl InventoryItemStack {
         }
         Some(self.clone())
     }
+    pub fn modify_slot(&self, slot: usize) -> Self {
+        let item_stack = self.item_stack.clone();
+        Self { item_stack, slot }
+    }
     pub fn validate(
         &self,
         slot_type: InventorySlotType,
@@ -502,16 +506,27 @@ impl InventoryPlugin {
 
     pub fn get_first_empty_slot(container: &Container) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..INVENTORY_SIZE).find(|&i| container.items[i].is_none())
+        (0..container.items.len()).find(|&i| container.items[i].is_none())
     }
     pub fn get_slot_for_item_in_container(
         container: &Container,
         obj: &WorldObject,
     ) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..INVENTORY_SIZE).find(|&i| {
+        (0..container.items.len()).find(|&i| {
             container.items[i].is_some()
                 && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
+        })
+    }
+    pub fn get_slot_for_item_in_container_with_space(
+        container: &Container,
+        obj: &WorldObject,
+    ) -> Option<usize> {
+        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
+        (0..container.items.len()).find(|&i| {
+            container.items[i].is_some()
+                && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
+                && container.items[i].as_ref().unwrap().item_stack.count < MAX_STACK_SIZE
         })
     }
     pub fn get_item_count_in_container(container: &Container, obj: WorldObject) -> usize {
@@ -524,6 +539,48 @@ impl InventoryPlugin {
             }
         }
         count
+    }
+    pub fn move_item_between_containers(
+        container_a: &mut Container,
+        container_b: &mut Container,
+        slot: usize,
+    ) {
+        let container_item = container_a.items[slot].clone();
+        if let Some(mut container_a_item) = container_item {
+            let container_a_item_count = container_a_item.item_stack.count;
+            if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
+                container_b,
+                &container_a_item.item_stack.obj_type,
+            ) {
+                let mut existing_item = container_b.items[existing_item_slot]
+                    .as_ref()
+                    .unwrap()
+                    .clone();
+                let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
+                if space_left < container_a_item_count {
+                    container_b.items[existing_item.slot] =
+                        existing_item.modify_count(space_left as i8);
+                    container_a.items[container_a_item.slot] =
+                        container_a_item.modify_count(-(space_left as i8));
+                    if let Some(next_avail_slot) = Self::get_first_empty_slot(container_b) {
+                        container_b.items[next_avail_slot] = container_a_item
+                            .modify_slot(next_avail_slot)
+                            .modify_count(-(space_left as i8));
+                        container_a.items[container_a_item.slot] = None;
+                    }
+                } else {
+                    container_b.items[existing_item.slot] =
+                        existing_item.modify_count(container_a_item_count as i8);
+                    container_a.items[slot] = None;
+                }
+            } else {
+                if let Some(next_avail_slot) = Self::get_first_empty_slot(container_b) {
+                    container_b.items[next_avail_slot] =
+                        Some(container_a_item.modify_slot(next_avail_slot));
+                    container_a.items[slot] = None;
+                }
+            }
+        }
     }
     /// Attempt to merge item at slot a into b. Panics if
     /// either slot is empty, or not matching WorldObject types.

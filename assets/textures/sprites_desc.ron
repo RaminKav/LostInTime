@@ -70,11 +70,6 @@
             size: (16., 16.),
             anchor: None,
         ),
-        DungeonStone: WorldObjectData(
-            texture_pos: (2., 6.),
-            size: (32., 32.),
-            anchor: None,
-        ),
         Sword: WorldObjectData(
             texture_pos: (3., 4.),
             size: (16., 16.),
@@ -542,10 +537,6 @@
         ),
     },
     icons : {
-        DungeonStone: SpriteData(
-            texture_pos: (2., 6.),
-            size: (16., 16.),
-        ),
         StoneWallBlock: SpriteData(
             texture_pos: (1., 6.),
             size: (16., 16.),

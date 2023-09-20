@@ -76,7 +76,9 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
 
-            let Some(proj_state) = params.get_projectile_state(obj.clone()) else {return None};
+            let Some(proj_state) = params.get_projectile_state(obj.clone()) else {
+                return None;
+            };
             // modify the direction and offset of projectile
             let mut proto_data = proj_state.clone();
             proto_data.direction = dir;

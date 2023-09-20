@@ -13,15 +13,13 @@ use interpolation::lerp;
 
 use crate::ai::LeapAttackState;
 use crate::enemy::{EnemyMaterial, Mob};
-use crate::inputs::{
-    mouse_click_system, move_player, FacingDirection, InputsPlugin, MovementVector,
-};
+use crate::inputs::{mouse_click_system, FacingDirection, MovementVector};
 use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::world::chunk::Chunk;
-use crate::{inventory::ItemStack, Game, Player, TIME_STEP};
-use crate::{CoreGameSet, CustomFlush, GameParam, GameState, RawPosition};
+use crate::{inventory::ItemStack, Game, Player};
+use crate::{GameParam, GameState};
 
 use self::enemy_sprites::{
     animate_character_spritesheet_animations,
@@ -196,7 +194,7 @@ fn animate_hit(
     anim_state: Query<(&CharacterAnimationSpriteSheetData, &TextureAtlasSprite)>,
     time: Res<Time>,
 ) {
-    let (p_e, mut kcc, mut mv) = player.single_mut();
+    let (p_e, mut kcc, _mv) = player.single_mut();
     for (e, mut hit, mob_option) in hit_tracker.iter_mut() {
         if let Some(state) = mob_option {
             if state != &EnemyAnimationState::Hit {

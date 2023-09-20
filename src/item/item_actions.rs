@@ -7,6 +7,7 @@ use crate::{
     },
     inputs::CursorPos,
     inventory::Inventory,
+    juice::UseItemEvent,
     player::MovePlayerEvent,
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer, InventoryState},
@@ -48,6 +49,7 @@ pub struct ActionSuccessEvent {
 #[derive(SystemParam)]
 pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
+    pub use_item_event: EventWriter<'w, UseItemEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
@@ -77,18 +79,20 @@ impl ItemActions {
                     item_action_param
                         .modify_health_event
                         .send(ModifyHealthEvent(*delta));
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ModifyMana(delta) => {
                     item_action_param
                         .modify_mana_event
                         .send(ModifyManaEvent(*delta));
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::Teleport(pos) => {
                     let pos = world_pos_to_tile_pos(*pos);
-                    item_action_param.move_player_event.send(MovePlayerEvent {
-                        chunk_pos: pos.chunk_pos,
-                        tile_pos: pos.tile_pos,
-                    });
+                    item_action_param
+                        .move_player_event
+                        .send(MovePlayerEvent { pos });
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::PlacesInto(obj) => {
                     let pos = item_action_param.cursor_pos.world_coords.truncate();
@@ -115,6 +119,7 @@ impl ItemActions {
                     for mut hunger in item_action_param.hunger_query.iter_mut() {
                         hunger.modify_hunger(*delta);
                     }
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 _ => {}
             }

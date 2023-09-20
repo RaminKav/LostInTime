@@ -215,7 +215,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                         .world_generation_params
                         .obj_allowed_tiles_map
                         .get(obj)
-                        .unwrap_or(&vec![WorldObject::GrassTile, WorldObject::SandTile])
+                        .unwrap_or(&vec![WorldObject::GrassTile])
                         .clone();
                     for allowed_tile in filter.iter() {
                         if tile_type.contains(allowed_tile) {
