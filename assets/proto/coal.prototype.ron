@@ -1,6 +1,6 @@
 (
   name: "Coal",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Coal,
   "survival_rogue_like::inventory::ItemStack": (

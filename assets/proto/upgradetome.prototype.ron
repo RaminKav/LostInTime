@@ -1,6 +1,6 @@
 (
   name: "UpgradeTome",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": UpgradeTome,
   "survival_rogue_like::inventory::ItemStack": (
@@ -9,7 +9,8 @@
             name: "Upgrade Tome", 
             desc: ["A Upgrade Tome."]
         ),
-        count: 1
+        count: 1,
+        rarity: Rare
   ),
   }
 )

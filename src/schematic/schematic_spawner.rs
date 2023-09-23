@@ -1,7 +1,7 @@
 use super::SchematicType;
-use crate::world::{
-    chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, WorldGeneration,
-    CHUNK_SIZE,
+use crate::{
+    world::{chunk::Chunk, world_helpers::tile_pos_to_world_pos, TileMapPosition, CHUNK_SIZE},
+    GameParam,
 };
 use bevy_ecs_tilemap::tiles::TilePos;
 use rand::Rng;
@@ -39,12 +39,15 @@ pub fn attempt_to_spawn_schematic_in_chunk(
 
 pub fn give_chunks_schematic_spawners(
     mut commands: Commands,
-    new_chunks: Query<Entity, Added<Chunk>>,
-    world_gen_params: Res<WorldGeneration>,
+    new_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
+    game: GameParam,
 ) {
-    for e in new_chunks.iter() {
+    for (e, chunk) in new_chunks.iter() {
+        if game.is_chunk_generated(chunk.chunk_pos) {
+            continue;
+        }
         let mut rng = rand::thread_rng();
-        for (schematic, frequency) in world_gen_params.schematic_frequencies.iter() {
+        for (schematic, frequency) in game.world_generation_params.schematic_frequencies.iter() {
             if rng.gen_ratio((100. * frequency) as u32, 100) {
                 commands.entity(e).insert(SchematicSpawner {
                     schematic: schematic.clone(),

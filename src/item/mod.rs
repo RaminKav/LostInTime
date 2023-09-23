@@ -1,7 +1,10 @@
 use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
-use crate::colors::{BLACK, BLUE, BROWN, DARK_GREEN, LIGHT_GREEN, LIGHT_GREY, RED, UI_GRASS_GREEN};
+use crate::colors::{
+    BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
+    UI_GRASS_GREEN, WHITE, YELLOW,
+};
 use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::enemy::Mob;
@@ -12,6 +15,8 @@ use crate::schematic::handle_new_scene_entities_parent_chunk;
 use crate::schematic::loot_chests::LootChestType;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
+use crate::world::dimension::ActiveDimension;
+use crate::world::dungeon::Dungeon;
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
@@ -198,6 +203,8 @@ pub enum WorldObject {
     Pendant,
     SmallPotion,
     LargePotion,
+    SmallManaPotion,
+    LargeManaPotion,
     Chest,
     ChestBlock,
     DungeonEntrance,
@@ -380,7 +387,7 @@ impl WorldObject {
     pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)
-            .unwrap()
+            .unwrap_or(&SpriteSize::Small)
             .is_medium()
     }
 
@@ -466,21 +473,42 @@ impl WorldObject {
             WorldObject::Grass2 => UI_GRASS_GREEN,
             WorldObject::Grass3 => UI_GRASS_GREEN,
             WorldObject::RedMushroom => RED,
-            WorldObject::BrownMushroom => BROWN,
-            WorldObject::BerryBush => DARK_GREEN,
+            WorldObject::BrownMushroom => LIGHT_BROWN,
             WorldObject::GrassTile => LIGHT_GREEN,
-            WorldObject::DeadSapling => BROWN,
+            WorldObject::DeadSapling => LIGHT_BROWN,
             WorldObject::StoneWall => LIGHT_GREY,
             WorldObject::Boulder => LIGHT_GREY,
             WorldObject::CoalBoulder => LIGHT_GREY,
             WorldObject::MetalBoulder => LIGHT_GREY,
             WorldObject::WaterTile => BLUE,
-            WorldObject::SmallGreenTree => DARK_GREEN,
-            WorldObject::Crate => BROWN,
-            WorldObject::Crate2 => BROWN,
-            WorldObject::SmallYellowTree => DARK_GREEN,
-            WorldObject::MediumYellowTree => DARK_GREEN,
-            WorldObject::MediumGreenTree => DARK_GREEN,
+            WorldObject::SmallGreenTree => WHITE,
+            WorldObject::SmallYellowTree => WHITE,
+            WorldObject::MediumYellowTree => DARK_BROWN,
+            WorldObject::MediumGreenTree => DARK_BROWN,
+            WorldObject::PinkFlower => PINK,
+            WorldObject::RedFlower => RED,
+            WorldObject::YellowFlower => YELLOW,
+            WorldObject::BerryBush => DARK_GREEN,
+            WorldObject::Bush => DARK_GREEN,
+            WorldObject::Bush2 => DARK_GREEN,
+            WorldObject::Boulder2 => LIGHT_GREEN,
+            WorldObject::Crate => LIGHT_BROWN,
+            WorldObject::Crate2 => LIGHT_GREEN,
+            WorldObject::CraftingTable => LIGHT_BROWN,
+            WorldObject::Anvil => LIGHT_GREY,
+            WorldObject::Furnace => LIGHT_GREY,
+            WorldObject::Cauldron => LIGHT_GREY,
+            WorldObject::UpgradeStation => LIGHT_BROWN,
+            WorldObject::Chest => LIGHT_BROWN,
+            WorldObject::Bridge => DARK_BROWN,
+            WorldObject::Stump => DARK_BROWN,
+            WorldObject::Stump2 => DARK_BROWN,
+            WorldObject::LargeMushroomStump => DARK_BROWN,
+            WorldObject::LargeStump => DARK_BROWN,
+            WorldObject::Cattail => LIGHT_GREEN,
+            WorldObject::WaterBoulder => LIGHT_GREY,
+            WorldObject::WaterBoulder2 => LIGHT_GREY,
+            WorldObject::Pebble => LIGHT_GREY,
 
             _ => BLACK,
         }
@@ -539,6 +567,7 @@ pub fn handle_placing_world_object(
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
@@ -558,7 +587,7 @@ pub fn handle_placing_world_object(
             );
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
-                commands.entity(item).set_parent(*chunk);
+                commands.entity(item).set_parent(chunk);
                 if let Some(loot_chest_type) = &place_event.loot_chest_type {
                     commands.entity(item).insert(loot_chest_type.clone());
                 }
@@ -580,9 +609,8 @@ pub fn handle_placing_world_object(
                     }
                 }
             }
-
-            continue;
-        } else {
+        }
+        if dungeon_check.get_single().is_err() {
             game.add_object_to_chunk_cache(tile_pos, place_event.obj);
         }
     }
@@ -612,6 +640,7 @@ pub fn handle_break_object(
             }
         }
         commands.entity(broken.entity).despawn_recursive();
+        game_param.remove_object_from_chunk_cache(broken.pos);
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {

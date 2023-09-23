@@ -1,15 +1,17 @@
 (
   name: "OrbOfTransformation",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": OrbOfTransformation,
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: OrbOfTransformation,
         metadata: (
-            name: "Orb Of Transformation", 
+            name: "Orb Of ???", 
             desc: ["???."]
         ),
-        count: 1
+        count: 1,
+        rarity: Legendary
+
   ),
   }
 )

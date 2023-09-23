@@ -21,11 +21,18 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes};
 pub struct WallBreakEvent {
     pub pos: TileMapPosition,
 }
+
+#[derive(Resource, Debug, Default)]
+pub struct WorldObjectCache {
+    pub objects: HashMap<TileMapPosition, WorldObject>,
+    pub generated_chunks: Vec<IVec2>,
+}
 pub struct GenerationPlugin;
 
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<WallBreakEvent>()
+            .insert_resource(WorldObjectCache::default())
             .add_systems(
                 (
                     handle_wall_break
@@ -150,7 +157,8 @@ impl GenerationPlugin {
         mut commands: Commands,
         mut game: GameParam,
         mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
-        seed: Query<(&GenerationSeed, Option<&Dungeon>), With<ActiveDimension>>,
+        dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
+        seed: Res<GenerationSeed>,
         mut minimap_update: EventWriter<UpdateMiniMapEvent>,
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         mut proto_commands: ProtoCommands,
@@ -159,185 +167,229 @@ impl GenerationPlugin {
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
-            let (seed, maybe_dungeon) = seed.single();
+            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap().clone();
+            let dungeon_check = dungeon_check.get_single();
+            if !game.is_chunk_generated(chunk_pos) || dungeon_check.is_ok() {
+                println!("Generating new objects for {chunk_pos:?}");
+                // generate stone walls for dungeons
+                let stone = Self::generate_stone_for_chunk(
+                    &game.world_generation_params,
+                    chunk_pos,
+                    seed.seed,
+                );
 
-            // generate stone walls for dungeons
-            let stone =
-                Self::generate_stone_for_chunk(&game.world_generation_params, chunk_pos, seed.seed);
+                // generate all objs
+                let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
+                    Box::new(stone.into_iter());
 
-            // generate all objs
-            let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
-                Box::new(stone.into_iter());
-
-            for (obj, frequency) in game
-                .world_generation_params
-                .object_generation_frequencies
-                .iter()
-            {
-                let raw_points = get_object_points_for_chunk(seed.seed, *frequency);
-                let points = raw_points
+                for (obj, frequency) in game
+                    .world_generation_params
+                    .object_generation_frequencies
                     .iter()
-                    .map(|tp| {
-                        let tp_vec = Vec2::new(
-                            tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                            tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
-                        );
+                {
+                    let raw_points = get_object_points_for_chunk(seed.seed, *frequency);
+                    let points = raw_points
+                        .iter()
+                        .map(|tp| {
+                            let tp_vec = Vec2::new(
+                                tp.0 + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                                tp.1 + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                            );
 
-                        let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
-                        (relative_tp, *obj)
-                    })
-                    .collect::<Vec<(TileMapPosition, WorldObject)>>();
-                objs_to_spawn = Box::new(objs_to_spawn.chain(points.into_iter()));
-            }
+                            let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
+                            (relative_tp, *obj)
+                        })
+                        .collect::<Vec<(TileMapPosition, WorldObject)>>();
+                    objs_to_spawn = Box::new(objs_to_spawn.chain(points.into_iter()));
+                }
 
-            let mut objs_to_spawn = objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
-            if maybe_dungeon.is_none() {
-                if let Some(cached_objs) = game.get_objects_from_chunk_cache(chunk_pos) {
+                let mut objs_to_spawn =
+                    objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
+                if dungeon_check.is_err() {
+                    let cached_objs = game.get_objects_from_chunk_cache(chunk_pos);
                     objs_to_spawn = objs_to_spawn
                         .into_iter()
                         .chain(cached_objs.to_owned().into_iter())
                         .collect::<Vec<(TileMapPosition, WorldObject)>>();
                 }
-            }
-            let objs = objs_to_spawn
-                .iter()
-                .filter(|tp| {
-                    // spawn walls in dungeon according to the generated grid layout
-                    if let Some(dungeon) = maybe_dungeon {
-                        let mut wall_cache = chunk_wall_cache.get_mut(*chunk_e).unwrap();
-                        if chunk_pos.x < -1
-                            || chunk_pos.x > 2
-                            || chunk_pos.y < -2
-                            || chunk_pos.y > 1
-                        {
-                            wall_cache.walls.insert(tp.0, true);
-                            return true;
-                        }
+                let objs = objs_to_spawn
+                    .iter()
+                    .filter(|tp| {
+                        // spawn walls in dungeon according to the generated grid layout
+                        if let Ok(dungeon) = dungeon_check {
+                            let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
+                            if chunk_pos.x < -3
+                                || chunk_pos.x > 4
+                                || chunk_pos.y < -4
+                                || chunk_pos.y > 3
+                            {
+                                if tp.1 == WorldObject::StoneWall {
+                                    wall_cache.walls.insert(tp.0, true);
+                                    return true;
+                                } else {
+                                    return false;
+                                }
+                            }
 
-                        if dungeon.grid[(CHUNK_SIZE as i32 * (2 - chunk_pos.y)
-                            - 1
-                            - (tp.0.tile_pos.y as i32))
-                            as usize][(CHUNK_SIZE as i32
-                            + (chunk_pos.x * CHUNK_SIZE as i32)
-                            + tp.0.tile_pos.x as i32)
-                            as usize]
-                            == 1
-                        {
-                            wall_cache.walls.insert(tp.0, false);
-                            return false;
-                        }
-                    }
-                    let tile = if let Some(tile_data) = game.get_tile_data(tp.0) {
-                        tile_data.block_type
-                    } else {
-                        return false;
-                    };
-
-                    let filter = game
-                        .world_generation_params
-                        .obj_allowed_tiles_map
-                        .get(&tp.1)
-                        .unwrap();
-                    for allowed_tile in filter.iter() {
-                        if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
-                            return true;
-                        }
-                    }
-                    false
-                })
-                .map(|tp| *tp)
-                .collect::<HashMap<_, _>>();
-
-            // now spawn them, keeping track of duplicates on the same tile
-            let mut spawned_vec: HashMap<TileMapPosition, WorldObject> = HashMap::new();
-            for obj_data in objs.clone().iter() {
-                let (pos, obj) = obj_data;
-                let is_medium = obj_data.1.is_medium_size(&proto_param);
-                if spawned_vec.contains_key(pos)
-                    || (is_medium
-                        && (spawned_vec.contains_key(&pos)
-                            || spawned_vec
-                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[0])
-                            || spawned_vec
-                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[1])
-                            || spawned_vec
-                                .contains_key(&pos.get_neighbour_tiles_for_medium_objects()[2])))
-                {
-                    continue;
-                }
-                if is_medium {
-                    spawned_vec.insert(*pos, obj.clone());
-                    spawned_vec
-                        .insert(pos.get_neighbour_tiles_for_medium_objects()[0], obj.clone());
-                    spawned_vec
-                        .insert(pos.get_neighbour_tiles_for_medium_objects()[1], obj.clone());
-                    spawned_vec
-                        .insert(pos.get_neighbour_tiles_for_medium_objects()[2], obj.clone());
-                } else {
-                    spawned_vec.insert(pos.clone(), obj.clone());
-                }
-
-                let mut is_touching_air = false;
-                if let Some(dungeon) = maybe_dungeon {
-                    for x in -1..2 {
-                        for y in -1..2 {
-                            let original_y = (CHUNK_SIZE as i32 * (2 - obj_data.0.chunk_pos.y)
+                            if dungeon.grid[(CHUNK_SIZE as i32 * (4 - chunk_pos.y)
                                 - 1
-                                - (obj_data.0.tile_pos.y as i32))
-                                as usize;
-                            let original_x = (CHUNK_SIZE as i32
-                                + (obj_data.0.chunk_pos.x * CHUNK_SIZE as i32)
-                                + obj_data.0.tile_pos.x as i32)
-                                as usize;
-                            if dungeon.grid[(original_y + y as usize).clamp(0, 63)]
-                                [(original_x + x as usize).clamp(0, 63)]
+                                - (tp.0.tile_pos.y as i32))
+                                as usize][(3 * CHUNK_SIZE as i32
+                                + (chunk_pos.x * CHUNK_SIZE as i32)
+                                + tp.0.tile_pos.x as i32)
+                                as usize]
                                 == 1
                             {
-                                is_touching_air = true
+                                if tp.1 == WorldObject::StoneWall {
+                                    wall_cache.walls.insert(tp.0, false);
+                                    return false;
+                                }
+                            } else if tp.1 != WorldObject::StoneWall {
+                                return false;
+                            }
+                        }
+                        let tile = if let Some(tile_data) = game.get_tile_data(tp.0) {
+                            tile_data.block_type
+                        } else {
+                            return false;
+                        };
+
+                        let filter = game
+                            .world_generation_params
+                            .obj_allowed_tiles_map
+                            .get(&tp.1)
+                            .unwrap();
+                        for allowed_tile in filter.iter() {
+                            if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
+                                return true;
+                            }
+                        }
+                        false
+                    })
+                    .map(|tp| *tp)
+                    .collect::<HashMap<_, _>>();
+
+                // now spawn them, keeping track of duplicates on the same tile
+                let mut spawned_vec: HashMap<TileMapPosition, WorldObject> = HashMap::new();
+                for obj_data in objs.clone().iter() {
+                    let (pos, obj) = obj_data;
+                    let is_medium = obj_data.1.is_medium_size(&proto_param);
+                    if spawned_vec.contains_key(pos)
+                        || (is_medium
+                            && (spawned_vec.contains_key(&pos)
+                                || spawned_vec.contains_key(
+                                    &pos.get_neighbour_tiles_for_medium_objects()[0],
+                                )
+                                || spawned_vec.contains_key(
+                                    &pos.get_neighbour_tiles_for_medium_objects()[1],
+                                )
+                                || spawned_vec.contains_key(
+                                    &pos.get_neighbour_tiles_for_medium_objects()[2],
+                                )))
+                    {
+                        continue;
+                    }
+                    if is_medium {
+                        spawned_vec.insert(*pos, obj.clone());
+                        spawned_vec
+                            .insert(pos.get_neighbour_tiles_for_medium_objects()[0], obj.clone());
+                        spawned_vec
+                            .insert(pos.get_neighbour_tiles_for_medium_objects()[1], obj.clone());
+                        spawned_vec
+                            .insert(pos.get_neighbour_tiles_for_medium_objects()[2], obj.clone());
+                    } else {
+                        spawned_vec.insert(pos.clone(), obj.clone());
+                    }
+
+                    let mut is_touching_air = false;
+                    if let Ok(dungeon) = dungeon_check {
+                        for x in -1_i32..2 {
+                            for y in -1_i32..2 {
+                                let original_y = ((CHUNK_SIZE) as i32
+                                    * (4 - obj_data.0.chunk_pos.y)
+                                    - 1
+                                    - (obj_data.0.tile_pos.y as i32))
+                                    as usize;
+                                let original_x = ((3 * CHUNK_SIZE) as i32
+                                    + (obj_data.0.chunk_pos.x * CHUNK_SIZE as i32)
+                                    + obj_data.0.tile_pos.x as i32)
+                                    as usize;
+                                if dungeon.grid[(original_y + y as usize).clamp(0, 127)]
+                                    [(original_x + x as usize).clamp(0, 127)]
+                                    == 1
+                                {
+                                    is_touching_air = true
+                                }
                             }
                         }
                     }
-                }
 
-                let obj = proto_commands.spawn_object_from_proto(
-                    *obj_data.1,
-                    tile_pos_to_world_pos(*obj_data.0, obj_data.1.is_medium_size(&proto_param)),
-                    &prototypes,
-                    &mut proto_param,
-                    is_touching_air,
-                );
+                    let obj = proto_commands.spawn_object_from_proto(
+                        *obj_data.1,
+                        tile_pos_to_world_pos(*obj_data.0, obj_data.1.is_medium_size(&proto_param)),
+                        &prototypes,
+                        &mut proto_param,
+                        is_touching_air,
+                    );
 
-                if let Some(spawned_obj) = obj {
-                    if is_medium {
-                        minimap_update.send(UpdateMiniMapEvent {
-                            pos: Some(*obj_data.0),
-                            new_tile: Some(*obj_data.1),
-                        });
-                        for q in 0..3 {
+                    if let Some(spawned_obj) = obj {
+                        if is_medium {
                             minimap_update.send(UpdateMiniMapEvent {
-                                pos: Some(obj_data.0.get_neighbour_tiles_for_medium_objects()[q]),
+                                pos: Some(*obj_data.0),
+                                new_tile: Some(*obj_data.1),
+                            });
+                            for q in 0..3 {
+                                minimap_update.send(UpdateMiniMapEvent {
+                                    pos: Some(
+                                        obj_data.0.get_neighbour_tiles_for_medium_objects()[q],
+                                    ),
+                                    new_tile: Some(*obj_data.1),
+                                });
+                            }
+                        } else {
+                            minimap_update.send(UpdateMiniMapEvent {
+                                pos: Some(*obj_data.0),
                                 new_tile: Some(*obj_data.1),
                             });
                         }
-                    } else {
-                        minimap_update.send(UpdateMiniMapEvent {
-                            pos: Some(*obj_data.0),
-                            new_tile: Some(*obj_data.1),
-                        });
+
+                        commands
+                            .entity(spawned_obj)
+                            .set_parent(game.get_chunk_entity(chunk_pos).unwrap());
+
+                        if let Ok(_) = dungeon_check {
+                            let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
+                            if *obj_data.1 == WorldObject::StoneWall {
+                                wall_cache.walls.insert(*obj_data.0, true);
+                            }
+                        } else {
+                            game.add_object_to_chunk_cache(*obj_data.0, *obj_data.1);
+                        }
                     }
-
-                    commands
-                        .entity(spawned_obj)
-                        .set_parent(*game.get_chunk_entity(chunk_pos).unwrap());
-
-                    if let Some(_) = maybe_dungeon {
-                        let mut wall_cache = chunk_wall_cache.get_mut(*chunk_e).unwrap();
-                        wall_cache.walls.insert(*obj_data.0, true);
+                }
+                if dungeon_check.is_err() {
+                    game.set_chunk_generated(chunk_pos);
+                }
+            } else {
+                for (pos, obj) in game.get_objects_from_chunk_cache(chunk_pos) {
+                    let spawned_obj = proto_commands.spawn_object_from_proto(
+                        obj,
+                        tile_pos_to_world_pos(pos, obj.is_medium_size(&proto_param)),
+                        &prototypes,
+                        &mut proto_param,
+                        true,
+                    );
+                    if let Some(spawned_obj) = spawned_obj {
+                        let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
+                        if obj == WorldObject::StoneWall {
+                            wall_cache.walls.insert(pos, true);
+                        }
+                        commands
+                            .entity(spawned_obj)
+                            .set_parent(game.get_chunk_entity(chunk_pos).unwrap());
                     }
                 }
             }
-            game.set_chunk_objects_cache(chunk_pos, spawned_vec);
         }
     }
 }

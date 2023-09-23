@@ -6,11 +6,10 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_rapier2d::prelude::Collider;
 
-use super::dimension::{ActiveDimension, GenerationSeed};
+use super::dimension::GenerationSeed;
 
 use super::world_helpers::get_neighbour_tile;
 
-use crate::world::dimension::ChunkCache;
 use crate::world::wall_auto_tile::ChunkWallCache;
 use crate::{item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
@@ -31,17 +30,14 @@ impl Plugin for ChunkPlugin {
             .add_event::<GenerateObjectsEvent>()
             .add_systems(
                 (
-                    Self::spawn_chunks_around_camera.after(CustomFlush), //.before(Self::handle_new_chunk_event),
-                    Self::handle_new_chunk_event.before(CustomFlush),
-                    Self::handle_update_tiles_for_new_chunks
-                        .after(Self::register_spawned_chunks)
-                        .after(CustomFlush),
-                    Self::despawn_outofrange_chunks,
+                    Self::spawn_chunks_around_camera.before(CustomFlush), //.before(Self::handle_new_chunk_event),
+                    Self::handle_new_chunk_event.after(Self::spawn_chunks_around_camera),
+                    Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
-                    Self::register_spawned_chunks.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(Self::despawn_outofrange_chunks.in_base_set(CoreSet::PostUpdate))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -128,7 +124,7 @@ impl ChunkPlugin {
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
         game: GameParam,
-        seed: Query<&GenerationSeed, With<ActiveDimension>>,
+        seed: Res<GenerationSeed>,
     ) {
         for e in cache_events.iter() {
             let chunk_pos = e.chunk_pos;
@@ -164,7 +160,7 @@ impl ChunkPlugin {
                         &game.world_generation_params,
                         chunk_pos,
                         tile_pos,
-                        seed.single().seed,
+                        seed.seed,
                     );
 
                     let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
@@ -253,14 +249,6 @@ impl ChunkPlugin {
             // minimap_update.send(UpdateMiniMapEvent);
         }
     }
-    pub fn register_spawned_chunks(
-        mut game: GameParam,
-        loaded_chunks: Query<(Entity, &Chunk), Added<Chunk>>,
-    ) {
-        for (e, chunk) in loaded_chunks.iter() {
-            game.set_chunk_entity(chunk.chunk_pos, e);
-        }
-    }
     pub fn handle_update_tiles_for_new_chunks(
         mut create_events: EventReader<CreateChunkEvent>,
         mut gen_events: EventWriter<GenerateObjectsEvent>,
@@ -333,11 +321,7 @@ impl ChunkPlugin {
         mut camera_query: Query<&Transform, With<TextureCamera>>,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         _load_chunk_event: EventWriter<SpawnChunkEvent>,
-        chunk_cache: Query<&ChunkCache, With<ActiveDimension>>,
     ) {
-        if chunk_cache.get_single().is_err() {
-            return;
-        }
         let transform = camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
@@ -348,13 +332,7 @@ impl ChunkPlugin {
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
-                    // load_chunk_event.send(SpawnChunkEvent { chunk_pos });
-                    // if chunk_cache.single().snapshots.contains_key(&chunk_pos) {
-                    //     println!("Sending load event {chunk_pos:?}");
-                    // } else {
-                    // println!("Sending cache event {chunk_pos:?}");
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
-                    // }
                 }
             }
         }
@@ -362,15 +340,16 @@ impl ChunkPlugin {
     //TODO: change despawning systems to use playe rpos instead??
     fn despawn_outofrange_chunks(
         game: GameParam,
-        mut events: EventWriter<DespawnChunkEvent>,
         camera_query: Query<&Transform, With<TextureCamera>>,
+        mut commands: Commands,
+        chunk_query: Query<&Transform, With<Chunk>>,
     ) {
         for camera_transform in camera_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
                 CHUNK_SIZE as f32 * TILE_SIZE.y,
             );
-            for (_entity, chunk_transform, _) in game.chunk_query.iter() {
+            for chunk_transform in chunk_query.iter() {
                 let chunk_pos = chunk_transform.translation.xy();
                 let distance = camera_transform.translation.xy().distance(chunk_pos);
                 //TODO: calculate maximum possible distance for 2x2 chunksa
@@ -379,10 +358,10 @@ impl ChunkPlugin {
                 if distance > max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
                     && game.get_chunk_entity(IVec2::new(x, y)).is_some()
                 {
-                    // commands.entity(entity).despawn_recursive();
-                    events.send(DespawnChunkEvent {
-                        chunk_pos: IVec2::new(x, y),
-                    })
+                    println!("            despawning chunk {x:?},{y:?}");
+                    commands
+                        .entity(game.get_chunk_entity(IVec2::new(x, y)).unwrap())
+                        .despawn_recursive();
                 }
             }
         }

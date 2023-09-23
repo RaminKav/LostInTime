@@ -175,7 +175,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         let relative_tile_pos = world_pos_to_chunk_relative_tile_pos(pos);
         let should_center = proto_param
             .get_component::<SpriteSize, _>(obj.clone())
-            .unwrap()
+            .unwrap_or(&SpriteSize::Small)
             .is_medium();
         let pos = tile_pos_to_world_pos(relative_tile_pos, should_center).extend(0.);
         spawned_entity_commands.insert(TransformBundle::from_transform(

@@ -455,18 +455,20 @@ add velocity to dmg numbers, and fade out
 add acceleration to player
 fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
 cape + clothes
-add is_recipe bool to tool tips
 fix desc of all items
 bunch of recipes are missing, of course
-inv full cant pick up items you have room for in stacks, bug
 
 fix camera, add acceleration
-use a more simple object gen algo for small objects, instead of PDS
 use tile coordinate multiplied by big number and module down to check if obj spawns. deterministic spawning.
 use air blocks to determin a broken tile, regen world
-add mana potions
-cleanup crafting/furnace ui
 red mushrooms dont stack for some reason
 somehow make recipe icons deterministic order
-chests in dungeons are spawning in walls...
-add in the remaining colors for obj/mobs
+taking multiple equipment from craft drains resources but does not increment the stack (since cant stack equipment)
+make objects be defined by a 2x2 grid rather than 1x1 or 2x2 allow 2x1 and 1x2
+fix objects in dungeons,
+add mobs to world gen params?
+make dungeon spawn with mobs initially, and hostile
+particles w gradient, or tweak idk
+dungeon chest has chance to spawn mobs
+big brain: move the grid down until its at 0,0, not move the player
+add exit from dungeon,

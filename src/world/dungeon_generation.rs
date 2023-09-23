@@ -115,9 +115,11 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
         if let Some((x, _)) = picked_tile {
             let player_tile_pos = TileMapPosition::new(
                 IVec2::new(
-                    f64::floor((x as f64 - CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64) as i32,
-                    f64::floor(((CHUNK_SIZE as f64) - y as f64 - 1.) as f64 / (CHUNK_SIZE) as f64)
-                        as i32
+                    f64::floor((x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64)
+                        as i32,
+                    f64::floor(
+                        ((3. * CHUNK_SIZE as f64) - y as f64 - 1.) as f64 / (CHUNK_SIZE) as f64,
+                    ) as i32
                         + 1,
                 ),
                 TilePos {
@@ -182,20 +184,18 @@ pub fn add_dungeon_chests(
                 let pos = TileMapPosition::new(
                     IVec2::new(
                         f64::floor(
-                            (picked_x as f64 - CHUNK_SIZE as f64 * 2.) as f64
-                                / (CHUNK_SIZE * 2) as f64,
+                            (picked_x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64,
                         ) as i32,
                         f64::floor(
-                            ((CHUNK_SIZE as f64 * 2.) - picked_y as f64 - 1.) as f64
-                                / (CHUNK_SIZE * 2) as f64,
+                            ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.) as f64
+                                / (CHUNK_SIZE) as f64,
                         ) as i32
                             + 1,
                     ),
                     TilePos {
-                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as u32,
+                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
                         y: f64::ceil(
-                            CHUNK_SIZE as f64
-                                - (picked_y as f64 % (CHUNK_SIZE * 2) as f64 / 2.) as f64,
+                            CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64) as f64,
                         ) as u32
                             - 1,
                     },

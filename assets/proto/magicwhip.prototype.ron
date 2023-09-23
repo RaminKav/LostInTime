@@ -1,6 +1,6 @@
 (
   name: "MagicWhip",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": MagicWhip,
   "survival_rogue_like::item::EquipmentType": Weapon,

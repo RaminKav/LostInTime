@@ -1,6 +1,6 @@
 (
   name: "AlchemyTable",
-  templates: [],
+  templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": AlchemyTable,
   "survival_rogue_like::assets::SpriteSize": Medium,
@@ -9,9 +9,6 @@
   "survival_rogue_like::proto::ColliderProto": (x: 10., y: 4),
   "survival_rogue_like::attributes::MaxHealth": (25),
   "survival_rogue_like::world::WorldObjectEntityData": (object: AlchemyTable, obj_bit_index: 0, texture_offset: 0),
-  "survival_rogue_like::world::y_sort::YSort": (0.),
-  "bevy_proto::custom::VisibilityBundle": (),
-  "bevy_proto::custom::SpriteSheetBundle": (texture_atlas: AssetPath("bevy_survival_sprites.png")),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: AlchemyTableBlock,

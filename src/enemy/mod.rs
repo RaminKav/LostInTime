@@ -15,7 +15,7 @@ use crate::{
         NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
-    colors::{BLACK, DMG_NUM_PURPLE, UI_GRASS_GREEN},
+    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     player::levels::ExperienceReward,
@@ -79,12 +79,12 @@ impl Mob {
     pub fn get_mob_color(&self) -> Color {
         match self {
             Mob::None => BLACK,
-            Mob::Slime => UI_GRASS_GREEN,
-            Mob::SpikeSlime => UI_GRASS_GREEN,
-            Mob::Bushling => UI_GRASS_GREEN,
-            Mob::StingFly => UI_GRASS_GREEN,
-            Mob::FurDevil => DMG_NUM_PURPLE,
-            _ => BLACK,
+            Mob::Slime => LIGHT_GREEN,
+            Mob::SpikeSlime => LIGHT_GREEN,
+            Mob::Bushling => DARK_GREEN,
+            Mob::StingFly => LIGHT_GREEN,
+            Mob::FurDevil => PINK,
+            Mob::Hog => LIGHT_BROWN,
         }
     }
 }

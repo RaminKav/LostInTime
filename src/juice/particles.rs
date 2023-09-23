@@ -3,12 +3,12 @@ use bevy::prelude::*;
 use bevy_hanabi::prelude::*;
 
 use crate::{
+    assets::SpriteAnchor,
     combat::{EnemyDeathEvent, HitEvent, JustGotHit},
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
     player::Player,
-    proto::proto_param::ProtoParam,
     world::y_sort::YSort,
     Game,
 };
@@ -276,21 +276,20 @@ pub fn spawn_obj_hit_particles(
     transforms: Query<&GlobalTransform>,
     particles: Res<Particles>,
     mob_query: Query<&Mob>,
-    world_object: Query<&WorldObject>,
-    proto: ProtoParam,
+    world_object: Query<(&WorldObject, &SpriteAnchor)>,
 ) {
     // add spark animation entity as child, will animate once and remove itself.
     for hit in hit_events.iter() {
         if hit.hit_entity == game.player {
             continue;
         }
-
         let hit_pos = transforms.get(hit.hit_entity).unwrap().translation();
-        let is_medium = if let Ok(is_obj) = world_object.get(hit.hit_entity) {
-            is_obj.is_medium_size(&proto)
+        let anchor = if let Ok(anchor) = world_object.get(hit.hit_entity) {
+            anchor.1 .0
         } else {
-            false
+            Vec2::ZERO
         };
+
         let is_mob = mob_query.get(hit.hit_entity).is_ok();
         let effect = if is_mob {
             particles.enemy_hit_particles.clone()
@@ -301,7 +300,7 @@ pub fn spawn_obj_hit_particles(
         let color = if is_mob {
             mob_query.get(hit.hit_entity).unwrap().get_mob_color()
         } else {
-            world_object.get(hit.hit_entity).unwrap().get_obj_color()
+            world_object.get(hit.hit_entity).unwrap().0.get_obj_color()
         };
 
         commands.spawn((
@@ -313,11 +312,9 @@ pub fn spawn_obj_hit_particles(
                         graph::Value::Uint(color.as_linear_rgba_u32()),
                     )])
                     .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(
-                    hit_pos.x as f32,
-                    hit_pos.y + 4. + if is_medium { -32. } else { 0. } as f32,
-                    2.,
-                )),
+                transform: Transform::from_translation(
+                    Vec3::new(hit_pos.x as f32, hit_pos.y + 4., 2.) + (anchor.extend(0.) * -1.),
+                ),
                 ..Default::default()
             },
             YSort(1.),

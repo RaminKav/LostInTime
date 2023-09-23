@@ -45,7 +45,7 @@ pub fn handle_spawn_inv_item_tooltip(
         };
         let attributes = item.item_stack.attributes.get_tooltips();
         let durability = item.item_stack.attributes.get_durability_tooltip();
-        let has_attributes = attributes.len() > 0;
+        let should_show_attributes = attributes.len() > 0 && !item.is_recipe;
         let size = Vec2::new(93., 120.5);
         let tooltip = commands
             .spawn((
@@ -77,11 +77,11 @@ pub fn handle_spawn_inv_item_tooltip(
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
         // tooltip_text.push(item.item_stack.metadata.desc.clone());
-        for a in attributes.iter().clone() {
-            tooltip_text.push((a.to_string(), 0.));
-        }
 
-        if has_attributes {
+        if should_show_attributes {
+            for a in attributes.iter().clone() {
+                tooltip_text.push((a.to_string(), 0.));
+            }
             tooltip_text.push((
                 durability.clone(),
                 size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
@@ -118,7 +118,7 @@ pub fn handle_spawn_inv_item_tooltip(
                                     item.item_stack.rarity.get_color()
                                 } else if i > 1 && i == tooltip_text.len() - 1 {
                                     LIGHT_GREY
-                                } else if i > 2 {
+                                } else if i > 2 && should_show_attributes {
                                     GOLD
                                 } else {
                                     LIGHT_GREY

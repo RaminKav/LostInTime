@@ -1,12 +1,12 @@
 (
   name: "StoneChunk",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": StoneChunk,
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: StoneChunk,
         metadata: (
-            name: "Stone Chunk", 
+            name: "Stone", 
             desc: ["A big chunk of stone."]
         ),
         count: 1
