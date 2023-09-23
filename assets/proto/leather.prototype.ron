@@ -1,6 +1,6 @@
 (
   name: "Leather",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Leather,
   "survival_rogue_like::inventory::ItemStack": (

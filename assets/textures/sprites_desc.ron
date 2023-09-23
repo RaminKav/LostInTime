@@ -160,6 +160,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        LargeManaPotion: WorldObjectData(
+            texture_pos: (0., 7.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmallManaPotion: WorldObjectData(
+            texture_pos: (2., 7.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         UpgradeStation: WorldObjectData(
             texture_pos: (0., 6.),
             size: (16., 16.),
@@ -521,12 +531,12 @@
             anchor: None,
         ),
         Crate: WorldObjectData(
-            texture_pos: (0., 10.),
+            texture_pos: (1., 10.),
             size: (16., 22.),
             anchor: None,
         ),
         Crate2: WorldObjectData(
-            texture_pos: (1., 10.),
+            texture_pos: (0., 10.),
             size: (16., 20.),
             anchor: None,
         ),

@@ -7,7 +7,7 @@ pub mod health_regen;
 pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
-    colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
+    colors::{GREY, LIGHT_BLUE, LIGHT_GREEN, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::{stats::PlayerStats, Limb},
@@ -358,7 +358,7 @@ impl ItemRarity {
     }
     pub fn get_color(&self) -> Color {
         match self {
-            ItemRarity::Common => LIGHT_GREY,
+            ItemRarity::Common => GREY,
             ItemRarity::Uncommon => LIGHT_GREEN,
             ItemRarity::Rare => LIGHT_BLUE,
             ItemRarity::Legendary => LIGHT_RED,

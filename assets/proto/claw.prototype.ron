@@ -1,6 +1,6 @@
 (
   name: "Claw",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Claw,
   "survival_rogue_like::item::EquipmentType": Weapon,

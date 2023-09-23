@@ -1,0 +1,17 @@
+(
+  name: "SmallManaPotion",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SmallManaPotion,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyMana(40)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: SmallManaPotion,
+        metadata: (
+            name: "Small Mana Potion", 
+            desc: ["Heals 40 mana."]
+        ),
+        count: 1
+  ),
+  }
+)

@@ -1,15 +1,15 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
 
 use crate::{
     player::MovePlayerEvent,
-    world::dimension::{Dimension, GenerationSeed, SpawnDimension},
+    world::dimension::{Dimension, SpawnDimension},
 };
 
 use super::{
-    dimension::{ActiveDimension, ChunkCache},
+    dimension::ActiveDimension,
     dungeon_generation::{add_dungeon_chests, gen_new_dungeon, get_player_spawn_tile, Bias},
-    ChunkManager, CHUNK_SIZE,
+    CHUNK_SIZE,
 };
 
 #[derive(Component)]
@@ -25,12 +25,14 @@ impl Plugin for DungeonPlugin {
 }
 
 impl DungeonPlugin {
-    pub fn spawn_new_dungeon_dimension(commands: &mut Commands, protoCommands: &mut ProtoCommands) {
-        let cm = ChunkManager::new();
+    pub fn spawn_new_dungeon_dimension(
+        commands: &mut Commands,
+        proto_commands: &mut ProtoCommands,
+    ) {
         let grid = gen_new_dungeon(
-            1500 * 2,
+            2000 * 2,
             // 250,
-            (CHUNK_SIZE * 4) as usize,
+            (CHUNK_SIZE * 4 * 2) as usize,
             Bias {
                 bias: super::dungeon_generation::Direction::Left,
                 strength: 0,
@@ -38,17 +40,9 @@ impl DungeonPlugin {
         );
 
         let dim_e = commands
-            .spawn((
-                Dimension,
-                Dungeon { grid: grid.clone() },
-                GenerationSeed { seed: 123 },
-                ChunkCache {
-                    snapshots: HashMap::new(),
-                },
-                cm,
-            ))
+            .spawn((Dimension, Dungeon { grid: grid.clone() }))
             .id();
-        protoCommands.apply("DungeonWorldGenerationParams");
+        proto_commands.apply("DungeonWorldGenerationParams");
         commands.entity(dim_e).insert(SpawnDimension);
     }
     fn handle_move_player_after_dungeon_gen(

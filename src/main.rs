@@ -28,7 +28,6 @@ use bevy::{
         view::RenderLayers,
     },
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
-    utils::HashMap,
     window::{PresentMode, WindowResolution},
 };
 
@@ -59,7 +58,7 @@ use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppE
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
 use combat::*;
-use enemy::{spawner::ChunkSpawners, EnemyPlugin};
+use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
 use inventory::InventoryPlugin;
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
@@ -68,13 +67,14 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use ui::{InventorySlotState, UIPlugin};
+use world::WorldGeneration;
 use world::{
-    chunk::{Chunk, ChunkObjectCache, TileEntityCollection, TileSpriteData},
+    chunk::{Chunk, TileEntityCollection, TileSpriteData},
+    generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
     TileMapPosition, WorldObjectEntityData, WorldPlugin,
 };
-use world::{ChunkManager, WorldGeneration};
 
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
@@ -189,10 +189,9 @@ pub struct ImageAssets {
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
-    pub chunk_obj_cache: ResMut<'w, ChunkObjectCache>,
-    pub chunk_manager: ResMut<'w, ChunkManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
+    pub world_obj_cache: ResMut<'w, WorldObjectCache>,
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
     pub player_stats: Query<
@@ -215,12 +214,7 @@ pub struct GameParam<'w, 's> {
             &'static LootRateBonus,
         ),
     >,
-    pub chunk_query: Query<
-        'w,
-        's,
-        (Entity, &'static Transform, &'static mut ChunkSpawners),
-        (With<Chunk>, Without<Player>),
-    >,
+    pub chunk_query: Query<'w, 's, (Entity, &'static Chunk)>,
     pub tile_collection_query: Query<'w, 's, &'static TileEntityCollection, With<Chunk>>,
     pub tile_data_query: Query<'w, 's, (&'static mut TileSpriteData, Option<&'static Children>)>,
     pub world_object_query: Query<
@@ -248,47 +242,47 @@ impl<'w, 's> GameParam<'w, 's> {
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state
     }
-    pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<&Entity> {
-        self.chunk_manager.chunks.get(&chunk_pos.into())
-    }
-    pub fn set_chunk_entity(&mut self, chunk_pos: IVec2, e: Entity) {
-        self.chunk_manager.chunks.insert(chunk_pos.into(), e);
-    }
-    pub fn remove_chunk_entity(&mut self, chunk_pos: IVec2) {
-        self.chunk_manager.chunks.remove(&chunk_pos.into());
-    }
-
-    pub fn set_chunk_objects_cache(
-        &mut self,
-        chunk_pos: IVec2,
-        objects: HashMap<TileMapPosition, WorldObject>,
-    ) {
-        self.chunk_obj_cache.cache.insert(chunk_pos, objects);
-    }
-
-    pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
-        self.chunk_obj_cache
-            .cache
-            .entry(pos.chunk_pos.into())
-            .or_insert_with(HashMap::new)
-            .insert(pos, obj);
-    }
-    pub fn get_objects_from_chunk_cache(
-        &self,
-        chunk_pos: IVec2,
-    ) -> Option<&HashMap<TileMapPosition, WorldObject>> {
-        self.chunk_obj_cache.cache.get(&chunk_pos.into())
-    }
-    pub fn get_object_from_chunk_cache(&self, pos: TileMapPosition) -> Option<WorldObject> {
-        if let Some(cache) = self.chunk_obj_cache.cache.get(&pos.chunk_pos) {
-            return cache.get(&pos).copied();
+    pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<Entity> {
+        for (e, chunk) in self.chunk_query.iter() {
+            if chunk.chunk_pos == chunk_pos {
+                return Some(e);
+            }
         }
         None
     }
 
+    pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
+        print!(" add ");
+        self.world_obj_cache.objects.insert(pos, obj);
+    }
+    pub fn remove_object_from_chunk_cache(&mut self, pos: TileMapPosition) {
+        self.world_obj_cache.objects.remove(&pos);
+    }
+    pub fn get_objects_from_chunk_cache(
+        &self,
+        chunk_pos: IVec2,
+    ) -> Vec<(TileMapPosition, WorldObject)> {
+        let mut cache = vec![];
+        for (pos, obj) in self.world_obj_cache.objects.iter() {
+            if pos.chunk_pos == chunk_pos {
+                cache.push((*pos, *obj));
+            }
+        }
+        cache
+    }
+    pub fn is_chunk_generated(&self, chunk_pos: IVec2) -> bool {
+        self.world_obj_cache.generated_chunks.contains(&chunk_pos)
+    }
+    pub fn set_chunk_generated(&mut self, chunk_pos: IVec2) {
+        self.world_obj_cache.generated_chunks.push(chunk_pos);
+    }
+    pub fn get_object_from_chunk_cache(&self, pos: TileMapPosition) -> Option<&WorldObject> {
+        self.world_obj_cache.objects.get(&pos)
+    }
+
     pub fn get_tile_entity(&self, tile: TileMapPosition) -> Option<Entity> {
         if let Some(chunk_e) = self.get_chunk_entity(tile.chunk_pos) {
-            let tile_collection = self.tile_collection_query.get(*chunk_e).unwrap();
+            let tile_collection = self.tile_collection_query.get(chunk_e).unwrap();
             return tile_collection.map.get(&tile.tile_pos.into()).copied();
         }
         None

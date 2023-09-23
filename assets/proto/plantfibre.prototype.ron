@@ -1,6 +1,6 @@
 (
   name: "PlantFibre",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": PlantFibre,
   "survival_rogue_like::inventory::ItemStack": (

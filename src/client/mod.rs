@@ -22,7 +22,7 @@ use crate::{
         dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
         ChunkManager, TileMapPosition, WorldGeneration, WorldObjectEntityData,
     },
-    CustomFlush, GameParam, GameState, YSort,
+    CustomFlush, GameParam, YSort,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -93,16 +93,16 @@ impl Plugin for ClientPlugin {
                     .run_if(run_once())
                     .in_schedule(CoreSchedule::Startup),
             )
-            .add_systems(
-                (
-                    Self::save_chunk,
-                    Self::despawn_saved_chunks.after(Self::save_chunk),
-                    Self::despawn_non_saveable_entities.before(CustomFlush),
-                    Self::close_and_save_on_esc.after(CustomFlush),
-                    Self::load_chunk.before(CustomFlush),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
+            // .add_systems(
+            //     (
+            //         // Self::save_chunk,
+            //         // Self::despawn_saved_chunks,
+            //         // Self::despawn_non_saveable_entities.before(CustomFlush),
+            //         // Self::close_and_save_on_esc.after(CustomFlush),
+            //         // Self::load_chunk.before(CustomFlush),
+            //     )
+            //         .in_set(OnUpdate(GameState::Main)),
+            // )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -241,7 +241,7 @@ impl ClientPlugin {
         for (chunk_pos, _) in saved_chunks.iter() {
             let (game, mut commands) = state.get_mut(world);
             commands
-                .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
+                .entity(game.get_chunk_entity(*chunk_pos).unwrap())
                 .despawn_recursive();
         }
 
@@ -261,14 +261,16 @@ impl ClientPlugin {
     }
     fn despawn_saved_chunks(
         mut commands: Commands,
-        mut game: GameParam,
+        game: GameParam,
         mut events: EventReader<DespawnChunkEvent>,
     ) {
         for event in events.iter() {
+            print!("DESPAWNING {:?} ", event.chunk_pos);
             commands
-                .entity(*game.get_chunk_entity(event.chunk_pos).unwrap())
+                .entity(game.get_chunk_entity(event.chunk_pos).unwrap())
                 .despawn_recursive();
-            game.remove_chunk_entity(event.chunk_pos);
+            // game.remove_chunk_entity(event.chunk_pos);
+            println!(" ... Done");
         }
     }
     pub fn despawn_non_saveable_entities(
@@ -285,7 +287,6 @@ impl ClientPlugin {
     pub fn close_and_save_on_esc(world: &mut World) {
         let input = world.resource::<Input<KeyCode>>();
         if input.just_pressed(KeyCode::Escape) {
-            return;
             // const PATH: &str = "example2.json";
 
             // let file = File::create(PATH).expect("Could not open file for serialization");
@@ -305,18 +306,20 @@ impl ClientPlugin {
         println!("TRYING TO LOAD GAME");
         // world.load("game").map_err(|c| {
         // println!("{c:?}");
+        let mut rng = rand::thread_rng();
+
+        let seed = rng.gen_range(0..100000);
         let params = WorldGeneration {
             sand_frequency: 0.32,
             water_frequency: 0.15,
             obj_allowed_tiles_map: HashMap::default(),
             ..default()
         };
+        world.insert_resource(GenerationSeed { seed });
         let mut state: SystemState<EventWriter<DimensionSpawnEvent>> = SystemState::new(world);
         let mut dim_event = state.get_mut(world);
-        let mut rng = rand::thread_rng();
         dim_event.send(DimensionSpawnEvent {
             generation_params: params,
-            seed: Some(rng.gen_range(0..100000)),
             swap_to_dim_now: true,
         });
         // });

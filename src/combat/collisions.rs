@@ -243,13 +243,20 @@ pub fn check_item_drop_collisions(
             if !allowed_targets.contains(e2) {
                 continue;
             }
+            let item_stack = items_query.get(e2).unwrap().clone();
+
             // ...and the entity is an item stack...
-            if InventoryPlugin::get_first_empty_slot(&inv.single().items).is_none() {
+            if InventoryPlugin::get_first_empty_slot(&inv.single().items).is_none()
+                && InventoryPlugin::get_slot_for_item_in_container_with_space(
+                    &inv.single().items,
+                    &item_stack.obj_type,
+                )
+                .is_none()
+            {
                 return;
             }
             // ...and inventory has room, add it to the player's inventory
 
-            let item_stack = items_query.get(e2).unwrap().clone();
             item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
 
             game.world_obj_data.drop_entities.remove(&e2);

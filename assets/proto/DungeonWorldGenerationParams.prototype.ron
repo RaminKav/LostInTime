@@ -12,15 +12,23 @@
       stone_wall_frequency: 1.0,
       schematic_frequencies: {
         House: 0.0,
-        DungeonEntrance: 0.0
+        DungeonEntrance: 0.0,
       },
       object_generation_frequencies: {
-        Boulder: 0.0,
         Grass: 0.0,
         DeadSapling: 0.0,
+        Boulder: 0.01,
+        // Boulder2: 0.005,
+        // CoalBoulder: 0.005,
+        // MetalBoulder: 0.005,
+        Pebble: 0.05,
       },
       obj_allowed_tiles_map: {
         Boulder: [GrassTile, StoneTile],
+        Boulder2: [GrassTile, StoneTile],
+        Pebble: [GrassTile, StoneTile],
+        MetalBoulder: [GrassTile, StoneTile],
+        CoalBoulder: [GrassTile, StoneTile],
         Grass: [GrassTile, StoneTile],
         DeadSapling: [GrassTile, StoneTile],
         Chest: [GrassTile, StoneTile],

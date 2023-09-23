@@ -106,6 +106,7 @@ pub struct RemoveFromSlotEvent {
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub parent_slot_entity: Entity,
+    pub is_recipe: bool,
 }
 #[derive(Debug, Clone)]
 
@@ -346,6 +347,7 @@ pub fn handle_hovering(
                     tooltip_update_events.send(ToolTipUpdateEvent {
                         item_stack: item,
                         parent_slot_entity: e,
+                        is_recipe: state.r#type.is_crafting(),
                     });
                 }
             }

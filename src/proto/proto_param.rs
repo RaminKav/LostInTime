@@ -10,6 +10,7 @@ use crate::{
         projectile::{ProjectileState, RangedAttack},
         WorldObject,
     },
+    world::WorldGeneration,
 };
 
 use super::SpriteSheetProto;
@@ -29,6 +30,19 @@ impl<'w, 's> ProtoParam<'w, 's> {
             self.prototypes
                 .get(format!("proto/{}.prototype.ron", id.to_lowercase()))?,
         )
+    }
+    pub fn get_world_gen(&self) -> Option<WorldGeneration> {
+        if let Some(data) = self.get_prototype("worldgenerationparams") {
+            data.schematics()
+                .get::<WorldGeneration>()
+                .unwrap()
+                .input()
+                .downcast_ref::<WorldGeneration>()
+                .cloned()
+        } else {
+            warn!("Could not get world generation data");
+            None
+        }
     }
     pub fn get_item_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &self,
@@ -88,8 +102,9 @@ impl<'w, 's> ProtoParam<'w, 's> {
         let id = <T as Into<&str>>::into(obj).to_owned();
 
         if let Some(data) = self.get_prototype(&id) {
-            let Some(data) = data.schematics()
-                .get::<RangedAttack>() else {return None};
+            let Some(data) = data.schematics().get::<RangedAttack>() else {
+                return None;
+            };
             data.input().downcast_ref::<RangedAttack>()
         } else {
             warn!("Could not get item data for: {}", id);
@@ -104,8 +119,9 @@ impl<'w, 's> ProtoParam<'w, 's> {
         let id = <T as Into<&str>>::into(obj).to_owned();
 
         if let Some(data) = self.get_prototype(&id) {
-            let Some(data) = data.schematics()
-                .get::<MeleeAttack>() else {return None};
+            let Some(data) = data.schematics().get::<MeleeAttack>() else {
+                return None;
+            };
             data.input().downcast_ref::<MeleeAttack>()
         } else {
             warn!("Could not get item data for: {}", id);

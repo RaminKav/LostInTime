@@ -45,7 +45,7 @@
         WaterBoulder2: 0.02,
       },
       schematic_frequencies: {
-        // House: 0.08,
+        House: 0.05,
         DungeonEntrance: 0.1
       },
       obj_allowed_tiles_map: {

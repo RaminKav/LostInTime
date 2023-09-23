@@ -1,6 +1,6 @@
 (
   name: "MetalPants",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": MetalPants,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (

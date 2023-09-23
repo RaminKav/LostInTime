@@ -3,6 +3,8 @@ use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::handle_player_raw_position;
+use crate::world::dimension::DimensionSpawnEvent;
+use crate::world::dungeon::DungeonPlugin;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -352,6 +354,7 @@ pub fn toggle_inventory(
     mut inv_state: ResMut<InventoryState>,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
+    mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
 ) {
@@ -434,9 +437,15 @@ pub fn toggle_inventory(
         // );
     }
 
-    // if key_input.just_pressed(KeyCode::P) {
-    //     DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
-    // }
+    if key_input.just_pressed(KeyCode::P) {
+        DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
+    }
+    if key_input.just_pressed(KeyCode::O) {
+        dim_event.send(DimensionSpawnEvent {
+            generation_params: proto.get_world_gen().unwrap(),
+            swap_to_dim_now: true,
+        });
+    }
     if key_input.just_pressed(KeyCode::U) {
         commands
             .entity(game.game.player)

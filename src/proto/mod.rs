@@ -143,6 +143,8 @@ impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
         println!("Loading prototypes...");
         //TODO: automate this
+        prototypes.load("proto/item_drop.prototype.ron");
+        prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/smallgreentree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");
@@ -156,7 +158,6 @@ impl ProtoPlugin {
         prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/fireball.prototype.ron");
         prototypes.load("proto/electricity.prototype.ron");
-        prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/chestplate.prototype.ron");
         prototypes.load("proto/metalpants.prototype.ron");
@@ -270,6 +271,9 @@ impl ProtoPlugin {
         prototypes.load("proto/orboftransformation.prototype.ron");
         prototypes.load("proto/bridge.prototype.ron");
         prototypes.load("proto/bridgeblock.prototype.ron");
+        prototypes.load("proto/largemanapotion.prototype.ron");
+        prototypes.load("proto/smallmanapotion.prototype.ron");
+        prototypes.load("proto/worldgenerationparams.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

@@ -57,7 +57,7 @@ pub fn update_wall(
                 let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
                     continue 'outer;
                 };
-                if let Ok(cache) = chunk_wall_cache.get(*neighbour_chunk_e) {
+                if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
                     if let Some(cached_wall) = cache.walls.get(&neighbour_pos) {
                         neighbour_walls.insert(neighbour_pos, *cached_wall);
                     } else {
@@ -172,7 +172,7 @@ pub fn handle_wall_break(
     let mut removed_wall_pos = Vec::new();
     for broken_wall in obj_break_events.iter() {
         let chunk_e = game.get_chunk_entity(broken_wall.pos.chunk_pos).unwrap();
-        if let Ok(mut cache) = chunk_wall_cache.get_mut(*chunk_e) {
+        if let Ok(mut cache) = chunk_wall_cache.get_mut(chunk_e) {
             cache.walls.insert(broken_wall.pos.clone(), false);
             removed_wall_pos.push(broken_wall.pos.clone());
         }
@@ -206,8 +206,10 @@ pub fn handle_wall_placed(
             continue;
         }
         let new_wall_pos = world_pos_to_tile_pos(*pos);
-        let chunk_e = game.get_chunk_entity(new_wall_pos.chunk_pos).unwrap();
-        if let Ok(mut cache) = chunk_wall_cache.get_mut(*chunk_e) {
+        let Some(chunk_e) = game.get_chunk_entity(new_wall_pos.chunk_pos) else {
+            continue;
+        };
+        if let Ok(mut cache) = chunk_wall_cache.get_mut(chunk_e) {
             cache.walls.insert(world_pos_to_tile_pos(*pos), true);
             new_walls_pos.push(new_wall_pos.clone());
         }
@@ -238,12 +240,16 @@ pub fn mark_neighbour_walls_dirty(
             }
             let wall_pos = target_pos;
             let neighbour_pos = get_neighbour_tile(wall_pos.clone(), (dx, dy));
-            let neighbour_chunk_e = game.get_chunk_entity(neighbour_pos.chunk_pos).unwrap();
-            if let Ok(cache) = chunk_wall_cache.get(*neighbour_chunk_e) {
+            let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
+                continue;
+            };
+            if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
                 if let Some(true) = cache.walls.get(&neighbour_pos).cloned() {
-                    let new_wall_entity = game
-                        .get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
-                        .unwrap();
+                    let Some(new_wall_entity) =
+                        game.get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
+                    else {
+                        continue;
+                    };
                     commands.entity(new_wall_entity).insert(Dirty);
                 }
             } else if let Some((_, neighbour_block_entity_data)) =

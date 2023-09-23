@@ -248,7 +248,6 @@ impl GameAssetsPlugin {
         let mut furnace_list = FurnaceRecipeList::default();
 
         for (item, rect) in sprite_desc.items.iter() {
-            println!("Found graphic {item:?} {:?}", rect.to_atlas_rect());
             match item {
                 _ => {
                     let mut sprite =

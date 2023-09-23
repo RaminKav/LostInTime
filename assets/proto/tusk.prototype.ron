@@ -1,6 +1,6 @@
 (
   name: "Tusk",
-  templates: ["world_object"],
+  templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Tusk,
   "survival_rogue_like::inventory::ItemStack": (
