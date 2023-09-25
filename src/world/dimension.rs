@@ -1,9 +1,18 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_save::{CloneReflect, Snapshot};
 
-use crate::{enemy::Mob, item::Equipment, CustomFlush, WorldGeneration};
+use crate::{
+    enemy::Mob,
+    item::Equipment,
+    player::{MovePlayerEvent, Player},
+    CustomFlush, WorldGeneration,
+};
 
-use super::chunk::Chunk;
+use super::{
+    chunk::Chunk,
+    dungeon::{CachedPlayerPos, DungeonText},
+    TileMapPosition,
+};
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
@@ -58,6 +67,9 @@ impl DimensionPlugin {
     pub fn new_dim_with_params(
         mut commands: Commands,
         mut spawn_event: EventReader<DimensionSpawnEvent>,
+        dungeon_text: Query<Entity, With<DungeonText>>,
+        mut move_player_event: EventWriter<MovePlayerEvent>,
+        player_pos: Query<&CachedPlayerPos, With<Player>>,
     ) {
         for new_dim in spawn_event.iter() {
             println!("SPAWNING NEW DIMENSION");
@@ -65,6 +77,12 @@ impl DimensionPlugin {
             let dim_e = commands.spawn((Dimension,)).id();
             if new_dim.swap_to_dim_now {
                 commands.entity(dim_e).insert(SpawnDimension);
+            }
+            for e in dungeon_text.iter() {
+                commands.entity(e).despawn();
+            }
+            if let Ok(cached_pos) = player_pos.get_single() {
+                move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
             }
         }
     }
@@ -82,9 +100,9 @@ impl DimensionPlugin {
             for e in entity_query.iter() {
                 commands.entity(e).despawn_recursive();
             }
-            // clean up old dimension, remove active tag, and update its chunk manager
+            // clean up old dimension,
             if let Ok(old_dim) = old_dim.get_single() {
-                commands.entity(old_dim).remove::<ActiveDimension>();
+                commands.entity(old_dim).despawn_recursive();
             }
             //give the new dimension active tag, and use its chunk manager as the game resource
             commands

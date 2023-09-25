@@ -57,7 +57,7 @@ pub fn change_ui_state_to_chest_when_resource_added(
 
 pub fn add_inv_to_new_chest_objs(
     mut commands: Commands,
-    new_chests: Query<(Entity, &WorldObject), Added<WorldObject>>,
+    new_chests: Query<(Entity, &WorldObject), Without<ChestContainer>>,
 ) {
     for e in new_chests.iter() {
         if e.1 == &WorldObject::Chest {

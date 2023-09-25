@@ -32,11 +32,3 @@ bevy_hanabi = { version = "0.6", default-features = false, features = [ "2d" ] }
 
 [features]
 release-bundle = []
-
-[target.x86_64-pc-windows-msvc]
-linker = "/usr/local/bin/lld"
-rustflags = [
-  "-Lnative=/Users/ramin/xwin/crt/lib/x86_64",
-  "-Lnative=/Users/ramin/xwin/sdk/lib/um/x86_64",
-  "-Lnative=/Users/ramin/xwin/sdk/lib/ucrt/x86_64"
-]

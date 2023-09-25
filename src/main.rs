@@ -193,7 +193,7 @@ pub struct GameParam<'w, 's> {
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     pub world_obj_cache: ResMut<'w, WorldObjectCache>,
     //TODO: remove this to use Bevy_Save
-    pub player_query: Query<'w, 's, (Entity, &'static mut Player)>,
+    pub player_query: Query<'w, 's, Entity, With<Player>>,
     pub player_stats: Query<
         'w,
         's,
@@ -252,11 +252,20 @@ impl<'w, 's> GameParam<'w, 's> {
     }
 
     pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
-        print!(" add ");
         self.world_obj_cache.objects.insert(pos, obj);
     }
     pub fn remove_object_from_chunk_cache(&mut self, pos: TileMapPosition) {
         self.world_obj_cache.objects.remove(&pos);
+    }
+    pub fn add_object_to_dungeon_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
+        self.world_obj_cache.dungeon_objects.insert(pos, obj);
+    }
+    pub fn remove_object_from_dungeon_cache(&mut self, pos: TileMapPosition) {
+        self.world_obj_cache.dungeon_objects.remove(&pos);
+    }
+    pub fn clear_dungeon_cache(&mut self) {
+        self.world_obj_cache.dungeon_objects.clear();
+        self.world_obj_cache.generated_dungeon_chunks.clear();
     }
     pub fn get_objects_from_chunk_cache(
         &self,
@@ -270,11 +279,33 @@ impl<'w, 's> GameParam<'w, 's> {
         }
         cache
     }
+    pub fn get_objects_from_dungeon_cache(
+        &self,
+        chunk_pos: IVec2,
+    ) -> Vec<(TileMapPosition, WorldObject)> {
+        let mut cache = vec![];
+        for (pos, obj) in self.world_obj_cache.dungeon_objects.iter() {
+            if pos.chunk_pos == chunk_pos {
+                cache.push((*pos, *obj));
+            }
+        }
+        cache
+    }
     pub fn is_chunk_generated(&self, chunk_pos: IVec2) -> bool {
         self.world_obj_cache.generated_chunks.contains(&chunk_pos)
     }
     pub fn set_chunk_generated(&mut self, chunk_pos: IVec2) {
         self.world_obj_cache.generated_chunks.push(chunk_pos);
+    }
+    pub fn is_dungeon_chunk_generated(&self, chunk_pos: IVec2) -> bool {
+        self.world_obj_cache
+            .generated_dungeon_chunks
+            .contains(&chunk_pos)
+    }
+    pub fn set_dungeon_chunk_generated(&mut self, chunk_pos: IVec2) {
+        self.world_obj_cache
+            .generated_dungeon_chunks
+            .push(chunk_pos);
     }
     pub fn get_object_from_chunk_cache(&self, pos: TileMapPosition) -> Option<&WorldObject> {
         self.world_obj_cache.objects.get(&pos)

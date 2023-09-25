@@ -12,7 +12,7 @@ use crate::inventory::ItemStack;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::handle_new_scene_entities_parent_chunk;
-use crate::schematic::loot_chests::LootChestType;
+use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::dimension::ActiveDimension;
@@ -64,7 +64,7 @@ pub struct PlacesInto(pub WorldObject);
 pub struct Block;
 #[derive(Component)]
 pub struct Equipment(pub Limb);
-#[derive(Component, Reflect, Debug, FromReflect, Schematic, Default, Eq, PartialEq)]
+#[derive(Component, Reflect, Debug, Clone, FromReflect, Schematic, Default, Eq, PartialEq)]
 #[reflect(Component, Schematic)]
 pub enum EquipmentType {
     #[default]
@@ -107,6 +107,19 @@ impl EquipmentType {
             EquipmentType::Pendant => InventorySlotType::Accessory,
             EquipmentType::Trinket => InventorySlotType::Accessory,
             _ => InventorySlotType::Normal,
+        }
+    }
+    pub fn is_weapon(&self) -> bool {
+        match self {
+            EquipmentType::Weapon => true,
+            _ => false,
+        }
+    }
+    pub fn is_tool(&self) -> bool {
+        match self {
+            EquipmentType::Axe => true,
+            EquipmentType::Pickaxe => true,
+            _ => false,
         }
     }
     pub fn is_equipment(&self) -> bool {
@@ -289,6 +302,7 @@ pub enum WorldObject {
     UpgradeStationBlock,
     BridgeBlock,
     Bridge,
+    DungeonExit,
 }
 
 #[derive(
@@ -390,6 +404,12 @@ impl WorldObject {
             .unwrap_or(&SpriteSize::Small)
             .is_medium()
     }
+    pub fn get_equip_type(&self, proto_param: &ProtoParam) -> Option<EquipmentType> {
+        if let Some(eq_type) = proto_param.get_component::<EquipmentType, _>(*self) {
+            return Some(eq_type.clone());
+        }
+        None
+    }
 
     pub fn spawn_equipment_on_player(
         self,
@@ -408,7 +428,7 @@ impl WorldObject {
             .get(&self)
             .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
             .clone();
-        let player_e = game.player_query.single().0;
+        let player_e = game.player_query.single();
         let obj_data = game.world_obj_data.properties.get(&self).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let position;
@@ -518,7 +538,7 @@ impl WorldObject {
 pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
-    pub loot_chest_type: Option<LootChestType>,
+    pub placed_by_player: bool,
 }
 
 pub struct ItemsPlugin;
@@ -576,7 +596,6 @@ pub fn handle_placing_world_object(
         if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param) {
             continue;
         }
-
         if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
             let item = proto_commands.spawn_object_from_proto(
                 place_event.obj,
@@ -588,8 +607,10 @@ pub fn handle_placing_world_object(
             if let Some(item) = item {
                 //TODO: do what old game data did, add obj to registry
                 commands.entity(item).set_parent(chunk);
-                if let Some(loot_chest_type) = &place_event.loot_chest_type {
-                    commands.entity(item).insert(loot_chest_type.clone());
+                if !place_event.placed_by_player && place_event.obj == WorldObject::Chest {
+                    commands
+                        .entity(item)
+                        .insert(get_random_loot_chest_type(rand::thread_rng()));
                 }
 
                 minimap_event.send(UpdateMiniMapEvent {
@@ -612,6 +633,8 @@ pub fn handle_placing_world_object(
         }
         if dungeon_check.get_single().is_err() {
             game.add_object_to_chunk_cache(tile_pos, place_event.obj);
+        } else {
+            game.add_object_to_dungeon_cache(tile_pos, place_event.obj);
         }
     }
 }

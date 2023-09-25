@@ -4,7 +4,9 @@ use super::item_actions::ItemActionParam;
 use crate::inventory::Container;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
-use crate::world::dungeon::DungeonPlugin;
+use crate::world::dimension::DimensionSpawnEvent;
+use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
+use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
     world::world_helpers::world_pos_to_tile_pos,
@@ -20,6 +22,7 @@ pub enum ObjectAction {
     ModifyHealth(i32),
     Teleport(Vec2),
     DungeonTeleport,
+    DungeonExit,
     Chest,
     Crafting(CraftingContainerType), //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
     Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
@@ -29,6 +32,7 @@ impl ObjectAction {
     pub fn run_action(
         &self,
         e: Entity,
+        game: &mut GameParam,
         item_action_param: &mut ItemActionParam,
         commands: &mut Commands,
         proto_param: &mut ProtoParam,
@@ -46,10 +50,13 @@ impl ObjectAction {
                     .send(MovePlayerEvent { pos });
             }
             ObjectAction::DungeonTeleport => {
-                DungeonPlugin::spawn_new_dungeon_dimension(
-                    commands,
-                    &mut proto_param.proto_commands,
-                );
+                spawn_new_dungeon_dimension(game, commands, &mut proto_param.proto_commands);
+            }
+            ObjectAction::DungeonExit => {
+                item_action_param.dim_event.send(DimensionSpawnEvent {
+                    generation_params: proto_param.get_world_gen().unwrap(),
+                    swap_to_dim_now: true,
+                });
             }
             ObjectAction::Chest => {
                 let chest_inv = item_action_param.chest_query.get(e).unwrap();

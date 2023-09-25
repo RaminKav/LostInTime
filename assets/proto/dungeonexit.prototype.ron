@@ -1,0 +1,13 @@
+(
+  name: "DungeonExit",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": DungeonExit,
+  "survival_rogue_like::item::object_actions::ObjectAction": DungeonExit,
+  "survival_rogue_like::assets::SpriteSize": Small,
+   "survival_rogue_like::world::y_sort::YSort": (-0.05),
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
+  "survival_rogue_like::proto::ColliderProto": (x: 7., y: 7),
+  "survival_rogue_like::world::WorldObjectEntityData": (object: DungeonExit, obj_bit_index: 0, texture_offset: 0),
+  }
+)

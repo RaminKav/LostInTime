@@ -249,7 +249,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                     place_item_event.send(PlaceItemEvent {
                         obj: *obj,
                         pos,
-                        loot_chest_type: loot_chest_option.cloned(),
+                        placed_by_player: false,
                     });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);

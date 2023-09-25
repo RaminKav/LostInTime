@@ -3,8 +3,9 @@ use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::handle_player_raw_position;
+use crate::ui::stats_ui::StatsUI;
 use crate::world::dimension::DimensionSpawnEvent;
-use crate::world::dungeon::DungeonPlugin;
+use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -32,7 +33,7 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, InventoryState};
+use crate::ui::{change_hotbar_slot, InventoryState, UIContainersParam};
 use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
@@ -151,6 +152,7 @@ impl Plugin for InputsPlugin {
                     tick_dash_timer,
                     update_cursor_pos.after(move_player),
                     toggle_inventory,
+                    close_container,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -348,8 +350,21 @@ pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
         }
     }
 }
+pub fn close_container(
+    key_input: ResMut<Input<KeyCode>>,
+    mut inv_state: ResMut<InventoryState>,
+    mut commands: Commands,
+    stats_query: Query<Entity, With<StatsUI>>,
+) {
+    if key_input.just_pressed(KeyCode::Escape) {
+        inv_state.open = false;
+        if let Ok(e) = stats_query.get_single() {
+            commands.entity(e).despawn_recursive();
+        }
+    }
+}
 pub fn toggle_inventory(
-    game: GameParam,
+    mut game: GameParam,
     key_input: ResMut<Input<KeyCode>>,
     mut inv_state: ResMut<InventoryState>,
     mut commands: Commands,
@@ -362,83 +377,8 @@ pub fn toggle_inventory(
         inv_state.open = !inv_state.open;
     }
 
-    if key_input.just_pressed(KeyCode::E) {
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::WoodSword,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::BasicStaff,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::DualStaff,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::FireStaff,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::Chestplate,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::Pants,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::Ring,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::CrateBlock,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::MagicWhip,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::WoodBow,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::Claw,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     1,
-        // );
-        // proto_commands.spawn_item_from_proto(
-        //     WorldObject::ThrowingStar,
-        //     &proto,
-        //     game.player().position.truncate(),
-        //     64,
-        // );
-    }
-
     if key_input.just_pressed(KeyCode::P) {
-        DungeonPlugin::spawn_new_dungeon_dimension(&mut commands, &mut proto_commands);
+        spawn_new_dungeon_dimension(&mut game, &mut commands, &mut proto_commands);
     }
     if key_input.just_pressed(KeyCode::O) {
         dim_event.send(DimensionSpawnEvent {
@@ -623,6 +563,7 @@ pub fn mouse_click_system(
             if let Ok(obj_action) = obj_actions.get(obj_e) {
                 obj_action.run_action(
                     obj_e,
+                    &mut game,
                     &mut item_action_param,
                     &mut commands,
                     &mut proto_param,
