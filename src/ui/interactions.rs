@@ -40,6 +40,7 @@ pub enum UIElement {
     EliteStar,
     CraftingInventory,
     FurnaceInventory,
+    TileHover,
 }
 
 #[derive(Component, Debug, Clone)]
