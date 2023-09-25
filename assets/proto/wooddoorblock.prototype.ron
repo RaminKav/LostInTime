@@ -1,0 +1,17 @@
+(
+  name: "WoodDoorBlock",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": WoodDoorBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(WoodDoor)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: WoodDoorBlock,
+        metadata: (
+            name: "Wood Door", 
+            desc: ["Creates a Wood Door."]
+        ),
+        count: 1
+  ),
+  }
+)

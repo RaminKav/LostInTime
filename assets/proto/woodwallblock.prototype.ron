@@ -1,0 +1,17 @@
+(
+  name: "WoodWallBlock",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": WoodWallBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(WoodWall)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: WoodWallBlock,
+        metadata: (
+            name: "Wood Wall", 
+            desc: ["Creates a Wood Wall."]
+        ),
+        count: 1
+  ),
+  }
+)

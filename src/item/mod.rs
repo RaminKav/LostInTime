@@ -303,6 +303,10 @@ pub enum WorldObject {
     BridgeBlock,
     Bridge,
     DungeonExit,
+    WoodWall,
+    WoodWallBlock,
+    WoodDoor,
+    WoodDoorBlock,
 }
 
 #[derive(
@@ -358,6 +362,8 @@ pub struct FoliageSize(pub Vec2);
 #[reflect(Component, Schematic)]
 pub enum Wall {
     StoneWall,
+    WoodWall,
+    WoodDoor,
 }
 impl Default for Wall {
     fn default() -> Self {
@@ -392,9 +398,11 @@ impl WorldObjectResource {
 }
 
 impl WorldObject {
-    pub fn is_block(&self) -> bool {
+    pub fn is_wall(&self) -> bool {
         match self {
             WorldObject::StoneWall => true,
+            WorldObject::WoodWall => true,
+            WorldObject::WoodDoor => true,
             _ => false,
         }
     }
@@ -529,6 +537,8 @@ impl WorldObject {
             WorldObject::WaterBoulder => LIGHT_GREY,
             WorldObject::WaterBoulder2 => LIGHT_GREY,
             WorldObject::Pebble => LIGHT_GREY,
+            WorldObject::WoodWall => LIGHT_BROWN,
+            WorldObject::WoodDoor => LIGHT_BROWN,
 
             _ => BLACK,
         }
