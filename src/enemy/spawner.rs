@@ -75,7 +75,7 @@ pub struct MobSpawnEvent {
 
 fn add_spawners_to_new_chunks(
     mut commands: Commands,
-    maybe_dungeon: Query<Option<&Dungeon>, With<ActiveDimension>>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     new_chunk_query: Query<(Entity, &Chunk), Added<Chunk>>,
 ) {
     for new_chunk in new_chunk_query.iter() {
@@ -299,7 +299,6 @@ fn spawn_one_time_enemies_at_day(
             }
             break;
         }
-        println!("SPAWNING BIG BOI");
         proto_commands.spawn_from_proto(Mob::Slime, &prototypes, pos);
         *day_tracker += 1;
     }

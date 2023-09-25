@@ -249,6 +249,11 @@ fn spawn_player(
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10);
+    // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeStationBlock, &proto, Vec2::ZERO, 64);

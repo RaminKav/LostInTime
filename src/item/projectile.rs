@@ -167,6 +167,7 @@ fn handle_ranged_attack_event(
 fn handle_translate_projectiles(
     mut query: Query<(&mut Transform, &ProjectileState, &Projectile), With<Projectile>>,
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
+    time: Res<Time>,
 ) {
     for (mut transform, state, proj) in query.iter_mut() {
         let arrow_speed_upgrade = if proj == &Projectile::Arrow {
@@ -177,7 +178,7 @@ fn handle_translate_projectiles(
         } else {
             0.
         };
-        let delta = state.direction * (state.speed + arrow_speed_upgrade);
+        let delta = state.direction * (state.speed + arrow_speed_upgrade) * time.delta_seconds();
         transform.translation += delta.extend(0.0);
     }
 }

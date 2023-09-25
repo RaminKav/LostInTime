@@ -373,7 +373,10 @@ pub fn toggle_inventory(
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
 ) {
-    if key_input.just_pressed(KeyCode::I) {
+    if key_input.just_pressed(KeyCode::I)
+        || key_input.just_pressed(KeyCode::Tab)
+        || key_input.just_pressed(KeyCode::E)
+    {
         inv_state.open = !inv_state.open;
     }
 
