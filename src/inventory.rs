@@ -147,7 +147,7 @@ impl InventoryItemStack {
             panic!("graphics not loaded");
         }
         //TODO: extract this out to helper fn vvvv
-        let is_block = obj.is_block();
+        let is_block = obj.is_wall();
         let has_icon = if is_block {
             game.graphics.icons.as_ref().unwrap().get(&obj)
         } else {

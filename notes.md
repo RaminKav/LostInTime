@@ -476,4 +476,5 @@ add mobs to world gen params?
 particles w gradient, or tweak idk
 dungeon chest has chance to spawn mobs
 big brain: move the grid down until its at 0,0, not move the player
+pre-load enemy spritesheets
 SOUNDS!

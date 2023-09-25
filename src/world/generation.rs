@@ -237,7 +237,7 @@ impl GenerationPlugin {
                                 || chunk_pos.y < -4
                                 || chunk_pos.y > 3
                             {
-                                if tp.1 == WorldObject::StoneWall {
+                                if tp.1.is_wall() {
                                     wall_cache.walls.insert(tp.0, true);
                                     return true;
                                 } else {
@@ -254,11 +254,11 @@ impl GenerationPlugin {
                                 as usize]
                                 == 1
                             {
-                                if tp.1 == WorldObject::StoneWall {
+                                if tp.1.is_wall() {
                                     wall_cache.walls.insert(tp.0, false);
                                     return false;
                                 }
-                            } else if tp.1 != WorldObject::StoneWall {
+                            } else if !tp.1.is_wall() {
                                 return false;
                             }
                         }
@@ -384,7 +384,7 @@ impl GenerationPlugin {
 
                         if let Ok(_) = dungeon_check {
                             let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                            if obj == &WorldObject::StoneWall {
+                            if obj.is_wall() {
                                 wall_cache.walls.insert(*pos, true);
                             }
                             game.add_object_to_dungeon_cache(*pos, *obj);
@@ -414,7 +414,7 @@ impl GenerationPlugin {
                     );
                     if let Some(spawned_obj) = spawned_obj {
                         let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                        if obj == WorldObject::StoneWall {
+                        if obj.is_wall() {
                             wall_cache.walls.insert(pos, true);
                         } else if obj == WorldObject::Chest {
                             commands

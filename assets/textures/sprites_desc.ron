@@ -280,6 +280,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        WoodDoorBlock: WorldObjectData(
+            texture_pos: (5., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         RedMushroom: WorldObjectData(
             texture_pos: (10., 13.),
             size: (16., 16.),
@@ -497,6 +502,11 @@
         ),
         Coal: WorldObjectData(
             texture_pos: (11., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        WoodWallBlock: WorldObjectData(
+            texture_pos: (11., 2.),
             size: (16., 16.),
             anchor: None,
         ),

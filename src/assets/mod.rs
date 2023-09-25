@@ -230,7 +230,7 @@ impl GameAssetsPlugin {
             wall_image_handle.clone(),
             Vec2::new(16., 32.),
             32,
-            2,
+            3,
             None,
             None,
         );
