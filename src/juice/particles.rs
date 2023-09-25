@@ -291,6 +291,7 @@ pub fn spawn_obj_hit_particles(
         };
 
         let is_mob = mob_query.get(hit.hit_entity).is_ok();
+        let is_object = world_object.get(hit.hit_entity).is_ok();
         let effect = if is_mob {
             particles.enemy_hit_particles.clone()
         } else {
@@ -299,8 +300,10 @@ pub fn spawn_obj_hit_particles(
         //TODO: fix this bs unwrap panic
         let color = if is_mob {
             mob_query.get(hit.hit_entity).unwrap().get_mob_color()
-        } else {
+        } else if is_object {
             world_object.get(hit.hit_entity).unwrap().0.get_obj_color()
+        } else {
+            continue;
         };
 
         commands.spawn((
