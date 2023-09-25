@@ -1,0 +1,55 @@
+use bevy::prelude::*;
+
+use crate::{
+    assets::Graphics,
+    inputs::CursorPos,
+    world::{
+        world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
+        y_sort::YSort,
+        TileMapPosition,
+    },
+};
+
+use super::UIElement;
+
+#[derive(Component)]
+pub struct TileHover {
+    pos: TileMapPosition,
+}
+
+pub fn spawn_tile_hover_on_cursor_move(
+    mut commands: Commands,
+    cursor: Res<CursorPos>,
+    graphics: Res<Graphics>,
+    tile_hover_check: Query<(Entity, &TileHover)>,
+) {
+    let tile_pos = world_pos_to_tile_pos(cursor.world_coords.truncate());
+    if let Ok((e, tile_hover)) = tile_hover_check.get_single() {
+        if tile_hover.pos == tile_pos {
+            return;
+        }
+        commands.entity(e).despawn();
+    }
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics
+                .ui_image_handles
+                .as_ref()
+                .unwrap()
+                .get(&UIElement::TileHover)
+                .unwrap()
+                .clone(),
+            transform: Transform {
+                translation: tile_pos_to_world_pos(tile_pos, false).extend(1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(16., 16.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(TileHover { pos: tile_pos })
+        .insert(YSort(-0.2));
+}

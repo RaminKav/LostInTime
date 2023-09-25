@@ -11,6 +11,7 @@ mod inventory_ui;
 pub mod minimap;
 mod player_hud;
 pub mod stats_ui;
+mod tile_hover;
 mod tooltips;
 mod ui_helpers;
 pub use chest_ui::*;
@@ -37,6 +38,7 @@ use self::{
     },
     minimap::MinimapPlugin,
     stats_ui::{setup_stats_ui, toggle_stats_visibility, update_sp_text, update_stats_text},
+    tile_hover::spawn_tile_hover_on_cursor_move,
 };
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
@@ -135,6 +137,7 @@ impl Plugin for UIPlugin {
                     handle_spawn_inv_player_stats.after(CustomFlush),
                     handle_cursor_stats_buttons.run_if(in_state(UIState::Stats)),
                     toggle_stats_visibility,
+                    spawn_tile_hover_on_cursor_move,
                     setup_stats_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Stats))),
