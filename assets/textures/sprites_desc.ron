@@ -275,6 +275,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        DungeonExit: WorldObjectData(
+            texture_pos: (4., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         RedMushroom: WorldObjectData(
             texture_pos: (10., 13.),
             size: (16., 16.),

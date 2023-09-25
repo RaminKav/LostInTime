@@ -173,7 +173,7 @@ pub fn add_dungeon_chests(
     let grid_size = dungeon.grid.len();
     let mut picked_x;
     let mut picked_y;
-    let mut num_chests_left_to_spawn = if rng.gen_ratio(1, 2) { 2 } else { 1 };
+    let mut num_chests_left_to_spawn = if rng.gen_ratio(3, 4) { 2 } else { 1 };
     let mut chest_positions = vec![];
 
     while num_chests_left_to_spawn > 0 {
@@ -209,11 +209,58 @@ pub fn add_dungeon_chests(
         place_item_event.send(PlaceItemEvent {
             obj: WorldObject::Chest,
             pos: tile_pos_to_world_pos(*pos, false),
-            loot_chest_type: Some(if i == 0 {
-                LootChestType::Rare
-            } else {
-                LootChestType::Common
-            }),
+            placed_by_player: false,
+        });
+    }
+}
+pub fn add_dungeon_exit_block(
+    new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
+    mut place_item_event: EventWriter<PlaceItemEvent>,
+) {
+    let Ok(dungeon) = new_dungeon.get_single() else {
+        return;
+    };
+    let mut rng = rand::thread_rng();
+    let grid_size = dungeon.grid.len();
+    let mut picked_x;
+    let mut picked_y;
+    let mut num_exits_left_to_spawn = 1;
+    let mut chest_positions = vec![];
+
+    while num_exits_left_to_spawn > 0 {
+        picked_x = rng.gen_range(0..grid_size - 1);
+        picked_y = rng.gen_range(0..grid_size - 1);
+        if dungeon.grid[picked_y][picked_x] == 1 {
+            if dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
+                let pos = TileMapPosition::new(
+                    IVec2::new(
+                        f64::floor(
+                            (picked_x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64,
+                        ) as i32,
+                        f64::floor(
+                            ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.) as f64
+                                / (CHUNK_SIZE) as f64,
+                        ) as i32
+                            + 1,
+                    ),
+                    TilePos {
+                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
+                        y: f64::ceil(
+                            CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64) as f64,
+                        ) as u32
+                            - 1,
+                    },
+                );
+                chest_positions.push(pos);
+                num_exits_left_to_spawn -= 1;
+            }
+        }
+    }
+    for (i, pos) in chest_positions.iter().enumerate() {
+        place_item_event.send(PlaceItemEvent {
+            obj: WorldObject::DungeonExit,
+            pos: tile_pos_to_world_pos(*pos, false),
+            placed_by_player: false,
         });
     }
 }

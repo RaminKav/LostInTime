@@ -17,11 +17,12 @@
       object_generation_frequencies: {
         Grass: 0.0,
         DeadSapling: 0.0,
-        Boulder: 0.01,
-        // Boulder2: 0.005,
-        // CoalBoulder: 0.005,
-        // MetalBoulder: 0.005,
-        Pebble: 0.05,
+        Boulder: 0.005,
+        Boulder2: 0.005,
+        CoalBoulder: 0.003,
+        MetalBoulder: 0.003,
+        Crate: 0.00003,
+        Pebble: 0.01,
       },
       obj_allowed_tiles_map: {
         Boulder: [GrassTile, StoneTile],
@@ -32,7 +33,8 @@
         Grass: [GrassTile, StoneTile],
         DeadSapling: [GrassTile, StoneTile],
         Chest: [GrassTile, StoneTile],
-        StoneWall: [GrassTile, StoneTile]
+        StoneWall: [GrassTile, StoneTile],
+        DungeonExit: [GrassTile, StoneTile]
       }
     ),
   }

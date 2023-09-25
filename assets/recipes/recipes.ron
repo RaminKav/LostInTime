@@ -2,7 +2,7 @@
     (String, ([(item: PlantFibre, count: 4)], Inventory, 1)),
     (StoneChunk, ([(item: PebbleBlock, count: 4)], Inventory, 1)),
     (WoodAxe, ([(item: String, count: 1),(item: StoneChunk, count: 1),(item: Stick, count: 1)], Inventory, 1)),
-    (WoodPickaxe, ([(item: String, count: 1),(item: StoneChunk, count: 2),(item: Stick, count: 1)], Inventory, 1)),
+    (WoodPickaxe, ([(item: String, count: 1),(item: StoneChunk, count: 2),(item: Stick, count: 1)], CraftingTable, 1)),
     (CraftingTableBlock, ([(item: WoodPlank, count: 1),(item: Log, count: 1),(item: Stick, count: 1),], Inventory, 1)),
     (Log, ([(item: WoodPlank, count: 4)], Inventory, 1)),
     (WoodPlank, ([(item: Log, count: 1)], Inventory, 4)),
@@ -22,7 +22,7 @@
     (MetalPants, ([(item: MetalBar, count: 15)], Anvil, 1)),
     (MetalShoes, ([(item: MetalBar, count: 10)], Anvil, 1)),
     (Sword, ([(item: MetalBar, count: 8),(item: Stick, count: 2),(item: StoneChunk, count: 2)], Anvil, 1)),
-    (WoodSword, ([(item: Log, count: 2),(item: Stick, count: 2),(item: WoodPlank, count: 2)], CraftingTable, 1)),
+    (WoodSword, ([(item: Log, count: 2),(item: Stick, count: 2),(item: WoodPlank, count: 2)], Inventory, 1)),
     (Dagger, ([(item: MetalBar, count: 6),(item: Stick, count: 2),(item: StoneChunk, count: 1)], Anvil, 1)),
     (ForestShirt, ([(item: BushlingScale, count: 8),(item: Tusk, count: 4),(item: PlantFibre, count: 4)], Anvil, 1)),
     (ForestPants, ([(item: BushlingScale, count: 8),(item: Tusk, count: 4),(item: PlantFibre, count: 4)], Anvil, 1)),
@@ -39,5 +39,6 @@
 [
     (MetalShard, MetalBar),
     (RawMeat, CookedMeat),
-]
+],
+[WoodSword, Sword, Chestplate, MetalPants, MetalShoes, LeatherTunic, LeatherPants, LeatherShoes, ForestShirt, ForestPants, ForestShoes, WoodAxe, WoodPickaxe, Dagger, Claw, WoodBow, FireStaff, BasicStaff, MagicWhip ]
 )

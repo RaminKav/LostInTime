@@ -246,6 +246,7 @@ impl GameAssetsPlugin {
         ];
         let mut recipes_list = RecipeList::default();
         let mut furnace_list = FurnaceRecipeList::default();
+        let mut upgradeable_items = Vec::new();
 
         for (item, rect) in sprite_desc.items.iter() {
             match item {
@@ -313,10 +314,15 @@ impl GameAssetsPlugin {
         for (result, recipe) in recipes_desc.1.iter() {
             furnace_list.insert(*result, recipe.clone());
         }
+        // load upgradeable items
+        for item in recipes_desc.2.iter() {
+            upgradeable_items.push(*item);
+        }
 
         *recipes = Recipes {
             crafting_list: recipes_list,
             furnace_list,
+            upgradeable_items,
         };
         // load UI
         for u in UIElement::iter() {

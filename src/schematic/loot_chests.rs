@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
@@ -21,12 +21,13 @@ pub enum LootChestType {
 }
 
 pub fn handle_new_loot_chest_spawn(
-    mut loot_chests: Query<(&LootChestType, &mut ChestContainer), Added<LootChestType>>,
+    mut loot_chests: Query<(Entity, &LootChestType, &mut ChestContainer), With<LootChestType>>,
     proto_param: ProtoParam,
+    mut commands: Commands,
 ) {
     let mut rng = rand::thread_rng();
 
-    for (chest_type, mut inventory) in loot_chests.iter_mut() {
+    for (e, chest_type, mut inventory) in loot_chests.iter_mut() {
         let loot_table = match chest_type {
             LootChestType::Common => LootTable {
                 drops: vec![
@@ -151,5 +152,19 @@ pub fn handle_new_loot_chest_spawn(
                 }
             }
         }
+        commands.entity(e).remove::<LootChestType>();
+    }
+}
+
+pub fn get_random_loot_chest_type(mut rng: ThreadRng) -> LootChestType {
+    let random_number = rng.gen_range(0..100);
+    if random_number < 15 {
+        LootChestType::Rare
+    } else if random_number < 38 {
+        LootChestType::Uncommon
+    } else if random_number < 50 {
+        LootChestType::Food
+    } else {
+        LootChestType::Common
     }
 }

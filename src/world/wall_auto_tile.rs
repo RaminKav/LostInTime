@@ -199,7 +199,7 @@ pub fn handle_wall_placed(
     for PlaceItemEvent {
         obj,
         pos,
-        loot_chest_type: _,
+        placed_by_player: _,
     } in events.iter()
     {
         if proto_param.get_component::<Wall, _>(*obj).is_none() {

@@ -11,7 +11,10 @@ use crate::{
     player::MovePlayerEvent,
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer, InventoryState},
-    world::world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
+    world::{
+        dimension::DimensionSpawnEvent,
+        world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
+    },
     GameParam,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
@@ -51,6 +54,7 @@ pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
     pub use_item_event: EventWriter<'w, UseItemEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
+    pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
@@ -112,7 +116,7 @@ impl ItemActions {
                     item_action_param.place_item_event.send(PlaceItemEvent {
                         obj: *obj,
                         pos,
-                        loot_chest_type: None,
+                        placed_by_player: true,
                     });
                 }
                 ItemAction::Eat(delta) => {

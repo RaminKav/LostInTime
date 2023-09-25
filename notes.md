@@ -190,9 +190,9 @@ impl different att styles w seldum_state
 [x] # mobs dont spawn around player
 [x] # add elite mobs
 [x] ### add resource UI (furnace, item upgrade station)
-[] ### FIX: lag in dungeons use bevy_spacial?
-[] ### save/load/cache
-[] cleanup proto obj files, add parent
+[x] ### FIX: lag in dungeons use bevy_spacial?
+[] ## save/load on exit
+[x] cleanup proto obj files, add parent
 [] # bushlings have chance to spawn from bush
 [] ## add cursor tile highlight/world tooltip
 [] enemy attack hit indicator/colliders
@@ -451,12 +451,17 @@ Dungeons are smaller, with an unbreakable wall barrier around them, might reduce
 ##
 
 juice the game -> hit objectgs shake depending on health left
-add velocity to dmg numbers, and fade out
+[x] add velocity to dmg numbers, and fade out
 add acceleration to player
 fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
 cape + clothes
-fix desc of all items
-bunch of recipes are missing, of course
+[] fix desc of all items
+[] bunch of recipes are missing, of course
+[] tweak rarity of upgrade tome/orbs
+
+[x] fix upgrade tome for equipment
+[x] add esc to close container
+[x] check if player spawn thing works
 
 fix camera, add acceleration
 use tile coordinate multiplied by big number and module down to check if obj spawns. deterministic spawning.
@@ -467,8 +472,8 @@ taking multiple equipment from craft drains resources but does not increment the
 make objects be defined by a 2x2 grid rather than 1x1 or 2x2 allow 2x1 and 1x2
 fix objects in dungeons,
 add mobs to world gen params?
-make dungeon spawn with mobs initially, and hostile
+[x] make dungeon spawn with mobs initially, and hostile
 particles w gradient, or tweak idk
 dungeon chest has chance to spawn mobs
 big brain: move the grid down until its at 0,0, not move the player
-add exit from dungeon,
+SOUNDS!

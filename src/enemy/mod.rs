@@ -20,7 +20,7 @@ use crate::{
     item::{projectile::Projectile, Loot, LootTable},
     player::levels::ExperienceReward,
     ui::minimap::UpdateMiniMapEvent,
-    world::TileMapPosition,
+    world::{dungeon::Dungeon, TileMapPosition},
     AppExt, GameParam, GameState,
 };
 
@@ -143,10 +143,15 @@ pub fn handle_new_mob_state_machine(
         ),
         Added<Mob>,
     >,
+    dungeon_check: Query<&Dungeon>,
 ) {
     for (e, _mob, alignment, follow_speed, leap_attack_option, proj_attack_option) in
         spawn_events.iter()
     {
+        let mut alignment = alignment.clone();
+        if dungeon_check.get_single().is_ok() {
+            alignment = CombatAlignment::Hostile;
+        }
         let mut e_cmds = commands.entity(e);
         let mut state_machine = StateMachine::default().set_trans_logging(false);
         match alignment {
@@ -276,7 +281,7 @@ pub fn handle_new_mob_state_machine(
                 );
             }
         }
-        if alignment != &CombatAlignment::Passive {
+        if alignment != CombatAlignment::Passive {
             state_machine = state_machine.trans::<IdleState>(
                 NightTimeAggro,
                 FollowState {

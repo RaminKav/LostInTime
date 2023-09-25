@@ -274,6 +274,7 @@ impl ProtoPlugin {
         prototypes.load("proto/largemanapotion.prototype.ron");
         prototypes.load("proto/smallmanapotion.prototype.ron");
         prototypes.load("proto/worldgenerationparams.prototype.ron");
+        prototypes.load("proto/dungeonexit.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

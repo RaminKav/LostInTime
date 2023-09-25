@@ -145,7 +145,7 @@ pub fn add_container_to_new_furnace_objs(
                     parent: e.0,
                     slot_map: vec![
                         vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
-                        vec![WorldObject::WoodSword],
+                        recipes.upgradeable_items.clone(),
                     ],
                     timer: Timer::from_seconds(3., TimerMode::Once),
                     state: None,

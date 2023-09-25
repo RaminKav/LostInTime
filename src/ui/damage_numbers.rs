@@ -8,7 +8,10 @@ use crate::{
 };
 
 #[derive(Component)]
-pub struct DamageNumber(pub Timer);
+pub struct DamageNumber {
+    pub timer: Timer,
+    pub velocity: f32,
+}
 
 #[derive(Component)]
 pub struct PreviousHealth(i32);
@@ -93,7 +96,10 @@ pub fn handle_add_damage_numbers_after_hit(
                     },
                     ..Default::default()
                 })
-                .insert(DamageNumber(Timer::from_seconds(0.75, TimerMode::Once)));
+                .insert(DamageNumber {
+                    timer: Timer::from_seconds(0.7, TimerMode::Once),
+                    velocity: 0.,
+                });
         }
     }
 }
@@ -135,7 +141,10 @@ pub fn handle_add_dodge_text(
                     },
                     ..Default::default()
                 })
-                .insert(DamageNumber(Timer::from_seconds(0.75, TimerMode::Once)));
+                .insert(DamageNumber {
+                    timer: Timer::from_seconds(0.7, TimerMode::Once),
+                    velocity: 0.,
+                });
         }
     }
 }
@@ -144,12 +153,21 @@ pub fn handle_add_dodge_text(
 pub fn tick_damage_numbers(
     mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(Entity, &mut DamageNumber, &mut Transform)>,
+    mut query: Query<(Entity, &mut Text, &mut DamageNumber, &mut Transform)>,
 ) {
-    for (entity, mut damage_number, mut t) in query.iter_mut() {
-        damage_number.0.tick(time.delta());
-        t.translation.y += 10. * time.delta_seconds();
-        if damage_number.0.finished() {
+    for (entity, mut text, mut damage_number, mut t) in query.iter_mut() {
+        damage_number.timer.tick(time.delta());
+        t.translation.y += damage_number.velocity * time.delta_seconds();
+        if damage_number.timer.percent() > 0.3 {
+            for section in text.sections.iter_mut() {
+                section
+                    .style
+                    .color
+                    .set_a(1. - damage_number.timer.percent() + 0.3);
+            }
+        }
+        damage_number.velocity += 0.7;
+        if damage_number.timer.finished() {
             commands.entity(entity).despawn_recursive();
         }
     }

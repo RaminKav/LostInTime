@@ -35,6 +35,7 @@ pub struct Recipes {
     // map of recipie result and its recipe matrix
     pub crafting_list: RecipeList,
     pub furnace_list: FurnaceRecipeList,
+    pub upgradeable_items: Vec<WorldObject>,
 }
 
 #[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq)]
@@ -48,6 +49,7 @@ pub type FurnaceRecipeList = HashMap<WorldObject, WorldObject>;
 pub type RecipeListProto = (
     Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>,
     Vec<(WorldObject, WorldObject)>,
+    Vec<WorldObject>,
 );
 
 #[derive(Resource, Default, Deserialize)]
@@ -239,17 +241,29 @@ pub fn handle_furnace_slot_update(
                     .current_fuel_type
                 {
                     WorldObject::UpgradeTome => {
-                        furnace.items.items[1]
+                        let mut modifier = None;
+                        if let Some(eqp_type) = furnace.items.items[1]
                             .as_ref()
                             .unwrap()
-                            .clone()
-                            .modify_attributes(
-                                AttributeModifier {
-                                    modifier: "attack".to_owned(),
-                                    delta: 1,
-                                },
-                                &mut furnace.items,
-                            );
+                            .get_obj()
+                            .get_equip_type(&proto)
+                        {
+                            if eqp_type.is_weapon() || eqp_type.is_tool() {
+                                modifier = Some("attack".to_owned())
+                            } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
+                                modifier = Some("health".to_owned())
+                            }
+                        }
+                        if let Some(modifier) = modifier {
+                            furnace.items.items[1]
+                                .as_ref()
+                                .unwrap()
+                                .clone()
+                                .modify_attributes(
+                                    AttributeModifier { modifier, delta: 1 },
+                                    &mut furnace.items,
+                                );
+                        }
                     }
                     WorldObject::OrbOfTransformation => {
                         let old_item = furnace.items.items[1].as_ref().unwrap();

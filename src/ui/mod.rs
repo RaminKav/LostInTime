@@ -10,7 +10,7 @@ mod interactions;
 mod inventory_ui;
 pub mod minimap;
 mod player_hud;
-mod stats_ui;
+pub mod stats_ui;
 mod tooltips;
 mod ui_helpers;
 pub use chest_ui::*;
@@ -126,7 +126,7 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    add_inv_to_new_chest_objs,
+                    add_inv_to_new_chest_objs.after(CustomFlush),
                     add_container_to_new_furnace_objs,
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     update_foodbar,

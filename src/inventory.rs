@@ -166,7 +166,7 @@ impl InventoryItemStack {
         };
 
         let player_state = game.player();
-        let player_e = game.player_query.single().0;
+        let player_e = game.player_query.single();
         let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
         let is_facing_left = player_state.direction == FacingDirection::Left;
