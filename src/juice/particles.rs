@@ -4,12 +4,13 @@ use bevy_hanabi::prelude::*;
 
 use crate::{
     assets::SpriteAnchor,
-    combat::{EnemyDeathEvent, HitEvent, JustGotHit},
+    combat::{EnemyDeathEvent, HitEvent, JustGotHit, ObjBreakEvent},
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
     player::Player,
-    world::y_sort::YSort,
+    proto::proto_param::ProtoParam,
+    world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort},
     Game,
 };
 
@@ -368,6 +369,38 @@ pub fn spawn_enemy_death_particles(
 ) {
     for death_event in death_events.iter() {
         let t = death_event.enemy_pos;
+
+        commands.spawn((
+            Name::new("emit:burst"),
+            ParticleEffectBundle {
+                effect: ParticleEffect::new(particles.enemy_death_particle.clone())
+                    .with_z_layer_2d(Some(999.)),
+                transform: Transform::from_translation(Vec3::new(t.x as f32, t.y + 4., 2.)),
+                ..Default::default()
+            },
+            YSort(1.),
+            ObjectHitParticles {
+                despawn_timer: Timer::from_seconds(1.1, TimerMode::Once),
+                velocity: Vec3::new(0., 8000., 0.),
+            },
+        ));
+    }
+}
+
+pub fn spawn_obj_death_particles(
+    mut commands: Commands,
+    mut death_events: EventReader<ObjBreakEvent>,
+    particles: Res<Particles>,
+    proto_param: ProtoParam,
+) {
+    for death_event in death_events.iter() {
+        if (!death_event.obj.is_medium_size(&proto_param) && !death_event.obj.is_tree())
+            && death_event.obj != WorldObject::Crate
+            && death_event.obj != WorldObject::Crate2
+        {
+            return;
+        }
+        let t = tile_pos_to_world_pos(death_event.pos, true);
 
         commands.spawn((
             Name::new("emit:burst"),

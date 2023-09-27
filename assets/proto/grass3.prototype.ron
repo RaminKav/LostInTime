@@ -5,7 +5,6 @@
   "survival_rogue_like::item::WorldObject": Grass3,
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::attributes::MaxHealth": (1),
-  "survival_rogue_like::world::WorldObjectEntityData": (object: Grass3, obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::world::y_sort::YSort": (-0.01),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

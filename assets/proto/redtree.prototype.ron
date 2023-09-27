@@ -1,12 +1,12 @@
 (
-  name: "MediumGreenTree",
+  name: "RedTree",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": MediumGreenTree,
-  "survival_rogue_like::item::Foliage": MediumGreenTree,
+  "survival_rogue_like::item::WorldObject": RedTree,
+  "survival_rogue_like::item::Foliage": RedTree,
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 64., y: 96.)),
-   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -30., x2: 0., y2: -22., r: 2.5),
   "survival_rogue_like::attributes::MaxHealth": (35),

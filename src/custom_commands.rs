@@ -6,7 +6,7 @@ use crate::{
     world::{
         wall_auto_tile::Dirty,
         world_helpers::{tile_pos_to_world_pos, world_pos_to_chunk_relative_tile_pos},
-        WorldObjectEntityData,
+        WallTextureData,
     },
 };
 use bevy::{prelude::*, sprite::Mesh2dHandle};
@@ -210,7 +210,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         }
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
             let sprite_data = proto_param
-                .get_component::<WorldObjectEntityData, _>(obj)
+                .get_component::<WallTextureData, _>(obj)
                 .unwrap();
             spawned_entity_commands
                 .insert(

@@ -6,8 +6,8 @@ use crate::{
     attributes::{AttributeModifier, ItemAttributes, ItemRarity},
     inputs::FacingDirection,
     item::{
-        Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
-        PLAYER_EQUIPMENT_POSITIONS,
+        CraftedItemEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand,
+        WorldObject, PLAYER_EQUIPMENT_POSITIONS,
     },
     player::Limb,
     proto::proto_param::ProtoParam,
@@ -618,23 +618,24 @@ impl InventoryPlugin {
     pub fn pick_up_and_merge_crafting_result_stack(
         dragging_item: ItemStack,
         dropped_slot: usize,
-        container: &mut Container,
+        cont_param: &mut UIContainersParam,
     ) -> Option<ItemStack> {
+        let container = cont_param
+            .get_active_ui_container_mut()
+            .expect("clicked on crafting slot without a container");
         let pickup_item_option = container.items[dropped_slot].clone();
         if let Some(pickup_item) = pickup_item_option {
-            let item_type = dragging_item.obj_type;
-            //TODO: should this return  None, or the original stack??
-            if item_type != *pickup_item.get_obj()
-                || pickup_item.item_stack.metadata != dragging_item.metadata
-                || pickup_item.item_stack.attributes != dragging_item.attributes
-            {
+            let dragging_item_type = dragging_item.obj_type;
+            if dragging_item_type != *pickup_item.get_obj() {
                 return Some(dragging_item);
             }
             let item_a_count = dragging_item.count;
             let item_b_count = pickup_item.item_stack.count;
             let combined_size = item_a_count + item_b_count;
             let new_item = Some(dragging_item.copy_with_count(min(combined_size, MAX_STACK_SIZE)));
-
+            cont_param.crafted_event.send(CraftedItemEvent {
+                obj: dragging_item_type,
+            });
             return new_item;
         } else {
             Some(dragging_item)

@@ -11,6 +11,12 @@ pub fn create_new_random_item_stack_with_attributes(
     proto: &ProtoParam,
 ) -> ItemStack {
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
+        let mut stack = stack.clone();
+        stack.metadata = proto
+            .get_item_data(stack.obj_type)
+            .unwrap()
+            .metadata
+            .clone();
         return stack.clone();
     };
     let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);

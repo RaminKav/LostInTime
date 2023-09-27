@@ -27,11 +27,11 @@ impl PlayerStats {
         let mut att = input_att;
         att.attack += self.str;
         att.defence += self.str;
-        att.crit_damage += self.dex;
-        att.crit_chance += self.dex;
-        att.speed += self.agi;
-        att.dodge += self.agi;
-        att.health += self.vit;
+        att.crit_damage += 2 * self.dex;
+        att.crit_chance += 2 * self.dex;
+        att.speed += 2 * self.agi;
+        att.dodge += 2 * self.agi;
+        att.health += 3 * self.vit;
         att.health_regen += self.vit;
         att
     }

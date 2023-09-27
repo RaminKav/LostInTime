@@ -450,7 +450,6 @@ Dungeons are smaller, with an unbreakable wall barrier around them, might reduce
 
 ##
 
-juice the game -> hit objectgs shake depending on health left
 [x] add velocity to dmg numbers, and fade out
 add acceleration to player
 fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
@@ -466,15 +465,17 @@ cape + clothes
 fix camera, add acceleration
 use tile coordinate multiplied by big number and module down to check if obj spawns. deterministic spawning.
 use air blocks to determin a broken tile, regen world
-red mushrooms dont stack for some reason
 somehow make recipe icons deterministic order
-taking multiple equipment from craft drains resources but does not increment the stack (since cant stack equipment)
 make objects be defined by a 2x2 grid rather than 1x1 or 2x2 allow 2x1 and 1x2
-fix objects in dungeons,
 add mobs to world gen params?
 [x] make dungeon spawn with mobs initially, and hostile
 particles w gradient, or tweak idk
 dungeon chest has chance to spawn mobs
 big brain: move the grid down until its at 0,0, not move the player
 pre-load enemy spritesheets
+shift click from/to hotbar
+sapplings!!!
+add juice explosion to projectiles on hit
+recipe discovery (with JUICE)
+MAGIC LIGHTING 2D
 SOUNDS!

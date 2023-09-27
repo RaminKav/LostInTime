@@ -3,11 +3,12 @@
   templates: ["world_object"],
   schematics: {
   "survival_rogue_like::item::WorldObject": WoodDoor,
+  "survival_rogue_like::item::object_actions::ObjectAction": ChangeObject(WoodDoorOpen),
   "survival_rogue_like::item::Wall": WoodDoor,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 4.)),
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -3., x2: 0., y2: -2., r: 7.5),
   "survival_rogue_like::attributes::MaxHealth": (35),
-  "survival_rogue_like::world::WorldObjectEntityData": (object: WoodDoor, obj_bit_index: 15, texture_offset: 2),
+  "survival_rogue_like::world::WallTextureData": (obj_bit_index: 15, texture_offset: 2),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: WoodDoorBlock,

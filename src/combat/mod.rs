@@ -15,6 +15,7 @@ use crate::{
         projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
         RequiredEquipmentType, WorldObject,
     },
+    juice::bounce::BounceOnHit,
     player::levels::{ExperienceReward, PlayerLevel},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
@@ -289,7 +290,7 @@ pub fn handle_hits(
                         0.2,
                         TimerMode::Once,
                     ),
-                    knockback: if is_player { 400. } else { 200. },
+                    knockback: if is_player { 400. } else { 0. },
                     dir: hit.dir,
                 });
                 if let Some(i_frames) = i_frame_option {
@@ -307,7 +308,7 @@ pub fn handle_hits(
             }
 
             if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
-                hit_e.insert(JustGotHit);
+                hit_e.insert(JustGotHit).insert(BounceOnHit::new());
             }
         }
     }

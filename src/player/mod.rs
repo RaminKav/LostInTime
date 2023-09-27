@@ -32,7 +32,9 @@ use crate::{
 };
 
 use self::{
-    levels::{handle_level_up, spawn_particles_when_leveling, PlayerLevel},
+    levels::{
+        handle_level_up, hide_particles_when_inv_open, spawn_particles_when_leveling, PlayerLevel,
+    },
     stats::{send_attribute_event_on_stats_update, PlayerStats, SkillPoints},
 };
 pub struct PlayerPlugin;
@@ -59,14 +61,14 @@ impl Default for PlayerState {
     fn default() -> Self {
         Self {
             direction: FacingDirection::Left,
-            is_moving: false,
+            is_moving: true,
             is_dashing: false,
             is_attacking: false,
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 1.5,
             player_dash_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.225, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.15, TimerMode::Once),
         }
     }
 }
@@ -99,6 +101,7 @@ impl Plugin for PlayerPlugin {
             load_recipes_into_inventory_container_on_startup.run_if(resource_changed::<Recipes>()),
             handle_level_up,
             spawn_particles_when_leveling,
+            hide_particles_when_inv_open,
             give_player_starting_items.in_schedule(OnEnter(GameState::Main)),
         ))
         .add_system(handle_move_player.in_set(OnUpdate(GameState::Main)))
@@ -250,7 +253,8 @@ fn spawn_player(
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 64);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40);
     // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10);
