@@ -4,9 +4,9 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": FurDevil,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
-    "survival_rogue_like::enemy::FollowSpeed": (0.55),
+    "survival_rogue_like::enemy::FollowSpeed": (0.45),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 16., startup: 0.15, duration: 0.42, cooldown: 0.15, speed: 85.),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 24., startup: 0.25, duration: 0.42, cooldown: 0.15, speed: 85.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 6.5),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/furdevil/furdevil_down.png", size: (x: 32., y: 32.), cols: 8, rows: 6),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.06),

@@ -1,16 +1,16 @@
 (
-  name: "WoodWall",
+  name: "WoodDoorOpen",
   templates: ["world_object"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": WoodWall,
-  "survival_rogue_like::item::Wall": WoodWall,
+  "survival_rogue_like::item::WorldObject": WoodDoorOpen,
+  "survival_rogue_like::item::object_actions::ObjectAction": ChangeObject(WoodDoor),
+  "survival_rogue_like::item::Wall": WoodDoorOpen,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 4.)),
-  "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -3., x2: 0., y2: -2., r: 7.5),
   "survival_rogue_like::attributes::MaxHealth": (35),
-  "survival_rogue_like::world::WallTextureData": (obj_bit_index: 15, texture_offset: 1),
+  "survival_rogue_like::world::WallTextureData": (obj_bit_index: 15, texture_offset: 3),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: WoodWallBlock,
+                item: WoodDoorBlock,
                 min: 1,
                 max: 1,
                 rate: 1.

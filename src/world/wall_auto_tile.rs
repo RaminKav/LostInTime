@@ -9,7 +9,7 @@ use crate::{
 use super::{
     chunk::GenerateObjectsEvent,
     generation::WallBreakEvent,
-    world_helpers::{get_neighbour_obj_data, get_neighbour_tile, world_pos_to_tile_pos},
+    world_helpers::{get_neighbour_tile, get_neighbour_wall_data, world_pos_to_tile_pos},
     TileMapPosition,
 };
 #[derive(Component)]
@@ -155,7 +155,7 @@ pub fn update_wall(
             }
         }
         let mut new_wall_data = game
-            .get_tile_obj_data_mut(new_wall_pos.clone(), &proto_param)
+            .get_wall_data_at_tile_mut(new_wall_pos.clone(), &proto_param)
             .unwrap();
 
         new_wall_data.obj_bit_index = final_sprite_index;
@@ -252,18 +252,12 @@ pub fn mark_neighbour_walls_dirty(
                     };
                     commands.entity(new_wall_entity).insert(Dirty);
                 }
-            } else if let Some((_, neighbour_block_entity_data)) =
-                get_neighbour_obj_data(wall_pos, (dx, dy), game, proto_param)
-            {
-                if let Some(_wall) =
-                    proto_param.get_component::<Wall, _>(neighbour_block_entity_data.object)
-                {
-                    let new_wall_entity = game
-                        .get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
-                        .unwrap();
+            } else if let Some(_) = get_neighbour_wall_data(wall_pos, (dx, dy), game, proto_param) {
+                let new_wall_entity = game
+                    .get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
+                    .unwrap();
 
-                    commands.entity(new_wall_entity).insert(Dirty);
-                }
+                commands.entity(new_wall_entity).insert(Dirty);
             }
         }
     }

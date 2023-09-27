@@ -92,8 +92,7 @@ impl TileMapPosition {
 )]
 #[reflect(Component, Schematic)]
 
-pub struct WorldObjectEntityData {
-    pub object: WorldObject,
+pub struct WallTextureData {
     pub obj_bit_index: u8,
     pub texture_offset: u8,
 }

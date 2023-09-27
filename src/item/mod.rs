@@ -8,6 +8,7 @@ use crate::colors::{
 use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::enemy::Mob;
+use crate::inputs::mouse_click_system;
 use crate::inventory::ItemStack;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
@@ -21,7 +22,7 @@ use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
-use crate::world::TileMapPosition;
+use crate::world::{TileMapPosition, WallTextureData};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -196,6 +197,7 @@ pub enum WorldObject {
     SmallGreenTree,
     MediumGreenTree,
     MediumYellowTree,
+    RedTree,
     Log,
     Sword,
     BasicStaff,
@@ -306,6 +308,7 @@ pub enum WorldObject {
     WoodWall,
     WoodWallBlock,
     WoodDoor,
+    WoodDoorOpen,
     WoodDoorBlock,
 }
 
@@ -332,6 +335,7 @@ pub enum Foliage {
     SmallYellowTree,
     MediumGreenTree,
     MediumYellowTree,
+    RedTree,
 }
 impl Default for Foliage {
     fn default() -> Self {
@@ -364,6 +368,7 @@ pub enum Wall {
     StoneWall,
     WoodWall,
     WoodDoor,
+    WoodDoorOpen,
 }
 impl Default for Wall {
     fn default() -> Self {
@@ -403,6 +408,16 @@ impl WorldObject {
             WorldObject::StoneWall => true,
             WorldObject::WoodWall => true,
             WorldObject::WoodDoor => true,
+            _ => false,
+        }
+    }
+    pub fn is_tree(&self) -> bool {
+        match self {
+            WorldObject::SmallGreenTree => true,
+            WorldObject::SmallYellowTree => true,
+            WorldObject::MediumGreenTree => true,
+            WorldObject::MediumYellowTree => true,
+            WorldObject::RedTree => true,
             _ => false,
         }
     }
@@ -510,6 +525,7 @@ impl WorldObject {
             WorldObject::MetalBoulder => LIGHT_GREY,
             WorldObject::WaterTile => BLUE,
             WorldObject::SmallGreenTree => WHITE,
+            WorldObject::RedTree => WHITE,
             WorldObject::SmallYellowTree => WHITE,
             WorldObject::MediumYellowTree => DARK_BROWN,
             WorldObject::MediumGreenTree => DARK_BROWN,
@@ -565,12 +581,7 @@ impl Plugin for ItemsPlugin {
                     .before(CustomFlush)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(
-                handle_placing_world_object
-                    .after(handle_new_scene_entities_parent_chunk)
-                    .after(CustomFlush)
-                    .in_set(OnUpdate(GameState::Main)),
-            )
+            .add_system(handle_placing_world_object.in_base_set(CoreSet::PostUpdate))
             .add_systems(
                 (
                     handle_item_action_success,

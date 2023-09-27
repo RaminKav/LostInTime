@@ -166,7 +166,7 @@ fn check_projectile_hit_mob_collisions(
 fn check_projectile_hit_player_collisions(
     mut commands: Commands,
     enemy_attack: Query<(Entity, &Attack), With<Mob>>,
-    allowed_targets: Query<Entity, With<Player>>,
+    allowed_targets: Query<Entity, (Or<(With<Player>, With<WorldObject>)>, Without<Projectile>)>,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
@@ -235,6 +235,9 @@ pub fn check_item_drop_collisions(
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
 ) {
+    if !game.player().is_moving {
+        return;
+    }
     let player_e = player.single();
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {

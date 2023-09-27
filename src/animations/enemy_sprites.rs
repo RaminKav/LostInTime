@@ -186,11 +186,15 @@ pub fn animate_character_spritesheet_animations(
         let mult = if is_player.is_some()
             && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Attack
         {
-            3
+            3.
+        } else if is_player.is_none()
+            && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Idle
+        {
+            0.5
         } else {
-            1
+            1.
         };
-        timer.tick(time.delta() * mult);
+        timer.tick(time.delta().mul_f32(mult));
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
             let frames =

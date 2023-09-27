@@ -6,7 +6,6 @@
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderProto": (x: 5., y: 5),
   "survival_rogue_like::attributes::MaxHealth": (20),
-  "survival_rogue_like::world::WorldObjectEntityData": (object: Stump2, obj_bit_index: 0, texture_offset: 0),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
             item: WoodPlank,

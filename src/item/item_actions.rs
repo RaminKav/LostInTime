@@ -22,7 +22,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use super::{CraftingTracker, PlaceItemEvent, Recipes, WorldObject};
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[derive(Component, Reflect, FromReflect, Clone, Schematic, Default, PartialEq)]
 #[reflect(Component, Schematic)]
 pub enum ItemAction {
     #[default]

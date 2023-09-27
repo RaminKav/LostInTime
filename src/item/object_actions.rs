@@ -1,11 +1,13 @@
-use super::get_crafting_inventory_item_stacks;
 use super::item_actions::ItemActionParam;
+use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::inventory::Container;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
+use crate::world::wall_auto_tile::Dirty;
+use crate::world::WallTextureData;
 use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
@@ -26,6 +28,7 @@ pub enum ObjectAction {
     Chest,
     Crafting(CraftingContainerType), //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
     Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
+    ChangeObject(WorldObject),
 }
 
 impl ObjectAction {
@@ -61,6 +64,17 @@ impl ObjectAction {
             ObjectAction::Chest => {
                 let chest_inv = item_action_param.chest_query.get(e).unwrap();
                 commands.insert_resource(chest_inv.clone());
+            }
+            ObjectAction::ChangeObject(new_obj) => {
+                commands.entity(e).despawn_recursive();
+                let pos = item_action_param.cursor_pos.world_coords.truncate();
+                game.remove_object_from_chunk_cache(world_pos_to_tile_pos(pos));
+
+                item_action_param.place_item_event.send(PlaceItemEvent {
+                    obj: *new_obj,
+                    pos,
+                    placed_by_player: true,
+                });
             }
             ObjectAction::Crafting(crafting_type) => {
                 let crafting_items = item_action_param

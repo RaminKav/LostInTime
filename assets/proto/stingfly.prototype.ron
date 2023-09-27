@@ -4,7 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": StingFly,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
-    "survival_rogue_like::enemy::FollowSpeed": (0.5),
+    "survival_rogue_like::enemy::FollowSpeed": (0.4),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 150., startup: 0.7, duration: 0.52, cooldown: 1.8, speed: 144.),

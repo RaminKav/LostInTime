@@ -46,7 +46,7 @@ use crate::{
     player::levels::ExperienceReward,
     schematic::{loot_chests::LootChestType, SchematicType},
     ui::crafting_ui::CraftingContainerType,
-    world::WorldObjectEntityData,
+    world::WallTextureData,
     CustomFlush, GameState, YSort,
 };
 pub struct ProtoPlugin;
@@ -75,7 +75,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Attack>()
             .register_type::<MeleeAttack>()
             .register_type::<ItemStack>()
-            .register_type::<WorldObjectEntityData>()
+            .register_type::<WallTextureData>()
             .register_type::<ItemAttributes>()
             .register_type::<RawItemBaseAttributes>()
             .register_type::<RawItemBonusAttributes>()
@@ -146,6 +146,7 @@ impl ProtoPlugin {
         prototypes.load("proto/item_drop.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/smallgreentree.prototype.ron");
+        prototypes.load("proto/redtree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");
         prototypes.load("proto/mediumyellowtree.prototype.ron");
@@ -278,6 +279,7 @@ impl ProtoPlugin {
         prototypes.load("proto/woodwall.prototype.ron");
         prototypes.load("proto/woodwallblock.prototype.ron");
         prototypes.load("proto/wooddoor.prototype.ron");
+        prototypes.load("proto/wooddooropen.prototype.ron");
         prototypes.load("proto/wooddoorblock.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
@@ -353,6 +355,7 @@ impl From<IdleStateProto> for IdleState {
             walk_timer: Timer::from_seconds(idle_state.walk_dir_change_time, TimerMode::Repeating),
             direction: FacingDirection::new_rand_dir(rand::thread_rng()),
             speed: idle_state.speed,
+            is_stopped: false,
         }
     }
 }

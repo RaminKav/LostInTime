@@ -7,7 +7,7 @@ use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
-    item::CraftedItemEvent,
+    item::{CraftedItemEvent, EquipmentType},
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
     GameParam,
@@ -41,6 +41,7 @@ pub enum UIElement {
     CraftingInventory,
     FurnaceInventory,
     TileHover,
+    BlockedTileHover,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -188,38 +189,38 @@ pub fn handle_drop_on_slot_events(
         let obj = drop_event.dropped_item_stack.obj_type;
         if slot_type.is_crafting() && !cont_param.crafting_tracker.craftable.contains(&obj) {
             continue;
-        } else if slot_type.is_crafting() {
-            cont_param.crafted_event.send(CraftedItemEvent { obj });
         }
-        let return_item =
-            if slot_type.is_crafting() && cont_param.crafting_tracker.craftable.contains(&obj) {
-                InventoryPlugin::pick_up_and_merge_crafting_result_stack(
-                    drop_event.dropped_item_stack.clone(),
-                    drop_event.drop_target_slot_state.slot_index,
-                    &mut inv.single_mut().crafting_items,
-                )
-            } else {
-                if slot_type.is_crafting() {
-                    continue;
-                }
-                let inv_stack = InventoryItemStack {
-                    item_stack: drop_event.dropped_item_stack.clone(),
-                    slot: drop_event.drop_target_slot_state.slot_index,
-                };
-                if !inv_stack.validate(slot_type, &proto_param, &cont_param) {
-                    return;
-                }
-                let mut inv = inv.single_mut();
-                let container = if slot_type.is_chest() {
-                    &mut cont_param.chest_option.as_mut().unwrap().items
-                } else if slot_type.is_furnace() {
-                    &mut cont_param.furnace_option.as_mut().unwrap().items
-                } else {
-                    inv.get_mut_items_from_slot_type(slot_type)
-                };
-
-                inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
+        let return_item = if slot_type.is_crafting()
+            && cont_param.crafting_tracker.craftable.contains(&obj)
+            && proto_param.get_component::<EquipmentType, _>(obj).is_none()
+        {
+            InventoryPlugin::pick_up_and_merge_crafting_result_stack(
+                drop_event.dropped_item_stack.clone(),
+                drop_event.drop_target_slot_state.slot_index,
+                &mut cont_param,
+            )
+        } else {
+            if slot_type.is_crafting() {
+                continue;
+            }
+            let inv_stack = InventoryItemStack {
+                item_stack: drop_event.dropped_item_stack.clone(),
+                slot: drop_event.drop_target_slot_state.slot_index,
             };
+            if !inv_stack.validate(slot_type, &proto_param, &cont_param) {
+                return;
+            }
+            let mut inv = inv.single_mut();
+            let container = if slot_type.is_chest() {
+                &mut cont_param.chest_option.as_mut().unwrap().items
+            } else if slot_type.is_furnace() {
+                &mut cont_param.furnace_option.as_mut().unwrap().items
+            } else {
+                inv.get_mut_items_from_slot_type(slot_type)
+            };
+
+            inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
+        };
 
         let updated_drag_item;
         if let Some(return_item) = return_item {

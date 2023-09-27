@@ -20,7 +20,7 @@ use crate::{
             TileEntityCollection, TileSpriteData,
         },
         dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
-        ChunkManager, TileMapPosition, WorldGeneration, WorldObjectEntityData,
+        ChunkManager, TileMapPosition, WallTextureData, WorldGeneration,
     },
     CustomFlush, GameParam, YSort,
 };
@@ -70,7 +70,7 @@ impl Plugin for ClientPlugin {
             // .register_saveable::<Handle<TextureAtlas>>()
             .register_saveable::<TextureAtlasSprite>()
             .register_saveable::<CurrentHealth>()
-            .register_saveable::<WorldObjectEntityData>()
+            .register_saveable::<WallTextureData>()
             .register_saveable::<YSort>()
             .register_saveable::<TileMapPosition>()
             .register_saveable::<ColliderReflect>()

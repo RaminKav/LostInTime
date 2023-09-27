@@ -11,10 +11,11 @@
       dirt_frequency: 0.0,
       stone_wall_frequency: 0.0,
       object_generation_frequencies: {
-        SmallGreenTree: 0.05,
-        SmallYellowTree: 0.05,
-        MediumYellowTree: 0.03,
-        MediumGreenTree: 0.03,
+        SmallGreenTree: 0.02,
+        SmallYellowTree: 0.02,
+        MediumYellowTree: 0.01,
+        MediumGreenTree: 0.01,
+        RedTree: 0.005,
         Boulder: 0.003,
         Boulder2: 0.003,
         CoalBoulder: 0.001,
@@ -51,6 +52,7 @@
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],
         SmallYellowTree: [GrassTile],
+        RedTree: [GrassTile],
         MediumYellowTree: [GrassTile],
         MediumGreenTree: [GrassTile],
         Boulder: [GrassTile],

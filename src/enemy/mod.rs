@@ -173,6 +173,7 @@ pub fn handle_new_mob_state_machine(
                             walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                             direction: FacingDirection::new_rand_dir(rand::thread_rng()),
                             speed: 0.5,
+                            is_stopped: false,
                         },
                     );
             }
@@ -197,6 +198,7 @@ pub fn handle_new_mob_state_machine(
                             walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
                             direction: FacingDirection::new_rand_dir(rand::thread_rng()),
                             speed: 0.5,
+                            is_stopped: false,
                         },
                     );
             }

@@ -3,7 +3,7 @@ use bevy_ecs_tilemap::tiles::TilePos;
 
 use crate::{item::WorldObject, proto::proto_param::ProtoParam, GameParam};
 
-use super::{TileMapPosition, WorldObjectEntityData, CHUNK_SIZE, TILE_SIZE};
+use super::{TileMapPosition, WallTextureData, CHUNK_SIZE, TILE_SIZE};
 
 pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
     // do this bc we want bottom left of the block to be 0,0 instead of centre
@@ -99,18 +99,18 @@ pub fn get_neighbour_quadrant(pos: TileMapPosition, offset: (i8, i8)) -> TileMap
     world_pos_to_tile_pos(parent_world_pos + Vec2::new(dx, dy))
 }
 
-pub fn get_neighbour_obj_data(
+pub fn get_neighbour_wall_data(
     pos: TileMapPosition,
     offset: (i8, i8),
     game: &mut GameParam,
     proto_param: &ProtoParam,
-) -> Option<(Entity, WorldObjectEntityData)> {
+) -> Option<WallTextureData> {
     let pos = get_neighbour_quadrant(pos, offset);
 
     if game.get_chunk_entity(pos.chunk_pos).is_none() {
         return None;
     }
-    game.get_tile_obj_data(pos, &proto_param)
+    game.get_wall_data_at_tile(pos, &proto_param)
 }
 
 pub fn can_object_be_placed_here(

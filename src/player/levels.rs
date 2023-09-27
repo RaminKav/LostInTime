@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{animations::AnimationTimer, world::y_sort::YSort};
+use crate::{animations::AnimationTimer, ui::InventoryState, world::y_sort::YSort};
 
 use super::stats::SkillPoints;
 
@@ -96,5 +96,17 @@ pub fn spawn_particles_when_leveling(
         ));
     } else if player_xp.single().count == 0 && existing_particles.iter().next().is_some() {
         commands.entity(existing_particles.single()).despawn();
+    }
+}
+
+pub fn hide_particles_when_inv_open(
+    mut commands: Commands,
+    particles: Query<Entity, With<LevelUpParticles>>,
+    inv_state: Res<InventoryState>,
+) {
+    if inv_state.open {
+        for p in particles.iter() {
+            commands.entity(p).despawn();
+        }
     }
 }

@@ -1,6 +1,9 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::KinematicCharacterController;
 
+use rand::Rng;
 use seldom_state::prelude::*;
 
 use crate::{
@@ -56,7 +59,7 @@ impl Trigger for NightTimeAggro {
 
     // Return `Ok` to trigger and `Err` to not trigger
     fn trigger(&self, _entity: Entity, night_tracker: Self::Param<'_, '_>) -> Result<f32, f32> {
-        if (night_tracker.time - 12.) >= 12. {
+        if (night_tracker.time - 12.) >= 0. {
             Ok(1.)
         } else {
             Err(0.)
@@ -124,6 +127,7 @@ pub struct IdleState {
     pub walk_timer: Timer,
     pub direction: FacingDirection,
     pub speed: f32,
+    pub is_stopped: bool,
 }
 
 // Entities in the `Follow` state should move towards the given entity at the given speed
@@ -314,22 +318,33 @@ pub fn idle(
         // Get the positions of the follower and target
         idle.walk_timer.tick(time.delta());
         let mut idle_transform = transforms.get_mut(entity).unwrap();
-
-        let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_seconds();
-        match idle.direction {
-            FacingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
-            FacingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
-            FacingDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
-            FacingDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
+        if !idle.is_stopped {
+            let s = idle.speed * PLAYER_MOVE_SPEED * time.delta_seconds();
+            match idle.direction {
+                FacingDirection::Left => idle_transform.translation = Some(Vec2::new(-s, 0.)),
+                FacingDirection::Right => idle_transform.translation = Some(Vec2::new(s, 0.)),
+                FacingDirection::Up => idle_transform.translation = Some(Vec2::new(0., s)),
+                FacingDirection::Down => idle_transform.translation = Some(Vec2::new(0., -s)),
+            }
         }
 
         if idle.walk_timer.just_finished() {
-            let new_dir = idle.direction.get_next_rand_dir(rand::thread_rng()).clone();
-            idle.direction = new_dir.clone();
-            commands
-                .entity(entity)
-                .insert(new_dir)
-                .insert(EnemyAnimationState::Walk);
+            let mut rng = rand::thread_rng();
+            idle.walk_timer
+                .set_duration(Duration::from_secs_f32(rng.gen_range(0.3..3.0)));
+            if rng.gen_ratio(1, 2) {
+                idle.is_stopped = true;
+                commands.entity(entity).insert(EnemyAnimationState::Idle);
+            } else {
+                idle.is_stopped = false;
+
+                let new_dir = idle.direction.get_next_rand_dir(rand::thread_rng()).clone();
+                idle.direction = new_dir.clone();
+                commands
+                    .entity(entity)
+                    .insert(new_dir)
+                    .insert(EnemyAnimationState::Walk);
+            }
         }
     }
 }

@@ -3,11 +3,17 @@ use bevy::prelude::*;
 use crate::{
     assets::Graphics,
     inputs::CursorPos,
+    item::{
+        item_actions::{ItemAction, ItemActions},
+        MainHand, WorldObject,
+    },
+    proto::proto_param::ProtoParam,
     world::{
-        world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
+        world_helpers::{can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos},
         y_sort::YSort,
         TileMapPosition,
     },
+    GameParam,
 };
 
 use super::UIElement;
@@ -22,21 +28,45 @@ pub fn spawn_tile_hover_on_cursor_move(
     cursor: Res<CursorPos>,
     graphics: Res<Graphics>,
     tile_hover_check: Query<(Entity, &TileHover)>,
+    proto_param: ProtoParam,
+    mut game: GameParam,
+    main_hand: Query<&WorldObject, With<MainHand>>,
 ) {
     let tile_pos = world_pos_to_tile_pos(cursor.world_coords.truncate());
     if let Ok((e, tile_hover)) = tile_hover_check.get_single() {
-        if tile_hover.pos == tile_pos {
+        if tile_hover.pos == tile_pos && !game.world_obj_cache.is_changed() {
             return;
         }
         commands.entity(e).despawn();
     }
+    let main_hand_obj = main_hand.get_single();
+    let hover_type = if let Ok(main_hand) = main_hand_obj {
+        let mut hover = UIElement::TileHover;
+        if let Some(actions) = proto_param.get_component::<ItemActions, _>(*main_hand) {
+            for action in actions.actions.clone() {
+                hover = match action {
+                    ItemAction::PlacesInto(obj) => {
+                        if !can_object_be_placed_here(tile_pos, &mut game, obj, &proto_param) {
+                            UIElement::BlockedTileHover
+                        } else {
+                            UIElement::TileHover
+                        }
+                    }
+                    _ => UIElement::TileHover,
+                };
+            }
+        }
+        hover
+    } else {
+        UIElement::TileHover
+    };
     commands
         .spawn(SpriteBundle {
             texture: graphics
                 .ui_image_handles
                 .as_ref()
                 .unwrap()
-                .get(&UIElement::TileHover)
+                .get(&hover_type)
                 .unwrap()
                 .clone(),
             transform: Transform {
