@@ -304,11 +304,6 @@ impl GameAssetsPlugin {
         // load recipes
         for (result, recipe) in recipes_desc.0.iter() {
             recipes_list.insert(*result, (recipe.0.clone(), recipe.1.clone(), recipe.2));
-            crafting_tracker
-                .crafting_type_map
-                .entry(recipe.1.clone())
-                .or_default()
-                .push(*result);
         }
         // load furnace recipes
         for (result, recipe) in recipes_desc.1.iter() {

@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 
 use bevy::{
     ecs::system::SystemParam,
-    prelude::{EventWriter, Res, ResMut, State},
+    prelude::{EventWriter, Query, Res, ResMut, Resource, State},
 };
 
 use crate::{
-    inventory::Container,
+    inventory::{Container, Inventory},
     item::{CraftedItemEvent, CraftingTracker, Recipes},
 };
 

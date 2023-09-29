@@ -59,48 +59,26 @@ pub fn handle_add_damage_numbers_after_hit(
         let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = !is_player && delta.abs() > dmg && dmg != 0;
-        for i in 0..2 {
-            commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        if delta < 0 {
-                            format!("{}{}", delta.abs(), if is_crit { "!" } else { "" })
-                        } else {
-                            format!("+{}", delta)
-                        },
-                        TextStyle {
-                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                            font_size: 8.0,
-                            color: if i == 0 {
-                                BLACK
-                            } else if delta > 0 {
-                                DMG_NUM_GREEN
-                            } else if is_player {
-                                DMG_NUM_PURPLE
-                            } else if is_crit {
-                                DMG_NUM_YELLOW
-                            } else {
-                                DMG_NUM_RED
-                            },
-                        },
-                    ),
-                    transform: Transform {
-                        translation: txfms.get(e).unwrap().translation()
-                            + pos_offset
-                            + if i == 0 {
-                                Vec3::new(1., -1., -1.)
-                            } else {
-                                Vec3::ZERO
-                            },
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(DamageNumber {
-                    timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    velocity: 0.,
-                });
-        }
+
+        spawn_floating_text_with_shadow(
+            &mut commands,
+            &asset_server,
+            txfms.get(e).unwrap().translation() + pos_offset,
+            if delta > 0 {
+                DMG_NUM_GREEN
+            } else if is_player {
+                DMG_NUM_PURPLE
+            } else if is_crit {
+                DMG_NUM_YELLOW
+            } else {
+                DMG_NUM_RED
+            },
+            if delta < 0 {
+                format!("{}{}", delta.abs(), if is_crit { "!" } else { "" })
+            } else {
+                format!("+{}", delta)
+            },
+        );
     }
 }
 pub fn handle_add_dodge_text(
@@ -117,35 +95,13 @@ pub fn handle_add_dodge_text(
             i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
             2.,
         );
-
-        for i in 0..2 {
-            commands
-                .spawn(Text2dBundle {
-                    text: Text::from_section(
-                        "Dodge!",
-                        TextStyle {
-                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                            font_size: 8.0,
-                            color: if i == 0 { BLACK } else { DMG_NUM_YELLOW },
-                        },
-                    ),
-                    transform: Transform {
-                        translation: txfms.get(event.entity).unwrap().translation()
-                            + pos_offset
-                            + if i == 0 {
-                                Vec3::new(1., -1., -1.)
-                            } else {
-                                Vec3::ZERO
-                            },
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(DamageNumber {
-                    timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    velocity: 0.,
-                });
-        }
+        spawn_floating_text_with_shadow(
+            &mut commands,
+            &asset_server,
+            txfms.get(event.entity).unwrap().translation() + pos_offset,
+            DMG_NUM_YELLOW,
+            "Dodge!".to_string(),
+        );
     }
 }
 
@@ -170,5 +126,41 @@ pub fn tick_damage_numbers(
         if damage_number.timer.finished() {
             commands.entity(entity).despawn_recursive();
         }
+    }
+}
+
+pub fn spawn_floating_text_with_shadow(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+) {
+    for i in 0..2 {
+        commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    text.clone(),
+                    TextStyle {
+                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                        font_size: 8.0,
+                        color: if i == 0 { BLACK } else { color },
+                    },
+                ),
+                transform: Transform {
+                    translation: pos
+                        + if i == 0 {
+                            Vec3::new(1., -1., -1.)
+                        } else {
+                            Vec3::ZERO
+                        },
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(DamageNumber {
+                timer: Timer::from_seconds(0.7, TimerMode::Once),
+                velocity: 0.,
+            });
     }
 }
