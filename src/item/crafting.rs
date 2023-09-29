@@ -3,12 +3,14 @@ use serde::Deserialize;
 
 use crate::{
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin},
+    colors::YELLOW,
+    inventory::{Container, Inventory, InventoryItemStack, InventoryPlugin},
     item::WorldObject,
+    player::Player,
     proto::proto_param::ProtoParam,
     ui::{
-        crafting_ui::CraftingContainerType, handle_hovering, FurnaceContainer, FurnaceState,
-        InventorySlotState, InventorySlotType,
+        crafting_ui::CraftingContainerType, damage_numbers::spawn_floating_text_with_shadow,
+        handle_hovering, FurnaceContainer, FurnaceState, InventorySlotState, InventorySlotType,
     },
     GameState,
 };
@@ -23,6 +25,7 @@ impl Plugin for CraftingPlugin {
                 (
                     handle_crafting_update_when_inv_changes,
                     handle_crafted_item,
+                    handle_inv_changed_update_crafting_tracker,
                     handle_furnace_slot_update.after(handle_hovering),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -54,9 +57,9 @@ pub type RecipeListProto = (
 
 #[derive(Resource, Default, Deserialize)]
 pub struct CraftingTracker {
-    // map of recipie result and its recipe matrix
     pub craftable: Vec<WorldObject>,
-    pub discovered: Vec<WorldObject>,
+    pub discovered_objects: Vec<WorldObject>,
+    pub discovered_recipes: Vec<WorldObject>,
     pub crafting_type_map: HashMap<CraftingContainerType, Vec<WorldObject>>,
 }
 
@@ -291,5 +294,63 @@ pub fn handle_furnace_slot_update(
     }
     for mut furnace in furnace_objects.iter_mut() {
         process_furnace(&mut furnace);
+    }
+}
+
+pub fn handle_inv_changed_update_crafting_tracker(
+    mut inv: Query<&mut Inventory, Changed<Inventory>>,
+    mut craft_tracker: ResMut<CraftingTracker>,
+    recipes: Res<Recipes>,
+    proto: ProtoParam,
+    player_t: Query<&GlobalTransform, With<Player>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    if inv.get_single().is_err() {
+        return;
+    }
+
+    let mut inv = inv.single_mut();
+    for slot in inv.items.items.iter() {
+        if let Some(item) = slot {
+            let new_obj = item.item_stack.obj_type;
+            if craft_tracker.discovered_objects.contains(&new_obj) {
+                continue;
+            }
+
+            for (result, recipe) in recipes.crafting_list.iter() {
+                if craft_tracker.discovered_recipes.contains(&result) {
+                    continue;
+                }
+                for ingredient in recipe.0.iter() {
+                    if ingredient.item == new_obj {
+                        craft_tracker.discovered_recipes.push(result.clone());
+                        craft_tracker
+                            .crafting_type_map
+                            .entry(recipe.1.clone())
+                            .or_insert(vec![])
+                            .push(result.clone());
+                        spawn_floating_text_with_shadow(
+                            &mut commands,
+                            &asset_server,
+                            player_t.single().translation() + Vec3::new(0., 10., 0.),
+                            YELLOW,
+                            "New Recipe!".to_string(),
+                        );
+                        continue;
+                    }
+                }
+            }
+            craft_tracker.discovered_objects.push(new_obj);
+        }
+    }
+    if let Some(inv_recipes) = craft_tracker
+        .crafting_type_map
+        .get(&CraftingContainerType::Inventory)
+    {
+        inv.crafting_items = Container {
+            items: get_crafting_inventory_item_stacks(inv_recipes.clone(), &recipes, &proto),
+            ..default()
+        };
     }
 }

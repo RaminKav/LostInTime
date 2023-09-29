@@ -198,6 +198,7 @@ pub fn handle_drop_on_slot_events(
                 drop_event.dropped_item_stack.clone(),
                 drop_event.drop_target_slot_state.slot_index,
                 &mut cont_param,
+                &inv.single().crafting_items,
             )
         } else {
             if slot_type.is_crafting() {
@@ -611,18 +612,18 @@ pub fn handle_interaction_clicks(
                         }
                     } else if shift_key_pressed && left_mouse_pressing {
                         let mut inv = inv.single_mut();
-                        if let Some(active_container) =
+                        if let Some(mut active_container) =
                             container_param.get_active_ui_container_mut()
                         {
                             if state.r#type.is_inventory() {
                                 InventoryPlugin::move_item_between_containers(
                                     &mut inv.items,
-                                    active_container,
+                                    &mut active_container,
                                     state.slot_index,
                                 )
                             } else {
                                 InventoryPlugin::move_item_between_containers(
-                                    active_container,
+                                    &mut active_container,
                                     &mut inv.items,
                                     state.slot_index,
                                 )

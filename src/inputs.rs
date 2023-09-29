@@ -7,13 +7,14 @@ use crate::ui::stats_ui::StatsUI;
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
 use bevy::prelude::*;
+use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 
 use bevy_hanabi::EffectSpawner;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
-use bevy_rapier2d::prelude::KinematicCharacterController;
+use bevy_rapier2d::prelude::{KinematicCharacterController, PhysicsSet};
 use interpolation::Lerp;
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -144,9 +145,6 @@ impl Plugin for InputsPlugin {
                 (
                     move_player,
                     turn_player,
-                    move_camera_with_player
-                        .after(handle_player_raw_position)
-                        .before(move_player),
                     mouse_click_system.after(CustomFlush),
                     handle_hotbar_key_input,
                     tick_dash_timer,
@@ -155,6 +153,12 @@ impl Plugin for InputsPlugin {
                     close_container,
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                move_camera_with_player
+                    .after(PhysicsSet::SyncBackendFlush)
+                    .before(TransformSystem::TransformPropagate)
+                    .in_base_set(CoreSet::PostUpdate),
             );
     }
 }
@@ -595,30 +599,23 @@ pub fn move_camera_with_player(
         (&mut Transform, &GameUpscale),
         (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
     >,
+    time: Res<Time>,
 ) {
     let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
     let (_player_pos, raw_player_pos, player_movement_vec) = player_query.single();
-    //     game_camera_transform.translation.x = game_camera_transform
-    //         .translation
-    //         .x
-    //         .lerp(&player_pos.translation.x, &0.08);
-    //     game_camera_transform.translation.y = game_camera_transform
-    //         .translation
-    //         .y
-    //         .lerp(&player_pos.translation.y, &0.08);
-    //     println!(
-    //         "  c: {:?} {:?}",
-    //         game_camera_transform.translation.x, game_camera_transform.translation.y
-    //     );
-    // }
-    let camera_lookahead_scale = 15.0;
-    raw_camera_pos.0 = raw_camera_pos
-        .0
-        .lerp(player_movement_vec.0 * camera_lookahead_scale, 0.08);
+
+    let camera_lookahead_scale = 4.0;
+    let delta = raw_player_pos.0 - raw_camera_pos.0;
+    raw_camera_pos.0 = raw_camera_pos.0 + delta * camera_lookahead_scale * time.delta_seconds();
+
+    let decimals = 10i32.pow(3) as f32;
+
+    let camera_final_pos = Vec2::new(raw_camera_pos.x, raw_camera_pos.y);
     let camera_final_pos = Vec2::new(
-        raw_player_pos.x - raw_camera_pos.x,
-        raw_player_pos.y - raw_camera_pos.y,
+        (camera_final_pos.x * decimals).round() / decimals,
+        (camera_final_pos.y * decimals).round() / decimals,
     );
+
     game_camera_transform.translation.x = camera_final_pos.x.trunc();
     game_camera_transform.translation.y = camera_final_pos.y.trunc();
     let (mut screen_camera_transform, game_upscale) = screen_camera.single_mut();

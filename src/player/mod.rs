@@ -1,9 +1,9 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, transform::TransformSystem};
 
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::{
     ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
-    KinematicCharacterControllerOutput, QueryFilterFlags, RigidBody,
+    KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
@@ -21,7 +21,7 @@ use crate::{
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
     custom_commands::CommandsExt,
-    inputs::{move_player, FacingDirection, MovementVector},
+    inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
     inventory::{Container, Inventory, INVENTORY_SIZE},
     item::{get_crafting_inventory_item_stacks, EquipmentData, Recipes, WorldObject},
     juice::RunDustTimer,
@@ -98,7 +98,6 @@ impl Plugin for PlayerPlugin {
         .add_startup_system(spawn_player)
         .add_systems((
             send_attribute_event_on_stats_update,
-            load_recipes_into_inventory_container_on_startup.run_if(resource_changed::<Recipes>()),
             handle_level_up,
             spawn_particles_when_leveling,
             hide_particles_when_inv_open,
@@ -107,8 +106,10 @@ impl Plugin for PlayerPlugin {
         .add_system(handle_move_player.in_set(OnUpdate(GameState::Main)))
         .add_system(
             handle_player_raw_position
-                .before(move_player)
-                .in_set(OnUpdate(GameState::Main)),
+                .after(PhysicsSet::SyncBackendFlush)
+                .before(TransformSystem::TransformPropagate)
+                .before(move_camera_with_player)
+                .in_base_set(CoreSet::PostUpdate),
         );
     }
 }
@@ -140,35 +141,12 @@ pub fn handle_player_raw_position(
     if let Ok(kcc) = kcc.get_single() {
         raw_pos.0 += kcc.effective_translation;
     };
-
     let delta = raw_pos.0 - pos.translation.truncate();
     pos.translation.x += delta.x;
     pos.translation.y += delta.y;
     pos.translation.x = pos.translation.x.round();
     pos.translation.y = pos.translation.y.round();
     game.player_mut().position = pos.translation;
-}
-fn load_recipes_into_inventory_container_on_startup(
-    mut added_inv: Query<&mut Inventory>,
-    recipes: Res<Recipes>,
-    proto: ProtoParam,
-) {
-    if recipes.crafting_list.len() == 0 {
-        return;
-    }
-    for mut inv in added_inv.iter_mut() {
-        //TODO: fix this to read from recipes not a hardcoded list
-        let objs = recipes
-            .crafting_list
-            .iter()
-            .filter(|r| r.1 .1 == CraftingContainerType::Inventory)
-            .map(|r| *r.0)
-            .collect();
-        inv.crafting_items = Container {
-            items: get_crafting_inventory_item_stacks(objs, &recipes, &proto),
-            ..default()
-        };
-    }
 }
 fn spawn_player(
     mut commands: Commands,
@@ -195,6 +173,7 @@ fn spawn_player(
                 items: Container::with_size(INVENTORY_SIZE),
                 equipment_items: Container::with_size(4),
                 accessory_items: Container::with_size(4),
+                crafting_items: Container::with_size(0),
                 ..default()
             },
             //TODO: remove itematt and construct from components?
@@ -254,6 +233,7 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40);
     // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1);
     // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1);

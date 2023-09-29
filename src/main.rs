@@ -53,14 +53,14 @@ mod schematic;
 mod ui;
 mod world;
 use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, Graphics, SpriteSize};
+use assets::{GameAssetsPlugin, Graphics, SpriteSize, WorldObjectData};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
 use combat::*;
 use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
-use inventory::InventoryPlugin;
+use inventory::{InventoryPlugin, ItemStack};
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -73,13 +73,13 @@ use world::{
     generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
-    TileMapPosition, WorldObjectEntityData, WorldPlugin,
+    TileMapPosition, WallTextureData, WorldPlugin,
 };
 
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
-const PLAYER_MOVE_SPEED: f32 = 64. * ZOOM_SCALE;
-const PLAYER_DASH_SPEED: f32 = 275. * ZOOM_SCALE;
+const PLAYER_MOVE_SPEED: f32 = 90. * ZOOM_SCALE;
+const PLAYER_DASH_SPEED: f32 = 200. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
@@ -224,10 +224,11 @@ pub struct GameParam<'w, 's> {
             Entity,
             &'static GlobalTransform,
             &'static SpriteSize,
-            &'static mut WorldObjectEntityData,
+            &'static WorldObject,
         ),
-        (With<WorldObject>, With<WorldObjectEntityData>),
+        Without<ItemStack>,
     >,
+    pub wall_data_query: Query<'w, 's, (Entity, &'static mut WallTextureData)>,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
 
@@ -337,9 +338,9 @@ impl<'w, 's> GameParam<'w, 's> {
         tile: TileMapPosition,
         proto_param: &ProtoParam,
     ) -> Option<Entity> {
-        for (obj_e, g_txm, size, obj_data) in self.world_object_query.iter() {
+        for (obj_e, g_txm, size, obj) in self.world_object_query.iter() {
             let anchor = proto_param
-                .get_component::<SpriteAnchor, _>(obj_data.object.clone())
+                .get_component::<SpriteAnchor, _>(*obj)
                 .unwrap_or(&SpriteAnchor(Vec2::ZERO));
             let pos = world_pos_to_tile_pos(g_txm.translation().truncate() - anchor.0);
             if size.is_medium() {
@@ -359,24 +360,27 @@ impl<'w, 's> GameParam<'w, 's> {
 
         None
     }
-    pub fn get_tile_obj_data(
+    pub fn get_wall_data_at_tile(
         &self,
         tile: TileMapPosition,
         proto_param: &ProtoParam,
-    ) -> Option<(Entity, WorldObjectEntityData)> {
+    ) -> Option<WallTextureData> {
         if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
-            let data = self.world_object_query.get(e).unwrap();
-            return Some((data.0, data.3.clone()));
+            if let Ok(data) = self.wall_data_query.get(e) {
+                return Some(data.1.clone());
+            }
         }
         None
     }
-    pub fn get_tile_obj_data_mut(
+    pub fn get_wall_data_at_tile_mut(
         &mut self,
         tile: TileMapPosition,
         proto_param: &ProtoParam,
-    ) -> Option<Mut<WorldObjectEntityData>> {
+    ) -> Option<Mut<WallTextureData>> {
         if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
-            return Some(self.world_object_query.get_mut(e).unwrap().3);
+            if let Ok(data) = self.wall_data_query.get_mut(e) {
+                return Some(data.1);
+            }
         }
         None
     }
@@ -405,7 +409,7 @@ pub struct TextureCamera;
 pub struct UICamera;
 #[derive(Component, Default)]
 pub struct TextureTarget;
-#[derive(Component, Default)]
+#[derive(Component, Debug, Default)]
 pub struct RawPosition(Vec2);
 
 #[derive(Component)]

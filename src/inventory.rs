@@ -619,11 +619,16 @@ impl InventoryPlugin {
         dragging_item: ItemStack,
         dropped_slot: usize,
         cont_param: &mut UIContainersParam,
+        inv: &Container,
     ) -> Option<ItemStack> {
-        let container = cont_param
-            .get_active_ui_container_mut()
-            .expect("clicked on crafting slot without a container");
-        let pickup_item_option = container.items[dropped_slot].clone();
+        let inv = inv.clone();
+        let container_option = cont_param.get_active_ui_container();
+
+        let pickup_item_option = if let Some(container) = container_option {
+            container.items[dropped_slot].clone()
+        } else {
+            inv.items[dropped_slot].clone()
+        };
         if let Some(pickup_item) = pickup_item_option {
             let dragging_item_type = dragging_item.obj_type;
             if dragging_item_type != *pickup_item.get_obj() {

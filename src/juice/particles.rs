@@ -284,7 +284,11 @@ pub fn spawn_obj_hit_particles(
         if hit.hit_entity == game.player {
             continue;
         }
-        let hit_pos = transforms.get(hit.hit_entity).unwrap().translation();
+        let hit_pos = if let Ok(txfm) = transforms.get(hit.hit_entity) {
+            txfm.translation()
+        } else {
+            continue;
+        };
         let anchor = if let Ok(anchor) = world_object.get(hit.hit_entity) {
             anchor.1 .0
         } else {
