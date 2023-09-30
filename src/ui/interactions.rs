@@ -628,6 +628,11 @@ pub fn handle_interaction_clicks(
                                     state.slot_index,
                                 )
                             }
+                        } else {
+                            InventoryPlugin::move_item_from_hotbar_to_inv_or_vice_versa(
+                                &mut inv.items,
+                                state.slot_index,
+                            )
                         }
                     }
                 }

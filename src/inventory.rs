@@ -508,6 +508,13 @@ impl InventoryPlugin {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
         (0..container.items.len()).find(|&i| container.items[i].is_none())
     }
+    pub fn get_first_empty_hotbar_slot(container: &Container) -> Option<usize> {
+        (0..6).find(|&i| container.items[i].is_none())
+    }
+    pub fn get_first_empty_non_hotbar_slot(container: &Container) -> Option<usize> {
+        (6..container.items.len()).find(|&i| container.items[i].is_none())
+    }
+
     pub fn get_slot_for_item_in_container(
         container: &Container,
         obj: &WorldObject,
@@ -521,12 +528,14 @@ impl InventoryPlugin {
     pub fn get_slot_for_item_in_container_with_space(
         container: &Container,
         obj: &WorldObject,
+        exclude_slot: Option<usize>,
     ) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
         (0..container.items.len()).find(|&i| {
             container.items[i].is_some()
                 && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
                 && container.items[i].as_ref().unwrap().item_stack.count < MAX_STACK_SIZE
+                && exclude_slot != Some(i)
         })
     }
     pub fn get_item_count_in_container(container: &Container, obj: WorldObject) -> usize {
@@ -551,6 +560,7 @@ impl InventoryPlugin {
             if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
                 container_b,
                 &container_a_item.item_stack.obj_type,
+                None,
             ) {
                 let mut existing_item = container_b.items[existing_item_slot]
                     .as_ref()
@@ -578,6 +588,65 @@ impl InventoryPlugin {
                     container_b.items[next_avail_slot] =
                         Some(container_a_item.modify_slot(next_avail_slot));
                     container_a.items[slot] = None;
+                }
+            }
+        }
+    }
+    //TODO: there has to be a nice way to merge the two move_item_between_containers fn
+    pub fn move_item_from_hotbar_to_inv_or_vice_versa(inv: &mut Container, slot: usize) {
+        let inv_item = inv.items[slot].clone();
+        let is_from_hotbar = slot < 6;
+        if let Some(mut inv_item_stack) = inv_item {
+            let stack_count = inv_item_stack.item_stack.count;
+            if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
+                inv,
+                &inv_item_stack.item_stack.obj_type,
+                Some(slot),
+            ) {
+                if is_from_hotbar && existing_item_slot < 6 {
+                    if let Some(next_avail_inv_slot) = Self::get_first_empty_non_hotbar_slot(inv) {
+                        inv.items[next_avail_inv_slot] =
+                            Some(inv_item_stack.modify_slot(next_avail_inv_slot));
+                        inv.items[slot] = None;
+                    }
+                    return;
+                } else if !is_from_hotbar && existing_item_slot >= 6 {
+                    if let Some(next_avail_hotbar_slot) = Self::get_first_empty_hotbar_slot(inv) {
+                        inv.items[next_avail_hotbar_slot] =
+                            Some(inv_item_stack.modify_slot(next_avail_hotbar_slot));
+                        inv.items[slot] = None;
+                    }
+                    return;
+                }
+                let mut existing_item = inv.items[existing_item_slot].as_ref().unwrap().clone();
+                let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
+                if space_left < stack_count {
+                    inv.items[existing_item.slot] = existing_item.modify_count(space_left as i8);
+                    inv.items[inv_item_stack.slot] =
+                        inv_item_stack.modify_count(-(space_left as i8));
+                    if let Some(next_avail_slot) = Self::get_first_empty_slot(inv) {
+                        inv.items[next_avail_slot] = inv_item_stack
+                            .modify_slot(next_avail_slot)
+                            .modify_count(-(space_left as i8));
+                        inv.items[inv_item_stack.slot] = None;
+                    }
+                } else {
+                    inv.items[existing_item.slot] = existing_item.modify_count(stack_count as i8);
+                    inv.items[slot] = None;
+                }
+            } else {
+                if !is_from_hotbar {
+                    if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(inv) {
+                        inv.items[next_avail_slot] =
+                            Some(inv_item_stack.modify_slot(next_avail_slot));
+                        inv.items[slot] = None;
+                    }
+                } else {
+                    if let Some(next_avail_slot) = Self::get_first_empty_non_hotbar_slot(inv) {
+                        inv.items[next_avail_slot] =
+                            Some(inv_item_stack.modify_slot(next_avail_slot));
+                        inv.items[slot] = None;
+                    }
                 }
             }
         }

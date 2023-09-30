@@ -8,6 +8,7 @@ use attributes::{
     Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
+mod audio;
 
 use juice::JuicePlugin;
 use night::NightPlugin;
