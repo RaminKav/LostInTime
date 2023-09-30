@@ -472,10 +472,7 @@ add mobs to world gen params?
 particles w gradient, or tweak idk
 dungeon chest has chance to spawn mobs
 big brain: move the grid down until its at 0,0, not move the player
-pre-load enemy spritesheets
-shift click from/to hotbar
 sapplings!!!
 add juice explosion to projectiles on hit
-recipe discovery (with JUICE)
 MAGIC LIGHTING 2D
 SOUNDS!

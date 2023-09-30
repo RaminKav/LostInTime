@@ -50,14 +50,22 @@ fn check_melee_hit_collisions(
     lifesteal: Query<&Lifesteal>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mob_txfms: Query<&GlobalTransform, With<Mob>>,
+    mut hit_tracker: Local<Vec<Entity>>,
 ) {
+    if !game.game.player_state.is_attacking {
+        hit_tracker.clear();
+    }
     if let Ok((weapon_e, weapon_parent, weapon_t, weapon_obj)) = weapons.get_single() {
-        if let Some(hit) = context.intersection_pairs().find(|c| {
+        let hits_this_frame = context.intersection_pairs().filter(|c| {
             (c.0 == weapon_e && c.1 != weapon_parent.get())
                 || (c.1 == weapon_e && c.0 != weapon_parent.get())
-        }) {
+        });
+        for hit in hits_this_frame {
             let hit_entity = if hit.0 == weapon_e { hit.1 } else { hit.0 };
-            if !game.game.player_state.is_attacking || world_obj.get(hit_entity).is_ok() {
+            if !game.game.player_state.is_attacking
+                || world_obj.get(hit_entity).is_ok()
+                || hit_tracker.contains(&hit_entity)
+            {
                 return;
             }
             if let Some(Some(wep)) = inv
@@ -75,7 +83,7 @@ fn check_melee_hit_collisions(
                     &mut inv.single_mut().items,
                 );
             }
-            commands.entity(weapon_e).insert(HitMarker);
+            hit_tracker.push(hit_entity);
             let damage = game.calculate_player_damage().0 as i32;
             let Ok(mob_txfm) = mob_txfms.get(hit_entity) else {
                 return;
@@ -253,6 +261,7 @@ pub fn check_item_drop_collisions(
                 && InventoryPlugin::get_slot_for_item_in_container_with_space(
                     &inv.single().items,
                     &item_stack.obj_type,
+                    None,
                 )
                 .is_none()
             {

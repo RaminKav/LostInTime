@@ -122,48 +122,58 @@ pub fn change_character_anim_direction(
     ) in mob_query.iter_mut()
     {
         let texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
-        let entity_name = mob_option
-            .map(|m| m.to_string().to_lowercase())
-            .unwrap_or("player".to_owned());
+
         match facing_direction {
             FacingDirection::Left => {
-                texture_atlas.texture = if let Some(_) = mob_option {
-                    asset_server.load(format!(
-                        "textures/{}/{}_{}.png",
-                        entity_name, entity_name, "side"
-                    ))
+                texture_atlas.texture = if let Some(mob) = mob_option {
+                    graphics
+                        .mob_spritesheets
+                        .as_ref()
+                        .unwrap()
+                        .get(mob)
+                        .unwrap()[0]
+                        .clone()
                 } else {
                     graphics.player_spritesheets.as_ref().unwrap()[0].clone()
                 };
                 sprite.flip_x = left_side_profile_option.is_none();
             }
             FacingDirection::Up => {
-                texture_atlas.texture = if let Some(_) = mob_option {
-                    asset_server.load(format!(
-                        "textures/{}/{}_{}.png",
-                        entity_name, entity_name, "up"
-                    ))
+                texture_atlas.texture = if let Some(mob) = mob_option {
+                    graphics
+                        .mob_spritesheets
+                        .as_ref()
+                        .unwrap()
+                        .get(mob)
+                        .unwrap()[1]
+                        .clone()
                 } else {
                     graphics.player_spritesheets.as_ref().unwrap()[1].clone()
                 };
             }
             FacingDirection::Right => {
-                texture_atlas.texture = if let Some(_) = mob_option {
-                    asset_server.load(format!(
-                        "textures/{}/{}_{}.png",
-                        entity_name, entity_name, "side"
-                    ))
+                texture_atlas.texture = if let Some(mob) = mob_option {
+                    graphics
+                        .mob_spritesheets
+                        .as_ref()
+                        .unwrap()
+                        .get(mob)
+                        .unwrap()[0]
+                        .clone()
                 } else {
                     graphics.player_spritesheets.as_ref().unwrap()[0].clone()
                 };
                 sprite.flip_x = left_side_profile_option.is_some();
             }
             FacingDirection::Down => {
-                texture_atlas.texture = if let Some(_) = mob_option {
-                    asset_server.load(format!(
-                        "textures/{}/{}_{}.png",
-                        entity_name, entity_name, "down"
-                    ))
+                texture_atlas.texture = if let Some(mob) = mob_option {
+                    graphics
+                        .mob_spritesheets
+                        .as_ref()
+                        .unwrap()
+                        .get(mob)
+                        .unwrap()[2]
+                        .clone()
                 } else {
                     graphics.player_spritesheets.as_ref().unwrap()[2].clone()
                 };

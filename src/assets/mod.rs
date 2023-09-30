@@ -11,6 +11,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
+use crate::enemy::Mob;
 use crate::item::{
     CraftingTracker, Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes,
     Wall, WorldObject, WorldObjectResource,
@@ -88,6 +89,7 @@ impl Plugin for GameAssetsPlugin {
                 foliage_material_map: None,
                 ui_image_handles: None,
                 player_spritesheets: None,
+                mob_spritesheets: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -138,6 +140,7 @@ pub struct Graphics {
     pub foliage_material_map: Option<HashMap<Foliage, Handle<FoliageMaterial>>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub player_spritesheets: Option<Vec<Handle<Image>>>,
+    pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
 }
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
@@ -244,6 +247,18 @@ impl GameAssetsPlugin {
             asset_server.load("textures/player/player_up.png"),
             asset_server.load("textures/player/player_down.png"),
         ];
+        let mob_spritesheets = Mob::iter()
+            .map(|mob| {
+                (
+                    mob.clone(),
+                    vec![
+                        asset_server.load(format!("textures/{}/{}_side.png", mob, mob)),
+                        asset_server.load(format!("textures/{}/{}_up.png", mob, mob)),
+                        asset_server.load(format!("textures/{}/{}_down.png", mob, mob)),
+                    ],
+                )
+            })
+            .collect::<HashMap<_, _>>();
         let mut recipes_list = RecipeList::default();
         let mut furnace_list = FurnaceRecipeList::default();
         let mut upgradeable_items = Vec::new();
@@ -337,6 +352,7 @@ impl GameAssetsPlugin {
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
             player_spritesheets: Some(player_spritesheets),
+            mob_spritesheets: Some(mob_spritesheets),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
