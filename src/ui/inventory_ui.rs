@@ -3,7 +3,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
+    inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
     ui::{ChestContainer, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
@@ -525,13 +525,13 @@ pub fn change_hotbar_slot(
     inv_state: &mut InventoryState,
     inv_slots: &mut Query<&mut InventorySlotState>,
 ) {
-    InventoryPlugin::mark_slot_dirty(
+    mark_slot_dirty(
         inv_state.active_hotbar_slot,
         InventorySlotType::Hotbar,
         inv_slots,
     );
     inv_state.active_hotbar_slot = slot;
-    InventoryPlugin::mark_slot_dirty(slot, InventorySlotType::Hotbar, inv_slots);
+    mark_slot_dirty(slot, InventorySlotType::Hotbar, inv_slots);
 }
 pub fn update_inventory_ui(
     mut commands: Commands,
@@ -621,6 +621,19 @@ pub fn handle_update_inv_item_entities(
                     }
                 }
             }
+        }
+    }
+}
+
+pub fn mark_slot_dirty(
+    slot_index: usize,
+    slot_type: InventorySlotType,
+    inv_slots: &mut Query<&mut InventorySlotState>,
+) {
+    for mut state in inv_slots.iter_mut() {
+        if state.slot_index == slot_index && (state.r#type == slot_type || state.r#type.is_hotbar())
+        {
+            state.dirty = true;
         }
     }
 }

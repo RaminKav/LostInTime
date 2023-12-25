@@ -1,11 +1,14 @@
-use super::chunk::GenerateObjectsEvent;
+use super::chunk::{ChunkPlugin, GenerateObjectsEvent};
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::get_object_points_for_chunk;
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::WorldGeneration;
+use crate::container::ContainerRegistry;
+use crate::enemy::Mob;
 use crate::item::{handle_break_object, WorldObject};
+use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -17,6 +20,7 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
+use bevy_rapier2d::prelude::Collider;
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -167,6 +171,11 @@ impl GenerationPlugin {
         mut proto_commands: ProtoCommands,
         prototypes: Prototypes,
         mut proto_param: ProtoParam,
+        container_reg: Res<ContainerRegistry>,
+        water_colliders: Query<
+            (Entity, &Collider, &GlobalTransform),
+            (Without<WorldObject>, Without<Mob>, Without<Player>),
+        >,
     ) {
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
@@ -373,10 +382,22 @@ impl GenerationPlugin {
                             });
                         }
 
-                        if obj == &WorldObject::Chest {
+                        if obj == &WorldObject::Chest && container_reg.containers.get(pos).is_none()
+                        {
+                            println!("no registry at {pos:?}");
                             commands
                                 .entity(spawned_obj)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
+                        } else if obj == &WorldObject::Bridge {
+                            for (e, _c, t) in water_colliders.iter() {
+                                if t.translation()
+                                    .truncate()
+                                    .distance(tile_pos_to_world_pos(*pos, false))
+                                    <= 6.
+                                {
+                                    commands.entity(e).despawn();
+                                }
+                            }
                         }
                         commands
                             .entity(spawned_obj)
@@ -416,10 +437,23 @@ impl GenerationPlugin {
                         let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
                         if obj.is_wall() {
                             wall_cache.walls.insert(pos, true);
-                        } else if obj == WorldObject::Chest {
+                        } else if obj == WorldObject::Chest
+                            && container_reg.containers.get(&pos).is_none()
+                        {
+                            println!("no registry at {pos:?}");
                             commands
                                 .entity(spawned_obj)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
+                        } else if obj == WorldObject::Bridge {
+                            for (e, _c, t) in water_colliders.iter() {
+                                if t.translation()
+                                    .truncate()
+                                    .distance(tile_pos_to_world_pos(pos, false))
+                                    <= 6.
+                                {
+                                    commands.entity(e).despawn();
+                                }
+                            }
                         }
                         commands
                             .entity(spawned_obj)

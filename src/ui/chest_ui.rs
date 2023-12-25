@@ -1,6 +1,11 @@
 pub use bevy::prelude::*;
 
-use crate::{assets::Graphics, inventory::Container, item::WorldObject};
+use crate::{
+    assets::Graphics,
+    container::{Container, ContainerRegistry},
+    item::WorldObject,
+    world::world_helpers::world_pos_to_tile_pos,
+};
 
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
@@ -57,13 +62,23 @@ pub fn change_ui_state_to_chest_when_resource_added(
 
 pub fn add_inv_to_new_chest_objs(
     mut commands: Commands,
-    new_chests: Query<(Entity, &WorldObject), Without<ChestContainer>>,
+    new_chests: Query<(Entity, &GlobalTransform, &WorldObject), Without<ChestContainer>>,
+    container_reg: Res<ContainerRegistry>,
 ) {
-    for e in new_chests.iter() {
-        if e.1 == &WorldObject::Chest {
-            commands.entity(e.0).insert(ChestContainer {
-                items: Container::with_size(CHEST_SIZE),
-                parent: e.0,
+    for (e, t, obj) in new_chests.iter() {
+        if obj == &WorldObject::Chest {
+            let existing_cont_option = container_reg
+                .containers
+                .get(&world_pos_to_tile_pos(t.translation().truncate()));
+            println!(
+                "NEW CHEST at {:?} {existing_cont_option:?}",
+                world_pos_to_tile_pos(t.translation().truncate())
+            );
+            commands.entity(e).insert(ChestContainer {
+                items: existing_cont_option
+                    .unwrap_or(&Container::with_size(CHEST_SIZE))
+                    .clone(),
+                parent: e,
             });
         }
     }

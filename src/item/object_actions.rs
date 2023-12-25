@@ -1,7 +1,7 @@
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
-use crate::inventory::Container;
+use crate::container::Container;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dimension::DimensionSpawnEvent;
@@ -53,7 +53,12 @@ impl ObjectAction {
                     .send(MovePlayerEvent { pos });
             }
             ObjectAction::DungeonTeleport => {
-                spawn_new_dungeon_dimension(game, commands, &mut proto_param.proto_commands);
+                spawn_new_dungeon_dimension(
+                    game,
+                    commands,
+                    &mut proto_param.proto_commands,
+                    &mut item_action_param.move_player_event,
+                );
             }
             ObjectAction::DungeonExit => {
                 item_action_param.dim_event.send(DimensionSpawnEvent {

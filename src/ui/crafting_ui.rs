@@ -1,7 +1,7 @@
 pub use bevy::prelude::*;
 use serde::Deserialize;
 
-use crate::inventory::Container;
+use crate::container::Container;
 
 use super::{InventoryState, UIState};
 

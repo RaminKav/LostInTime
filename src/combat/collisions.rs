@@ -5,7 +5,7 @@ use crate::{
         InvincibilityCooldown, Lifesteal, Thorns,
     },
     enemy::Mob,
-    inventory::{Inventory, InventoryPlugin, ItemStack},
+    inventory::{Inventory, ItemStack},
     item::{
         projectile::{EnemyProjectile, Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
@@ -257,13 +257,11 @@ pub fn check_item_drop_collisions(
             let item_stack = items_query.get(e2).unwrap().clone();
 
             // ...and the entity is an item stack...
-            if InventoryPlugin::get_first_empty_slot(&inv.single().items).is_none()
-                && InventoryPlugin::get_slot_for_item_in_container_with_space(
-                    &inv.single().items,
-                    &item_stack.obj_type,
-                    None,
-                )
-                .is_none()
+            let inv_container = inv.single().items.clone();
+            if inv_container.get_first_empty_slot().is_none()
+                && inv_container
+                    .get_slot_for_item_in_container_with_space(&item_stack.obj_type, None)
+                    .is_none()
             {
                 return;
             }

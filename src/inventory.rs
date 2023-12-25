@@ -4,6 +4,7 @@ use std::cmp::min;
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
     attributes::{AttributeModifier, ItemAttributes, ItemRarity},
+    container::Container,
     inputs::FacingDirection,
     item::{
         CraftedItemEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand,
@@ -11,7 +12,7 @@ use crate::{
     },
     player::Limb,
     proto::proto_param::ProtoParam,
-    ui::{InventorySlotState, InventorySlotType, UIContainersParam},
+    ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::y_sort::YSort,
     GameParam,
 };
@@ -23,7 +24,6 @@ use bevy_proto::prelude::*;
 use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
-pub const INVENTORY_INIT: Option<InventoryItemStack> = None;
 pub const MAX_STACK_SIZE: usize = 64;
 
 #[derive(Component, Debug, Default, Clone)]
@@ -52,19 +52,6 @@ impl Inventory {
         }
     }
 }
-
-#[derive(Default, Debug, Clone)]
-pub struct Container {
-    pub items: Vec<Option<InventoryItemStack>>,
-}
-impl Container {
-    pub fn with_size(size: usize) -> Self {
-        Self {
-            items: vec![INVENTORY_INIT; size],
-        }
-    }
-}
-pub struct InventoryPlugin;
 
 #[derive(Component, Debug, PartialEq, Reflect, FromReflect, Schematic, Default, Clone)]
 #[reflect(Schematic, Default)]
@@ -107,17 +94,12 @@ impl InventoryItemStack {
                 && target_item.item_stack.attributes == self.item_stack.attributes
                 && !(slot_type.is_equipment() || slot_type.is_accessory())
             {
-                InventoryPlugin::mark_slot_dirty(self.slot, slot_type, inv_slots);
-                return InventoryPlugin::merge_item_stacks(
-                    self.item_stack.clone(),
-                    target_item,
-                    container,
-                );
+                mark_slot_dirty(self.slot, slot_type, inv_slots);
+                return container.merge_item_stacks(self.item_stack.clone(), target_item);
             } else {
-                return Some(InventoryPlugin::swap_items(
+                return Some(container.swap_items(
                     self.item_stack.clone(),
                     self.slot,
-                    container,
                     inv_slots,
                     slot_type,
                 ));
@@ -255,7 +237,7 @@ impl InventoryItemStack {
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
         container.items[self.slot] = Some(self.clone());
-        InventoryPlugin::mark_slot_dirty(self.slot, InventorySlotType::Normal, inv_slots);
+        mark_slot_dirty(self.slot, InventorySlotType::Normal, inv_slots);
     }
     pub fn remove_from_inventory(self, container: &mut Container) {
         container.items[self.slot] = None
@@ -420,11 +402,7 @@ impl ItemStack {
                 item_stack: self.copy_with_count(min(self.count + pre_stack_size, MAX_STACK_SIZE)),
                 slot,
             });
-            InventoryPlugin::mark_slot_dirty(
-                inv_item_stack.slot,
-                InventorySlotType::Normal,
-                inv_slots,
-            );
+            mark_slot_dirty(inv_item_stack.slot, InventorySlotType::Normal, inv_slots);
 
             if pre_stack_size + self.count > MAX_STACK_SIZE {
                 Self::add_to_empty_inventory_slot(
@@ -442,7 +420,7 @@ impl ItemStack {
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
-        let slot = InventoryPlugin::get_first_empty_slot(container);
+        let slot = container.get_first_empty_slot();
         if let Some(slot) = slot {
             let item = InventoryItemStack {
                 item_stack: self,
@@ -492,262 +470,5 @@ impl ItemStack {
             self.count = ((self.count as i8) + amount) as usize;
         }
         self.clone()
-    }
-}
-
-impl Plugin for InventoryPlugin {
-    fn build(&self, _app: &mut App) {
-        //
-    }
-}
-
-impl InventoryPlugin {
-    // get the lowest slot number occupied
-
-    pub fn get_first_empty_slot(container: &Container) -> Option<usize> {
-        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..container.items.len()).find(|&i| container.items[i].is_none())
-    }
-    pub fn get_first_empty_hotbar_slot(container: &Container) -> Option<usize> {
-        (0..6).find(|&i| container.items[i].is_none())
-    }
-    pub fn get_first_empty_non_hotbar_slot(container: &Container) -> Option<usize> {
-        (6..container.items.len()).find(|&i| container.items[i].is_none())
-    }
-
-    pub fn get_slot_for_item_in_container(
-        container: &Container,
-        obj: &WorldObject,
-    ) -> Option<usize> {
-        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..container.items.len()).find(|&i| {
-            container.items[i].is_some()
-                && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
-        })
-    }
-    pub fn get_slot_for_item_in_container_with_space(
-        container: &Container,
-        obj: &WorldObject,
-        exclude_slot: Option<usize>,
-    ) -> Option<usize> {
-        //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
-        (0..container.items.len()).find(|&i| {
-            container.items[i].is_some()
-                && container.items[i].as_ref().unwrap().item_stack.obj_type == *obj
-                && container.items[i].as_ref().unwrap().item_stack.count < MAX_STACK_SIZE
-                && exclude_slot != Some(i)
-        })
-    }
-    pub fn get_item_count_in_container(container: &Container, obj: WorldObject) -> usize {
-        let mut count = 0;
-        for item in container.items.clone() {
-            if let Some(item_stack) = item {
-                if item_stack.item_stack.obj_type == obj {
-                    count += item_stack.item_stack.count;
-                }
-            }
-        }
-        count
-    }
-    pub fn move_item_between_containers(
-        container_a: &mut Container,
-        container_b: &mut Container,
-        slot: usize,
-    ) {
-        let container_item = container_a.items[slot].clone();
-        if let Some(mut container_a_item) = container_item {
-            let container_a_item_count = container_a_item.item_stack.count;
-            if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
-                container_b,
-                &container_a_item.item_stack.obj_type,
-                None,
-            ) {
-                let mut existing_item = container_b.items[existing_item_slot]
-                    .as_ref()
-                    .unwrap()
-                    .clone();
-                let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
-                if space_left < container_a_item_count {
-                    container_b.items[existing_item.slot] =
-                        existing_item.modify_count(space_left as i8);
-                    container_a.items[container_a_item.slot] =
-                        container_a_item.modify_count(-(space_left as i8));
-                    if let Some(next_avail_slot) = Self::get_first_empty_slot(container_b) {
-                        container_b.items[next_avail_slot] = container_a_item
-                            .modify_slot(next_avail_slot)
-                            .modify_count(-(space_left as i8));
-                        container_a.items[container_a_item.slot] = None;
-                    }
-                } else {
-                    container_b.items[existing_item.slot] =
-                        existing_item.modify_count(container_a_item_count as i8);
-                    container_a.items[slot] = None;
-                }
-            } else {
-                if let Some(next_avail_slot) = Self::get_first_empty_slot(container_b) {
-                    container_b.items[next_avail_slot] =
-                        Some(container_a_item.modify_slot(next_avail_slot));
-                    container_a.items[slot] = None;
-                }
-            }
-        }
-    }
-    //TODO: there has to be a nice way to merge the two move_item_between_containers fn
-    pub fn move_item_from_hotbar_to_inv_or_vice_versa(inv: &mut Container, slot: usize) {
-        let inv_item = inv.items[slot].clone();
-        let is_from_hotbar = slot < 6;
-        if let Some(mut inv_item_stack) = inv_item {
-            let stack_count = inv_item_stack.item_stack.count;
-            if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
-                inv,
-                &inv_item_stack.item_stack.obj_type,
-                Some(slot),
-            ) {
-                if is_from_hotbar && existing_item_slot < 6 {
-                    if let Some(next_avail_inv_slot) = Self::get_first_empty_non_hotbar_slot(inv) {
-                        inv.items[next_avail_inv_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_inv_slot));
-                        inv.items[slot] = None;
-                    }
-                    return;
-                } else if !is_from_hotbar && existing_item_slot >= 6 {
-                    if let Some(next_avail_hotbar_slot) = Self::get_first_empty_hotbar_slot(inv) {
-                        inv.items[next_avail_hotbar_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_hotbar_slot));
-                        inv.items[slot] = None;
-                    }
-                    return;
-                }
-                let mut existing_item = inv.items[existing_item_slot].as_ref().unwrap().clone();
-                let space_left = MAX_STACK_SIZE - existing_item.item_stack.count;
-                if space_left < stack_count {
-                    inv.items[existing_item.slot] = existing_item.modify_count(space_left as i8);
-                    inv.items[inv_item_stack.slot] =
-                        inv_item_stack.modify_count(-(space_left as i8));
-                    if let Some(next_avail_slot) = Self::get_first_empty_slot(inv) {
-                        inv.items[next_avail_slot] = inv_item_stack
-                            .modify_slot(next_avail_slot)
-                            .modify_count(-(space_left as i8));
-                        inv.items[inv_item_stack.slot] = None;
-                    }
-                } else {
-                    inv.items[existing_item.slot] = existing_item.modify_count(stack_count as i8);
-                    inv.items[slot] = None;
-                }
-            } else {
-                if !is_from_hotbar {
-                    if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(inv) {
-                        inv.items[next_avail_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_slot));
-                        inv.items[slot] = None;
-                    }
-                } else {
-                    if let Some(next_avail_slot) = Self::get_first_empty_non_hotbar_slot(inv) {
-                        inv.items[next_avail_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_slot));
-                        inv.items[slot] = None;
-                    }
-                }
-            }
-        }
-    }
-    /// Attempt to merge item at slot a into b. Panics if
-    /// either slot is empty, or not matching WorldObject types.
-    /// Keeps remainder where it was, if overflow.
-    pub fn merge_item_stacks(
-        to_merge: ItemStack,
-        merge_into: InventoryItemStack,
-        container: &mut Container,
-    ) -> Option<ItemStack> {
-        let item_type = to_merge.obj_type;
-        //TODO: should this return  None, or the original stack??
-        if item_type != *merge_into.get_obj()
-            || merge_into.item_stack.metadata != to_merge.metadata
-            || merge_into.item_stack.attributes != to_merge.attributes
-        {
-            return Some(to_merge);
-        }
-        let item_a_count = to_merge.count;
-        let item_b_count = merge_into.item_stack.count;
-        let combined_size = item_a_count + item_b_count;
-        let new_item = Some(InventoryItemStack {
-            item_stack: to_merge.copy_with_count(min(combined_size, MAX_STACK_SIZE)),
-            slot: merge_into.slot,
-        });
-
-        container.items[merge_into.slot] = new_item;
-
-        // if we overflow, keep remainder where it was
-        if combined_size > MAX_STACK_SIZE {
-            return Some(to_merge.copy_with_count(combined_size - MAX_STACK_SIZE));
-        }
-
-        None
-    }
-    pub fn pick_up_and_merge_crafting_result_stack(
-        dragging_item: ItemStack,
-        dropped_slot: usize,
-        cont_param: &mut UIContainersParam,
-        inv: &Container,
-    ) -> Option<ItemStack> {
-        let inv = inv.clone();
-        let container_option = cont_param.get_active_ui_container();
-
-        let pickup_item_option = if let Some(container) = container_option {
-            container.items[dropped_slot].clone()
-        } else {
-            inv.items[dropped_slot].clone()
-        };
-        if let Some(pickup_item) = pickup_item_option {
-            let dragging_item_type = dragging_item.obj_type;
-            if dragging_item_type != *pickup_item.get_obj() {
-                return Some(dragging_item);
-            }
-            let item_a_count = dragging_item.count;
-            let item_b_count = pickup_item.item_stack.count;
-            let combined_size = item_a_count + item_b_count;
-            let new_item = Some(dragging_item.copy_with_count(min(combined_size, MAX_STACK_SIZE)));
-            cont_param.crafted_event.send(CraftedItemEvent {
-                obj: dragging_item_type,
-            });
-            return new_item;
-        } else {
-            Some(dragging_item)
-        }
-    }
-    fn swap_items(
-        item: ItemStack,
-        target_slot: usize,
-        container: &mut Container,
-        inv_slots: &mut Query<&mut InventorySlotState>,
-        slot_type: InventorySlotType,
-    ) -> ItemStack {
-        let target_item_option = container.items[target_slot].clone();
-        if let Some(target_item_stack) = target_item_option {
-            let swapped_item = Some(InventoryItemStack {
-                item_stack: item,
-                slot: target_item_stack.slot,
-            });
-
-            container.items[target_slot] = swapped_item;
-            InventoryPlugin::mark_slot_dirty(target_item_stack.slot, slot_type, inv_slots);
-            return target_item_stack.item_stack;
-        }
-        item
-    }
-    //TODO: Maybe make a resource to instead store slot indexs, and then mark them all dirty in a system?
-    // benefit: dont need to pass in the inv slot query anymore
-    pub fn mark_slot_dirty(
-        slot_index: usize,
-        slot_type: InventorySlotType,
-        inv_slots: &mut Query<&mut InventorySlotState>,
-    ) {
-        for mut state in inv_slots.iter_mut() {
-            if state.slot_index == slot_index
-                && (state.r#type == slot_type || state.r#type.is_hotbar())
-            {
-                state.dirty = true;
-            }
-        }
     }
 }

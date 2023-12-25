@@ -10,7 +10,11 @@ use super::dimension::GenerationSeed;
 
 use super::world_helpers::get_neighbour_tile;
 
+use crate::container::ContainerRegistry;
+use crate::player::{handle_move_player, Player};
+use crate::ui::{ChestContainer, FurnaceContainer};
 use crate::world::wall_auto_tile::ChunkWallCache;
+use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::{item::WorldObject, GameParam, ImageAssets};
 use crate::{CustomFlush, GameState, TextureCamera};
 use serde::{Deserialize, Serialize};
@@ -30,7 +34,7 @@ impl Plugin for ChunkPlugin {
             .add_event::<GenerateObjectsEvent>()
             .add_systems(
                 (
-                    Self::spawn_chunks_around_camera.before(CustomFlush), //.before(Self::handle_new_chunk_event),
+                    Self::spawn_chunks_around_camera.after(handle_move_player), //.before(Self::handle_new_chunk_event),
                     Self::handle_new_chunk_event.after(Self::spawn_chunks_around_camera),
                     Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
@@ -119,7 +123,7 @@ pub struct Chunk {
 }
 
 impl ChunkPlugin {
-    fn handle_new_chunk_event(
+    pub fn handle_new_chunk_event(
         mut cache_events: EventReader<CreateChunkEvent>,
         mut commands: Commands,
         sprite_sheet: Res<ImageAssets>,
@@ -318,7 +322,7 @@ impl ChunkPlugin {
 
     pub fn spawn_chunks_around_camera(
         game: GameParam,
-        mut camera_query: Query<&Transform, With<TextureCamera>>,
+        mut camera_query: Query<&Transform, With<Player>>,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         _load_chunk_event: EventWriter<SpawnChunkEvent>,
     ) {
@@ -332,6 +336,7 @@ impl ChunkPlugin {
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
+                    println!("send chunk spawn event {chunk_pos}");
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
                 }
             }
@@ -340,16 +345,22 @@ impl ChunkPlugin {
     //TODO: change despawning systems to use playe rpos instead??
     fn despawn_outofrange_chunks(
         game: GameParam,
-        camera_query: Query<&Transform, With<TextureCamera>>,
+        camera_query: Query<&Transform, With<Player>>,
         mut commands: Commands,
-        chunk_query: Query<&Transform, With<Chunk>>,
+        chunk_query: Query<(&Transform, &Children), With<Chunk>>,
+        containers: Query<(
+            &GlobalTransform,
+            Option<&FurnaceContainer>,
+            Option<&ChestContainer>,
+        )>,
+        mut container_reg: ResMut<ContainerRegistry>,
     ) {
         for camera_transform in camera_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
                 CHUNK_SIZE as f32 * TILE_SIZE.y,
             );
-            for chunk_transform in chunk_query.iter() {
+            for (chunk_transform, children) in chunk_query.iter() {
                 let chunk_pos = chunk_transform.translation.xy();
                 let distance = camera_transform.translation.xy().distance(chunk_pos);
                 //TODO: calculate maximum possible distance for 2x2 chunksa
@@ -359,6 +370,33 @@ impl ChunkPlugin {
                     && game.get_chunk_entity(IVec2::new(x, y)).is_some()
                 {
                     println!("            despawning chunk {x:?},{y:?}");
+
+                    // add all containers in this chunk into the registry so their contents are safe
+                    for child in children.iter() {
+                        if let Ok((t, furnace_option, chest_option)) = containers.get(*child) {
+                            if let Some(furnace) = furnace_option {
+                                println!(
+                                    "furnace: {:?}",
+                                    world_pos_to_tile_pos(t.translation().xy())
+                                );
+                                container_reg.containers.insert(
+                                    world_pos_to_tile_pos(t.translation().xy()),
+                                    furnace.items.clone(),
+                                );
+                            }
+                            if let Some(chest) = chest_option {
+                                println!(
+                                    "chest: {:?}",
+                                    world_pos_to_tile_pos(t.translation().xy())
+                                );
+
+                                container_reg.containers.insert(
+                                    world_pos_to_tile_pos(t.translation().xy()),
+                                    chest.items.clone(),
+                                );
+                            }
+                        }
+                    }
                     commands
                         .entity(game.get_chunk_entity(IVec2::new(x, y)).unwrap())
                         .despawn_recursive();

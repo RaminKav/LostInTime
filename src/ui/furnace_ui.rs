@@ -4,8 +4,9 @@ use bevy::{render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     colors::YELLOW,
-    inventory::Container,
+    container::{Container, ContainerRegistry},
     item::{Recipes, WorldObject},
+    world::world_helpers::world_pos_to_tile_pos,
 };
 
 use super::{
@@ -115,11 +116,15 @@ pub fn change_ui_state_to_furnace_when_resource_added(
 
 pub fn add_container_to_new_furnace_objs(
     mut commands: Commands,
-    new_furnace: Query<(Entity, &WorldObject), Added<WorldObject>>,
+    new_furnace: Query<(Entity, &GlobalTransform, &WorldObject), Added<WorldObject>>,
     recipes: Res<Recipes>,
+    container_reg: Res<ContainerRegistry>,
 ) {
-    for e in new_furnace.iter() {
-        match e.1 {
+    for (e, t, obj) in new_furnace.iter() {
+        let existing_cont_option = container_reg
+            .containers
+            .get(&world_pos_to_tile_pos(t.translation().truncate()));
+        match obj {
             WorldObject::Furnace => {
                 let ing: Vec<_> = recipes
                     .furnace_list
@@ -131,18 +136,22 @@ pub fn add_container_to_new_furnace_objs(
                     .iter()
                     .map(|(_, v)| v.clone())
                     .collect();
-                commands.entity(e.0).insert(FurnaceContainer {
-                    items: Container::with_size(3),
-                    parent: e.0,
+                commands.entity(e).insert(FurnaceContainer {
+                    items: existing_cont_option
+                        .unwrap_or(&Container::with_size(3))
+                        .clone(),
+                    parent: e,
                     slot_map: vec![vec![WorldObject::Coal], ing.clone(), results.clone()],
                     timer: Timer::from_seconds(3., TimerMode::Once),
                     state: None,
                 });
             }
             WorldObject::UpgradeStation => {
-                commands.entity(e.0).insert(FurnaceContainer {
-                    items: Container::with_size(2),
-                    parent: e.0,
+                commands.entity(e).insert(FurnaceContainer {
+                    items: existing_cont_option
+                        .unwrap_or(&Container::with_size(2))
+                        .clone(),
+                    parent: e,
                     slot_map: vec![
                         vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
                         recipes.upgradeable_items.clone(),

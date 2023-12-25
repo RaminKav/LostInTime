@@ -4,13 +4,15 @@ use serde::Deserialize;
 use crate::{
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
     colors::YELLOW,
-    inventory::{Container, Inventory, InventoryItemStack, InventoryPlugin},
+    container::Container,
+    inventory::{Inventory, InventoryItemStack},
     item::WorldObject,
     player::Player,
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::CraftingContainerType, damage_numbers::spawn_floating_text_with_shadow,
-        handle_hovering, FurnaceContainer, FurnaceState, InventorySlotState, InventorySlotType,
+        handle_hovering, mark_slot_dirty, FurnaceContainer, FurnaceState, InventorySlotState,
+        InventorySlotType,
     },
     GameState,
 };
@@ -84,9 +86,7 @@ pub fn handle_crafting_update_when_inv_changes(
         let mut can_craft = true;
         let inv = inv.single();
         for ingredient in recipe.0.clone() {
-            if InventoryPlugin::get_item_count_in_container(&inv.items, ingredient.item)
-                < ingredient.count
-            {
+            if inv.items.get_item_count_in_container(ingredient.item) < ingredient.count {
                 can_craft = false;
                 break;
             }
@@ -113,9 +113,10 @@ pub fn handle_crafted_item(
             .clone();
         while remaining_cost.len() > 0 {
             for item in remaining_cost.clone().iter() {
-                let ingredient_slot =
-                    InventoryPlugin::get_slot_for_item_in_container(&inv.items, &item.item)
-                        .expect("player crafted item but does not have the required ingredients?");
+                let ingredient_slot = inv
+                    .items
+                    .get_slot_for_item_in_container(&item.item)
+                    .expect("player crafted item but does not have the required ingredients?");
                 let stack = inv.items.items[ingredient_slot].as_mut().unwrap();
                 if stack.item_stack.count >= item.count {
                     inv.items.items[ingredient_slot] = stack.modify_count(-(item.count as i8));
@@ -277,7 +278,7 @@ pub fn handle_furnace_slot_update(
                     }
                     _ => {}
                 }
-                InventoryPlugin::mark_slot_dirty(1, InventorySlotType::Furnace, &mut inv_slots);
+                mark_slot_dirty(1, InventorySlotType::Furnace, &mut inv_slots);
             }
 
             if let Some(state) = furnace.state.as_ref() {
