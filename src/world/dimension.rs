@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, transform::TransformSystem, utils::HashMap};
 use bevy_save::{CloneReflect, Snapshot};
 
 use crate::{
@@ -57,8 +57,8 @@ pub struct DimensionPlugin;
 impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DimensionSpawnEvent>()
-            .add_system(Self::handle_dimension_swap_events.after(Self::new_dim_with_params))
-            .add_system(Self::new_dim_with_params.before(CustomFlush))
+            .add_system(Self::handle_dimension_swap_events.before(CustomFlush))
+            .add_system(Self::new_dim_with_params.after(CustomFlush))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

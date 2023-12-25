@@ -9,7 +9,9 @@ use attributes::{
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
 mod audio;
+mod container;
 
+use container::ContainerRegistry;
 use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
@@ -61,7 +63,7 @@ use client::ClientPlugin;
 use combat::*;
 use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
-use inventory::{InventoryPlugin, ItemStack};
+use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -91,6 +93,7 @@ pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
 fn main() {
     App::new()
         .init_resource::<Game>()
+        .insert_resource(ContainerRegistry::default())
         .add_state::<GameState>()
         .edit_schedule(CoreSchedule::FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
@@ -129,7 +132,6 @@ fn main() {
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
         .add_plugin(InputsPlugin)
-        .add_plugin(InventoryPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
         .add_plugin(AIPlugin)

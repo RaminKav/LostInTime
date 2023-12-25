@@ -8,7 +8,7 @@ use crate::{
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
-    inventory::{Inventory, InventoryPlugin},
+    inventory::Inventory,
     player::Player,
     proto::proto_param::ProtoParam,
     GameParam, GameState,
@@ -131,10 +131,11 @@ fn handle_ranged_attack_event(
             .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
             .is_some()
         {
-            if let Some(proj_slot) = InventoryPlugin::get_slot_for_item_in_container(
-                &inv.single().items,
-                &proj_event.projectile.get_world_object(),
-            ) {
+            if let Some(proj_slot) = inv
+                .single()
+                .items
+                .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
+            {
                 let held_item_option = inv.single().items.items[proj_slot].clone();
                 inv.single_mut().items.items[proj_slot] =
                     held_item_option.unwrap().modify_count(-1);

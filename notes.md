@@ -178,8 +178,7 @@ impl different att styles w seldum_state
 [] Aesthetics: Add random animals that don't do anything,
 [] Aesthetics: add randomized full-block types
 [x] Aesthetics: Particle system for easy non-damaging animations/particles
--> use bevy_honabi and color maps
-[] Dungeons: add exit method, add chest generation
+[x] Dungeons: add exit method, add chest generation
 [] ## Items: Trinkets
 [] ## Gameplay: weapon upgrades
 [x] # Gameplay: weapon scrolls
@@ -194,7 +193,7 @@ impl different att styles w seldum_state
 [] ## save/load on exit
 [x] cleanup proto obj files, add parent
 [] # bushlings have chance to spawn from bush
-[] ## add cursor tile highlight/world tooltip
+[x] ## add cursor tile highlight/world tooltip
 [] enemy attack hit indicator/colliders
 [] multi attack swings player animations, bow anim, etc
 [x] bridges to cross water
@@ -220,8 +219,6 @@ impl different att styles w seldum_state
 - Find boss summon keys, various methods (mob drop, crafting, dungeon loot)
   - `Goal:` kill all bosses
 - World changes in difficulty after each boss is defeataed. New Mobs/harder mobs, new dungeons/harder dungeons
-  TODO: remove or rename WorldObjectData type, turn into wall data only
-  TODO: add way to mark items unstackable, sword stack bug on right click
   TODO: Maybe there is a way to tick all timers in one system rather than each handle their own timers?
   TODO: upgrade collider animation proto to use more detail: each frame can take a [shape, size, rotation, position]
 
@@ -452,20 +449,17 @@ Dungeons are smaller, with an unbreakable wall barrier around them, might reduce
 
 [x] add velocity to dmg numbers, and fade out
 add acceleration to player
-fix camera -> make camera movement pixel perfect, -> make camera follow player w lerp
 cape + clothes
 [] fix desc of all items
-[] bunch of recipes are missing, of course
+[x] bunch of recipes are missing, of course
 [] tweak rarity of upgrade tome/orbs
 
 [x] fix upgrade tome for equipment
 [x] add esc to close container
 [x] check if player spawn thing works
 
-fix camera, add acceleration
 use tile coordinate multiplied by big number and module down to check if obj spawns. deterministic spawning.
 use air blocks to determin a broken tile, regen world
-somehow make recipe icons deterministic order
 make objects be defined by a 2x2 grid rather than 1x1 or 2x2 allow 2x1 and 1x2
 add mobs to world gen params?
 [x] make dungeon spawn with mobs initially, and hostile
@@ -474,5 +468,18 @@ dungeon chest has chance to spawn mobs
 big brain: move the grid down until its at 0,0, not move the player
 sapplings!!!
 add juice explosion to projectiles on hit
+can shift click crafting items to inv...
+forrest armor too strong...
+
+<!-- reloading chunk needs to remove water colliders from bridge -->
+<!-- Player placed chests re-spawn as loot chests... -->
+
+arrows double-hit
+arrows can dmg objects
+cant shoot proj over water
+pick up item existign in inv when its full doesnt work
+make mobs get stronger slightly every day.
 MAGIC LIGHTING 2D
 SOUNDS!
+
+<!-- FRAME START -> (gen objs (prev frame), send chunk event -> spawn chunk, spawn dim event)  -> {CF} -> update walls -->

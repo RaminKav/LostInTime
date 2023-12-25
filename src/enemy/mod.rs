@@ -18,6 +18,7 @@ use crate::{
     colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
+    night::NightTracker,
     player::levels::ExperienceReward,
     ui::minimap::UpdateMiniMapEvent,
     world::{dungeon::Dungeon, TileMapPosition},
@@ -40,6 +41,7 @@ impl Plugin for EnemyPlugin {
                     handle_new_mob_state_machine,
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
+                    juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -332,6 +334,20 @@ fn juice_up_spawned_elite_mobs(
                 rate: l.rate * 2.5,
             })
             .collect();
+    }
+}
+
+fn juice_up_spawned_mobs_per_day(
+    mut elites: Query<
+        (Entity, &mut MaxHealth, &mut Attack, &mut ExperienceReward),
+        Added<EliteMob>,
+    >,
+    night_tracker: Res<NightTracker>,
+) {
+    for (_e, mut hp, mut att, mut exp) in elites.iter_mut() {
+        hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
+        att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
+        exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
     }
 }
 

@@ -55,6 +55,7 @@ pub fn update_wall(
                 }
                 let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
                 let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
+                    // println!("NEIGHBOUR CHUNK MISSING {:?}", neighbour_pos.chunk_pos);
                     continue 'outer;
                 };
                 if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
@@ -67,7 +68,6 @@ pub fn update_wall(
             }
         }
 
-        commands.entity(wall_entity).remove::<Dirty>();
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 //skip corner block updates for walls
@@ -154,12 +154,17 @@ pub fn update_wall(
                 }
             }
         }
-        let mut new_wall_data = game
-            .get_wall_data_at_tile_mut(new_wall_pos.clone(), &proto_param)
-            .unwrap();
+        if let Some(mut new_wall_data) =
+            game.get_wall_data_at_tile_mut(new_wall_pos.clone(), &proto_param)
+        {
+            commands.entity(wall_entity).remove::<Dirty>();
 
-        new_wall_data.obj_bit_index = final_sprite_index;
-        (*wall_sprite).index = (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
+            new_wall_data.obj_bit_index = final_sprite_index;
+            (*wall_sprite).index =
+                (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
+        } else {
+            println!("missing {:?}", new_wall_pos);
+        }
     }
 }
 pub fn handle_wall_break(

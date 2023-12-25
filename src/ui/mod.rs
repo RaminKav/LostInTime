@@ -128,7 +128,7 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    add_inv_to_new_chest_objs.after(CustomFlush),
+                    add_inv_to_new_chest_objs,
                     add_container_to_new_furnace_objs,
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     update_foodbar,

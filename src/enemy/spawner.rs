@@ -283,7 +283,7 @@ fn spawn_one_time_enemies_at_day(
     if maybe_dungeon.get_single().is_ok() {
         return;
     }
-    if night_tracker.days == 3 && *day_tracker < 3 {
+    if night_tracker.days >= 5 && *day_tracker < 3 {
         let mut rng = rand::thread_rng();
         let mut pos = Vec2::new(0., 0.);
         for _ in 0..10 {

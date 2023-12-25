@@ -6,7 +6,8 @@ use bevy::{
 };
 
 use crate::{
-    inventory::{Container, Inventory},
+    container::Container,
+    inventory::Inventory,
     item::{CraftedItemEvent, CraftingTracker, Recipes},
 };
 

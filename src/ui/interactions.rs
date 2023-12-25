@@ -6,7 +6,7 @@ use crate::{
     assets::Graphics,
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inputs::CursorPos,
-    inventory::{Inventory, InventoryItemStack, InventoryPlugin, ItemStack},
+    inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
     player::stats::{PlayerStats, SkillPoints},
     proto::proto_param::ProtoParam,
@@ -194,12 +194,13 @@ pub fn handle_drop_on_slot_events(
             && cont_param.crafting_tracker.craftable.contains(&obj)
             && proto_param.get_component::<EquipmentType, _>(obj).is_none()
         {
-            InventoryPlugin::pick_up_and_merge_crafting_result_stack(
-                drop_event.dropped_item_stack.clone(),
-                drop_event.drop_target_slot_state.slot_index,
-                &mut cont_param,
-                &inv.single().crafting_items,
-            )
+            inv.single()
+                .crafting_items
+                .pick_up_and_merge_crafting_result_stack(
+                    drop_event.dropped_item_stack.clone(),
+                    drop_event.drop_target_slot_state.slot_index,
+                    &mut cont_param,
+                )
         } else {
             if slot_type.is_crafting() {
                 continue;
@@ -611,28 +612,25 @@ pub fn handle_interaction_clicks(
                             }
                         }
                     } else if shift_key_pressed && left_mouse_pressing {
+                        if state.r#type.is_crafting() {
+                            continue;
+                        }
                         let mut inv = inv.single_mut();
                         if let Some(mut active_container) =
                             container_param.get_active_ui_container_mut()
                         {
                             if state.r#type.is_inventory() {
-                                InventoryPlugin::move_item_between_containers(
-                                    &mut inv.items,
+                                inv.items.move_item_to_target_container(
                                     &mut active_container,
                                     state.slot_index,
                                 )
                             } else {
-                                InventoryPlugin::move_item_between_containers(
-                                    &mut active_container,
-                                    &mut inv.items,
-                                    state.slot_index,
-                                )
+                                active_container
+                                    .move_item_to_target_container(&mut inv.items, state.slot_index)
                             }
                         } else {
-                            InventoryPlugin::move_item_from_hotbar_to_inv_or_vice_versa(
-                                &mut inv.items,
-                                state.slot_index,
-                            )
+                            inv.items
+                                .move_item_from_hotbar_to_inv_or_vice_versa(state.slot_index)
                         }
                     }
                 }

@@ -2,7 +2,7 @@ use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyA
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::handle_player_raw_position;
+use crate::player::{handle_player_raw_position, MovePlayerEvent};
 use crate::ui::stats_ui::StatsUI;
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
@@ -376,6 +376,7 @@ pub fn toggle_inventory(
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
+    mut move_player_event: EventWriter<MovePlayerEvent>,
 ) {
     if key_input.just_pressed(KeyCode::I)
         || key_input.just_pressed(KeyCode::Tab)
@@ -385,7 +386,12 @@ pub fn toggle_inventory(
     }
 
     if key_input.just_pressed(KeyCode::P) {
-        spawn_new_dungeon_dimension(&mut game, &mut commands, &mut proto_commands);
+        spawn_new_dungeon_dimension(
+            &mut game,
+            &mut commands,
+            &mut proto_commands,
+            &mut move_player_event,
+        );
     }
     if key_input.just_pressed(KeyCode::O) {
         dim_event.send(DimensionSpawnEvent {
@@ -512,7 +518,7 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        // println!("C: {cursor_tile_pos:?}",);
+        println!("C: {cursor_tile_pos:?}",);
         if attack_timer_option.is_some() {
             return;
         }

@@ -47,6 +47,7 @@ pub fn spawn_new_dungeon_dimension(
     game: &mut GameParam,
     commands: &mut Commands,
     proto_commands: &mut ProtoCommands,
+    move_player_event: &mut EventWriter<MovePlayerEvent>,
 ) {
     game.clear_dungeon_cache();
     let player = game.player_query.single();
@@ -74,17 +75,21 @@ pub fn spawn_new_dungeon_dimension(
         .id();
     proto_commands.apply("DungeonWorldGenerationParams");
     commands.entity(dim_e).insert(SpawnDimension);
+
+    if let Some(pos) = get_player_spawn_tile(grid.clone()) {
+        move_player_event.send(MovePlayerEvent { pos });
+    }
 }
 fn handle_move_player_after_dungeon_gen(
     new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
     mut move_player_event: EventWriter<MovePlayerEvent>,
 ) {
-    if let Ok(dungeon) = new_dungeon.get_single() {
-        let grid = &dungeon.grid;
-        if let Some(pos) = get_player_spawn_tile(grid.clone()) {
-            move_player_event.send(MovePlayerEvent { pos });
-        }
-    }
+    // if let Ok(dungeon) = new_dungeon.get_single() {
+    //     let grid = &dungeon.grid;
+    //     if let Some(pos) = get_player_spawn_tile(grid.clone()) {
+    //         move_player_event.send(MovePlayerEvent { pos });
+    //     }
+    // }
 }
 
 fn tick_dungeon_timer(
