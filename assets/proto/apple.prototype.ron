@@ -3,7 +3,7 @@
   templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Apple,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(20)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(25), ModifyHealth(5)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Apple,

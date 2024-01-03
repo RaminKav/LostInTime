@@ -1,0 +1,17 @@
+(
+  name: "MagicTusk",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MagicTusk,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [TeleportHome]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: MagicTusk,
+        metadata: (
+            name: "Magic Tusk", 
+            desc: ["Guides you", "home."]
+        ),
+        count: 1
+  ),
+  }
+)

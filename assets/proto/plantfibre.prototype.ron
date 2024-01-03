@@ -7,7 +7,7 @@
         obj_type: PlantFibre,
         metadata: (
             name: "Plant Fibre", 
-            desc: ["Might be able to make some string."]
+            desc: ["Might be able", "to make some", "string."]
         ),
         count: 1
   ),

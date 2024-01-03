@@ -5,7 +5,7 @@ use crate::{
     player::MovePlayerEvent,
     proto::proto_param::ProtoParam,
     world::dimension::{Dimension, SpawnDimension},
-    GameParam, GAME_HEIGHT, GAME_WIDTH,
+    GameParam, GAME_HEIGHT,
 };
 
 use super::{
@@ -81,8 +81,8 @@ pub fn spawn_new_dungeon_dimension(
     }
 }
 fn handle_move_player_after_dungeon_gen(
-    new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
-    mut move_player_event: EventWriter<MovePlayerEvent>,
+    _new_dungeon: Query<&Dungeon, Added<ActiveDimension>>,
+    _move_player_event: EventWriter<MovePlayerEvent>,
 ) {
     // if let Ok(dungeon) = new_dungeon.get_single() {
     //     let grid = &dungeon.grid;
@@ -124,7 +124,7 @@ pub fn spawn_dungeon_text(
     asset_server: Res<AssetServer>,
     new_dungeon: Query<Entity, (Added<ActiveDimension>, With<Dungeon>)>,
 ) {
-    for dim_e in new_dungeon.iter() {
+    for _dim_e in new_dungeon.iter() {
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(

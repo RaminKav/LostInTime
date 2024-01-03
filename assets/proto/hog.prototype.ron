@@ -4,6 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": Hog,
     "survival_rogue_like::enemy::CombatAlignment": Passive,
+    "survival_rogue_like::enemy::MobLevel": (1),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 7.5),

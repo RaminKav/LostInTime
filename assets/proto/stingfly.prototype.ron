@@ -20,73 +20,73 @@
                 item: SmallPotion,
                 min: 1,
                 max: 1,
-                rate: 0.065
+                rate: 0.1
             ),
             (
                 item: LargePotion,
                 min: 1,
                 max: 1,
-                rate: 0.035
+                rate: 0.05
             ),
             (
                 item: Feather,
                 min: 1,
-                max: 3,
+                max: 2,
                 rate: 0.65
             ),
             (
                 item: Arrow,
                 min: 1,
                 max: 3,
-                rate: 0.25
+                rate: 0.1
             ),
             (
                 item: ThrowingStar,
                 min: 1,
                 max: 3,
-                rate: 0.25
+                rate: 0.1
             ),
             (
                 item: Sword,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: Dagger,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: BasicStaff,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: FireStaff,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: MagicWhip,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: WoodBow,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: Claw,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: Ring,
@@ -104,67 +104,67 @@
                 item: Chestplate,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: MetalPants,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: MetalShoes,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: LeatherTunic,
                 min: 1,
                 max: 1,
-                rate: 0.005
+                rate: 0.0075
             ),
             (
                 item: LeatherPants,
                 min: 1,
                 max: 1,
-                rate: 0.005
+                rate: 0.0075
             ),
             (
                 item: LeatherShoes,
                 min: 1,
                 max: 1,
-                rate: 0.005
+                rate: 0.0075
             ),
             (
                 item: ForestShirt,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: ForestPants,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: ForestShoes,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.006
             ),
             (
                 item: UpgradeTome,
                 min: 1,
                 max: 1,
-                rate: 0.003
+                rate: 0.07
             ),
             (
                 item: OrbOfTransformation,
                 min: 1,
                 max: 1,
-                rate: 0.0015
+                rate: 0.04
             ),
             ]
         ),

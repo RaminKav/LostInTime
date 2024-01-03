@@ -5,11 +5,11 @@
   "survival_rogue_like::item::WorldObject": Claw,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 4, end: 12)),
+        attack: Some((start: 4, end: 8)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        crit_damage: Some((start: 2, end: 60)),
-        crit_chance: Some((start: 2, end: 15)),
+        crit_damage: Some((start: 10, end: 60)),
+        crit_chance: Some((start: 3, end: 15)),
         healing: Some((start: 2, end: 8)),
         bonus_damage: Some((start: 1, end: 7)),
         speed: Some((start: 4, end: 10)),

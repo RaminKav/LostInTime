@@ -1,4 +1,4 @@
-use bevy::{prelude::*, transform::TransformSystem, utils::HashMap};
+use bevy::{prelude::*, utils::HashMap};
 use bevy_save::{CloneReflect, Snapshot};
 
 use crate::{
@@ -11,7 +11,6 @@ use crate::{
 use super::{
     chunk::Chunk,
     dungeon::{CachedPlayerPos, DungeonText},
-    TileMapPosition,
 };
 
 #[derive(Component, Reflect, Default, Debug, Clone)]

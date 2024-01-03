@@ -18,7 +18,7 @@ pub struct ExperienceReward(pub u32);
 #[derive(Component)]
 pub struct LevelUpParticles;
 
-pub const LEVEL_REQ_XP: [u32; 10] = [100, 200, 400, 800, 1600, 3200, 6400, 12800, 25600, 25600];
+pub const LEVEL_REQ_XP: [u32; 10] = [60, 100, 150, 200, 350, 625, 920, 1250, 1770, 2500];
 impl PlayerLevel {
     pub fn new(level: u8) -> Self {
         PlayerLevel {
@@ -39,6 +39,7 @@ impl PlayerLevel {
             self.xp = self.xp - self.next_level_xp;
             self.next_level_xp = LEVEL_REQ_XP[self.level as usize];
         }
+        println!("EXP: {:?} LEVEL: {:?}", self.xp, self.level);
     }
 }
 

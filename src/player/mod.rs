@@ -22,12 +22,11 @@ use crate::{
     },
     container::Container,
     custom_commands::CommandsExt,
-    inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
+    inputs::{move_camera_with_player, FacingDirection, MovementVector},
     inventory::{Inventory, INVENTORY_SIZE},
-    item::{get_crafting_inventory_item_stacks, EquipmentData, Recipes, WorldObject},
+    item::{EquipmentData, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
-    ui::crafting_ui::CraftingContainerType,
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
@@ -232,38 +231,53 @@ fn spawn_player(
 }
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
-    proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40);
-    proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10);
-    proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1);
-    proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::UpgradeStationBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::OrbOfTransformation, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1);
-    // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::MetalShard, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::LargePotion, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::Leather, &proto, Vec2::ZERO, 64);
-    // proto_commands.spawn_item_from_proto(WorldObject::Feather, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::CraftingTableBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::AlchemyTableBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64);
-    proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64);
+    proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::BedBlock, &proto, Vec2::ZERO, 1, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::MagicGem, &proto, Vec2::ZERO, 1, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::MagicTusk, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(
+    //     WorldObject::UpgradeStationBlock,
+    //     &proto,
+    //     Vec2::ZERO,
+    //     64,
+    //     None,
+    // );
+    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(
+    //     WorldObject::OrbOfTransformation,
+    //     &proto,
+    //     Vec2::ZERO,
+    //     64,
+    //     None,
+    // );
+    // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(3));
+    // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Coal, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::MetalShard, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::LargePotion, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Leather, &proto, Vec2::ZERO, 64,None);
+    // // proto_commands.spawn_item_from_proto(WorldObject::Feather, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::CraftingTableBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::AlchemyTableBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64,None);
 }

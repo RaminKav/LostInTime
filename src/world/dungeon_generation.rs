@@ -7,7 +7,6 @@ use rand::Rng;
 
 use crate::{
     item::{PlaceItemEvent, WorldObject},
-    schematic::loot_chests::LootChestType,
     world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
 };
 
@@ -205,7 +204,7 @@ pub fn add_dungeon_chests(
             }
         }
     }
-    for (i, pos) in chest_positions.iter().enumerate() {
+    for (_i, pos) in chest_positions.iter().enumerate() {
         place_item_event.send(PlaceItemEvent {
             obj: WorldObject::Chest,
             pos: tile_pos_to_world_pos(*pos, false),
@@ -256,7 +255,7 @@ pub fn add_dungeon_exit_block(
             }
         }
     }
-    for (i, pos) in chest_positions.iter().enumerate() {
+    for (_i, pos) in chest_positions.iter().enumerate() {
         place_item_event.send(PlaceItemEvent {
             obj: WorldObject::DungeonExit,
             pos: tile_pos_to_world_pos(*pos, false),

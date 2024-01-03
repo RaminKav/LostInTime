@@ -1,7 +1,8 @@
 use crate::{
     assets::{SpriteAnchor, SpriteSize},
+    attributes::ItemLevel,
     inventory::ItemStack,
-    item::{projectile::ArcProjectileData, Foliage, FoliageSize, Wall},
+    item::{projectile::ArcProjectileData, EquipmentType, Foliage, FoliageSize, Wall},
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -21,6 +22,7 @@ pub trait CommandsExt<'w, 's> {
         params: &ProtoParam,
         pos: Vec2,
         count: usize,
+        level: Option<u8>,
     ) -> Option<Entity>;
     fn spawn_projectile_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
@@ -52,6 +54,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         params: &ProtoParam,
         pos: Vec2,
         count: usize,
+        level: Option<u8>,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
@@ -60,7 +63,17 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
+                println!("ON SPAWN {proto_data:?}");
                 spawned_entity_commands.insert(proto_data);
+                let eqp_type = params
+                    .get_component::<EquipmentType, _>(obj.clone())
+                    .unwrap_or(&EquipmentType::None);
+                if let Some(level) = level {
+                    if eqp_type.is_weapon() || (eqp_type.is_equipment() && !eqp_type.is_accessory())
+                    {
+                        spawned_entity_commands.insert(ItemLevel(level));
+                    }
+                }
             }
             return Some(spawned_entity);
         }

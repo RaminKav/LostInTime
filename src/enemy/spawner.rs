@@ -107,14 +107,14 @@ fn add_spawners_to_new_chunks(
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(80., TimerMode::Once),
-                min_days_to_spawn: 0,
+                min_days_to_spawn: 2,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(80., TimerMode::Once),
-                min_days_to_spawn: 0,
+                min_days_to_spawn: 1,
             });
         } else {
             spawners.push(Spawner {

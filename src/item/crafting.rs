@@ -148,17 +148,7 @@ pub fn get_crafting_inventory_item_stacks(
         let desc = recipe
             .0
             .iter()
-            .map(|ingredient| {
-                format!(
-                    "{}x {}",
-                    ingredient.count,
-                    proto
-                        .get_item_data(ingredient.item.clone())
-                        .unwrap()
-                        .metadata
-                        .name
-                )
-            })
+            .map(|ingredient| format!("{}x", ingredient.count,))
             .collect();
         default_stack.metadata.desc = desc;
         list.push(Some(InventoryItemStack::new(
@@ -245,28 +235,30 @@ pub fn handle_furnace_slot_update(
                     .current_fuel_type
                 {
                     WorldObject::UpgradeTome => {
-                        let mut modifier = None;
-                        if let Some(eqp_type) = furnace.items.items[1]
-                            .as_ref()
-                            .unwrap()
-                            .get_obj()
-                            .get_equip_type(&proto)
-                        {
+                        let mut modifiers: Vec<(String, i32)> = vec![];
+                        let furnace_item = furnace.items.items[1].as_ref().unwrap();
+                        if let Some(eqp_type) = furnace_item.get_obj().get_equip_type(&proto) {
                             if eqp_type.is_weapon() || eqp_type.is_tool() {
-                                modifier = Some("attack".to_owned())
+                                modifiers.push(("attack".to_owned(), 1));
                             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
-                                modifier = Some("health".to_owned())
+                                modifiers.push(("health".to_owned(), 2));
+                                modifiers.push(("armor".to_owned(), 1));
                             }
                         }
-                        if let Some(modifier) = modifier {
+                        for (modifier, delta) in modifiers {
                             furnace.items.items[1]
                                 .as_ref()
                                 .unwrap()
                                 .clone()
                                 .modify_attributes(
-                                    AttributeModifier { modifier, delta: 1 },
+                                    AttributeModifier { modifier, delta },
                                     &mut furnace.items,
                                 );
+                            furnace.items.items[1]
+                                .as_ref()
+                                .unwrap()
+                                .clone()
+                                .modify_level(1, &mut furnace.items);
                         }
                     }
                     WorldObject::OrbOfTransformation => {

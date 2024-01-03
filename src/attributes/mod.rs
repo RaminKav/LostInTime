@@ -7,7 +7,8 @@ pub mod health_regen;
 pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
-    colors::{GREY, LIGHT_BLUE, LIGHT_GREEN, LIGHT_RED},
+    attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
+    colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::{stats::PlayerStats, Limb},
@@ -358,7 +359,7 @@ impl ItemRarity {
     }
     pub fn get_color(&self) -> Color {
         match self {
-            ItemRarity::Common => GREY,
+            ItemRarity::Common => LIGHT_GREY,
             ItemRarity::Uncommon => LIGHT_GREEN,
             ItemRarity::Rare => LIGHT_BLUE,
             ItemRarity::Legendary => LIGHT_RED,
@@ -373,6 +374,11 @@ impl ItemRarity {
         }
     }
 }
+
+#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
+#[reflect(Component)]
+pub struct ItemLevel(pub u8);
+
 pub struct AttributeModifier {
     pub modifier: String,
     pub delta: i32,
@@ -664,34 +670,21 @@ fn handle_new_items_raw_attributes(
             Option<&RawItemBonusAttributes>,
             &RawItemBaseAttributes,
             &EquipmentType,
+            Option<&ItemLevel>,
         ),
         Or<(Added<RawItemBaseAttributes>, Added<RawItemBonusAttributes>)>,
     >,
 ) {
-    for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type) in new_items.iter() {
-        let mut rng = rand::thread_rng();
-        let rarity_rng = rng.gen_range(0..40);
-        let rarity = if rarity_rng == 0 {
-            ItemRarity::Legendary
-        } else if rarity_rng < 4 {
-            ItemRarity::Rare
-        } else if rarity_rng < 13 {
-            ItemRarity::Uncommon
-        } else {
-            ItemRarity::Common
-        };
-        let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
-            raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type)
-        } else {
-            ItemAttributes::default()
-        };
-        let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
-        let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
-        final_att.max_durability = stack.attributes.max_durability;
-        final_att.durability =
-            rng.gen_range(final_att.max_durability / 10..final_att.max_durability);
-        let mut new_stack = stack.copy_with_attributes(&final_att);
-        new_stack.rarity = rarity;
+    for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
+        let rarity = get_rarity_rng(rand::thread_rng());
+        let new_stack = build_item_stack_with_parsed_attributes(
+            stack,
+            raw_base_att,
+            raw_bonus_att_option,
+            rarity,
+            eqp_type,
+            item_level.map(|l| l.0),
+        );
         commands.entity(e).insert(new_stack);
     }
 }

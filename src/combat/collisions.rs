@@ -36,7 +36,7 @@ impl Plugin for CollisionPlugion {
 }
 
 fn check_melee_hit_collisions(
-    mut commands: Commands,
+    _commands: Commands,
     context: ResMut<RapierContext>,
     weapons: Query<
         (Entity, &Parent, &GlobalTransform, &WorldObject),
@@ -174,7 +174,13 @@ fn check_projectile_hit_mob_collisions(
 fn check_projectile_hit_player_collisions(
     mut commands: Commands,
     enemy_attack: Query<(Entity, &Attack), With<Mob>>,
-    allowed_targets: Query<Entity, (Or<(With<Player>, With<WorldObject>)>, Without<Projectile>)>,
+    allowed_targets: Query<
+        Option<&WorldObject>,
+        (
+            Or<(With<Player>, With<WorldObject>)>,
+            (Without<Projectile>, Without<MainHand>),
+        ),
+    >,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
@@ -216,6 +222,23 @@ fn check_projectile_hit_player_collisions(
             if enemy_e == *e2 || !allowed_targets.contains(*e2) {
                 continue;
             }
+            if let Some(obj) = allowed_targets.get(*e2).unwrap() {
+                if [
+                    WorldObject::Grass,
+                    WorldObject::Grass2,
+                    WorldObject::Grass3,
+                    WorldObject::RedFlower,
+                    WorldObject::PinkFlower,
+                    WorldObject::YellowFlower,
+                    WorldObject::RedMushroom,
+                    WorldObject::BrownMushroom,
+                    WorldObject::Stick,
+                ]
+                .contains(obj)
+                {
+                    continue;
+                }
+            }
             if state.hit_entities.contains(e2) {
                 continue;
             }
@@ -255,7 +278,7 @@ pub fn check_item_drop_collisions(
                 continue;
             }
             let item_stack = items_query.get(e2).unwrap().clone();
-
+            println!("PICKUP {item_stack:?}");
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
             if inv_container.get_first_empty_slot().is_none()

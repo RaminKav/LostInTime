@@ -29,9 +29,9 @@ pub enum ItemAction {
     None,
     ModifyHealth(i32),
     ModifyMana(i32),
-    Teleport(Vec2),
+    TeleportHome,
     PlacesInto(WorldObject),
-    Eat(i8), // Projectile
+    Eat(i8),
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -91,12 +91,13 @@ impl ItemActions {
                         .send(ModifyManaEvent(*delta));
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
-                ItemAction::Teleport(pos) => {
-                    let pos = world_pos_to_tile_pos(*pos);
-                    item_action_param
-                        .move_player_event
-                        .send(MovePlayerEvent { pos });
-                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                ItemAction::TeleportHome => {
+                    if let Some(pos) = game.game.home_pos {
+                        item_action_param
+                            .move_player_event
+                            .send(MovePlayerEvent { pos });
+                        item_action_param.use_item_event.send(UseItemEvent(obj));
+                    }
                 }
                 ItemAction::PlacesInto(obj) => {
                     let pos = item_action_param.cursor_pos.world_coords.truncate();

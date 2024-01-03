@@ -1,0 +1,17 @@
+(
+  name: "BedBlock",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BedBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Bed)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BedBlock,
+        metadata: (
+            name: "Bed", 
+            desc: ["Marks your home."]
+        ),
+        count: 1
+  ),
+  }
+)

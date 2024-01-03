@@ -35,8 +35,9 @@ pub fn handle_mana_regen(
     time: Res<Time>,
 ) {
     let (mana_regen, mut timer, hunger) = player_regen.single_mut();
+
     timer.0.tick(time.delta());
-    if timer.0.just_finished() {
+    if timer.0.finished() {
         if hunger.is_starving() {
             return;
         }

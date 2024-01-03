@@ -169,11 +169,15 @@ pub fn follow(
         &TextureAtlasSprite,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
+        Option<&EnemyAttackCooldown>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (entity, follow, sprite, anim_data, anim_state) in &follows {
+    for (entity, follow, sprite, anim_data, anim_state, att_cooldown) in &follows {
+        if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 50. {
+            return;
+        }
         // Get the positions of the follower and target
         let target_translation = transforms.get(follow.target).unwrap().translation;
         let follow_transform = &mut transforms.get_mut(entity).unwrap();

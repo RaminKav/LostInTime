@@ -45,13 +45,15 @@ impl LootTablePlugin {
         loot_table: &LootTable,
         proto: &ProtoParam,
         loot_bonus: i32,
+        level: Option<u8>,
     ) -> Vec<ItemStack> {
         let mut rng = rand::thread_rng();
         let mut loot = vec![];
         for drop in loot_table.drops.iter() {
             let r: f32 = rng.gen();
             if r <= drop.rate * (1.0 + loot_bonus as f32 / 100.0) {
-                let stack = proto.get_item_data(drop.item.clone()).unwrap();
+                let mut stack = proto.get_item_data(drop.item.clone()).unwrap().clone();
+                stack.metadata.level = level;
                 loot.push(stack.copy_with_count(if drop.min == drop.max {
                     drop.min
                 } else {

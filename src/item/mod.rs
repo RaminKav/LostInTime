@@ -8,11 +8,11 @@ use crate::colors::{
 use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::enemy::Mob;
-use crate::inputs::mouse_click_system;
+
 use crate::inventory::ItemStack;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
-use crate::schematic::handle_new_scene_entities_parent_chunk;
+
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
@@ -22,7 +22,7 @@ use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
-use crate::world::{TileMapPosition, WallTextureData};
+use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -154,11 +154,12 @@ pub struct EquipmentData {
     pub obj: WorldObject,
 }
 
-#[derive(Component, Reflect, FromReflect, Schematic, Debug, Default, PartialEq, Clone)]
-#[reflect(Schematic)]
+#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
+#[reflect(Schematic, Default)]
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: Vec<String>,
+    pub level: Option<u8>, //TODO: something about this is bugged
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -310,6 +311,10 @@ pub enum WorldObject {
     WoodDoor,
     WoodDoorOpen,
     WoodDoorBlock,
+    MagicGem,
+    MagicTusk,
+    Bed,
+    BedBlock,
 }
 
 #[derive(
@@ -483,6 +488,7 @@ impl WorldObject {
             .insert(attributes)
             .insert(ItemDisplayMetaData {
                 name: self.to_string(),
+                level: None,
                 desc: vec!["A cool piece of Equipment".to_string()],
             })
             .insert(Equipment(Limb::Hands))
@@ -686,7 +692,7 @@ pub fn handle_break_object(
         commands.entity(broken.entity).despawn_recursive();
         game_param.remove_object_from_chunk_cache(broken.pos);
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0) {
+            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
                         TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),
@@ -707,6 +713,7 @@ pub fn handle_break_object(
                     &proto_param,
                     pos.truncate(),
                     drop.count,
+                    None,
                 );
             }
         }

@@ -365,6 +365,11 @@
             size: (32., 32.),
             anchor: None,
         ),
+        Bed: WorldObjectData(
+            texture_pos: (14., 9.),
+            size: (32., 32.),
+            anchor: None,
+        ),
         LargeMushroomStump: WorldObjectData(
             texture_pos: (10., 9.),
             size: (32., 32.),
@@ -472,6 +477,21 @@
         ),
         Tusk: WorldObjectData(
             texture_pos: (15., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MagicTusk: WorldObjectData(
+            texture_pos: (13., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MagicGem: WorldObjectData(
+            texture_pos: (12., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BedBlock: WorldObjectData(
+            texture_pos: (11., 6.),
             size: (16., 16.),
             anchor: None,
         ),

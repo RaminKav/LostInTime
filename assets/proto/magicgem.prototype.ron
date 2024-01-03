@@ -1,0 +1,15 @@
+(
+  name: "MagicGem",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MagicGem,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: MagicGem,
+        metadata: (
+            name: "Magic Gem", 
+            desc: ["A magical gem."]
+        ),
+        count: 1
+  ),
+  }
+)

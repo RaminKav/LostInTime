@@ -10,7 +10,7 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
     custom_commands::CommandsExt,
-    enemy::Mob,
+    enemy::{Mob, MobLevel},
     item::{
         projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
         RequiredEquipmentType, WorldObject,
@@ -114,7 +114,7 @@ fn handle_enemy_death(
     _asset_server: Res<AssetServer>,
     _texture_atlases: ResMut<Assets<TextureAtlas>>,
     loot_tables: Query<&LootTable>,
-    mob_xp: Query<&ExperienceReward>,
+    mob_xp: Query<(&ExperienceReward, &MobLevel)>,
     mut player_xp: Query<&mut PlayerLevel>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
@@ -136,23 +136,28 @@ fn handle_enemy_death(
         //     DoneAnimation,
         //     Name::new("Hit Spark"),
         // ));
-
+        let (mob_xp, mob_lvl) = mob_xp.get(death_event.entity).unwrap();
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, loot_bonus.single().0)
-            {
+            for drop in LootTablePlugin::get_drops(
+                loot_table,
+                &proto_param,
+                loot_bonus.single().0,
+                Some(mob_lvl.0),
+            ) {
                 proto_commands.spawn_item_from_proto(
                     drop.obj_type,
                     &proto_param,
                     death_event.enemy_pos,
                     drop.count,
+                    Some(mob_lvl.0),
                 );
             }
         }
 
         //give player xp
         let mut player_level = player_xp.single_mut();
-        player_level.add_xp(mob_xp.get(death_event.entity).unwrap().0);
+        player_level.add_xp(mob_xp.0);
     }
 }
 fn handle_invincibility_frames(

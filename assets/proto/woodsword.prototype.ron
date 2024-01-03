@@ -26,8 +26,8 @@
             attack_cooldown: 0.65
         ),
         metadata: (
-            name: "WoodSword", 
-            desc: ["A wood sword."]
+            name: "Wood Sword", 
+            desc: ["A wood sword."],
         ),
         count: 1
   ),
