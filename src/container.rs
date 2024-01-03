@@ -1,27 +1,13 @@
-use core::panic;
 use std::cmp::min;
 
 use crate::{
-    animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
-    attributes::{AttributeModifier, ItemAttributes, ItemRarity},
-    inputs::FacingDirection,
     inventory::{InventoryItemStack, ItemStack, MAX_STACK_SIZE},
-    item::{
-        CraftedItemEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand,
-        WorldObject, PLAYER_EQUIPMENT_POSITIONS,
-    },
-    player::Limb,
-    proto::proto_param::ProtoParam,
+    item::{CraftedItemEvent, WorldObject},
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
-    world::{y_sort::YSort, TileMapPosition},
-    GameParam,
+    world::TileMapPosition,
 };
-use rand::Rng;
 
 use bevy::{prelude::*, utils::HashMap};
-
-use bevy_proto::prelude::*;
-use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
 
 pub const CONTAINER_UNIT: Option<InventoryItemStack> = None;
 

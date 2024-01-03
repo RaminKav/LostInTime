@@ -6,6 +6,7 @@ use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inventory::InventoryItemStack,
     item::{Loot, LootTable, LootTablePlugin, WorldObject},
+    night::NightTracker,
     proto::proto_param::ProtoParam,
     ui::ChestContainer,
 };
@@ -24,6 +25,7 @@ pub fn handle_new_loot_chest_spawn(
     mut loot_chests: Query<(Entity, &LootChestType, &mut ChestContainer), With<LootChestType>>,
     proto_param: ProtoParam,
     mut commands: Commands,
+    night_tracker: ResMut<NightTracker>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -71,6 +73,7 @@ pub fn handle_new_loot_chest_spawn(
                     Loot::new(WorldObject::Chestplate, 1, 1, 0.05),
                     Loot::new(WorldObject::MetalPants, 1, 1, 0.05),
                     Loot::new(WorldObject::Dagger, 1, 1, 0.05),
+                    Loot::new(WorldObject::MagicTusk, 1, 1, 0.07),
                     Loot::new(WorldObject::Ring, 1, 1, 0.05),
                     Loot::new(WorldObject::Pendant, 1, 1, 0.05),
                     Loot::new(WorldObject::LargePotion, 1, 1, 0.15),
@@ -105,6 +108,8 @@ pub fn handle_new_loot_chest_spawn(
                     Loot::new(WorldObject::ForestShirt, 1, 1, 0.06),
                     Loot::new(WorldObject::ForestPants, 1, 1, 0.06),
                     Loot::new(WorldObject::ForestShoes, 1, 1, 0.06),
+                    Loot::new(WorldObject::MagicTusk, 1, 1, 0.15),
+                    Loot::new(WorldObject::MagicGem, 1, 2, 0.1),
                     Loot::new(WorldObject::Dagger, 1, 1, 0.06),
                     Loot::new(WorldObject::Ring, 1, 1, 0.06),
                     Loot::new(WorldObject::Pendant, 1, 1, 0.06),
@@ -139,7 +144,10 @@ pub fn handle_new_loot_chest_spawn(
                 ],
             },
         };
-        for loot in LootTablePlugin::get_drops(&loot_table, &proto_param, 0).iter() {
+        for loot in
+            LootTablePlugin::get_drops(&loot_table, &proto_param, 0, Some(night_tracker.days + 1))
+                .iter()
+        {
             let mut found_slot = false;
             while !found_slot {
                 let picked_slot = rng.gen_range(0..inventory.items.items.len());

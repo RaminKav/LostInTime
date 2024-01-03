@@ -203,7 +203,7 @@ pub fn handle_new_scene_entities_parent_chunk(
             }
         }
         for child in children.iter() {
-            if let Ok((obj, txfm, loot_chest_option)) = obj_data.get(*child) {
+            if let Ok((obj, txfm, _loot_chest_option)) = obj_data.get(*child) {
                 let pos = scene_g.translation().truncate()
                     + (txfm.translation.truncate() - Vec2::new(x_offset, y_offset));
 

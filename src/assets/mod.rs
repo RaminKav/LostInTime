@@ -196,7 +196,7 @@ impl GameAssetsPlugin {
         mut world_obj_data: ResMut<WorldObjectResource>,
         mut materials: ResMut<Assets<FoliageMaterial>>,
         asset_server: Res<AssetServer>,
-        mut crafting_tracker: ResMut<CraftingTracker>,
+        _crafting_tracker: ResMut<CraftingTracker>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();

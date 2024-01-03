@@ -483,3 +483,53 @@ MAGIC LIGHTING 2D
 SOUNDS!
 
 <!-- FRAME START -> (gen objs (prev frame), send chunk event -> spawn chunk, spawn dim event)  -> {CF} -> update walls -->
+
+quick impls to feel out
+
+- make dash faster
+- animation startup for sword feels weird?
+- should items have a level that scales with stats?
+
+  - solves issue of getting random rng good drops in the early game and being op + items not scaling well at all + everything was the same power
+  - also solves the fact that i only have a few item variations, this way items dont have to have to be balanced in different "power levels" (armor for example)
+  - means that player will want to continue to upgrade their gear, via new drops, or upgrades
+  - upgrade tome will just upgrade the level, which will guide the stat increase too.
+    BUG: miss-matched items unstackable (add log)
+    BUG: Slime proj dont hit, get destroyed by other colliders
+  - mana regen and mana steal
+  - lower drop rate of arrows and starss
+
+  muck progression notes:
+
+- progression is done through 2 things: chests/relics and higher tiers of gear
+  - chests are gained through gold: incentivises killing mobs, and also exploring for free chests
+  - higher tiers of gear gained through mining/trees: incentivises foraging/exploring
+- gold is the true progression, since mobs give gold rather than gear/upgrades.
+- all gear is crafted
+- urgency comes from: mobs get stronger every night, very quickly, gotta explore to find chests/higher tiers of materials
+- only get strong from 2 sources: relics and gear
+
+notes for game:
+
+- mobs get stronger quickly, higher health + dmg
+- level up to add stat points -> agency to pick direction for build
+- need lvl req to wear equipment
+- equipment gets stronger as days progress (higher lvl mobs drop higher lvl equipment)
+- 2 sources of progression: stat points, gear
+- both gear and stat points incentivise killing mobs
+- shelter, food, resources, and upgrading gear incentivise exploration/material gathering
+- exploration incentivised to find dungeons
+  - dungeon enemies match strenght of enemeis by day count
+
+island variation:
+
+- world generation is no longer infinite open world
+- spawn on a randomly generated island, surrounded by water
+- later, could introduce sections that are blocked off by unbreakable trees (can signify tiers of gear)
+  - progress to harder area by getting strongest tools in previous area
+- 1 dungeon spawner per area (or full island if no areas)
+- every new day, the dungeon its different, repopulated with loot and mobs, maybe you can only enter once per day too
+- on certain days, it could be a boss arena too
+- would imply limited resources, 2 ways to solve this
+  - add farming/plant growth: a way to regenerate plants/mushrooms
+  - stone/ores can be later farmed in dungeons once they run out in the overworld

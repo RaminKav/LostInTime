@@ -31,7 +31,9 @@ use crate::{
         Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
         RawItemBonusAttributes,
     },
-    enemy::{CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack, Mob, ProjectileAttack},
+    enemy::{
+        CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack, Mob, MobLevel, ProjectileAttack,
+    },
     inputs::FacingDirection,
     inventory::ItemStack,
     item::{
@@ -86,6 +88,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<EnemyMaterialMesh2DProto>()
             .register_type::<SpriteSheetProto>()
             .register_type::<KCC>()
+            .register_type::<MobLevel>()
             .register_type::<LootChestType>()
             .register_type::<SpriteSize>()
             .register_type::<SpriteAnchor>()
@@ -121,6 +124,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<Vec<String>>()
             .register_type::<Vec<ItemAction>>()
             .register_type::<Option<Range<i32>>>()
+            .register_type::<Option<u8>>()
             .register_type::<Range<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
@@ -231,6 +235,10 @@ impl ProtoPlugin {
         prototypes.load("proto/hog.prototype.ron");
         prototypes.load("proto/mob_passive.prototype.ron");
         prototypes.load("proto/tusk.prototype.ron");
+        prototypes.load("proto/bed.prototype.ron");
+        prototypes.load("proto/bedblock.prototype.ron");
+        prototypes.load("proto/magictusk.prototype.ron");
+        prototypes.load("proto/magicgem.prototype.ron");
         prototypes.load("proto/leather.prototype.ron");
         prototypes.load("proto/rawmeat.prototype.ron");
         prototypes.load("proto/cookedmeat.prototype.ron");

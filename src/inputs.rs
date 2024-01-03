@@ -2,10 +2,10 @@ use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyA
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::{handle_player_raw_position, MovePlayerEvent};
+use crate::player::MovePlayerEvent;
 use crate::ui::stats_ui::StatsUI;
 use crate::world::dimension::DimensionSpawnEvent;
-use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
+use crate::world::dungeon::spawn_new_dungeon_dimension;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
@@ -22,7 +22,7 @@ use rand::Rng;
 use crate::attributes::Speed;
 use crate::combat::{AttackTimer, HitEvent};
 
-use crate::enemy::Mob;
+use crate::enemy::{Mob, MobLevel};
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::item_upgrades::{
@@ -34,7 +34,7 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, InventoryState, UIContainersParam};
+use crate::ui::{change_hotbar_slot, InventoryState};
 use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
@@ -422,7 +422,9 @@ pub fn toggle_inventory(
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
         proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
-        proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+        proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+        let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+        commands.entity(f.unwrap()).insert(MobLevel(2));
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
     }
 }
@@ -518,7 +520,7 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        println!("C: {cursor_tile_pos:?}",);
+        // println!("C: {cursor_tile_pos:?}",);
         if attack_timer_option.is_some() {
             return;
         }
@@ -608,7 +610,7 @@ pub fn move_camera_with_player(
     time: Res<Time>,
 ) {
     let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
-    let (_player_pos, raw_player_pos, player_movement_vec) = player_query.single();
+    let (_player_pos, raw_player_pos, _player_movement_vec) = player_query.single();
 
     let camera_lookahead_scale = 4.0;
     let delta = raw_player_pos.0 - raw_camera_pos.0;

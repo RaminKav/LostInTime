@@ -114,6 +114,10 @@ pub struct EnemySpawnEvent {
     pub pos: TileMapPosition,
 }
 
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct MobLevel(pub u8);
+
 #[derive(FromReflect, Debug, Default, Reflect, Clone, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
 pub struct LeapAttack {
@@ -338,16 +342,15 @@ fn juice_up_spawned_elite_mobs(
 }
 
 fn juice_up_spawned_mobs_per_day(
-    mut elites: Query<
-        (Entity, &mut MaxHealth, &mut Attack, &mut ExperienceReward),
-        Added<EliteMob>,
-    >,
+    mut elites: Query<(Entity, &mut MaxHealth, &mut Attack, &mut ExperienceReward), Added<Mob>>,
     night_tracker: Res<NightTracker>,
+    mut commands: Commands,
 ) {
-    for (_e, mut hp, mut att, mut exp) in elites.iter_mut() {
+    for (e, mut hp, mut att, mut exp) in elites.iter_mut() {
         hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
         att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
         exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
+        commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }
 

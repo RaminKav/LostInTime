@@ -1,4 +1,4 @@
-use super::chunk::{ChunkPlugin, GenerateObjectsEvent};
+use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::get_object_points_for_chunk;

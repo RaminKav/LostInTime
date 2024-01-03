@@ -7,8 +7,8 @@ use crate::{
     container::Container,
     inputs::FacingDirection,
     item::{
-        CraftedItemEvent, Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand,
-        WorldObject, PLAYER_EQUIPMENT_POSITIONS,
+        Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
+        PLAYER_EQUIPMENT_POSITIONS,
     },
     player::Limb,
     proto::proto_param::ProtoParam,
@@ -265,6 +265,14 @@ impl InventoryItemStack {
             return None;
         }
         Some(self.clone())
+    }
+    pub fn modify_level(&self, amount: i8, container: &mut Container) -> Self {
+        let mut new_stack = self.clone();
+        new_stack.item_stack.metadata.level =
+            Some((new_stack.item_stack.metadata.level.unwrap() as i8 + amount) as u8);
+        container.items[self.slot] = Some(new_stack.clone());
+
+        new_stack
     }
     pub fn modify_slot(&self, slot: usize) -> Self {
         let item_stack = self.item_stack.clone();

@@ -110,7 +110,7 @@ pub fn change_character_anim_direction(
         Changed<FacingDirection>,
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    asset_server: Res<AssetServer>,
+    _asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
 ) {
     for (

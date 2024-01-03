@@ -6,9 +6,11 @@ use crate::{
         Attack, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing, HealthRegen,
         ItemAttributes, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
     },
-    colors::{BLACK, GOLD, LIGHT_GREEN, LIGHT_GREY},
+    colors::{BLACK, GOLD, GREY, LIGHT_GREEN},
+    inventory::ItemStack,
+    item::{Recipes, WorldObject},
     player::Player,
-    ui::{STATS_UI_SIZE, TOOLTIP_UI_SIZE},
+    ui::{spawn_item_stack_icon, STATS_UI_SIZE, TOOLTIP_UI_SIZE},
 };
 
 use super::{
@@ -18,6 +20,9 @@ use super::{
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
+
+#[derive(Component)]
+pub struct RecipeIngredientTooltipIcon;
 
 pub fn handle_spawn_inv_item_tooltip(
     mut commands: Commands,
@@ -30,6 +35,7 @@ pub fn handle_spawn_inv_item_tooltip(
         (Entity, &UIElement, &Parent),
         (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
     >,
+    recipes: Res<Recipes>,
 ) {
     for item in updates.iter() {
         for tooltip in old_tooltips.iter() {
@@ -44,7 +50,8 @@ pub fn handle_spawn_inv_item_tooltip(
             _ => unreachable!(),
         };
         let attributes = item.item_stack.attributes.get_tooltips();
-        let durability = item.item_stack.attributes.get_durability_tooltip();
+        // let durability = item.item_stack.attributes.get_durability_tooltip();
+        let level = item.item_stack.metadata.level;
         let should_show_attributes = attributes.len() > 0 && !item.is_recipe;
         let size = Vec2::new(93., 120.5);
         let tooltip = commands
@@ -76,16 +83,19 @@ pub fn handle_spawn_inv_item_tooltip(
 
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
+        println!("{:?} {:?}", tooltip_text, item.item_stack.metadata);
         // tooltip_text.push(item.item_stack.metadata.desc.clone());
 
         if should_show_attributes {
             for a in attributes.iter().clone() {
                 tooltip_text.push((a.to_string(), 0.));
             }
-            tooltip_text.push((
-                durability.clone(),
-                size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
-            ));
+            if let Some(level) = level {
+                tooltip_text.push((
+                    "Level ".to_string() + &level.to_string(),
+                    size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
+                ));
+            }
         } else {
             for desc_string in item.item_stack.metadata.desc.iter().clone() {
                 tooltip_text.push((desc_string.to_string(), 0.));
@@ -101,8 +111,8 @@ pub fn handle_spawn_inv_item_tooltip(
                 )
             } else {
                 Vec3::new(
-                    -size.x / 2. + 8.,
-                    size.y / 2. - 12. - (i as f32 * 10.) - d - 2.,
+                    -size.x / 2. + 8. + if item.is_recipe { 4. } else { 0. },
+                    size.y / 2. - 14. - (i as f32 * if item.is_recipe { 14. } else { 10. }) - d,
                     1.,
                 )
             };
@@ -117,11 +127,11 @@ pub fn handle_spawn_inv_item_tooltip(
                                 color: if i == 0 {
                                     item.item_stack.rarity.get_color()
                                 } else if i > 1 && i == tooltip_text.len() - 1 {
-                                    LIGHT_GREY
+                                    GREY
                                 } else if i > 2 && should_show_attributes {
                                     GOLD
                                 } else {
-                                    LIGHT_GREY
+                                    GREY
                                 },
                             },
                         ),
@@ -137,6 +147,34 @@ pub fn handle_spawn_inv_item_tooltip(
                     RenderLayers::from_layers(&[3]),
                 ))
                 .id();
+            if item.is_recipe && i > 0 {
+                let ingredient_world_obj: Vec<WorldObject> = recipes
+                    .crafting_list
+                    .get(&item.item_stack.obj_type)
+                    .unwrap()
+                    .0
+                    .iter()
+                    .map(|r| r.item)
+                    .collect();
+                let icon_e = spawn_item_stack_icon(
+                    &mut commands,
+                    &graphics,
+                    &ItemStack {
+                        obj_type: ingredient_world_obj[i - 1],
+                        count: 1,
+                        ..Default::default()
+                    },
+                    &asset_server,
+                );
+                commands
+                    .entity(icon_e)
+                    .insert(RecipeIngredientTooltipIcon)
+                    .insert(Transform {
+                        translation: text_pos + Vec3::new(20., 0., 0.),
+                        ..Default::default()
+                    });
+                commands.entity(tooltip).add_child(icon_e);
+            }
             commands.entity(tooltip).add_child(text);
         }
         commands.entity(inv).add_child(tooltip);
@@ -287,7 +325,7 @@ pub fn handle_spawn_inv_player_stats(
                                 style: TextStyle {
                                     font: asset_server.load("fonts/Kitchen Sink.ttf"),
                                     font_size: 8.0,
-                                    color: if i == 0 { BLACK } else { LIGHT_GREY },
+                                    color: if i == 0 { BLACK } else { GREY },
                                 },
                             },
                             TextSection {

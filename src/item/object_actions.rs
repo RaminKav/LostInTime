@@ -5,9 +5,8 @@ use crate::container::Container;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dimension::DimensionSpawnEvent;
-use crate::world::dungeon::{spawn_new_dungeon_dimension, DungeonPlugin};
-use crate::world::wall_auto_tile::Dirty;
-use crate::world::WallTextureData;
+use crate::world::dungeon::spawn_new_dungeon_dimension;
+
 use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
@@ -29,6 +28,7 @@ pub enum ObjectAction {
     Crafting(CraftingContainerType), //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
     Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
     ChangeObject(WorldObject),
+    SetHome,
 }
 
 impl ObjectAction {
@@ -101,6 +101,11 @@ impl ObjectAction {
             ObjectAction::Furnace => {
                 let furnace_res = item_action_param.furnace_query.get(e).unwrap();
                 commands.insert_resource(furnace_res.clone());
+            }
+            ObjectAction::SetHome => {
+                let pos =
+                    world_pos_to_tile_pos(item_action_param.cursor_pos.world_coords.truncate());
+                game.game.home_pos = Some(pos);
             }
             _ => {}
         }

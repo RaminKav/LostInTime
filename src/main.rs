@@ -56,7 +56,7 @@ mod schematic;
 mod ui;
 mod world;
 use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, Graphics, SpriteSize, WorldObjectData};
+use assets::{GameAssetsPlugin, Graphics, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
@@ -82,7 +82,7 @@ use world::{
 use crate::assets::SpriteAnchor;
 const ZOOM_SCALE: f32 = 1.;
 const PLAYER_MOVE_SPEED: f32 = 90. * ZOOM_SCALE;
-const PLAYER_DASH_SPEED: f32 = 200. * ZOOM_SCALE;
+const PLAYER_DASH_SPEED: f32 = 250. * ZOOM_SCALE;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1600.;
 pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
@@ -154,12 +154,14 @@ fn main() {
 #[derive(Resource)]
 pub struct Game {
     player_state: PlayerState,
+    home_pos: Option<TileMapPosition>,
     player: Entity,
 }
 impl Default for Game {
     fn default() -> Self {
         Self {
             player_state: PlayerState::default(),
+            home_pos: None,
             player: Entity::from_raw(0),
         }
     }
