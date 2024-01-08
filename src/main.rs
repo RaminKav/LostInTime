@@ -11,6 +11,7 @@ use attributes::{
 mod audio;
 mod container;
 
+use audio::AudioPlugin;
 use container::ContainerRegistry;
 use juice::JuicePlugin;
 use night::NightPlugin;
@@ -129,6 +130,7 @@ fn main() {
         .add_plugin(WorldInspectorPlugin::new())
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
+        .add_plugin(AudioPlugin)
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
         .add_plugin(InputsPlugin)
