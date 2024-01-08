@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
@@ -17,6 +19,7 @@ use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::{KinematicCharacterController, PhysicsSet};
 use interpolation::Lerp;
 use rand::rngs::ThreadRng;
+use rand::seq::IteratorRandom;
 use rand::Rng;
 
 use crate::attributes::Speed;
@@ -226,7 +229,13 @@ pub fn move_player(
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut commands: Commands,
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
+    asset_server: Res<AssetServer>,
+    audio: Res<Audio>,
+    mut audio_timer: Local<Timer>,
 ) {
+    if audio_timer.duration() == Duration::ZERO {
+        *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
+    }
     let (
         player_e,
         mut player_kcc,
@@ -335,6 +344,20 @@ pub fn move_player(
             if run_dust_timer.0.finished() {
                 run_dust_timer.0.reset()
             }
+        }
+        //audio
+        audio_timer.tick(time.delta());
+        if audio_timer.finished() {
+            audio_timer.reset();
+            let walk1 = asset_server.load("sounds/walk_grass1.ogg");
+            let walk2 = asset_server.load("sounds/walk_grass2.ogg");
+            let walk3 = asset_server.load("sounds/walk_grass3.ogg");
+            let walk4 = asset_server.load("sounds/walk_grass4.ogg");
+            let walk5 = asset_server.load("sounds/walk_grass5.ogg");
+            let walks = vec![walk1, walk2, walk3, walk4, walk5];
+            walks.iter().choose(&mut rand::thread_rng()).map(|sound| {
+                audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.35))
+            });
         }
     } else {
         if curr_anim != &EnemyAnimationState::Idle
