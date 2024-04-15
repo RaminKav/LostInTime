@@ -282,7 +282,6 @@ impl ProtoPlugin {
         prototypes.load("proto/bridgeblock.prototype.ron");
         prototypes.load("proto/largemanapotion.prototype.ron");
         prototypes.load("proto/smallmanapotion.prototype.ron");
-        prototypes.load("proto/worldgenerationparams.prototype.ron");
         prototypes.load("proto/dungeonexit.prototype.ron");
         prototypes.load("proto/woodwall.prototype.ron");
         prototypes.load("proto/woodwallblock.prototype.ron");
