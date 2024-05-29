@@ -22,6 +22,7 @@ use crate::{
     container::{Container, ContainerRegistry},
     inventory::{Inventory, ItemStack},
     item::{projectile::Projectile, Foliage, MainHand, Wall, WorldObject},
+    night::NightTracker,
     player::{
         levels::PlayerLevel,
         stats::{PlayerStats, SkillPoints},
@@ -111,11 +112,6 @@ impl Plugin for ClientPlugin {
                 timer: Timer::from_seconds(15., TimerMode::Repeating),
             })
             .add_system(
-                Self::load_on_start
-                    .run_if(run_once())
-                    .in_schedule(CoreSchedule::Startup),
-            )
-            .add_system(
                 load_state
                     .run_if(run_once())
                     .in_schedule(CoreSchedule::Startup),
@@ -144,6 +140,7 @@ pub struct SaveData {
     containers: HashMap<TileMapPosition, Container>,
     #[serde(with = "vectorize")]
     craft_reg: HashMap<TileMapPosition, Container>,
+    night_tracker: NightTracker,
 
     //Player Data
     pub inventory: Inventory,
@@ -186,6 +183,7 @@ pub fn save_state(
     >,
     craft_reg: Res<ContainerRegistry>,
     dungeon_check: Query<&Dungeon>,
+    night_tracker: Res<NightTracker>,
 ) {
     timer.timer.tick(time.delta());
     // only save if the timer is done and we are not in a dungeon
@@ -233,6 +231,7 @@ pub fn save_state(
         })
         .collect();
     save_data.craft_reg = craft_reg.containers.clone();
+    save_data.night_tracker = night_tracker.clone();
 
     const PATH: &str = "save_state.json";
 
@@ -246,8 +245,15 @@ pub fn save_state(
     }
 }
 
-pub fn load_state(mut commands: Commands, mut game: GameParam) {
+pub fn load_state(
+    mut commands: Commands,
+    mut game: GameParam,
+    mut dim_event: EventWriter<DimensionSpawnEvent>,
+) {
     if let Ok(file_file) = File::open("save_state.json") {
+        let mut rng = rand::thread_rng();
+        let mut seed = rng.gen_range(0..100000);
+
         let reader = BufReader::new(file_file);
 
         // Read the JSON contents of the file as an instance of `User`.
@@ -259,10 +265,28 @@ pub fn load_state(mut commands: Commands, mut game: GameParam) {
                     }
                 }
                 game.world_obj_cache.objects = data.placed_objs;
-                println!("LOADED WORLD FROM SAVE FILE");
+                seed = data.seed;
+                commands.insert_resource(data.night_tracker);
+                commands.insert_resource(ContainerRegistry {
+                    containers: data.craft_reg,
+                });
             }
             Err(err) => println!("Failed to load data from file {err:?}"),
         }
+
+        commands.insert_resource(GenerationSeed { seed });
+        let params = WorldGeneration {
+            sand_frequency: 0.32,
+            water_frequency: 0.15,
+            obj_allowed_tiles_map: HashMap::default(),
+            ..default()
+        };
+        dim_event.send(DimensionSpawnEvent {
+            generation_params: params,
+            swap_to_dim_now: true,
+        });
+
+        println!("DONE LOADING GAME DATA");
     }
 }
 
@@ -460,36 +484,5 @@ impl ClientPlugin {
             let mut exit = state.get_mut(world);
             exit.send(AppExit);
         }
-    }
-    pub fn load_on_start(world: &mut World) {
-        println!("TRYING TO LOAD GAME");
-        let mut rng = rand::thread_rng();
-        let mut seed = rng.gen_range(0..100000);
-
-        if let Ok(save_file) = File::open("save_state.json") {
-            let reader = BufReader::new(save_file);
-            // Read the JSON contents of the file as an instance of `User`.
-            match serde_json::from_reader::<_, SaveData>(reader) {
-                Ok(data) => {
-                    seed = data.seed;
-                }
-                Err(err) => println!("Failed to load data from file {err:?}"),
-            }
-        }
-        let params = WorldGeneration {
-            sand_frequency: 0.32,
-            water_frequency: 0.15,
-            obj_allowed_tiles_map: HashMap::default(),
-            ..default()
-        };
-        world.insert_resource(GenerationSeed { seed });
-        let mut state: SystemState<EventWriter<DimensionSpawnEvent>> = SystemState::new(world);
-        let mut dim_event = state.get_mut(world);
-        dim_event.send(DimensionSpawnEvent {
-            generation_params: params,
-            swap_to_dim_now: true,
-        });
-        // });
-        println!("DONE LOADING");
     }
 }

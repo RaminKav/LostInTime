@@ -1,5 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_inspector_egui::quick::ResourceInspectorPlugin;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     colors::{overwrite_alpha, NIGHT},
@@ -9,7 +10,7 @@ use crate::{
 #[derive(Component)]
 pub struct Night(Timer, f32);
 
-#[derive(Default, Reflect, Resource, Debug)]
+#[derive(Default, Reflect, Resource, Clone, Debug, Serialize, Deserialize)]
 #[reflect(Resource)]
 pub struct NightTracker {
     pub days: u8,

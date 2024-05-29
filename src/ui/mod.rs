@@ -22,10 +22,9 @@ pub use interactions::*;
 pub use inventory_ui::*;
 pub use player_hud::*;
 pub use tooltips::*;
-pub use ui_helpers::*;
 
 use crate::{
-    client::ClientPlugin, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
+    client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
     GameState,
 };
 
@@ -83,8 +82,8 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_hotbar_hud,
-                    setup_xp_bar_ui.after(ClientPlugin::load_on_start),
-                    setup_bars_ui.after(ClientPlugin::load_on_start),
+                    setup_xp_bar_ui.after(load_state),
+                    setup_bars_ui.after(load_state),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
