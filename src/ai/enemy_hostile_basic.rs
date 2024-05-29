@@ -26,7 +26,11 @@ pub struct LineOfSight {
 pub struct EnemyAttackCooldown(Timer);
 
 impl Trigger for LineOfSight {
-    type Param<'w, 's> = (Query<'w, 's, &'static Transform>, Res<'w, Time>);
+    type Param<'w, 's> = (
+        Query<'w, 's, &'static Transform>,
+        Res<'w, Time>,
+        Res<'w, NightTracker>,
+    );
     type Ok = f32;
     type Err = f32;
 
@@ -34,8 +38,11 @@ impl Trigger for LineOfSight {
     fn trigger(
         &self,
         entity: Entity,
-        (transforms, _time): Self::Param<'_, '_>,
+        (transforms, _time, night_tracker): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
+        if (night_tracker.time - 12.) >= 0. {
+            return Ok(0.);
+        }
         if let Ok(tfxm) = transforms.get(entity) {
             let delta = transforms.get(self.target).unwrap().translation.truncate()
                 - tfxm.translation.truncate();
@@ -175,7 +182,7 @@ pub fn follow(
     time: Res<Time>,
 ) {
     for (entity, follow, sprite, anim_data, anim_state, att_cooldown) in &follows {
-        if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 50. {
+        if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
             return;
         }
         // Get the positions of the follower and target

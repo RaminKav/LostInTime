@@ -10,6 +10,7 @@ use attributes::{
 };
 mod audio;
 mod container;
+mod vectorize;
 
 use audio::AudioPlugin;
 use container::ContainerRegistry;
@@ -103,7 +104,7 @@ fn main() {
             DefaultPlugins
                 .set(AssetPlugin {
                     // Enable hot-reloading of assets:
-                    watch_for_changes: true,
+                    watch_for_changes: false,
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest())

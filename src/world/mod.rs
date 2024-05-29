@@ -4,7 +4,7 @@ pub mod dungeon;
 mod dungeon_generation;
 pub mod generation;
 mod noise_helpers;
-mod tile;
+pub mod tile;
 pub mod wall_auto_tile;
 pub mod world_helpers;
 pub mod y_sort;
@@ -29,6 +29,7 @@ use self::{
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
 pub const CHUNK_SIZE: u32 = 16;
+pub const ISLAND_SIZE: f32 = 64.;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 2) * TILE_SIZE.x as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
@@ -61,12 +62,35 @@ pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);
 
 /// A component that represents a position in the tilemap. The `quadrant` is a number from 0 to 3
 /// where 0 is top left, 1 is top right, 2 is bottom left, 3 is bottom right
-#[derive(Eq, Hash, PartialEq, Debug, Component, Copy, Clone, Default, Reflect, FromReflect)]
+#[derive(
+    Eq,
+    Hash,
+    PartialEq,
+    Debug,
+    Component,
+    Copy,
+    Clone,
+    Default,
+    Reflect,
+    FromReflect,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Component)]
 pub struct TileMapPosition {
     pub chunk_pos: IVec2,
+
+    #[serde(with = "TilePosSerde")]
     pub tile_pos: TilePos,
 }
+
+#[derive(Serialize, Deserialize)]
+#[serde(remote = "TilePos")]
+struct TilePosSerde {
+    pub x: u32,
+    pub y: u32,
+}
+
 impl TileMapPosition {
     pub fn new(chunk_pos: IVec2, tile_pos: TilePos) -> Self {
         Self {

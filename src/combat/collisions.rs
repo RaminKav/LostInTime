@@ -278,7 +278,6 @@ pub fn check_item_drop_collisions(
                 continue;
             }
             let item_stack = items_query.get(e2).unwrap().clone();
-            println!("PICKUP {item_stack:?}");
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
             if inv_container.get_first_empty_slot().is_none()

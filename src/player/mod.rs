@@ -1,3 +1,5 @@
+use std::{fs::File, io::BufReader};
+
 use bevy::{prelude::*, transform::TransformSystem};
 
 use bevy_proto::prelude::ProtoCommands;
@@ -20,6 +22,7 @@ use crate::{
         Attack, AttackCooldown, CritChance, CritDamage, HealthRegen, InvincibilityCooldown,
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
+    client::SaveData,
     container::Container,
     custom_commands::CommandsExt,
     inputs::{move_camera_with_player, FacingDirection, MovementVector},
@@ -220,32 +223,59 @@ fn spawn_player(
         .insert(ActiveEvents::COLLISION_EVENTS)
         .insert(EnemyAnimationState::Idle)
         .insert(ManaRegenTimer(Timer::from_seconds(0.5, TimerMode::Once)))
+        .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
+        .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
-        .insert(PlayerStats::new())
-        .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(SkillPoints { count: 0 })
-        .insert(RigidBody::KinematicPositionBased)
         .id();
+
+    let mut hunger = Hunger::new(100, 5., 8);
+    // Try to load inv from save
+    if let Ok(save_file) = File::open("save_state.json") {
+        let reader = BufReader::new(save_file);
+
+        // Read the JSON contents of the file as an instance of `User`.
+        match serde_json::from_reader::<_, SaveData>(reader) {
+            Ok(data) => {
+                hunger.current = data.player_hunger;
+                commands.entity(p).insert((
+                    data.inventory,
+                    data.player_level,
+                    data.player_stats,
+                    data.skill_points,
+                    data.current_health,
+                    hunger,
+                    Transform::from_translation(data.player_transform.extend(0.)),
+                ));
+
+                println!("LOADED PLAYER DATA FROM SAVE FILE");
+            }
+            Err(err) => println!("Failed to load data from file {err:?}"),
+        }
+    }
     game.player = p;
 }
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
+    if let Ok(_) = File::open("save_state.json") {
+        return;
+    }
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::BedBlock, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::MagicGem, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::MagicTusk, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40, None);
     // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
     // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(
     //     WorldObject::UpgradeStationBlock,
     //     &proto,
@@ -262,7 +292,7 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     //     None,
     // );
     // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(3));
-    proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::StoneChunk, &proto, Vec2::ZERO, 64,None);
@@ -271,16 +301,28 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::MetalBar, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::PlantFibre, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::Stick, &proto, Vec2::ZERO, 64,None);
-    proto_commands.spawn_item_from_proto(WorldObject::SmallPotion, &proto, Vec2::ZERO, 64, None);
-    proto_commands.spawn_item_from_proto(WorldObject::Apple, &proto, Vec2::ZERO, 64, None);
-    proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1, Some(1));
-    proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::SmallPotion, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Apple, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::BushlingScale, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::Tusk, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Leather, &proto, Vec2::ZERO, 64,None);
-    // // proto_commands.spawn_item_from_proto(WorldObject::Feather, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::CraftingTableBlock, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::AlchemyTableBlock, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodDoor, &proto, Vec2::ZERO, 1, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(
+    //     WorldObject::CraftingTableBlock,
+    //     &proto,
+    //     Vec2::ZERO,
+    //     64,
+    //     None,
+    // );
+    // proto_commands.spawn_item_from_proto(
+    //     WorldObject::AlchemyTableBlock,
+    //     &proto,
+    //     Vec2::ZERO,
+    //     64,
+    //     None,
+    // );
+    // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
 }

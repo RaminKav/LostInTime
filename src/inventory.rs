@@ -22,11 +22,12 @@ use bevy::prelude::*;
 
 use bevy_proto::prelude::*;
 use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
+use serde::{Deserialize, Serialize};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
 pub const MAX_STACK_SIZE: usize = 64;
 
-#[derive(Component, Debug, Default, Clone)]
+#[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Inventory {
     pub items: Container,
     pub equipment_items: Container,
@@ -53,7 +54,18 @@ impl Inventory {
     }
 }
 
-#[derive(Component, Debug, PartialEq, Reflect, FromReflect, Schematic, Default, Clone)]
+#[derive(
+    Component,
+    Debug,
+    PartialEq,
+    Reflect,
+    FromReflect,
+    Schematic,
+    Default,
+    Clone,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Schematic, Default)]
 pub struct ItemStack {
     pub obj_type: WorldObject,
@@ -67,7 +79,7 @@ pub struct ItemStack {
 pub enum InventoryError {
     FailedToMerge(String),
 }
-#[derive(Component, Debug, PartialEq, Clone)]
+#[derive(Component, Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct InventoryItemStack {
     pub item_stack: ItemStack,
     pub slot: usize,

@@ -1,7 +1,8 @@
 use bevy::prelude::*;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
+use interpolation::lerp;
 
-use crate::{item::WorldObject, GameParam};
+use crate::{item::WorldObject, world::ISLAND_SIZE, GameParam};
 
 use super::{
     chunk::TileSpriteData, noise_helpers, world_helpers::get_neighbour_tile, TileMapPosition,
@@ -58,6 +59,7 @@ impl TilePlugin {
             // let m = f64::powf(m / (1. + 0.5 + 0.25), 1.);
             // print!("{:?}", e);
             // let m = f64::powf(m, 1.);
+            let e = Self::apply_distance_function_to_tile(x as f32, y as f32, e);
             let block = if e <= world_generation_params.water_frequency {
                 WorldObject::WaterTile
             } else {
@@ -90,6 +92,18 @@ impl TilePlugin {
             index_shift = 16;
         }
         (bits, index_shift, blocks)
+    }
+    pub fn apply_distance_function_to_tile(x: f32, y: f32, e: f64) -> f64 {
+        let d = (Vec2::new(x, y).distance(Vec2::ZERO)) / ISLAND_SIZE;
+        let mix = 0.5;
+        let ne = lerp(&e, &(1. - d as f64), &mix);
+        if ne >= 0.25 {
+            // land
+            0.3
+        } else {
+            // water
+            0.1
+        }
     }
     pub fn _update_neighbour_tiles(
         new_tile_pos: TilePos,

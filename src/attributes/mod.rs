@@ -1,4 +1,5 @@
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::ops::{Range, RangeInclusive};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
@@ -30,7 +31,18 @@ pub struct AttributesPlugin;
 pub struct BlockAttributeBundle {
     pub health: CurrentHealth,
 }
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
+#[derive(
+    Component,
+    PartialEq,
+    Clone,
+    Reflect,
+    FromReflect,
+    Schematic,
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Schematic, Default)]
 pub struct ItemAttributes {
     pub health: i32,
@@ -328,7 +340,19 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      loot_rate: Option<Range<i32>>,
 }}
 
-#[derive(Component, Reflect, FromReflect, Debug, Schematic, Clone, Default, Eq, PartialEq)]
+#[derive(
+    Component,
+    Reflect,
+    FromReflect,
+    Debug,
+    Schematic,
+    Clone,
+    Default,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Component, Schematic)]
 pub enum ItemRarity {
     #[default]
@@ -409,7 +433,9 @@ pub struct PlayerAttributeBundle {
 }
 
 //TODO: Add max health vs curr health
-#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[derive(
+    Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy, Serialize, Deserialize,
+)]
 #[reflect(Component, Schematic)]
 pub struct CurrentHealth(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]

@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
+use crate::enemy::spawner::{ChunkSpawners, Spawner};
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::MovePlayerEvent;
 use crate::ui::stats_ui::StatsUI;
@@ -14,7 +15,7 @@ use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 
 use bevy_hanabi::EffectSpawner;
-use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
+use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 
 use bevy_rapier2d::prelude::{KinematicCharacterController, PhysicsSet};
 use interpolation::Lerp;
@@ -34,7 +35,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::Equipment;
+use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};
@@ -154,6 +155,7 @@ impl Plugin for InputsPlugin {
                     update_cursor_pos.after(move_player),
                     toggle_inventory,
                     close_container,
+                    diagnostics,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -443,11 +445,11 @@ pub fn toggle_inventory(
             true,
         );
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-        proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
-        proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
+        // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+        // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
         proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
-        let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-        commands.entity(f.unwrap()).insert(MobLevel(2));
+        // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+        // commands.entity(f.unwrap()).insert(MobLevel(2));
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
     }
 }
@@ -516,7 +518,18 @@ pub fn cursor_pos_in_ui(
     let ndc = (cursor_pos / window_size) * 2.0 - Vec2::ONE;
     ndc_to_world.project_point3(ndc.extend(0.0))
 }
-
+pub fn diagnostics(
+    mouse_button_input: Res<Input<MouseButton>>,
+    entities: Query<Entity>,
+    mobs: Query<&Mob>,
+    spawners: Query<&ChunkSpawners>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Right) {
+        println!("[DEBUG] Entity Count: {:?}", entities.iter().count());
+        println!("[DEBUG] Mob Count: {:?}", mobs.iter().count());
+        println!("[DEBUG] Spawner Count: {:?}", spawners.iter().count());
+    }
+}
 pub fn mouse_click_system(
     mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,

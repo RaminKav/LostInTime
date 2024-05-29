@@ -63,7 +63,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 // modify the item stack count
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
-                println!("ON SPAWN {proto_data:?}");
                 spawned_entity_commands.insert(proto_data);
                 let eqp_type = params
                     .get_component::<EquipmentType, _>(obj.clone())

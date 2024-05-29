@@ -1,15 +1,16 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 
-#[derive(Component, Clone, Debug)]
+#[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerStats {
     pub str: i32,
     pub dex: i32,
     pub agi: i32,
     pub vit: i32,
 }
-#[derive(Component, Clone, Debug)]
+#[derive(Component, Clone, Default, Serialize, Deserialize, Debug)]
 pub struct SkillPoints {
     pub count: u8,
 }

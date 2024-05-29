@@ -198,7 +198,7 @@ pub fn handle_new_mob_state_machine(
                     .trans::<FollowState>(
                         Trigger::not(LineOfSight {
                             target: game.game.player,
-                            range: 130.,
+                            range: 160.,
                         }),
                         IdleState {
                             walk_timer: Timer::from_seconds(2., TimerMode::Repeating),

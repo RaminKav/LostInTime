@@ -1,11 +1,12 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use serde::{Deserialize, Serialize};
 
 use crate::{animations::AnimationTimer, ui::InventoryState, world::y_sort::YSort};
 
 use super::stats::SkillPoints;
 
-#[derive(Component, Debug)]
+#[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerLevel {
     pub level: u8,
     pub xp: u32,

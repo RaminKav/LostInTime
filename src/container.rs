@@ -8,10 +8,11 @@ use crate::{
 };
 
 use bevy::{prelude::*, utils::HashMap};
+use serde::{Deserialize, Serialize};
 
 pub const CONTAINER_UNIT: Option<InventoryItemStack> = None;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Container {
     pub items: Vec<Option<InventoryItemStack>>,
 }

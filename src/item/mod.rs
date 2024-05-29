@@ -154,7 +154,18 @@ pub struct EquipmentData {
     pub obj: WorldObject,
 }
 
-#[derive(Component, PartialEq, Clone, Reflect, FromReflect, Schematic, Default, Debug)]
+#[derive(
+    Component,
+    PartialEq,
+    Clone,
+    Reflect,
+    FromReflect,
+    Schematic,
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Schematic, Default)]
 pub struct ItemDisplayMetaData {
     pub name: String,

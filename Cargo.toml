@@ -16,7 +16,7 @@ bevy_proto = {version = "0.10.0", features = ["bevy_sprite", "ron", "bevy_render
 seldom_state = "0.6.3"
 ron = "0.8.0"
 serde = "1.0.136"
-serde_with = "2.1.0"
+serde_with = "3.8.1"
 rand = "0.8.5"
 rand_xorshift = "^0.3"
 itertools = "^0.8"
