@@ -247,6 +247,7 @@ fn spawn_player(
                     data.current_health,
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),
+                    RawPosition(data.player_transform),
                 ));
 
                 println!("LOADED PLAYER DATA FROM SAVE FILE");
