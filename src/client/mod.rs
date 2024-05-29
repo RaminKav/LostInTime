@@ -250,10 +250,11 @@ pub fn load_state(
     mut game: GameParam,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
 ) {
-    if let Ok(file_file) = File::open("save_state.json") {
-        let mut rng = rand::thread_rng();
-        let mut seed = rng.gen_range(0..100000);
+    let mut rng = rand::thread_rng();
+    let mut seed = rng.gen_range(0..100000);
 
+    // Load data if it exists
+    if let Ok(file_file) = File::open("save_state.json") {
         let reader = BufReader::new(file_file);
 
         // Read the JSON contents of the file as an instance of `User`.
@@ -273,21 +274,20 @@ pub fn load_state(
             }
             Err(err) => println!("Failed to load data from file {err:?}"),
         }
-
-        commands.insert_resource(GenerationSeed { seed });
-        let params = WorldGeneration {
-            sand_frequency: 0.32,
-            water_frequency: 0.15,
-            obj_allowed_tiles_map: HashMap::default(),
-            ..default()
-        };
-        dim_event.send(DimensionSpawnEvent {
-            generation_params: params,
-            swap_to_dim_now: true,
-        });
-
-        println!("DONE LOADING GAME DATA");
     }
+    commands.insert_resource(GenerationSeed { seed });
+    let params = WorldGeneration {
+        sand_frequency: 0.32,
+        water_frequency: 0.15,
+        obj_allowed_tiles_map: HashMap::default(),
+        ..default()
+    };
+    dim_event.send(DimensionSpawnEvent {
+        generation_params: params,
+        swap_to_dim_now: true,
+    });
+
+    println!("DONE LOADING GAME DATA");
 }
 
 impl ClientPlugin {
