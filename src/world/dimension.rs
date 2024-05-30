@@ -57,7 +57,7 @@ impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DimensionSpawnEvent>()
             .add_system(Self::handle_dimension_swap_events.before(CustomFlush))
-            .add_system(Self::new_dim_with_params.after(CustomFlush))
+            .add_system(Self::new_dim_with_params.in_base_set(CoreSet::PreUpdate))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -110,4 +110,8 @@ impl DimensionPlugin {
                 .remove::<SpawnDimension>();
         }
     }
+}
+
+pub fn dim_spawned(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
+    dim_spawn.iter().count() > 0
 }

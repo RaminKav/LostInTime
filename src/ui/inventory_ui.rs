@@ -375,7 +375,6 @@ pub fn spawn_inv_slot(
     } else if slot_type.is_chest() {
         y += 4. * UI_SLOT_SIZE + 11.;
     } else if slot_type.is_furnace() {
-        println!("SLOT INDEX {slot_index:?}");
         if slot_index == 0 {
             x = -20.5;
             y = 26.;

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     colors::{overwrite_alpha, NIGHT},
+    world::dimension::dim_spawned,
     GameState, GAME_HEIGHT, GAME_WIDTH,
 };
 
@@ -34,17 +35,17 @@ impl Plugin for NightPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(NightTracker::default())
             .register_type::<NightTracker>()
-            .add_plugin(ResourceInspectorPlugin::<NightTracker>::default())
-            .add_startup_system(spawn_night)
+            .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
+            .add_system(spawn_night.in_schedule(OnEnter(GameState::Main)))
             .add_system(tick_night_color.in_set(OnUpdate(GameState::Main)));
     }
 }
 
-pub fn spawn_night(mut commands: Commands) {
+pub fn spawn_night(mut commands: Commands, night_tracker: Res<NightTracker>) {
     commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: overwrite_alpha(NIGHT, 0.),
+                color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
                 custom_size: Some(Vec2::new(GAME_WIDTH, GAME_HEIGHT)),
                 ..default()
             },

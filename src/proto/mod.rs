@@ -137,7 +137,7 @@ impl Plugin for ProtoPlugin {
             )
             .add_system(
                 Self::spawn_proto_resources
-                    .in_schedule(OnEnter(GameState::Main))
+                    .in_schedule(OnExit(GameState::Loading))
                     .run_if(prototype_ready("WorldGenerationParams").and_then(run_once())),
             );
     }
@@ -282,7 +282,7 @@ impl ProtoPlugin {
         prototypes.load("proto/bridgeblock.prototype.ron");
         prototypes.load("proto/largemanapotion.prototype.ron");
         prototypes.load("proto/smallmanapotion.prototype.ron");
-        prototypes.load("proto/worldgenerationparams.prototype.ron");
+        prototypes.load("proto/WorldGenerationParams.prototype.ron");
         prototypes.load("proto/dungeonexit.prototype.ron");
         prototypes.load("proto/woodwall.prototype.ron");
         prototypes.load("proto/woodwallblock.prototype.ron");
@@ -321,7 +321,6 @@ impl ProtoPlugin {
             }
         }
         println!("READY, ENTERING GAME STATE");
-        next_state.0 = Some(GameState::Main);
     }
 }
 #[derive(Schematic, Reflect, FromReflect)]

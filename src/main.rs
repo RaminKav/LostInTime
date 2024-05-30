@@ -71,10 +71,14 @@ use player::{Player, PlayerPlugin, PlayerState};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
-use ui::{InventorySlotState, UIPlugin};
+use ui::{
+    display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
+    InventorySlotState, UIPlugin,
+};
 use world::WorldGeneration;
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
+    dimension::ActiveDimension,
     generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
@@ -91,6 +95,7 @@ pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 180. * ZOOM_SCALE;
 pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
+pub const DEBUG_MODE: bool = false;
 
 fn main() {
     App::new()
@@ -113,7 +118,7 @@ fn main() {
                     primary_window: Some(Window {
                         resolution: WindowResolution::new(WIDTH, HEIGHT)
                             .with_scale_factor_override(1.0),
-                        title: "Survival Game".to_string(),
+                        title: "Hiru's Island".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: false,
                         transparent: true,
@@ -128,7 +133,7 @@ fn main() {
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
-        .add_plugin(WorldInspectorPlugin::new())
+        .add_plugin(WorldInspectorPlugin::new().run_if(should_show_inspector))
         .add_plugin(TilemapPlugin)
         .add_plugin(GameAssetsPlugin)
         .add_plugin(AudioPlugin)
@@ -149,8 +154,14 @@ fn main() {
         .add_plugin(JuicePlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
-        .add_loading_state(LoadingState::new(GameState::Loading))
+        .add_loading_state(
+            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
+        )
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
+        .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
+        .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
+        .add_system(handle_menu_button_click_events.in_set(OnUpdate(GameState::MainMenu)))
+        .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)))
         .run();
 }
 
@@ -178,6 +189,7 @@ pub enum CoreGameSet {
 pub enum GameState {
     #[default]
     Loading,
+    MainMenu,
     Main,
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
@@ -637,4 +649,8 @@ impl AppExt for App {
         self.default_schedule_label = orig_default;
         self
     }
+}
+
+pub fn should_show_inspector(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
+    dim_spawn.iter().count() > 0 && DEBUG_MODE
 }

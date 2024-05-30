@@ -533,3 +533,13 @@ island variation:
 - would imply limited resources, 2 ways to solve this
   - add farming/plant growth: a way to regenerate plants/mushrooms
   - stone/ores can be later farmed in dungeons once they run out in the overworld
+
+# Main Menu
+
+Buttons:
+
+- Play: opens window to pick a save (3 slots). default empty icon, then a designed one with some data on the run (night, level)
+- Settings: opens settings menu -> one system to handle all options, match on enum, buttons just call an event with that enum type
+  - music volume: [-] [+]
+  - save frequency: [15s] [2]
+- Quit.

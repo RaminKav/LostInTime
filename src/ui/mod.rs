@@ -22,6 +22,8 @@ pub use interactions::*;
 pub use inventory_ui::*;
 pub use player_hud::*;
 pub use tooltips::*;
+mod main_menu;
+pub use main_menu::*;
 
 use crate::{
     client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
@@ -62,9 +64,10 @@ impl Plugin for UIPlugin {
             .add_event::<ToolTipUpdateEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DropInWorldEvent>()
+            .add_event::<MenuButtonClickEvent>()
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
-            .add_startup_system(spawn_fps_text)
+            .add_system(spawn_fps_text.in_schedule(OnEnter(GameState::Main)))
             .add_systems((
                 setup_inv_ui
                     .before(CustomFlush)
@@ -112,7 +115,6 @@ impl Plugin for UIPlugin {
                     toggle_inv_visibility,
                     handle_item_drop_clicks,
                     handle_dragging,
-                    handle_hovering.before(CustomFlush),
                     handle_drop_on_slot_events.after(handle_item_drop_clicks),
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
                     handle_interaction_clicks
@@ -151,6 +153,12 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
+            .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
+}
+
+fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
+    state.0 == GameState::Main || state.0 == GameState::MainMenu
 }

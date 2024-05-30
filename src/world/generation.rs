@@ -49,7 +49,11 @@ impl Plugin for GenerationPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(Self::generate_and_cache_objects.before(CustomFlush))
+            .add_system(
+                Self::generate_and_cache_objects
+                    .before(CustomFlush)
+                    .run_if(resource_exists::<GenerationSeed>()),
+            )
             .add_system(update_wall.in_base_set(CoreSet::PostUpdate))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

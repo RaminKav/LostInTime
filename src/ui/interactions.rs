@@ -5,6 +5,7 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     assets::Graphics,
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
+    colors::{DARK_GREEN, YELLOW_2},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
@@ -15,8 +16,8 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, PlayerStatsTooltip,
-    UIContainersParam,
+    ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, MenuButton,
+    MenuButtonClickEvent, PlayerStatsTooltip, UIContainersParam,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -42,6 +43,8 @@ pub enum UIElement {
     FurnaceInventory,
     TileHover,
     BlockedTileHover,
+    MenuButton,
+    MainMenu,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -699,6 +702,46 @@ pub fn handle_cursor_stats_buttons(
                 };
 
                 interactable.change(Interaction::None);
+            }
+        }
+    }
+}
+
+pub fn handle_cursor_main_menu_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut menu_buttons: Query<(Entity, &mut Interactable, &MenuButton), Without<InventorySlotState>>,
+    mut text: Query<&mut Text, With<MenuButton>>,
+    mut send_menu_button_event: EventWriter<MenuButtonClickEvent>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
+
+    for (e, mut interactable, menu_button) in menu_buttons.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    text.get_mut(e).unwrap().sections[0].style.color = DARK_GREEN;
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        send_menu_button_event.send(MenuButtonClickEvent {
+                            button: menu_button.clone(),
+                        });
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                // reset hovering states if we stop hovering ?
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+
+                interactable.change(Interaction::None);
+                text.get_mut(e).unwrap().sections[0].style.color = YELLOW_2;
             }
         }
     }

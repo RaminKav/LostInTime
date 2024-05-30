@@ -6,7 +6,7 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_rapier2d::prelude::Collider;
 
-use super::dimension::GenerationSeed;
+use super::dimension::{dim_spawned, GenerationSeed};
 
 use super::world_helpers::get_neighbour_tile;
 
@@ -34,7 +34,9 @@ impl Plugin for ChunkPlugin {
             .add_event::<GenerateObjectsEvent>()
             .add_systems(
                 (
-                    Self::spawn_chunks_around_camera.after(handle_move_player), //.before(Self::handle_new_chunk_event),
+                    Self::spawn_chunks_around_camera
+                        .after(handle_move_player)
+                        .run_if(dim_spawned),
                     Self::handle_new_chunk_event.after(Self::spawn_chunks_around_camera),
                     Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),

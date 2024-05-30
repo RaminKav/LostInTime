@@ -41,7 +41,8 @@ use crate::{
         world_helpers::world_pos_to_tile_pos,
         ChunkManager, TileMapPosition, WallTextureData, WorldGeneration,
     },
-    CustomFlush, GameParam, GameState, YSort,
+    CustomFlush, GameParam, GameState, GameUpscale, MainCamera, RawPosition, TextureCamera,
+    UICamera, YSort,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -114,19 +115,9 @@ impl Plugin for ClientPlugin {
             .add_system(
                 load_state
                     .run_if(run_once())
-                    .in_schedule(CoreSchedule::Startup),
+                    .in_schedule(OnExit(GameState::MainMenu)),
             )
             .add_system(save_state.in_set(OnUpdate(GameState::Main)))
-            // .add_systems(
-            //     (
-            //         // Self::save_chunk,
-            //         // Self::despawn_saved_chunks,
-            //         // Self::despawn_non_saveable_entities.before(CustomFlush),
-            //         // Self::close_and_save_on_esc.after(CustomFlush),
-            //         // Self::load_chunk.before(CustomFlush),
-            //     )
-            //         .in_set(OnUpdate(GameState::Main)),
-            // )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -249,6 +240,10 @@ pub fn load_state(
     mut commands: Commands,
     mut game: GameParam,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
+    mut game_camera: Query<
+        (&mut Transform, &mut RawPosition),
+        (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
+    >,
 ) {
     let mut rng = rand::thread_rng();
     let mut seed = rng.gen_range(0..100000);
@@ -271,6 +266,13 @@ pub fn load_state(
                 commands.insert_resource(ContainerRegistry {
                     containers: data.craft_reg,
                 });
+
+                // PRE-MOVE CAMERAS TO PLAYER
+                let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
+
+                raw_camera_pos.0 = data.player_transform;
+                game_camera_transform.translation.x = data.player_transform.x;
+                game_camera_transform.translation.y = data.player_transform.y;
             }
             Err(err) => println!("Failed to load data from file {err:?}"),
         }
@@ -283,206 +285,9 @@ pub fn load_state(
         ..default()
     };
     dim_event.send(DimensionSpawnEvent {
-        generation_params: params,
+        generation_params: game.world_generation_params.clone(),
         swap_to_dim_now: true,
     });
 
     println!("DONE LOADING GAME DATA");
-}
-
-impl ClientPlugin {
-    fn load_chunk(world: &mut World) {
-        let mut state: SystemState<(
-            Query<&ChunkCache, With<ActiveDimension>>,
-            EventReader<SpawnChunkEvent>,
-        )> = SystemState::new(world);
-        let (_dim_query, mut spawn_events) = state.get_mut(world);
-        let mut chunks = vec![];
-        for event in spawn_events.iter() {
-            println!("attempting load chunk {:?}", event.chunk_pos);
-            chunks.push(event.chunk_pos);
-            // if let Some(snapshot) = dim_query.single().snapshots.get(&event.chunk_pos) {
-            //     snapshots.push(snapshot.clone_value());
-            //     println!("Loading chunk from cache {:?}.", event.chunk_pos);
-            // }
-        }
-        let mut new_chunks = vec![];
-        for chunk in chunks.iter() {
-            if let Ok(reader) = world
-                .resource::<AppBackend>()
-                .reader(&format!("{}", chunk))
-                .map_err(SaveableError::other)
-            {
-                print!(" LOADING CHUNK ");
-                let loader = world.resource::<AppLoader>();
-                let deser = world.deserialize_applier(&mut loader.deserializer(reader));
-                if let Err(e) = deser {
-                    new_chunks.push(chunk);
-                    println!("{e}");
-                } else {
-                    // deser.unwrap().map(EntityMap::new())
-                }
-            } else {
-                new_chunks.push(chunk);
-            }
-        }
-        let mut state: SystemState<EventWriter<CreateChunkEvent>> = SystemState::new(world);
-        for chunk_pos in new_chunks.iter() {
-            println!("          NO LOAD {chunk_pos:?}");
-            state.get_mut(world).send(CreateChunkEvent {
-                chunk_pos: **chunk_pos,
-            });
-        }
-        // for snapshot in snapshots.iter() {
-        //     snapshot
-        //         .applier(world)
-        //         .despawn(DespawnMode::None)
-        //         .mapping(MappingMode::Strict)
-        //         .apply()
-        //         .expect("Failed to Load snapshot.");
-        // }
-    }
-
-    // fn handle_add_visuals_to_loaded_objects(
-    //     game: GameParam,
-    //     mut commands: Commands,
-    //     mut meshes: ResMut<Assets<Mesh>>,
-    //     loaded_entities: Query<(Entity, &WorldObject), Added<WorldObject>>,
-    // ) {
-
-    //     // let foliage_material = &game
-    //     //     .graphics
-    //     //     .foliage_material_map
-    //     //     .as_ref()
-    //     //     .unwrap()
-    //     //     .get(&Foliage::Tree)
-    //     //     .unwrap();
-
-    //     // for (e, obj) in loaded_entities.iter() {
-    //     //     match obj {
-    //     //          if let Some(foliage) = proto_param.get_component::<Foliage, _>(obj) {
-    //     //             commands
-    //     //                 .entity(e)
-    //     //                 .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-    //     //                     size: Vec2::new(32., 40.),
-    //     //                     ..Default::default()
-    //     //                 }))))
-    //     //                 .insert((*foliage_material).clone());
-    //     //         }
-    //     //          if let Some(wall) = proto_param.get_component::<Wall, _>(obj) {
-    //     //             println!("ADDING WALL VISUALS");
-    //     //             commands
-    //     //                 .entity(e)
-    //     //                 .insert(game.graphics.wall_texture_atlas.as_ref().unwrap().clone())
-    //     //                 .insert(TextureAtlasSprite::default());
-    //     //         }
-    //     //         _ => {}
-    //     //     }
-    //     // }
-    // }
-    //TODO: make this work with Spawn events too ,change event name
-    fn save_chunk(
-        world: &mut World,
-        mut local: Local<
-            SystemState<(
-                Res<ChunkManager>,
-                EventReader<DespawnChunkEvent>,
-                Query<&Children>,
-            )>,
-        >,
-    ) {
-        let (chunk_manager, mut save_events, children) = local.get_mut(world);
-        let mut saved_chunks = HashMap::default();
-        for saves in save_events.iter() {
-            let chunk_e = *chunk_manager.chunks.get(&saves.chunk_pos.into()).unwrap();
-
-            let mut entities = children.iter_descendants(chunk_e).collect::<Vec<_>>();
-            entities.push(chunk_e);
-            saved_chunks.insert(saves.chunk_pos, entities);
-        }
-
-        for (chunk_pos, entities) in saved_chunks.iter() {
-            let snapshot = Snapshot::builder(world)
-                .extract_entities(entities.clone().into_iter())
-                .build();
-            if let Ok(writer) = world
-                .resource::<AppBackend>()
-                .writer(&format!("{}", chunk_pos))
-                .map_err(SaveableError::other)
-            {
-                let saver = world.resource::<AppSaver>();
-                if let Err(e) = saver.serialize(
-                    &SnapshotSerializer::new(&snapshot, world.resource::<AppTypeRegistry>()),
-                    writer,
-                ) {
-                    println!("{e}")
-                };
-            }
-            // snapshots.insert(*chunk_pos, snapshot);
-        }
-        let mut state: SystemState<(GameParam, Commands)> = SystemState::new(world);
-        for (chunk_pos, _) in saved_chunks.iter() {
-            let (game, mut commands) = state.get_mut(world);
-            commands
-                .entity(game.get_chunk_entity(*chunk_pos).unwrap())
-                .despawn_recursive();
-        }
-
-        // let (mut game, mut commands, mut dim_query) = state.get_mut(world);
-
-        // for (chunk_pos, snapshot) in snapshots.iter() {
-        //     // println!("Inserting new snapshot for {chunk_pos:?} and despawning it");
-        //     dim_query
-        //         .single_mut()
-        //         .snapshots
-        //         .insert(*chunk_pos, snapshot.clone_value());
-        //     commands
-        //         .entity(*game.get_chunk_entity(*chunk_pos).unwrap())
-        //         .despawn_recursive();
-        //     game.remove_chunk_entity(*chunk_pos);
-        // }
-    }
-    fn despawn_saved_chunks(
-        mut commands: Commands,
-        game: GameParam,
-        mut events: EventReader<DespawnChunkEvent>,
-    ) {
-        for event in events.iter() {
-            print!("DESPAWNING {:?} ", event.chunk_pos);
-            commands
-                .entity(game.get_chunk_entity(event.chunk_pos).unwrap())
-                .despawn_recursive();
-            // game.remove_chunk_entity(event.chunk_pos);
-            println!(" ... Done");
-        }
-    }
-    pub fn despawn_non_saveable_entities(
-        _commands: Commands,
-        _minimap: Query<Entity, With<Minimap>>,
-        key_input: ResMut<Input<KeyCode>>,
-    ) {
-        if key_input.just_pressed(KeyCode::Escape) {
-            // println!("DESPAWNED MAP");
-            // let map = minimap.single();
-            // commands.entity(map).despawn_recursive();
-        }
-    }
-    pub fn close_and_save_on_esc(world: &mut World) {
-        let input = world.resource::<Input<KeyCode>>();
-        if input.just_pressed(KeyCode::Escape) {
-            // const PATH: &str = "example2.json";
-
-            // let file = File::create(PATH).expect("Could not open file for serialization");
-
-            // let mut ser = serde_json::Serializer::pretty(file);
-
-            // world
-            //     .serialize(&mut ser)
-            //     .expect("Could not serialize World");
-            world.save("game").expect("Failed to save");
-            let mut state: SystemState<EventWriter<AppExit>> = SystemState::new(world);
-            let mut exit = state.get_mut(world);
-            exit.send(AppExit);
-        }
-    }
 }

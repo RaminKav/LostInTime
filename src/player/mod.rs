@@ -169,6 +169,7 @@ fn spawn_player(
             SpriteSheetBundle {
                 texture_atlas: player_texture_atlas_handle,
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                visibility: Visibility::Hidden,
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),

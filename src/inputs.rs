@@ -152,18 +152,19 @@ impl Plugin for InputsPlugin {
                     mouse_click_system.after(CustomFlush),
                     handle_hotbar_key_input,
                     tick_dash_timer,
-                    update_cursor_pos.after(move_player),
                     toggle_inventory,
                     close_container,
                     diagnostics,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(update_cursor_pos.after(move_player))
             .add_system(
                 move_camera_with_player
                     .after(PhysicsSet::SyncBackendFlush)
                     .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate),
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
             );
     }
 }
