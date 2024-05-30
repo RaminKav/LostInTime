@@ -175,6 +175,7 @@ pub fn save_state(
     craft_reg: Res<ContainerRegistry>,
     dungeon_check: Query<&Dungeon>,
     night_tracker: Res<NightTracker>,
+    seed: Res<GenerationSeed>,
 ) {
     timer.timer.tick(time.delta());
     // only save if the timer is done and we are not in a dungeon
@@ -223,6 +224,7 @@ pub fn save_state(
         .collect();
     save_data.craft_reg = craft_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
+    save_data.seed = seed.seed;
 
     const PATH: &str = "save_state.json";
 
@@ -278,12 +280,7 @@ pub fn load_state(
         }
     }
     commands.insert_resource(GenerationSeed { seed });
-    let params = WorldGeneration {
-        sand_frequency: 0.32,
-        water_frequency: 0.15,
-        obj_allowed_tiles_map: HashMap::default(),
-        ..default()
-    };
+
     dim_event.send(DimensionSpawnEvent {
         generation_params: game.world_generation_params.clone(),
         swap_to_dim_now: true,

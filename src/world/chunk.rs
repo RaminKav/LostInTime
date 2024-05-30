@@ -156,7 +156,7 @@ impl ChunkPlugin {
             let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
                 CHUNK_SIZE as usize] =
                 [[[WorldObject::GrassTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-            println!("Creating new chunk {chunk_pos:?}");
+            println!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
 
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
