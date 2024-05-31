@@ -1,5 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
@@ -57,7 +57,7 @@ pub type RecipeListProto = (
     Vec<WorldObject>,
 );
 
-#[derive(Resource, Default, Deserialize)]
+#[derive(Resource, Default, Clone, Serialize, Deserialize)]
 pub struct CraftingTracker {
     pub craftable: Vec<WorldObject>,
     pub discovered_objects: Vec<WorldObject>,

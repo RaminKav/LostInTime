@@ -21,7 +21,7 @@ use crate::{
     attributes::{hunger::Hunger, CurrentHealth},
     container::{Container, ContainerRegistry},
     inventory::{Inventory, ItemStack},
-    item::{projectile::Projectile, Foliage, MainHand, Wall, WorldObject},
+    item::{projectile::Projectile, CraftingTracker, Foliage, MainHand, Wall, WorldObject},
     night::NightTracker,
     player::{
         levels::PlayerLevel,
@@ -130,7 +130,8 @@ pub struct SaveData {
     #[serde(with = "vectorize")]
     containers: HashMap<TileMapPosition, Container>,
     #[serde(with = "vectorize")]
-    craft_reg: HashMap<TileMapPosition, Container>,
+    container_reg: HashMap<TileMapPosition, Container>,
+    craft_tracker: CraftingTracker,
     night_tracker: NightTracker,
 
     //Player Data
@@ -172,7 +173,8 @@ pub fn save_state(
         ),
         With<Player>,
     >,
-    craft_reg: Res<ContainerRegistry>,
+    container_reg: Res<ContainerRegistry>,
+    craft_tracker: Res<CraftingTracker>,
     dungeon_check: Query<&Dungeon>,
     night_tracker: Res<NightTracker>,
     seed: Res<GenerationSeed>,
@@ -191,6 +193,7 @@ pub fn save_state(
     save_data.current_health = hp.clone();
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
+    save_data.craft_tracker = craft_tracker.clone();
 
     save_data.placed_objs = placed_objs
         .iter()
@@ -222,7 +225,7 @@ pub fn save_state(
             None
         })
         .collect();
-    save_data.craft_reg = craft_reg.containers.clone();
+    save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;
 
@@ -266,8 +269,9 @@ pub fn load_state(
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
                 commands.insert_resource(ContainerRegistry {
-                    containers: data.craft_reg,
+                    containers: data.container_reg,
                 });
+                commands.insert_resource(data.craft_tracker);
 
                 // PRE-MOVE CAMERAS TO PLAYER
                 let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();

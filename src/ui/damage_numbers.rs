@@ -14,7 +14,7 @@ pub struct DamageNumber {
 }
 
 #[derive(Component)]
-pub struct PreviousHealth(i32);
+pub struct PreviousHealth(pub i32);
 
 pub struct DodgeEvent {
     pub entity: Entity,
@@ -22,7 +22,7 @@ pub struct DodgeEvent {
 
 pub fn add_previous_health(
     mut commands: Commands,
-    query: Query<(Entity, &MaxHealth), Added<MaxHealth>>,
+    query: Query<(Entity, &MaxHealth), (Added<MaxHealth>, Without<PreviousHealth>)>,
 ) {
     for (entity, max_health) in query.iter() {
         commands.entity(entity).insert(PreviousHealth(max_health.0));

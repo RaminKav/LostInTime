@@ -30,6 +30,7 @@ use crate::{
     item::{EquipmentData, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
+    ui::damage_numbers::PreviousHealth,
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
@@ -246,6 +247,7 @@ fn spawn_player(
                     data.player_stats,
                     data.skill_points,
                     data.current_health,
+                    PreviousHealth(data.current_health.0),
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),

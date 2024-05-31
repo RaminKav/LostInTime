@@ -1,5 +1,5 @@
 pub use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::container::Container;
 
@@ -10,7 +10,9 @@ pub struct CraftingContainer {
     pub items: Container,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Deserialize, Reflect, FromReflect)]
+#[derive(
+    Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, FromReflect,
+)]
 pub enum CraftingContainerType {
     #[default]
     Inventory,
