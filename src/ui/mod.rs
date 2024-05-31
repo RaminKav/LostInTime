@@ -57,11 +57,15 @@ impl Plugin for UIPlugin {
         app.add_state::<UIState>()
             .insert_resource(LastHoveredSlot { slot: None })
             .insert_resource(InventoryState::default())
+            .insert_resource(TooltipsManager {
+                timer: Timer::from_seconds(0.3, TimerMode::Once),
+            })
             .add_event::<ActionSuccessEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<DodgeEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
+            .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
@@ -152,6 +156,9 @@ impl Plugin for UIPlugin {
                     update_sp_text.run_if(in_state(UIState::Stats)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (tick_tooltip_timer, handle_tooltip_teardown).in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))

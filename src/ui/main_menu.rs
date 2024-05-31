@@ -145,7 +145,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
         UIElement::MenuButton,
         MenuButton::Options,
         Sprite {
-            custom_size: Some(Vec2::new(38., 11.)),
+            custom_size: Some(Vec2::new(58., 11.)),
             ..default()
         },
     ));
@@ -174,7 +174,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
         UIElement::MenuButton,
         MenuButton::Quit,
         Sprite {
-            custom_size: Some(Vec2::new(38., 11.)),
+            custom_size: Some(Vec2::new(30., 11.)),
             ..default()
         },
     ));

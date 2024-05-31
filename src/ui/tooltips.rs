@@ -14,15 +14,58 @@ use crate::{
 };
 
 use super::{
-    stats_ui::StatsUI, InventorySlotState, InventoryUI, ShowInvPlayerStatsEvent,
-    ToolTipUpdateEvent, UIElement, UIState, CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE,
-    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    stats_ui::StatsUI, InventoryUI, ShowInvPlayerStatsEvent, UIElement, UIState,
+    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE,
+    INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
+#[derive(Component)]
+pub struct ItemOrRecipeTooltip;
 
 #[derive(Component)]
 pub struct RecipeIngredientTooltipIcon;
+
+#[derive(Resource, Clone)]
+pub struct TooltipsManager {
+    pub timer: Timer,
+}
+
+#[derive(Debug, Clone)]
+
+pub struct ToolTipUpdateEvent {
+    pub item_stack: ItemStack,
+    pub parent_slot_entity: Entity,
+    pub is_recipe: bool,
+}
+
+#[derive(Default)]
+pub struct TooltipTeardownEvent;
+
+pub fn tick_tooltip_timer(time: Res<Time>, mut tooltip_manager: ResMut<TooltipsManager>) {
+    if tooltip_manager.timer.finished() {
+        return;
+    }
+    tooltip_manager.timer.tick(time.delta());
+}
+
+pub fn handle_tooltip_teardown(
+    mut commands: Commands,
+    mut updates: EventReader<TooltipTeardownEvent>,
+    tooltip: Query<Entity, With<ItemOrRecipeTooltip>>,
+    mut tooltip_manager: ResMut<TooltipsManager>,
+) {
+    if updates.iter().count() > 0 {
+        for t in tooltip.iter() {
+            commands.entity(t).despawn_recursive();
+        }
+
+        // begin delay for next tooltip
+        if tooltip.iter().count() > 0 {
+            tooltip_manager.timer.reset();
+        }
+    }
+}
 
 pub fn handle_spawn_inv_item_tooltip(
     mut commands: Commands,
@@ -31,16 +74,9 @@ pub fn handle_spawn_inv_item_tooltip(
     mut updates: EventReader<ToolTipUpdateEvent>,
     inv: Query<Entity, With<InventoryUI>>,
     cur_inv_state: Res<State<UIState>>,
-    old_tooltips: Query<
-        (Entity, &UIElement, &Parent),
-        (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
-    >,
     recipes: Res<Recipes>,
 ) {
     for item in updates.iter() {
-        for tooltip in old_tooltips.iter() {
-            commands.entity(tooltip.0).despawn_recursive();
-        }
         let inv = inv.single();
         let parent_inv_size = match cur_inv_state.0 {
             UIState::Inventory => INVENTORY_UI_SIZE,
@@ -78,13 +114,12 @@ pub fn handle_spawn_inv_item_tooltip(
                 RenderLayers::from_layers(&[3]),
                 item.item_stack.rarity.get_tooltip_ui_element(),
                 Name::new("TOOLTIP"),
+                ItemOrRecipeTooltip,
             ))
             .id();
 
         let mut tooltip_text: Vec<(String, f32)> = vec![];
         tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
-        println!("{:?} {:?}", tooltip_text, item.item_stack.metadata);
-        // tooltip_text.push(item.item_stack.metadata.desc.clone());
 
         if should_show_attributes {
             for a in attributes.iter().clone() {
@@ -208,16 +243,9 @@ pub fn handle_spawn_inv_player_stats(
     >,
     inv: Query<Entity, With<InventoryUI>>,
     stats: Query<Entity, With<StatsUI>>,
-    old_tooltips: Query<
-        (Entity, &UIElement, &Parent),
-        (Without<InventorySlotState>, With<PlayerStatsTooltip>),
-    >,
+    tooltip_manager: Res<TooltipsManager>,
 ) {
-    if updates.iter().len() > 0 {
-        for tooltip in old_tooltips.iter() {
-            commands.entity(tooltip.0).despawn_recursive();
-        }
-
+    if updates.iter().len() > 0 && tooltip_manager.timer.finished() {
         let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
             (
                 inv.get_single(),

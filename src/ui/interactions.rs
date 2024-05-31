@@ -17,7 +17,7 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
     ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, MenuButton,
-    MenuButtonClickEvent, PlayerStatsTooltip, UIContainersParam,
+    MenuButtonClickEvent, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -105,13 +105,6 @@ pub struct DropOnSlotEvent {
 pub struct RemoveFromSlotEvent {
     pub removed_item_stack: ItemStack,
     pub removed_slot_state: InventorySlotState,
-}
-#[derive(Debug, Clone)]
-
-pub struct ToolTipUpdateEvent {
-    pub item_stack: ItemStack,
-    pub parent_slot_entity: Entity,
-    pub is_recipe: bool,
 }
 #[derive(Debug, Clone)]
 
@@ -295,10 +288,6 @@ pub fn handle_hovering(
         &mut Interactable,
         Option<&InventorySlotState>,
     )>,
-    tooltips: Query<
-        (Entity, &UIElement, &Parent),
-        (Without<InventorySlotState>, Without<PlayerStatsTooltip>),
-    >,
     graphics: Res<Graphics>,
     mut commands: Commands,
     inv: Query<&Inventory>,
@@ -306,6 +295,7 @@ pub fn handle_hovering(
     crafting_option: Option<Res<CraftingContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
@@ -387,9 +377,8 @@ pub fn handle_hovering(
                         .clone()
                         .to_owned(),
                 );
-                for tooltip in tooltips.iter() {
-                    commands.entity(tooltip.0).despawn_recursive();
-                }
+
+                tooltip_teardown_events.send_default();
             }
             if ui == &UIElement::StatsButtonHover {
                 // swap to base img
