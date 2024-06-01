@@ -41,6 +41,8 @@ var<uniform> distortion: f32;
 var<uniform> heightOffset: f32;
 @group(1) @binding(8)
 var<uniform> offset: f32; 
+@group(1) @binding(9)
+var<uniform> opacity: f32; 
 
 
 // @group(1) @binding(1)
@@ -51,9 +53,9 @@ var<uniform> offset: f32;
 // var<uniform> _ShakeWindspeed: f32;
 // @group(1) @binding(4)
 // var<uniform>  _ShakeBending: f32;
-@group(1) @binding(9)
-var _MainTex: texture_2d<f32>; //("Base (RGB) Trans (A)", 2D) = "white" {}
 @group(1) @binding(10)
+var _MainTex: texture_2d<f32>; //("Base (RGB) Trans (A)", 2D) = "white" {}
+@group(1) @binding(11)
 var _MainTexSampler: sampler; //("Base (RGB) Trans (A)", 2D) = "white" {}
 // @group(0) @binding(0)
 // var<uniform> view: View;
@@ -183,5 +185,5 @@ fn fragment(
     #import bevy_sprite::mesh2d_vertex_output
     ) -> @location(0) vec4<f32>{
     let c = textureSample(_MainTex, _MainTexSampler, uv) * vec4<f32>(1.,1.,1.,1.);
-    return c;
+    return vec4<f32>(c.rgb, c.a * opacity);
 }

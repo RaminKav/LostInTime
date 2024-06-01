@@ -126,8 +126,10 @@ pub struct FoliageMaterial {
     heightOffset: f32,
     #[uniform(8)]
     offset: f32,
-    #[texture(9)]
-    #[sampler(10)]
+    #[uniform(9)]
+    pub opacity: f32,
+    #[texture(10)]
+    #[sampler(11)]
     pub source_texture: Option<Handle<Image>>,
 }
 #[derive(Resource)]
@@ -137,7 +139,7 @@ pub struct Graphics {
     pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
     pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
-    pub foliage_material_map: Option<HashMap<Foliage, Handle<FoliageMaterial>>>,
+    pub foliage_material_map: Option<HashMap<Foliage, FoliageMaterial>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub player_spritesheets: Option<Vec<Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
@@ -287,7 +289,7 @@ impl GameAssetsPlugin {
         // load foliage mat
         for f in Foliage::iter() {
             let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
-            let foliage_material = materials.add(FoliageMaterial {
+            let foliage_material = FoliageMaterial {
                 source_texture: Some(handle),
                 speed: 0.5,
                 minStrength: 0.001,
@@ -298,8 +300,9 @@ impl GameAssetsPlugin {
                 distortion: 1.,
                 heightOffset: 0.4,
                 offset: 0.,
+                opacity: 1.,
                 // alpha_mode: AlphaMode::Blend,
-            });
+            };
             foliage_material_map.insert(f, foliage_material);
         }
 

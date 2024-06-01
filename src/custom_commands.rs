@@ -2,7 +2,7 @@ use crate::{
     assets::{SpriteAnchor, SpriteSize},
     attributes::ItemLevel,
     inventory::ItemStack,
-    item::{projectile::ArcProjectileData, EquipmentType, Foliage, FoliageSize, Wall},
+    item::{projectile::ArcProjectileData, EquipmentType, Wall},
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -10,7 +10,7 @@ use crate::{
         WallTextureData,
     },
 };
-use bevy::{prelude::*, sprite::Mesh2dHandle};
+use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
 use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
 use core::fmt::Display;
@@ -194,27 +194,6 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             Transform::from_translation(pos),
         ));
 
-        if let Some(foliage) = proto_param.get_component::<Foliage, _>(obj.clone()) {
-            let foliage_material = &proto_param
-                .graphics
-                .foliage_material_map
-                .as_ref()
-                .unwrap()
-                .get(foliage)
-                .unwrap();
-            let size = proto_param
-                .get_component::<FoliageSize, _>(obj.clone())
-                .unwrap()
-                .0;
-            spawned_entity_commands
-                .insert(Mesh2dHandle::from(proto_param.meshes.add(Mesh::from(
-                    shape::Quad {
-                        size,
-                        ..Default::default()
-                    },
-                ))))
-                .insert((*foliage_material).clone());
-        }
         if let Some(anchor) = proto_param.get_component::<SpriteAnchor, _>(obj.clone()) {
             spawned_entity_commands.insert(TransformBundle::from_transform(
                 Transform::from_translation(pos + anchor.0.extend(0.)),
