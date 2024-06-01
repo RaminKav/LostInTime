@@ -18,7 +18,9 @@ pub fn pointcast_2d<'a>(
             }
         }
 
-        let Some(size) = sprite.custom_size else {continue};
+        let Some(size) = sprite.custom_size else {
+            continue;
+        };
 
         let initial_x = xform.translation().x - (0.5 * size.x);
         let initial_y = xform.translation().y - (0.5 * size.y);
@@ -35,7 +37,7 @@ pub fn pointcast_2d<'a>(
     ret
 }
 
-pub fn get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
+pub fn _get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
     let player_pos = game.player_state.position;
     let chunk_pos =
         world::world_helpers::camera_pos_to_chunk_pos(&Vec2::new(player_pos.x, player_pos.y));

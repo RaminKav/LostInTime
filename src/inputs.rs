@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
-use crate::enemy::spawner::{ChunkSpawners, Spawner};
+use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::MovePlayerEvent;
 use crate::ui::stats_ui::StatsUI;
@@ -15,7 +15,7 @@ use bevy::window::PrimaryWindow;
 use bevy_ecs_tilemap::tiles::TilePos;
 
 use bevy_hanabi::EffectSpawner;
-use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
+use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
 use bevy_rapier2d::prelude::{KinematicCharacterController, PhysicsSet};
 use interpolation::Lerp;
@@ -26,7 +26,7 @@ use rand::Rng;
 use crate::attributes::Speed;
 use crate::combat::{AttackTimer, HitEvent};
 
-use crate::enemy::{Mob, MobLevel};
+use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::item_upgrades::{
@@ -35,7 +35,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, WorldObject};
+use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, InventoryState};

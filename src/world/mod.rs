@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use crate::{item::WorldObject, schematic::SchematicType};
 
 use self::{
-    chunk::{ChunkPlugin, ReflectedPos},
+    chunk::ChunkPlugin,
     dimension::DimensionPlugin,
     dungeon::DungeonPlugin,
     dungeon_generation::{Bias, GridSize, NumSteps},
@@ -32,30 +32,6 @@ pub const CHUNK_SIZE: u32 = 16;
 pub const ISLAND_SIZE: f32 = 64.;
 pub const MAX_VISIBILITY: u32 = (CHUNK_SIZE / 2) * TILE_SIZE.x as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
-
-#[derive(Debug, Component, Resource, Reflect, Default, Clone)]
-#[reflect(Resource)]
-// for dimensions, chunks are child of D, and when swapping,
-// save only obj data, tiles/chunks will regenerate from seed
-// obj data is  saved in cm of dimension
-// when dim is changed, despawn all children, but parent dim
-// will keep its CM data with the obj data inside
-// when we swap back, use the obj data to spawn teh objs back
-// may not need to add obj data as comp to tile??
-pub struct ChunkManager {
-    pub chunks: HashMap<ReflectedPos, Entity>,
-    pub objects: HashMap<IVec2, HashMap<TileMapPosition, WorldObject>>,
-    // turn into comp for each tile
-}
-
-impl ChunkManager {
-    pub fn new() -> Self {
-        Self {
-            chunks: HashMap::new(),
-            objects: HashMap::new(),
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChunkObjectData(pub Vec<(f32, f32, WorldObject)>);

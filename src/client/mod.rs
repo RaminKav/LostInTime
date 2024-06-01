@@ -1,8 +1,6 @@
 use std::{fs::File, io::BufReader};
 
-use bevy::{
-    app::AppExit, ecs::system::SystemState, math::Vec3Swizzles, prelude::*, utils::HashMap,
-};
+use bevy::{math::Vec3Swizzles, prelude::*, utils::HashMap};
 use bevy_ecs_tilemap::{
     prelude::{
         TilemapGridSize, TilemapId, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize,
@@ -29,20 +27,16 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
-    ui::{minimap::Minimap, ChestContainer, FurnaceContainer},
+    ui::{ChestContainer, FurnaceContainer},
     vectorize::vectorize,
     world::{
-        chunk::{
-            Chunk, CreateChunkEvent, DespawnChunkEvent, ReflectedPos, SpawnChunkEvent,
-            TileEntityCollection, TileSpriteData,
-        },
-        dimension::{ActiveDimension, ChunkCache, Dimension, DimensionSpawnEvent, GenerationSeed},
+        chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
+        dimension::{ActiveDimension, Dimension, DimensionSpawnEvent, GenerationSeed},
         dungeon::Dungeon,
         world_helpers::world_pos_to_tile_pos,
-        ChunkManager, TileMapPosition, WallTextureData, WorldGeneration,
+        TileMapPosition, WallTextureData, WorldGeneration,
     },
-    CustomFlush, GameParam, GameState, GameUpscale, MainCamera, RawPosition, TextureCamera,
-    UICamera, YSort,
+    CustomFlush, GameParam, GameState, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -58,7 +52,6 @@ impl Plugin for ClientPlugin {
             .register_saveable::<GenerationSeed>()
             .register_saveable::<Dimension>()
             .register_saveable::<ActiveDimension>()
-            .register_saveable::<ChunkManager>()
             // register tile bundle types
             .register_saveable::<TileSpriteData>()
             .register_saveable::<TilePos>()

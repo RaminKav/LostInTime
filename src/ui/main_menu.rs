@@ -1,10 +1,6 @@
 use std::process::exit;
 
-use bevy::{
-    diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin},
-    prelude::*,
-    render::view::RenderLayers,
-};
+use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
     assets::Graphics, colors::YELLOW_2, player::Player, GameState, GAME_HEIGHT, GAME_WIDTH,

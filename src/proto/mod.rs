@@ -310,7 +310,7 @@ impl ProtoPlugin {
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");
     }
-    fn check_proto_ready(prototypes: Prototypes, mut next_state: ResMut<NextState<GameState>>) {
+    fn check_proto_ready(prototypes: Prototypes) {
         for obj in WorldObject::iter() {
             if obj == WorldObject::None
                 || obj == WorldObject::WaterTile
