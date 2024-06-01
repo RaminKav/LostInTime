@@ -244,8 +244,12 @@ pub fn handle_spawn_inv_player_stats(
     inv: Query<Entity, With<InventoryUI>>,
     stats: Query<Entity, With<StatsUI>>,
     tooltip_manager: Res<TooltipsManager>,
+    old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
 ) {
     if updates.iter().len() > 0 && tooltip_manager.timer.finished() {
+        for t in old_tooltips.iter() {
+            commands.entity(t).despawn_recursive();
+        }
         let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
             (
                 inv.get_single(),

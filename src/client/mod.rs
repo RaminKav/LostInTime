@@ -171,10 +171,15 @@ pub fn save_state(
     dungeon_check: Query<&Dungeon>,
     night_tracker: Res<NightTracker>,
     seed: Res<GenerationSeed>,
+    check_open_chest: Option<Res<ChestContainer>>,
+    check_open_furnace: Option<Res<FurnaceContainer>>,
+    key_input: ResMut<Input<KeyCode>>,
 ) {
     timer.timer.tick(time.delta());
     // only save if the timer is done and we are not in a dungeon
-    if !timer.timer.just_finished() || dungeon_check.get_single().is_ok() {
+    if (!timer.timer.just_finished() || dungeon_check.get_single().is_ok())
+        && !key_input.just_pressed(KeyCode::U)
+    {
         return;
     }
     timer.timer.reset();
@@ -204,9 +209,11 @@ pub fn save_state(
 
     // chain the current chests, and also the ones in registry,
     // since they will be despawned and missed by the query
-    save_data.containers = placed_objs
+    save_data.containers = container_reg
+        .containers
         .iter()
-        .filter_map(|(p, _, c, f)| {
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .chain(placed_objs.iter().filter_map(|(p, _, c, f)| {
             if let Some(chest) = c {
                 return Some((
                     world_pos_to_tile_pos(p.translation().truncate()),
@@ -219,14 +226,32 @@ pub fn save_state(
                 ));
             }
             None
-        })
-        .chain(
-            container_reg
-                .containers
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone())),
-        )
+        }))
         .collect();
+
+    // override with resource if we save while player is interacting with a container
+    if let Some(chest) = check_open_chest {
+        let pos = placed_objs
+            .get(chest.parent)
+            .unwrap()
+            .0
+            .translation()
+            .truncate();
+        save_data
+            .containers
+            .insert(world_pos_to_tile_pos(pos), chest.items.clone());
+    }
+    if let Some(furnace) = check_open_furnace {
+        let pos = placed_objs
+            .get(furnace.parent)
+            .unwrap()
+            .0
+            .translation()
+            .truncate();
+        save_data
+            .containers
+            .insert(world_pos_to_tile_pos(pos), furnace.items.clone());
+    }
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;
@@ -271,7 +296,7 @@ pub fn load_state(
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
                 commands.insert_resource(ContainerRegistry {
-                    containers: data.container_reg,
+                    containers: data.containers,
                 });
                 commands.insert_resource(data.craft_tracker);
 

@@ -548,8 +548,14 @@ Buttons:
 - [x] add sapplings asap
 - [x] make breaking trees, etc give exp (Add component mobs get)
 - [x] stats bug
-- stats page re-render bug (its not getting purged, stats menu)
-- chests generate as non-players so they spawn garbage loot :/
-- lower mob stat/dmg scaling
+- [x] stats page re-render bug (its not getting purged, stats menu)
+- [x] chests generate as non-players so they spawn garbage loot :/
+- [x] lower mob stat/dmg scaling
 - sapplings reset timer when despawned... set up resource to track them, or dont despawn them lol...
 - dungeon exiting is broken i think
+- [x] neg stats showing "+ -"
+- [x] unify stat lines in gear
+- add special inv slots for gear/acc
+- add options menu...
+- hitting trees always gives brown or white particles (different from minimap color...)
+  make sword hitbox slightly bigger/forward?

@@ -318,34 +318,25 @@ pub fn handle_hovering(
 
                 if let Some(_item_e) = state.item {
                     let item = if state.r#type.is_chest() {
-                        chest_option.as_ref().unwrap().items.items[state.slot_index]
-                            .clone()
-                            .unwrap()
-                            .item_stack
+                        chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_furnace() {
-                        furnace_option.as_ref().unwrap().items.items[state.slot_index]
-                            .clone()
-                            .unwrap()
-                            .item_stack
+                        furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
                         if state.r#type.is_crafting() && crafting_option.is_some() {
-                            crafting_option.as_ref().unwrap().items.items[state.slot_index]
-                                .clone()
-                                .unwrap()
-                                .item_stack
+                            crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                         } else {
                             inv.single().get_items_from_slot_type(state.r#type).items
                                 [state.slot_index]
                                 .clone()
-                                .unwrap()
-                                .item_stack
                         }
                     };
-                    tooltip_update_events.send(ToolTipUpdateEvent {
-                        item_stack: item,
-                        parent_slot_entity: e,
-                        is_recipe: state.r#type.is_crafting(),
-                    });
+                    if let Some(item) = item {
+                        tooltip_update_events.send(ToolTipUpdateEvent {
+                            item_stack: item.item_stack,
+                            parent_slot_entity: e,
+                            is_recipe: state.r#type.is_crafting(),
+                        });
+                    }
                 }
             }
             if ui == &UIElement::StatsButton {

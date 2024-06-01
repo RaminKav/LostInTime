@@ -68,51 +68,108 @@ pub struct ItemAttributes {
 impl ItemAttributes {
     pub fn get_tooltips(&self) -> Vec<String> {
         let mut tooltips: Vec<String> = vec![];
+        let is_positive = |val: i32| val > 0;
         if self.health != 0 {
-            tooltips.push(format!("+{} HP", self.health));
+            tooltips.push(format!(
+                "{}{} HP",
+                if is_positive(self.health) { "+" } else { "" },
+                self.health
+            ));
         }
         if self.defence != 0 {
-            tooltips.push(format!("+{} Defence", self.defence));
+            tooltips.push(format!(
+                "{}{} Defence",
+                if is_positive(self.health) { "+" } else { "" },
+                self.defence
+            ));
         }
         if self.attack != 0 {
-            tooltips.push(format!("+{} DMG", self.attack));
+            tooltips.push(format!(
+                "{}{} DMG",
+                if is_positive(self.health) { "+" } else { "" },
+                self.attack
+            ));
         }
         if self.attack_cooldown != 0. {
             tooltips.push(format!("{:.2} Hits/s", 1. / self.attack_cooldown));
         }
         if self.crit_chance != 0 {
-            tooltips.push(format!("+{}% Crit", self.crit_chance));
+            tooltips.push(format!(
+                "{}{}% Crit",
+                if is_positive(self.health) { "+" } else { "" },
+                self.crit_chance
+            ));
         }
         if self.crit_damage != 0 {
-            tooltips.push(format!("+{}% Crit DMG", self.crit_damage));
+            tooltips.push(format!(
+                "{}{}% Crit DMG",
+                if is_positive(self.health) { "+" } else { "" },
+                self.crit_damage
+            ));
         }
         if self.bonus_damage != 0 {
-            tooltips.push(format!("+{} DMG", self.bonus_damage));
+            tooltips.push(format!(
+                "{}{} DMG",
+                if is_positive(self.health) { "+" } else { "" },
+                self.bonus_damage
+            ));
         }
         if self.health_regen != 0 {
-            tooltips.push(format!("+{} HP Regen", self.health_regen));
+            tooltips.push(format!(
+                "{}{} HP Regen",
+                if is_positive(self.health) { "+" } else { "" },
+                self.health_regen
+            ));
         }
         if self.healing != 0 {
-            tooltips.push(format!("+{}% Healing", self.healing));
+            tooltips.push(format!(
+                "{}{}% Healing",
+                if is_positive(self.health) { "+" } else { "" },
+                self.healing
+            ));
         }
         if self.thorns != 0 {
-            tooltips.push(format!("+{}% Thorns", self.thorns));
+            tooltips.push(format!(
+                "{}{}% Thorns",
+                if is_positive(self.health) { "+" } else { "" },
+                self.thorns
+            ));
         }
         if self.dodge != 0 {
-            tooltips.push(format!("+{}% Dodge", self.dodge));
+            tooltips.push(format!(
+                "{}{}% Dodge",
+                if is_positive(self.health) { "+" } else { "" },
+                self.dodge
+            ));
         }
         if self.speed != 0 {
-            tooltips.push(format!("+{}% Speed", self.speed));
+            tooltips.push(format!(
+                "{}{}% Speed",
+                if is_positive(self.health) { "+" } else { "" },
+                self.speed
+            ));
         }
         if self.lifesteal != 0 {
-            tooltips.push(format!("+{} Lifesteal", self.lifesteal));
+            tooltips.push(format!(
+                "{}{} Lifesteal",
+                if is_positive(self.health) { "+" } else { "" },
+                self.lifesteal
+            ));
         }
 
         if self.xp_rate != 0 {
-            tooltips.push(format!("+{}% XP", self.xp_rate));
+            tooltips.push(format!(
+                "{}{}% XP",
+                if is_positive(self.health) { "+" } else { "" },
+                self.xp_rate
+            ));
         }
         if self.loot_rate != 0 {
-            tooltips.push(format!("+{}% Loot", self.loot_rate));
+            tooltips.push(format!(
+                "{}{}% Loot",
+                if is_positive(self.health) { "+" } else { "" },
+                self.loot_rate
+            ));
         }
 
         tooltips
@@ -366,10 +423,10 @@ impl ItemRarity {
     fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
         let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
         match self {
-            ItemRarity::Common => (0 + acc_offset)..=(2 + acc_offset),
-            ItemRarity::Uncommon => (1 + acc_offset)..=(3 + acc_offset),
-            ItemRarity::Rare => (2 + acc_offset)..=(4 + acc_offset),
-            ItemRarity::Legendary => (3 + acc_offset)..=(5 + acc_offset),
+            ItemRarity::Common => (0 + acc_offset)..=(1 + acc_offset),
+            ItemRarity::Uncommon => (1 + acc_offset)..=(2 + acc_offset),
+            ItemRarity::Rare => (2 + acc_offset)..=(3 + acc_offset),
+            ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
         }
     }
 
