@@ -12,7 +12,7 @@
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/stingfly/stingfly_down.png", size: (x: 38., y: 38.), cols: 10, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.08),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,10,7], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (32),
+    "survival_rogue_like::attributes::MaxHealth": (20),
     "survival_rogue_like::attributes::Attack": (9),
     "survival_rogue_like::player::levels::ExperienceReward": (40),
     "survival_rogue_like::item::loot_table::LootTable": (
