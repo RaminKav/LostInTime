@@ -118,6 +118,7 @@ impl ItemActions {
                         obj: *obj,
                         pos,
                         placed_by_player: true,
+                        override_existing_obj: false,
                     });
                 }
                 ItemAction::Eat(delta) => {

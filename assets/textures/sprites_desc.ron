@@ -580,6 +580,21 @@
             size: (16., 16.),
             anchor: None,
         ),
+        RedSapplingBlock: WorldObjectData(
+            texture_pos: (15., 1.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GreenSapplingBlock: WorldObjectData(
+            texture_pos: (14., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        YellowSapplingBlock: WorldObjectData(
+            texture_pos: (15., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(
@@ -624,6 +639,18 @@
         ),
         Claw: SpriteData(
             texture_pos: (4., 7.),
+            size: (16., 16.),
+        ),
+        RedSapplingBlock: SpriteData(
+            texture_pos: (1., 15.),
+            size: (16., 16.),
+        ),
+        GreenSapplingBlock: SpriteData(
+            texture_pos: (0., 14.),
+            size: (16., 16.),
+        ),
+        YellowSapplingBlock: SpriteData(
+            texture_pos: (0., 15.),
             size: (16., 16.),
         ),
     }

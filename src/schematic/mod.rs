@@ -250,6 +250,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                         obj: *obj,
                         pos,
                         placed_by_player: false,
+                        override_existing_obj: false,
                     });
                 } else {
                     println!("did not spawn, Invalid tile type for object: {:?}", obj);

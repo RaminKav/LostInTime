@@ -17,6 +17,7 @@ use container::ContainerRegistry;
 use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
+use sappling::SapplingPlugin;
 
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
@@ -54,6 +55,7 @@ mod item;
 mod night;
 mod player;
 mod proto;
+mod sappling;
 mod schematic;
 mod ui;
 mod world;
@@ -142,6 +144,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
+        .add_plugin(SapplingPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)

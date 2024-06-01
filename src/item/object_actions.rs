@@ -79,6 +79,7 @@ impl ObjectAction {
                     obj: *new_obj,
                     pos,
                     placed_by_player: true,
+                    override_existing_obj: false,
                 });
             }
             ObjectAction::Crafting(crafting_type) => {

@@ -209,6 +209,7 @@ pub fn add_dungeon_chests(
             obj: WorldObject::Chest,
             pos: tile_pos_to_world_pos(*pos, false),
             placed_by_player: false,
+            override_existing_obj: false,
         });
     }
 }
@@ -260,6 +261,7 @@ pub fn add_dungeon_exit_block(
             obj: WorldObject::DungeonExit,
             pos: tile_pos_to_world_pos(*pos, false),
             placed_by_player: false,
+            override_existing_obj: false,
         });
     }
 }

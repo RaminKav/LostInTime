@@ -10,6 +10,7 @@ use crate::combat::{handle_hits, ObjBreakEvent};
 use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
+use crate::player::levels::{ExperienceReward, PlayerLevel};
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 
@@ -326,6 +327,20 @@ pub enum WorldObject {
     MagicTusk,
     Bed,
     BedBlock,
+
+    // Sapplings
+    RedSapplingBlock,
+    YellowSapplingBlock,
+    GreenSapplingBlock,
+    RedSapplingStage1,
+    RedSapplingStage2,
+    RedSapplingStage3,
+    YellowSapplingStage1,
+    YellowSapplingStage2,
+    YellowSapplingStage3,
+    GreenSapplingStage1,
+    GreenSapplingStage2,
+    GreenSapplingStage3,
 }
 
 #[derive(
@@ -352,6 +367,17 @@ pub enum Foliage {
     MediumGreenTree,
     MediumYellowTree,
     RedTree,
+
+    // Sapplings
+    RedSapplingStage1,
+    RedSapplingStage2,
+    RedSapplingStage3,
+    YellowSapplingStage1,
+    YellowSapplingStage2,
+    YellowSapplingStage3,
+    GreenSapplingStage1,
+    GreenSapplingStage2,
+    GreenSapplingStage3,
 }
 impl Default for Foliage {
     fn default() -> Self {
@@ -582,6 +608,12 @@ pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
     pub placed_by_player: bool,
+    pub override_existing_obj: bool,
+}
+pub struct UpdateObjectEvent {
+    pub obj: WorldObject,
+    pub pos: Vec2,
+    pub placed_by_player: bool,
 }
 
 pub struct ItemsPlugin;
@@ -590,6 +622,7 @@ impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
             .add_event::<PlaceItemEvent>()
+            .add_event::<UpdateObjectEvent>()
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
@@ -631,9 +664,20 @@ pub fn handle_placing_world_object(
         let pos = place_event.pos;
 
         let tile_pos = world_pos_to_tile_pos(pos);
-        if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param) {
+        if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param)
+            && !place_event.override_existing_obj
+        {
             continue;
         }
+
+        // Delete old object
+        if place_event.override_existing_obj {
+            if let Some(old_obj) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+                commands.entity(old_obj).despawn_recursive();
+            }
+        }
+
+        // Place New Object
         if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
             let item = proto_commands.spawn_object_from_proto(
                 place_event.obj,
@@ -686,9 +730,13 @@ pub fn handle_break_object(
     mut wall_break_event: EventWriter<WallBreakEvent>,
     loot_tables: Query<&LootTable>,
     chest_containers: Query<&ChestContainer>,
+    xp: Query<&ExperienceReward>,
+    mut player_xp: Query<&mut PlayerLevel>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
+
+        // Chest
         if broken.obj == WorldObject::Chest {
             if let Ok(chest) = chest_containers.get(broken.entity) {
                 for item_option in chest.items.items.iter() {
@@ -700,8 +748,23 @@ pub fn handle_break_object(
                 }
             }
         }
+
         commands.entity(broken.entity).despawn_recursive();
         game_param.remove_object_from_chunk_cache(broken.pos);
+
+        if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
+            wall_break_event.send(WallBreakEvent { pos: broken.pos })
+        }
+
+        minimap_event.send(UpdateMiniMapEvent {
+            pos: Some(broken.pos),
+            new_tile: None,
+        });
+
+        if !broken.give_drops_and_xp {
+            continue;
+        }
+        // Item Drops
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
             for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
@@ -729,13 +792,10 @@ pub fn handle_break_object(
             }
         }
 
-        if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
-            wall_break_event.send(WallBreakEvent { pos: broken.pos })
+        // EXP Reward
+        if let Some(exp) = xp.get(broken.entity).ok() {
+            let mut player = player_xp.single_mut();
+            player.add_xp(exp.0);
         }
-
-        minimap_event.send(UpdateMiniMapEvent {
-            pos: Some(broken.pos),
-            new_tile: None,
-        });
     }
 }

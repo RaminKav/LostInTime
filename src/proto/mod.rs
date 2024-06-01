@@ -46,6 +46,7 @@ use crate::{
         PlacesInto, RequiredEquipmentType, Wall, WorldObject,
     },
     player::levels::ExperienceReward,
+    sappling::{GrowsInto, Sappling},
     schematic::{loot_chests::LootChestType, SchematicType},
     ui::crafting_ui::CraftingContainerType,
     world::WallTextureData,
@@ -82,6 +83,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<RawItemBaseAttributes>()
             .register_type::<RawItemBonusAttributes>()
             .register_type::<ExperienceReward>()
+            .register_type::<GrowsInto>()
+            .register_type::<SapplingProto>()
             .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
@@ -289,6 +292,20 @@ impl ProtoPlugin {
         prototypes.load("proto/wooddoor.prototype.ron");
         prototypes.load("proto/wooddooropen.prototype.ron");
         prototypes.load("proto/wooddoorblock.prototype.ron");
+
+        // Sapplings
+        prototypes.load("proto/redsapplingblock.prototype.ron");
+        prototypes.load("proto/yellowsapplingblock.prototype.ron");
+        prototypes.load("proto/greensapplingblock.prototype.ron");
+        prototypes.load("proto/redsapplingstage1.prototype.ron");
+        prototypes.load("proto/greensapplingstage1.prototype.ron");
+        prototypes.load("proto/yellowsapplingstage1.prototype.ron");
+        prototypes.load("proto/redsapplingstage2.prototype.ron");
+        prototypes.load("proto/greensapplingstage2.prototype.ron");
+        prototypes.load("proto/yellowsapplingstage2.prototype.ron");
+        prototypes.load("proto/redsapplingstage3.prototype.ron");
+        prototypes.load("proto/greensapplingstage3.prototype.ron");
+        prototypes.load("proto/yellowsapplingstage3.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");
@@ -407,6 +424,17 @@ pub struct ColliderCapsulProto {
 impl From<ColliderCapsulProto> for Collider {
     fn from(c: ColliderCapsulProto) -> Collider {
         Collider::capsule(Vec2::new(c.x1, c.y1), Vec2::new(c.x2, c.y2), c.r)
+    }
+}
+
+#[derive(Schematic, Reflect, FromReflect)]
+#[reflect(Schematic)]
+#[schematic(into = Sappling)]
+pub struct SapplingProto(f32);
+
+impl From<SapplingProto> for Sappling {
+    fn from(c: SapplingProto) -> Sappling {
+        Sappling(Timer::from_seconds(c.0, TimerMode::Once))
     }
 }
 

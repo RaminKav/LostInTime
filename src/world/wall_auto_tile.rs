@@ -205,6 +205,7 @@ pub fn handle_wall_placed(
         obj,
         pos,
         placed_by_player: _,
+        override_existing_obj: _,
     } in events.iter()
     {
         if proto_param.get_component::<Wall, _>(*obj).is_none() {

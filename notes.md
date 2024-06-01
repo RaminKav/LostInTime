@@ -543,3 +543,13 @@ Buttons:
   - music volume: [-] [+]
   - save frequency: [15s] [2]
 - Quit.
+
+- [x] shrink hit box on mobs
+- [x] add sapplings asap
+- [x] make breaking trees, etc give exp (Add component mobs get)
+- [x] stats bug
+- stats page re-render bug (its not getting purged, stats menu)
+- chests generate as non-players so they spawn garbage loot :/
+- lower mob stat/dmg scaling
+- sapplings reset timer when despawned... set up resource to track them, or dont despawn them lol...
+- dungeon exiting is broken i think
