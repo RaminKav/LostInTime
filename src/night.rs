@@ -61,7 +61,7 @@ pub fn spawn_night(mut commands: Commands, night_tracker: Res<NightTracker>) {
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(30., TimerMode::Repeating)))
+        .insert(Night(Timer::from_seconds(20., TimerMode::Repeating)))
         .insert(Name::new("night"));
 }
 

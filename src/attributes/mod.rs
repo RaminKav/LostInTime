@@ -79,14 +79,14 @@ impl ItemAttributes {
         if self.defence != 0 {
             tooltips.push(format!(
                 "{}{} Defence",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.defence) { "+" } else { "" },
                 self.defence
             ));
         }
         if self.attack != 0 {
             tooltips.push(format!(
                 "{}{} DMG",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.attack) { "+" } else { "" },
                 self.attack
             ));
         }
@@ -96,63 +96,79 @@ impl ItemAttributes {
         if self.crit_chance != 0 {
             tooltips.push(format!(
                 "{}{}% Crit",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.crit_chance) {
+                    "+"
+                } else {
+                    ""
+                },
                 self.crit_chance
             ));
         }
         if self.crit_damage != 0 {
             tooltips.push(format!(
                 "{}{}% Crit DMG",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.crit_damage) {
+                    "+"
+                } else {
+                    ""
+                },
                 self.crit_damage
             ));
         }
         if self.bonus_damage != 0 {
             tooltips.push(format!(
                 "{}{} DMG",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.bonus_damage) {
+                    "+"
+                } else {
+                    ""
+                },
                 self.bonus_damage
             ));
         }
         if self.health_regen != 0 {
             tooltips.push(format!(
                 "{}{} HP Regen",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.health_regen) {
+                    "+"
+                } else {
+                    ""
+                },
                 self.health_regen
             ));
         }
         if self.healing != 0 {
             tooltips.push(format!(
                 "{}{}% Healing",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.healing) { "+" } else { "" },
                 self.healing
             ));
         }
         if self.thorns != 0 {
             tooltips.push(format!(
                 "{}{}% Thorns",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.thorns) { "+" } else { "" },
                 self.thorns
             ));
         }
         if self.dodge != 0 {
             tooltips.push(format!(
                 "{}{}% Dodge",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.dodge) { "+" } else { "" },
                 self.dodge
             ));
         }
         if self.speed != 0 {
             tooltips.push(format!(
                 "{}{}% Speed",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.speed) { "+" } else { "" },
                 self.speed
             ));
         }
         if self.lifesteal != 0 {
             tooltips.push(format!(
                 "{}{} Lifesteal",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.lifesteal) { "+" } else { "" },
                 self.lifesteal
             ));
         }
@@ -160,14 +176,14 @@ impl ItemAttributes {
         if self.xp_rate != 0 {
             tooltips.push(format!(
                 "{}{}% XP",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.xp_rate) { "+" } else { "" },
                 self.xp_rate
             ));
         }
         if self.loot_rate != 0 {
             tooltips.push(format!(
                 "{}{}% Loot",
-                if is_positive(self.health) { "+" } else { "" },
+                if is_positive(self.loot_rate) { "+" } else { "" },
                 self.loot_rate
             ));
         }
