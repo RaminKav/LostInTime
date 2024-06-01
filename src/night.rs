@@ -3,6 +3,7 @@ use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    audio::{BGMPicker, UpdateBGMTrackEvent},
     colors::{overwrite_alpha, NIGHT},
     world::dimension::dim_spawned,
     GameState, GAME_HEIGHT, GAME_WIDTH,
@@ -26,6 +27,9 @@ impl NightTracker {
         } else {
             return 0.7 - (self.time - 18.) * 0.11666666;
         }
+    }
+    pub fn is_night(&self) -> bool {
+        self.time - 12. >= 0.
     }
 }
 
@@ -65,6 +69,8 @@ pub fn tick_night_color(
     time: Res<Time>,
     mut query: Query<(&mut Night, &mut Sprite)>,
     mut night_tracker: ResMut<NightTracker>,
+    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    bgm_tracker: Res<BGMPicker>,
 ) {
     for (mut night_state, mut sprite) in query.iter_mut() {
         night_state.0.tick(time.delta());
@@ -75,6 +81,20 @@ pub fn tick_night_color(
                 night_tracker.days += 1;
                 night_tracker.time = 0.;
             }
+        }
+        // change music
+        if night_tracker.is_night()
+            && bgm_tracker.current_track != "sounds/bgm_night.ogg".to_owned()
+        {
+            bgm_track_event.send(UpdateBGMTrackEvent {
+                asset_path: "sounds/bgm_night.ogg".to_owned(),
+            });
+        } else if !night_tracker.is_night()
+            && bgm_tracker.current_track != "sounds/bgm_day.ogg".to_owned()
+        {
+            bgm_track_event.send(UpdateBGMTrackEvent {
+                asset_path: "sounds/bgm_day.ogg".to_owned(),
+            });
         }
     }
 }

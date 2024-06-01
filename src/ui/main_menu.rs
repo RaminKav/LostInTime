@@ -3,7 +3,8 @@ use std::process::exit;
 use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    assets::Graphics, colors::YELLOW_2, player::Player, GameState, GAME_HEIGHT, GAME_WIDTH,
+    assets::Graphics, audio::UpdateBGMTrackEvent, colors::YELLOW_2, player::Player, GameState,
+    GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{Interactable, UIElement};
@@ -22,7 +23,11 @@ pub struct MenuButtonClickEvent {
 #[derive(Component)]
 pub struct MainMenu;
 
-pub fn display_main_menu(mut commands: Commands, graphics: Res<Graphics>) {
+pub fn display_main_menu(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+) {
     let mut menu = commands.spawn(SpriteBundle {
         texture: graphics
             .ui_image_handles
@@ -47,6 +52,11 @@ pub fn display_main_menu(mut commands: Commands, graphics: Res<Graphics>) {
         .insert(UIElement::MainMenu)
         .insert(MainMenu)
         .insert(Name::new("Main Menu"));
+
+    //start music
+    bgm_track_event.send(UpdateBGMTrackEvent {
+        asset_path: "sounds/bgm_day.ogg".to_owned(),
+    });
 }
 
 pub fn remove_main_menu(

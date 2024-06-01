@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{animations::AnimationTimer, ui::InventoryState, world::y_sort::YSort};
+use crate::{animations::AnimationTimer, ui::InventoryState, world::y_sort::YSort, DEBUG_MODE};
 
 use super::stats::SkillPoints;
 
@@ -42,7 +42,9 @@ impl PlayerLevel {
             self.xp = self.xp - self.next_level_xp;
             self.next_level_xp = LEVEL_REQ_XP[self.level as usize];
         }
-        println!("EXP: {:?} LEVEL: {:?}", self.xp, self.level);
+        if *DEBUG_MODE {
+            println!("EXP: {:?} LEVEL: {:?}", self.xp, self.level);
+        }
     }
 }
 

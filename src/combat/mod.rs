@@ -19,7 +19,7 @@ use crate::{
     player::levels::{ExperienceReward, PlayerLevel},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
-    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort,
+    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort, DEBUG_MODE,
 };
 
 use self::collisions::CollisionPlugion;
@@ -275,8 +275,9 @@ pub fn handle_hits(
                     }
                 }
                 hit_health.0 -= dmg;
-
-                println!("HP {:?} {:?}", e, hit_health.0);
+                if *DEBUG_MODE {
+                    println!("HP {:?} {:?}", e, hit_health.0);
+                }
                 if hit_health.0 <= 0 {
                     obj_death_events.send(ObjBreakEvent {
                         entity: e,
@@ -288,7 +289,9 @@ pub fn handle_hits(
             } else {
                 let is_player = game.game.player == e;
                 hit_health.0 -= dmg;
-                println!("HP {:?}", hit_health.0);
+                if *DEBUG_MODE {
+                    println!("HP {:?}", hit_health.0);
+                }
 
                 // let has_i_frames = has_i_frames.get(hit.hit_entity);
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {

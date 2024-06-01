@@ -40,7 +40,7 @@ impl Trigger for LineOfSight {
         entity: Entity,
         (transforms, _time, night_tracker): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        if (night_tracker.time - 12.) >= 0. {
+        if night_tracker.is_night() {
             return Ok(0.);
         }
         if let Ok(tfxm) = transforms.get(entity) {

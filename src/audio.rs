@@ -15,9 +15,25 @@ use crate::{
 pub struct HitSound;
 pub struct AudioPlugin;
 
+#[derive(Resource, Debug)]
+pub struct BGMPicker {
+    pub current_track: String,
+    pub current_handle: Option<Handle<AudioSink>>,
+}
+
+pub struct UpdateBGMTrackEvent {
+    pub asset_path: String,
+}
+
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(bgm_audio).add_systems(
+        app.insert_resource(BGMPicker {
+            current_track: "sounds/bgm_day.ogg".to_owned(),
+            current_handle: None,
+        })
+        .add_event::<UpdateBGMTrackEvent>()
+        .add_system(bgm_audio)
+        .add_systems(
             (
                 sword_swing_sound,
                 use_item_audio,
@@ -51,10 +67,29 @@ pub fn sword_swing_sound(
         });
     }
 }
-pub fn bgm_audio(asset_server: Res<AssetServer>, audio: Res<Audio>) {
-    let bgm1 = asset_server.load("sounds/bgm_1.ogg");
+pub fn bgm_audio(
+    asset_server: Res<AssetServer>,
+    audio: Res<Audio>,
+    mut bgm_tracker: ResMut<BGMPicker>,
+    audio_handles: Res<Assets<AudioSink>>,
+    mut bgm_update_events: EventReader<UpdateBGMTrackEvent>,
+) {
+    for event in bgm_update_events.iter() {
+        //TODO: Fade out music rather than just stopping it
+        if let Some(prev_handle) = bgm_tracker.current_handle.as_ref() {
+            if let Some(prev_audio) = audio_handles.get(prev_handle) {
+                prev_audio.stop();
+            }
+        }
+        let path = event.asset_path.clone();
+        bgm_tracker.current_track = path.clone();
+        let bgm1 = asset_server.load(path);
 
-    audio.play_with_settings(bgm1.clone(), PlaybackSettings::LOOP.with_volume(1.0));
+        let new_handle = audio_handles.get_handle(
+            audio.play_with_settings(bgm1.clone(), PlaybackSettings::LOOP.with_volume(1.0)),
+        );
+        bgm_tracker.current_handle = Some(new_handle);
+    }
 }
 
 pub fn use_item_audio(
