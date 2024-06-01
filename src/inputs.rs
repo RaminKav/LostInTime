@@ -47,7 +47,7 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
 };
-use crate::{Game, GameUpscale, Player, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, GameUpscale, Player, DEBUG_MODE, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -557,7 +557,9 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        // println!("C: {cursor_tile_pos:?}",);
+        if *DEBUG_MODE {
+            println!("C: {cursor_tile_pos:?}",);
+        }
         if attack_timer_option.is_some() {
             return;
         }
@@ -592,6 +594,9 @@ pub fn mouse_click_system(
             return;
         }
         if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+            if *DEBUG_MODE {
+                println!("OBJ: {hit_obj:?}");
+            }
             hit_event.send(HitEvent {
                 hit_entity: hit_obj,
                 damage: game.calculate_player_damage().0 as i32,

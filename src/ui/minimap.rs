@@ -1,11 +1,12 @@
 use crate::assets::Graphics;
 
+use crate::colors::LIGHT_RED;
 use crate::enemy::Mob;
 use crate::item::WorldObject;
 use crate::world::dimension::SpawnDimension;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE};
-use crate::{GameParam, Player, GAME_HEIGHT, GAME_WIDTH};
+use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH, MINIMAP};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -20,16 +21,15 @@ impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MinimapTileCache::default())
             .add_event::<UpdateMiniMapEvent>()
-            // .add_systems(
-            //     (update_minimap_cache, clear_cache_for_new_dimensions)
-            //         .in_set(OnUpdate(GameState::Main)),
-            // )
-            // .add_system(
-            //     setup_mini_map
-            //         .after(CustomFlush)
-            //         .in_set(OnUpdate(GameState::Main)),
-            // )
-            ;
+            .add_systems(
+                (update_minimap_cache, clear_cache_for_new_dimensions)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                setup_mini_map
+                    .after(CustomFlush)
+                    .in_set(OnUpdate(GameState::Main)),
+            );
     }
 }
 
@@ -47,10 +47,14 @@ pub struct MinimapTileCache {
 }
 
 //TODO: Optimize this to not run if player does not move over a tile, maybe w resource to track
+//TODO: Fix Caching mob positions, they dont show when behind a tile
 fn update_minimap_cache(
     mut minimap_update: EventReader<UpdateMiniMapEvent>,
     mut cache: ResMut<MinimapTileCache>,
 ) {
+    if !*MINIMAP {
+        return;
+    }
     for event in minimap_update.iter() {
         let Some(pos) = event.pos else {
             //TODO: find another way to trigger change detection
@@ -72,6 +76,9 @@ fn clear_cache_for_new_dimensions(
     new_dim: Query<Entity, Added<SpawnDimension>>,
     mut cache: ResMut<MinimapTileCache>,
 ) {
+    if !*MINIMAP {
+        return;
+    }
     for _ in new_dim.iter() {
         cache.cache = HashMap::new();
     }
@@ -85,7 +92,7 @@ fn setup_mini_map(
     minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<Minimap>>,
     p_t: Query<&Transform, With<Player>>,
-    _mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
+    mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     // mut cache: ResMut<MinimapTileCache>,
 ) {
@@ -102,6 +109,10 @@ fn setup_mini_map(
     //           need a helper fn to convert the tile pos to data vec index
     // option 2: keep track of every tile color in a vector and update the map every frame with it
     //           events would mutate this vector
+
+    if !*MINIMAP {
+        return;
+    }
     if minimap_cache.is_changed() {
         for old_map in old_map.iter() {
             commands.entity(old_map).despawn_recursive();
@@ -115,16 +126,16 @@ fn setup_mini_map(
         };
         let pt = p_t.single();
         let p_cp = camera_pos_to_chunk_pos(&pt.translation.truncate());
-        let p_tp = camera_pos_to_tile_pos(&pt.translation.truncate());
-        // let mobs: Vec<_> = mob_t
-        //     .iter()
-        //     .map(|t| {
-        //         (
-        //             camera_pos_to_chunk_pos(&t.translation().truncate()),
-        //             camera_pos_to_tile_pos(&t.translation().truncate()),
-        //         )
-        //     })
-        //     .collect();
+        let p_tp: TilePos = camera_pos_to_tile_pos(&pt.translation.truncate());
+        let mobs: Vec<_> = mob_t
+            .iter()
+            .map(|t| {
+                (
+                    camera_pos_to_chunk_pos(&t.translation().truncate()),
+                    camera_pos_to_tile_pos(&t.translation().truncate()),
+                )
+            })
+            .collect();
 
         //Every pixel is 4 entries in image.data
         let mut data = Vec::with_capacity(16384);
@@ -181,14 +192,14 @@ fn setup_mini_map(
                             game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos))
                         {
                             let tile = tile_data.block_type;
-                            // if mobs.contains(&(chunk_pos, tile_pos)) {
-                            //     let c = LIGHT_RED;
-                            //     data.push((c.r() * 255.) as u8);
-                            //     data.push((c.g() * 255.) as u8);
-                            //     data.push((c.b() * 255.) as u8);
-                            //     data.push(255);
-                            //     continue;
-                            // }
+                            if mobs.contains(&(chunk_pos, tile_pos)) {
+                                let c = LIGHT_RED;
+                                data.push((c.r() * 255.) as u8);
+                                data.push((c.g() * 255.) as u8);
+                                data.push((c.b() * 255.) as u8);
+                                data.push(255);
+                                continue;
+                            }
                             //Copy 1 pixel at index 0,1 2,3
                             let c = tile[(q + offset) as usize].get_obj_color();
 

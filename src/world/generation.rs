@@ -14,6 +14,7 @@ use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
+use crate::NO_GEN;
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
 
 use bevy::prelude::*;
@@ -181,6 +182,9 @@ impl GenerationPlugin {
             (Without<WorldObject>, Without<Mob>, Without<Player>),
         >,
     ) {
+        if *NO_GEN {
+            return;
+        }
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
             let chunk_e = game.get_chunk_entity(chunk_pos).unwrap().clone();
@@ -459,6 +463,11 @@ impl GenerationPlugin {
                                 }
                             }
                         }
+                        minimap_update.send(UpdateMiniMapEvent {
+                            pos: Some(pos),
+                            new_tile: Some(obj),
+                        });
+
                         commands
                             .entity(spawned_obj)
                             .set_parent(game.get_chunk_entity(chunk_pos).unwrap());

@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 use std::{
+    env,
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
@@ -89,6 +90,8 @@ use world::{
 };
 
 use crate::assets::SpriteAnchor;
+use lazy_static::lazy_static;
+
 const ZOOM_SCALE: f32 = 1.;
 const PLAYER_MOVE_SPEED: f32 = 90. * ZOOM_SCALE;
 const PLAYER_DASH_SPEED: f32 = 250. * ZOOM_SCALE;
@@ -98,7 +101,15 @@ pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 180. * ZOOM_SCALE;
 pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
-pub const DEBUG_MODE: bool = false;
+lazy_static! {
+    pub static ref DEBUG_MODE: bool = env::var("DEBUG_MODE").is_ok();
+}
+lazy_static! {
+    pub static ref NO_GEN: bool = env::var("NO_GEN").is_ok();
+}
+lazy_static! {
+    pub static ref MINIMAP: bool = env::var("MINIMAP").is_ok();
+}
 
 fn main() {
     App::new()
@@ -656,5 +667,5 @@ impl AppExt for App {
 }
 
 pub fn should_show_inspector(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
-    dim_spawn.iter().count() > 0 && DEBUG_MODE
+    dim_spawn.iter().count() > 0 && *DEBUG_MODE
 }
