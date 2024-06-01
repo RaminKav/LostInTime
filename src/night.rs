@@ -9,7 +9,7 @@ use crate::{
 };
 
 #[derive(Component)]
-pub struct Night(Timer, f32);
+pub struct Night(Timer);
 
 #[derive(Default, Reflect, Resource, Clone, Debug, Serialize, Deserialize)]
 #[reflect(Resource)]
@@ -57,7 +57,7 @@ pub fn spawn_night(mut commands: Commands, night_tracker: Res<NightTracker>) {
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(15., TimerMode::Repeating), 1.))
+        .insert(Night(Timer::from_seconds(30., TimerMode::Repeating)))
         .insert(Name::new("night"));
 }
 

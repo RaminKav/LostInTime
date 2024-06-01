@@ -208,6 +208,9 @@ pub fn save_state(
         })
         .map_into()
         .collect();
+
+    // chain the current chests, and also the ones in registry,
+    // since they will be despawned and missed by the query
     save_data.containers = placed_objs
         .iter()
         .filter_map(|(p, _, c, f)| {
@@ -224,6 +227,12 @@ pub fn save_state(
             }
             None
         })
+        .chain(
+            container_reg
+                .containers
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone())),
+        )
         .collect();
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();

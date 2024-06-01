@@ -47,6 +47,7 @@ pub struct ObjBreakEvent {
     pub entity: Entity,
     pub obj: WorldObject,
     pub pos: TileMapPosition,
+    pub give_drops_and_xp: bool,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -281,6 +282,7 @@ pub fn handle_hits(
                         entity: e,
                         obj: *obj,
                         pos,
+                        give_drops_and_xp: true,
                     });
                 }
             } else {

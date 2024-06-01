@@ -85,35 +85,35 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::SpikeSlime,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(80., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(80., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Hog,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(80., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::StingFly,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(80., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 2,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(80., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 1,
             });
         } else {
@@ -121,21 +121,21 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::SpikeSlime,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
             });
         }

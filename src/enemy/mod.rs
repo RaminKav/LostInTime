@@ -347,8 +347,8 @@ fn juice_up_spawned_mobs_per_day(
     mut commands: Commands,
 ) {
     for (e, mut hp, mut att, mut exp) in elites.iter_mut() {
-        hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
-        att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
+        hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.06)) as i32;
+        att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.06)) as i32;
         exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }

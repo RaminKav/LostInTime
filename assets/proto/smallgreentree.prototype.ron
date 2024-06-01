@@ -11,6 +11,7 @@
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -30., x2: 0., y2: -22., r: 2.5),
   "survival_rogue_like::attributes::MaxHealth": (35),
   "survival_rogue_like::world::y_sort::YSort": (0.),
+  "survival_rogue_like::player::levels::ExperienceReward": (15),
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
@@ -23,13 +24,19 @@
                 item: Log,
                 min: 1,
                 max: 1,
-                rate: 0.15
+                rate: 0.35
             ),
             (
                 item: Stick,
                 min: 1,
                 max: 3,
                 rate: 0.3
+            ),
+            (
+                item: GreenSapplingBlock,
+                min: 1,
+                max: 1,
+                rate: 1.
             ),
             (
                 item: Apple,

@@ -7,6 +7,7 @@
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
   "survival_rogue_like::attributes::MaxHealth": (30),
+  "survival_rogue_like::player::levels::ExperienceReward": (10),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
             item: Stick,

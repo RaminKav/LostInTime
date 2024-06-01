@@ -9,6 +9,7 @@ use super::stats::SkillPoints;
 #[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerLevel {
     pub level: u8,
+    pub next_level: u8,
     pub xp: u32,
     pub next_level_xp: u32,
 }
@@ -24,6 +25,7 @@ impl PlayerLevel {
     pub fn new(level: u8) -> Self {
         PlayerLevel {
             level,
+            next_level: level + 1,
             xp: 0,
             next_level_xp: LEVEL_REQ_XP[if level >= LEVEL_REQ_XP.len() as u8 {
                 LEVEL_REQ_XP.len() - 1
@@ -58,17 +60,13 @@ impl PlayerLevel {
 //     }
 // }
 pub fn handle_level_up(
-    mut player: Query<(&PlayerLevel, &mut SkillPoints), Changed<PlayerLevel>>,
-    mut next_level: Local<u8>,
+    mut player: Query<(&mut PlayerLevel, &mut SkillPoints), Changed<PlayerLevel>>,
 ) {
-    for (player_level, mut sp) in player.iter_mut() {
-        if player_level.level == 1 {
-            *next_level = 2;
-            return;
-        }
-        if player_level.level == *next_level {
+    for (mut player_level, mut sp) in player.iter_mut() {
+        if player_level.level == player_level.next_level {
+            player_level.next_level += 1;
+
             sp.count += 1;
-            *next_level += 1;
         }
     }
 }

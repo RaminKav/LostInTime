@@ -8,6 +8,7 @@
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
   "survival_rogue_like::attributes::MaxHealth": (75),
+  "survival_rogue_like::player::levels::ExperienceReward": (20),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
             item: WoodPlank,

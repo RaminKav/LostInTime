@@ -70,10 +70,6 @@ pub fn add_inv_to_new_chest_objs(
             let existing_cont_option = container_reg
                 .containers
                 .get(&world_pos_to_tile_pos(t.translation().truncate()));
-            println!(
-                "NEW CHEST at {:?} {existing_cont_option:?}",
-                world_pos_to_tile_pos(t.translation().truncate())
-            );
             commands.entity(e).insert(ChestContainer {
                 items: existing_cont_option
                     .unwrap_or(&Container::with_size(CHEST_SIZE))

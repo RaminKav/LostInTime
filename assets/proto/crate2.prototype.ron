@@ -5,6 +5,7 @@
   "survival_rogue_like::item::WorldObject": Crate2,
   "survival_rogue_like::attributes::MaxHealth": (15),
   "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
+  "survival_rogue_like::player::levels::ExperienceReward": (25),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: Apple,
