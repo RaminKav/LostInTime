@@ -32,7 +32,10 @@ impl<'w, 's> ProtoParam<'w, 's> {
         )
     }
     pub fn get_world_gen(&self) -> Option<WorldGeneration> {
-        if let Some(data) = self.get_prototype("WorldGenerationParams") {
+        if let Some(data) = self.prototype_assets.get(
+            self.prototypes
+                .get(format!("proto/WorldGenerationParams.prototype.ron"))?,
+        ) {
             data.schematics()
                 .get::<WorldGeneration>()
                 .unwrap()
