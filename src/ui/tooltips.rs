@@ -14,9 +14,9 @@ use crate::{
 };
 
 use super::{
-    stats_ui::StatsUI, InventoryUI, ShowInvPlayerStatsEvent, UIElement, UIState,
-    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE,
-    INVENTORY_UI_SIZE,
+    stats_ui::StatsUI, EssenceUI, InventoryUI, ShowInvPlayerStatsEvent, UIElement, UIState,
+    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -35,7 +35,6 @@ pub struct TooltipsManager {
 
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
-    pub parent_slot_entity: Entity,
     pub is_recipe: bool,
 }
 
@@ -73,16 +72,17 @@ pub fn handle_spawn_inv_item_tooltip(
     asset_server: Res<AssetServer>,
     mut updates: EventReader<ToolTipUpdateEvent>,
     inv: Query<Entity, With<InventoryUI>>,
+    essence: Query<Entity, With<EssenceUI>>,
     cur_inv_state: Res<State<UIState>>,
     recipes: Res<Recipes>,
 ) {
     for item in updates.iter() {
-        let inv = inv.single();
         let parent_inv_size = match cur_inv_state.0 {
             UIState::Inventory => INVENTORY_UI_SIZE,
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
+            UIState::Essence => ESSENCE_UI_SIZE,
             _ => unreachable!(),
         };
         let attributes = item.item_stack.attributes.get_tooltips();
@@ -94,12 +94,7 @@ pub fn handle_spawn_inv_item_tooltip(
             .spawn((
                 SpriteBundle {
                     texture: graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&item.item_stack.rarity.get_tooltip_ui_element())
-                        .unwrap()
-                        .clone(),
+                        .get_ui_element_texture(item.item_stack.rarity.get_tooltip_ui_element()),
                     transform: Transform {
                         translation: Vec3::new(-(parent_inv_size.x + size.x + 2.) / 2., 0., 4.),
                         scale: Vec3::new(1., 1., 1.),
@@ -212,7 +207,15 @@ pub fn handle_spawn_inv_item_tooltip(
             }
             commands.entity(tooltip).add_child(text);
         }
-        commands.entity(inv).add_child(tooltip);
+        // add tooltip to inventory or essence ui
+        //TODO: maybe we dont need to add as parent here and avoid this
+        if let Ok(inv) = inv.get_single() {
+            commands.entity(inv).add_child(tooltip);
+        } else {
+            commands
+                .entity(essence.get_single().unwrap())
+                .add_child(tooltip);
+        }
     }
 }
 
@@ -303,13 +306,7 @@ pub fn handle_spawn_inv_player_stats(
         let tooltip = commands
             .spawn((
                 SpriteBundle {
-                    texture: graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&UIElement::LargeTooltipCommon)
-                        .unwrap()
-                        .clone(),
+                    texture: graphics.get_ui_element_texture(UIElement::LargeTooltipCommon),
                     transform: Transform {
                         translation,
                         scale: Vec3::new(1., 1., 1.),

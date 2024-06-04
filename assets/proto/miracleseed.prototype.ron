@@ -1,0 +1,16 @@
+(
+  name: "MiracleSeed",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": MiracleSeed,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [SkillPoint(1)]),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: MiracleSeed,
+        metadata: (
+            name: "Miracle Seed", 
+            desc: ["A magic seed.", "Will grant", "+1 skill pt.",]
+        ),
+        count: 1
+  ),
+  }
+)

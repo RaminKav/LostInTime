@@ -24,6 +24,8 @@ pub use player_hud::*;
 pub use tooltips::*;
 mod main_menu;
 pub use main_menu::*;
+mod essence_ui;
+pub use essence_ui::*;
 
 use crate::{
     client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
@@ -44,6 +46,7 @@ use self::{
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
 pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
+pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
@@ -51,7 +54,7 @@ pub const FURNACE_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
 pub const UI_SLOT_SIZE: f32 = 20.0;
 
 pub struct UIPlugin;
-
+//TODO: extract out ui darken overlay into a helper function
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
@@ -67,6 +70,7 @@ impl Plugin for UIPlugin {
             .add_event::<ToolTipUpdateEvent>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
+            .add_event::<SubmitEssenceChoice>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
             .register_type::<InventorySlotState>()
@@ -158,7 +162,17 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
-                (tick_tooltip_timer, handle_tooltip_teardown).in_set(OnUpdate(GameState::Main)),
+                (
+                    tick_tooltip_timer,
+                    handle_tooltip_teardown,
+                    handle_submit_essence_choice,
+                    handle_populate_essence_shop_on_new_spawn,
+                    handle_cursor_essence_buttons,
+                    setup_essence_ui
+                        .before(CustomFlush)
+                        .run_if(resource_added::<EssenceShopChoices>()),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))

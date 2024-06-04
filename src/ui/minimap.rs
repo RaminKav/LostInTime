@@ -232,13 +232,8 @@ fn setup_mini_map(
 
         let map_border = commands
             .spawn(SpriteBundle {
-                texture: graphics
-                    .ui_image_handles
-                    .as_ref()
-                    .unwrap()
-                    .get(&UIElement::Minimap)
-                    .unwrap()
-                    .clone(),
+                texture: graphics.get_ui_element_texture(UIElement::Minimap),
+
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(
                         ((num_tiles + 1) * 2) as f32,

@@ -33,13 +33,7 @@ pub fn setup_stats_ui(
 ) {
     let (size, texture, t_offset) = (
         STATS_UI_SIZE,
-        graphics
-            .ui_image_handles
-            .as_ref()
-            .unwrap()
-            .get(&UIElement::LevelUpStats)
-            .unwrap()
-            .clone(),
+        graphics.get_ui_element_texture(UIElement::LevelUpStats),
         Vec2::new(3.5, 4.),
     );
 
@@ -83,13 +77,7 @@ pub fn setup_stats_ui(
     for i in -1..3 {
         let translation = Vec3::new(6., (-i as f32 * 21.) + 10., 1.);
         let mut slot_entity = commands.spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::StatsButton)
-                .unwrap()
-                .clone(),
+            texture: graphics.get_ui_element_texture(UIElement::StatsButton),
             transform: Transform {
                 translation,
                 scale: Vec3::new(1., 1., 1.),
@@ -198,7 +186,9 @@ pub fn update_stats_text(
     mut stats_text_query: Query<(&mut Text, &StatsText)>,
     player_stats: Query<&PlayerStats, Changed<PlayerStats>>,
 ) {
-    let Ok(stats) = player_stats.get_single() else {return;};
+    let Ok(stats) = player_stats.get_single() else {
+        return;
+    };
     for (mut text, stats_text) in stats_text_query.iter_mut() {
         text.sections[0].value = stats
             .get_stats_from_ui_index(stats_text.index as i32)
@@ -210,7 +200,9 @@ pub fn update_sp_text(
     mut sp_text_query: Query<(&mut Text, &SPText)>,
     player_stats: Query<&SkillPoints, Changed<SkillPoints>>,
 ) {
-    let Ok(sp) = player_stats.get_single() else {return;};
+    let Ok(sp) = player_stats.get_single() else {
+        return;
+    };
     for (mut text, _) in sp_text_query.iter_mut() {
         text.sections[0].value = sp.count.to_string();
     }

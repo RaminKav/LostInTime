@@ -48,7 +48,7 @@ use crate::{
     player::levels::ExperienceReward,
     sappling::{GrowsInto, Sappling},
     schematic::{loot_chests::LootChestType, SchematicType},
-    ui::crafting_ui::CraftingContainerType,
+    ui::{crafting_ui::CraftingContainerType, EssenceOption, EssenceShopChoices},
     world::WallTextureData,
     CustomFlush, GameState, YSort,
 };
@@ -116,6 +116,9 @@ impl Plugin for ProtoPlugin {
             .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
+            .register_type::<EssenceOption>()
+            .register_type::<Vec<EssenceOption>>()
+            .register_type::<EssenceShopChoices>()
             .register_type::<CharacterAnimationSpriteSheetData>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
@@ -292,6 +295,10 @@ impl ProtoPlugin {
         prototypes.load("proto/wooddoor.prototype.ron");
         prototypes.load("proto/wooddooropen.prototype.ron");
         prototypes.load("proto/wooddoorblock.prototype.ron");
+        prototypes.load("proto/essence.prototype.ron");
+        prototypes.load("proto/key.prototype.ron");
+        prototypes.load("proto/fairy.prototype.ron");
+        prototypes.load("proto/miracleseed.prototype.ron");
 
         // Sapplings
         prototypes.load("proto/redsapplingblock.prototype.ron");

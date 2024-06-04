@@ -5,6 +5,7 @@ use crate::{item::WorldObject, proto::proto_param::ProtoParam, GameParam};
 
 use super::{TileMapPosition, WallTextureData, CHUNK_SIZE, TILE_SIZE};
 
+/// gets the chunk from pixel world coordinates
 pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
     // do this bc we want bottom left of the block to be 0,0 instead of centre
     let camera_pos = Vec2::new(
@@ -16,6 +17,7 @@ pub fn camera_pos_to_chunk_pos(camera_pos: &Vec2) -> IVec2 {
         (camera_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32,
     )
 }
+/// gets the tile from pixel world coordinates
 pub fn camera_pos_to_tile_pos(camera_pos: &Vec2) -> TilePos {
     let camera_pos = Vec2::new(
         camera_pos.x + (TILE_SIZE.x / 2.),
@@ -39,6 +41,7 @@ pub fn camera_pos_to_tile_pos(camera_pos: &Vec2) -> TilePos {
         y: block_pos.y as u32,
     }
 }
+/// gets the [TileMapPosition] from pixel world coordinates
 pub fn world_pos_to_tile_pos(pos: Vec2) -> TileMapPosition {
     let chunk_pos = camera_pos_to_chunk_pos(&pos);
     let tile_pos = camera_pos_to_tile_pos(&pos);

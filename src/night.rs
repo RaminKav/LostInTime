@@ -31,14 +31,21 @@ impl NightTracker {
     pub fn is_night(&self) -> bool {
         self.time - 12. >= 0.
     }
+    pub fn is_dawn(&self) -> bool {
+        self.time == 0.
+    }
 }
 
 pub struct NightPlugin;
+
+#[derive(Default)]
+pub struct NewDayEvent;
 
 impl Plugin for NightPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(NightTracker::default())
             .register_type::<NightTracker>()
+            .add_event::<NewDayEvent>()
             .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
             .add_system(spawn_night.in_schedule(OnEnter(GameState::Main)))
             .add_system(tick_night_color.in_set(OnUpdate(GameState::Main)));
@@ -71,6 +78,7 @@ pub fn tick_night_color(
     mut night_tracker: ResMut<NightTracker>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
     bgm_tracker: Res<BGMPicker>,
+    mut new_day_event: EventWriter<NewDayEvent>,
 ) {
     for (mut night_state, mut sprite) in query.iter_mut() {
         night_state.0.tick(time.delta());
@@ -95,6 +103,10 @@ pub fn tick_night_color(
             bgm_track_event.send(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_day.ogg".to_owned(),
             });
+        }
+
+        if night_tracker.is_dawn() {
+            new_day_event.send_default();
         }
     }
 }

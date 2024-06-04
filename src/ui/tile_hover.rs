@@ -62,13 +62,7 @@ pub fn spawn_tile_hover_on_cursor_move(
     };
     commands
         .spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&hover_type)
-                .unwrap()
-                .clone(),
+            texture: graphics.get_ui_element_texture(hover_type),
             transform: Transform {
                 translation: tile_pos_to_world_pos(tile_pos, false).extend(1.),
                 scale: Vec3::new(1., 1., 1.),

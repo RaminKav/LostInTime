@@ -327,6 +327,9 @@ pub enum WorldObject {
     MagicTusk,
     Bed,
     BedBlock,
+    Essence,
+    Key,
+    MiracleSeed,
 
     // Sapplings
     RedSapplingBlock,

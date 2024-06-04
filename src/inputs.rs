@@ -38,7 +38,7 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, InventoryState};
+use crate::ui::{change_hotbar_slot, EssenceShopChoices, EssenceUI, InventoryState, UIState};
 use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
@@ -57,6 +57,40 @@ const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key5,
     KeyCode::Key6,
 ];
+pub struct InputsPlugin;
+
+impl Plugin for InputsPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(CursorPos::default())
+            .register_type::<CursorPos>()
+            // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
+            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+                app.add_event::<AttackEvent>();
+            })
+            .add_systems(
+                (
+                    move_player,
+                    turn_player,
+                    mouse_click_system.after(CustomFlush),
+                    handle_hotbar_key_input,
+                    tick_dash_timer,
+                    toggle_inventory,
+                    handle_open_essence_ui,
+                    close_container,
+                    diagnostics,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(update_cursor_pos.after(move_player))
+            .add_system(
+                move_camera_with_player
+                    .after(PhysicsSet::SyncBackendFlush)
+                    .before(TransformSystem::TransformPropagate)
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            );
+    }
+}
 #[derive(Default, Reflect, Resource, Debug)]
 #[reflect(Resource)]
 pub struct CursorPos {
@@ -132,40 +166,6 @@ impl FacingDirection {
             new_dir = Self::Down;
         }
         new_dir
-    }
-}
-
-pub struct InputsPlugin;
-
-impl Plugin for InputsPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(CursorPos::default())
-            .register_type::<CursorPos>()
-            // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
-            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-                app.add_event::<AttackEvent>();
-            })
-            .add_systems(
-                (
-                    move_player,
-                    turn_player,
-                    mouse_click_system.after(CustomFlush),
-                    handle_hotbar_key_input,
-                    tick_dash_timer,
-                    toggle_inventory,
-                    close_container,
-                    diagnostics,
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(update_cursor_pos.after(move_player))
-            .add_system(
-                move_camera_with_player
-                    .after(PhysicsSet::SyncBackendFlush)
-                    .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
-            );
     }
 }
 
@@ -385,8 +385,15 @@ pub fn close_container(
     mut inv_state: ResMut<InventoryState>,
     mut commands: Commands,
     stats_query: Query<Entity, With<StatsUI>>,
+    essence_query: Query<Entity, With<EssenceUI>>,
+    mut next_inv_state: ResMut<NextState<UIState>>,
 ) {
     if key_input.just_pressed(KeyCode::Escape) {
+        if let Some(e) = essence_query.iter().next() {
+            commands.entity(e).despawn_recursive();
+            next_inv_state.set(UIState::Closed);
+            return;
+        }
         inv_state.open = false;
         if let Ok(e) = stats_query.get_single() {
             commands.entity(e).despawn_recursive();
@@ -448,7 +455,7 @@ pub fn toggle_inventory(
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
         // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
-        proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+        proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
         // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
         // commands.entity(f.unwrap()).insert(MobLevel(2));
         // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
@@ -543,12 +550,13 @@ pub fn mouse_click_system(
     player_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
     inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
+    ui_state: Res<State<UIState>>,
     ranged_query: Query<&RangedAttack, With<Equipment>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     obj_actions: Query<&ObjectAction>,
 ) {
-    if inv_state.open {
+    if ui_state.0 != UIState::Closed {
         return;
     }
 
@@ -625,6 +633,24 @@ pub fn mouse_click_system(
                     &mut commands,
                     &mut proto_param,
                 );
+            }
+        }
+    }
+}
+
+pub fn handle_open_essence_ui(
+    mut commands: Commands,
+    key_input: ResMut<Input<KeyCode>>,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    nearby_merchant_query: Query<(&GlobalTransform, &EssenceShopChoices)>,
+    mut next_inv_state: ResMut<NextState<UIState>>,
+) {
+    if key_input.just_pressed(KeyCode::F) {
+        let player_t = player_query.single().translation().truncate();
+        for (transform, choices) in nearby_merchant_query.iter() {
+            if player_t.distance(transform.translation().truncate()) < 32. {
+                commands.insert_resource(choices.clone());
+                next_inv_state.set(UIState::Essence);
             }
         }
     }

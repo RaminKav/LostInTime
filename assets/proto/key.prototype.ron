@@ -1,0 +1,16 @@
+(
+  name: "Key",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Key,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [DungeonKey]),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Key,
+        metadata: (
+            name: "Key", 
+            desc: ["A key that", "will let you", "enter the", "dungeon once."]
+        ),
+        count: 1
+  ),
+  }
+)

@@ -495,6 +495,21 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Essence: WorldObjectData(
+            texture_pos: (9., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MiracleSeed: WorldObjectData(
+            texture_pos: (8., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Key: WorldObjectData(
+            texture_pos: (10., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         RedStew: WorldObjectData(
             texture_pos: (14., 6.),
             size: (16., 16.),

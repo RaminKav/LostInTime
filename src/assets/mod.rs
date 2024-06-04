@@ -144,6 +144,16 @@ pub struct Graphics {
     pub player_spritesheets: Option<Vec<Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
 }
+impl Graphics {
+    pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
+        self.ui_image_handles
+            .as_ref()
+            .unwrap()
+            .get(&element)
+            .unwrap()
+            .clone()
+    }
+}
 
 /// Work around helper function to convert texture atlas sprites into stand alone image handles
 /// Copies sprite data pixel by pixel, needed to render things in UI

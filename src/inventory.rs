@@ -78,6 +78,7 @@ pub struct ItemStack {
 #[derive(Debug)]
 pub enum InventoryError {
     FailedToMerge(String),
+    NotEnoughItems(String),
 }
 #[derive(Component, Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct InventoryItemStack {
@@ -311,6 +312,17 @@ impl InventoryItemStack {
 }
 //TODO: abstract all these behind a AddItemToInventoryEvent ? let event drive info needed for sub-fns
 impl ItemStack {
+    /// creates a new item stack with count 1 with no attributes or metadata
+    /// used for icons in UI
+    pub fn crate_icon_stack(obj: WorldObject) -> Self {
+        Self {
+            obj_type: obj,
+            count: 1,
+            rarity: ItemRarity::Common,
+            attributes: ItemAttributes::default(),
+            metadata: ItemDisplayMetaData::default(),
+        }
+    }
     //TODO: fix for later, remove and use proto
     pub fn spawn_as_drop(
         &self,

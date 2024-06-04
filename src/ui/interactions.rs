@@ -16,8 +16,9 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, MenuButton,
-    MenuButtonClickEvent, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam,
+    ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, InventoryState,
+    MenuButton, MenuButtonClickEvent, SubmitEssenceChoice, ToolTipUpdateEvent,
+    TooltipTeardownEvent, UIContainersParam,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -45,6 +46,9 @@ pub enum UIElement {
     BlockedTileHover,
     MenuButton,
     MainMenu,
+    Essence,
+    EssenceButton,
+    EssenceButtonHover,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -287,6 +291,7 @@ pub fn handle_hovering(
         &UIElement,
         &mut Interactable,
         Option<&InventorySlotState>,
+        Option<&EssenceOption>,
     )>,
     graphics: Res<Graphics>,
     mut commands: Commands,
@@ -299,22 +304,15 @@ pub fn handle_hovering(
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
-    for (e, ui, interactable, state_option) in interactables.iter_mut() {
+    for (e, ui, interactable, state_option, essence_option) in interactables.iter_mut() {
         if let Interaction::Hovering = interactable.current() {
             if ui == &UIElement::InventorySlot {
                 let state = state_option.unwrap();
                 // swap to hover img
                 commands.entity(e).insert(UIElement::InventorySlotHover);
-                commands.entity(e).insert(
-                    graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&UIElement::InventorySlotHover)
-                        .unwrap()
-                        .clone()
-                        .to_owned(),
-                );
+                commands
+                    .entity(e)
+                    .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
 
                 if let Some(_item_e) = state.item {
                     let item = if state.r#type.is_chest() {
@@ -333,7 +331,6 @@ pub fn handle_hovering(
                     if let Some(item) = item {
                         tooltip_update_events.send(ToolTipUpdateEvent {
                             item_stack: item.item_stack,
-                            parent_slot_entity: e,
                             is_recipe: state.r#type.is_crafting(),
                         });
                     }
@@ -342,47 +339,50 @@ pub fn handle_hovering(
             if ui == &UIElement::StatsButton {
                 // swap to hover img
                 commands.entity(e).insert(UIElement::StatsButtonHover);
-                commands.entity(e).insert(
-                    graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&UIElement::StatsButtonHover)
-                        .unwrap()
-                        .clone()
-                        .to_owned(),
-                );
+                commands
+                    .entity(e)
+                    .insert(graphics.get_ui_element_texture(UIElement::StatsButtonHover));
+            }
+            if ui == &UIElement::EssenceButton {
+                // swap to hover img
+                commands.entity(e).insert(UIElement::EssenceButtonHover);
+                commands
+                    .entity(e)
+                    .insert(graphics.get_ui_element_texture(UIElement::EssenceButtonHover));
+
+                let essence = essence_option.expect("essence buttons have essence state");
+                tooltip_update_events.send(ToolTipUpdateEvent {
+                    item_stack: essence.item.clone(),
+                    is_recipe: false,
+                });
             }
         }
         if let Interaction::Hovering = interactable.previous() {
             if ui == &UIElement::InventorySlotHover {
                 // swap to base img
 
-                commands.entity(e).insert(UIElement::InventorySlot).insert(
-                    graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&UIElement::InventorySlot)
-                        .unwrap()
-                        .clone()
-                        .to_owned(),
-                );
+                commands
+                    .entity(e)
+                    .insert(UIElement::InventorySlot)
+                    .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
 
                 tooltip_teardown_events.send_default();
             }
             if ui == &UIElement::StatsButtonHover {
                 // swap to base img
-                commands.entity(e).insert(UIElement::StatsButton).insert(
-                    graphics
-                        .ui_image_handles
-                        .as_ref()
-                        .unwrap()
-                        .get(&UIElement::StatsButton)
-                        .unwrap()
-                        .clone()
-                        .to_owned(),
-                );
+                commands
+                    .entity(e)
+                    .insert(UIElement::StatsButton)
+                    .insert(graphics.get_ui_element_texture(UIElement::StatsButton));
+            }
+            if ui == &UIElement::EssenceButtonHover {
+                // swap to base img
+                commands
+                    .entity(e)
+                    .insert(UIElement::EssenceButton)
+                    .insert(graphics.get_ui_element_texture(UIElement::EssenceButton));
+
+                tooltip_teardown_events.send_default();
             }
         }
     }
@@ -722,6 +722,43 @@ pub fn handle_cursor_main_menu_buttons(
 
                 interactable.change(Interaction::None);
                 text.get_mut(e).unwrap().sections[0].style.color = YELLOW_2;
+            }
+        }
+    }
+}
+
+pub fn handle_cursor_essence_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut essence_buttons: Query<(Entity, &mut Interactable, &EssenceOption)>,
+    mut essence_event: EventWriter<SubmitEssenceChoice>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, essence_option) in essence_buttons.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        essence_event.send(SubmitEssenceChoice {
+                            choice: essence_option.clone(),
+                        });
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                // reset hovering states if we stop hovering ?
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+
+                interactable.change(Interaction::None);
             }
         }
     }

@@ -9,7 +9,7 @@ use crate::{
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     item::WorldObject,
-    night::NightTracker,
+    night::{NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
     world::{
@@ -34,6 +34,7 @@ impl Plugin for SpawnerPlugin {
                 handle_spawn_mobs,
                 tick_spawner_timers,
                 add_spawners_to_new_chunks,
+                handle_add_fairy_spawners,
                 check_mob_count,
                 spawn_one_time_enemies_at_day,
                 reduce_chunk_mob_count_on_mob_death,
@@ -53,6 +54,8 @@ pub struct Spawner {
     pub spawn_timer: Timer,
     pub min_days_to_spawn: u8,
     pub enemy: Mob,
+    pub num_to_spawn: Option<u32>,
+    pub num_spawned: u32,
 }
 impl PartialEq for Spawner {
     fn eq(&self, other: &Self) -> bool {
@@ -87,6 +90,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
@@ -94,6 +99,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Hog,
@@ -101,6 +108,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::StingFly,
@@ -108,6 +117,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 2,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
@@ -115,6 +126,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(240., TimerMode::Once),
                 min_days_to_spawn: 1,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
         } else {
             spawners.push(Spawner {
@@ -123,6 +136,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
@@ -130,6 +145,8 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
@@ -137,12 +154,37 @@ fn add_spawners_to_new_chunks(
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(12., TimerMode::Once),
                 min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
             });
         }
         commands.entity(new_chunk.0).insert(ChunkSpawners {
             spawners,
             spawned_mobs: 0,
         });
+    }
+}
+
+fn handle_add_fairy_spawners(
+    mut chunk_query: Query<(&Chunk, &mut ChunkSpawners)>,
+    new_day_event: EventReader<NewDayEvent>,
+    player_pos: Query<&GlobalTransform, With<Player>>,
+) {
+    if !new_day_event.is_empty() {
+        let player_chunk = camera_pos_to_chunk_pos(&player_pos.single().translation().truncate());
+        for (chunk, mut spawners) in chunk_query.iter_mut() {
+            if chunk.chunk_pos == player_chunk {
+                spawners.spawners.push(Spawner {
+                    enemy: Mob::Fairy,
+                    chunk_pos: player_chunk,
+                    weight: 9999.,
+                    spawn_timer: Timer::from_seconds(60., TimerMode::Once),
+                    min_days_to_spawn: 0,
+                    num_to_spawn: Some(1),
+                    num_spawned: 0,
+                });
+            }
+        }
     }
 }
 fn handle_spawn_mobs(
@@ -173,12 +215,16 @@ fn handle_spawn_mobs(
             if is_currently_spawning {
                 continue;
             }
+
             if let Ok(picked_spawner) = chunk_spawner
                 .spawners
                 .choose_weighted_mut(&mut rng, |spawner| spawner.weight)
             {
+                let no_more_spawns_left = picked_spawner.num_to_spawn.is_some()
+                    && picked_spawner.num_spawned >= picked_spawner.num_to_spawn.unwrap();
                 if picked_spawner.spawn_timer.percent() == 0.
                     && picked_spawner.min_days_to_spawn <= night_tracker.days
+                    && !no_more_spawns_left
                 {
                     let player_pos = player_t.single().translation().truncate();
                     let mut pos = player_pos.clone();
@@ -194,6 +240,8 @@ fn handle_spawn_mobs(
                     }
                     picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     picked_mob_to_spawn = Some((picked_spawner.enemy.clone(), pos));
+
+                    picked_spawner.num_spawned += 1;
                 }
             }
         }

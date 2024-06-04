@@ -1,7 +1,7 @@
 use std::cmp::min;
 
 use crate::{
-    inventory::{InventoryItemStack, ItemStack, MAX_STACK_SIZE},
+    inventory::{InventoryError, InventoryItemStack, ItemStack, MAX_STACK_SIZE},
     item::{CraftedItemEvent, WorldObject},
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::TileMapPosition,
@@ -251,5 +251,34 @@ impl Container {
             return target_item_stack.item_stack;
         }
         item
+    }
+
+    pub fn remove_from_inventory(
+        &mut self,
+        amount: usize,
+        item: WorldObject,
+    ) -> Result<(), InventoryError> {
+        let mut remaining_cost = amount;
+        while remaining_cost > 0 && self.get_item_count_in_container(item.clone()) > 0 {
+            let ingredient_slot = self
+                .get_slot_for_item_in_container(&item)
+                .expect("player crafted item but does not have the required ingredients?");
+            let stack = self.items[ingredient_slot].as_mut().unwrap();
+            if stack.item_stack.count >= amount {
+                self.items[ingredient_slot] = stack.modify_count(-(amount as i8));
+                remaining_cost = 0 as usize;
+            } else {
+                let count = stack.item_stack.count;
+                self.items[ingredient_slot] = None;
+                remaining_cost -= count as usize;
+            }
+        }
+        if remaining_cost > 0 {
+            return Err(InventoryError::NotEnoughItems(
+                "Not enough items".to_string(),
+            ));
+        } else {
+            return Ok(());
+        }
     }
 }

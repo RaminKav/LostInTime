@@ -30,13 +30,8 @@ const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
     let hud_bar_frame = commands
         .spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::PlayerHUDBars)
-                .unwrap()
-                .clone(),
+            texture: graphics.get_ui_element_texture(UIElement::PlayerHUDBars),
+
             sprite: Sprite {
                 custom_size: Some(Vec2::new(84.5, 33.)),
                 ..Default::default()
@@ -144,13 +139,8 @@ pub fn setup_xp_bar_ui(
         .id();
     let xp_bar_frame = commands
         .spawn(SpriteBundle {
-            texture: graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::XPBarFrame)
-                .unwrap()
-                .clone(),
+            texture: graphics.get_ui_element_texture(UIElement::XPBarFrame),
+
             sprite: Sprite {
                 custom_size: Some(Vec2::new(119.5, 24.)),
                 ..Default::default()

@@ -29,13 +29,8 @@ pub fn display_main_menu(
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
 ) {
     let mut menu = commands.spawn(SpriteBundle {
-        texture: graphics
-            .ui_image_handles
-            .as_ref()
-            .unwrap()
-            .get(&UIElement::MainMenu)
-            .unwrap()
-            .clone(),
+        texture: graphics.get_ui_element_texture(UIElement::MainMenu),
+
         transform: Transform {
             translation: Vec3::new(0., 0., 0.),
             scale: Vec3::new(1., 1., 1.),

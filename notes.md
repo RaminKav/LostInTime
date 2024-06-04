@@ -560,3 +560,17 @@ Buttons:
 - hitting trees always gives brown or white particles (different from minimap color...)
   make sword hitbox slightly bigger/forward?
   - weird attack animation/sound bug (multi hits)
+- fade intro step after hitting start
+- only take dmg from enemy when they're in attack anim
+- potentially dual weild staffs??
+- proj double fire bug!!!
+- helper ui keybind icons for stats, fairy, inv, etc
+- [x] add a way to get weapons
+      -> `Essence of the Forrest` (some way to translate monster killing to get a random piece of loot)
+      -> All monsters can drop essense
+      -> Or, Mob drops can be exchanged for essence
+  - -> Right clicking Essence drops you a random piece of gear
+  - -> Right clicking Essence opens a menu to spend on various things (Random gear, Skill Point, dungeon key?, boss summon?)
+  - Genius prairie ida: Fairies!!
+  - -> fairies spawn randomly and want to trade you random loot stuff for essence
+  - -> they have a chance to sell you gear you lost in previous runs!!!!

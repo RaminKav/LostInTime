@@ -7,7 +7,7 @@ use crate::{
     item::WorldObject,
     juice::UseItemEvent,
     player::Player,
-    ui::InventoryState,
+    ui::UIState,
     GameState,
 };
 
@@ -50,9 +50,9 @@ pub fn sword_swing_sound(
     audio: Res<Audio>,
     mouse_button_input: Res<Input<MouseButton>>,
     player_query: Query<Option<&AttackTimer>, With<Player>>,
-    inv_state: Res<InventoryState>,
+    curr_ui_state: Res<State<UIState>>,
 ) {
-    if mouse_button_input.pressed(MouseButton::Left) && !inv_state.open {
+    if mouse_button_input.pressed(MouseButton::Left) && curr_ui_state.0 == UIState::Closed {
         let attack_timer_option = player_query.single();
         if attack_timer_option.is_some() {
             return;

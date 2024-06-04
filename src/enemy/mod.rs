@@ -75,6 +75,7 @@ pub enum Mob {
     Hog,
     StingFly,
     Bushling,
+    Fairy,
 }
 
 impl Mob {
@@ -85,6 +86,7 @@ impl Mob {
             Mob::SpikeSlime => LIGHT_GREEN,
             Mob::Bushling => DARK_GREEN,
             Mob::StingFly => LIGHT_GREEN,
+            Mob::Fairy => PINK,
             Mob::FurDevil => PINK,
             Mob::Hog => LIGHT_BROWN,
         }

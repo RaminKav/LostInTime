@@ -8,9 +8,9 @@ use crate::{
     inputs::CursorPos,
     inventory::Inventory,
     juice::UseItemEvent,
-    player::MovePlayerEvent,
+    player::{stats::SkillPoints, MovePlayerEvent},
     proto::proto_param::ProtoParam,
-    ui::{ChestContainer, FurnaceContainer, InventoryState},
+    ui::{ChestContainer, FurnaceContainer, InventoryState, UIState},
     world::{
         dimension::DimensionSpawnEvent,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
@@ -32,6 +32,9 @@ pub enum ItemAction {
     TeleportHome,
     PlacesInto(WorldObject),
     Eat(i8),
+    Essence,
+    DungeonKey,
+    GrantSkillPoint(u8),
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -55,6 +58,7 @@ pub struct ItemActionParam<'w, 's> {
     pub use_item_event: EventWriter<'w, UseItemEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
     pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
+    pub next_inv_state: ResMut<'w, NextState<UIState>>,
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
@@ -64,6 +68,7 @@ pub struct ItemActionParam<'w, 's> {
     pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
     pub crafting_tracker: Res<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
+    pub skill_points: Query<'w, 's, &'static mut SkillPoints>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -125,6 +130,23 @@ impl ItemActions {
                     for mut hunger in item_action_param.hunger_query.iter_mut() {
                         hunger.modify_hunger(*delta);
                     }
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::Essence => {
+                    item_action_param.next_inv_state.set(UIState::Essence);
+                }
+                ItemAction::DungeonKey => {
+                    // spawn_new_dungeon_dimension(
+                    //     game,
+                    //     commands,
+                    //     &mut proto_param.proto_commands,
+                    //     &mut item_action_param.move_player_event,
+                    // );
+                }
+                ItemAction::GrantSkillPoint(amount) => {
+                    let mut sp = item_action_param.skill_points.single_mut();
+                    sp.count += *amount;
+
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 _ => {}

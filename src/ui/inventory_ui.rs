@@ -25,6 +25,7 @@ pub enum UIState {
     Stats,
     Crafting,
     Furnace,
+    Essence,
 }
 
 #[derive(Component, Default, Clone)]
@@ -88,46 +89,22 @@ pub fn setup_inv_ui(
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory => (
             INVENTORY_UI_SIZE,
-            graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::Inventory)
-                .unwrap()
-                .clone(),
+            graphics.get_ui_element_texture(UIElement::Inventory),
             Vec2::new(22., 0.5),
         ),
         UIState::Chest => (
             CHEST_INVENTORY_UI_SIZE,
-            graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::ChestInventory)
-                .unwrap()
-                .clone(),
+            graphics.get_ui_element_texture(UIElement::ChestInventory),
             Vec2::new(22.5, 0.),
         ),
         UIState::Crafting => (
             CRAFTING_INVENTORY_UI_SIZE,
-            graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::CraftingInventory)
-                .unwrap()
-                .clone(),
+            graphics.get_ui_element_texture(UIElement::CraftingInventory),
             Vec2::new(22.5, 0.),
         ),
         UIState::Furnace => (
             FURNACE_INVENTORY_UI_SIZE,
-            graphics
-                .ui_image_handles
-                .as_ref()
-                .unwrap()
-                .get(&UIElement::FurnaceInventory)
-                .unwrap()
-                .clone(),
+            graphics.get_ui_element_texture(UIElement::FurnaceInventory),
             Vec2::new(22.5, 0.),
         ),
         _ => return,
@@ -408,19 +385,14 @@ pub fn spawn_inv_slot(
     }
 
     let mut slot_entity = commands.spawn(SpriteBundle {
-        texture: graphics
-            .ui_image_handles
-            .as_ref()
-            .unwrap()
-            .get(
-                if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
-                    &UIElement::InventorySlotHover
-                } else {
-                    &UIElement::InventorySlot
-                },
-            )
-            .unwrap()
-            .clone(),
+        texture: graphics.get_ui_element_texture(
+            if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
+                UIElement::InventorySlotHover
+            } else {
+                UIElement::InventorySlot
+            },
+        ),
+
         transform: Transform {
             translation,
             scale: Vec3::new(1., 1., 1.),
