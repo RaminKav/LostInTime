@@ -13,7 +13,7 @@ Feature-rich roguelike survival gameplay:
 - [x] Random dungeon generation (Dimention support, like minecraft)
 - [x] Chunking optimizations
 - [x] Day/Night cycle
-- [x] 3 enemies and 1 boss with animations and different attack styles/flavor
+- [x] 4 enemies and 1 boss with animations and different attack styles/flavor
 - [x] Tons of weapon types: melee, ranged, and magic with diferent play styles
 - [x] Weapon upgrades (bows shoot in a spread, chain lightning upgrade, etc)
 - [x] Fully custom UI implementation: Inventory, Containers(chests), Stats page, tooltips, HUD, etc
@@ -24,18 +24,30 @@ Feature-rich roguelike survival gameplay:
 - [x] Beautiful art pack and UI (still a WIP)
 - [x] Internal tooling for easy addition of new enemies, items, world generation items/params, etc all with the power of `bevy_proto` and custom tooling to make further development fast and easy!
 - [x] Simple enemy AI, expanding to mroe complex behaviors soon
-- [ ] Saving/Loading gameplay -> blocked upstream for `bevy_ecs_tilemap`, a WIP
+- [x] Saving/Loading gameplay -> blocked upstream for `bevy_ecs_tilemap`, a WIP
 - [ ] Gameplay integration for mentioned weapon upgrades
 - [ ] More bosses/enemies! -> (huge art bottleneck)
-- [ ] Improved world generation algorithems
+- [x] Improved world generation algorithems
 - [ ] Add configuration options for device specific settings (for example screen resolution)
+- [ ] Options menu
 
 run using `cargo run --release`, if not using a retina Display, game might render too large, change `HEIGHT` constant in `main.rs`
 
 ### Controls
 
 - `WASD` to move
-- `I` opens inventory
+- `I, E, TAB,` opens inventory
 - `B` opens stats page
+- `F` interact with fairy merchant
 - Mouse buttons to attack/use item
 - `SPACE` to dash
+
+### Future Plans & Goals
+
+The goal is to launch on steam one day. The current state of the game is a lot better than it was a year ago, and im sure it will be even better next year. I currently have no idea when it will be ready for an early access release.
+
+I am in the process of getting a ton more pixel art/animation assets in order to build out the bosses in the game, as well as some more hostile and passive mobs.
+
+Beyond adding more art/creatures, there are some open game-design related concepts that need to be figured out before the game feels _right_. Some of those missing things are part of the list above, but a lot of them are unknown.
+
+If you would like to play-test this game but don't know how to set up `rust` to compile it, contact me for an executable build of the game.
