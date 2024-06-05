@@ -1,6 +1,15 @@
 # A Top Down 2D Survival Rogue-like Game
+<img width="1420" alt="Screenshot 2024-06-05 at 7 25 12 PM" src="https://github.com/RaminKav/BevySurvivalGame/assets/5355774/d471ad11-ea90-4c99-acd4-8f4ab839adc5">
+
 
 <img width="1425" alt="Screen Shot 2023-09-08 at 4 21 39 PM" src="https://github.com/RaminKav/BevySurvivalGame/assets/5355774/c692e56a-00e9-4bbe-9802-c18946e8544c">
+
+
+![ScreenRecording2024-06-05at7 26 59PM-ezgif com-gif-maker](https://github.com/RaminKav/BevySurvivalGame/assets/5355774/0739d1a6-9781-4372-9179-c0227878d0e3)
+![ScreenRecording2024-06-05at7 37 12PM-ezgif com-gif-maker](https://github.com/RaminKav/BevySurvivalGame/assets/5355774/a2d071a9-7333-4bc8-b8d7-5f25bce54d60)
+![ScreenRecording2024-06-05at7 47 17PM-ezgif com-gif-maker](https://github.com/RaminKav/BevySurvivalGame/assets/5355774/01443a48-17d9-4466-a1b4-8dc503358459)
+
+
 
 A survival game for the exploration of Bevy/Rust and game development.
 
