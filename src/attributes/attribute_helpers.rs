@@ -111,5 +111,7 @@ pub fn build_item_stack_with_parsed_attributes(
         new_stack.metadata.level = Some(item_level);
     }
 
+    new_stack = stack.copy_with_attributes(&final_att);
+
     new_stack
 }

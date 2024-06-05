@@ -52,11 +52,7 @@ pub fn setup_chest_slots_ui(
         );
     }
 }
-pub fn change_ui_state_to_chest_when_resource_added(
-    mut inv_ui_state: ResMut<NextState<UIState>>,
-    mut inv_state: ResMut<InventoryState>,
-) {
-    inv_state.open = true;
+pub fn change_ui_state_to_chest_when_resource_added(mut inv_ui_state: ResMut<NextState<UIState>>) {
     inv_ui_state.set(UIState::Chest);
 }
 

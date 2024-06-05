@@ -105,7 +105,7 @@ pub fn tick_night_color(
             });
         }
 
-        if night_tracker.is_dawn() {
+        if night_tracker.is_dawn() && night_tracker.days > 0 {
             new_day_event.send_default();
         }
     }

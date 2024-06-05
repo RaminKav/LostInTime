@@ -22,7 +22,7 @@ use crate::{
         Attack, AttackCooldown, CritChance, CritDamage, HealthRegen, InvincibilityCooldown,
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
-    client::SaveData,
+    client::CurrentRunSaveData,
     container::Container,
     custom_commands::CommandsExt,
     inputs::{move_camera_with_player, FacingDirection, MovementVector},
@@ -238,7 +238,7 @@ fn spawn_player(
         let reader = BufReader::new(save_file);
 
         // Read the JSON contents of the file as an instance of `User`.
-        match serde_json::from_reader::<_, SaveData>(reader) {
+        match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
             Ok(data) => {
                 hunger.current = data.player_hunger;
                 commands.entity(p).insert((

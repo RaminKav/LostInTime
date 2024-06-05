@@ -3,7 +3,7 @@ use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::ItemAttributes;
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
-    UI_GRASS_GREEN, WHITE, YELLOW,
+    UI_GRASS_GREEN, YELLOW,
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 

@@ -10,7 +10,7 @@
         rarity: Uncommon,
         metadata: (
             name: "Large Potion", 
-            desc: ["Heals 35 health."]
+            desc: ["Heals 35 HP",]
         ),
         count: 1
   ),

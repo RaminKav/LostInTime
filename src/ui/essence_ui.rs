@@ -1,15 +1,13 @@
+use std::{fs::File, io::BufReader};
+
 use bevy::{prelude::*, render::view::RenderLayers};
-use bevy_proto::{
-    backend::{
-        proto,
-        schematics::{ReflectSchematic, Schematic},
-    },
-    prelude::ProtoCommands,
-};
+use bevy_proto::backend::schematics::{ReflectSchematic, Schematic};
+use rand::seq::IteratorRandom;
 
 use crate::{
     assets::Graphics,
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
+    client::GameData,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     player::Player,
@@ -50,7 +48,6 @@ pub fn setup_essence_ui(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     shop: Res<EssenceShopChoices>,
-    proto_param: ProtoParam,
 ) {
     let (size, texture, t_offset) = (
         ESSENCE_UI_SIZE,
@@ -76,7 +73,7 @@ pub fn setup_essence_ui(
         .insert(Name::new("overlay"))
         .id();
 
-    let stats_e = commands
+    let essence_ui_e = commands
         .spawn(SpriteBundle {
             texture,
             sprite: Sprite {
@@ -92,16 +89,11 @@ pub fn setup_essence_ui(
         })
         .insert(EssenceUI)
         .insert(Name::new("STATS UI"))
-        .insert(UIElement::Essence)
+        .insert(UIState::Essence)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
 
     for (i, essence_option) in shop.choices.iter().enumerate() {
-        let essence_option = EssenceOption {
-            item: create_new_random_item_stack_with_attributes(&essence_option.item, &proto_param),
-            cost: essence_option.cost,
-        };
-
         let translation = Vec3::new(24.5, 40.5 - (i as f32 * 29.), 1.);
         let slot_entity = commands
             .spawn((
@@ -124,7 +116,7 @@ pub fn setup_essence_ui(
                 RenderLayers::from_layers(&[3]),
                 Name::new("Essence Loot Button"),
             ))
-            .set_parent(stats_e)
+            .set_parent(essence_ui_e)
             .id();
 
         // icon
@@ -156,7 +148,7 @@ pub fn setup_essence_ui(
                 RenderLayers::from_layers(&[3]),
                 Name::new("Essence Cost Button"),
             ))
-            .set_parent(stats_e)
+            .set_parent(essence_ui_e)
             .id();
 
         // cost icon
@@ -170,7 +162,7 @@ pub fn setup_essence_ui(
         commands.entity(cost_icon).set_parent(slot_entity);
     }
 
-    commands.entity(stats_e).push_children(&[overlay]);
+    commands.entity(essence_ui_e).push_children(&[overlay]);
 }
 
 pub fn handle_submit_essence_choice(
@@ -178,8 +170,6 @@ pub fn handle_submit_essence_choice(
     mut ev: EventReader<SubmitEssenceChoice>,
     mut next_inv_state: ResMut<NextState<UIState>>,
     essence_ui: Query<Entity, With<EssenceUI>>,
-    mut proto_commands: ProtoCommands,
-    proto: ProtoParam,
     mut inv: Query<&mut Inventory>,
     mut game_param: GameParam,
     player_t: Query<&GlobalTransform, With<Player>>,
@@ -210,7 +200,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
     proto_param: ProtoParam,
 ) {
     for mut shop in new_spawns.iter_mut() {
-        let GENERIC_SHOP_OPTIONS = vec![
+        let mut GENERIC_SHOP_OPTIONS = vec![
             EssenceOption {
                 item: create_new_random_item_stack_with_attributes(
                     &ItemStack::crate_icon_stack(WorldObject::LargePotion).copy_with_count(3),
@@ -240,6 +230,38 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 cost: 10,
             },
         ];
-        shop.choices = GENERIC_SHOP_OPTIONS;
+
+        let mut shop_choices = vec![];
+        if let Ok(file_file) = File::open("game_data.json") {
+            let reader = BufReader::new(file_file);
+            let mut rng = rand::thread_rng();
+            // Read the JSON contents of the file as an instance of `User`.
+            match serde_json::from_reader::<_, GameData>(reader) {
+                Ok(data) => {
+                    if let Some(seen_item) = data.seen_gear.iter().choose(&mut rng) {
+                        shop_choices.push(EssenceOption {
+                            item: seen_item.clone(),
+                            cost: 5,
+                        });
+                        while shop_choices.len() < 4 {
+                            let pick = GENERIC_SHOP_OPTIONS
+                                .iter()
+                                .choose(&mut rng)
+                                .unwrap()
+                                .clone();
+                            shop_choices.push(pick.clone());
+                            GENERIC_SHOP_OPTIONS.retain(|x| x.get_obj() != pick.get_obj());
+                        }
+                    } else {
+                        shop_choices = GENERIC_SHOP_OPTIONS;
+                    }
+                }
+                Err(err) => {
+                    println!("No previous runs found, no gear to populate shop with {err:?}");
+                    shop_choices = GENERIC_SHOP_OPTIONS;
+                }
+            }
+        };
+        shop.choices = shop_choices;
     }
 }

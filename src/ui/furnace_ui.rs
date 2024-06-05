@@ -88,6 +88,7 @@ pub fn setup_furnace_slots_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Furnace)
         .insert(FurnaceProgBar)
         .insert(Name::new("inner xp bar"))
         .set_parent(inv_query.single());
@@ -108,9 +109,7 @@ pub fn update_furnace_bar(
 }
 pub fn change_ui_state_to_furnace_when_resource_added(
     mut inv_ui_state: ResMut<NextState<UIState>>,
-    mut inv_state: ResMut<InventoryState>,
 ) {
-    inv_state.open = true;
     inv_ui_state.set(UIState::Furnace);
 }
 

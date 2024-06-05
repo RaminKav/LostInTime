@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::container::Container;
 
-use super::{InventoryState, UIState};
+use super::UIState;
 
 #[derive(Resource, Default, Debug, Clone)]
 pub struct CraftingContainer {
@@ -24,8 +24,6 @@ pub enum CraftingContainerType {
 
 pub fn change_ui_state_to_crafting_when_resource_added(
     mut inv_ui_state: ResMut<NextState<UIState>>,
-    mut inv_state: ResMut<InventoryState>,
 ) {
-    inv_state.open = true;
     inv_ui_state.set(UIState::Crafting);
 }

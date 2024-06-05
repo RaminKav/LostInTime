@@ -16,9 +16,9 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, InventoryState,
-    MenuButton, MenuButtonClickEvent, SubmitEssenceChoice, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam,
+    ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, MenuButton,
+    MenuButtonClickEvent, SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent,
+    UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -119,7 +119,7 @@ pub struct ShowInvPlayerStatsEvent;
 pub struct DropInWorldEvent {
     pub dropped_entity: Entity,
     pub dropped_item_stack: ItemStack,
-    pub parent_interactable_entity: Entity,
+    pub parent_interactable_entity: Option<Entity>,
     pub stack_empty: bool,
 }
 #[derive(Resource)]
@@ -145,27 +145,27 @@ pub fn handle_drop_in_world_events(
             .entity(drop_event.dropped_entity)
             .despawn_recursive();
 
-        if let Ok(mut parent_interactable) =
-            interactables.get_mut(drop_event.parent_interactable_entity)
-        {
-            if drop_event.stack_empty {
-                commands
-                    .entity(drop_event.dropped_entity)
-                    .despawn_recursive();
+        if let Some(parent_e) = drop_event.parent_interactable_entity {
+            if let Ok(mut parent_interactable) = interactables.get_mut(parent_e) {
+                if drop_event.stack_empty {
+                    commands
+                        .entity(drop_event.dropped_entity)
+                        .despawn_recursive();
 
-                parent_interactable.2.change(Interaction::None);
-            } else {
-                let new_drag_icon_entity = spawn_item_stack_icon(
-                    &mut commands,
-                    &graphics,
-                    item_stacks.get(drop_event.dropped_entity).unwrap(),
-                    &asset_server,
-                );
+                    parent_interactable.2.change(Interaction::None);
+                } else {
+                    let new_drag_icon_entity = spawn_item_stack_icon(
+                        &mut commands,
+                        &graphics,
+                        item_stacks.get(drop_event.dropped_entity).unwrap(),
+                        &asset_server,
+                    );
 
-                commands.entity(new_drag_icon_entity).insert(DraggedItem);
-                parent_interactable.2.change(Interaction::Dragging {
-                    item: new_drag_icon_entity,
-                });
+                    commands.entity(new_drag_icon_entity).insert(DraggedItem);
+                    parent_interactable.2.change(Interaction::Dragging {
+                        item: new_drag_icon_entity,
+                    });
+                }
             }
         }
     }
@@ -393,7 +393,6 @@ pub fn handle_item_drop_clicks(
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     slot_states: Query<&mut InventorySlotState>,
-    inv_state: Res<InventoryState>,
 
     mut slot_drop_events: EventWriter<DropOnSlotEvent>,
     mut world_drop_events: EventWriter<DropInWorldEvent>,
@@ -401,13 +400,14 @@ pub fn handle_item_drop_clicks(
     mut item_stack_query: Query<&mut ItemStack>,
     mut interactables: Query<(Entity, &mut Interactable)>,
     mut right_clicks: Local<Vec<usize>>,
+    ui_state: Res<State<UIState>>,
 ) {
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
     let right_mouse_pressed = mouse_input.pressed(MouseButton::Right);
     if !right_mouse_pressed {
         right_clicks.clear();
     }
-    let inv_open = inv_state.open;
+    let inv_open = ui_state.0.is_inv_open();
     let hit_test = if inv_open {
         ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
     } else {
@@ -457,7 +457,7 @@ pub fn handle_item_drop_clicks(
                         world_drop_events.send(DropInWorldEvent {
                             dropped_entity: *item,
                             dropped_item_stack: item_stack.clone(),
-                            parent_interactable_entity: e,
+                            parent_interactable_entity: Some(e),
                             stack_empty: true,
                         });
                     } else if mouse_input.just_pressed(MouseButton::Right) {
@@ -466,7 +466,7 @@ pub fn handle_item_drop_clicks(
                         world_drop_events.send(DropInWorldEvent {
                             dropped_entity: *item,
                             dropped_item_stack: lonely_item_stack,
-                            parent_interactable_entity: e,
+                            parent_interactable_entity: Some(e),
                             stack_empty: item_stack.count == 0,
                         });
                     }
@@ -475,6 +475,24 @@ pub fn handle_item_drop_clicks(
         } else {
             continue;
         };
+    }
+}
+
+pub fn handle_drop_dragged_items_on_inv_close(
+    mut world_drop_events: EventWriter<DropInWorldEvent>,
+    ui_state: ResMut<State<UIState>>,
+    dragging_query: Query<(Entity, &ItemStack), With<DraggedItem>>,
+) {
+    if ui_state.0.is_inv_open() {
+        return;
+    }
+    for (e, item_stack) in dragging_query.iter() {
+        world_drop_events.send(DropInWorldEvent {
+            dropped_entity: e,
+            dropped_item_stack: item_stack.clone(),
+            parent_interactable_entity: None,
+            stack_empty: true,
+        });
     }
 }
 pub fn handle_interaction_clicks(
@@ -486,17 +504,17 @@ pub fn handle_interaction_clicks(
     mut inv_slots: Query<(Entity, &mut Interactable, &mut InventorySlotState)>,
     mut inv_item_icons: Query<(Entity, &mut Transform, &ItemStack)>,
     dragging_query: Query<&DraggedItem>,
-    inv_state: Res<InventoryState>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut inv: Query<&mut Inventory>,
     mut remove_item_event: EventWriter<RemoveFromSlotEvent>,
     mut container_param: UIContainersParam,
     proto: ProtoParam,
+    ui_state: Res<State<UIState>>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
-    if !inv_state.open {
+    if !ui_state.0.is_inv_open() {
         return;
     }
 

@@ -206,7 +206,6 @@ impl GameAssetsPlugin {
         sprite_sheet: Res<ImageAssets>,
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
-        mut materials: ResMut<Assets<FoliageMaterial>>,
         asset_server: Res<AssetServer>,
         _crafting_tracker: ResMut<CraftingTracker>,
     ) {

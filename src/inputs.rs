@@ -6,7 +6,6 @@ use crate::attributes::hunger::Hunger;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::MovePlayerEvent;
-use crate::ui::stats_ui::StatsUI;
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 use bevy::prelude::*;
@@ -38,7 +37,7 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, EssenceShopChoices, EssenceUI, InventoryState, UIState};
+use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
 use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
@@ -382,83 +381,73 @@ pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
 }
 pub fn close_container(
     key_input: ResMut<Input<KeyCode>>,
-    mut inv_state: ResMut<InventoryState>,
-    mut commands: Commands,
-    stats_query: Query<Entity, With<StatsUI>>,
-    essence_query: Query<Entity, With<EssenceUI>>,
     mut next_inv_state: ResMut<NextState<UIState>>,
 ) {
     if key_input.just_pressed(KeyCode::Escape) {
-        if let Some(e) = essence_query.iter().next() {
-            commands.entity(e).despawn_recursive();
-            next_inv_state.set(UIState::Closed);
-            return;
-        }
-        inv_state.open = false;
-        if let Ok(e) = stats_query.get_single() {
-            commands.entity(e).despawn_recursive();
-        }
+        next_inv_state.set(UIState::Closed);
     }
 }
 pub fn toggle_inventory(
     mut game: GameParam,
     key_input: ResMut<Input<KeyCode>>,
-    mut inv_state: ResMut<InventoryState>,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
     mut move_player_event: EventWriter<MovePlayerEvent>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
 ) {
     if key_input.just_pressed(KeyCode::I)
         || key_input.just_pressed(KeyCode::Tab)
         || key_input.just_pressed(KeyCode::E)
     {
-        inv_state.open = !inv_state.open;
+        next_ui_state.set(UIState::Inventory);
     }
 
-    if key_input.just_pressed(KeyCode::P) {
-        spawn_new_dungeon_dimension(
-            &mut game,
-            &mut commands,
-            &mut proto_commands,
-            &mut move_player_event,
-        );
-    }
-    if key_input.just_pressed(KeyCode::O) {
-        dim_event.send(DimensionSpawnEvent {
-            generation_params: proto.get_world_gen().unwrap(),
-            swap_to_dim_now: true,
-        });
-    }
-    if key_input.just_pressed(KeyCode::U) {
-        commands
-            .entity(game.game.player)
-            .insert(FireStaffAOEUpgrade)
-            .insert(LightningStaffChainUpgrade)
-            .insert(BowUpgradeSpread(2))
-            .insert(ArrowSpeedUpgrade(1.))
-            .insert(BurnOnHitUpgrade)
-            .insert(VenomOnHitUpgrade)
-            .insert(LethalHitUpgrade)
-            .insert(ClawUpgradeMultiThrow(
-                Timer::from_seconds(0.1, TimerMode::Once),
-                2,
-            ));
-    }
-    if key_input.just_pressed(KeyCode::L) {
-        let pos = tile_pos_to_world_pos(
-            TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }),
-            true,
-        );
-        // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
-        // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
-        // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
-        proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-        // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-        // commands.entity(f.unwrap()).insert(MobLevel(2));
-        // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+    if *DEBUG_MODE {
+        if key_input.just_pressed(KeyCode::P) {
+            spawn_new_dungeon_dimension(
+                &mut game,
+                &mut commands,
+                &mut proto_commands,
+                &mut move_player_event,
+            );
+        }
+        if key_input.just_pressed(KeyCode::O) {
+            dim_event.send(DimensionSpawnEvent {
+                generation_params: proto.get_world_gen().unwrap(),
+                swap_to_dim_now: true,
+            });
+        }
+        if key_input.just_pressed(KeyCode::U) {
+            commands
+                .entity(game.game.player)
+                .insert(FireStaffAOEUpgrade)
+                .insert(LightningStaffChainUpgrade)
+                .insert(BowUpgradeSpread(2))
+                .insert(ArrowSpeedUpgrade(1.))
+                .insert(BurnOnHitUpgrade)
+                .insert(VenomOnHitUpgrade)
+                .insert(LethalHitUpgrade)
+                .insert(ClawUpgradeMultiThrow(
+                    Timer::from_seconds(0.1, TimerMode::Once),
+                    2,
+                ));
+        }
+        if key_input.just_pressed(KeyCode::L) {
+            let pos = tile_pos_to_world_pos(
+                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }),
+                true,
+            );
+            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
+            // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // commands.entity(f.unwrap()).insert(MobLevel(2));
+            // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
+        }
     }
 }
 fn handle_hotbar_key_input(

@@ -8,7 +8,7 @@
         obj_type: Essence,
         metadata: (
             name: "Essence", 
-            desc: ["Essence of the", "Forrest. Can", "be spent to", "aid you. x"]
+            desc: ["Essence of the", "Forrest. Can", "be spent to", "aid you."]
         ),
         count: 1
   ),

@@ -19,7 +19,10 @@ use crate::{
     attributes::{hunger::Hunger, CurrentHealth},
     container::{Container, ContainerRegistry},
     inventory::{Inventory, ItemStack},
-    item::{projectile::Projectile, CraftingTracker, Foliage, MainHand, Wall, WorldObject},
+    item::{
+        projectile::Projectile, CraftingTracker, EquipmentType, Foliage, MainHand, Wall,
+        WorldObject,
+    },
     night::NightTracker,
     player::{
         levels::PlayerLevel,
@@ -48,7 +51,8 @@ pub struct ClientPlugin;
 //TODO: Temp does not work, Save/Load WIP
 impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(SavePlugins)
+        app.add_event::<GameOverEvent>()
+            .add_plugins(SavePlugins)
             .register_saveable::<GenerationSeed>()
             .register_saveable::<Dimension>()
             .register_saveable::<ActiveDimension>()
@@ -101,7 +105,7 @@ impl Plugin for ClientPlugin {
             .register_type::<[WorldObject; 4]>()
             .insert_resource(AppDespawnMode::new(DespawnMode::None))
             .insert_resource(AppMappingMode::new(MappingMode::Strict))
-            .insert_resource(SaveData::default())
+            .insert_resource(CurrentRunSaveData::default())
             .insert_resource(SaveTimer {
                 timer: Timer::from_seconds(15., TimerMode::Repeating),
             })
@@ -110,13 +114,15 @@ impl Plugin for ClientPlugin {
                     .run_if(run_once())
                     .in_schedule(OnExit(GameState::MainMenu)),
             )
-            .add_system(save_state.in_set(OnUpdate(GameState::Main)))
+            .add_systems(
+                (save_state, handle_append_run_data_after_death).in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
 
 #[derive(Resource, Clone, Serialize, Deserialize, Default)]
-pub struct SaveData {
+pub struct CurrentRunSaveData {
     seed: u64,
     #[serde(with = "vectorize")]
     placed_objs: HashMap<TileMapPosition, WorldObject>,
@@ -137,9 +143,71 @@ pub struct SaveData {
     pub player_hunger: u8,
 }
 
+#[derive(Default)]
+pub struct GameOverEvent;
+
 #[derive(Resource, Default)]
 pub struct SaveTimer {
     timer: Timer,
+}
+
+#[derive(Resource, Clone, Serialize, Deserialize, Default)]
+pub struct GameData {
+    pub num_runs: u128,
+    pub longest_run: u8,
+    pub seen_gear: Vec<ItemStack>,
+}
+pub fn handle_append_run_data_after_death(
+    night: Res<NightTracker>,
+    inv: Query<&Inventory>,
+    proto_param: ProtoParam,
+    game_over: EventReader<GameOverEvent>,
+) {
+    if game_over.is_empty() {
+        return;
+    }
+    println!("GAME OVER! Storing run data in game_data.json...");
+    let mut game_data: GameData = GameData::default();
+
+    if let Ok(file_file) = File::open("game_data.json") {
+        let reader = BufReader::new(file_file);
+
+        // Read the JSON contents of the file as an instance of `User`.
+        match serde_json::from_reader::<_, GameData>(reader) {
+            Ok(data) => game_data = data,
+            Err(err) => println!("Failed to load data from game_data.json file {err:?}"),
+        }
+    };
+    game_data.num_runs += 1;
+    if game_data.longest_run < night.days {
+        game_data.longest_run = night.days;
+    }
+    let inv = inv.single();
+    for item in inv.items.items.clone().iter().flatten() {
+        if item.slot < 6 {
+            //hotbar item
+            if let Some(eqp_type) = item.get_obj().get_equip_type(&proto_param) {
+                if eqp_type != EquipmentType::Axe && eqp_type != EquipmentType::Pickaxe {
+                    game_data.seen_gear.push(item.item_stack.clone());
+                }
+            }
+        }
+    }
+
+    for item in inv.equipment_items.items.iter().flatten() {
+        game_data.seen_gear.push(item.item_stack.clone());
+    }
+
+    const PATH: &str = "game_data.json";
+
+    let file = File::create(PATH).expect("Could not create game data file for serialization");
+
+    // let json_Data: String = serde_json::to_string(&save_data).unwrap();
+    if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
+        println!("Failed to save game data after death: {result:?}");
+    } else {
+        println!("UPDATED GAME DATA...");
+    }
 }
 pub fn save_state(
     mut timer: ResMut<SaveTimer>,
@@ -153,7 +221,7 @@ pub fn save_state(
         ),
         (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
     >,
-    mut save_data: ResMut<SaveData>,
+    mut save_data: ResMut<CurrentRunSaveData>,
     proto_param: ProtoParam,
     player_data: Query<
         (
@@ -285,7 +353,7 @@ pub fn load_state(
         let reader = BufReader::new(file_file);
 
         // Read the JSON contents of the file as an instance of `User`.
-        match serde_json::from_reader::<_, SaveData>(reader) {
+        match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
             Ok(data) => {
                 for (tp, _) in data.placed_objs.iter() {
                     if !game.is_chunk_generated(tp.chunk_pos) {

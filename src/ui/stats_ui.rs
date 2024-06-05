@@ -70,7 +70,7 @@ pub fn setup_stats_ui(
         })
         .insert(StatsUI)
         .insert(Name::new("STATS UI"))
-        .insert(UIElement::StatsButton)
+        .insert(UIState::Stats)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
 
@@ -165,20 +165,10 @@ pub fn setup_stats_ui(
 
 pub fn toggle_stats_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
-    curr_inv_state: Res<State<UIState>>,
-    stats_query: Query<Entity, With<StatsUI>>,
-    mut commands: Commands,
     key_input: ResMut<Input<KeyCode>>,
 ) {
     if key_input.just_pressed(KeyCode::B) {
-        if curr_inv_state.0 == UIState::Stats {
-            next_inv_state.set(UIState::Closed);
-            if let Ok(e) = stats_query.get_single() {
-                commands.entity(e).despawn_recursive();
-            }
-        } else if curr_inv_state.0 == UIState::Closed && !next_inv_state.is_changed() {
-            next_inv_state.set(UIState::Stats);
-        }
+        next_inv_state.set(UIState::Stats);
     }
 }
 

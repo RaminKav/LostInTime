@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{animations::AnimationTimer, ui::InventoryState, world::y_sort::YSort, DEBUG_MODE};
+use crate::{animations::AnimationTimer, ui::UIState, world::y_sort::YSort, DEBUG_MODE};
 
 use super::stats::SkillPoints;
 
@@ -78,7 +78,11 @@ pub fn spawn_particles_when_leveling(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     player_xp: Query<&SkillPoints>,
     existing_particles: Query<Entity, With<LevelUpParticles>>,
+    ui_state: Res<State<UIState>>,
 ) {
+    if ui_state.0 != UIState::Closed {
+        return;
+    }
     if player_xp.single().count > 0 && existing_particles.iter().next().is_none() {
         let texture_handle = asset_server.load("textures/effects/levelup.png");
         let texture_atlas =
@@ -104,9 +108,9 @@ pub fn spawn_particles_when_leveling(
 pub fn hide_particles_when_inv_open(
     mut commands: Commands,
     particles: Query<Entity, With<LevelUpParticles>>,
-    inv_state: Res<InventoryState>,
+    ui_state: Res<State<UIState>>,
 ) {
-    if inv_state.open {
+    if ui_state.0 != UIState::Closed {
         for p in particles.iter() {
             commands.entity(p).despawn();
         }

@@ -5,17 +5,17 @@ use crate::{
     attributes::AttributeChangeEvent,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
-    ui::{ChestContainer, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
+    ui::{CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{
-    crafting_ui::CraftingContainer, interactions::Interaction, stats_ui::StatsUI, FurnaceContainer,
-    Interactable, ShowInvPlayerStatsEvent, UIContainersParam, UIElement,
-    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
+    crafting_ui::CraftingContainer, interactions::Interaction, Interactable,
+    ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
 };
 
-#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States)]
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
 pub enum UIState {
     #[default]
     Closed,
@@ -26,6 +26,14 @@ pub enum UIState {
     Crafting,
     Furnace,
     Essence,
+}
+impl UIState {
+    pub fn is_inv_open(&self) -> bool {
+        self == &UIState::Inventory
+            || self == &UIState::Chest
+            || self == &UIState::Crafting
+            || self == &UIState::Furnace
+    }
 }
 
 #[derive(Component, Default, Clone)]
@@ -41,7 +49,6 @@ pub struct InventorySlotState {
 }
 #[derive(Resource, Default, Debug)]
 pub struct InventoryState {
-    pub open: bool,
     pub active_hotbar_slot: usize,
     pub inv_size: Vec2,
     pub hotbar_dirty: bool,
@@ -142,6 +149,7 @@ pub fn setup_inv_ui(
             ..Default::default()
         })
         .insert(InventoryUI)
+        .insert(cur_inv_state.0.clone())
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
@@ -237,63 +245,6 @@ pub fn setup_inv_slots_ui(
     }
 }
 
-pub fn toggle_inv_visibility(
-    inv_state: Res<InventoryState>,
-    mut hotbar_slots: Query<&mut Visibility, (Without<Interactable>, With<InventorySlotState>)>,
-    mut next_inv_state: ResMut<NextState<UIState>>,
-    curr_inv_state: Res<State<UIState>>,
-    inv_query: Query<Entity, With<InventoryUI>>,
-    mut commands: Commands,
-    chest_option: Option<Res<ChestContainer>>,
-    furnace_option: Option<Res<FurnaceContainer>>,
-    stats_query: Query<Entity, With<StatsUI>>,
-) {
-    if !inv_state.open
-        && (curr_inv_state.0 == UIState::Inventory
-            || curr_inv_state.0 == UIState::Chest
-            || curr_inv_state.0 == UIState::Crafting
-            || curr_inv_state.0 == UIState::Furnace)
-    {
-        next_inv_state.set(UIState::Closed);
-        if let Ok(e) = inv_query.get_single() {
-            if let Some(chest) = chest_option {
-                if let Some(mut chest_parent) = commands.get_entity(chest.parent) {
-                    chest_parent.insert(chest.to_owned());
-                }
-                commands.remove_resource::<ChestContainer>();
-            }
-            if let Some(furnace) = furnace_option {
-                if let Some(mut furnace_parent) = commands.get_entity(furnace.parent) {
-                    furnace_parent.insert(furnace.to_owned());
-                }
-                commands.remove_resource::<ChestContainer>();
-            }
-            commands.remove_resource::<CraftingContainer>();
-            commands.remove_resource::<FurnaceContainer>();
-            commands.entity(e).despawn_recursive();
-        }
-    } else if inv_state.open
-        && (curr_inv_state.0 == UIState::Closed || curr_inv_state.0 == UIState::Stats)
-        && !next_inv_state.is_changed()
-    {
-        next_inv_state.set(UIState::Inventory);
-
-        // close stats ui if its open
-        if let Ok(e) = stats_query.get_single() {
-            commands.entity(e).despawn_recursive();
-        }
-    }
-    for mut hbv in hotbar_slots.iter_mut() {
-        *hbv = if inv_state.open {
-            Visibility::Hidden
-        } else {
-            Visibility::Inherited
-        };
-    }
-    if inv_state.open {
-        return;
-    }
-}
 pub fn spawn_inv_slot(
     commands: &mut Commands,
     inv_ui_state: &Res<State<UIState>>,
@@ -522,7 +473,7 @@ pub fn update_inventory_ui(
 
         // hotbars are hidden when inventory is open, so defer update
         // untile inv is closed again.
-        if inv_state.open && slot_state.r#type.is_hotbar() {
+        if inv_ui_state.0.is_inv_open() && slot_state.r#type.is_hotbar() {
             continue;
         }
 
@@ -571,10 +522,10 @@ pub fn handle_update_inv_item_entities(
     mut inv: Query<&mut Inventory, Changed<Inventory>>,
     mut inv_slot_state: Query<&mut InventorySlotState>,
     mut att_event: EventWriter<AttributeChangeEvent>,
-    inv_state: Res<InventoryState>,
     mut commands: Commands,
+    ui_state: Res<State<UIState>>,
 ) {
-    if !inv_state.open {
+    if !ui_state.0.is_inv_open() {
         return;
     }
     if let Ok(inv) = inv.get_single_mut() {

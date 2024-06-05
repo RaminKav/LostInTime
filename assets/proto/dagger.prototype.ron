@@ -23,7 +23,7 @@
         obj_type: Dagger,
         attributes: (
             max_durability: 100,
-            attack_cooldown: 0.2
+            attack_cooldown: 0.25
         ),
         metadata: (
             name: "Dagger", 

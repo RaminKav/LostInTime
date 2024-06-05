@@ -120,8 +120,8 @@ impl Plugin for UIPlugin {
                         .before(CustomFlush)
                         .run_if(resource_added::<ChestContainer>()),
                     text_update_system,
-                    toggle_inv_visibility,
                     handle_item_drop_clicks,
+                    handle_drop_dragged_items_on_inv_close,
                     handle_dragging,
                     handle_drop_on_slot_events.after(handle_item_drop_clicks),
                     handle_drop_in_world_events.after(handle_item_drop_clicks),
@@ -174,6 +174,7 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(handle_new_ui_state.in_base_set(CoreSet::PostUpdate))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
@@ -182,4 +183,61 @@ impl Plugin for UIPlugin {
 
 fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
     state.0 == GameState::Main || state.0 == GameState::MainMenu
+}
+
+pub fn handle_new_ui_state(
+    mut next_ui_state: ResMut<NextState<UIState>>,
+    curr_ui_state: Res<State<UIState>>,
+    old_ui: Query<(Entity, &UIState), With<UIState>>,
+    mut commands: Commands,
+    chest_option: Option<Res<ChestContainer>>,
+    furnace_option: Option<Res<FurnaceContainer>>,
+    mut hotbar_slots: Query<&mut Visibility, (Without<Interactable>, With<InventorySlotState>)>,
+) {
+    if !next_ui_state.0.is_some() {
+        return;
+    }
+    let next_ui = next_ui_state.0.as_ref().unwrap().clone();
+    println!("UI State Changed: {:?} -> {:?}", curr_ui_state.0, next_ui);
+    let mut should_close_self = false;
+    if next_ui == curr_ui_state.0 {
+        next_ui_state.set(UIState::Closed);
+        should_close_self = true;
+    }
+    for (e, ui) in old_ui.iter() {
+        if *ui != next_ui || should_close_self {
+            commands.entity(e).despawn_recursive();
+        }
+    }
+    if let Some(chest) = chest_option {
+        if let Some(mut chest_parent) = commands.get_entity(chest.parent) {
+            chest_parent.insert(chest.to_owned());
+        }
+        if next_ui != UIState::Chest {
+            commands.remove_resource::<ChestContainer>();
+        }
+    }
+    if let Some(furnace) = furnace_option {
+        if let Some(mut furnace_parent) = commands.get_entity(furnace.parent) {
+            furnace_parent.insert(furnace.to_owned());
+        }
+        if next_ui != UIState::Furnace {
+            commands.remove_resource::<FurnaceContainer>();
+        }
+    }
+    if !next_ui.is_inv_open() {
+        commands.remove_resource::<CraftingContainer>();
+    }
+    if next_ui != UIState::Essence {
+        commands.remove_resource::<EssenceShopChoices>();
+    }
+    if let Some(next_ui) = &next_ui_state.0 {
+        for mut hbv in hotbar_slots.iter_mut() {
+            *hbv = if next_ui.is_inv_open() {
+                Visibility::Hidden
+            } else {
+                Visibility::Inherited
+            };
+        }
+    }
 }

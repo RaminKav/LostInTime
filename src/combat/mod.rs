@@ -9,6 +9,7 @@ use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
+    client::GameOverEvent,
     custom_commands::CommandsExt,
     enemy::{Mob, MobLevel},
     item::{
@@ -236,6 +237,7 @@ pub fn handle_hits(
     mut obj_death_events: EventWriter<ObjBreakEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
+    mut game_over_event: EventWriter<GameOverEvent>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -314,6 +316,8 @@ pub fn handle_hits(
                         entity: e,
                         enemy_pos: t.translation().truncate(),
                     })
+                } else if hit_health.0 <= 0 && is_player {
+                    game_over_event.send_default();
                 }
             }
 
