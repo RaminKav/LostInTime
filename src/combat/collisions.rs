@@ -1,8 +1,9 @@
 use crate::{
+    ai::LeapAttackState,
     animations::DoneAnimation,
     attributes::{
-        modifiers::ModifyHealthEvent, Attack, AttributeModifier, Defence, Dodge,
-        InvincibilityCooldown, Lifesteal, Thorns,
+        modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
+        Thorns,
     },
     enemy::Mob,
     inventory::{Inventory, ItemStack},
@@ -10,7 +11,7 @@ use crate::{
         projectile::{EnemyProjectile, Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
     },
-    ui::{damage_numbers::DodgeEvent, InventoryState},
+    ui::damage_numbers::DodgeEvent,
     CustomFlush, GameParam, GameState, Player,
 };
 use bevy::prelude::*;
@@ -44,8 +45,6 @@ fn check_melee_hit_collisions(
     >,
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
-    inv_state: Res<InventoryState>,
-    mut inv: Query<&mut Inventory>,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     lifesteal: Query<&Lifesteal>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
@@ -68,21 +67,7 @@ fn check_melee_hit_collisions(
             {
                 return;
             }
-            if let Some(Some(wep)) = inv
-                .single()
-                .clone()
-                .items
-                .items
-                .get(inv_state.active_hotbar_slot)
-            {
-                wep.modify_attributes(
-                    AttributeModifier {
-                        modifier: "durability".to_owned(),
-                        delta: -1,
-                    },
-                    &mut inv.single_mut().items,
-                );
-            }
+
             hit_tracker.push(hit_entity);
             let damage = game.calculate_player_damage().0 as i32;
             let Ok(mob_txfm) = mob_txfms.get(hit_entity) else {
@@ -309,7 +294,7 @@ fn check_mob_to_player_collisions(
         ),
         With<Player>,
     >,
-    mobs: Query<(&Transform, &Attack), (With<Mob>, Without<Player>)>,
+    mobs: Query<(&Transform, &Attack, Option<&LeapAttackState>), (With<Mob>, Without<Player>)>,
     rapier_context: Res<RapierContext>,
     mut hit_event: EventWriter<HitEvent>,
     mut dodge_event: EventWriter<DodgeEvent>,
@@ -327,7 +312,17 @@ fn check_mob_to_player_collisions(
             if !mobs.contains(e2) {
                 continue;
             }
-            let (mob_txfm, attack) = mobs.get(e2).unwrap();
+            let (mob_txfm, attack, is_leap_attacking) = mobs.get(e2).unwrap();
+
+            // mobs can only hit player during their attack animations
+            if is_leap_attacking.is_none() {
+                continue;
+            } else if let Some(is_leap_attacking) = is_leap_attacking {
+                if !is_leap_attacking.attack_startup_timer.finished() {
+                    continue;
+                }
+            }
+
             let delta = player_txfm.translation - mob_txfm.translation;
             hit_this_frame = true;
 
