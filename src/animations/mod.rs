@@ -408,7 +408,7 @@ fn animate_foliage_opacity(
         if let Some(mat) = foliage_material {
             // check if player is behind tree
             let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-            if delta_t.x <= 10. && delta_t.x >= -10. && delta_t.y <= 32. && delta_t.y >= -24. {
+            if delta_t.x <= 14. && delta_t.x >= -14. && delta_t.y <= 32. && delta_t.y >= -24. {
                 mat.opacity = 0.5;
             } else {
                 mat.opacity = 1.;
