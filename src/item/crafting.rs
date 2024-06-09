@@ -21,7 +21,6 @@ pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(Recipes::default())
-            .insert_resource(CraftingTracker::default())
             .add_event::<CraftedItemEvent>()
             .add_systems(
                 (

@@ -433,16 +433,13 @@ lazy_static! {
 #[derive(Debug, Resource)]
 pub struct WorldObjectResource {
     pub properties: HashMap<WorldObject, WorldObjectData>,
-    pub drop_entities: HashMap<Entity, (ItemStack, Transform)>,
 }
-
 //TODO: delete this and unify with WorldItemMetadata...
 
 impl WorldObjectResource {
     fn new() -> Self {
         Self {
             properties: HashMap::new(),
-            drop_entities: HashMap::new(),
         }
     }
 }
@@ -635,7 +632,11 @@ impl Plugin for ItemsPlugin {
                     .before(CustomFlush)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(handle_placing_world_object.in_base_set(CoreSet::PostUpdate))
+            .add_system(
+                handle_placing_world_object
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_systems(
                 (
                     handle_item_action_success,

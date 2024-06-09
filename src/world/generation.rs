@@ -40,7 +40,6 @@ pub struct GenerationPlugin;
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<WallBreakEvent>()
-            .insert_resource(WorldObjectCache::default())
             .add_systems(
                 (
                     handle_wall_break
@@ -52,10 +51,15 @@ impl Plugin for GenerationPlugin {
             )
             .add_system(
                 Self::generate_and_cache_objects
+                    .in_set(OnUpdate(GameState::Main))
                     .before(CustomFlush)
                     .run_if(resource_exists::<GenerationSeed>()),
             )
-            .add_system(update_wall.in_base_set(CoreSet::PostUpdate))
+            .add_system(
+                update_wall
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

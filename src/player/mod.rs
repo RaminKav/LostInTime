@@ -99,17 +99,21 @@ impl Plugin for PlayerPlugin {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
             app.add_event::<MovePlayerEvent>();
         })
-        .add_startup_system(spawn_player)
-        .add_systems((
-            send_attribute_event_on_stats_update,
-            handle_level_up,
-            spawn_particles_when_leveling,
-            hide_particles_when_inv_open,
-            give_player_starting_items.in_schedule(OnEnter(GameState::Main)),
-        ))
+        .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
+        .add_systems(
+            (
+                send_attribute_event_on_stats_update,
+                handle_level_up,
+                spawn_particles_when_leveling,
+                hide_particles_when_inv_open,
+            )
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
         .add_system(handle_move_player.before(CustomFlush))
         .add_system(
             handle_player_raw_position
+                .run_if(in_state(GameState::Main))
                 .after(PhysicsSet::SyncBackendFlush)
                 .before(TransformSystem::TransformPropagate)
                 .before(move_camera_with_player)
@@ -170,7 +174,6 @@ fn spawn_player(
             SpriteSheetBundle {
                 texture_atlas: player_texture_atlas_handle,
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                visibility: Visibility::Hidden,
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
@@ -275,9 +278,10 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40, None);
     // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
-    // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64, None);

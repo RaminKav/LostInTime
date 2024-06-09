@@ -43,8 +43,7 @@ pub struct NewDayEvent;
 
 impl Plugin for NightPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(NightTracker::default())
-            .register_type::<NightTracker>()
+        app.register_type::<NightTracker>()
             .add_event::<NewDayEvent>()
             .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
             .add_system(spawn_night.in_schedule(OnEnter(GameState::Main)))

@@ -388,9 +388,6 @@ impl ItemStack {
             obj_data.size.x / 3.5,
             obj_data.size.y / 4.5,
         ));
-        game.world_obj_data
-            .drop_entities
-            .insert(item, (self.clone(), transform));
         item
     }
     pub fn copy_with_attributes(&self, attributes: &ItemAttributes) -> Self {

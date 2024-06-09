@@ -109,11 +109,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(SaveTimer {
                 timer: Timer::from_seconds(15., TimerMode::Repeating),
             })
-            .add_system(
-                load_state
-                    .run_if(run_once())
-                    .in_schedule(OnExit(GameState::MainMenu)),
-            )
+            .add_system(load_state.in_schedule(OnExit(GameState::MainMenu)))
             .add_systems(
                 (save_state, handle_append_run_data_after_death).in_set(OnUpdate(GameState::Main)),
             )

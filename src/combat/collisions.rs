@@ -276,7 +276,6 @@ pub fn check_item_drop_collisions(
 
             item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
 
-            game.world_obj_data.drop_entities.remove(&e2);
             commands.entity(e2).despawn();
         }
     }

@@ -3,8 +3,9 @@ use std::process::exit;
 use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    assets::Graphics, audio::UpdateBGMTrackEvent, colors::YELLOW_2, player::Player, GameState,
-    GAME_HEIGHT, GAME_WIDTH,
+    assets::Graphics, audio::UpdateBGMTrackEvent, colors::YELLOW_2, container::ContainerRegistry,
+    item::CraftingTracker, night::NightTracker, world::generation::WorldObjectCache, Game,
+    GameState, GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{Interactable, UIElement};
@@ -42,10 +43,9 @@ pub fn display_main_menu(
         },
         ..Default::default()
     });
-    menu
-        // .insert(RenderLayers::from_layers(&[1]))
-        .insert(UIElement::MainMenu)
+    menu.insert(UIElement::MainMenu)
         .insert(MainMenu)
+        .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Main Menu"));
 
     //start music
@@ -57,30 +57,32 @@ pub fn display_main_menu(
 pub fn remove_main_menu(
     mut commands: Commands,
     query: Query<Entity, With<MainMenu>>,
-    player: Query<Entity, With<Player>>,
     menu_buttons: Query<Entity, With<MenuButton>>,
 ) {
     for entity in query.iter() {
-        println!("REMOVING MAIN MENU");
         commands.entity(entity).despawn_recursive();
 
         for button in menu_buttons.iter() {
             commands.entity(button).despawn_recursive();
         }
-
-        commands.entity(player.single()).insert(Visibility::Visible);
     }
 }
 
 pub fn handle_menu_button_click_events(
     mut event_reader: EventReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
+    mut commands: Commands,
 ) {
     for event in event_reader.iter() {
         match event.button {
             MenuButton::Start => {
                 println!("START GAME");
                 next_state.0 = Some(GameState::Main);
+                commands.init_resource::<Game>();
+                commands.init_resource::<NightTracker>();
+                commands.init_resource::<ContainerRegistry>();
+                commands.init_resource::<CraftingTracker>();
+                commands.insert_resource(WorldObjectCache::default());
             }
             MenuButton::Options => {
                 println!("OPTIONS");

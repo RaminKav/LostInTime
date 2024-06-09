@@ -16,7 +16,7 @@ mod vectorize;
 
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
-use container::ContainerRegistry;
+
 use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
@@ -118,8 +118,6 @@ lazy_static! {
 fn main() {
     let mut app = App::new();
     let app = app
-        .init_resource::<Game>()
-        .insert_resource(ContainerRegistry::default())
         .add_state::<GameState>()
         .edit_schedule(CoreSchedule::FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));

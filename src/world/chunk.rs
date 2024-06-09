@@ -27,8 +27,7 @@ use super::{
 pub struct ChunkPlugin;
 impl Plugin for ChunkPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(ChunkObjectCache::default())
-            .add_event::<SpawnChunkEvent>()
+        app.add_event::<SpawnChunkEvent>()
             .add_event::<DespawnChunkEvent>()
             .add_event::<CreateChunkEvent>()
             .add_event::<GenerateObjectsEvent>()
@@ -43,14 +42,15 @@ impl Plugin for ChunkPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(Self::despawn_outofrange_chunks.in_base_set(CoreSet::PostUpdate))
+            .add_system(
+                Self::despawn_outofrange_chunks
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
-#[derive(Resource, Debug, Clone, Default)]
-pub struct ChunkObjectCache {
-    pub cache: HashMap<IVec2, HashMap<TileMapPosition, WorldObject>>,
-}
+
 #[derive(Component)]
 pub struct SpawnedChunk;
 #[derive(Eq, Hash, Reflect, Component, PartialEq, Default, Debug, Clone)]

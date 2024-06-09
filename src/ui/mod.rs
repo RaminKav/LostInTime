@@ -174,7 +174,11 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(handle_new_ui_state.in_base_set(CoreSet::PostUpdate))
+            .add_system(
+                handle_new_ui_state
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))
             .add_system(apply_system_buffers.in_set(CustomFlush));

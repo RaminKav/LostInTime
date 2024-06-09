@@ -9,6 +9,7 @@ pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
+    client::GameOverEvent,
     colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
@@ -318,7 +319,7 @@ macro_rules! setup_raw_bonus_attributes {
                         {
                             if stringify!($field_name) == picked_attribute {
                                 let value = rng.gen_range(self.$field_name.clone().unwrap());
-                                item_attributes.$field_name = value + rarity.get_rarity_attributes_bonus(item_type);
+                                item_attributes.$field_name = value + rarity.get_rarity_attributes_bonus();
                             }
                         }
                     )*
@@ -446,7 +447,7 @@ impl ItemRarity {
             ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
         }
     }
-    fn get_rarity_attributes_bonus(&self, eqp_type: &EquipmentType) -> i32 {
+    fn get_rarity_attributes_bonus(&self) -> i32 {
         match self {
             ItemRarity::Common => 1,
             ItemRarity::Uncommon => 2,
@@ -605,10 +606,14 @@ impl Plugin for AttributesPlugin {
     }
 }
 
-fn clamp_health(mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>>) {
+fn clamp_health(
+    mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>>,
+    mut game_over_event: EventWriter<GameOverEvent>,
+) {
     for (mut h, max_h) in health.iter_mut() {
-        if h.0 < 0 {
+        if h.0 <= 0 {
             h.0 = 0;
+            game_over_event.send_default();
         } else if h.0 > max_h.0 {
             h.0 = max_h.0;
         }
