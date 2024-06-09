@@ -29,19 +29,20 @@ pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<MobSpawnEvent>().add_systems(
-            (
-                handle_spawn_mobs,
-                tick_spawner_timers,
-                add_spawners_to_new_chunks,
-                handle_add_fairy_spawners,
-                check_mob_count,
-                spawn_one_time_enemies_at_day,
-                reduce_chunk_mob_count_on_mob_death,
-                despawn_out_of_range_mobs,
+        app.add_event::<MobSpawnEvent>()
+            .add_systems(
+                (
+                    handle_spawn_mobs,
+                    tick_spawner_timers,
+                    add_spawners_to_new_chunks,
+                    handle_add_fairy_spawners,
+                    spawn_one_time_enemies_at_day,
+                    reduce_chunk_mob_count_on_mob_death,
+                    despawn_out_of_range_mobs,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
-                .in_set(OnUpdate(GameState::Main)),
-        );
+            .add_system(check_mob_count.in_base_set(CoreSet::PreUpdate));
     }
 }
 
@@ -74,6 +75,7 @@ pub struct ChunkSpawners {
 #[derive(Debug)]
 pub struct MobSpawnEvent {
     chunk_pos: IVec2,
+    bypass_timers: bool,
 }
 
 fn add_spawners_to_new_chunks(
@@ -88,7 +90,7 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::SpikeSlime,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
@@ -97,7 +99,16 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::FurDevil,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
+                min_days_to_spawn: 0,
+                num_to_spawn: None,
+                num_spawned: 0,
+            });
+            spawners.push(Spawner {
+                enemy: Mob::RedMushling,
+                chunk_pos: new_chunk.1.chunk_pos,
+                weight: 50.,
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
@@ -106,7 +117,7 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::Hog,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
@@ -115,7 +126,7 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::StingFly,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 2,
                 num_to_spawn: None,
                 num_spawned: 0,
@@ -124,7 +135,7 @@ fn add_spawners_to_new_chunks(
                 enemy: Mob::Bushling,
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(240., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 1,
                 num_to_spawn: None,
                 num_spawned: 0,
@@ -198,6 +209,7 @@ fn handle_spawn_mobs(
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut ChunkSpawners>,
 ) {
+    let c = spawner_trigger_event.len();
     for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
             continue;
@@ -212,7 +224,7 @@ fn handle_spawn_mobs(
                 .spawners
                 .iter()
                 .any(|spawner| spawner.spawn_timer.percent() > 0.);
-            if is_currently_spawning {
+            if is_currently_spawning && !e.bypass_timers {
                 continue;
             }
 
@@ -222,7 +234,7 @@ fn handle_spawn_mobs(
             {
                 let no_more_spawns_left = picked_spawner.num_to_spawn.is_some()
                     && picked_spawner.num_spawned >= picked_spawner.num_to_spawn.unwrap();
-                if picked_spawner.spawn_timer.percent() == 0.
+                if (picked_spawner.spawn_timer.percent() == 0. || e.bypass_timers)
                     && picked_spawner.min_days_to_spawn <= night_tracker.days
                     && !no_more_spawns_left
                 {
@@ -248,7 +260,7 @@ fn handle_spawn_mobs(
         if let Some((mob, pos)) = picked_mob_to_spawn {
             let tile_pos = world_pos_to_tile_pos(pos);
             if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
-                return;
+                continue;
             }
             if game
                 .get_tile_data(tile_pos)
@@ -256,17 +268,20 @@ fn handle_spawn_mobs(
                 .block_type
                 .contains(&WorldObject::WaterTile)
             {
-                return;
+                continue;
             }
-            // prototypes.is_ready("Slime");
 
             spawners
                 .get_mut(game.get_chunk_entity(e.chunk_pos).unwrap())
                 .unwrap()
                 .spawned_mobs += 1;
+
             if let Some(spawned_mob) =
                 proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
             {
+                if mob.clone() == Mob::Fairy {
+                    println!("SPAWNED A FAIRY!!!");
+                }
                 if rng.gen::<f32>() < ELITE_SPAWN_RATE
                     && !(proto_param
                         .get_component::<CombatAlignment, _>(mob)
@@ -304,7 +319,10 @@ fn check_mob_count(
         if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
             continue;
         }
-        spawn_event.send(MobSpawnEvent { chunk_pos });
+        spawn_event.send(MobSpawnEvent {
+            chunk_pos,
+            bypass_timers: false,
+        });
     }
 }
 fn despawn_out_of_range_mobs(
@@ -351,11 +369,19 @@ fn spawn_one_time_enemies_at_day(
         *day_tracker += 1;
     }
 }
-fn tick_spawner_timers(time: Res<Time>, mut spawners: Query<&mut ChunkSpawners>) {
+fn tick_spawner_timers(
+    time: Res<Time>,
+    mut spawners: Query<&mut ChunkSpawners>,
+    night_tracker: Res<NightTracker>,
+) {
     for mut spawners in spawners.iter_mut() {
         for spawner in spawners.spawners.iter_mut() {
             if spawner.spawn_timer.percent() > 0. {
                 spawner.spawn_timer.tick(time.delta());
+                if night_tracker.is_night() {
+                    // double spawn rate at night
+                    spawner.spawn_timer.tick(time.delta());
+                }
                 if spawner.spawn_timer.just_finished() {
                     spawner.spawn_timer.reset();
                 }

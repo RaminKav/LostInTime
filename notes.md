@@ -583,3 +583,7 @@ Buttons:
 - add way to grow food
 - [x] decrease cost to craft w stone, or new way to obtain it (stone mob?)
 - [x] decrease dagger speed?
+- [ ] upgrade station needs to reset tooltips when task is done
+- BUG commo ngear dropping w 4 lines of stats
+- Problem: You can run aroudn the island to despawn mobs
+- mushroom doesnt do dmg

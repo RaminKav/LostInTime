@@ -15,7 +15,7 @@ use crate::{
         NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
-    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK},
+    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
@@ -25,8 +25,10 @@ use crate::{
     AppExt, GameParam, GameState,
 };
 
+pub mod red_mushling;
 pub mod spawner;
 use self::spawner::SpawnerPlugin;
+use red_mushling::*;
 
 pub struct EnemyPlugin;
 
@@ -38,6 +40,7 @@ impl Plugin for EnemyPlugin {
             })
             .add_systems(
                 (
+                    handle_new_red_mushling_state_machine,
                     handle_new_mob_state_machine,
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
@@ -76,6 +79,7 @@ pub enum Mob {
     StingFly,
     Bushling,
     Fairy,
+    RedMushling,
 }
 
 impl Mob {
@@ -88,6 +92,7 @@ impl Mob {
             Mob::StingFly => LIGHT_GREEN,
             Mob::Fairy => PINK,
             Mob::FurDevil => PINK,
+            Mob::RedMushling => RED,
             Mob::Hog => LIGHT_BROWN,
         }
     }
@@ -130,6 +135,9 @@ pub struct LeapAttack {
     pub speed: f32,
 }
 
+#[derive(Component)]
+pub struct MobIsAttacking;
+
 #[derive(FromReflect, Default, Reflect, Clone, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
 pub struct ProjectileAttack {
@@ -153,12 +161,15 @@ pub fn handle_new_mob_state_machine(
     >,
     dungeon_check: Query<&Dungeon>,
 ) {
-    for (e, _mob, alignment, follow_speed, leap_attack_option, proj_attack_option) in
+    for (e, mob, alignment, follow_speed, leap_attack_option, proj_attack_option) in
         spawn_events.iter()
     {
         let mut alignment = alignment.clone();
         if dungeon_check.get_single().is_ok() {
             alignment = CombatAlignment::Hostile;
+        }
+        if mob == &Mob::RedMushling {
+            continue;
         }
         let mut e_cmds = commands.entity(e);
         let mut state_machine = StateMachine::default().set_trans_logging(false);
@@ -349,8 +360,8 @@ fn juice_up_spawned_mobs_per_day(
     mut commands: Commands,
 ) {
     for (e, mut hp, mut att, mut exp) in elites.iter_mut() {
-        hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.06)) as i32;
-        att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.06)) as i32;
+        hp.0 = (hp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
+        att.0 = (att.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as i32;
         exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }

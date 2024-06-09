@@ -1,4 +1,5 @@
 pub mod enemy_sprites;
+mod game_over;
 
 use std::cmp::max;
 use std::f32::consts::PI;
@@ -9,6 +10,7 @@ use bevy::sprite::{Material2d, Material2dPlugin, Mesh2dHandle};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
+use game_over::{handle_game_over_fadeout, tick_game_over_overlay};
 use interpolation::lerp;
 
 use crate::ai::LeapAttackState;
@@ -106,9 +108,11 @@ impl Plugin for AnimationsPlugin {
                     animate_spritesheet_animations.after(mouse_click_system),
                     animate_foliage_opacity,
                     handle_add_foliage_material,
+                    handle_game_over_fadeout,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            );
+            )
+            .add_system(tick_game_over_overlay.in_set(OnUpdate(GameState::GameOver)));
     }
 }
 
@@ -202,7 +206,7 @@ fn animate_hit(
     let (p_e, mut kcc, _mv) = player.single_mut();
     for (e, mut hit, mob_option) in hit_tracker.iter_mut() {
         if let Some(state) = mob_option {
-            if state != &EnemyAnimationState::Hit {
+            if state != &EnemyAnimationState::Hit && state != &EnemyAnimationState::Attack {
                 commands.entity(e).insert(EnemyAnimationState::Hit);
             }
         }

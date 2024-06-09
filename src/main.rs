@@ -15,6 +15,7 @@ mod container;
 mod vectorize;
 
 use audio::AudioPlugin;
+use bevy_aseprite::AsepritePlugin;
 use container::ContainerRegistry;
 use juice::JuicePlugin;
 use night::NightPlugin;
@@ -110,9 +111,13 @@ lazy_static! {
 lazy_static! {
     pub static ref MINIMAP: bool = env::var("MINIMAP").is_ok();
 }
+lazy_static! {
+    pub static ref COLLIDERS: bool = env::var("COLLIDERS").is_ok();
+}
 
 fn main() {
-    App::new()
+    let mut app = App::new();
+    let app = app
         .init_resource::<Game>()
         .insert_resource(ContainerRegistry::default())
         .add_state::<GameState>()
@@ -143,7 +148,7 @@ fn main() {
         )
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
-        // .add_plugin(RapierDebugRenderPlugin::default())
+        .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
@@ -176,8 +181,13 @@ fn main() {
         .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
         .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
         .add_system(handle_menu_button_click_events.in_set(OnUpdate(GameState::MainMenu)))
-        .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)))
-        .run();
+        .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));
+
+    if *COLLIDERS {
+        app.add_plugin(RapierDebugRenderPlugin::default());
+    }
+
+    app.run();
 }
 
 #[derive(Resource)]
@@ -206,6 +216,7 @@ pub enum GameState {
     Loading,
     MainMenu,
     Main,
+    GameOver,
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 struct CustomFlush;

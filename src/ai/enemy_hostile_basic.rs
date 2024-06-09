@@ -9,7 +9,7 @@ use seldom_state::prelude::*;
 use crate::{
     animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
     combat::HitEvent,
-    enemy::FollowSpeed,
+    enemy::{FollowSpeed, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
@@ -245,10 +245,14 @@ pub fn leap_attack(
                     delta.normalize_or_zero().truncate() * attack.speed * time.delta_seconds(),
                 );
             }
+
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
             if anim_state != &EnemyAnimationState::Attack {
-                commands.entity(entity).insert(EnemyAnimationState::Attack);
+                commands
+                    .entity(entity)
+                    .insert(EnemyAnimationState::Attack)
+                    .insert(MobIsAttacking);
             }
         }
 
@@ -256,14 +260,17 @@ pub fn leap_attack(
             //start attack cooldown timer
             attack.dir = None;
             if anim_data.is_done_current_animation(sprite.index) {
+                if follow_speed.0 > 0. {
+                    commands.entity(entity).insert(FollowState {
+                        target: attack.target,
+                        speed: follow_speed.0,
+                    });
+                }
                 commands
                     .entity(entity)
                     .insert(EnemyAnimationState::Walk)
-                    .insert(FollowState {
-                        target: attack.target,
-                        speed: follow_speed.0,
-                    })
                     .remove::<LeapAttackState>()
+                    .remove::<MobIsAttacking>()
                     .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
             }
         } else {

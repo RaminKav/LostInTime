@@ -5,7 +5,7 @@ use crate::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
     },
-    enemy::Mob,
+    enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
     item::{
         projectile::{EnemyProjectile, Projectile, ProjectileState},
@@ -65,13 +65,13 @@ fn check_melee_hit_collisions(
                 || world_obj.get(hit_entity).is_ok()
                 || hit_tracker.contains(&hit_entity)
             {
-                return;
+                continue;
             }
 
             hit_tracker.push(hit_entity);
             let damage = game.calculate_player_damage().0 as i32;
             let Ok(mob_txfm) = mob_txfms.get(hit_entity) else {
-                return;
+                continue;
             };
             let delta = weapon_t.translation() - mob_txfm.translation();
             if let Ok(lifesteal) = lifesteal.get(game.game.player) {
@@ -294,7 +294,7 @@ fn check_mob_to_player_collisions(
         ),
         With<Player>,
     >,
-    mobs: Query<(&Transform, &Attack, Option<&LeapAttackState>), (With<Mob>, Without<Player>)>,
+    dmg_source: Query<(&Transform, &Attack, Option<&MobIsAttacking>), Without<Player>>,
     rapier_context: Res<RapierContext>,
     mut hit_event: EventWriter<HitEvent>,
     mut dodge_event: EventWriter<DodgeEvent>,
@@ -309,18 +309,15 @@ fn check_mob_to_player_collisions(
             }
             //if the player is colliding with an entity...
             let Ok(_) = player.get(e1) else { continue };
-            if !mobs.contains(e2) {
+
+            if !dmg_source.contains(e2) {
                 continue;
             }
-            let (mob_txfm, attack, is_leap_attacking) = mobs.get(e2).unwrap();
+            let (mob_txfm, attack, is_attacking) = dmg_source.get(e2).unwrap();
 
             // mobs can only hit player during their attack animations
-            if is_leap_attacking.is_none() {
+            if is_attacking.is_none() {
                 continue;
-            } else if let Some(is_leap_attacking) = is_leap_attacking {
-                if !is_leap_attacking.attack_startup_timer.finished() {
-                    continue;
-                }
             }
 
             let delta = player_txfm.translation - mob_txfm.translation;

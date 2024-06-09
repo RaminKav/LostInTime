@@ -1,22 +1,23 @@
 (
-  name: "SpikeSlime",
-  templates: ["mob_basic"],
+  name: "RedMushling",
+  templates: [],
   schematics: {
-    "survival_rogue_like::enemy::Mob": SpikeSlime,
+    "survival_rogue_like::enemy::Mob": RedMushling, 
+    "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::proto::SensorProto": (),
+    "survival_rogue_like::world::y_sort::YSort": (0.),
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
-    "survival_rogue_like::enemy::FollowSpeed": (0.32),
-    "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 60., startup: 0.7, duration: 0.2, cooldown: 1.5, speed: 145.),
-    "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 120., cooldown: 2.0, projectile: SlimeGooProjectile),
-//    "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
-    "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/spikeslime/spikeslime_down.png", size: (x: 32., y: 32.), cols: 6, rows: 5),
-    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -4., x2: 0., y2: -4.5, r: 7.),
-    "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
-    "survival_rogue_like::animations::AnimationFrameTracker": (0, 7),
-    "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,6,4], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (65),
-    "survival_rogue_like::attributes::Attack": (14),
-    "survival_rogue_like::player::levels::ExperienceReward": (37),
+    // "survival_rogue_like::enemy::FollowSpeed": (0.0),
+    // "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 100., speed: 0.0),
+    // "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Idle,
+    // "survival_rogue_like::enemy::LeapAttack": (activation_distance: 64., startup: 0.0, duration: 4.35, cooldown: 1.0, speed: 40.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 8.),
+    // "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/redmushling/redmushling_down.png", size: (x: 48., y: 48.), cols: 47, rows: 5),
+    // "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.05),
+    // "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [1,1,1,1,47], anim_offset: 0),
+    "survival_rogue_like::attributes::MaxHealth": (45),
+    "survival_rogue_like::attributes::Attack": (105),
+    "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: SmallPotion,
@@ -31,10 +32,10 @@
                 rate: 0.05
             ),
             (
-                item: SlimeGoo,
+                item: RedMushroomBlock,
                 min: 1,
-                max: 3,
-                rate: 0.5
+                max: 2,
+                rate: 1.
             ),
             (
                 item: Arrow,

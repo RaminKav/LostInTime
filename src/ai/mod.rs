@@ -1,6 +1,9 @@
 mod enemy_hostile_basic;
 
-use crate::{GameState, Plugin};
+use crate::{
+    enemy::red_mushling::{gas_attack, sprout},
+    GameState, Plugin,
+};
 
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;
@@ -14,6 +17,8 @@ impl Plugin for AIPlugin {
             (
                 follow,
                 leap_attack,
+                gas_attack,
+                sprout,
                 projectile_attack,
                 tick_enemy_attack_cooldowns,
                 idle,

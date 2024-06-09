@@ -250,6 +250,7 @@ impl ProtoPlugin {
         prototypes.load("proto/cookedmeat.prototype.ron");
         prototypes.load("proto/stingfly.prototype.ron");
         prototypes.load("proto/bushling.prototype.ron");
+        prototypes.load("proto/redmushling.prototype.ron");
         prototypes.load("proto/crate2.prototype.ron");
         prototypes.load("proto/bushlingscale.prototype.ron");
         prototypes.load("proto/bush.prototype.ron");

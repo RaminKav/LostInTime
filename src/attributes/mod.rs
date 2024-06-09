@@ -292,7 +292,8 @@ macro_rules! setup_raw_bonus_attributes {
             ) -> ItemAttributes {
                 // take fields of Range<i32> into one i32
                 let mut rng = rand::thread_rng();
-                let num_attributes = rng.gen_range(rarity.get_num_bonus_attributes(item_type));
+                let num_bonus_attributes = rarity.get_num_bonus_attributes(item_type);
+                let num_attributes = rng.gen_range(num_bonus_attributes);
                 let mut item_attributes = ItemAttributes::default();
                 let valid_attributes = {
                     let mut v = Vec::new();
@@ -317,7 +318,7 @@ macro_rules! setup_raw_bonus_attributes {
                         {
                             if stringify!($field_name) == picked_attribute {
                                 let value = rng.gen_range(self.$field_name.clone().unwrap());
-                                item_attributes.$field_name = value;
+                                item_attributes.$field_name = value + rarity.get_rarity_attributes_bonus(item_type);
                             }
                         }
                     )*
@@ -443,6 +444,14 @@ impl ItemRarity {
             ItemRarity::Uncommon => (1 + acc_offset)..=(2 + acc_offset),
             ItemRarity::Rare => (2 + acc_offset)..=(3 + acc_offset),
             ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
+        }
+    }
+    fn get_rarity_attributes_bonus(&self, eqp_type: &EquipmentType) -> i32 {
+        match self {
+            ItemRarity::Common => 1,
+            ItemRarity::Uncommon => 2,
+            ItemRarity::Rare => 3,
+            ItemRarity::Legendary => 5,
         }
     }
 

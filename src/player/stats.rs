@@ -26,9 +26,9 @@ impl PlayerStats {
     }
     pub fn apply_stats_to_player_attributes(&self, input_att: ItemAttributes) -> ItemAttributes {
         let mut att = input_att;
-        att.attack += self.str;
+        att.attack += (self.str) + (self.dex / 2) + (self.agi / 2) + (self.vit / 2);
         // att.defence += self.str;
-        att.crit_damage += 5 * self.dex;
+        att.crit_damage += 5 * self.dex + 2 * self.str;
         att.crit_chance += 2 * self.dex;
         att.speed += 5 * self.agi;
         att.dodge += 2 * self.agi;

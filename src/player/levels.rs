@@ -20,18 +20,15 @@ pub struct ExperienceReward(pub u32);
 #[derive(Component)]
 pub struct LevelUpParticles;
 
-pub const LEVEL_REQ_XP: [u32; 10] = [60, 100, 150, 200, 350, 625, 920, 1250, 1770, 2500];
+pub const BASE_LEVEL_EXP_REQ: f32 = 200.;
 impl PlayerLevel {
     pub fn new(level: u8) -> Self {
         PlayerLevel {
             level,
             next_level: level + 1,
             xp: 0,
-            next_level_xp: LEVEL_REQ_XP[if level >= LEVEL_REQ_XP.len() as u8 {
-                LEVEL_REQ_XP.len() - 1
-            } else {
-                level as usize
-            }],
+            next_level_xp: f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.3 * (level as f32 - 1.))))
+                as u32,
         }
     }
 
@@ -40,10 +37,14 @@ impl PlayerLevel {
         if self.xp >= self.next_level_xp {
             self.level += 1;
             self.xp = self.xp - self.next_level_xp;
-            self.next_level_xp = LEVEL_REQ_XP[self.level as usize];
+            self.next_level_xp =
+                f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.5 * (self.level as f32 - 1.)))) as u32;
         }
         if *DEBUG_MODE {
-            println!("EXP: {:?} LEVEL: {:?}", self.xp, self.level);
+            println!(
+                "EXP: {:?} LEVEL: {:?} NEXT: {:?}",
+                self.xp, self.level, self.next_level_xp
+            );
         }
     }
 }
