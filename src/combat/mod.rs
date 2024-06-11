@@ -9,12 +9,12 @@ use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
-    client::GameOverEvent,
     custom_commands::CommandsExt,
     enemy::{Mob, MobLevel},
     item::{
-        projectile::Projectile, EquipmentType, LootTable, LootTablePlugin, MainHand,
-        RequiredEquipmentType, WorldObject,
+        combat_shrine::{CombatShrineMob, CombatShrineMobDeathEvent},
+        projectile::Projectile,
+        EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
     juice::bounce::BounceOnHit,
     player::levels::{ExperienceReward, PlayerLevel},
@@ -231,9 +231,11 @@ pub fn handle_hits(
         Option<&WorldObject>,
         Option<&RequiredEquipmentType>,
         Option<&InvincibilityCooldown>,
+        Option<&CombatShrineMob>,
     )>,
     mut hit_events: EventReader<HitEvent>,
     mut enemy_death_events: EventWriter<EnemyDeathEvent>,
+    mut shrine_mob_death_event: EventWriter<CombatShrineMobDeathEvent>,
     mut obj_death_events: EventWriter<ObjBreakEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
@@ -243,8 +245,15 @@ pub fn handle_hits(
         if in_i_frame.get(hit.hit_entity).is_ok() {
             return;
         }
-        if let Ok((e, mut hit_health, t, obj_option, hit_req_option, i_frame_option)) =
-            health.get_mut(hit.hit_entity)
+        if let Ok((
+            e,
+            mut hit_health,
+            t,
+            obj_option,
+            hit_req_option,
+            i_frame_option,
+            shrine_option,
+        )) = health.get_mut(hit.hit_entity)
         {
             // don't shoot a dead horse...
             if hit_health.0 <= 0 {
@@ -314,7 +323,12 @@ pub fn handle_hits(
                     enemy_death_events.send(EnemyDeathEvent {
                         entity: e,
                         enemy_pos: t.translation().truncate(),
-                    })
+                    });
+
+                    if let Some(parent_shrine) = shrine_option {
+                        shrine_mob_death_event
+                            .send(CombatShrineMobDeathEvent(parent_shrine.parent_shrine));
+                    }
                 }
             }
 

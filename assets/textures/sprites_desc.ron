@@ -240,6 +240,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        CombatShrine: WorldObjectData(
+            texture_pos: (15., 11.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        CombatShrineDone: WorldObjectData(
+            texture_pos: (15., 9.),
+            size: (16., 32.),
+            anchor: None,
+        ),
         GrassBlock: WorldObjectData(
             texture_pos: (0., 12.),
             size: (16., 16.),

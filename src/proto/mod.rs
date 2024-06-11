@@ -300,6 +300,7 @@ impl ProtoPlugin {
         prototypes.load("proto/key.prototype.ron");
         prototypes.load("proto/fairy.prototype.ron");
         prototypes.load("proto/miracleseed.prototype.ron");
+        prototypes.load("proto/combatshrine.prototype.ron");
 
         // Sapplings
         prototypes.load("proto/redsapplingblock.prototype.ron");

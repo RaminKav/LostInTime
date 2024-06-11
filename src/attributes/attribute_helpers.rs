@@ -89,7 +89,7 @@ pub fn build_item_stack_with_parsed_attributes(
     raw_bonus_att_option: Option<&RawItemBonusAttributes>,
     rarity: ItemRarity,
     equip_type: &EquipmentType,
-    level: Option<u8>,
+    level_option: Option<u8>,
 ) -> ItemStack {
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
         raw_bonus_att.into_item_attributes(rarity.clone(), equip_type)
@@ -98,20 +98,19 @@ pub fn build_item_stack_with_parsed_attributes(
     };
     let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
     let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
-    let mut new_stack = stack.copy_with_attributes(&final_att);
-    new_stack.rarity = rarity;
-
-    if let Some(item_level) = level {
+    let mut level = 1;
+    if let Some(item_level) = level_option {
         if equip_type.is_weapon() {
             final_att.attack += max(0, (item_level - 1) as i32);
         } else if equip_type.is_equipment() && !equip_type.is_accessory() {
             final_att.health += max(0, ((item_level * 2) - 1) as i32);
             final_att.defence += max(0, (item_level - 1) as i32);
         }
-        new_stack.metadata.level = Some(item_level);
+        level = item_level;
     }
-
-    new_stack = stack.copy_with_attributes(&final_att);
+    let mut new_stack = stack.copy_with_attributes(&final_att);
+    new_stack.metadata.level = Some(level);
+    new_stack.rarity = rarity.clone();
 
     new_stack
 }

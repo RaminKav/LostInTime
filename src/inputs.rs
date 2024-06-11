@@ -618,6 +618,7 @@ pub fn mouse_click_system(
             if let Ok(obj_action) = obj_actions.get(obj_e) {
                 obj_action.run_action(
                     obj_e,
+                    cursor_tile_pos,
                     &mut game,
                     &mut item_action_param,
                     &mut commands,

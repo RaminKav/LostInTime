@@ -17,7 +17,7 @@ use crate::{
     item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
-    world::world_helpers::world_pos_to_tile_pos,
+    world::{generation::GenerationPlugin, world_helpers::world_pos_to_tile_pos},
     CustomFlush, GameParam, GameState,
 };
 use loot_chests::*;
@@ -42,6 +42,7 @@ pub enum SchematicType {
     #[default]
     House,
     DungeonEntrance,
+    CombatShrine,
 }
 
 #[derive(Component)]
@@ -67,7 +68,8 @@ impl Plugin for SchematicPlugin {
                     clear_schematic_entities,
                     mark_new_world_obj_as_schematic,
                     attempt_to_spawn_schematic_in_chunk,
-                    give_chunks_schematic_spawners,
+                    give_chunks_schematic_spawners
+                        .before(GenerationPlugin::generate_and_cache_objects),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );

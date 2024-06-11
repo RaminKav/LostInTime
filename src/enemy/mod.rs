@@ -157,7 +157,7 @@ pub fn handle_new_mob_state_machine(
             Option<&LeapAttack>,
             Option<&ProjectileAttack>,
         ),
-        Added<Mob>,
+        Or<(Added<Mob>, Added<CombatAlignment>, Changed<CombatAlignment>)>,
     >,
     dungeon_check: Query<&Dungeon>,
 ) {

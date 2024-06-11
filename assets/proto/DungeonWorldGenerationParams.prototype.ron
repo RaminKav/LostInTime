@@ -13,6 +13,7 @@
       schematic_frequencies: {
         House: 0.0,
         DungeonEntrance: 0.0,
+        CombatShrine: 0.0,
       },
       object_generation_frequencies: {
         Grass: 0.0,

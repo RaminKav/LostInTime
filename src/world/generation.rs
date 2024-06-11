@@ -50,10 +50,9 @@ impl Plugin for GenerationPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
-                Self::generate_and_cache_objects
-                    .in_set(OnUpdate(GameState::Main))
-                    .before(CustomFlush)
-                    .run_if(resource_exists::<GenerationSeed>()),
+                Self::generate_and_cache_objects.before(CustomFlush).run_if(
+                    resource_exists::<GenerationSeed>().and_then(in_state(GameState::Main)),
+                ),
             )
             .add_system(
                 update_wall

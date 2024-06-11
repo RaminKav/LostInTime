@@ -1,12 +1,19 @@
+use super::combat_shrine::CombatShrine;
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::container::Container;
+use crate::custom_commands::CommandsExt;
+use crate::enemy::{CombatAlignment, EliteMob, Mob};
+use crate::item::combat_shrine::CombatShrineMob;
+use crate::item::LootTable;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 
+use crate::world::world_helpers::tile_pos_to_world_pos;
+use crate::world::{TileMapPosition, TILE_SIZE};
 use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
@@ -14,6 +21,7 @@ use crate::{
 };
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use rand::Rng;
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
@@ -29,12 +37,14 @@ pub enum ObjectAction {
     Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
     ChangeObject(WorldObject),
     SetHome,
+    CombatShrine,
 }
 
 impl ObjectAction {
     pub fn run_action(
         &self,
         e: Entity,
+        obj_pos: TileMapPosition,
         game: &mut GameParam,
         item_action_param: &mut ItemActionParam,
         commands: &mut Commands,
@@ -107,6 +117,39 @@ impl ObjectAction {
                 let pos =
                     world_pos_to_tile_pos(item_action_param.cursor_pos.world_coords.truncate());
                 game.game.home_pos = Some(pos);
+            }
+            ObjectAction::CombatShrine => {
+                let mut rng = rand::thread_rng();
+                let mut num_spawns_left = rng.gen_range(6..=8);
+                commands.entity(e).insert(CombatShrine {
+                    num_mobs_left: num_spawns_left,
+                });
+                let possible_spawns =
+                    [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
+                while num_spawns_left > 0 {
+                    let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
+                        * Vec2::splat(TILE_SIZE.x);
+                    let choice_mob = rng.gen_range(0..possible_spawns.len());
+                    num_spawns_left -= 1;
+
+                    if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+                        possible_spawns[choice_mob].clone(),
+                        &proto_param.prototypes,
+                        tile_pos_to_world_pos(obj_pos, true) + offset,
+                    ) {
+                        //last mob is elite
+                        if num_spawns_left == 0 {
+                            commands.entity(mob).insert(EliteMob);
+                        }
+                        proto_param
+                            .proto_commands
+                            .commands()
+                            .entity(mob)
+                            .insert(CombatAlignment::Hostile)
+                            .insert(LootTable::default())
+                            .insert(CombatShrineMob { parent_shrine: e });
+                    }
+                }
             }
             _ => {}
         }

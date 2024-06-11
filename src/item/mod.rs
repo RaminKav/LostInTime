@@ -28,11 +28,13 @@ use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, 
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
+use combat_shrine::{handle_shrine_rewards, CombatShrineMobDeathEvent};
 use rand::Rng;
 
 mod crafting;
 pub mod item_actions;
 
+pub mod combat_shrine;
 pub mod item_upgrades;
 mod loot_table;
 pub mod melee;
@@ -237,6 +239,8 @@ pub enum WorldObject {
     ChestBlock,
     DungeonEntrance,
     DungeonEntranceBlock,
+    CombatShrine,
+    CombatShrineDone,
     Grass,
     Grass2,
     Grass3,
@@ -624,6 +628,7 @@ impl Plugin for ItemsPlugin {
         app.insert_resource(WorldObjectResource::new())
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
+            .add_event::<CombatShrineMobDeathEvent>()
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
@@ -643,6 +648,7 @@ impl Plugin for ItemsPlugin {
                     handle_delayed_ranged_attack,
                     handle_spread_arrows_attack.after(CustomFlush),
                     handle_burning_ticks,
+                    handle_shrine_rewards,
                     handle_on_hit_upgrades.after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),
