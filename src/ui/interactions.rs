@@ -49,6 +49,12 @@ pub enum UIElement {
     Essence,
     EssenceButton,
     EssenceButtonHover,
+    HealthDebuff1,
+    HealthDebuff2,
+    HealthDebuff3,
+    HungerDebuff1,
+    HungerDebuff2,
+    HungerDebuff3,
 }
 
 #[derive(Component, Debug, Clone)]

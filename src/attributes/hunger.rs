@@ -12,24 +12,30 @@ use super::CurrentHealth;
 pub struct Hunger {
     pub max: u8,
     pub current: u8,
+}
+#[derive(Component, Default)]
+pub struct HungerTracker {
     pub timer: Timer,
     pub action_fatigue: u8,
     pub action_fatigue_max: u8,
 }
-
-impl Hunger {
-    pub fn new(max: u8, tick_time: f32, action_fatigue_max: u8) -> Self {
+impl HungerTracker {
+    pub fn new(tick_time: f32, action_fatigue_max: u8) -> Self {
         Self {
-            max,
-            current: max,
             timer: Timer::from_seconds(tick_time, TimerMode::Once),
-            action_fatigue: action_fatigue_max,
+            action_fatigue: 0,
             action_fatigue_max,
         }
     }
     pub fn is_fatigued(&self) -> bool {
         self.action_fatigue >= self.action_fatigue_max
     }
+}
+impl Hunger {
+    pub fn new(max: u8) -> Self {
+        Self { max, current: max }
+    }
+
     pub fn is_starving(&self) -> bool {
         self.current == 0
     }
@@ -46,14 +52,14 @@ impl Hunger {
 }
 
 pub fn tick_hunger(
-    mut hunger_query: Query<(&mut Hunger, &mut CurrentHealth), With<Player>>,
+    mut hunger_query: Query<(&mut Hunger, &mut HungerTracker, &mut CurrentHealth), With<Player>>,
     game: Res<Game>,
     time: Res<Time>,
 ) {
-    for (mut hunger, mut health) in hunger_query.iter_mut() {
+    for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
         let is_moving = game.player_state.is_moving;
         let d = time.delta();
-        hunger.timer.tick(if is_moving {
+        tracker.timer.tick(if is_moving {
             Duration::new(
                 (d.as_secs() as f32 * 1.25) as u64,
                 (d.subsec_nanos() as f32 * 1.25) as u32,
@@ -62,27 +68,27 @@ pub fn tick_hunger(
             d
         });
 
-        if hunger.timer.finished() {
+        if tracker.timer.finished() {
             if hunger.current == 0 {
                 health.0 -= 1;
             } else {
                 hunger.current -= 1;
             }
-            hunger.timer.reset();
+            tracker.timer.reset();
         }
     }
 }
 
 pub fn handle_actions_drain_hunger(
-    mut hunger_query: Query<(&mut Hunger, &mut CurrentHealth), With<Hunger>>,
+    mut hunger_query: Query<(&mut Hunger, &mut HungerTracker, &mut CurrentHealth), With<Hunger>>,
     action_events: EventReader<ActionSuccessEvent>,
     attack_event: EventReader<AttackEvent>,
 ) {
     if action_events.len() > 0 || attack_event.len() > 0 {
-        for (mut hunger, mut health) in hunger_query.iter_mut() {
-            hunger.action_fatigue += 1;
-            if hunger.is_fatigued() {
-                hunger.action_fatigue = 0;
+        for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
+            tracker.action_fatigue += 1;
+            if tracker.is_fatigued() {
+                tracker.action_fatigue = 0;
                 if hunger.current == 0 {
                     health.0 -= 1;
                 } else {

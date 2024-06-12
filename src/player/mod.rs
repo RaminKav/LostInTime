@@ -18,7 +18,7 @@ use crate::{
     },
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
-        hunger::Hunger,
+        hunger::{Hunger, HungerTracker},
         Attack, AttackCooldown, CritChance, CritDamage, HealthRegen, InvincibilityCooldown,
         ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
     },
@@ -194,18 +194,8 @@ fn spawn_player(
                 crit_damage: 150,
                 ..default()
             },
-            Hunger::new(100, 5., 8),
-            PlayerAttributeBundle {
-                health: MaxHealth(100),
-                mana: Mana::new(100),
-                attack: Attack(0),
-                health_regen: HealthRegen(2),
-                mana_regen: ManaRegen(1),
-                crit_chance: CritChance(5),
-                crit_damage: CritDamage(150),
-                attack_cooldown: AttackCooldown(0.4),
-                ..default()
-            },
+            Hunger::new(100),
+            HungerTracker::new(5., 8),
             InvincibilityCooldown(1.),
             HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
             MovementVector::default(),
@@ -220,6 +210,17 @@ fn spawn_player(
             },
             RawPosition::default(),
         ))
+        .insert(PlayerAttributeBundle {
+            health: MaxHealth(100),
+            mana: Mana::new(100),
+            attack: Attack(0),
+            health_regen: HealthRegen(2),
+            mana_regen: ManaRegen(1),
+            crit_chance: CritChance(5),
+            crit_damage: CritDamage(150),
+            attack_cooldown: AttackCooldown(0.4),
+            ..default()
+        })
         .insert(CharacterAnimationSpriteSheetData {
             animation_frames: vec![6, 6, 4, 6, 7],
             anim_offset: 0,
@@ -235,7 +236,7 @@ fn spawn_player(
         .insert(SkillPoints { count: 0 })
         .id();
 
-    let mut hunger = Hunger::new(100, 5., 8);
+    let mut hunger = Hunger::new(100);
     // Try to load inv from save
     if let Ok(save_file) = File::open("save_state.json") {
         let reader = BufReader::new(save_file);

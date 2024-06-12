@@ -10,7 +10,7 @@ use crate::{
     item::CraftingTracker,
     night::NightTracker,
     player::Player,
-    ui::{ChestContainer, FurnaceContainer},
+    ui::{screen_effects::HealthScreenEffect, ChestContainer, FurnaceContainer},
     world::{chunk::Chunk, dimension::ActiveDimension, generation::WorldObjectCache},
     Game, GameState, GAME_HEIGHT, GAME_WIDTH,
 };
@@ -59,6 +59,7 @@ pub fn tick_game_over_overlay(
             With<Player>,
             With<Text>,
             With<ActiveDimension>,
+            With<HealthScreenEffect>,
         )>,
     >,
     mut next_state: ResMut<NextState<GameState>>,

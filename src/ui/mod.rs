@@ -1,7 +1,10 @@
 pub mod chest_ui;
 pub mod crafting_ui;
 pub mod damage_numbers;
+pub mod screen_effects;
 pub mod ui_container_param;
+use bevy::sprite::Material2dPlugin;
+use screen_effects::{handle_add_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
@@ -73,6 +76,7 @@ impl Plugin for UIPlugin {
             .add_event::<SubmitEssenceChoice>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
+            .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
             .add_system(spawn_fps_text.in_schedule(OnEnter(GameState::Main)))
@@ -168,6 +172,8 @@ impl Plugin for UIPlugin {
                     handle_submit_essence_choice,
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
+                    handle_add_screen_effects,
+                    setup_screen_effects,
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
