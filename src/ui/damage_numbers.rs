@@ -51,15 +51,14 @@ pub fn handle_add_damage_numbers_after_hit(
         let mut rng = rand::thread_rng();
         let drop_spread = 10.;
         let pos_offset = Vec3::new(
-            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
-            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            rng.gen_range(-drop_spread..drop_spread) as f32,
+            rng.gen_range(-drop_spread..drop_spread) as f32,
             2.,
         );
         prev_health.0 = changed_health.0;
         let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = !is_player && delta.abs() > dmg && dmg != 0;
-
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,

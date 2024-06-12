@@ -71,16 +71,10 @@ pub fn sprout(
 }
 
 pub fn gas_attack(
-    mut sprouts: Query<(
-        Entity,
-        &mut AsepriteAnimation,
-        &GlobalTransform,
-        &Attack,
-        &mut GasAttackState,
-    )>,
+    mut sprouts: Query<(Entity, &mut AsepriteAnimation, &Attack, &mut GasAttackState)>,
     mut commands: Commands,
 ) {
-    for (entity, mut anim, t, attack, mut gas_state) in sprouts.iter_mut() {
+    for (entity, mut anim, attack, mut gas_state) in sprouts.iter_mut() {
         if anim.is_paused() {
             anim.play();
         }
@@ -92,7 +86,7 @@ pub fn gas_attack(
             } else {
                 let hitbox = commands
                     .spawn((
-                        Transform::from_translation(t.translation()),
+                        TransformBundle::default(),
                         attack.clone(),
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 7.),
                         MobIsAttacking,

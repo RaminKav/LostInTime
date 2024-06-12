@@ -11,12 +11,12 @@
     // "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 100., speed: 0.0),
     // "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Idle,
     // "survival_rogue_like::enemy::LeapAttack": (activation_distance: 64., startup: 0.0, duration: 4.35, cooldown: 1.0, speed: 40.),
-    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 8.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 4.),
     // "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/redmushling/redmushling_down.png", size: (x: 48., y: 48.), cols: 47, rows: 5),
     // "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.05),
     // "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [1,1,1,1,47], anim_offset: 0),
     "survival_rogue_like::attributes::MaxHealth": (45),
-    "survival_rogue_like::attributes::Attack": (105),
+    "survival_rogue_like::attributes::Attack": (15),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

@@ -107,7 +107,7 @@ fn add_spawners_to_new_chunks(
             spawners.push(Spawner {
                 enemy: Mob::RedMushling,
                 chunk_pos: new_chunk.1.chunk_pos,
-                weight: 50.,
+                weight: 200.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
