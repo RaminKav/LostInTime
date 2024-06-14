@@ -564,7 +564,7 @@ pub fn mouse_click_system(
         let mut main_hand_option = None;
         // if it has AttackTimer, the action is on cooldown, so we abort.
         if let Some(tool) = &game.player().main_hand_slot {
-            main_hand_option = Some(tool.obj);
+            main_hand_option = Some(tool.get_obj());
         }
         let direction =
             (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
@@ -577,6 +577,7 @@ pub fn mouse_click_system(
                 from_enemy: None,
                 is_followup_proj: false,
                 mana_cost: mana_cost_option.map(|m| -m.0),
+                dmg_override: None,
             })
         }
         commands

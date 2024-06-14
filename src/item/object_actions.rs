@@ -120,7 +120,8 @@ impl ObjectAction {
             }
             ObjectAction::CombatShrine => {
                 let mut rng = rand::thread_rng();
-                let mut num_spawns_left = rng.gen_range(6..=8);
+                let num_days = 4 + item_action_param.night_tracker.days;
+                let mut num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
                 commands.entity(e).insert(CombatShrine {
                     num_mobs_left: num_spawns_left,
                 });

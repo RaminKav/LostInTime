@@ -8,12 +8,12 @@
         attack: Some((start: 1, end: 3)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        crit_damage: Some((start: 10, end: 60)),
-        crit_chance: Some((start: 10, end: 25)),
+        crit_damage: Some((start: 10, end: 30)),
+        crit_chance: Some((start: 10, end: 18)),
         healing: Some((start: 2, end: 8)),
-        bonus_damage: Some((start: 1, end: 4)),
+        bonus_damage: Some((start: 1, end: 2)),
         speed: Some((start: 4, end: 10)),
-        health_regen: Some((start: 1, end: 4)),
+        health_regen: Some((start: 1, end: 2)),
         thorns: Some((start: 3, end: 5)),
         dodge: Some((start: 1, end: 5)),
         loot_rate: Some((start: 3, end: 7)),
@@ -23,7 +23,7 @@
         obj_type: Dagger,
         attributes: (
             max_durability: 100,
-            attack_cooldown: 0.25
+            attack_cooldown: 0.3
         ),
         metadata: (
             name: "Dagger", 

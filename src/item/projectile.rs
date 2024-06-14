@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    attributes::{modifiers::ModifyManaEvent, Mana},
+    attributes::{modifiers::ModifyManaEvent, Attack, Mana},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -49,6 +49,8 @@ pub enum Projectile {
     ThrowingStar,
     FireExplosionAOE,
     SlimeGooProjectile,
+    Arc,
+    FireAttack,
 }
 
 impl Projectile {
@@ -86,6 +88,7 @@ pub struct RangedAttackEvent {
     pub mana_cost: Option<i32>,
     pub from_enemy: Option<Entity>,
     pub is_followup_proj: bool,
+    pub dmg_override: Option<i32>,
 }
 
 #[derive(Clone, Component)]
@@ -162,6 +165,11 @@ fn handle_ranged_attack_event(
             if let Some(e) = proj_event.from_enemy {
                 commands.entity(p).insert(EnemyProjectile { entity: e });
             }
+            commands.entity(p).insert(Attack(
+                proj_event
+                    .dmg_override
+                    .unwrap_or(game.calculate_player_damage().0 as i32),
+            ));
         }
     }
 }

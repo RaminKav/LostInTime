@@ -3,7 +3,7 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::seq::IteratorRandom;
 
 use crate::{
-    custom_commands::CommandsExt, item::object_actions::ObjectAction,
+    custom_commands::CommandsExt, item::object_actions::ObjectAction, night::NightTracker,
     proto::proto_param::ProtoParam,
 };
 

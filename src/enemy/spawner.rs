@@ -209,7 +209,6 @@ fn handle_spawn_mobs(
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut ChunkSpawners>,
 ) {
-    let c = spawner_trigger_event.len();
     for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
             continue;

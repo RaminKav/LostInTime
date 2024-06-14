@@ -49,20 +49,36 @@ pub fn setup_screen_effects(
     let hp_percent = current_hp.0 as f32 / max_hp.0 as f32;
     let hunger_percent = hunger.current as f32 / hunger.max as f32;
 
-    let handle = asset_server.load("ui/HealthScreenEffect.png");
-    let effect_material = materials.add(ScreenEffectMaterial {
-        source_texture: Some(handle),
+    let hp_handle = asset_server.load("ui/HealthScreenEffect.png");
+    let hp_effect_material = materials.add(ScreenEffectMaterial {
+        source_texture: Some(hp_handle),
         opacity: 1. - hp_percent,
+    });
+    let hunger_handle = asset_server.load("ui/HungerScreenEffect.png");
+    let hunger_effect_material = materials.add(ScreenEffectMaterial {
+        source_texture: Some(hunger_handle),
+        opacity: 1. - hunger_percent,
     });
     commands.spawn((
         Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
             size: Vec2::new(GAME_WIDTH, GAME_HEIGHT),
             ..Default::default()
         }))),
-        effect_material.clone(),
+        hp_effect_material.clone(),
         HealthScreenEffect,
         RenderLayers::from_layers(&[3]),
         Name::new("hp screen effect"),
+        SpatialBundle::from_transform(Transform::from_xyz(0., 0., 1.)),
+    ));
+    commands.spawn((
+        Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+            size: Vec2::new(GAME_WIDTH, GAME_HEIGHT),
+            ..Default::default()
+        }))),
+        hunger_effect_material.clone(),
+        HungerScreenEffect,
+        RenderLayers::from_layers(&[3]),
+        Name::new("hunger screen effect"),
         SpatialBundle::from_transform(Transform::from_xyz(0., 0., 1.)),
     ));
 }
@@ -74,7 +90,7 @@ pub fn handle_add_screen_effects(
     >,
     mut materials: ResMut<Assets<ScreenEffectMaterial>>,
     hp_effect: Query<&Handle<ScreenEffectMaterial>, With<HealthScreenEffect>>,
-    // hunger_effect: Query<&mut ScreenEffectMaterial, With<HungerScreenEffect>>,
+    hunger_effect: Query<&Handle<ScreenEffectMaterial>, With<HungerScreenEffect>>,
 ) {
     let Ok((current_hp, max_hp, hunger)) = hp.get_single() else {
         return;
@@ -83,6 +99,12 @@ pub fn handle_add_screen_effects(
         if let Some(hp_effect_material) = materials.get_mut(hp_mat_handle) {
             let hp_percent = current_hp.0 as f32 / max_hp.0 as f32;
             hp_effect_material.opacity = 1. - hp_percent;
+        }
+    }
+    if let Ok(hunger_mat_handle) = hunger_effect.get_single() {
+        if let Some(hunger_effect_material) = materials.get_mut(hunger_mat_handle) {
+            let hunger_percent = hunger.current as f32 / hunger.max as f32;
+            hunger_effect_material.opacity = 1. - hunger_percent;
         }
     }
 

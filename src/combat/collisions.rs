@@ -1,5 +1,4 @@
 use crate::{
-    ai::LeapAttackState,
     animations::DoneAnimation,
     attributes::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
@@ -91,7 +90,6 @@ fn check_melee_hit_collisions(
 }
 fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
-    game: GameParam,
     player_attack: Query<(Entity, &Children, Option<&Lifesteal>), With<Player>>,
     allowed_targets: Query<Entity, (Without<ItemStack>, Without<MainHand>, Without<Projectile>)>,
     mut hit_event: EventWriter<HitEvent>,
@@ -101,6 +99,7 @@ fn check_projectile_hit_mob_collisions(
             Entity,
             &mut ProjectileState,
             &Projectile,
+            &Attack,
             Option<&DoneAnimation>,
         ),
         Without<EnemyProjectile>,
@@ -114,17 +113,22 @@ fn check_projectile_hit_mob_collisions(
             continue;
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, proj, anim_option) = if let Ok(e) = children.get_mut(*e1) {
-                if let Ok((proj_entity, state, proj, anim_option)) = projectiles.get_mut(e.get()) {
-                    (proj_entity, state, proj, anim_option)
+            let (proj_entity, mut state, proj, att, anim_option) =
+                if let Ok(e) = children.get_mut(*e1) {
+                    if let Ok((proj_entity, state, proj, att, anim_option)) =
+                        projectiles.get_mut(e.get())
+                    {
+                        (proj_entity, state, proj, att, anim_option)
+                    } else {
+                        continue;
+                    }
+                } else if let Ok((proj_entity, state, proj, att, anim_option)) =
+                    projectiles.get_mut(*e1)
+                {
+                    (proj_entity, state, proj, att, anim_option)
                 } else {
                     continue;
-                }
-            } else if let Ok((proj_entity, state, proj, anim_option)) = projectiles.get_mut(*e1) {
-                (proj_entity, state, proj, anim_option)
-            } else {
-                continue;
-            };
+                };
             let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {
                 continue;
             };
@@ -135,7 +139,7 @@ fn check_projectile_hit_mob_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
-            let damage = game.calculate_player_damage().0 as i32;
+            let damage = att.0;
             if let Some(lifesteal) = lifesteal {
                 if !is_world_obj.contains(*e2) {
                     modify_health_events.send(ModifyHealthEvent(f32::floor(
@@ -150,6 +154,7 @@ fn check_projectile_hit_mob_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
             });
+            //non-animating sprites are despawned immediately
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
             }
@@ -174,6 +179,7 @@ fn check_projectile_hit_player_collisions(
             &mut ProjectileState,
             Option<&DoneAnimation>,
             &Projectile,
+            &Attack,
             &EnemyProjectile,
         ),
         With<EnemyProjectile>,
@@ -185,23 +191,23 @@ fn check_projectile_hit_player_collisions(
             continue;
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, anim_option, proj, enemy_proj) =
+            let (proj_entity, mut state, anim_option, proj, att, enemy_proj) =
                 if let Ok(e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, anim_option, proj, enemy_proj)) =
+                    if let Ok((proj_entity, state, anim_option, proj, att, enemy_proj)) =
                         projectiles.get_mut(e.get())
                     {
-                        (proj_entity, state, anim_option, proj, enemy_proj)
+                        (proj_entity, state, anim_option, proj, att, enemy_proj)
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, anim_option, proj, enemy_proj)) =
+                } else if let Ok((proj_entity, state, anim_option, proj, att, enemy_proj)) =
                     projectiles.get_mut(*e1)
                 {
-                    (proj_entity, state, anim_option, proj, enemy_proj)
+                    (proj_entity, state, anim_option, proj, att, enemy_proj)
                 } else {
                     continue;
                 };
-            let Ok((enemy_e, attack)) = enemy_attack.get(enemy_proj.entity) else {
+            let Ok((enemy_e, _attack)) = enemy_attack.get(enemy_proj.entity) else {
                 continue;
             };
             if enemy_e == *e2 || !allowed_targets.contains(*e2) {
@@ -231,7 +237,7 @@ fn check_projectile_hit_player_collisions(
 
             hit_event.send(HitEvent {
                 hit_entity: *e2,
-                damage: attack.0,
+                damage: att.0,
                 dir: state.direction,
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),

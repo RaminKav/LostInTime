@@ -1,3 +1,4 @@
+use item_abilities::{add_ability_to_item_drops, handle_item_abilitiy_on_attack};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Range, RangeInclusive};
@@ -24,6 +25,7 @@ use modifiers::*;
 pub mod attribute_helpers;
 pub mod hunger;
 use hunger::*;
+pub mod item_abilities;
 
 use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
@@ -598,6 +600,7 @@ impl Plugin for AttributesPlugin {
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_sprite_with_equipment_removed,
+                    handle_item_abilitiy_on_attack,
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
@@ -685,11 +688,11 @@ fn update_attributes_with_held_item_change(
     let player_data = game_param.player_mut();
     let prev_held_item_data = &player_data.main_hand_slot;
     if let Some(new_item) = active_hotbar_item {
-        let new_item_obj = new_item.get_obj();
+        let new_item_stack = new_item.item_stack.clone();
         if let Some(current_item) = prev_held_item_data {
             let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
-            let new_attributes = &new_item.item_stack.attributes;
-            if new_item_obj != &current_item.obj {
+            let new_attributes = &(new_item.item_stack.attributes);
+            if new_item_stack != current_item.item_stack {
                 new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
                 att_event.send(AttributeChangeEvent);
             } else if curr_attributes != new_attributes {
@@ -790,7 +793,7 @@ fn handle_new_items_raw_attributes(
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
         let rarity = get_rarity_rng(rand::thread_rng());
-        let new_stack = build_item_stack_with_parsed_attributes(
+        let mut new_stack = build_item_stack_with_parsed_attributes(
             stack,
             raw_base_att,
             raw_bonus_att_option,
@@ -798,6 +801,7 @@ fn handle_new_items_raw_attributes(
             eqp_type,
             item_level.map(|l| l.0),
         );
+        add_ability_to_item_drops(&mut new_stack);
         commands.entity(e).insert(new_stack);
     }
 }

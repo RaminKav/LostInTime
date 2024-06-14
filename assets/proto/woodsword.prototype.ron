@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": WoodSword,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 4, end: 6)),
+        attack: Some((start: 5, end: 6)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 2, end: 4)),

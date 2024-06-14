@@ -310,6 +310,7 @@ pub fn projectile_attack(
                 from_enemy: Some(entity),
                 is_followup_proj: false,
                 mana_cost: None,
+                dmg_override: None,
             });
             commands
                 .entity(entity)

@@ -3,8 +3,9 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     attributes::{
-        Attack, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing, HealthRegen,
-        ItemAttributes, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
+        item_abilities::ItemAbility, Attack, BonusDamage, CritChance, CritDamage, Defence, Dodge,
+        Healing, HealthRegen, ItemAttributes, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns,
+        XpRateBonus,
     },
     colors::{BLACK, GOLD, GREY, LIGHT_GREEN},
     inventory::ItemStack,
@@ -177,6 +178,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     RenderLayers::from_layers(&[3]),
                 ))
                 .id();
+
             if item.is_recipe && i > 0 {
                 let ingredient_world_obj: Vec<WorldObject> = recipes
                     .crafting_list
@@ -206,6 +208,51 @@ pub fn handle_spawn_inv_item_tooltip(
                 commands.entity(tooltip).add_child(icon_e);
             }
             commands.entity(tooltip).add_child(text);
+        }
+        if let Some(ability) = &item.item_stack.metadata.item_ability {
+            let (obj, dmg) = match ability {
+                ItemAbility::Arc(dmg) => (WorldObject::Feather, dmg),
+                ItemAbility::FireAttack(dmg) => (WorldObject::Fireball, dmg),
+            };
+            let pos = Vec3::new(28., -size.y / 2. + 12., 1.);
+            let icon_e = spawn_item_stack_icon(
+                &mut commands,
+                &graphics,
+                &ItemStack {
+                    obj_type: obj,
+                    count: 1,
+                    ..Default::default()
+                },
+                &asset_server,
+            );
+            commands.entity(icon_e).insert(Transform {
+                translation: pos,
+                ..Default::default()
+            });
+            let text = commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            format!("{:}", dmg),
+                            TextStyle {
+                                font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                                font_size: 8.0,
+                                color: GREY,
+                            },
+                        ),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform {
+                            translation: pos + Vec3::new(-14., -3., 0.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    },
+                    Name::new("TOOLTIP TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .id();
+            commands.entity(tooltip).add_child(icon_e).add_child(text);
         }
         // add tooltip to inventory or essence ui
         //TODO: maybe we dont need to add as parent here and avoid this

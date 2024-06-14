@@ -104,8 +104,11 @@ pub fn gas_attack(
                 .insert(WaitingToSproutState);
             *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
             anim.pause();
+        } else if anim.current_frame() == 41 {
             if let Some(hitbox) = gas_state.hitbox {
-                commands.entity(hitbox).despawn_recursive();
+                if let Some(hitbox) = commands.get_entity(hitbox) {
+                    hitbox.despawn_recursive();
+                }
             }
         }
     }

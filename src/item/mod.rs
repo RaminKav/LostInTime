@@ -1,5 +1,6 @@
 use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
+use crate::attributes::item_abilities::ItemAbility;
 use crate::attributes::ItemAttributes;
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
@@ -152,9 +153,14 @@ pub struct MainHand;
 
 //TODO: Convert attributes to a vec of attributes?
 #[derive(Debug, Clone)]
-pub struct EquipmentData {
+pub struct ActiveMainHandState {
     pub entity: Entity,
-    pub obj: WorldObject,
+    pub item_stack: ItemStack,
+}
+impl ActiveMainHandState {
+    pub fn get_obj(&self) -> WorldObject {
+        self.item_stack.obj_type
+    }
 }
 
 #[derive(
@@ -173,7 +179,8 @@ pub struct EquipmentData {
 pub struct ItemDisplayMetaData {
     pub name: String,
     pub desc: Vec<String>,
-    pub level: Option<u8>, //TODO: something about this is bugged
+    pub level: Option<u8>,
+    pub item_ability: Option<ItemAbility>,
 }
 #[derive(Component)]
 pub struct Size(pub Vec2);
@@ -531,6 +538,7 @@ impl WorldObject {
                 name: self.to_string(),
                 level: None,
                 desc: vec!["A cool piece of Equipment".to_string()],
+                item_ability: None,
             })
             .insert(Equipment(Limb::Hands))
             .insert(YSort(0.))

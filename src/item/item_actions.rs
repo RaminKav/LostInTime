@@ -8,6 +8,7 @@ use crate::{
     inputs::CursorPos,
     inventory::Inventory,
     juice::UseItemEvent,
+    night::NightTracker,
     player::{stats::SkillPoints, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer, InventoryState, UIState},
@@ -68,6 +69,7 @@ pub struct ItemActionParam<'w, 's> {
     pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
     pub crafting_tracker: Res<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
+    pub night_tracker: Res<'w, NightTracker>,
     pub skill_points: Query<'w, 's, &'static mut SkillPoints>,
 
     #[system_param(ignore)]

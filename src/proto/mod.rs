@@ -169,6 +169,8 @@ impl ProtoPlugin {
         prototypes.load("proto/rock.prototype.ron");
         prototypes.load("proto/fireball.prototype.ron");
         prototypes.load("proto/electricity.prototype.ron");
+        prototypes.load("proto/arc.prototype.ron");
+        prototypes.load("proto/fireattack.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/chestplate.prototype.ron");
         prototypes.load("proto/metalpants.prototype.ron");

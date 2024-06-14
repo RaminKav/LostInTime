@@ -586,14 +586,23 @@ Buttons:
 - [ ] upgrade station needs to reset tooltips when task is done
 - BUG commo ngear dropping w 4 lines of stats
 - Problem: You can run aroudn the island to despawn mobs
-- mushroom doesnt do dmg
-- make dmg numbers stray more
+- [x] mushroom doesnt do dmg
+- [x] make dmg numbers stray more
 - Risk vs Reward:
   - shrine to pay resource( hp, essence?) for a reward (resources, food, item?)
-  - shrine to engage in combat to get reward (resource, food, item) (summons a bunch of mobs to kill, with an Elite)
+  - [x] shrine to engage in combat to get reward (resource, food, item) (summons a bunch of mobs to kill, with an Elite)
 - Relics/Buffs: Buffs that grant you unique bonuses: gain one after every night?
 
   - regen faster, dash twice, dash further, aoe burst when hit, split dmg in two hits, Knockback enemies on hit, food goes down slower, attack speed up, poison on hit, mp faster, mp discount, -1 damage on every hit, night time aggro distance decreased, more ammo drops, chance to not use ammo, weapon upgrades (drops a weapon of that type), upgrade tomes drop more often, bonus xp, +25% stat bonus (all 4), more chests in dungeons, defelct proj on dash,
   - Cursed relics: satisfy a condition to gain a powerful buff.
 
   -BUG shift clicking gear stacks them no matter what
+
+- bug only give ability to weapons
+- inv toggle bugs (pressing tab to close doesnt reset state to closed)
+- inv hotbar bug
+- bed texture bug
+- lvl text offset after double digits3
+- fairy is not spawning...
+- duplicate audio triggers on attack
+  Notes: day 4, 15-35 dmg, day 6 45dmg, lvl 11-12

@@ -7,7 +7,7 @@ use crate::{
     container::Container,
     inputs::FacingDirection,
     item::{
-        Equipment, EquipmentData, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
+        ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
         PLAYER_EQUIPMENT_POSITIONS,
     },
     player::Limb,
@@ -194,6 +194,7 @@ impl InventoryItemStack {
             .insert(Name::new("EquippedItem"))
             .insert(self.item_stack.attributes.clone())
             .insert(obj)
+            .insert(self.item_stack.clone())
             .set_parent(player_e)
             .id();
 
@@ -211,7 +212,10 @@ impl InventoryItemStack {
                 Timer::from_seconds(0.18, TimerMode::Once),
                 0.,
             ));
-        game.player_mut().main_hand_slot = Some(EquipmentData { obj, entity: item });
+        game.player_mut().main_hand_slot = Some(ActiveMainHandState {
+            item_stack: self.item_stack.clone(),
+            entity: item,
+        });
         if let Some(melee) = proto.is_item_melee_weapon(obj) {
             item_entity.insert(melee.clone());
         }
@@ -408,18 +412,20 @@ impl ItemStack {
             metadata: self.metadata.clone(),
         }
     }
+    pub fn is_stackable(&self, other: &Self) -> bool {
+        self.obj_type == other.obj_type
+            && self.attributes == other.attributes
+            && self.metadata == other.metadata
+            && self.rarity == other.rarity
+    }
     pub fn add_to_inventory(
         self,
         container: &mut Container,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
         // if stack of that item exists, add to it, otherwise push as new stack.
-        // TODO: add max stack size, and create new stack if reached.
-        // TODO: abstract direct access of .obj_type behind a getter
         if let Some(stack) = container.items.iter().find(|i| match i {
-            Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => {
-                *ii.get_obj() == self.obj_type && ii.item_stack.attributes == self.attributes
-            }
+            Some(ii) if ii.item_stack.count < MAX_STACK_SIZE => self.is_stackable(&ii.item_stack),
             _ => false,
         }) {
             // safe to unwrap, we check for it above

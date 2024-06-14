@@ -75,11 +75,16 @@ pub fn handle_delayed_ranged_attack(
     mut att_cooldown_query: Query<(&mut ClawUpgradeMultiThrow, Option<&AttackTimer>), With<Player>>,
     mut count: Local<u8>,
 ) {
-    let Ok(ranged_attack) = wep_query.get_single() else {return};
+    let Ok(ranged_attack) = wep_query.get_single() else {
+        return;
+    };
     if ranged_attack.0 != Projectile::ThrowingStar {
         return;
     }
-    let Ok((mut delayed_ranged_attack, cooldown_option)) = att_cooldown_query.get_single_mut() else {return};
+    let Ok((mut delayed_ranged_attack, cooldown_option)) = att_cooldown_query.get_single_mut()
+    else {
+        return;
+    };
     if cooldown_option.is_some() && delayed_ranged_attack.0.percent() == 0. {
         *count = 0;
         return;
@@ -95,6 +100,7 @@ pub fn handle_delayed_ranged_attack(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
+                dmg_override: None,
             });
 
             delayed_ranged_attack.0.reset();
@@ -113,11 +119,15 @@ pub fn handle_spread_arrows_attack(
     att_cooldown_query: Query<(&BowUpgradeSpread, Option<&AttackTimer>), With<Player>>,
     mut count: Local<u8>,
 ) {
-    let Ok(ranged_attack) = wep_query.get_single() else {return};
+    let Ok(ranged_attack) = wep_query.get_single() else {
+        return;
+    };
     if ranged_attack.0 != Projectile::Arrow {
         return;
     }
-    let Ok((spread_attack, cooldown_option)) = att_cooldown_query.get_single() else {return};
+    let Ok((spread_attack, cooldown_option)) = att_cooldown_query.get_single() else {
+        return;
+    };
     if cooldown_option.is_none() {
         *count = 0;
     }
@@ -136,6 +146,7 @@ pub fn handle_spread_arrows_attack(
             from_enemy: None,
             is_followup_proj: true,
             mana_cost: None,
+            dmg_override: None,
         });
     }
 }
@@ -168,15 +179,20 @@ pub fn handle_on_hit_upgrades(
         if hit.hit_entity == game.game.player {
             continue;
         }
-        let Ok((hit_e, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {continue};
+        let Ok((hit_e, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {
+            continue;
+        };
         let (fire_aoe_option, lightning_chain_option, lethal_option, burn_option) =
             upgrades.single();
 
         if let Some(_) = lightning_chain_option {
             if hit.hit_with_projectile == Some(Projectile::Electricity) && *elec_count == 0 {
-                let Some(nearest_mob_t) = mobs
-                .iter()
-                .find(|t| t.1.translation().distance(hit_entity_txfm.translation()) < 70. && t.0 != hit.hit_entity) else {continue};
+                let Some(nearest_mob_t) = mobs.iter().find(|t| {
+                    t.1.translation().distance(hit_entity_txfm.translation()) < 70.
+                        && t.0 != hit.hit_entity
+                }) else {
+                    continue;
+                };
                 *elec_count += 1;
                 proto_commands.spawn_projectile_from_proto(
                     Projectile::Electricity,
@@ -208,7 +224,10 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        let Ok((burning_option, _poisoned_option)) = burn_or_venom_mobs.get_mut(hit.hit_entity) else {continue};
+        let Ok((burning_option, _poisoned_option)) = burn_or_venom_mobs.get_mut(hit.hit_entity)
+        else {
+            continue;
+        };
         if let Some(_) = burn_option {
             if let Some(mut burning) = burning_option {
                 (*burning).duration_timer.reset();
