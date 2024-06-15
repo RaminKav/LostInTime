@@ -4,6 +4,7 @@ pub mod damage_numbers;
 pub mod screen_effects;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
+use damage_numbers::handle_clamp_screen_locked_icons;
 use screen_effects::{handle_add_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
 mod enemy_health_bar;
@@ -32,7 +33,7 @@ pub use essence_ui::*;
 
 use crate::{
     client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
-    GameState,
+    GameState, DEBUG_MODE,
 };
 
 use self::{
@@ -174,6 +175,7 @@ impl Plugin for UIPlugin {
                     handle_cursor_essence_buttons,
                     handle_add_screen_effects,
                     setup_screen_effects,
+                    handle_clamp_screen_locked_icons,
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
@@ -202,13 +204,15 @@ pub fn handle_new_ui_state(
     mut commands: Commands,
     chest_option: Option<Res<ChestContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
-    mut hotbar_slots: Query<&mut Visibility, (Without<Interactable>, With<InventorySlotState>)>,
+    mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
 ) {
     if !next_ui_state.0.is_some() {
         return;
     }
     let next_ui = next_ui_state.0.as_ref().unwrap().clone();
-    println!("UI State Changed: {:?} -> {:?}", curr_ui_state.0, next_ui);
+    if *DEBUG_MODE {
+        println!("UI State Changed: {:?} -> {:?}", curr_ui_state.0, next_ui);
+    }
     let mut should_close_self = false;
     if next_ui == curr_ui_state.0 {
         next_ui_state.set(UIState::Closed);
@@ -235,14 +239,17 @@ pub fn handle_new_ui_state(
             commands.remove_resource::<FurnaceContainer>();
         }
     }
-    if !next_ui.is_inv_open() {
+    if !next_ui.is_inv_open() || should_close_self {
         commands.remove_resource::<CraftingContainer>();
     }
     if next_ui != UIState::Essence {
         commands.remove_resource::<EssenceShopChoices>();
     }
     if let Some(next_ui) = &next_ui_state.0 {
-        for mut hbv in hotbar_slots.iter_mut() {
+        for (mut hbv, mut state) in hotbar_slots.iter_mut() {
+            if !next_ui.is_inv_open() {
+                state.dirty = true;
+            }
             *hbv = if next_ui.is_inv_open() {
                 Visibility::Hidden
             } else {

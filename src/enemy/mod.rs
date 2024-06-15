@@ -26,6 +26,7 @@ use crate::{
 };
 
 pub mod red_mushling;
+pub mod spawn_helpers;
 pub mod spawner;
 use self::spawner::SpawnerPlugin;
 use red_mushling::*;

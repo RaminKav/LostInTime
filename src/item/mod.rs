@@ -474,6 +474,19 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_weapon(&self) -> bool {
+        match self {
+            WorldObject::WoodSword => true,
+            WorldObject::Sword => true,
+            WorldObject::Dagger => true,
+            WorldObject::WoodBow => true,
+            WorldObject::Claw => true,
+            WorldObject::FireStaff => true,
+            WorldObject::BasicStaff => true,
+            WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
     pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)

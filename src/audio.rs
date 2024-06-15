@@ -4,6 +4,7 @@ use rand::seq::IteratorRandom;
 use crate::{
     combat::{AttackTimer, HitEvent, ObjBreakEvent},
     enemy::Mob,
+    handle_attack_cooldowns,
     item::WorldObject,
     juice::UseItemEvent,
     player::Player,
@@ -35,7 +36,7 @@ impl Plugin for AudioPlugin {
         .add_system(bgm_audio)
         .add_systems(
             (
-                sword_swing_sound,
+                sword_swing_sound.after(handle_attack_cooldowns),
                 use_item_audio,
                 break_item_audio,
                 hit_collision_audio,
@@ -57,6 +58,7 @@ pub fn sword_swing_sound(
         if attack_timer_option.is_some() {
             return;
         }
+        println!("AUDIO!!");
 
         let swing1 = asset_server.load("sounds/swing.ogg");
         let swing2 = asset_server.load("sounds/swing2.ogg");

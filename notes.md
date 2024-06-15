@@ -598,11 +598,15 @@ Buttons:
 
   -BUG shift clicking gear stacks them no matter what
 
-- bug only give ability to weapons
-- inv toggle bugs (pressing tab to close doesnt reset state to closed)
-- inv hotbar bug
-- bed texture bug
-- lvl text offset after double digits3
-- fairy is not spawning...
+- [x] bug only give ability to weapons
+- [x] inv toggle bugs (pressing tab to close doesnt reset state to closed)
+- [x] inv hotbar bug
+- [x] bed texture bug
+- [x] lvl text offset after double digits3
+- [x] fairy is not spawning...
+- ui element that sticks to screen edges to show where fairy is
+- can summon inf number of combat shrine mobs until you win
+- change item abilities to use % total dmg instead of fixed
+- mobs shoudl be able to hit w non-weapons
 - duplicate audio triggers on attack
   Notes: day 4, 15-35 dmg, day 6 45dmg, lvl 11-12

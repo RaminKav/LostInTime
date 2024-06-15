@@ -138,7 +138,9 @@ fn handle_enemy_death(
         //     DoneAnimation,
         //     Name::new("Hit Spark"),
         // ));
-        let (mob_xp, mob_lvl) = mob_xp.get(death_event.entity).unwrap();
+        let Ok((mob_xp, mob_lvl)) = mob_xp.get(death_event.entity) else {
+            continue;
+        };
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(

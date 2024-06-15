@@ -377,7 +377,7 @@
         ),
         Bed: WorldObjectData(
             texture_pos: (14., 9.),
-            size: (32., 32.),
+            size: (16., 32.),
             anchor: None,
         ),
         LargeMushroomStump: WorldObjectData(

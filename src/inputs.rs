@@ -444,7 +444,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);

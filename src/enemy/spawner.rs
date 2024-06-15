@@ -1,17 +1,19 @@
 use std::time::Duration;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
+    colors::BLACK,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     item::WorldObject,
     night::{NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
+    ui::damage_numbers::spawn_screen_locked_icon,
     world::{
         chunk::Chunk,
         dimension::ActiveDimension,
@@ -22,7 +24,7 @@ use crate::{
     GameParam, GameState,
 };
 
-use super::{CombatAlignment, EliteMob, Mob};
+use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const MAX_MOB_PER_CHUNK: i32 = 6;
 pub const ELITE_SPAWN_RATE: f32 = 0.07;
@@ -208,6 +210,7 @@ fn handle_spawn_mobs(
     night_tracker: Res<NightTracker>,
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut ChunkSpawners>,
+    asset_server: Res<AssetServer>,
 ) {
     for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
@@ -239,7 +242,12 @@ fn handle_spawn_mobs(
                 {
                     let player_pos = player_t.single().translation().truncate();
                     let mut pos = player_pos.clone();
-                    while pos.distance(player_pos) <= TILE_SIZE.x * 10. {
+                    let mut can_spawn_mob_here_check = false;
+                    let mut fallback_attempts = 10;
+                    while (pos.distance(player_pos) <= TILE_SIZE.x * 10.
+                        || !can_spawn_mob_here_check)
+                        && fallback_attempts > 0
+                    {
                         let tile_pos = TilePos {
                             x: rng.gen_range(0..CHUNK_SIZE),
                             y: rng.gen_range(0..CHUNK_SIZE),
@@ -248,6 +256,8 @@ fn handle_spawn_mobs(
                             TileMapPosition::new(picked_spawner.chunk_pos, tile_pos),
                             true,
                         );
+                        can_spawn_mob_here_check = can_spawn_mob_here(pos, &game, &proto_param);
+                        fallback_attempts -= 1;
                     }
                     picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     picked_mob_to_spawn = Some((picked_spawner.enemy.clone(), pos));
@@ -257,19 +267,6 @@ fn handle_spawn_mobs(
             }
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
-            let tile_pos = world_pos_to_tile_pos(pos);
-            if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
-                continue;
-            }
-            if game
-                .get_tile_data(tile_pos)
-                .expect("spawned mob but tile does not exist?")
-                .block_type
-                .contains(&WorldObject::WaterTile)
-            {
-                continue;
-            }
-
             spawners
                 .get_mut(game.get_chunk_entity(e.chunk_pos).unwrap())
                 .unwrap()
@@ -280,6 +277,13 @@ fn handle_spawn_mobs(
             {
                 if mob.clone() == Mob::Fairy {
                     println!("SPAWNED A FAIRY!!!");
+                    spawn_screen_locked_icon(
+                        spawned_mob,
+                        &mut commands,
+                        &game.graphics,
+                        &asset_server,
+                        WorldObject::Essence,
+                    );
                 }
                 if rng.gen::<f32>() < ELITE_SPAWN_RATE
                     && !(proto_param

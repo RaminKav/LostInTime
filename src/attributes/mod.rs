@@ -801,7 +801,9 @@ fn handle_new_items_raw_attributes(
             eqp_type,
             item_level.map(|l| l.0),
         );
-        add_ability_to_item_drops(&mut new_stack);
+        if new_stack.obj_type.is_weapon() {
+            add_ability_to_item_drops(&mut new_stack);
+        }
         commands.entity(e).insert(new_stack);
     }
 }

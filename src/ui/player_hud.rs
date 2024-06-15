@@ -204,7 +204,7 @@ pub fn update_healthbar(
 pub fn update_xp_bar(
     player_hunger_query: Query<&PlayerLevel, (With<Player>, Changed<PlayerLevel>)>,
     mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
-    mut xp_bar_text_query: Query<&mut Text, With<XPBarText>>,
+    mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
 ) {
     let Ok(level) = player_hunger_query.get_single() else {
         return;
@@ -213,7 +213,11 @@ pub fn update_xp_bar(
         x: 111. * level.xp as f32 / level.next_level_xp as f32,
         y: 1.,
     });
-    xp_bar_text_query.single_mut().sections[0].value = format!("{:}", level.level);
+    let (mut text, mut txfm) = xp_bar_text_query.single_mut();
+    text.sections[0].value = format!("{:}", level.level);
+    if level.level >= 10 {
+        txfm.translation.x = -5.5;
+    }
 }
 
 pub fn update_foodbar(

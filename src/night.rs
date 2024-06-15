@@ -88,24 +88,23 @@ pub fn tick_night_color(
                 night_tracker.days += 1;
                 night_tracker.time = 0.;
             }
-        }
-        // change music
-        if night_tracker.is_night()
-            && bgm_tracker.current_track != "sounds/bgm_night.ogg".to_owned()
-        {
-            bgm_track_event.send(UpdateBGMTrackEvent {
-                asset_path: "sounds/bgm_night.ogg".to_owned(),
-            });
-        } else if !night_tracker.is_night()
-            && bgm_tracker.current_track != "sounds/bgm_day.ogg".to_owned()
-        {
-            bgm_track_event.send(UpdateBGMTrackEvent {
-                asset_path: "sounds/bgm_day.ogg".to_owned(),
-            });
-        }
-
-        if night_tracker.is_dawn() && night_tracker.days > 0 {
-            new_day_event.send_default();
+            if night_tracker.is_dawn() && night_tracker.days > 0 {
+                new_day_event.send_default();
+            }
+            // change music
+            if night_tracker.is_night()
+                && bgm_tracker.current_track != "sounds/bgm_night.ogg".to_owned()
+            {
+                bgm_track_event.send(UpdateBGMTrackEvent {
+                    asset_path: "sounds/bgm_night.ogg".to_owned(),
+                });
+            } else if !night_tracker.is_night()
+                && bgm_tracker.current_track != "sounds/bgm_day.ogg".to_owned()
+            {
+                bgm_track_event.send(UpdateBGMTrackEvent {
+                    asset_path: "sounds/bgm_day.ogg".to_owned(),
+                });
+            }
         }
     }
 }

@@ -1,11 +1,17 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use rand::Rng;
 
 use crate::{
+    assets::Graphics,
     attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
     colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
-    Game,
+    inventory::ItemStack,
+    item::WorldObject,
+    world::TILE_SIZE,
+    Game, RawPosition, TextureCamera,
 };
+
+use super::{spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
 
 #[derive(Component)]
 pub struct DamageNumber {
@@ -18,6 +24,10 @@ pub struct PreviousHealth(pub i32);
 
 pub struct DodgeEvent {
     pub entity: Entity,
+}
+#[derive(Component)]
+pub struct ScreenLockedIcon {
+    parent: Entity,
 }
 
 pub fn add_previous_health(
@@ -128,6 +138,83 @@ pub fn tick_damage_numbers(
     }
 }
 
+pub fn spawn_screen_locked_icon(
+    parent: Entity,
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    obj: WorldObject,
+) {
+    let item_icon = spawn_item_stack_icon(
+        commands,
+        graphics,
+        &ItemStack::crate_icon_stack(obj),
+        asset_server,
+    );
+    commands
+        .entity(item_icon)
+        .insert(RenderLayers::from_layers(&[0]))
+        .insert(Name::new("SCREEN ICON ITEM"));
+
+    let mut slot_entity = commands.spawn(SpriteBundle {
+        texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
+        transform: Transform::default(),
+        sprite: Sprite {
+            custom_size: Some(Vec2::new(UI_SLOT_SIZE, UI_SLOT_SIZE)),
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    slot_entity
+        .insert(ScreenLockedIcon { parent })
+        .insert(Name::new("SCREEN ICON"));
+
+    slot_entity.push_children(&[item_icon]);
+}
+
+pub fn handle_clamp_screen_locked_icons(
+    mut commands: Commands,
+    mut query: Query<(Entity, &ScreenLockedIcon, &mut Transform, &mut Visibility)>,
+    txfms: Query<&GlobalTransform>,
+    game_camera: Query<&GlobalTransform, With<TextureCamera>>,
+) {
+    let MAX_DIST: Vec2 = Vec2::new(9.5, 5.) * TILE_SIZE.x - Vec2::new(3., 1.);
+
+    for (e, screen_locked_icon, mut icon_txfm, mut v) in query.iter_mut() {
+        if let Ok(parent_txfm) = txfms.get(screen_locked_icon.parent) {
+            icon_txfm.translation = parent_txfm.translation() + Vec3::new(0., 20., 1.);
+            let camera_txfm = game_camera.single();
+
+            let cx = camera_txfm.translation().x;
+            let cy = camera_txfm.translation().y;
+
+            if icon_txfm.translation.x > cx + MAX_DIST.x {
+                icon_txfm.translation.x = cx + MAX_DIST.x;
+            } else if icon_txfm.translation.x < cx - MAX_DIST.x {
+                icon_txfm.translation.x = cx - MAX_DIST.x;
+            }
+            if icon_txfm.translation.y > cy + MAX_DIST.y {
+                icon_txfm.translation.y = cy + MAX_DIST.y;
+            } else if icon_txfm.translation.y < cy - MAX_DIST.y {
+                icon_txfm.translation.y = cy - MAX_DIST.y;
+            }
+
+            // TOGGLE VISIBILITY WHEN PARENT IN VIEW
+            if icon_txfm.translation.x < cx + MAX_DIST.x
+                && icon_txfm.translation.x > cx - MAX_DIST.x
+                && icon_txfm.translation.y < cy + MAX_DIST.y
+                && icon_txfm.translation.y > cy - MAX_DIST.y
+            {
+                *v = Visibility::Hidden;
+            } else {
+                *v = Visibility::Visible;
+            }
+        } else {
+            commands.entity(e).despawn_recursive();
+        }
+    }
+}
+
 pub fn spawn_floating_text_with_shadow(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -136,30 +223,46 @@ pub fn spawn_floating_text_with_shadow(
     text: String,
 ) {
     for i in 0..2 {
-        commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    text.clone(),
-                    TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
-                        color: if i == 0 { BLACK } else { color },
-                    },
-                ),
-                transform: Transform {
-                    translation: pos
-                        + if i == 0 {
-                            Vec3::new(1., -1., -1.)
-                        } else {
-                            Vec3::ZERO
-                        },
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(DamageNumber {
-                timer: Timer::from_seconds(0.7, TimerMode::Once),
-                velocity: 0.,
-            });
+        let entity = spawn_text(
+            commands,
+            asset_server,
+            pos + if i == 0 {
+                Vec3::new(1., -1., -1.)
+            } else {
+                Vec3::ZERO
+            },
+            if i == 0 { BLACK } else { color },
+            text.clone(),
+        );
+        commands.entity(entity).insert(DamageNumber {
+            timer: Timer::from_seconds(0.7, TimerMode::Once),
+            velocity: 0.,
+        });
     }
+}
+
+pub fn spawn_text(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    color: Color,
+    text: String,
+) -> Entity {
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                text,
+                TextStyle {
+                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                    font_size: 8.0,
+                    color,
+                },
+            ),
+            transform: Transform {
+                translation: pos,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .id()
 }

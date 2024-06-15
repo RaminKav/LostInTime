@@ -93,19 +93,21 @@ impl ObjectAction {
                 });
             }
             ObjectAction::Crafting(crafting_type) => {
-                let crafting_items = item_action_param
+                let items = if let Some(crafting_items) = item_action_param
                     .crafting_tracker
                     .crafting_type_map
                     .get(crafting_type)
-                    .unwrap();
+                {
+                    get_crafting_inventory_item_stacks(
+                        crafting_items.to_vec(),
+                        &item_action_param.recipes,
+                        proto_param,
+                    )
+                } else {
+                    vec![]
+                };
                 let crafting_container_res = CraftingContainer {
-                    items: Container {
-                        items: get_crafting_inventory_item_stacks(
-                            crafting_items.to_vec(),
-                            &item_action_param.recipes,
-                            proto_param,
-                        ),
-                    },
+                    items: Container { items },
                 };
                 commands.insert_resource(crafting_container_res.clone());
             }
@@ -122,9 +124,12 @@ impl ObjectAction {
                 let mut rng = rand::thread_rng();
                 let num_days = 4 + item_action_param.night_tracker.days;
                 let mut num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
-                commands.entity(e).insert(CombatShrine {
-                    num_mobs_left: num_spawns_left,
-                });
+                commands
+                    .entity(e)
+                    .insert(CombatShrine {
+                        num_mobs_left: num_spawns_left,
+                    })
+                    .remove::<ObjectAction>();
                 let possible_spawns =
                     [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
                 while num_spawns_left > 0 {
