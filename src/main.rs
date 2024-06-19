@@ -83,7 +83,6 @@ use ui::{
 use world::WorldGeneration;
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
-    dimension::ActiveDimension,
     generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     y_sort::YSort,
@@ -118,6 +117,7 @@ lazy_static! {
 fn main() {
     let mut app = App::new();
     let app = app
+        .insert_resource(ClearColor(Color::BLACK))
         .add_state::<GameState>()
         .edit_schedule(CoreSchedule::FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
@@ -676,7 +676,6 @@ impl AppExt for App {
     }
 }
 
-pub fn should_show_inspector(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
-    return true;
-    dim_spawn.iter().count() > 0 && *DEBUG_MODE
+pub fn should_show_inspector() -> bool {
+    *DEBUG_MODE
 }
