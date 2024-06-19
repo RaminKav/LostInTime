@@ -2,7 +2,9 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{animations::AnimationTimer, ui::UIState, world::y_sort::YSort, DEBUG_MODE};
+use crate::{
+    animations::AnimationTimer, ui::UIState, world::y_sort::YSort, DEBUG_MODE, GAME_HEIGHT,
+};
 
 use super::stats::SkillPoints;
 
@@ -92,7 +94,11 @@ pub fn spawn_particles_when_leveling(
         commands.spawn((
             SpriteSheetBundle {
                 texture_atlas: texture_atlas_handle,
-                transform: Transform::from_translation(Vec3::new(9.5, -52.5, 5.)),
+                transform: Transform::from_translation(Vec3::new(
+                    9.5,
+                    -GAME_HEIGHT / 2. + 40.5,
+                    5.,
+                )),
                 ..default()
             },
             AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),

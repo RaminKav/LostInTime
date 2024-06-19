@@ -1,7 +1,10 @@
 mod enemy_hostile_basic;
 
 use crate::{
-    enemy::red_mushling::{gas_attack, sprout},
+    enemy::{
+        red_mushking::{new_follow, new_leap_attack, summon_attack},
+        red_mushling::{gas_attack, sprout},
+    },
     GameState, Plugin,
 };
 
@@ -16,7 +19,10 @@ impl Plugin for AIPlugin {
         app.add_plugin(StateMachinePlugin).add_systems(
             (
                 follow,
+                new_follow,
                 leap_attack,
+                summon_attack,
+                new_leap_attack,
                 gas_attack,
                 sprout,
                 projectile_attack,

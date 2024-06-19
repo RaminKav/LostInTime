@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
+use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::MovePlayerEvent;
@@ -11,7 +12,6 @@ use crate::world::dungeon::spawn_new_dungeon_dimension;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
-use bevy_ecs_tilemap::tiles::TilePos;
 
 use bevy_hanabi::EffectSpawner;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
@@ -397,6 +397,7 @@ pub fn toggle_inventory(
     _inv: Query<&mut Inventory>,
     mut move_player_event: EventWriter<MovePlayerEvent>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    cursor: Res<CursorPos>,
 ) {
     if key_input.just_pressed(KeyCode::I)
         || key_input.just_pressed(KeyCode::Tab)
@@ -436,15 +437,16 @@ pub fn toggle_inventory(
                 ));
         }
         if key_input.just_pressed(KeyCode::L) {
-            let pos = tile_pos_to_world_pos(
-                TileMapPosition::new(IVec2 { x: 0, y: 0 }, TilePos { x: 0, y: 0 }),
-                true,
-            );
+            let pos = cursor.world_coords.truncate();
+            if !can_spawn_mob_here(pos, &game, &proto, false) {
+                return;
+            }
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
@@ -602,6 +604,7 @@ pub fn mouse_click_system(
                 dir: Vec2::new(0., 0.),
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,
+                ignore_tool: false,
             });
         }
     }

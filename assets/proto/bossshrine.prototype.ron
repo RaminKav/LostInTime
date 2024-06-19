@@ -1,0 +1,14 @@
+(
+  name: "BossShrine",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BossShrine,
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
+  "survival_rogue_like::world::y_sort::YSort": (-1.),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("textures/BossShrine.png")
+    )
+  }
+)

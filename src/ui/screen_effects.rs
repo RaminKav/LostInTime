@@ -2,10 +2,14 @@ use bevy::{
     prelude::*,
     reflect::TypeUuid,
     render::{
-        render_resource::{AsBindGroup, ShaderRef},
+        mesh::MeshVertexBufferLayout,
+        render_resource::{
+            AsBindGroup, BlendComponent, BlendFactor, BlendOperation, BlendState,
+            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
+        },
         view::RenderLayers,
     },
-    sprite::{Material2d, Mesh2dHandle},
+    sprite::{Material2d, Material2dKey, Mesh2dHandle},
 };
 
 use crate::{
@@ -13,7 +17,19 @@ use crate::{
     player::Player,
     GAME_HEIGHT, GAME_WIDTH,
 };
+const BLEND_ADD: BlendState = BlendState {
+    color: BlendComponent {
+        src_factor: BlendFactor::SrcAlpha,
+        dst_factor: BlendFactor::One,
+        operation: BlendOperation::Add,
+    },
 
+    alpha: BlendComponent {
+        src_factor: BlendFactor::SrcAlpha,
+        dst_factor: BlendFactor::OneMinusSrcAlpha,
+        operation: BlendOperation::Add,
+    },
+};
 #[derive(Component)]
 pub struct HealthScreenEffect;
 
@@ -23,6 +39,20 @@ pub struct HungerScreenEffect;
 impl Material2d for ScreenEffectMaterial {
     fn fragment_shader() -> ShaderRef {
         "shaders/screen_effect.wgsl".into()
+    }
+
+    fn specialize(
+        descriptor: &mut RenderPipelineDescriptor,
+        _layout: &MeshVertexBufferLayout,
+        _key: Material2dKey<Self>,
+    ) -> Result<(), SpecializedMeshPipelineError> {
+        if let Some(fragment) = &mut descriptor.fragment {
+            if let Some(target_state) = &mut fragment.targets[0] {
+                target_state.blend = Some(BLEND_ADD);
+            }
+        }
+
+        Ok(())
     }
 }
 

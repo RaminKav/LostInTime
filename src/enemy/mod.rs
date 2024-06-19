@@ -15,7 +15,7 @@ use crate::{
         NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
-    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
+    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED, WHITE},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
@@ -25,10 +25,12 @@ use crate::{
     AppExt, GameParam, GameState,
 };
 
+pub mod red_mushking;
 pub mod red_mushling;
 pub mod spawn_helpers;
 pub mod spawner;
 use self::spawner::SpawnerPlugin;
+use red_mushking::*;
 use red_mushling::*;
 
 pub struct EnemyPlugin;
@@ -39,9 +41,11 @@ impl Plugin for EnemyPlugin {
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<EnemySpawnEvent>();
             })
+            .add_system(handle_boss_health_threshold.in_base_set(CoreSet::PreUpdate))
             .add_systems(
                 (
                     handle_new_red_mushling_state_machine,
+                    handle_new_red_mushking_state_machine,
                     handle_new_mob_state_machine,
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
@@ -81,6 +85,7 @@ pub enum Mob {
     Bushling,
     Fairy,
     RedMushling,
+    RedMushking,
 }
 
 impl Mob {
@@ -94,7 +99,15 @@ impl Mob {
             Mob::Fairy => PINK,
             Mob::FurDevil => PINK,
             Mob::RedMushling => RED,
+            Mob::RedMushking => RED,
             Mob::Hog => LIGHT_BROWN,
+            _ => WHITE,
+        }
+    }
+    pub fn is_boss(&self) -> bool {
+        match self {
+            Mob::RedMushking => true,
+            _ => false,
         }
     }
 }
@@ -169,7 +182,7 @@ pub fn handle_new_mob_state_machine(
         if dungeon_check.get_single().is_ok() {
             alignment = CombatAlignment::Hostile;
         }
-        if mob == &Mob::RedMushling {
+        if mob == &Mob::RedMushling || mob.is_boss() {
             continue;
         }
         let mut e_cmds = commands.entity(e);

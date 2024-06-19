@@ -1,8 +1,15 @@
 use bevy::prelude::*;
 use bevy_rapier2d::geometry::{Collider, Sensor};
-use seldom_state::prelude::StateMachine;
+use seldom_state::{
+    prelude::StateMachine,
+    trigger::{BoolTrigger, Trigger},
+};
 
-use crate::{ai::HurtByPlayer, attributes::Attack};
+use crate::{
+    ai::{HurtByPlayer, LineOfSight},
+    attributes::Attack,
+    Game,
+};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use super::{Mob, MobIsAttacking};
@@ -13,6 +20,7 @@ pub fn handle_new_red_mushling_state_machine(
     mut commands: Commands,
     spawn_events: Query<(Entity, &Mob, &Transform), Added<Mob>>,
     asset_server: Res<AssetServer>,
+    game: Res<Game>,
 ) {
     for (e, mob, transform) in spawn_events.iter() {
         if mob != &Mob::RedMushling {
@@ -32,7 +40,14 @@ pub fn handle_new_red_mushling_state_machine(
         let state_machine = StateMachine::default()
             .with_state::<GasAttackState>()
             .set_trans_logging(false)
-            .trans::<WaitingToSproutState>(HurtByPlayer, SproutingState);
+            .trans::<WaitingToSproutState>(HurtByPlayer, SproutingState)
+            .trans::<WaitingToSproutState>(
+                MushkingSummoned.and(LineOfSight {
+                    target: game.player,
+                    range: 40.,
+                }),
+                SproutingState,
+            );
 
         e_cmds.insert(state_machine);
     }
@@ -80,9 +95,9 @@ pub fn gas_attack(
         }
         if anim.current_frame() >= 33 && anim.current_frame() <= 40 {
             if let Some(hitbox) = gas_state.hitbox {
-                commands
-                    .entity(hitbox)
-                    .insert(Collider::capsule(Vec2::ZERO, Vec2::ZERO, 24.));
+                if let Some(mut hit_e) = commands.get_entity(hitbox) {
+                    hit_e.insert(Collider::capsule(Vec2::ZERO, Vec2::ZERO, 24.));
+                }
             } else {
                 let hitbox = commands
                     .spawn((
@@ -111,5 +126,21 @@ pub fn gas_attack(
                 }
             }
         }
+    }
+}
+
+#[derive(Clone, Copy, Reflect)]
+pub struct MushkingSummoned;
+
+impl BoolTrigger for MushkingSummoned {
+    type Param<'w, 's> = Query<'w, 's, &'static Mob>;
+
+    fn trigger(&self, _entity: Entity, query: Self::Param<'_, '_>) -> bool {
+        for mob in query.iter() {
+            if mob == &Mob::RedMushking {
+                return true;
+            }
+        }
+        false
     }
 }

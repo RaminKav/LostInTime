@@ -25,6 +25,7 @@ impl Plugin for CollisionPlugion {
         app.add_systems(
             (
                 check_melee_hit_collisions,
+                check_boss_to_objects_collisions,
                 check_mob_to_player_collisions,
                 check_projectile_hit_mob_collisions,
                 check_projectile_hit_player_collisions,
@@ -34,6 +35,9 @@ impl Plugin for CollisionPlugion {
         );
     }
 }
+
+#[derive(Component)]
+pub struct DamagesWorldObjects;
 
 fn check_melee_hit_collisions(
     _commands: Commands,
@@ -84,6 +88,7 @@ fn check_melee_hit_collisions(
                 dir: delta.normalize_or_zero().truncate() * -1.,
                 hit_with_melee: Some(*weapon_obj),
                 hit_with_projectile: None,
+                ignore_tool: false,
             });
         }
     }
@@ -153,6 +158,7 @@ fn check_projectile_hit_mob_collisions(
                 dir: state.direction,
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
+                ignore_tool: false,
             });
             //non-animating sprites are despawned immediately
             if anim_option.is_none() {
@@ -241,6 +247,7 @@ fn check_projectile_hit_player_collisions(
                 dir: state.direction,
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
+                ignore_tool: false,
             });
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
@@ -345,6 +352,7 @@ fn check_mob_to_player_collisions(
                 dir: delta.normalize_or_zero().truncate(),
                 hit_with_melee: None,
                 hit_with_projectile: None,
+                ignore_tool: false,
             });
             // hit back to attacker if we have Thorns
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
@@ -354,6 +362,51 @@ fn check_mob_to_player_collisions(
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,
+                    ignore_tool: false,
+                });
+            }
+        }
+    }
+}
+
+fn check_boss_to_objects_collisions(
+    objs: Query<(Entity, &Transform, &WorldObject), With<WorldObject>>,
+    dmg_source: Query<
+        (Entity, &Transform, &Attack, Option<&MobIsAttacking>),
+        With<DamagesWorldObjects>,
+    >,
+    rapier_context: Res<RapierContext>,
+    mut hit_event: EventWriter<HitEvent>,
+) {
+    for (world_destroyer, world_destroyer_txfm, attack, is_attacking) in dmg_source.iter() {
+        let mut hit_this_frame = vec![];
+        'inner: for (e1, e2, _) in rapier_context.intersections_with(world_destroyer) {
+            for (e1, e2) in [(e1, e2), (e2, e1)] {
+                let target = if e1 == world_destroyer { e2 } else { e1 };
+                if hit_this_frame.contains(&target) {
+                    continue 'inner;
+                }
+
+                //if the enemy is colliding with an obj...
+                let Ok((obj_e, obj_txfm, _obj)) = objs.get(target) else {
+                    continue 'inner;
+                };
+
+                // mobs can only hit objs during their attack animations
+                if is_attacking.is_none() {
+                    continue 'inner;
+                }
+                hit_this_frame.push(target);
+
+                let delta = obj_txfm.translation - world_destroyer_txfm.translation;
+
+                hit_event.send(HitEvent {
+                    hit_entity: obj_e,
+                    damage: f32::round(attack.0 as f32) as i32,
+                    dir: delta.normalize_or_zero().truncate(),
+                    hit_with_melee: Some(WorldObject::WoodAxe),
+                    hit_with_projectile: None,
+                    ignore_tool: true,
                 });
             }
         }

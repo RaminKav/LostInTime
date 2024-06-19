@@ -355,6 +355,7 @@ pub enum WorldObject {
     GreenSapplingStage1,
     GreenSapplingStage2,
     GreenSapplingStage3,
+    BossShrine,
 }
 
 #[derive(

@@ -5,7 +5,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use crate::{
     assets::Graphics, audio::UpdateBGMTrackEvent, colors::YELLOW_2, container::ContainerRegistry,
     item::CraftingTracker, night::NightTracker, world::generation::WorldObjectCache, Game,
-    GameState, GAME_HEIGHT, GAME_WIDTH,
+    GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };
 
 use super::{Interactable, UIElement};
@@ -38,7 +38,7 @@ pub fn display_main_menu(
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(GAME_WIDTH, GAME_HEIGHT)),
+            custom_size: Some(Vec2::new(GAME_WIDTH / ZOOM_SCALE, GAME_HEIGHT / ZOOM_SCALE)),
             ..Default::default()
         },
         ..Default::default()
@@ -107,7 +107,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ),
             // .with_alignment(TextAlignment::Right),
             transform: Transform {
-                translation: Vec3::new(6., -36., 1.),
+                translation: Vec3::new(14., -28.5, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -136,7 +136,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ),
             // .with_alignment(TextAlignment::Right),
             transform: Transform {
-                translation: Vec3::new(-16., -53.5, 1.),
+                translation: Vec3::new(-8., -49.5, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -165,7 +165,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ),
             // .with_alignment(TextAlignment::Right),
             transform: Transform {
-                translation: Vec3::new(-47., -75., 1.),
+                translation: Vec3::new(-39.5, -74., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

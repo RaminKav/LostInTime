@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use super::chunk::GenerateObjectsEvent;
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
@@ -28,9 +30,13 @@ pub struct WallBreakEvent {
     pub pos: TileMapPosition,
 }
 
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2); 1] =
+    [(WorldObject::BossShrine, Vec2::new(8., 8.))];
+
 #[derive(Resource, Debug, Default)]
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
+    pub unique_objs: HashMap<WorldObject, TileMapPosition>,
     pub dungeon_objects: HashMap<TileMapPosition, WorldObject>,
     pub generated_chunks: Vec<IVec2>,
     pub generated_dungeon_chunks: Vec<IVec2>,
@@ -48,6 +54,9 @@ impl Plugin for GenerationPlugin {
                     handle_wall_placed.before(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                Self::generate_unique_objects_for_new_world.in_schedule(OnEnter(GameState::Main)),
             )
             .add_system(
                 Self::generate_and_cache_objects.before(CustomFlush).run_if(
@@ -167,7 +176,18 @@ impl GenerationPlugin {
     }
 
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
+    pub fn generate_unique_objects_for_new_world(mut game: GameParam) {
+        if let Ok(_) = File::open("save_state.json") {
+            return;
+        }
+        for (obj, _size) in UNIQUE_OBJECTS_DATA {
+            if !game.world_obj_cache.unique_objs.contains_key(&obj) {
+                let pos = TileMapPosition::new(IVec2::new(0, 0), TilePos::new(5, 5));
 
+                game.world_obj_cache.unique_objs.insert(obj, pos);
+            }
+        }
+    }
     pub fn generate_and_cache_objects(
         mut commands: Commands,
         mut game: GameParam,
@@ -246,7 +266,7 @@ impl GenerationPlugin {
                         .chain(cached_objs.to_owned().into_iter())
                         .collect::<Vec<(TileMapPosition, WorldObject)>>();
                 }
-                let objs = objs_to_spawn
+                let mut objs = objs_to_spawn
                     .iter()
                     .filter(|tp| {
                         // spawn walls in dungeon according to the generated grid layout
@@ -302,6 +322,13 @@ impl GenerationPlugin {
                     })
                     .map(|tp| *tp)
                     .collect::<HashMap<_, _>>();
+
+                // UNIQUE OBJECTS
+                for (obj, pos) in game.world_obj_cache.unique_objs.clone() {
+                    if pos.chunk_pos == chunk_pos {
+                        objs.insert(pos, obj);
+                    }
+                }
 
                 // now spawn them, keeping track of duplicates on the same tile
                 let mut tiles_to_spawn: HashMap<TileMapPosition, WorldObject> = HashMap::new();

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::{item::WorldObject, proto::proto_param::ProtoParam};
+use crate::{enemy::Mob, item::WorldObject, proto::proto_param::ProtoParam};
 
 #[derive(Component)]
 pub struct BounceOnHit {
@@ -22,11 +22,12 @@ pub fn bounce_on_hit(
         Entity,
         &mut Transform,
         &mut BounceOnHit,
+        Option<&Mob>,
         Option<&WorldObject>,
     )>,
     proto_param: ProtoParam,
 ) {
-    for (e, mut t, mut bounce_on_hit, obj_option) in bounce_on_hit_query.iter_mut() {
+    for (e, mut t, mut bounce_on_hit, mob_option, obj_option) in bounce_on_hit_query.iter_mut() {
         let modifier = if let Some(obj) = obj_option {
             if obj.is_medium_size(&proto_param) {
                 // large objects
@@ -38,8 +39,11 @@ pub fn bounce_on_hit(
                 // other small obj, crates, etc
                 1.
             }
+        } else if mob_option.is_some() && mob_option.unwrap().is_boss() {
+            // bosses
+            0.5
         } else {
-            // mobs
+            // other mobs
             2.
         };
         bounce_on_hit.timer.tick(time.delta());

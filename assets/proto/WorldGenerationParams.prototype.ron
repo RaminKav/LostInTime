@@ -85,6 +85,7 @@
         StoneWall: [GrassTile,],
         Crate: [GrassTile, ],
         Crate2: [GrassTile, ],
+        BossShrine: [GrassTile, ],
       }
     ),
   }

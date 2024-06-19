@@ -11,7 +11,9 @@ use crate::{
     night::NightTracker,
     player::Player,
     ui::{screen_effects::HealthScreenEffect, ChestContainer, FurnaceContainer},
-    world::{chunk::Chunk, dimension::ActiveDimension, generation::WorldObjectCache},
+    world::{
+        chunk::Chunk, dimension::ActiveDimension, generation::WorldObjectCache, y_sort::YSort,
+    },
     Game, GameState, GAME_HEIGHT, GAME_WIDTH,
 };
 
@@ -60,6 +62,7 @@ pub fn tick_game_over_overlay(
             With<Text>,
             With<ActiveDimension>,
             With<HealthScreenEffect>,
+            With<YSort>,
         )>,
     >,
     mut next_state: ResMut<NextState<GameState>>,

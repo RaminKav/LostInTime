@@ -146,7 +146,7 @@ pub fn setup_xp_bar_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(10., -56., 5.),
+                translation: Vec3::new(10., -GAME_HEIGHT / 2. + 34., 5.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

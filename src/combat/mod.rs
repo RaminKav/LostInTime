@@ -32,6 +32,7 @@ pub struct HitEvent {
     pub dir: Vec2,
     pub hit_with_melee: Option<WorldObject>,
     pub hit_with_projectile: Option<Projectile>,
+    pub ignore_tool: bool,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -245,8 +246,9 @@ pub fn handle_hits(
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
         if in_i_frame.get(hit.hit_entity).is_ok() {
-            return;
+            continue;
         }
+
         if let Ok((
             e,
             mut hit_health,
@@ -279,10 +281,11 @@ pub fn handle_hits(
                             .get_component::<EquipmentType, _>(hit_item_type)
                             .unwrap_or(&EquipmentType::None)
                             != &item_type_req.0
+                            && !hit.ignore_tool
                         {
                             continue;
                         }
-                    } else {
+                    } else if !hit.ignore_tool {
                         continue;
                     }
                 }

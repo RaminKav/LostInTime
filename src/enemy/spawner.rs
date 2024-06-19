@@ -26,7 +26,7 @@ use crate::{
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
-pub const MAX_MOB_PER_CHUNK: i32 = 6;
+pub const MAX_MOB_PER_CHUNK: i32 = 4;
 pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
@@ -84,8 +84,32 @@ fn add_spawners_to_new_chunks(
     mut commands: Commands,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     new_chunk_query: Query<(Entity, &Chunk), Added<Chunk>>,
+    game: GameParam,
+    proto: ProtoParam,
 ) {
     for new_chunk in new_chunk_query.iter() {
+        // Don't add spawners to chunks with no spawnable tiles
+        let mut at_least_one_spawnable_tile = false;
+        'check: for tile_x in 0..=15 {
+            for tile_y in 0..=15 {
+                let tile_pos = TilePos {
+                    x: tile_x,
+                    y: tile_y,
+                };
+                let pos = tile_pos_to_world_pos(
+                    TileMapPosition::new(new_chunk.1.chunk_pos, tile_pos),
+                    true,
+                );
+                if can_spawn_mob_here(pos, &game, &proto, false) {
+                    at_least_one_spawnable_tile = true;
+                    break 'check;
+                }
+            }
+        }
+
+        if !at_least_one_spawnable_tile {
+            continue;
+        }
         let mut spawners = vec![];
         if maybe_dungeon.get_single().is_err() {
             spawners.push(Spawner {
@@ -93,7 +117,7 @@ fn add_spawners_to_new_chunks(
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
-                min_days_to_spawn: 0,
+                min_days_to_spawn: 2,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
@@ -129,7 +153,7 @@ fn add_spawners_to_new_chunks(
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
-                min_days_to_spawn: 2,
+                min_days_to_spawn: 1,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
@@ -138,7 +162,7 @@ fn add_spawners_to_new_chunks(
                 chunk_pos: new_chunk.1.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
-                min_days_to_spawn: 1,
+                min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
@@ -244,9 +268,7 @@ fn handle_spawn_mobs(
                     let mut pos = player_pos.clone();
                     let mut can_spawn_mob_here_check = false;
                     let mut fallback_attempts = 10;
-                    while (pos.distance(player_pos) <= TILE_SIZE.x * 10.
-                        || !can_spawn_mob_here_check)
-                        && fallback_attempts > 0
+                    while pos.distance(player_pos) <= TILE_SIZE.x * 10. || !can_spawn_mob_here_check
                     {
                         let tile_pos = TilePos {
                             x: rng.gen_range(0..CHUNK_SIZE),
@@ -256,8 +278,12 @@ fn handle_spawn_mobs(
                             TileMapPosition::new(picked_spawner.chunk_pos, tile_pos),
                             true,
                         );
-                        can_spawn_mob_here_check = can_spawn_mob_here(pos, &game, &proto_param);
+                        can_spawn_mob_here_check =
+                            can_spawn_mob_here(pos, &game, &proto_param, false);
                         fallback_attempts -= 1;
+                        if fallback_attempts <= 0 {
+                            continue;
+                        }
                     }
                     picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     picked_mob_to_spawn = Some((picked_spawner.enemy.clone(), pos));
@@ -352,7 +378,7 @@ fn spawn_one_time_enemies_at_day(
     if maybe_dungeon.get_single().is_ok() {
         return;
     }
-    if night_tracker.days >= 5 && *day_tracker < 3 {
+    if night_tracker.days == 4 && *day_tracker == 3 {
         let mut rng = rand::thread_rng();
         let mut pos = Vec2::new(0., 0.);
         for _ in 0..10 {
@@ -368,7 +394,7 @@ fn spawn_one_time_enemies_at_day(
             }
             break;
         }
-        proto_commands.spawn_from_proto(Mob::Slime, &prototypes, pos);
+        proto_commands.spawn_from_proto(Mob::RedMushking, &prototypes, pos);
         *day_tracker += 1;
     }
 }

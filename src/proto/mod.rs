@@ -171,6 +171,7 @@ impl ProtoPlugin {
         prototypes.load("proto/electricity.prototype.ron");
         prototypes.load("proto/arc.prototype.ron");
         prototypes.load("proto/fireattack.prototype.ron");
+        prototypes.load("proto/redmushking.prototype.ron");
         prototypes.load("proto/sword.prototype.ron");
         prototypes.load("proto/chestplate.prototype.ron");
         prototypes.load("proto/metalpants.prototype.ron");
@@ -317,6 +318,8 @@ impl ProtoPlugin {
         prototypes.load("proto/redsapplingstage3.prototype.ron");
         prototypes.load("proto/greensapplingstage3.prototype.ron");
         prototypes.load("proto/yellowsapplingstage3.prototype.ron");
+
+        prototypes.load("proto/bossshrine.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
         commands.apply("WorldGenerationParams");

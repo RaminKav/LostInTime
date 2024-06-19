@@ -4,6 +4,7 @@ use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::container::Container;
 use crate::custom_commands::CommandsExt;
+use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::{CombatAlignment, EliteMob, Mob};
 use crate::item::combat_shrine::CombatShrineMob;
 use crate::item::LootTable;
@@ -132,28 +133,36 @@ impl ObjectAction {
                     .remove::<ObjectAction>();
                 let possible_spawns =
                     [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
+                let mut fallback_count = 0;
                 while num_spawns_left > 0 {
                     let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
                         * Vec2::splat(TILE_SIZE.x);
                     let choice_mob = rng.gen_range(0..possible_spawns.len());
-                    num_spawns_left -= 1;
-
-                    if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                        possible_spawns[choice_mob].clone(),
-                        &proto_param.prototypes,
+                    if can_spawn_mob_here(
                         tile_pos_to_world_pos(obj_pos, true) + offset,
+                        game,
+                        proto_param,
+                        fallback_count >= 10,
                     ) {
-                        //last mob is elite
-                        if num_spawns_left == 0 {
-                            commands.entity(mob).insert(EliteMob);
+                        if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+                            possible_spawns[choice_mob].clone(),
+                            &proto_param.prototypes,
+                            tile_pos_to_world_pos(obj_pos, true) + offset,
+                        ) {
+                            fallback_count = 0;
+                            num_spawns_left -= 1;
+                            //last mob is elite
+                            if num_spawns_left == 0 {
+                                commands.entity(mob).insert(EliteMob);
+                            }
+                            proto_param
+                                .proto_commands
+                                .commands()
+                                .entity(mob)
+                                .insert(CombatAlignment::Hostile)
+                                .insert(LootTable::default())
+                                .insert(CombatShrineMob { parent_shrine: e });
                         }
-                        proto_param
-                            .proto_commands
-                            .commands()
-                            .entity(mob)
-                            .insert(CombatAlignment::Hostile)
-                            .insert(LootTable::default())
-                            .insert(CombatShrineMob { parent_shrine: e });
                     }
                 }
             }

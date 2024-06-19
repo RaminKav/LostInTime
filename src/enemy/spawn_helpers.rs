@@ -5,10 +5,17 @@ use crate::{
     GameParam,
 };
 
-pub fn can_spawn_mob_here(pos: Vec2, game: &GameParam, proto_param: &ProtoParam) -> bool {
+pub fn can_spawn_mob_here(
+    pos: Vec2,
+    game: &GameParam,
+    proto_param: &ProtoParam,
+    ignore_objs: bool,
+) -> bool {
     let tile_pos = world_pos_to_tile_pos(pos);
-    if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
-        return false;
+    if !ignore_objs {
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+            return false;
+        }
     }
     if game
         .get_tile_data(tile_pos)

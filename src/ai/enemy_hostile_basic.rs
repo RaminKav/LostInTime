@@ -23,7 +23,7 @@ pub struct LineOfSight {
     pub range: f32,
 }
 #[derive(Component)]
-pub struct EnemyAttackCooldown(Timer);
+pub struct EnemyAttackCooldown(pub Timer);
 
 impl Trigger for LineOfSight {
     type Param<'w, 's> = (
@@ -236,7 +236,6 @@ pub fn leap_attack(
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
-        let hit = false;
 
         if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
             let delta = target_translation - attack_translation;
@@ -256,7 +255,7 @@ pub fn leap_attack(
             }
         }
 
-        if hit || attack.attack_duration_timer.finished() {
+        if attack.attack_duration_timer.finished() {
             //start attack cooldown timer
             attack.dir = None;
             if anim_data.is_done_current_animation(sprite.index) {

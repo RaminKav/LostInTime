@@ -37,7 +37,7 @@ use bevy::{
         view::RenderLayers,
     },
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
-    window::{PresentMode, WindowResolution},
+    window::{PresentMode, WindowMode, WindowResolution},
 };
 
 mod juice;
@@ -93,14 +93,14 @@ use world::{
 use crate::assets::SpriteAnchor;
 use lazy_static::lazy_static;
 
-const ZOOM_SCALE: f32 = 1.;
-const PLAYER_MOVE_SPEED: f32 = 90. * ZOOM_SCALE;
-const PLAYER_DASH_SPEED: f32 = 250. * ZOOM_SCALE;
+const ZOOM_SCALE: f32 = 1.2;
+const PLAYER_MOVE_SPEED: f32 = 75.;
+const PLAYER_DASH_SPEED: f32 = 200.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1600.;
-pub const ASPECT_RATIO: f32 = 16.0 / 9.0;
+pub const HEIGHT: f32 = 1800.;
+pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
-pub const GAME_HEIGHT: f32 = 180. * ZOOM_SCALE;
+pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
 pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
 lazy_static! {
     pub static ref DEBUG_MODE: bool = env::var("DEBUG_MODE").is_ok();
@@ -137,8 +137,9 @@ fn main() {
                             .with_scale_factor_override(1.0),
                         title: "Hiru's Island".to_string(),
                         present_mode: PresentMode::Fifo,
-                        resizable: false,
+                        resizable: true,
                         transparent: true,
+                        mode: WindowMode::BorderlessFullscreen,
                         ..Default::default()
                     }),
                     ..default()
@@ -676,5 +677,6 @@ impl AppExt for App {
 }
 
 pub fn should_show_inspector(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
+    return true;
     dim_spawn.iter().count() > 0 && *DEBUG_MODE
 }
