@@ -173,8 +173,6 @@ impl Plugin for UIPlugin {
                     handle_submit_essence_choice,
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
-                    handle_add_screen_effects,
-                    setup_screen_effects,
                     handle_clamp_screen_locked_icons,
                     setup_essence_ui
                         .before(CustomFlush)
