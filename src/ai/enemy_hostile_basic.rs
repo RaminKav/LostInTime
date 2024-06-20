@@ -328,7 +328,7 @@ pub fn projectile_attack(
 }
 pub fn idle(
     mut transforms: Query<&mut KinematicCharacterController>,
-    mut idles: Query<(Entity, &mut IdleState)>,
+    mut idles: Query<(Entity, &mut IdleState), With<EnemyAnimationState>>,
     mut commands: Commands,
     time: Res<Time>,
 ) {

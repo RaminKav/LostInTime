@@ -25,11 +25,13 @@ use crate::{
     AppExt, GameParam, GameState,
 };
 
+pub mod fairy;
 pub mod red_mushking;
 pub mod red_mushling;
 pub mod spawn_helpers;
 pub mod spawner;
 use self::spawner::SpawnerPlugin;
+use fairy::*;
 use red_mushking::*;
 use red_mushling::*;
 
@@ -46,6 +48,7 @@ impl Plugin for EnemyPlugin {
                 (
                     handle_new_red_mushling_state_machine,
                     handle_new_red_mushking_state_machine,
+                    handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
@@ -182,7 +185,7 @@ pub fn handle_new_mob_state_machine(
         if dungeon_check.get_single().is_ok() {
             alignment = CombatAlignment::Hostile;
         }
-        if mob == &Mob::RedMushling || mob.is_boss() {
+        if mob == &Mob::RedMushling || mob.is_boss() || mob == &Mob::Fairy {
             continue;
         }
         let mut e_cmds = commands.entity(e);

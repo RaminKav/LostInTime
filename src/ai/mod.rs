@@ -2,6 +2,7 @@ mod enemy_hostile_basic;
 
 use crate::{
     enemy::{
+        fairy::{new_idle, trade_anim},
         red_mushking::{new_follow, new_leap_attack, summon_attack},
         red_mushling::{gas_attack, sprout},
     },
@@ -20,6 +21,8 @@ impl Plugin for AIPlugin {
             (
                 follow,
                 new_follow,
+                new_idle,
+                trade_anim,
                 leap_attack,
                 summon_attack,
                 new_leap_attack,

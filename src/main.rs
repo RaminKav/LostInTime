@@ -94,9 +94,9 @@ use lazy_static::lazy_static;
 
 const ZOOM_SCALE: f32 = 1.2;
 const PLAYER_MOVE_SPEED: f32 = 75.;
-const PLAYER_DASH_SPEED: f32 = 200.;
+const PLAYER_DASH_SPEED: f32 = 215.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1800.;
+pub const HEIGHT: f32 = 1920.;
 pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
