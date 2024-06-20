@@ -47,7 +47,7 @@
       },
       schematic_frequencies: {
         House: 0.00,
-        DungeonEntrance: 0.1,
+        DungeonEntrance: 0.0,
         CombatShrine: 0.15,
       },
       obj_allowed_tiles_map: {
@@ -86,6 +86,7 @@
         Crate: [GrassTile, ],
         Crate2: [GrassTile, ],
         BossShrine: [GrassTile, ],
+        DungeonEntrance: [GrassTile, ],
       }
     ),
   }

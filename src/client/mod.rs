@@ -122,6 +122,7 @@ pub struct CurrentRunSaveData {
     seed: u64,
     #[serde(with = "vectorize")]
     placed_objs: HashMap<TileMapPosition, WorldObject>,
+    unique_objs: HashMap<WorldObject, TileMapPosition>,
     #[serde(with = "vectorize")]
     containers: HashMap<TileMapPosition, Container>,
     #[serde(with = "vectorize")]
@@ -238,6 +239,7 @@ pub fn save_state(
     check_open_chest: Option<Res<ChestContainer>>,
     check_open_furnace: Option<Res<FurnaceContainer>>,
     key_input: ResMut<Input<KeyCode>>,
+    game: GameParam,
 ) {
     timer.timer.tick(time.delta());
     // only save if the timer is done and we are not in a dungeon
@@ -270,6 +272,7 @@ pub fn save_state(
         })
         .map_into()
         .collect();
+    save_data.unique_objs = game.world_obj_cache.unique_objs.clone();
 
     // chain the current chests, and also the ones in registry,
     // since they will be despawned and missed by the query
@@ -357,6 +360,7 @@ pub fn load_state(
                     }
                 }
                 game.world_obj_cache.objects = data.placed_objs;
+                game.world_obj_cache.unique_objs = data.unique_objs;
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
                 commands.insert_resource(ContainerRegistry {

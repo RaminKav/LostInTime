@@ -17,14 +17,16 @@ pub fn can_spawn_mob_here(
             return false;
         }
     }
-    if game
-        .get_tile_data(tile_pos)
-        .expect("spawned mob but tile does not exist?")
-        .block_type
-        .contains(&WorldObject::WaterTile)
-    {
+    if is_tile_water(pos, game).is_ok_and(|x| x) {
         return false;
     }
-
     true
+}
+
+pub fn is_tile_water(pos: Vec2, game: &GameParam) -> Result<bool, ()> {
+    let tile_pos = world_pos_to_tile_pos(pos);
+    if let Some(tile_data) = game.get_tile_data(tile_pos) {
+        return Ok(tile_data.block_type.contains(&WorldObject::WaterTile));
+    }
+    Err(())
 }

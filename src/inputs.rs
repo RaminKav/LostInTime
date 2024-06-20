@@ -40,8 +40,8 @@ use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
 use crate::world::chunk::Chunk;
 
-use crate::world::world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos};
-use crate::world::TileMapPosition;
+use crate::world::world_helpers::world_pos_to_tile_pos;
+
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,

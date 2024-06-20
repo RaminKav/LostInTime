@@ -22,8 +22,9 @@
         Boulder2: 0.005,
         CoalBoulder: 0.003,
         MetalBoulder: 0.003,
-        Crate: 0.00003,
+        Crate: 0.0008,
         Pebble: 0.01,
+        BrownMushroom: 0.005,
       },
       obj_allowed_tiles_map: {
         Boulder: [GrassTile, StoneTile],
@@ -34,6 +35,8 @@
         Grass: [GrassTile, StoneTile],
         DeadSapling: [GrassTile, StoneTile],
         Chest: [GrassTile, StoneTile],
+        Crate: [GrassTile, StoneTile],
+        BrownMushroom: [GrassTile, StoneTile],
         StoneWall: [GrassTile, StoneTile],
         DungeonExit: [GrassTile, StoneTile]
       }

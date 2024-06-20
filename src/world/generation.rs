@@ -6,8 +6,9 @@ use super::dungeon::Dungeon;
 use super::noise_helpers::get_object_points_for_chunk;
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
-use super::WorldGeneration;
+use super::{WorldGeneration, ISLAND_SIZE};
 use crate::container::ContainerRegistry;
+use crate::enemy::spawn_helpers::is_tile_water;
 use crate::enemy::Mob;
 use crate::item::{handle_break_object, WorldObject};
 use crate::player::Player;
@@ -15,6 +16,7 @@ use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
+use crate::world::world_helpers::get_neighbour_tile;
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::NO_GEN;
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
@@ -24,14 +26,20 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
+use rand::Rng;
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
     pub pos: TileMapPosition,
 }
+pub struct DoneGeneratingEvent {
+    pub chunk_pos: IVec2,
+}
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2); 1] =
-    [(WorldObject::BossShrine, Vec2::new(8., 8.))];
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2); 2] = [
+    (WorldObject::BossShrine, Vec2::new(8., 8.)),
+    (WorldObject::DungeonEntrance, Vec2::new(2., 2.)),
+];
 
 #[derive(Resource, Debug, Default)]
 pub struct WorldObjectCache {
@@ -46,6 +54,7 @@ pub struct GenerationPlugin;
 impl Plugin for GenerationPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<WallBreakEvent>()
+            .add_event::<DoneGeneratingEvent>()
             .add_systems(
                 (
                     handle_wall_break
@@ -177,12 +186,23 @@ impl GenerationPlugin {
 
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(mut game: GameParam) {
+        // if a save state exists, we assume unique objs have already been generated
         if let Ok(_) = File::open("save_state.json") {
             return;
         }
+        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 1.) as i32;
         for (obj, _size) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {
-                let pos = TileMapPosition::new(IVec2::new(0, 0), TilePos::new(5, 5));
+                let mut rng = rand::thread_rng();
+
+                let pos = TileMapPosition::new(
+                    IVec2::new(
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                    ),
+                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                );
+                println!("set up a {obj:?} at {pos:?}");
 
                 game.world_obj_cache.unique_objs.insert(obj, pos);
             }
@@ -204,6 +224,7 @@ impl GenerationPlugin {
             (Entity, &Collider, &GlobalTransform),
             (Without<WorldObject>, Without<Mob>, Without<Player>),
         >,
+        mut done_event: EventWriter<DoneGeneratingEvent>,
     ) {
         if *NO_GEN {
             return;
@@ -312,7 +333,7 @@ impl GenerationPlugin {
                             .world_generation_params
                             .obj_allowed_tiles_map
                             .get(&tp.1)
-                            .unwrap();
+                            .expect(&format!("no allowed tiles for obj {:?}", &tp.1));
                         for allowed_tile in filter.iter() {
                             if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
                                 return true;
@@ -324,9 +345,56 @@ impl GenerationPlugin {
                     .collect::<HashMap<_, _>>();
 
                 // UNIQUE OBJECTS
-                for (obj, pos) in game.world_obj_cache.unique_objs.clone() {
-                    if pos.chunk_pos == chunk_pos {
-                        objs.insert(pos, obj);
+                if dungeon_check.is_err() {
+                    for (obj, pos) in game.world_obj_cache.unique_objs.clone() {
+                        if pos.chunk_pos == chunk_pos {
+                            //TODO: this will be funky if size is not even integers
+                            let x_halfsize = (UNIQUE_OBJECTS_DATA
+                                .iter()
+                                .find(|(o, _)| o == &obj)
+                                .map(|(_, s)| s)
+                                .unwrap()
+                                .x
+                                / 2.) as i32;
+                            let y_halfsize = (UNIQUE_OBJECTS_DATA
+                                .iter()
+                                .find(|(o, _)| o == &obj)
+                                .map(|(_, s)| s)
+                                .unwrap()
+                                .y
+                                / 2.) as i32;
+                            println!("SPAWNING UNIQUE {obj:?} at {pos:?} {x_halfsize:?}");
+
+                            let mut pos = pos;
+                            let mut found_non_water_location = false;
+                            'repeat: while !found_non_water_location {
+                                for x in (-x_halfsize)..=x_halfsize {
+                                    for y in (-y_halfsize)..=y_halfsize {
+                                        let n_pos = tile_pos_to_world_pos(
+                                            get_neighbour_tile(pos, (x as i8, y as i8)),
+                                            false,
+                                        );
+                                        if is_tile_water(n_pos, &mut game).is_ok_and(|x| x) {
+                                            let mut rng = rand::thread_rng();
+
+                                            pos = TileMapPosition::new(
+                                                chunk_pos,
+                                                TilePos::new(
+                                                    rng.gen_range(0..15),
+                                                    rng.gen_range(0..15),
+                                                ),
+                                            );
+                                            println!("relocating {obj:?} to {pos:?}");
+                                            continue 'repeat;
+                                        }
+                                    }
+                                }
+                                found_non_water_location = true;
+                            }
+                            game.world_obj_cache.unique_objs.insert(obj, pos);
+
+                            objs.insert(pos, obj);
+                        }
                     }
                 }
 
@@ -350,7 +418,10 @@ impl GenerationPlugin {
                                 )))
                     {
                         // override chests and dungeon exits, skip anything else
-                        if obj == &WorldObject::DungeonExit || obj == &WorldObject::Chest {
+                        if obj == &WorldObject::DungeonExit
+                            || obj == &WorldObject::Chest
+                            || obj == &WorldObject::DungeonEntrance
+                        {
                             occupied_tiles.remove(pos);
                             occupied_tiles.insert(*pos, *obj);
                         } else {
@@ -504,6 +575,8 @@ impl GenerationPlugin {
                     }
                 }
             }
+
+            done_event.send(DoneGeneratingEvent { chunk_pos });
         }
     }
 }

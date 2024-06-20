@@ -3,7 +3,10 @@ use std::time::Duration;
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-use rand::{seq::SliceRandom, Rng};
+use rand::{
+    seq::{IteratorRandom, SliceRandom},
+    Rng,
+};
 
 use crate::{
     colors::BLACK,
@@ -18,6 +21,7 @@ use crate::{
         chunk::Chunk,
         dimension::ActiveDimension,
         dungeon::Dungeon,
+        generation::DoneGeneratingEvent,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
         TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
@@ -32,11 +36,11 @@ pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MobSpawnEvent>()
+            .add_system(add_global_spawn_timer.in_schedule(OnEnter(GameState::Main)))
             .add_systems(
                 (
                     handle_spawn_mobs,
                     tick_spawner_timers,
-                    add_spawners_to_new_chunks,
                     handle_add_fairy_spawners,
                     spawn_one_time_enemies_at_day,
                     reduce_chunk_mob_count_on_mob_death,
@@ -44,8 +48,22 @@ impl Plugin for SpawnerPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(check_mob_count.in_base_set(CoreSet::PreUpdate));
+            .add_system(
+                add_spawners_to_new_chunks
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
+                check_mob_count
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(resource_exists::<GlobalSpawnTimer>()),
+            );
     }
+}
+
+#[derive(Resource, Debug)]
+pub struct GlobalSpawnTimer {
+    pub timer: Timer,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -80,14 +98,20 @@ pub struct MobSpawnEvent {
     bypass_timers: bool,
 }
 
+fn add_global_spawn_timer(mut commands: Commands) {
+    commands.insert_resource(GlobalSpawnTimer {
+        timer: Timer::from_seconds(5., TimerMode::Once),
+    });
+}
+
 fn add_spawners_to_new_chunks(
     mut commands: Commands,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
-    new_chunk_query: Query<(Entity, &Chunk), Added<Chunk>>,
     game: GameParam,
     proto: ProtoParam,
+    mut chunk_spawn_event: EventReader<DoneGeneratingEvent>,
 ) {
-    for new_chunk in new_chunk_query.iter() {
+    for new_chunk in chunk_spawn_event.iter() {
         // Don't add spawners to chunks with no spawnable tiles
         let mut at_least_one_spawnable_tile = false;
         'check: for tile_x in 0..=15 {
@@ -97,7 +121,7 @@ fn add_spawners_to_new_chunks(
                     y: tile_y,
                 };
                 let pos = tile_pos_to_world_pos(
-                    TileMapPosition::new(new_chunk.1.chunk_pos, tile_pos),
+                    TileMapPosition::new(new_chunk.chunk_pos, tile_pos),
                     true,
                 );
                 if can_spawn_mob_here(pos, &game, &proto, false) {
@@ -114,7 +138,7 @@ fn add_spawners_to_new_chunks(
         if maybe_dungeon.get_single().is_err() {
             spawners.push(Spawner {
                 enemy: Mob::SpikeSlime,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 2,
@@ -123,7 +147,7 @@ fn add_spawners_to_new_chunks(
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
@@ -132,7 +156,7 @@ fn add_spawners_to_new_chunks(
             });
             spawners.push(Spawner {
                 enemy: Mob::RedMushling,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 200.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
@@ -141,7 +165,7 @@ fn add_spawners_to_new_chunks(
             });
             spawners.push(Spawner {
                 enemy: Mob::Hog,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
@@ -150,7 +174,7 @@ fn add_spawners_to_new_chunks(
             });
             spawners.push(Spawner {
                 enemy: Mob::StingFly,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 1,
@@ -159,7 +183,7 @@ fn add_spawners_to_new_chunks(
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
                 spawn_timer: Timer::from_seconds(50., TimerMode::Once),
                 min_days_to_spawn: 0,
@@ -169,36 +193,41 @@ fn add_spawners_to_new_chunks(
         } else {
             spawners.push(Spawner {
                 enemy: Mob::SpikeSlime,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(20., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::FurDevil,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(20., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
             spawners.push(Spawner {
                 enemy: Mob::Bushling,
-                chunk_pos: new_chunk.1.chunk_pos,
+                chunk_pos: new_chunk.chunk_pos,
                 weight: 100.,
-                spawn_timer: Timer::from_seconds(12., TimerMode::Once),
+                spawn_timer: Timer::from_seconds(20., TimerMode::Once),
                 min_days_to_spawn: 0,
                 num_to_spawn: None,
                 num_spawned: 0,
             });
         }
-        commands.entity(new_chunk.0).insert(ChunkSpawners {
-            spawners,
-            spawned_mobs: 0,
-        });
+        commands
+            .entity(
+                game.get_chunk_entity(new_chunk.chunk_pos)
+                    .expect("spawnner added to chunk that does not exist"),
+            )
+            .insert(ChunkSpawners {
+                spawners,
+                spawned_mobs: 0,
+            });
     }
 }
 
@@ -236,7 +265,7 @@ fn handle_spawn_mobs(
     mut spawners: Query<&mut ChunkSpawners>,
     asset_server: Res<AssetServer>,
 ) {
-    for e in spawner_trigger_event.iter() {
+    'outer: for e in spawner_trigger_event.iter() {
         if game.get_chunk_entity(e.chunk_pos).is_none() {
             continue;
         }
@@ -267,7 +296,7 @@ fn handle_spawn_mobs(
                     let player_pos = player_t.single().translation().truncate();
                     let mut pos = player_pos.clone();
                     let mut can_spawn_mob_here_check = false;
-                    let mut fallback_attempts = 10;
+                    let mut fallback_attempts = 20;
                     while pos.distance(player_pos) <= TILE_SIZE.x * 10. || !can_spawn_mob_here_check
                     {
                         let tile_pos = TilePos {
@@ -282,10 +311,14 @@ fn handle_spawn_mobs(
                             can_spawn_mob_here(pos, &game, &proto_param, false);
                         fallback_attempts -= 1;
                         if fallback_attempts <= 0 {
-                            continue;
+                            warn!(
+                                "Could not find a valid spawn location for mob {:?}",
+                                e.chunk_pos
+                            );
+                            picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
+                            continue 'outer;
                         }
                     }
-                    picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
                     picked_mob_to_spawn = Some((picked_spawner.enemy.clone(), pos));
 
                     picked_spawner.num_spawned += 1;
@@ -340,18 +373,25 @@ fn reduce_chunk_mob_count_on_mob_death(
 fn check_mob_count(
     chunk_query: Query<(Entity, &Chunk, &mut ChunkSpawners), With<Chunk>>,
     mut spawn_event: EventWriter<MobSpawnEvent>,
+    mut timer: ResMut<GlobalSpawnTimer>,
+    time: Res<Time>,
 ) {
     // for each spawned chunk, check if mob count is < max
     // and if so, send event to spawn more
-    for (_e, chunk, spawners) in chunk_query.iter() {
-        let chunk_pos = chunk.chunk_pos;
-        if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
-            continue;
+    timer.timer.tick(time.delta());
+    if timer.timer.just_finished() {
+        timer.timer.reset();
+        let mut rng = rand::thread_rng();
+        if let Some((_e, chunk, spawners)) = chunk_query.iter().choose(&mut rng) {
+            let chunk_pos = chunk.chunk_pos;
+            if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
+                return;
+            }
+            spawn_event.send(MobSpawnEvent {
+                chunk_pos,
+                bypass_timers: false,
+            });
         }
-        spawn_event.send(MobSpawnEvent {
-            chunk_pos,
-            bypass_timers: false,
-        });
     }
 }
 fn despawn_out_of_range_mobs(
