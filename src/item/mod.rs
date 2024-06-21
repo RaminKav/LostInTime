@@ -35,7 +35,9 @@ use rand::Rng;
 mod crafting;
 pub mod item_actions;
 
+pub mod boss_shrine;
 pub mod combat_shrine;
+use boss_shrine::*;
 pub mod item_upgrades;
 mod loot_table;
 pub mod melee;
@@ -666,6 +668,8 @@ impl Plugin for ItemsPlugin {
             )
             .add_systems(
                 (
+                    check_for_items_on_shrine,
+                    handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>()),
                     handle_item_action_success,
                     handle_delayed_ranged_attack,
                     handle_spread_arrows_attack.after(CustomFlush),

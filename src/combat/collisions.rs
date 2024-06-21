@@ -370,7 +370,7 @@ fn check_mob_to_player_collisions(
 }
 
 fn check_boss_to_objects_collisions(
-    objs: Query<(Entity, &Transform, &WorldObject), With<WorldObject>>,
+    objs: Query<(Entity, &Transform, &WorldObject), (With<WorldObject>, Without<ItemStack>)>,
     dmg_source: Query<
         (Entity, &Transform, &Attack, Option<&MobIsAttacking>),
         With<DamagesWorldObjects>,

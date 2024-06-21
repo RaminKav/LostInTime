@@ -1,6 +1,11 @@
 use crate::{
-    custom_commands::CommandsExt, enemy::spawn_helpers::can_spawn_mob_here, item::LootTable,
-    player::levels::ExperienceReward, GameParam,
+    ai::HurtByPlayer,
+    custom_commands::CommandsExt,
+    enemy::spawn_helpers::can_spawn_mob_here,
+    item::{LootTable, WorldObject},
+    player::levels::ExperienceReward,
+    world::{world_helpers::tile_pos_to_world_pos, TILE_SIZE},
+    GameParam,
 };
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
@@ -9,14 +14,17 @@ use bevy_rapier2d::{
     geometry::{Collider, Sensor},
 };
 use rand::Rng;
-use seldom_state::{prelude::StateMachine, trigger::BoolTrigger};
+use seldom_state::{
+    prelude::StateMachine,
+    trigger::{BoolTrigger, Trigger},
+};
 
 use crate::{
     ai::{EnemyAttackCooldown, FollowState, LeapAttackState},
     attributes::{Attack, CurrentHealth, MaxHealth},
     collisions::DamagesWorldObjects,
     proto::proto_param::ProtoParam,
-    Game, PLAYER_MOVE_SPEED,
+    PLAYER_MOVE_SPEED,
 };
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
@@ -36,7 +44,7 @@ pub fn handle_new_red_mushking_state_machine(
     mut commands: Commands,
     spawn_events: Query<(Entity, &Mob, &Transform, &FollowSpeed, &LeapAttack), Added<Mob>>,
     asset_server: Res<AssetServer>,
-    game: Res<Game>,
+    game: GameParam,
 ) {
     for (e, mob, transform, follow_speed, leap_attack) in spawn_events.iter() {
         if mob != &Mob::RedMushking {
@@ -45,6 +53,16 @@ pub fn handle_new_red_mushking_state_machine(
         let mut e_cmds = commands.entity(e);
         let mut animation = AsepriteAnimation::from(RedMushking::tags::IDLE);
         animation.play();
+
+        let shrine_pos = tile_pos_to_world_pos(
+            *game
+                .world_obj_cache
+                .unique_objs
+                .get(&WorldObject::BossShrine)
+                .expect("no shrine found"),
+            false,
+        );
+
         e_cmds
             .insert(AsepriteBundle {
                 aseprite: asset_server.load(RedMushking::PATH),
@@ -53,12 +71,13 @@ pub fn handle_new_red_mushking_state_machine(
                 ..Default::default()
             })
             .insert(FollowState {
-                target: game.player,
+                target: game.game.player,
                 speed: follow_speed.0,
             })
             .insert(DamagesWorldObjects)
             .insert(HealthThreshold(1.))
             .insert(AttackCollider(None));
+
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
             .trans::<FollowState>(
@@ -71,7 +90,7 @@ pub fn handle_new_red_mushking_state_machine(
             .trans::<FollowState>(
                 JumpTimer,
                 LeapAttackState {
-                    target: game.player,
+                    target: game.game.player,
                     attack_startup_timer: Timer::from_seconds(leap_attack.startup, TimerMode::Once),
                     attack_duration_timer: Timer::from_seconds(
                         leap_attack.duration,
@@ -84,11 +103,29 @@ pub fn handle_new_red_mushking_state_machine(
                     dir: None,
                     speed: leap_attack.speed,
                 },
+            )
+            .trans::<FollowState>(
+                Trigger::not(ShrineLOS {
+                    range: TILE_SIZE.x * 16.,
+                    shrine_pos,
+                }),
+                ReturnToShrineState,
+            )
+            .trans::<ReturnToShrineState>(
+                HurtByPlayer,
+                FollowState {
+                    target: game.game.player,
+                    speed: follow_speed.0,
+                },
             );
 
         e_cmds.insert(state_machine);
     }
 }
+
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct ReturnToShrineState;
 
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
@@ -171,7 +208,8 @@ pub fn new_leap_attack(
         // BEGIN MOVING
         if frame >= 18 && frame <= 23 {
             // println!("      begin moveing {:?}", time.delta_seconds());
-            kcc.translation = Some((leap_attack.dir.unwrap() * time.delta_seconds()) * 10. / 6.);
+            kcc.translation =
+                Some((leap_attack.dir.unwrap_or(Vec2::ZERO) * time.delta_seconds()) * 10. / 6.);
         }
         // END LEAP ATTACK
         if frame == 28 {
@@ -306,9 +344,9 @@ pub fn new_follow(
 pub struct JumpTimer;
 
 impl BoolTrigger for JumpTimer {
-    type Param<'w, 's> = (Query<'w, 's, &'static EnemyAttackCooldown>, Res<'w, Time>);
+    type Param<'w, 's> = Query<'w, 's, &'static EnemyAttackCooldown>;
 
-    fn trigger(&self, entity: Entity, (attack_cooldown, time): Self::Param<'_, '_>) -> bool {
+    fn trigger(&self, entity: Entity, attack_cooldown: Self::Param<'_, '_>) -> bool {
         if let Ok(_) = attack_cooldown.get(entity) {
             return false;
         }
@@ -349,5 +387,73 @@ pub fn handle_boss_health_threshold(
 ) {
     for (hp, max_hp, mut threshold) in thresholds.iter_mut() {
         threshold.0 = hp.0 as f32 / max_hp.0 as f32;
+    }
+}
+
+pub fn return_to_shrine(
+    mut state_machines: Query<
+        (
+            Entity,
+            &mut AsepriteAnimation,
+            &mut KinematicCharacterController,
+            &mut CurrentHealth,
+            &MaxHealth,
+        ),
+        With<ReturnToShrineState>,
+    >,
+    game: GameParam,
+    mut transforms: Query<&mut Transform>,
+    time: Res<Time>,
+) {
+    for (entity, mut anim, mut mover, mut hp, max_hp) in state_machines.iter_mut() {
+        let shrine_pos = tile_pos_to_world_pos(
+            *game
+                .world_obj_cache
+                .unique_objs
+                .get(&WorldObject::BossShrine)
+                .expect("no shrine found"),
+            false,
+        );
+
+        // Get the positions of the follower and target
+        let follow_transform = &mut transforms.get_mut(entity).unwrap();
+        let follow_translation = follow_transform.translation;
+        let delta = shrine_pos.extend(0.) - follow_translation;
+        let normal_delta = (delta).normalize_or_zero().truncate();
+        println!("d {normal_delta:?}");
+        // Find the direction from the follower to the target and go that way
+        mover.translation = Some(normal_delta * 2. * PLAYER_MOVE_SPEED * time.delta_seconds());
+
+        if anim.current_frame() < 6 || anim.current_frame() > 13 {
+            *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
+        }
+
+        if delta.length() < 16. {
+            hp.0 = max_hp.0;
+        }
+    }
+}
+
+#[derive(Clone, Copy, Reflect)]
+pub struct ShrineLOS {
+    pub range: f32,
+    pub shrine_pos: Vec2,
+}
+
+impl Trigger for ShrineLOS {
+    type Param<'w, 's> = Query<'w, 's, &'static Transform>;
+    type Ok = f32;
+    type Err = f32;
+
+    // Return `Ok` to trigger and `Err` to not trigger
+    fn trigger(&self, entity: Entity, transforms: Self::Param<'_, '_>) -> Result<f32, f32> {
+        if let Ok(tfxm) = transforms.get(entity) {
+            let delta = tfxm.translation.truncate() - self.shrine_pos;
+
+            let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+            return (distance <= self.range).then_some(distance).ok_or(distance);
+        } else {
+            Err(0.)
+        }
     }
 }

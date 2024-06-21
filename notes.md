@@ -607,10 +607,12 @@ Buttons:
 - [x] bug: mobs spawn in water
 - TODO: extract game window size and other options into a resource
 - ui element that sticks to screen edges to show where fairy is
-- can summon inf number of combat shrine mobs until you win
+- [x] can summon inf number of combat shrine mobs until you win
 - change item abilities to use % total dmg instead of fixed
 - mobs shoudl be able to hit w non-weapons
 - duplicate audio triggers on attack
+- [] design a better mob spawner system, too many spawn in dungeons instantly.
 - weird tracking on the boss follow
-- make boss jump faster?
   Notes: day 4, 15-35 dmg, day 6 45dmg, lvl 11-12
+
+-[x] BUG: spawners need to get added after generation of a chunk is complete, not after a chunk is added

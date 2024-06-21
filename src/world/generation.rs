@@ -190,7 +190,7 @@ impl GenerationPlugin {
         if let Ok(_) = File::open("save_state.json") {
             return;
         }
-        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 1.) as i32;
+        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
         for (obj, _size) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {
                 let mut rng = rand::thread_rng();
