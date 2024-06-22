@@ -9,7 +9,7 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
-    player::stats::{PlayerStats, SkillPoints},
+    player::stats::{PlayerStats, SkillPoints, StatType},
     proto::proto_param::ProtoParam,
     GameParam,
 };
@@ -17,8 +17,8 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
     ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, MenuButton,
-    MenuButtonClickEvent, SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent,
-    UIContainersParam, UIState,
+    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SubmitEssenceChoice, ToolTipUpdateEvent,
+    TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -117,9 +117,6 @@ pub struct RemoveFromSlotEvent {
     pub removed_item_stack: ItemStack,
     pub removed_slot_state: InventorySlotState,
 }
-#[derive(Debug, Clone)]
-
-pub struct ShowInvPlayerStatsEvent;
 
 #[derive(Debug, Clone)]
 
@@ -128,10 +125,6 @@ pub struct DropInWorldEvent {
     pub dropped_item_stack: ItemStack,
     pub parent_interactable_entity: Option<Entity>,
     pub stack_empty: bool,
-}
-#[derive(Resource)]
-pub struct LastHoveredSlot {
-    pub slot: Option<usize>,
 }
 
 pub fn handle_drop_in_world_events(
@@ -299,6 +292,7 @@ pub fn handle_hovering(
         &mut Interactable,
         Option<&InventorySlotState>,
         Option<&EssenceOption>,
+        Option<&StatsButtonState>,
     )>,
     graphics: Res<Graphics>,
     mut commands: Commands,
@@ -308,10 +302,13 @@ pub fn handle_hovering(
     furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
     mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
+    mut stats_update_events: EventWriter<ShowInvPlayerStatsEvent>,
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
-    for (e, ui, interactable, state_option, essence_option) in interactables.iter_mut() {
+    for (e, ui, interactable, state_option, essence_option, stats_option) in
+        interactables.iter_mut()
+    {
         if let Interaction::Hovering = interactable.current() {
             if ui == &UIElement::InventorySlot {
                 let state = state_option.unwrap();
@@ -349,6 +346,14 @@ pub fn handle_hovering(
                 commands
                     .entity(e)
                     .insert(graphics.get_ui_element_texture(UIElement::StatsButtonHover));
+                stats_update_events.send(ShowInvPlayerStatsEvent {
+                    stat: Some(StatType::from_index(
+                        stats_option
+                            .expect("stats buttons have stats state")
+                            .index
+                            .clone(),
+                    )),
+                });
             }
             if ui == &UIElement::EssenceButton {
                 // swap to hover img
@@ -381,6 +386,7 @@ pub fn handle_hovering(
                     .entity(e)
                     .insert(UIElement::StatsButton)
                     .insert(graphics.get_ui_element_texture(UIElement::StatsButton));
+                stats_update_events.send_default();
             }
             if ui == &UIElement::EssenceButtonHover {
                 // swap to base img

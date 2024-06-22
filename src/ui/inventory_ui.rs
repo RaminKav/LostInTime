@@ -157,7 +157,7 @@ pub fn setup_inv_ui(
     inv_state.inv_size = size;
     commands.entity(inv_e).push_children(&[overlay]);
 
-    stats_event.send(ShowInvPlayerStatsEvent);
+    stats_event.send_default();
 }
 
 pub fn setup_inv_slots_ui(

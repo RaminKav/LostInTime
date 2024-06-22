@@ -3,6 +3,24 @@ use serde::{Deserialize, Serialize};
 
 use crate::attributes::{AttributeChangeEvent, ItemAttributes};
 
+#[derive(Clone, Debug)]
+pub enum StatType {
+    STR,
+    DEX,
+    AGI,
+    VIT,
+}
+impl StatType {
+    pub fn from_index(index: usize) -> Self {
+        match index {
+            0 => StatType::STR,
+            1 => StatType::DEX,
+            2 => StatType::AGI,
+            3 => StatType::VIT,
+            _ => StatType::STR,
+        }
+    }
+}
 #[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerStats {
     pub str: i32,

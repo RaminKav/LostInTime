@@ -160,7 +160,7 @@ pub fn setup_stats_ui(
 
     commands.entity(stats_e).push_children(&[overlay]);
 
-    stats_event.send(ShowInvPlayerStatsEvent);
+    stats_event.send_default();
 }
 
 pub fn toggle_stats_visibility(

@@ -3,9 +3,12 @@ use std::{fs::File, io::BufReader};
 use bevy::{prelude::*, transform::TransformSystem};
 
 use bevy_proto::prelude::ProtoCommands;
-use bevy_rapier2d::prelude::{
-    ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
-    KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
+use bevy_rapier2d::{
+    geometry::Sensor,
+    prelude::{
+        ActiveEvents, CharacterLength, Collider, KinematicCharacterController,
+        KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
+    },
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
@@ -233,6 +236,7 @@ fn spawn_player(
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
+        .insert(Sensor)
         .insert(SkillPoints { count: 0 })
         .id();
 

@@ -5,7 +5,7 @@ use crate::{
     inputs::CursorPos,
     item::{
         item_actions::{ItemAction, ItemActions},
-        MainHand, WorldObject,
+        EquipmentType, MainHand, RequiredEquipmentType, WorldObject,
     },
     proto::proto_param::ProtoParam,
     world::{
@@ -31,6 +31,7 @@ pub fn spawn_tile_hover_on_cursor_move(
     proto_param: ProtoParam,
     mut game: GameParam,
     main_hand: Query<&WorldObject, With<MainHand>>,
+    tool_req_query: Query<&RequiredEquipmentType>,
 ) {
     let tile_pos = world_pos_to_tile_pos(cursor.world_coords.truncate());
     if let Ok((e, tile_hover)) = tile_hover_check.get_single() {
@@ -42,6 +43,7 @@ pub fn spawn_tile_hover_on_cursor_move(
     let main_hand_obj = main_hand.get_single();
     let hover_type = if let Ok(main_hand) = main_hand_obj {
         let mut hover = UIElement::TileHover;
+        // check space for placing
         if let Some(actions) = proto_param.get_component::<ItemActions, _>(*main_hand) {
             for action in actions.actions.clone() {
                 hover = match action {
@@ -56,6 +58,23 @@ pub fn spawn_tile_hover_on_cursor_move(
                 };
             }
         }
+        // check tool type
+        if let Some(obj_e) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+            if let Ok(req) = tool_req_query.get(obj_e) {
+                if let Ok(main_hand) = main_hand_obj {
+                    if req.0
+                        != *proto_param
+                            .get_component::<EquipmentType, _>(*main_hand)
+                            .unwrap_or(&EquipmentType::None)
+                    {
+                        hover = UIElement::BlockedTileHover;
+                    }
+                } else {
+                    hover = UIElement::BlockedTileHover;
+                }
+            }
+        }
+
         hover
     } else {
         UIElement::TileHover

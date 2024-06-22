@@ -7,17 +7,17 @@ use crate::{
         Healing, HealthRegen, ItemAttributes, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns,
         XpRateBonus,
     },
-    colors::{BLACK, GOLD, GREY, LIGHT_GREEN},
+    colors::{BLACK, DARK_GREEN, GOLD, GREY, LIGHT_GREEN, LIGHT_RED},
     inventory::ItemStack,
     item::{Recipes, WorldObject},
-    player::Player,
+    juice::bounce::BounceOnHit,
+    player::{stats::StatType, Player},
     ui::{spawn_item_stack_icon, STATS_UI_SIZE, TOOLTIP_UI_SIZE},
 };
 
 use super::{
-    stats_ui::StatsUI, EssenceUI, InventoryUI, ShowInvPlayerStatsEvent, UIElement, UIState,
-    CHEST_INVENTORY_UI_SIZE, CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE,
-    FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    stats_ui::StatsUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
+    CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -37,6 +37,12 @@ pub struct TooltipsManager {
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
     pub is_recipe: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+
+pub struct ShowInvPlayerStatsEvent {
+    pub stat: Option<StatType>,
 }
 
 #[derive(Default)]
@@ -76,6 +82,7 @@ pub fn handle_spawn_inv_item_tooltip(
     essence: Query<Entity, With<EssenceUI>>,
     cur_inv_state: Res<State<UIState>>,
     recipes: Res<Recipes>,
+    item_stacks: Query<(Entity, &ItemStack)>,
 ) {
     for item in updates.iter() {
         let parent_inv_size = match cur_inv_state.0 {
@@ -206,6 +213,13 @@ pub fn handle_spawn_inv_item_tooltip(
                         ..Default::default()
                     });
                 commands.entity(tooltip).add_child(icon_e);
+
+                // bounce
+                for (e, stack) in item_stacks.iter() {
+                    if stack.obj_type == ingredient_world_obj[i - 1] {
+                        commands.entity(e).insert(BounceOnHit::new());
+                    }
+                }
             }
             commands.entity(tooltip).add_child(text);
         }
@@ -315,6 +329,8 @@ pub fn handle_spawn_inv_player_stats(
         }) else {
             return;
         };
+
+        let stat = &updates.iter().next().unwrap().stat;
         let (
             attack,
             max_health,
@@ -409,7 +425,7 @@ pub fn handle_spawn_inv_player_stats(
                                 style: TextStyle {
                                     font: asset_server.load("fonts/Kitchen Sink.ttf"),
                                     font_size: 8.0,
-                                    color: LIGHT_GREEN,
+                                    color: get_color_from_stat_hover(i, stat),
                                 },
                             },
                         ]),
@@ -429,4 +445,53 @@ pub fn handle_spawn_inv_player_stats(
         }
         commands.entity(parent_e).add_child(tooltip);
     }
+}
+
+fn get_color_from_stat_hover(i: usize, stat: &Option<StatType>) -> Color {
+    if let Some(stat) = stat {
+        match stat {
+            &StatType::STR => {
+                if i == 2 {
+                    return DARK_GREEN;
+                }
+                if i == 5 {
+                    return LIGHT_GREEN;
+                }
+            }
+            &StatType::DEX => {
+                if i == 2 {
+                    return LIGHT_GREEN;
+                }
+                if i == 4 {
+                    return DARK_GREEN;
+                }
+                if i == 5 {
+                    return DARK_GREEN;
+                }
+            }
+            &StatType::AGI => {
+                if i == 2 {
+                    return LIGHT_GREEN;
+                }
+                if i == 9 {
+                    return DARK_GREEN;
+                }
+                if i == 10 {
+                    return DARK_GREEN;
+                }
+            }
+            &StatType::VIT => {
+                if i == 2 {
+                    return LIGHT_GREEN;
+                }
+                if i == 1 {
+                    return DARK_GREEN;
+                }
+                if i == 6 {
+                    return DARK_GREEN;
+                }
+            }
+        }
+    }
+    LIGHT_RED
 }

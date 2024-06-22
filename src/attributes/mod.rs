@@ -14,10 +14,14 @@ use crate::{
     colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
-    player::{stats::PlayerStats, Limb},
+    player::{
+        stats::{PlayerStats, StatType},
+        Limb,
+    },
     proto::proto_param::ProtoParam,
     ui::{
-        DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
+        stats_ui::StatsButtonState, DropOnSlotEvent, InventoryState, RemoveFromSlotEvent,
+        ShowInvPlayerStatsEvent, UIElement,
     },
     CustomFlush, GameParam, GameState, Player,
 };
@@ -638,6 +642,7 @@ fn handle_player_item_attribute_change_events(
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     player_atts: Query<&ItemAttributes, With<Player>>,
+    stat_button: Query<(&UIElement, &StatsButtonState)>,
 ) {
     for _event in att_events.iter() {
         let mut new_att = player_atts.single().clone();
@@ -659,7 +664,15 @@ fn handle_player_item_attribute_change_events(
         }
         new_att = stats.apply_stats_to_player_attributes(new_att.clone());
         new_att.add_attribute_components(&mut commands.entity(player));
-        stats_event.send(ShowInvPlayerStatsEvent);
+        let stat = if let Some((_, stat_state)) = stat_button
+            .iter()
+            .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)
+        {
+            Some(StatType::from_index(stat_state.index))
+        } else {
+            None
+        };
+        stats_event.send(ShowInvPlayerStatsEvent { stat });
     }
 }
 

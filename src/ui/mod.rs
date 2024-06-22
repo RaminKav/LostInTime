@@ -5,7 +5,7 @@ pub mod screen_effects;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
 use damage_numbers::handle_clamp_screen_locked_icons;
-use screen_effects::{handle_add_screen_effects, setup_screen_effects, ScreenEffectMaterial};
+use screen_effects::ScreenEffectMaterial;
 pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
@@ -62,7 +62,6 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
-            .insert_resource(LastHoveredSlot { slot: None })
             .insert_resource(InventoryState::default())
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.3, TimerMode::Once),

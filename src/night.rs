@@ -29,7 +29,7 @@ impl NightTracker {
         }
     }
     pub fn is_night(&self) -> bool {
-        self.time - 12. >= 0.
+        self.time - 18. >= 0.
     }
     pub fn is_dawn(&self) -> bool {
         self.time == 0.
