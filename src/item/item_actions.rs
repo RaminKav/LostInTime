@@ -16,7 +16,7 @@ use crate::{
         dimension::DimensionSpawnEvent,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
     },
-    GameParam,
+    GameParam, TextureCamera,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -71,6 +71,7 @@ pub struct ItemActionParam<'w, 's> {
     pub recipes: Res<'w, Recipes>,
     pub night_tracker: Res<'w, NightTracker>,
     pub skill_points: Query<'w, 's, &'static mut SkillPoints>,
+    pub game_camera: Query<'w, 's, Entity, With<TextureCamera>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

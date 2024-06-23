@@ -87,7 +87,7 @@ pub fn handle_enemy_health_visibility(
     }
 }
 pub fn add_ui_icon_for_elite_mobs(
-    elites: Query<Entity, With<EliteMob>>,
+    elites: Query<Entity, Added<EliteMob>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
 ) {

@@ -5,7 +5,10 @@ pub mod bounce;
 mod particles;
 mod screen_flash;
 mod screen_shake;
-use crate::{combat::handle_hits, inputs::move_camera_with_player, GameState};
+use crate::{
+    combat::handle_hits, inputs::move_camera_with_player, item::handle_break_object, CustomFlush,
+    GameState,
+};
 pub use particles::*;
 pub use screen_flash::*;
 pub use screen_shake::*;
@@ -25,12 +28,15 @@ impl Plugin for JuicePlugin {
                     test_shake,
                     update_dust_particle_dir,
                     setup_particles,
+                    handle_exp_particles,
                     bounce_on_hit,
                     spawn_use_item_particles,
                     spawn_obj_hit_particles.after(handle_hits),
                     cleanup_object_particles,
                     spawn_enemy_death_particles,
-                    spawn_obj_death_particles,
+                    spawn_obj_death_particles
+                        .before(CustomFlush)
+                        .before(handle_break_object),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

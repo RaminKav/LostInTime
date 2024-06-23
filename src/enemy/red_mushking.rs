@@ -3,9 +3,10 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::spawn_helpers::can_spawn_mob_here,
     item::{LootTable, WorldObject},
+    juice::ShakeEffect,
     player::levels::ExperienceReward,
     world::{world_helpers::tile_pos_to_world_pos, TILE_SIZE},
-    GameParam,
+    GameParam, TextureCamera,
 };
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
@@ -154,6 +155,7 @@ pub fn new_leap_attack(
     )>,
     mut commands: Commands,
     time: Res<Time>,
+    mut game_camera: Query<Entity, With<TextureCamera>>,
 ) {
     for (
         entity,
@@ -188,6 +190,22 @@ pub fn new_leap_attack(
                     .set_parent(entity)
                     .id();
                 att_collider.0 = Some(hitbox);
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 80.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(0.4, TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
             }
         }
         // Get the positions of the attacker and target

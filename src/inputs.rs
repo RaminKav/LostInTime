@@ -557,7 +557,7 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        if *DEBUG_MODE {
+        if *DEBUG_MODE && mouse_button_input.just_pressed(MouseButton::Left) {
             println!("C: {cursor_tile_pos:?}",);
         }
         if attack_timer_option.is_some() {

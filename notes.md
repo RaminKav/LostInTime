@@ -616,3 +616,75 @@ Buttons:
   Notes: day 4, 15-35 dmg, day 6 45dmg, lvl 11-12
 
 -[x] BUG: spawners need to get added after generation of a chunk is complete, not after a chunk is added
+
+Stations: CT, Furnace, Cauldron, || Anvil, || Upgrade St.,|| Alchemy T
+
+Progression flow:
+Day 1: CT
+
+- gather first tools
+- gather some food / explore
+- gather some resources (wood, stone)
+- get to lvl 2
+- if youre fast, get a crafting table + some walls
+
+Night 1:
+
+- get a level or two
+
+Day 2: Furn / Caul
+
+- get lots of resoruces
+- finish building base, a chest
+- explore more
+- build towards furnace or cauldron, maybe both
+- allows for some better food
+- plant sapplings for food/grow other food
+
+Day 3:
+
+- should have enough essence/resources for a dungeon run
+
+Boss 1:
+
+- Unique Drops: Poison dagger,
+
+prairie gameplay notes:
+keybind icons
+rare drops have a animation + sound
+items drop more spread out
+exp particles
+
+### Time Travel idea
+
+## Design Notes
+
+- Player sent back to early times before the destruction of the island (maybe starts with a cutscene)
+- Goal is to work towards the present where the final boss is
+- Each era:
+  - gets harder in general, through new enemies and flora/fauna
+  - has more decay/damage in the form of less lush foliage, and eventually real damage (fire, destruction, etc)
+  - gets more grim and destroyed thematically
+  - can have vastly different climates/biomes (winter,)
+  - each era will be gatekept by a boss, upon defeat will allow access to the next era
+  - player can use `time currency` to access previous eras
+    - currency from bosses? not sure.
+- eras can also be partially random eventually, when we have a larger pool of eras, split into early/mid/endgame pools
+- can introduce time based item abilities: short range teleports/blinks, freeze enemies in time, rewind time?
+- item abilities should be on right click now, and optionally consume mana
+
+## Technical Notes
+
+- Need to rework generation code. Upon loading into a new era for the first time (including start of a run), we generate and cache the world in this order:
+  - generate all the terrain/tiles/chunks first in a ISLAND_SIZE + 1 area
+  - generate unique objs in viable spots, cache
+  - generate normal objs, cache
+- Eras can be indexed in order of discovery:
+  - all cache systems now cache a vec of the same thing.
+  - also track a vec of discovered eras, in order
+  - internally, traveling to an era just looks up the relevant cache for that era, and loads them.
+  - if its the first time traveling, we generate as normal.
+- need world gen proto files for each era
+- save system needs to match this system, store vec of obj data as well as vec of eras.
+
+-

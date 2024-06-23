@@ -8,6 +8,7 @@ use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::{CombatAlignment, EliteMob, Mob};
 use crate::item::combat_shrine::CombatShrineMob;
 use crate::item::LootTable;
+use crate::juice::ShakeEffect;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::world::dimension::DimensionSpawnEvent;
@@ -122,8 +123,25 @@ impl ObjectAction {
                 game.game.home_pos = Some(pos);
             }
             ObjectAction::CombatShrine => {
+                // Screen Shake
                 let mut rng = rand::thread_rng();
-                let num_days = 4 + item_action_param.night_tracker.days;
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in item_action_param.game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(3.5, TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+                let mut rng = rand::thread_rng();
+                let num_days = 3 + item_action_param.night_tracker.days;
                 let mut num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
                 commands
                     .entity(e)

@@ -11,6 +11,7 @@ use crate::combat::{handle_hits, ObjBreakEvent};
 use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
+use crate::juice::{spawn_obj_death_particles, spawn_xp_particles, Particles};
 use crate::player::levels::{ExperienceReward, PlayerLevel};
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
@@ -659,6 +660,7 @@ impl Plugin for ItemsPlugin {
             .add_system(
                 handle_break_object
                     .before(CustomFlush)
+                    .after(spawn_obj_death_particles)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
@@ -769,6 +771,7 @@ pub fn handle_break_object(
     chest_containers: Query<&ChestContainer>,
     xp: Query<&ExperienceReward>,
     mut player_xp: Query<&mut PlayerLevel>,
+    particles: Res<Particles>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
@@ -833,6 +836,8 @@ pub fn handle_break_object(
         if let Some(exp) = xp.get(broken.entity).ok() {
             let mut player = player_xp.single_mut();
             player.add_xp(exp.0);
+            let t = tile_pos_to_world_pos(broken.pos, true);
+            spawn_xp_particles(t, &mut commands, particles.xp_particles.clone());
         }
     }
 }

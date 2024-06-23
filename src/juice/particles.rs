@@ -4,14 +4,15 @@ use bevy_hanabi::prelude::*;
 
 use crate::{
     assets::SpriteAnchor,
+    colors::YELLOW,
     combat::{EnemyDeathEvent, HitEvent, JustGotHit, ObjBreakEvent},
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
-    player::Player,
+    player::{levels::ExperienceReward, Player},
     proto::proto_param::ProtoParam,
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort},
-    Game,
+    Game, GameParam,
 };
 
 const DUST_OFFSET: Vec2 = Vec2::new(3., 4.);
@@ -25,10 +26,13 @@ pub struct Particles {
     pub enemy_death_particle: Handle<EffectAsset>,
     pub use_item_particle: Handle<EffectAsset>,
     pub enemy_hit_particles: Handle<EffectAsset>,
+    pub xp_particles: Handle<EffectAsset>,
 }
 
 #[derive(Component)]
 pub struct DustParticles;
+#[derive(Component)]
+pub struct ExpParticles;
 pub struct UseItemEvent(pub WorldObject);
 
 #[derive(Component)]
@@ -217,11 +221,44 @@ pub fn setup_particles(
             })
             .update(AccelModifier::via_property("my_accel")),
         );
+        let xp_particles = effects.add(
+            EffectAsset {
+                name: "emit:hit".to_string(),
+                capacity: 32768,
+                spawner: Spawner::once(Value::Uniform((20., 55.)), true),
+                ..Default::default()
+            }
+            .with_property("my_accel", graph::Value::Float3(Vec3::new(0., 0., 0.)))
+            .with_property("my_color", graph::Value::Uint(0xFFFFFFFF))
+            .init(InitPositionCircleModifier {
+                center: Vec3::ZERO,
+                axis: Vec3::Z,
+                radius: 1.5,
+                dimension: ShapeDimension::Surface,
+            })
+            .init(InitVelocityCircleModifier {
+                center: Vec3::ZERO,
+                axis: Vec3::Z,
+                speed: 0_f32.into(),
+            })
+            .init(InitLifetimeModifier {
+                lifetime: 0.23_f32.into(),
+            })
+            .init(InitSizeModifier {
+                size: Value::<f32>::Uniform((0.05, 2.)).into(),
+            })
+            .init(InitAttributeModifier {
+                attribute: Attribute::COLOR,
+                value: "my_color".into(),
+            })
+            .update(AccelModifier::via_property("my_accel")),
+        );
         commands.insert_resource(Particles {
             obj_hit_particle,
             enemy_death_particle,
             use_item_particle,
             enemy_hit_particles,
+            xp_particles,
         });
         commands
             .spawn((
@@ -369,6 +406,7 @@ pub fn spawn_use_item_particles(
 pub fn spawn_enemy_death_particles(
     mut commands: Commands,
     mut death_events: EventReader<EnemyDeathEvent>,
+    xp: Query<&ExperienceReward>,
     particles: Res<Particles>,
 ) {
     for death_event in death_events.iter() {
@@ -388,6 +426,9 @@ pub fn spawn_enemy_death_particles(
                 velocity: Vec3::new(0., 8000., 0.),
             },
         ));
+        if let Ok(_xp) = xp.get(death_event.entity) {
+            spawn_xp_particles(t, &mut commands, particles.xp_particles.clone());
+        }
     }
 }
 
@@ -396,15 +437,16 @@ pub fn spawn_obj_death_particles(
     mut death_events: EventReader<ObjBreakEvent>,
     particles: Res<Particles>,
     proto_param: ProtoParam,
+    xp: Query<&ExperienceReward>,
 ) {
     for death_event in death_events.iter() {
+        let t = tile_pos_to_world_pos(death_event.pos, true);
         if (!death_event.obj.is_medium_size(&proto_param) && !death_event.obj.is_tree())
             && death_event.obj != WorldObject::Crate
             && death_event.obj != WorldObject::Crate2
         {
             return;
         }
-        let t = tile_pos_to_world_pos(death_event.pos, true);
 
         commands.spawn((
             Name::new("emit:burst"),
@@ -443,4 +485,62 @@ pub fn cleanup_object_particles(
             commands.entity(e).despawn();
         }
     }
+}
+
+pub fn handle_exp_particles(
+    mut commands: Commands,
+    mut particles: Query<
+        (
+            Entity,
+            &Transform,
+            &mut CompiledParticleEffect,
+            &mut ObjectHitParticles,
+        ),
+        With<ExpParticles>,
+    >,
+    game: GameParam,
+    time: Res<Time>,
+) {
+    for (e, t, mut effect, mut p) in particles.iter_mut() {
+        let xp_bar_txfm = game.player().position.truncate(); //+ Vec2::new(0., -5.5 * TILE_SIZE.x);
+        let delta = xp_bar_txfm - t.translation.truncate();
+        let delta_norm = delta.normalize();
+
+        // t.translation.y -= 10.;
+        let accel = 4000.;
+        p.velocity.y += delta_norm.y * accel;
+        p.velocity.x += delta_norm.x * accel;
+        effect.set_property(
+            "my_accel",
+            graph::Value::Float3(p.velocity * time.delta_seconds()),
+        );
+        if delta.length() <= 3. {
+            p.despawn_timer.tick(time.delta());
+        }
+        if p.despawn_timer.finished() {
+            commands.entity(e).despawn();
+        }
+    }
+}
+
+pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, handle: Handle<EffectAsset>) {
+    commands.spawn((
+        Name::new("emit:burst"),
+        ParticleEffectBundle {
+            effect: ParticleEffect::new(handle.clone())
+                .with_properties::<ParticleEffect>(vec![(
+                    "my_color".to_string(),
+                    graph::Value::Uint(YELLOW.as_linear_rgba_u32()),
+                )])
+                .with_z_layer_2d(Some(999.)),
+            transform: Transform::from_translation(Vec3::new(t.x as f32, t.y + 4., 2.)),
+            ..Default::default()
+        },
+        YSort(1.),
+        ExpParticles,
+        ObjectHitParticles {
+            despawn_timer: Timer::from_seconds(0.5, TimerMode::Once),
+            velocity: Vec3::new(0., 8000., 0.),
+        },
+    ));
 }

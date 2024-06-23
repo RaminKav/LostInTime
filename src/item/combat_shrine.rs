@@ -33,13 +33,17 @@ pub fn handle_shrine_rewards(
             shrine.num_mobs_left -= 1;
             let drop_list = [
                 WorldObject::WoodSword,
+                WorldObject::WoodSword,
+                WorldObject::WoodSword,
+                WorldObject::Sword,
                 WorldObject::Sword,
                 WorldObject::Dagger,
                 WorldObject::WoodBow,
                 WorldObject::Claw,
-                WorldObject::FireStaff,
-                WorldObject::BasicStaff,
-                WorldObject::MagicWhip,
+                WorldObject::MiracleSeed,
+                // WorldObject::FireStaff,
+                // WorldObject::BasicStaff,
+                // WorldObject::MagicWhip,
             ];
             if shrine.num_mobs_left == 0 {
                 // give rewards

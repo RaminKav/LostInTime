@@ -150,10 +150,13 @@ fn handle_enemy_death(
                 loot_bonus.single().0,
                 Some(mob_lvl.0),
             ) {
+                let mut rng = rand::thread_rng();
+                let d = 10.;
+                let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
                 proto_commands.spawn_item_from_proto(
                     drop.obj_type,
                     &proto_param,
-                    death_event.enemy_pos,
+                    death_event.enemy_pos + drop_offset,
                     drop.count,
                     Some(mob_lvl.0),
                 );

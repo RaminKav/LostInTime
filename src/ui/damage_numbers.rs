@@ -8,7 +8,7 @@ use crate::{
     inventory::ItemStack,
     item::WorldObject,
     world::TILE_SIZE,
-    Game, RawPosition, TextureCamera,
+    Game, TextureCamera,
 };
 
 use super::{spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
@@ -178,7 +178,7 @@ pub fn handle_clamp_screen_locked_icons(
     txfms: Query<&GlobalTransform>,
     game_camera: Query<&GlobalTransform, With<TextureCamera>>,
 ) {
-    let MAX_DIST: Vec2 = Vec2::new(9.5, 5.) * TILE_SIZE.x - Vec2::new(3., 1.);
+    let MAX_DIST: Vec2 = Vec2::new(11.5, 7.) * TILE_SIZE.x - Vec2::new(2., 1.);
 
     for (e, screen_locked_icon, mut icon_txfm, mut v) in query.iter_mut() {
         if let Ok(parent_txfm) = txfms.get(screen_locked_icon.parent) {
@@ -210,7 +210,9 @@ pub fn handle_clamp_screen_locked_icons(
                 *v = Visibility::Visible;
             }
         } else {
-            commands.entity(e).despawn_recursive();
+            if commands.get_entity(screen_locked_icon.parent).is_none() {
+                commands.entity(e).despawn_recursive();
+            }
         }
     }
 }

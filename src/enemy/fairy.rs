@@ -46,7 +46,6 @@ pub fn handle_new_fairy_state_machine(
                     despawn_timer: Timer::from_seconds(2., TimerMode::Once),
                 },
             );
-        println!("ADDED STATE TO NEW FAIRY");
         e_cmds.insert(state_machine);
     }
 }
