@@ -80,7 +80,6 @@ use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
     InventorySlotState, UIPlugin,
 };
-use world::WorldGeneration;
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
     generation::WorldObjectCache,
@@ -88,6 +87,7 @@ use world::{
     y_sort::YSort,
     TileMapPosition, WallTextureData, WorldPlugin,
 };
+use world::{dimension::EraManager, WorldGeneration};
 
 use crate::assets::SpriteAnchor;
 use lazy_static::lazy_static;
@@ -234,6 +234,7 @@ pub struct ImageAssets {
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
+    pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     pub world_obj_cache: ResMut<'w, WorldObjectCache>,

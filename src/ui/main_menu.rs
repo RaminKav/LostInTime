@@ -3,9 +3,14 @@ use std::process::exit;
 use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    assets::Graphics, audio::UpdateBGMTrackEvent, colors::YELLOW_2, container::ContainerRegistry,
-    item::CraftingTracker, night::NightTracker, world::generation::WorldObjectCache, Game,
-    GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
+    assets::Graphics,
+    audio::UpdateBGMTrackEvent,
+    colors::YELLOW_2,
+    container::ContainerRegistry,
+    item::CraftingTracker,
+    night::NightTracker,
+    world::{dimension::EraManager, generation::WorldObjectCache},
+    Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };
 
 use super::{Interactable, UIElement};
@@ -82,6 +87,7 @@ pub fn handle_menu_button_click_events(
                 commands.init_resource::<NightTracker>();
                 commands.init_resource::<ContainerRegistry>();
                 commands.init_resource::<CraftingTracker>();
+                commands.init_resource::<EraManager>();
                 commands.insert_resource(WorldObjectCache::default());
             }
             MenuButton::Options => {

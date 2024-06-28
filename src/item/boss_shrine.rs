@@ -31,14 +31,14 @@ pub fn check_for_items_on_shrine(
     if dungeon_check.get_single().is_ok() {
         return;
     }
-    let shrine_pos = tile_pos_to_world_pos(
-        *game
-            .world_obj_cache
-            .unique_objs
-            .get(&WorldObject::BossShrine)
-            .expect("no shrine found"),
-        false,
-    );
+    let Some(shrine) = game
+        .world_obj_cache
+        .unique_objs
+        .get(&WorldObject::BossShrine)
+    else {
+        return;
+    };
+    let shrine_pos = tile_pos_to_world_pos(*shrine, false);
 
     for (e, tfxm, item_stack) in dropped_items.iter() {
         if shrine_pos.distance(tfxm.translation.truncate()) < 32. {

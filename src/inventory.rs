@@ -148,17 +148,6 @@ impl InventoryItemStack {
         } else {
             None
         };
-        let _sprite = if let Some(icon) = has_icon {
-            icon.clone()
-        } else {
-            game.graphics
-                .spritesheet_map
-                .as_ref()
-                .unwrap()
-                .get(&obj)
-                .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-                .clone()
-        };
 
         let player_state = game.player();
         let player_e = game.player_query.single();

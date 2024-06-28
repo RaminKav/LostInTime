@@ -113,6 +113,7 @@ fn tick_dungeon_timer(
             dim_event.send(DimensionSpawnEvent {
                 generation_params: proto_param.get_world_gen().unwrap(),
                 swap_to_dim_now: true,
+                new_era: None,
             });
             commands.entity(text_query.single_mut().0).despawn();
         }

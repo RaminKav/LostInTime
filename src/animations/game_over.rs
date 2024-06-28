@@ -12,7 +12,10 @@ use crate::{
     player::Player,
     ui::{screen_effects::HealthScreenEffect, ChestContainer, FurnaceContainer},
     world::{
-        chunk::Chunk, dimension::ActiveDimension, generation::WorldObjectCache, y_sort::YSort,
+        chunk::Chunk,
+        dimension::{ActiveDimension, EraManager},
+        generation::WorldObjectCache,
+        y_sort::YSort,
     },
     Game, GameState, GAME_HEIGHT, GAME_WIDTH,
 };
@@ -84,6 +87,7 @@ pub fn tick_game_over_overlay(
             commands.remove_resource::<NightTracker>();
             commands.remove_resource::<ContainerRegistry>();
             commands.remove_resource::<CraftingTracker>();
+            commands.remove_resource::<EraManager>();
             commands.remove_resource::<WorldObjectCache>();
         } else {
             println!("Setting overlay to {:?}", timer.0.percent());
