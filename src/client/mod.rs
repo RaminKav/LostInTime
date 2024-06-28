@@ -383,6 +383,7 @@ pub fn load_state(
     dim_event.send(DimensionSpawnEvent {
         generation_params: game.world_generation_params.clone(),
         swap_to_dim_now: true,
+        new_era: None,
     });
 
     println!("DONE LOADING GAME DATA");

@@ -358,6 +358,12 @@ pub enum WorldObject {
     GreenSapplingStage1,
     GreenSapplingStage2,
     GreenSapplingStage3,
+
+    // Era 2
+    Era2SmallTree,
+    Era2MediumTree,
+    Era2LargeTree,
+
     BossShrine,
 }
 
@@ -396,6 +402,11 @@ pub enum Foliage {
     GreenSapplingStage1,
     GreenSapplingStage2,
     GreenSapplingStage3,
+
+    // Era 2
+    Era2SmallTree,
+    Era2MediumTree,
+    Era2LargeTree,
 }
 impl Default for Foliage {
     fn default() -> Self {

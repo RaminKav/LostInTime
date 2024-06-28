@@ -672,6 +672,8 @@ exp particles
 - eras can also be partially random eventually, when we have a larger pool of eras, split into early/mid/endgame pools
 - can introduce time based item abilities: short range teleports/blinks, freeze enemies in time, rewind time?
 - item abilities should be on right click now, and optionally consume mana
+- The same base resources (wood/stone) should be available in all eras probably
+- varrying levels of food
 
 ## Technical Notes
 
@@ -686,5 +688,17 @@ exp particles
   - if its the first time traveling, we generate as normal.
 - need world gen proto files for each era
 - save system needs to match this system, store vec of obj data as well as vec of eras.
+- new fairy in each world, spawns after boss dies, spawns FROM the boss when it dies. Time fairy or something
 
--
+## Era Designs
+
+- First Era: lush, colorful, saturated, cute enemies, peaceful music, lots of vegetation
+- Second Era: A little more baren, some life has been lost from the island, slightly darker tileset, darker trees, less lush foliage, More stumps and dead branches, bushes with less foliage, more wild animals, boars, perhapse somewhat hostile, food is harder to find so need to
+  - spider enemy: some form of slow effect with cobweb, maybe it creates a cobweb tile
+  - maybe fur devil varient that is more undead, bones: drops bones
+  - skeleton
+- PLANTS:
+  - taller more droopy fruit bush
+  - spike-y tree
+  - bamboo (near water)
+  -

@@ -5,12 +5,13 @@ use crate::{
     enemy::Mob,
     item::Equipment,
     player::{MovePlayerEvent, Player},
-    CustomFlush, WorldGeneration,
+    CustomFlush, GameParam, GameState, WorldGeneration,
 };
 
 use super::{
     chunk::Chunk,
     dungeon::{CachedPlayerPos, DungeonText},
+    generation::WorldObjectCache,
 };
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
@@ -29,6 +30,7 @@ pub struct SpawnDimension;
 pub struct DimensionSpawnEvent {
     pub generation_params: WorldGeneration,
     pub swap_to_dim_now: bool,
+    pub new_era: Option<Era>,
 }
 #[derive(Component, Reflect, Default, Debug, Clone)]
 #[reflect(Component)]
@@ -51,13 +53,44 @@ impl Clone for ChunkCache {
     }
 }
 
+#[derive(Component, Default, Clone, Eq, PartialEq, Hash)]
+pub enum Era {
+    #[default]
+    Main,
+    Second,
+}
+
+impl Era {
+    pub fn get_texture_index(&self) -> usize {
+        match self {
+            Era::Main => 0,
+            Era::Second => 2 * 16,
+        }
+    }
+    pub fn index(&self) -> usize {
+        match self {
+            Era::Main => 0,
+            Era::Second => 1,
+        }
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct EraManager {
+    pub current_era: Era,
+    pub era_generation_cache: HashMap<Era, WorldObjectCache>,
+}
 pub struct DimensionPlugin;
 
 impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DimensionSpawnEvent>()
             .add_system(Self::handle_dimension_swap_events.before(CustomFlush))
-            .add_system(Self::new_dim_with_params.in_base_set(CoreSet::PreUpdate))
+            .add_system(
+                Self::new_dim_with_params
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -69,6 +102,7 @@ impl DimensionPlugin {
         dungeon_text: Query<Entity, With<DungeonText>>,
         mut move_player_event: EventWriter<MovePlayerEvent>,
         player_pos: Query<&CachedPlayerPos, With<Player>>,
+        mut game: GameParam,
     ) {
         for new_dim in spawn_event.iter() {
             println!("SPAWNING NEW DIMENSION");
@@ -80,6 +114,19 @@ impl DimensionPlugin {
             for e in dungeon_text.iter() {
                 commands.entity(e).despawn();
             }
+
+            //swap era data
+            if let Some(new_era) = &new_dim.new_era {
+                let curr_era = game.era.current_era.clone();
+                game.era
+                    .era_generation_cache
+                    .insert(curr_era, game.world_obj_cache.clone());
+                game.era.current_era = new_era.clone();
+
+                commands.remove_resource::<WorldObjectCache>();
+                commands.insert_resource(WorldObjectCache::default());
+            }
+
             if let Ok(cached_pos) = player_pos.get_single() {
                 move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
             }

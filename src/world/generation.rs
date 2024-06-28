@@ -1,7 +1,7 @@
 use std::fs::File;
 
-use super::chunk::GenerateObjectsEvent;
-use super::dimension::{ActiveDimension, GenerationSeed};
+use super::chunk::{GenerateObjectsEvent, TileSpriteData};
+use super::dimension::{ActiveDimension, GenerationSeed, SpawnDimension};
 use super::dungeon::Dungeon;
 use super::noise_helpers::get_object_points_for_chunk;
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
@@ -41,13 +41,14 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2); 2] = [
     (WorldObject::DungeonEntrance, Vec2::new(2., 2.)),
 ];
 
-#[derive(Resource, Debug, Default)]
+#[derive(Resource, Debug, Default, Clone)]
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
     pub unique_objs: HashMap<WorldObject, TileMapPosition>,
     pub dungeon_objects: HashMap<TileMapPosition, WorldObject>,
     pub generated_chunks: Vec<IVec2>,
     pub generated_dungeon_chunks: Vec<IVec2>,
+    pub tile_data_cache: HashMap<TileMapPosition, TileSpriteData>,
 }
 pub struct GenerationPlugin;
 
@@ -65,7 +66,7 @@ impl Plugin for GenerationPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
-                Self::generate_unique_objects_for_new_world.in_schedule(OnEnter(GameState::Main)),
+                Self::generate_unique_objects_for_new_world.in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 Self::generate_and_cache_objects.before(CustomFlush).run_if(
@@ -185,11 +186,18 @@ impl GenerationPlugin {
     }
 
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
-    pub fn generate_unique_objects_for_new_world(mut game: GameParam) {
-        // if a save state exists, we assume unique objs have already been generated
-        if let Ok(_) = File::open("save_state.json") {
+    pub fn generate_unique_objects_for_new_world(
+        mut game: GameParam,
+        new_dim: Query<Entity, Added<SpawnDimension>>,
+    ) {
+        if new_dim.is_empty() {
             return;
         }
+        println!("NEW UNIQUE OBJS");
+        // if a save state exists, we assume unique objs have already been generated
+        // if let Ok(_) = File::open("save_state.json") {
+        //     return;
+        // }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
         for (obj, _size) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {

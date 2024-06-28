@@ -8,6 +8,7 @@ use bevy_rapier2d::prelude::Collider;
 
 use super::dimension::{dim_spawned, GenerationSeed};
 
+use super::generation::WorldObjectCache;
 use super::world_helpers::get_neighbour_tile;
 
 use crate::container::ContainerRegistry;
@@ -21,7 +22,8 @@ use serde::{Deserialize, Serialize};
 
 use super::tile::TilePlugin;
 use super::{
-    world_helpers, TileMapPosition, CHUNK_SIZE, MAX_VISIBILITY, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
+    world_helpers, TileMapPosition, CHUNK_SIZE, ISLAND_SIZE, MAX_VISIBILITY,
+    NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
 };
 
 pub struct ChunkPlugin;
@@ -46,6 +48,9 @@ impl Plugin for ChunkPlugin {
                 Self::despawn_outofrange_chunks
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
+            )
+            .add_system(
+                generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -124,6 +129,47 @@ pub struct Chunk {
     pub chunk_pos: IVec2,
 }
 
+pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
+    let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
+    let era = game.era.current_era.clone();
+    for y in -gen_radius..=gen_radius {
+        for x in -gen_radius..=gen_radius {
+            let chunk_pos = IVec2::new(x, y);
+            println!("Caching chunk {chunk_pos:?}");
+            for y in 0..CHUNK_SIZE {
+                for x in 0..CHUNK_SIZE {
+                    let tile_pos = TilePos { x, y };
+
+                    let (bits, mut index_shift, blocks) = TilePlugin::get_tile_from_perlin_noise(
+                        &game.world_generation_params,
+                        chunk_pos,
+                        tile_pos,
+                        seed.seed,
+                    );
+
+                    let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
+                    if index_shift == 0 {
+                        index_shift = era.get_texture_index() as u8;
+                    }
+                    let data = TileSpriteData {
+                        tile_bit_index: block_bits,
+                        block_type: blocks,
+                        raw_block_type: blocks,
+                        texture_offset: index_shift,
+                    };
+                    game.world_obj_cache.tile_data_cache.insert(
+                        TileMapPosition {
+                            chunk_pos,
+                            tile_pos,
+                        },
+                        data,
+                    );
+                }
+            }
+        }
+    }
+}
+
 impl ChunkPlugin {
     pub fn handle_new_chunk_event(
         mut cache_events: EventReader<CreateChunkEvent>,
@@ -134,6 +180,8 @@ impl ChunkPlugin {
     ) {
         for e in cache_events.iter() {
             let chunk_pos = e.chunk_pos;
+            let era = game.era.current_era.clone();
+
             if game.get_chunk_entity(chunk_pos).is_some() {
                 continue;
             }
@@ -153,56 +201,68 @@ impl ChunkPlugin {
             let grid_size = tile_size.into();
             let map_type = TilemapType::default();
             let mut water_colliders = vec![];
-            let mut raw_chunk_blocks: [[[WorldObject; 4]; CHUNK_SIZE as usize];
-                CHUNK_SIZE as usize] =
-                [[[WorldObject::GrassTile; 4]; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-            println!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
 
+            println!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
+                    let tile_data = if let Some(tile_data) = game
+                        .world_obj_cache
+                        .tile_data_cache
+                        .get(&TileMapPosition::new(chunk_pos, tile_pos))
+                    {
+                        tile_data.clone()
+                    } else {
+                        warn!("Tile data not found for {chunk_pos:?} {tile_pos:?}");
+                        let (bits, mut index_shift, blocks) =
+                            TilePlugin::get_tile_from_perlin_noise(
+                                &game.world_generation_params,
+                                chunk_pos,
+                                tile_pos,
+                                seed.seed,
+                            );
 
-                    let (bits, index_shift, blocks) = TilePlugin::get_tile_from_perlin_noise(
-                        &game.world_generation_params,
-                        chunk_pos,
-                        tile_pos,
-                        seed.seed,
-                    );
-
-                    let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
-
-                    let tile_entity = commands
-                        .spawn(TileBundle {
-                            position: tile_pos,
-                            tilemap_id: TilemapId(tilemap_entity),
-                            texture_index: TileTextureIndex((block_bits + index_shift).into()),
-                            ..Default::default()
-                        })
-                        .insert(TileSpriteData {
+                        let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
+                        if index_shift == 0 {
+                            index_shift = era.get_texture_index() as u8;
+                        }
+                        let data = TileSpriteData {
                             tile_bit_index: block_bits,
                             block_type: blocks,
                             raw_block_type: blocks,
                             texture_offset: index_shift,
+                        };
+                        data.clone()
+                    };
+                    let tile_entity = commands
+                        .spawn(TileBundle {
+                            position: tile_pos,
+                            tilemap_id: TilemapId(tilemap_entity),
+                            texture_index: TileTextureIndex(
+                                (tile_data.tile_bit_index + tile_data.texture_offset).into(),
+                            ),
+                            ..Default::default()
                         })
+                        .insert(tile_data.clone())
                         .id();
-                    raw_chunk_blocks[x as usize][y as usize] = blocks;
+
                     tiles.insert(tile_pos.into(), tile_entity);
                     commands.entity(tilemap_entity).add_child(tile_entity);
                     tile_storage.set(&tile_pos, tile_entity);
 
                     // spawn water colliders
-                    if blocks.contains(&WorldObject::WaterTile) {
+                    if tile_data.block_type.contains(&WorldObject::WaterTile) {
                         let mut pos_offset = Vec2::ZERO;
-                        if blocks[0] == WorldObject::WaterTile {
+                        if tile_data.block_type[0] == WorldObject::WaterTile {
                             pos_offset += Vec2::new(-3., 3.);
                         }
-                        if blocks[1] == WorldObject::WaterTile {
+                        if tile_data.block_type[1] == WorldObject::WaterTile {
                             pos_offset += Vec2::new(3., 3.);
                         }
-                        if blocks[2] == WorldObject::WaterTile {
+                        if tile_data.block_type[2] == WorldObject::WaterTile {
                             pos_offset += Vec2::new(-3., -3.);
                         }
-                        if blocks[3] == WorldObject::WaterTile {
+                        if tile_data.block_type[3] == WorldObject::WaterTile {
                             pos_offset += Vec2::new(3., -3.);
                         }
                         pos_offset = pos_offset.clamp(Vec2::new(-3., -3.), Vec2::new(3., 3.));

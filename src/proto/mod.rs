@@ -319,6 +319,11 @@ impl ProtoPlugin {
         prototypes.load("proto/greensapplingstage3.prototype.ron");
         prototypes.load("proto/yellowsapplingstage3.prototype.ron");
 
+        // Era 2
+        prototypes.load("proto/era2smalltree.prototype.ron");
+        prototypes.load("proto/era2mediumtree.prototype.ron");
+        prototypes.load("proto/era2largetree.prototype.ron");
+
         prototypes.load("proto/bossshrine.prototype.ron");
     }
     fn spawn_proto_resources(mut commands: ProtoCommands) {
