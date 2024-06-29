@@ -620,6 +620,110 @@
             size: (16., 16.),
             anchor: None,
         ),
+
+        // Era 2
+        Era2Grass: WorldObjectData(
+            texture_pos: (0., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Grass2: WorldObjectData(
+            texture_pos: (2., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Grass3: WorldObjectData(
+            texture_pos: (3., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2DeadBranch: WorldObjectData(
+            texture_pos: (1., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2BerryBush: WorldObjectData(
+            texture_pos: (4., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Stump: WorldObjectData(
+            texture_pos: (5., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Stump2: WorldObjectData(
+            texture_pos: (6., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2BrownMushroom: WorldObjectData(
+            texture_pos: (11., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2RedMushroom: WorldObjectData(
+            texture_pos: (11., 14.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2BrownMushroomBlock: WorldObjectData(
+            texture_pos: (11., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2RedMushroomBlock: WorldObjectData(
+            texture_pos: (11., 14.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2RedFlowerBlock: WorldObjectData(
+            texture_pos: (11., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2RedFlower: WorldObjectData(
+            texture_pos: (11., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2WhiteFlowerBlock: WorldObjectData(
+            texture_pos: (12., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2WhiteFlower: WorldObjectData(
+            texture_pos: (12., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Pebble: WorldObjectData(
+            texture_pos: (13., 11.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Era2Boulder: WorldObjectData(
+            texture_pos: (0., 16.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        Era2CoalBoulder: WorldObjectData(
+            texture_pos: (2., 16.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        Era2MagicBoulder: WorldObjectData(
+            texture_pos: (4., 16.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        Era2Boulder2: WorldObjectData(
+            texture_pos: (6., 16.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        
+
     },
     icons : {
         StoneWallBlock: SpriteData(

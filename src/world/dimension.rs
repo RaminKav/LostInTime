@@ -1,4 +1,5 @@
 use bevy::{prelude::*, utils::HashMap};
+use bevy_proto::prelude::ProtoCommands;
 use bevy_save::{CloneReflect, Snapshot};
 
 use crate::{
@@ -103,6 +104,7 @@ impl DimensionPlugin {
         mut move_player_event: EventWriter<MovePlayerEvent>,
         player_pos: Query<&CachedPlayerPos, With<Player>>,
         mut game: GameParam,
+        mut proto_commands: ProtoCommands,
     ) {
         for new_dim in spawn_event.iter() {
             println!("SPAWNING NEW DIMENSION");
@@ -125,6 +127,8 @@ impl DimensionPlugin {
 
                 commands.remove_resource::<WorldObjectCache>();
                 commands.insert_resource(WorldObjectCache::default());
+
+                proto_commands.apply("Era2WorldGenerationParams");
             }
 
             if let Ok(cached_pos) = player_pos.get_single() {

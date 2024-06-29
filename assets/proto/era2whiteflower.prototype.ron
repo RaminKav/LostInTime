@@ -1,0 +1,17 @@
+(
+  name: "Era2WhiteFlower",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Era2WhiteFlower,
+  "survival_rogue_like::attributes::MaxHealth": (1),
+  "survival_rogue_like::player::levels::ExperienceReward": (10),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: Era2WhiteFlowerBlock,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),]
+        ),
+  }
+)

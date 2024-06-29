@@ -1,0 +1,33 @@
+(
+  name: "Era2Boulder2",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Era2Boulder2,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::item::RequiredEquipmentType": (Pickaxe),
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
+  "survival_rogue_like::attributes::MaxHealth": (35),
+  "survival_rogue_like::player::levels::ExperienceReward": (20),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [
+            (
+                item: PebbleBlock,
+                min: 2,
+                max: 5,
+                rate: 1.
+            ),(
+                item: StoneChunk,
+                min: 1,
+                max: 1,
+                rate: 0.25
+            ),
+            (
+                item: Flint,
+                min: 1,
+                max: 3,
+                rate: 0.5
+            )]
+        ),
+  }
+)

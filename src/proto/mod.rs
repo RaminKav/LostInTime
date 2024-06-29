@@ -323,6 +323,27 @@ impl ProtoPlugin {
         prototypes.load("proto/era2smalltree.prototype.ron");
         prototypes.load("proto/era2mediumtree.prototype.ron");
         prototypes.load("proto/era2largetree.prototype.ron");
+        prototypes.load("proto/era2grass.prototype.ron");
+        prototypes.load("proto/era2grass2.prototype.ron");
+        prototypes.load("proto/era2grass3.prototype.ron");
+        prototypes.load("proto/era2stump.prototype.ron");
+        prototypes.load("proto/era2stump2.prototype.ron");
+        prototypes.load("proto/era2deadbranch.prototype.ron");
+        prototypes.load("proto/era2berrybush.prototype.ron");
+        prototypes.load("proto/era2boulder.prototype.ron");
+        prototypes.load("proto/era2boulder2.prototype.ron");
+        prototypes.load("proto/era2brownmushroom.prototype.ron");
+        prototypes.load("proto/era2brownmushroomblock.prototype.ron");
+        prototypes.load("proto/era2redmushroom.prototype.ron");
+        prototypes.load("proto/era2redmushroomblock.prototype.ron");
+        prototypes.load("proto/era2coalboulder.prototype.ron");
+        prototypes.load("proto/era2magicboulder.prototype.ron");
+        prototypes.load("proto/era2pebble.prototype.ron");
+        prototypes.load("proto/era2redflower.prototype.ron");
+        prototypes.load("proto/era2redflowerblock.prototype.ron");
+        prototypes.load("proto/era2whiteflower.prototype.ron");
+        prototypes.load("proto/era2whiteflowerblock.prototype.ron");
+        prototypes.load("proto/Era2WorldGenerationParams.prototype.ron");
 
         prototypes.load("proto/bossshrine.prototype.ron");
     }
