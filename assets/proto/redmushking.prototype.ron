@@ -48,127 +48,139 @@
                 item: Sword,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.05
             ),
             (
                 item: Dagger,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.05
             ),
-            (
-                item: BasicStaff,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
-            (
-                item: FireStaff,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
+            // (
+            //     item: BasicStaff,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
+            // (
+            //     item: FireStaff,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
             (
                 item: MagicWhip,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.15
             ),
             (
                 item: WoodBow,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.15
             ),
             (
                 item: Claw,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.15
             ),
             (
                 item: Ring,
                 min: 1,
                 max: 1,
-                rate: 0.0065
+                rate: 0.25
             ),
             (
                 item: Pendant,
                 min: 1,
                 max: 1,
-                rate: 0.005
+                rate: 0.15
             ),
-            (
-                item: Chestplate,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
-            (
-                item: MetalPants,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
-            (
-                item: MetalShoes,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
+            // (
+            //     item: Chestplate,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
+            // (
+            //     item: MetalPants,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
+            // (
+            //     item: MetalShoes,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
             (
                 item: LeatherTunic,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.2
             ),
             (
                 item: LeatherPants,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.2
             ),
             (
                 item: LeatherShoes,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.2
             ),
             (
                 item: ForestShirt,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.05
             ),
             (
                 item: ForestPants,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.05
             ),
             (
                 item: ForestShoes,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.05
             ),
             (
                 item: UpgradeTome,
                 min: 1,
-                max: 1,
-                rate: 0.07
+                max: 2,
+                rate: 0.1
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 2,
+                rate: 0.1
             ),
             (
                 item: OrbOfTransformation,
                 min: 1,
                 max: 1,
-                rate: 0.04
+                rate: 0.05
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.05
             ),
             (
                 item: Essence,
-                min: 1,
-                max: 1,
-                rate: 0.12
+                min: 2,
+                max: 8,
+                rate: 1.
             ),
             ]
         ),
