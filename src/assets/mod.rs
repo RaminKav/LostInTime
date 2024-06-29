@@ -238,7 +238,7 @@ impl GameAssetsPlugin {
             std::process::exit(1);
         });
 
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 32.));
+        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
             Vec2::new(16., 32.),

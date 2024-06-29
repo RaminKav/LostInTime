@@ -1,0 +1,40 @@
+(
+  name: "Era2MagicBoulder",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Era2MagicBoulder,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::item::RequiredEquipmentType": (Pickaxe),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9),
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
+  "survival_rogue_like::attributes::MaxHealth": (100),
+  "survival_rogue_like::player::levels::ExperienceReward": (35),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [
+            (
+                item: PebbleBlock,
+                min: 1,
+                max: 4,
+                rate: 0.6
+            ),
+            (
+                item: Flint,
+                min: 1,
+                max: 3,
+                rate: 0.2
+            ),
+            (
+                item: MagicGem,
+                min: 1,
+                max: 1,
+                rate: 0.85
+            ),
+            (
+                item: MagicGem,
+                min: 1,
+                max: 1,
+                rate: 0.15
+            )]
+        ),
+  }
+)
