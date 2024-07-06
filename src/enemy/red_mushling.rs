@@ -6,8 +6,9 @@ use seldom_state::{
 };
 
 use crate::{
-    ai::{HurtByPlayer, LineOfSight},
+    ai::{HurtByPlayer, IdleState, LineOfSight},
     attributes::Attack,
+    inputs::FacingDirection,
     Game,
 };
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
@@ -47,6 +48,13 @@ pub fn handle_new_red_mushling_state_machine(
                     range: 40.,
                 }),
                 SproutingState,
+            )
+            .trans::<IdleState>(
+                LineOfSight {
+                    target: game.player,
+                    range: 30.,
+                },
+                GasAttackState { hitbox: None },
             );
 
         e_cmds.insert(state_machine);
@@ -90,6 +98,9 @@ pub fn gas_attack(
     mut commands: Commands,
 ) {
     for (entity, mut anim, attack, mut gas_state) in sprouts.iter_mut() {
+        if anim.current_frame() < 18 || anim.current_frame() > 46 {
+            *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+        }
         if anim.is_paused() {
             anim.play();
         }
@@ -112,13 +123,17 @@ pub fn gas_attack(
                 gas_state.hitbox = Some(hitbox);
             }
         }
-        if anim.current_frame() >= 46 {
+        if anim.current_frame() == 46 {
             commands
                 .entity(entity)
                 .remove::<GasAttackState>()
-                .insert(WaitingToSproutState);
-            *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
-            anim.pause();
+                .insert(IdleState {
+                    walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
+                    direction: FacingDirection::new_rand_dir(rand::thread_rng()),
+                    speed: 0.,
+                    is_stopped: true,
+                });
+            *anim = AsepriteAnimation::from(RedMushling::tags::IDLE_FRONT);
         } else if anim.current_frame() == 41 {
             if let Some(hitbox) = gas_state.hitbox {
                 if let Some(hitbox) = commands.get_entity(hitbox) {

@@ -71,6 +71,9 @@ pub fn new_idle(
     time: Res<Time>,
 ) {
     for (entity, mut idle, mut anim) in idles.iter_mut() {
+        if idle.speed <= 0. {
+            continue;
+        }
         idle.walk_timer.tick(time.delta());
         let mut idle_transform = transforms.get_mut(entity).unwrap();
         if !idle.is_stopped {
