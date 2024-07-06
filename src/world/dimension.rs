@@ -1,6 +1,7 @@
 use bevy::{prelude::*, utils::HashMap};
 use bevy_proto::prelude::ProtoCommands;
 use bevy_save::{CloneReflect, Snapshot};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     enemy::Mob,
@@ -54,7 +55,7 @@ impl Clone for ChunkCache {
     }
 }
 
-#[derive(Component, Default, Clone, Eq, PartialEq, Hash)]
+#[derive(Component, Default, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum Era {
     #[default]
     Main,
@@ -74,11 +75,19 @@ impl Era {
             Era::Second => 1,
         }
     }
+    pub fn from_index(index: usize) -> Self {
+        match index {
+            0 => Era::Main,
+            1 => Era::Second,
+            _ => panic!("Invalid Era index"),
+        }
+    }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug, Clone)]
 pub struct EraManager {
     pub current_era: Era,
+    pub visited_eras: Vec<Era>,
     pub era_generation_cache: HashMap<Era, WorldObjectCache>,
 }
 pub struct DimensionPlugin;

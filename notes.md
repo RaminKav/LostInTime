@@ -598,13 +598,7 @@ Buttons:
 
   -BUG shift clicking gear stacks them no matter what
 
-- [x] bug only give ability to weapons
-- [x] inv toggle bugs (pressing tab to close doesnt reset state to closed)
-- [x] inv hotbar bug
-- [x] bed texture bug
-- [x] lvl text offset after double digits3
-- [x] fairy is not spawning...
-- [x] bug: mobs spawn in water
+- CLEAN_UP: refactor various resources into 1 mega resource for each era?
 - TODO: extract game window size and other options into a resource
 - ui element that sticks to screen edges to show where fairy is
 - [x] can summon inf number of combat shrine mobs until you win

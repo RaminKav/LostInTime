@@ -7,7 +7,7 @@ use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::MovePlayerEvent;
-use crate::world::dimension::DimensionSpawnEvent;
+use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
@@ -419,6 +419,7 @@ pub fn toggle_inventory(
             dim_event.send(DimensionSpawnEvent {
                 generation_params: proto.get_world_gen().unwrap(),
                 swap_to_dim_now: true,
+                new_era: Some(Era::Second),
             });
         }
         if key_input.just_pressed(KeyCode::U) {

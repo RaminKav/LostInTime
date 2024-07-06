@@ -31,11 +31,14 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer},
-    vectorize::vectorize,
+    vectorize::{vectorize, vectorize_inner},
     world::{
         chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
-        dimension::{ActiveDimension, Dimension, DimensionSpawnEvent, GenerationSeed},
+        dimension::{
+            ActiveDimension, Dimension, DimensionSpawnEvent, Era, EraManager, GenerationSeed,
+        },
         dungeon::Dungeon,
+        generation::WorldObjectCache,
         world_helpers::world_pos_to_tile_pos,
         TileMapPosition, WallTextureData, WorldGeneration,
     },
@@ -120,9 +123,11 @@ impl Plugin for ClientPlugin {
 #[derive(Resource, Clone, Serialize, Deserialize, Default)]
 pub struct CurrentRunSaveData {
     seed: u64,
-    #[serde(with = "vectorize")]
-    placed_objs: HashMap<TileMapPosition, WorldObject>,
-    unique_objs: HashMap<WorldObject, TileMapPosition>,
+
+    #[serde(with = "vectorize_inner")]
+    placed_objs: Vec<HashMap<TileMapPosition, WorldObject>>,
+
+    unique_objs: Vec<HashMap<WorldObject, TileMapPosition>>,
     #[serde(with = "vectorize")]
     containers: HashMap<TileMapPosition, Container>,
     #[serde(with = "vectorize")]
@@ -138,6 +143,10 @@ pub struct CurrentRunSaveData {
     pub current_health: CurrentHealth,
     pub player_transform: Vec2,
     pub player_hunger: u8,
+
+    // Era
+    pub current_era: Era,
+    pub visited_eras: Vec<Era>,
 }
 
 #[derive(Default)]
@@ -258,8 +267,14 @@ pub fn save_state(
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
     save_data.craft_tracker = craft_tracker.clone();
+    save_data.placed_objs = game
+        .era
+        .era_generation_cache
+        .iter()
+        .map((|(_, c)| c.objects.clone()))
+        .collect();
 
-    save_data.placed_objs = placed_objs
+    let curr_era_objs = placed_objs
         .iter()
         .map(|(p, w, _, _)| {
             let anchor = proto_param
@@ -272,7 +287,31 @@ pub fn save_state(
         })
         .map_into()
         .collect();
-    save_data.unique_objs = game.world_obj_cache.unique_objs.clone();
+    println!(
+        "SAVE: {:?} {:?} | {:?}",
+        (save_data.placed_objs.len() as i32) - 1,
+        game.era.current_era.index() as i32,
+        (save_data.placed_objs.len() as i32) - 1 < game.era.current_era.index() as i32
+    );
+    if (save_data.placed_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
+        // we are in the newest era and have not saved it in EraManager yet
+        save_data.placed_objs.push(curr_era_objs);
+    } else {
+        save_data.placed_objs[game.era.current_era.index()] = curr_era_objs;
+    }
+
+    save_data.unique_objs = game
+        .era
+        .era_generation_cache
+        .iter()
+        .map(|(e, c)| c.unique_objs.clone())
+        .collect();
+    let curr_era_unique_objs = game.world_obj_cache.unique_objs.clone();
+    if (save_data.unique_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
+        save_data.unique_objs.push(curr_era_unique_objs);
+    } else {
+        save_data.unique_objs[game.era.current_era.index()] = curr_era_unique_objs;
+    }
 
     // chain the current chests, and also the ones in registry,
     // since they will be despawned and missed by the query
@@ -354,13 +393,31 @@ pub fn load_state(
         // Read the JSON contents of the file as an instance of `User`.
         match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
             Ok(data) => {
-                for (tp, _) in data.placed_objs.iter() {
+                for (tp, _) in data.placed_objs[data.current_era.index()].iter() {
                     if !game.is_chunk_generated(tp.chunk_pos) {
                         game.set_chunk_generated(tp.chunk_pos);
                     }
                 }
-                game.world_obj_cache.objects = data.placed_objs;
-                game.world_obj_cache.unique_objs = data.unique_objs;
+                game.world_obj_cache.objects = data.placed_objs[data.current_era.index()].clone();
+                game.world_obj_cache.unique_objs =
+                    data.unique_objs[data.current_era.index()].clone();
+                for (i, (objs, unique_objs)) in data
+                    .placed_objs
+                    .iter()
+                    .zip(data.unique_objs.iter())
+                    .enumerate()
+                {
+                    game.era.era_generation_cache.insert(
+                        Era::from_index(i),
+                        WorldObjectCache {
+                            objects: objs.clone(),
+                            unique_objs: unique_objs.clone(),
+                            ..Default::default()
+                        },
+                    );
+                }
+                game.era.current_era = data.current_era;
+                game.era.visited_eras = data.visited_eras;
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
                 commands.insert_resource(ContainerRegistry {
