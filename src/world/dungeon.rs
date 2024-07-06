@@ -13,6 +13,7 @@ use super::{
     dungeon_generation::{
         add_dungeon_chests, add_dungeon_exit_block, gen_new_dungeon, get_player_spawn_tile, Bias,
     },
+    generation::WorldObjectCache,
     world_helpers::world_pos_to_tile_pos,
     TileMapPosition, CHUNK_SIZE,
 };
@@ -74,6 +75,15 @@ pub fn spawn_new_dungeon_dimension(
         ))
         .id();
     proto_commands.apply("DungeonWorldGenerationParams");
+
+    //cache era data
+    let curr_era = game.era.current_era.clone();
+    game.era
+        .era_generation_cache
+        .insert(curr_era, game.world_obj_cache.clone());
+
+    commands.remove_resource::<WorldObjectCache>();
+    commands.insert_resource(WorldObjectCache::default());
     commands.entity(dim_e).insert(SpawnDimension);
 
     if let Some(pos) = get_player_spawn_tile(grid.clone()) {
