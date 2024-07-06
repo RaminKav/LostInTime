@@ -398,7 +398,7 @@ impl ChunkPlugin {
             {
                 let chunk_pos = IVec2::new(x, y);
                 if game.get_chunk_entity(chunk_pos).is_none() {
-                    println!("send chunk spawn event {chunk_pos}");
+                    // println!("send chunk spawn event {chunk_pos}");
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
                 }
             }

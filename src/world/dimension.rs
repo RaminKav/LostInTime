@@ -134,7 +134,13 @@ impl DimensionPlugin {
                 game.era.current_era = new_era.clone();
 
                 commands.remove_resource::<WorldObjectCache>();
-                commands.insert_resource(WorldObjectCache::default());
+                let new_world_cache = game
+                    .era
+                    .era_generation_cache
+                    .get(&new_era)
+                    .cloned()
+                    .unwrap_or(WorldObjectCache::default());
+                commands.insert_resource(new_world_cache);
 
                 proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
             } else {
