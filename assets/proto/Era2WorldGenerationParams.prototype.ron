@@ -82,6 +82,7 @@
         Crate2: [GrassTile, ],
         BossShrine: [GrassTile, ],
         DungeonEntrance: [GrassTile, ],
+        CombatShrine: [GrassTile, ],
       }
     ),
   }

@@ -3,13 +3,12 @@ use bevy_proto::prelude::ProtoCommands;
 
 use crate::{
     player::MovePlayerEvent,
-    proto::proto_param::ProtoParam,
     world::dimension::{Dimension, SpawnDimension},
-    GameParam, GAME_HEIGHT,
+    GameParam, GameState, GAME_HEIGHT,
 };
 
 use super::{
-    dimension::{ActiveDimension, DimensionSpawnEvent},
+    dimension::{ActiveDimension, DimensionSpawnEvent, EraManager},
     dungeon_generation::{
         add_dungeon_chests, add_dungeon_exit_block, gen_new_dungeon, get_player_spawn_tile, Bias,
     },
@@ -28,7 +27,7 @@ impl Plugin for DungeonPlugin {
         app.add_system(handle_move_player_after_dungeon_gen)
             .add_systems((
                 add_dungeon_chests,
-                tick_dungeon_timer,
+                tick_dungeon_timer.run_if(in_state(GameState::Main)),
                 add_dungeon_exit_block,
                 spawn_dungeon_text,
             ));
@@ -107,8 +106,8 @@ fn tick_dungeon_timer(
     time: Res<Time>,
     mut query: Query<&mut Dungeontimer, With<Dimension>>,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
-    proto_param: ProtoParam,
     mut text_query: Query<(Entity, &mut Text), With<DungeonText>>,
+    era: Res<EraManager>,
 ) {
     for mut timer in query.iter_mut() {
         timer.0.tick(time.delta());
@@ -121,9 +120,8 @@ fn tick_dungeon_timer(
         }
         if timer.0.just_finished() {
             dim_event.send(DimensionSpawnEvent {
-                generation_params: proto_param.get_world_gen().unwrap(),
                 swap_to_dim_now: true,
-                new_era: None,
+                new_era: Some(era.current_era.clone()),
             });
             commands.entity(text_query.single_mut().0).despawn();
         }

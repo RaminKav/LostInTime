@@ -31,22 +31,6 @@ impl<'w, 's> ProtoParam<'w, 's> {
                 .get(format!("proto/{}.prototype.ron", id.to_lowercase()))?,
         )
     }
-    pub fn get_world_gen(&self) -> Option<WorldGeneration> {
-        if let Some(data) = self.prototype_assets.get(
-            self.prototypes
-                .get(format!("proto/WorldGenerationParams.prototype.ron"))?,
-        ) {
-            data.schematics()
-                .get::<WorldGeneration>()
-                .unwrap()
-                .input()
-                .downcast_ref::<WorldGeneration>()
-                .cloned()
-        } else {
-            warn!("Could not get world generation data");
-            None
-        }
-    }
     pub fn get_item_data<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &self,
         obj: T,

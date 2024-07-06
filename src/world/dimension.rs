@@ -30,7 +30,6 @@ pub struct GenerationSeed {
 #[derive(Component, Debug)]
 pub struct SpawnDimension;
 pub struct DimensionSpawnEvent {
-    pub generation_params: WorldGeneration,
     pub swap_to_dim_now: bool,
     pub new_era: Option<Era>,
 }
@@ -117,7 +116,7 @@ impl DimensionPlugin {
     ) {
         for new_dim in spawn_event.iter() {
             println!("SPAWNING NEW DIMENSION");
-            commands.insert_resource(new_dim.generation_params.clone());
+
             let dim_e = commands.spawn((Dimension,)).id();
             if new_dim.swap_to_dim_now {
                 commands.entity(dim_e).insert(SpawnDimension);
@@ -137,7 +136,17 @@ impl DimensionPlugin {
                 commands.remove_resource::<WorldObjectCache>();
                 commands.insert_resource(WorldObjectCache::default());
 
-                proto_commands.apply("Era2WorldGenerationParams");
+                proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
+            } else {
+                println!("USE CURR ERA: {:?}", game.era.current_era.index());
+                proto_commands.apply(format!(
+                    "Era{}WorldGenerationParams",
+                    game.era.current_era.index() + 1
+                ));
+                if let Some(era_cache) = game.era.era_generation_cache.get(&game.era.current_era) {
+                    println!("APPLYING ERA CACHE");
+                    commands.insert_resource(era_cache.clone());
+                }
             }
 
             if let Ok(cached_pos) = player_pos.get_single() {

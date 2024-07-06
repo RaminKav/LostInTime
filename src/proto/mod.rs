@@ -140,11 +140,6 @@ impl Plugin for ProtoPlugin {
                 Self::check_proto_ready
                     .after(Self::load_prototypes)
                     .in_set(OnUpdate(GameState::Loading)),
-            )
-            .add_system(
-                Self::spawn_proto_resources
-                    .in_schedule(OnExit(GameState::Loading))
-                    .run_if(prototype_ready("WorldGenerationParams").and_then(run_once())),
             );
     }
 }
@@ -161,7 +156,7 @@ impl ProtoPlugin {
         prototypes.load("proto/smallyellowtree.prototype.ron");
         prototypes.load("proto/mediumyellowtree.prototype.ron");
         prototypes.load("proto/mediumgreentree.prototype.ron");
-        prototypes.load("proto/WorldGenerationParams.prototype.ron");
+        prototypes.load("proto/Era1WorldGenerationParams.prototype.ron");
         prototypes.load("proto/DungeonWorldGenerationParams.prototype.ron");
         prototypes.load("proto/stonewall.prototype.ron");
         prototypes.load("proto/stonewallblock.prototype.ron");
@@ -292,7 +287,6 @@ impl ProtoPlugin {
         prototypes.load("proto/bridgeblock.prototype.ron");
         prototypes.load("proto/largemanapotion.prototype.ron");
         prototypes.load("proto/smallmanapotion.prototype.ron");
-        prototypes.load("proto/WorldGenerationParams.prototype.ron");
         prototypes.load("proto/dungeonexit.prototype.ron");
         prototypes.load("proto/woodwall.prototype.ron");
         prototypes.load("proto/woodwallblock.prototype.ron");
@@ -346,9 +340,6 @@ impl ProtoPlugin {
         prototypes.load("proto/Era2WorldGenerationParams.prototype.ron");
 
         prototypes.load("proto/bossshrine.prototype.ron");
-    }
-    fn spawn_proto_resources(mut commands: ProtoCommands) {
-        commands.apply("WorldGenerationParams");
     }
     fn check_proto_ready(prototypes: Prototypes) {
         for obj in WorldObject::iter() {

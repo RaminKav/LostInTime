@@ -9,6 +9,7 @@ use bevy_ecs_tilemap::{
     tiles::{TileColor, TileFlip, TilePos, TilePosOld, TileStorage, TileTextureIndex, TileVisible},
     FrustumCulling,
 };
+use bevy_proto::prelude::ProtoCommands;
 use bevy_save::prelude::*;
 use itertools::Itertools;
 use rand::Rng;
@@ -267,11 +268,14 @@ pub fn save_state(
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
     save_data.craft_tracker = craft_tracker.clone();
+    save_data.current_era = game.era.current_era.clone();
+    save_data.visited_eras = game.era.visited_eras.clone();
+
     save_data.placed_objs = game
         .era
         .era_generation_cache
         .iter()
-        .map((|(_, c)| c.objects.clone()))
+        .map(|(_, c)| c.objects.clone())
         .collect();
 
     let curr_era_objs = placed_objs
@@ -287,12 +291,6 @@ pub fn save_state(
         })
         .map_into()
         .collect();
-    println!(
-        "SAVE: {:?} {:?} | {:?}",
-        (save_data.placed_objs.len() as i32) - 1,
-        game.era.current_era.index() as i32,
-        (save_data.placed_objs.len() as i32) - 1 < game.era.current_era.index() as i32
-    );
     if (save_data.placed_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
         // we are in the newest era and have not saved it in EraManager yet
         save_data.placed_objs.push(curr_era_objs);
@@ -304,7 +302,7 @@ pub fn save_state(
         .era
         .era_generation_cache
         .iter()
-        .map(|(e, c)| c.unique_objs.clone())
+        .map(|(_e, c)| c.unique_objs.clone())
         .collect();
     let curr_era_unique_objs = game.world_obj_cache.unique_objs.clone();
     if (save_data.unique_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
@@ -376,6 +374,7 @@ pub fn save_state(
 
 pub fn load_state(
     mut commands: Commands,
+    mut proto_commands: ProtoCommands,
     mut game: GameParam,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     mut game_camera: Query<
@@ -407,6 +406,9 @@ pub fn load_state(
                     .zip(data.unique_objs.iter())
                     .enumerate()
                 {
+                    if data.current_era.index() == i {
+                        continue;
+                    }
                     game.era.era_generation_cache.insert(
                         Era::from_index(i),
                         WorldObjectCache {
@@ -424,7 +426,10 @@ pub fn load_state(
                     containers: data.containers,
                 });
                 commands.insert_resource(data.craft_tracker);
-
+                proto_commands.apply(format!(
+                    "Era{}WorldGenerationParams",
+                    game.era.current_era.clone().index() + 1
+                ));
                 // PRE-MOVE CAMERAS TO PLAYER
                 let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
 
@@ -438,7 +443,6 @@ pub fn load_state(
     commands.insert_resource(GenerationSeed { seed });
 
     dim_event.send(DimensionSpawnEvent {
-        generation_params: game.world_generation_params.clone(),
         swap_to_dim_now: true,
         new_era: None,
     });

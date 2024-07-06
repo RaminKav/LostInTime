@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use super::chunk::{GenerateObjectsEvent, TileSpriteData};
 use super::dimension::{ActiveDimension, GenerationSeed, SpawnDimension};
 use super::dungeon::Dungeon;
@@ -193,7 +191,6 @@ impl GenerationPlugin {
         if new_dim.is_empty() {
             return;
         }
-        println!("NEW UNIQUE OBJS");
         // if a save state exists, we assume unique objs have already been generated
         // if let Ok(_) = File::open("save_state.json") {
         //     return;
@@ -201,6 +198,8 @@ impl GenerationPlugin {
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
         for (obj, _size) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {
+                println!("NEW UNIQUE OBJ: {obj:?}");
+
                 let mut rng = rand::thread_rng();
 
                 let pos = TileMapPosition::new(

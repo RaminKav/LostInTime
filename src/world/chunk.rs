@@ -132,10 +132,10 @@ pub struct Chunk {
 pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
+    println!("Caching ALL chunks");
     for y in -gen_radius..=gen_radius {
         for x in -gen_radius..=gen_radius {
             let chunk_pos = IVec2::new(x, y);
-            println!("Caching chunk {chunk_pos:?}");
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
