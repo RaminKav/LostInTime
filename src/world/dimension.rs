@@ -95,7 +95,7 @@ pub struct DimensionPlugin;
 impl Plugin for DimensionPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DimensionSpawnEvent>()
-            .add_system(Self::handle_dimension_swap_events.before(CustomFlush))
+            .add_system(Self::clear_entities_for_dim_swap.before(CustomFlush))
             .add_system(
                 Self::new_dim_with_params
                     .in_base_set(CoreSet::PreUpdate)
@@ -146,7 +146,7 @@ impl DimensionPlugin {
         }
     }
     //TODO: integrate this with events to work wiht bevy_save
-    pub fn handle_dimension_swap_events(
+    pub fn clear_entities_for_dim_swap(
         new_dim: Query<Entity, Added<SpawnDimension>>,
         mut commands: Commands,
         entity_query: Query<Entity, (Or<(With<Mob>, With<Chunk>)>, Without<Equipment>)>,
