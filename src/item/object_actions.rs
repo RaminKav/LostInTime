@@ -74,9 +74,8 @@ impl ObjectAction {
             }
             ObjectAction::DungeonExit => {
                 item_action_param.dim_event.send(DimensionSpawnEvent {
-                    generation_params: proto_param.get_world_gen().unwrap(),
                     swap_to_dim_now: true,
-                    new_era: None,
+                    new_era: Some(game.era.current_era.clone()),
                 });
             }
             ObjectAction::Chest => {
