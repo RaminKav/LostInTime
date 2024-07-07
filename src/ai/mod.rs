@@ -3,7 +3,9 @@ mod enemy_hostile_basic;
 use crate::{
     enemy::{
         fairy::{new_idle, trade_anim},
-        red_mushking::{new_follow, new_leap_attack, return_to_shrine, summon_attack},
+        red_mushking::{
+            handle_death, new_follow, new_leap_attack, return_to_shrine, summon_attack,
+        },
         red_mushling::{gas_attack, sprout},
     },
     GameState, Plugin,
@@ -22,6 +24,7 @@ impl Plugin for AIPlugin {
                 follow,
                 new_follow,
                 new_idle,
+                handle_death,
                 return_to_shrine,
                 trade_anim,
                 leap_attack,

@@ -5,11 +5,12 @@ use crate::{
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
     player::levels::ExperienceReward,
+    ui::damage_numbers::spawn_screen_locked_icon,
     world::{world_helpers::tile_pos_to_world_pos, TILE_SIZE},
     GameParam, TextureCamera,
 };
 use bevy::prelude::*;
-use bevy_proto::prelude::ProtoCommands;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::{
     control::KinematicCharacterController,
     geometry::{Collider, Sensor},
@@ -81,7 +82,15 @@ pub fn handle_new_red_mushking_state_machine(
 
         let state_machine = StateMachine::default()
             .set_trans_logging(false)
+            .with_state::<DeathState>()
             .trans::<FollowState>(
+                HealthTrigger(0.65),
+                SummonAttackState {
+                    num_summons_left: 8,
+                    timer: Timer::from_seconds(0.2, TimerMode::Repeating),
+                },
+            )
+            .trans::<LeapAttackState>(
                 HealthTrigger(0.65),
                 SummonAttackState {
                     num_summons_left: 8,
@@ -138,6 +147,10 @@ pub struct SummonAttackState {
     num_summons_left: usize,
     timer: Timer,
 }
+
+#[derive(Clone, Component, Reflect)]
+#[component(storage = "SparseSet")]
+pub struct DeathState;
 
 #[derive(Component)]
 pub struct AttackCollider(pub Option<Entity>);
@@ -323,6 +336,40 @@ pub fn summon_attack(
                 )))
                 .remove::<SummonAttackState>();
             *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
+        }
+    }
+}
+pub fn handle_death(
+    mut commands: Commands,
+    mut death: Query<(Entity, &mut AsepriteAnimation, &GlobalTransform), With<DeathState>>,
+    asset_server: Res<AssetServer>,
+    prototypes: Prototypes,
+    mut proto_commands: ProtoCommands,
+    game: GameParam,
+) {
+    for (entity, mut anim, t) in death.iter_mut() {
+        if anim.current_frame() < 43 {
+            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_START);
+        }
+        if anim.current_frame() == 48 {
+            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_LOOP);
+        }
+        if anim.current_frame() == 56 {
+            *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_END);
+        }
+        if anim.current_frame() == 62 {
+            commands.entity(entity).despawn_recursive();
+            if let Some(spawned_mob) =
+                proto_commands.spawn_from_proto(Mob::Fairy, &prototypes, t.translation().truncate())
+            {
+                spawn_screen_locked_icon(
+                    spawned_mob,
+                    &mut commands,
+                    &game.graphics,
+                    &asset_server,
+                    WorldObject::Essence,
+                );
+            }
         }
     }
 }

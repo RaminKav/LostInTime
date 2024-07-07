@@ -91,7 +91,7 @@ pub fn handle_spawn_inv_item_tooltip(
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
             UIState::Essence => ESSENCE_UI_SIZE,
-            _ => unreachable!(),
+            _ => continue,
         };
         let attributes = item.item_stack.attributes.get_tooltips();
         // let durability = item.item_stack.attributes.get_durability_tooltip();

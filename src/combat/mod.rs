@@ -6,11 +6,15 @@ use rand::Rng;
 pub mod collisions;
 
 use crate::{
+    ai::{FollowState, LeapAttackState},
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
     custom_commands::CommandsExt,
-    enemy::{Mob, MobLevel},
+    enemy::{
+        red_mushking::{DeathState, ReturnToShrineState, SummonAttackState},
+        Mob, MobLevel,
+    },
     item::{
         combat_shrine::{CombatShrineMob, CombatShrineMobDeathEvent},
         projectile::Projectile,
@@ -111,13 +115,10 @@ pub fn handle_attack_cooldowns(
     }
 }
 fn handle_enemy_death(
-    _commands: Commands,
     proto_param: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
-    _asset_server: Res<AssetServer>,
-    _texture_atlases: ResMut<Assets<TextureAtlas>>,
     loot_tables: Query<&LootTable>,
-    mob_xp: Query<(&ExperienceReward, &MobLevel)>,
+    mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
     mut player_xp: Query<&mut PlayerLevel>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
@@ -139,7 +140,7 @@ fn handle_enemy_death(
         //     DoneAnimation,
         //     Name::new("Hit Spark"),
         // ));
-        let Ok((mob_xp, mob_lvl)) = mob_xp.get(death_event.entity) else {
+        let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
             continue;
         };
         // drop loot
@@ -151,7 +152,7 @@ fn handle_enemy_death(
                 Some(mob_lvl.0),
             ) {
                 let mut rng = rand::thread_rng();
-                let d = 10.;
+                let d = if mob.is_boss() { 30. } else { 10. };
                 let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
                 proto_commands.spawn_item_from_proto(
                     drop.obj_type,
@@ -162,7 +163,6 @@ fn handle_enemy_death(
                 );
             }
         }
-
         //give player xp
         let mut player_level = player_xp.single_mut();
         player_level.add_xp(mob_xp.0);
@@ -348,9 +348,20 @@ pub fn handle_hits(
 }
 pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
-    dead_query: Query<Entity, With<MarkedForDeath>>,
+    dead_query: Query<(Entity, &Mob), With<MarkedForDeath>>,
 ) {
-    for e in dead_query.iter() {
-        commands.entity(e).despawn_recursive();
+    for (e, mob) in dead_query.iter() {
+        if mob.is_boss() {
+            commands
+                .entity(e)
+                .insert(DeathState)
+                .remove::<FollowState>()
+                .remove::<SummonAttackState>()
+                .remove::<LeapAttackState>()
+                .remove::<ReturnToShrineState>()
+                .remove::<MarkedForDeath>();
+        } else {
+            commands.entity(e).despawn_recursive();
+        }
     }
 }
