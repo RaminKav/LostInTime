@@ -3,8 +3,8 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::seq::IteratorRandom;
 
 use crate::{
-    custom_commands::CommandsExt, item::object_actions::ObjectAction, night::NightTracker,
-    proto::proto_param::ProtoParam,
+    assets::SpriteAnchor, custom_commands::CommandsExt, item::object_actions::ObjectAction,
+    proto::proto_param::ProtoParam, world::world_helpers::world_pos_to_tile_pos, GameParam,
 };
 
 use super::WorldObject;
@@ -27,6 +27,7 @@ pub fn handle_shrine_rewards(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
+    mut game: GameParam,
 ) {
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine)) = shrines.get_mut(event.0) {
@@ -62,6 +63,13 @@ pub fn handle_shrine_rewards(
                     .entity(e)
                     .insert(WorldObject::CombatShrineDone)
                     .remove::<ObjectAction>();
+                let anchor = proto
+                    .get_component::<SpriteAnchor, _>(WorldObject::CombatShrine)
+                    .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+                game.add_object_to_chunk_cache(
+                    world_pos_to_tile_pos(t.translation().truncate() - anchor.0),
+                    WorldObject::CombatShrineDone,
+                );
             }
         }
     }

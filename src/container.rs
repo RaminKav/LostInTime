@@ -47,13 +47,17 @@ impl Container {
     }
     pub fn get_slot_for_item_in_container_with_space(
         &self,
-        obj: &WorldObject,
+        stack: &ItemStack,
         exclude_slot: Option<usize>,
     ) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
         (0..self.items.len()).find(|&i| {
             self.items[i].is_some()
-                && self.items[i].as_ref().unwrap().item_stack.obj_type == *obj
+                && self.items[i]
+                    .as_ref()
+                    .unwrap()
+                    .item_stack
+                    .is_stackable(stack)
                 && self.items[i].as_ref().unwrap().item_stack.count < MAX_STACK_SIZE
                 && exclude_slot != Some(i)
         })
@@ -75,7 +79,7 @@ impl Container {
             let container_a_item_count = container_a_item.item_stack.count;
             if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
                 target_container,
-                &container_a_item.item_stack.obj_type,
+                &container_a_item.item_stack,
                 None,
             ) {
                 let mut existing_item = target_container.items[existing_item_slot]
@@ -117,7 +121,7 @@ impl Container {
             let stack_count = inv_item_stack.item_stack.count;
             if let Some(existing_item_slot) = Self::get_slot_for_item_in_container_with_space(
                 self,
-                &inv_item_stack.item_stack.obj_type,
+                &inv_item_stack.item_stack,
                 Some(slot),
             ) {
                 if is_from_hotbar && existing_item_slot < 6 {
