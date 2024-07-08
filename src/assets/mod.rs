@@ -97,12 +97,12 @@ impl Plugin for GameAssetsPlugin {
 }
 
 impl Material2d for FoliageMaterial {
-    fn vertex_shader() -> ShaderRef {
-        "shaders/test_wind.wgsl".into()
-    }
-    fn fragment_shader() -> ShaderRef {
-        "shaders/test_wind.wgsl".into()
-    }
+    // fn vertex_shader() -> ShaderRef {
+    //     "shaders/test_wind.wgsl".into()
+    // }
+    // fn fragment_shader() -> ShaderRef {
+    //     "shaders/test_wind.wgsl".into()
+    // }
 }
 
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
@@ -296,22 +296,22 @@ impl GameAssetsPlugin {
         }
         // load foliage mat
         for f in Foliage::iter() {
-            let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
-            let foliage_material = FoliageMaterial {
-                source_texture: Some(handle),
-                speed: 0.5,
-                minStrength: 0.001,
-                maxStrength: 0.003,
-                strengthScale: 20.,
-                interval: 3.5,
-                detail: 1.,
-                distortion: 1.,
-                heightOffset: 0.4,
-                offset: 0.,
-                opacity: 1.,
-                // alpha_mode: AlphaMode::Blend,
-            };
-            foliage_material_map.insert(f, foliage_material);
+            // let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
+            // let foliage_material = FoliageMaterial {
+            //     source_texture: Some(handle),
+            //     speed: 0.5,
+            //     minStrength: 0.001,
+            //     maxStrength: 0.003,
+            //     strengthScale: 20.,
+            //     interval: 3.5,
+            //     detail: 1.,
+            //     distortion: 1.,
+            //     heightOffset: 0.4,
+            //     offset: 0.,
+            //     opacity: 1.,
+            //     // alpha_mode: AlphaMode::Blend,
+            // };
+            // foliage_material_map.insert(f, foliage_material);
         }
 
         // load icons
