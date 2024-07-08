@@ -280,7 +280,7 @@ pub fn check_item_drop_collisions(
             let inv_container = inv.single().items.clone();
             if inv_container.get_first_empty_slot().is_none()
                 && inv_container
-                    .get_slot_for_item_in_container_with_space(&item_stack.obj_type, None)
+                    .get_slot_for_item_in_container_with_space(&item_stack, None)
                     .is_none()
             {
                 return;
