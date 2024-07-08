@@ -3,7 +3,10 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2SmallTree,
-  "survival_rogue_like::item::Foliage": Era2SmallTree,
+//   "survival_rogue_like::item::Foliage": Era2SmallTree,
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("era2smalltree.png")
+   ),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 48., y: 96.)),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),

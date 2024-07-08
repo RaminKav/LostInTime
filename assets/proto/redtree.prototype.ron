@@ -3,7 +3,10 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": RedTree,
-  "survival_rogue_like::item::Foliage": RedTree,
+//   "survival_rogue_like::item::Foliage": RedTree,
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("redtree.png")
+   ),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 64., y: 96.)),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),

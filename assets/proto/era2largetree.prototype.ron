@@ -3,7 +3,10 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2LargeTree,
-  "survival_rogue_like::item::Foliage": Era2LargeTree,
+//   "survival_rogue_like::item::Foliage": Era2LargeTree,
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("era2largetree.png")
+   ),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 80., y: 112.)),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),

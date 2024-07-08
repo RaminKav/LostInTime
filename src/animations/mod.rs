@@ -107,7 +107,7 @@ impl Plugin for AnimationsPlugin {
                     animate_hit,
                     animate_spritesheet_animations.after(mouse_click_system),
                     animate_foliage_opacity,
-                    handle_add_foliage_material,
+                    // handle_add_foliage_material,
                     handle_game_over_fadeout,
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -421,29 +421,41 @@ fn animate_foliage_opacity(
     }
 }
 
-fn handle_add_foliage_material(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<FoliageMaterial>>,
-    mut tree_query: Query<(Entity, &Foliage, &FoliageSize), Added<Foliage>>,
-    graphics: Res<Graphics>,
-    mut meshes: ResMut<Assets<Mesh>>,
-) {
-    for (e, foliage, size) in tree_query.iter_mut() {
-        let foliage_material = graphics
-            .foliage_material_map
-            .as_ref()
-            .unwrap()
-            .get(foliage)
-            .unwrap();
+// fn handle_add_foliage_material(
+//     mut commands: Commands,
+//     mut materials: ResMut<Assets<FoliageMaterial>>,
+//     mut tree_query: Query<(Entity, &Foliage, &FoliageSize), Added<Foliage>>,
+//     graphics: Res<Graphics>,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     asset_server: Res<AssetServer>,
+// ) {
+//     let l = tree_query.iter().count();
+//     for (e, foliage, size) in tree_query.iter_mut() {
+//         // let foliage_material = graphics
+//         //     .foliage_material_map
+//         //     .as_ref()
+//         //     .unwrap()
+//         //     .get(foliage)
+//         //     .unwrap();
 
-        let handle = materials.add(foliage_material.clone());
-        let size = size.0;
-        commands
-            .entity(e)
-            .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-                size,
-                ..Default::default()
-            }))))
-            .insert((handle).clone());
-    }
-}
+//         // let handle = materials.add(foliage_material.clone());
+//         // println!("NEW TREE {:?} | {l:?}", foliage.to_string());
+//         let size = size.0;
+//         commands
+//             .entity(e)
+//             // .insert(SpriteBundle {
+//             //     custom_size: Some(size),
+//             //     ..Default::default()
+//             // })
+//             // .insert(
+//             //     asset_server
+//             //         .load::<Handle<Image>>(format!("{}.png", foliage.to_string().to_lowercase())),
+//             // )
+//             .insert(Name::new("FOLIAGE:GREEN_TREE"));
+//         // .insert(Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
+//         //     size,
+//         //     ..Default::default()
+//         // }))));
+//         // .insert((handle).clone());
+//     }
+// }
