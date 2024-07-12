@@ -28,8 +28,9 @@ impl YSortPlugin {
             // tf.translation.z = 1. - 1.0f32 / (1.0f32 + (2.0f32.powf(-0.01 * tf.translation.y)));
             let anchor_offset = anchor_option.map(|a| a.0.y).unwrap_or(0.);
             tf.translation.z = y_sort.0 + 900.
-                - 900.0f32
-                    / (1.0f32 + (2.0f32.powf(-0.00001 * (gtf.translation().y - anchor_offset))));
+                - (900.0f32
+                    / (1.0f32 + (2.0f32.powf(-0.00001 * (gtf.translation().y - anchor_offset)))))
+                - 0.00001 * gtf.translation().x;
         }
     }
 }

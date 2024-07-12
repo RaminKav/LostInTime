@@ -375,12 +375,12 @@ pub fn save_state(
 pub fn load_state(
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
-    mut game: GameParam,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     mut game_camera: Query<
         (&mut Transform, &mut RawPosition),
         (Without<MainCamera>, Without<UICamera>, With<TextureCamera>),
     >,
+    mut era: ResMut<EraManager>,
 ) {
     let mut rng = rand::thread_rng();
     let mut seed = rng.gen_range(0..100000);
@@ -392,14 +392,16 @@ pub fn load_state(
         // Read the JSON contents of the file as an instance of `User`.
         match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
             Ok(data) => {
+                let mut cache = WorldObjectCache::default();
                 for (tp, _) in data.placed_objs[data.current_era.index()].iter() {
-                    if !game.is_chunk_generated(tp.chunk_pos) {
-                        game.set_chunk_generated(tp.chunk_pos);
+                    if !cache.generated_chunks.contains(&tp.chunk_pos) {
+                        cache.generated_chunks.push(tp.chunk_pos);
                     }
                 }
-                game.world_obj_cache.objects = data.placed_objs[data.current_era.index()].clone();
-                game.world_obj_cache.unique_objs =
-                    data.unique_objs[data.current_era.index()].clone();
+                cache.objects = data.placed_objs[data.current_era.index()].clone();
+                cache.unique_objs = data.unique_objs[data.current_era.index()].clone();
+
+                commands.insert_resource(cache);
                 for (i, (objs, unique_objs)) in data
                     .placed_objs
                     .iter()
@@ -409,7 +411,7 @@ pub fn load_state(
                     if data.current_era.index() == i {
                         continue;
                     }
-                    game.era.era_generation_cache.insert(
+                    era.era_generation_cache.insert(
                         Era::from_index(i),
                         WorldObjectCache {
                             objects: objs.clone(),
@@ -418,8 +420,8 @@ pub fn load_state(
                         },
                     );
                 }
-                game.era.current_era = data.current_era;
-                game.era.visited_eras = data.visited_eras;
+                era.current_era = data.current_era;
+                era.visited_eras = data.visited_eras;
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
                 commands.insert_resource(ContainerRegistry {
@@ -428,7 +430,7 @@ pub fn load_state(
                 commands.insert_resource(data.craft_tracker);
                 proto_commands.apply(format!(
                     "Era{}WorldGenerationParams",
-                    game.era.current_era.clone().index() + 1
+                    era.current_era.clone().index() + 1
                 ));
                 // PRE-MOVE CAMERAS TO PLAYER
                 let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
@@ -439,6 +441,9 @@ pub fn load_state(
             }
             Err(err) => println!("Failed to load data from file {err:?}"),
         }
+    } else {
+        proto_commands.apply("Era1WorldGenerationParams");
+        commands.init_resource::<WorldObjectCache>();
     }
     commands.insert_resource(GenerationSeed { seed });
 

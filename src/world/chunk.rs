@@ -132,7 +132,10 @@ pub struct Chunk {
 pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
-    println!("Caching ALL chunks");
+    println!(
+        "Caching ALL chunks {:?}",
+        game.world_generation_params.water_frequency,
+    );
     for y in -gen_radius..=gen_radius {
         for x in -gen_radius..=gen_radius {
             let chunk_pos = IVec2::new(x, y);
@@ -213,7 +216,7 @@ impl ChunkPlugin {
                     {
                         tile_data.clone()
                     } else {
-                        warn!("Tile data not found for {chunk_pos:?} {tile_pos:?}");
+                        // warn!("Tile data not found for {chunk_pos:?} {tile_pos:?}");
                         let (bits, mut index_shift, blocks) =
                             TilePlugin::get_tile_from_perlin_noise(
                                 &game.world_generation_params,

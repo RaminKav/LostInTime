@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand_chacha::ChaCha8Rng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
@@ -41,13 +42,20 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
     e
 }
 
-pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<(f32, f32)> {
+pub fn _poisson_disk_sampling(
+    radius: f64,
+    k: i8,
+    f: f64,
+    max: f32,
+    max_points: usize,
+    start_pos: Vec2,
+    mut rng: ChaCha8Rng,
+) -> Vec<(f32, f32)> {
     if f <= 0. {
         return vec![];
     }
     // TODO: fix this to work w 4 quadrants -/+
     let n = 2.;
-    let chunk_pixel_size = CHUNK_SIZE as i32 * TILE_SIZE.x as i32 - (TILE_SIZE.x / 2. + 1.) as i32;
     // the final set of points to return
     let mut points: Vec<(f32, f32)> = vec![];
     if k == 0 {
@@ -55,14 +63,11 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
     }
     // the currently "Active" set of points
     let mut active: Vec<(f32, f32)> = vec![];
-    let p0 = (
-        rng.gen_range(0..chunk_pixel_size) as f32,
-        rng.gen_range(0..chunk_pixel_size) as f32,
-    );
+    let p0 = (start_pos.x * TILE_SIZE.x, start_pos.y * TILE_SIZE.y);
 
-    let cell_size = f64::floor(r / f64::sqrt(n));
-    let num_cell: usize =
-        (f64::ceil(CHUNK_SIZE as f64 * TILE_SIZE.x as f64 / cell_size) + 1.) as usize;
+    let cell_size = f64::floor(radius / f64::sqrt(n));
+    let num_cell: usize = max as usize * 2;
+    let mut num_points = 1;
     let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
     let insert_point = |g: &mut Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| {
@@ -73,7 +78,11 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
 
     let is_valid_point = move |g: &Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| -> bool {
         // make sure p is in the chunk
-        if p.0 < 0. || p.0 > chunk_pixel_size as f32 || p.1 < 0. || p.1 > chunk_pixel_size as f32 {
+        let dist_from_orgin = Vec2::new(p.0, p.1).distance(Vec2::new(p0.0, p0.1));
+        if dist_from_orgin >= max {
+            return false;
+        }
+        if p.0 < 0. || p.0 > num_cell as f32 || p.1 < 0. || p.1 > num_cell as f32 {
             return false;
         }
 
@@ -90,7 +99,7 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
                 if let Some(sample_point) = g[i][j] {
                     let sample_point_vec = Vec2::new(sample_point.0, sample_point.1);
                     let p_vec = Vec2::new(p.0, p.1);
-                    if sample_point_vec.distance(p_vec) < r as f32 {
+                    if sample_point_vec.distance(p_vec) < radius as f32 {
                         return false;
                     }
                 }
@@ -100,6 +109,7 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
     };
 
     insert_point(&mut grid, p0);
+    num_points += 1;
     let success = rng.gen::<f64>() < f;
 
     if success {
@@ -107,7 +117,7 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
     }
 
     active.push(p0);
-    while !active.is_empty() {
+    while !active.is_empty() && num_points < max_points {
         let i = rng.gen_range(0..=(active.len() - 1));
         let p = active.get(i).unwrap();
         let mut found = false;
@@ -115,7 +125,7 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
         for _ in 0..k {
             // get a random angle
             let theta: f64 = rng.gen_range(0. ..360.);
-            let new_r = rng.gen_range(r..(2. * r));
+            let new_r = rng.gen_range(radius..(2. * radius));
 
             // create new point from randodm angle r distance away from p
             let new_px = p.0 as f64 + new_r * theta.to_radians().cos();
@@ -133,6 +143,7 @@ pub fn _poisson_disk_sampling(r: f64, k: i8, f: f64, mut rng: ThreadRng) -> Vec<
                 points.push(new_p);
             }
             insert_point(&mut grid, new_p);
+            num_points += 1;
             active.push(new_p);
             found = true;
             break;
