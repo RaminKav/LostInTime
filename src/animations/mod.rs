@@ -6,21 +6,19 @@ use std::f32::consts::PI;
 
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
-use bevy::sprite::{Material2d, Material2dPlugin, Mesh2dHandle};
+use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{handle_game_over_fadeout, tick_game_over_overlay};
 use interpolation::lerp;
+use serde::{Deserialize, Serialize};
 
 use crate::ai::LeapAttackState;
-use crate::assets::{FoliageMaterial, Graphics};
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{mouse_click_system, FacingDirection, MovementVector};
 use crate::item::projectile::ArcProjectileData;
-use crate::item::{
-    Equipment, Foliage, FoliageSize, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS,
-};
+use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player};
@@ -401,22 +399,29 @@ fn animate_spritesheet_animations(
     }
 }
 
+#[derive(FromReflect, Default, Reflect, Clone, Serialize, Deserialize, Component, Schematic)]
+#[reflect(Component, Schematic)]
+pub struct FadeOpacity;
+
 fn animate_foliage_opacity(
-    mut materials: ResMut<Assets<FoliageMaterial>>,
-    mut tree_query: Query<(&GlobalTransform, &Handle<FoliageMaterial>)>,
+    mut commands: Commands,
+    tree_query: Query<(Entity, &GlobalTransform, &WorldObject), With<FadeOpacity>>,
     player: Query<&GlobalTransform, With<Player>>,
+    asset_server: Res<AssetServer>,
 ) {
-    for (txfm, foliage_handle) in tree_query.iter_mut() {
-        let foliage_material = materials.get_mut(foliage_handle);
+    for (e, txfm, obj) in tree_query.iter() {
         let p_txfm = player.single();
-        if let Some(mat) = foliage_material {
-            // check if player is behind tree
-            let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-            if delta_t.x <= 14. && delta_t.x >= -14. && delta_t.y <= 32. && delta_t.y >= -24. {
-                mat.opacity = 0.5;
-            } else {
-                mat.opacity = 1.;
-            }
+        // check if player is behind tree
+        let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
+        if delta_t.x <= 23. && delta_t.x >= -23. && delta_t.y <= 54. && delta_t.y >= -20. {
+            commands.entity(e).insert(
+                asset_server
+                    .load::<Image, _>(format!("{}_fade.png", obj.to_string().to_lowercase())),
+            );
+        } else {
+            commands.entity(e).insert(
+                asset_server.load::<Image, _>(format!("{}.png", obj.to_string().to_lowercase())),
+            );
         }
     }
 }

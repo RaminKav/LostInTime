@@ -88,7 +88,6 @@ pub fn handle_menu_button_click_events(
                 commands.init_resource::<ContainerRegistry>();
                 commands.init_resource::<CraftingTracker>();
                 commands.init_resource::<EraManager>();
-                commands.insert_resource(WorldObjectCache::default());
             }
             MenuButton::Options => {
                 println!("OPTIONS");

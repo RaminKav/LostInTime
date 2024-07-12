@@ -9,10 +9,7 @@ use bevy::{
 };
 use bevy_proto::{
     backend::schematics::FromSchematicInput,
-    prelude::{
-        prototype_ready, ProtoCommands, Prototypes, PrototypesMut, ReflectSchematic, Schematic,
-        SchematicContext,
-    },
+    prelude::{Prototypes, PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
 use strum::IntoEnumIterator;
@@ -24,7 +21,7 @@ use crate::{
         enemy_sprites::{
             CharacterAnimationSpriteSheetData, EnemyAnimationState, LeftFacingSideProfile,
         },
-        AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation,
+        AnimationFrameTracker, AnimationPosTracker, AnimationTimer, DoneAnimation, FadeOpacity,
     },
     assets::{SpriteAnchor, SpriteSize},
     attributes::{
@@ -58,6 +55,7 @@ impl Plugin for ProtoPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.register_type::<Mob>()
             .register_type::<SensorProto>()
+            .register_type::<FadeOpacity>()
             .register_type::<CombatAlignment>()
             .register_type::<AnimationFrameTracker>()
             .register_type::<EnemyAnimationState>()

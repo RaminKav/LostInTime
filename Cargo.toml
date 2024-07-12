@@ -29,6 +29,7 @@ strum_macros = "^0.15"
 interpolation = "0.2.0"
 lazy_static = "1.4.0"
 bevy_aseprite = "0.10"
+rand_chacha = "0.3.1"
 bevy_hanabi = { version = "0.6", default-features = false, features = [ "2d" ] }
 
 [features]

@@ -1,7 +1,7 @@
 use super::chunk::{GenerateObjectsEvent, TileSpriteData};
 use super::dimension::{ActiveDimension, GenerationSeed, SpawnDimension};
 use super::dungeon::Dungeon;
-use super::noise_helpers::get_object_points_for_chunk;
+use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::{WorldGeneration, ISLAND_SIZE};
@@ -14,17 +14,24 @@ use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
-use crate::world::world_helpers::get_neighbour_tile;
-use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
-use crate::NO_GEN;
+use rand_chacha::ChaCha8Rng;
+
+use crate::world::world_helpers::{
+    camera_pos_to_tile_pos, get_neighbour_tile, world_pos_to_chunk_relative_tile_pos,
+    world_pos_to_tile_pos,
+};
+use crate::world::{chunk, noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
+use crate::{DEBUG_MODE, NO_GEN};
 
 use bevy::prelude::*;
+use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
-use rand::Rng;
+use rand::seq::IteratorRandom;
+use rand::{Rng, SeedableRng};
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -76,6 +83,7 @@ impl Plugin for GenerationPlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             )
+            .add_system(spawn_debug_chunk_borders.in_schedule(OnEnter(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -118,6 +126,53 @@ impl GenerationPlugin {
             }
         }
         stone_blocks
+    }
+    fn generate_forest_for_chunk(
+        world_generation_params: &WorldGeneration,
+        chunk_pos: IVec2,
+        seed: u64,
+    ) -> Vec<(TileMapPosition, WorldObject)> {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+        //TODO: make these come from proto
+        let TREES = vec![
+            WorldObject::SmallGreenTree,
+            WorldObject::SmallGreenTree,
+            WorldObject::RedTree,
+            WorldObject::SmallYellowTree,
+            WorldObject::MediumYellowTree,
+            WorldObject::MediumGreenTree,
+        ];
+        let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 };
+        let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
+        for _ in 0..num_clusters {
+            let picked_trees = TREES.iter().choose_multiple(&mut rng.clone(), 2);
+            // for now, every chunk will get 1 forest startt point
+            let rand_x = rng.gen_range(0..CHUNK_SIZE) as f32;
+            let rand_y = rng.gen_range(0..CHUNK_SIZE) as f32;
+            let forest_nucleous = Vec2::new(rand_x, rand_y);
+            let noise_points = _poisson_disk_sampling(
+                16.,
+                30,
+                80.,
+                TILE_SIZE.x * 12.,
+                50,
+                forest_nucleous,
+                rng.clone(),
+            );
+            for point in noise_points {
+                let x = point.0;
+                let y = point.1;
+                let updated_pos = Vec2::new(
+                    x + (chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x),
+                    y + (chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y),
+                );
+                let pos = world_pos_to_tile_pos(updated_pos);
+                trees.push((pos, **picked_trees.iter().choose(&mut rng.clone()).unwrap()));
+            }
+        }
+
+        trees
     }
     // Use chunk manager as source of truth for index
 
@@ -253,11 +308,16 @@ impl GenerationPlugin {
                     chunk_pos,
                     seed.seed,
                 );
+                // generate forest walls trees for chunk
+                let trees = Self::generate_forest_for_chunk(
+                    &game.world_generation_params,
+                    chunk_pos,
+                    seed.seed,
+                );
 
                 // generate all objs
                 let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
-                    Box::new(stone.into_iter());
-
+                    Box::new(stone.into_iter().chain(trees.into_iter()));
                 for (obj, frequency) in game
                     .world_generation_params
                     .object_generation_frequencies
@@ -470,14 +530,21 @@ impl GenerationPlugin {
                             }
                         }
                     }
-
-                    let obj_e = proto_commands.spawn_object_from_proto(
-                        *obj,
-                        tile_pos_to_world_pos(*pos, obj.is_medium_size(&proto_param)),
-                        &prototypes,
-                        &mut proto_param,
-                        is_touching_air,
-                    );
+                    // only spawn if generated obj is in our chunk or a previously genereated chunk,
+                    // otherwise cache it for the correct chunk to spawn
+                    let obj_e =
+                        if pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos) {
+                            proto_commands.spawn_object_from_proto(
+                                *obj,
+                                tile_pos_to_world_pos(*pos, obj.is_medium_size(&proto_param)),
+                                &prototypes,
+                                &mut proto_param,
+                                is_touching_air,
+                            )
+                        } else {
+                            game.add_object_to_chunk_cache(*pos, *obj);
+                            None
+                        };
 
                     if let Some(spawned_obj) = obj_e {
                         if obj.is_medium_size(&proto_param) {
@@ -500,7 +567,6 @@ impl GenerationPlugin {
 
                         if obj == &WorldObject::Chest && container_reg.containers.get(pos).is_none()
                         {
-                            println!("no registry at {pos:?}");
                             commands
                                 .entity(spawned_obj)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
@@ -517,7 +583,7 @@ impl GenerationPlugin {
                         }
                         commands
                             .entity(spawned_obj)
-                            .set_parent(game.get_chunk_entity(chunk_pos).unwrap());
+                            .set_parent(game.get_chunk_entity(pos.chunk_pos).unwrap());
 
                         if let Ok(_) = dungeon_check {
                             let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
@@ -549,6 +615,7 @@ impl GenerationPlugin {
                         &mut proto_param,
                         true,
                     );
+
                     if let Some(spawned_obj) = spawned_obj {
                         let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
                         if obj.is_wall() {
@@ -556,7 +623,6 @@ impl GenerationPlugin {
                         } else if obj == WorldObject::Chest
                             && container_reg.containers.get(&pos).is_none()
                         {
-                            println!("no registry at {pos:?}");
                             commands
                                 .entity(spawned_obj)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
@@ -585,5 +651,63 @@ impl GenerationPlugin {
 
             done_event.send(DoneGeneratingEvent { chunk_pos });
         }
+    }
+}
+
+fn spawn_debug_chunk_borders(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    if !*DEBUG_MODE {
+        return;
+    }
+    let offset = Vec2::new(-8., -8.);
+    //vertical
+    for i in -10..10 {
+        commands
+            .spawn(MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(
+                        shape::Quad {
+                            size: Vec2::new(1.0, 100000.0),
+                            ..Default::default()
+                        }
+                        .into(),
+                    )
+                    .into(),
+                transform: Transform::from_translation(Vec3::new(
+                    i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x + offset.x,
+                    0. + offset.y,
+                    900.,
+                )),
+                material: materials.add(Color::RED.into()),
+                ..default()
+            })
+            .insert(Name::new("debug chunk border y"));
+    }
+
+    //horizontal
+    for i in -10..10 {
+        commands
+            .spawn(MaterialMesh2dBundle {
+                mesh: meshes
+                    .add(
+                        shape::Quad {
+                            size: Vec2::new(100000.0, 1.0),
+                            ..Default::default()
+                        }
+                        .into(),
+                    )
+                    .into(),
+                transform: Transform::from_translation(Vec3::new(
+                    offset.x,
+                    i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y + offset.y,
+                    900.,
+                )),
+                material: materials.add(Color::RED.into()),
+                ..default()
+            })
+            .insert(Name::new("debug chunk border x"));
     }
 }

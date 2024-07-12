@@ -377,7 +377,6 @@ impl GameAssetsPlugin {
             ),
             (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
         >,
-        game: GameParam,
         mut commands: Commands,
         graphics: Res<Graphics>,
         texture_atlases: Res<Assets<TextureAtlas>>,
@@ -400,7 +399,7 @@ impl GameAssetsPlugin {
                 };
                 commands
                     .entity(e)
-                    .insert(game.graphics.texture_atlas.as_ref().unwrap().clone());
+                    .insert(graphics.texture_atlas.as_ref().unwrap().clone());
                 sprite.clone_from(new_sprite);
             }
         }

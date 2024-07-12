@@ -8,6 +8,9 @@ pub mod tile;
 pub mod wall_auto_tile;
 pub mod world_helpers;
 pub mod y_sort;
+use std::fmt::Display;
+use std::fmt::Formatter;
+
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use bevy::{prelude::*, utils::HashMap};
@@ -86,6 +89,11 @@ impl TileMapPosition {
         ]
     }
 }
+impl Display for TileMapPosition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Chunk: {:?}, Tile: {:?}", self.chunk_pos, self.tile_pos)
+    }
+}
 
 #[derive(
     Eq, Hash, Component, PartialEq, Debug, Clone, Default, Reflect, FromReflect, Schematic,
@@ -113,8 +121,7 @@ pub struct WorldGeneration {
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(WorldGeneration::default())
-            .add_plugin(GenerationPlugin)
+        app.add_plugin(GenerationPlugin)
             .add_plugin(ChunkPlugin)
             .add_plugin(DimensionPlugin)
             .add_plugin(DungeonPlugin)
