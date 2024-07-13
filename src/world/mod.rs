@@ -113,6 +113,7 @@ pub struct WorldGeneration {
     pub stone_frequency: f64,
     pub sand_frequency: f64,
     pub dirt_frequency: f64,
+    pub tree_frequency: f64,
     pub stone_wall_frequency: f64,
     pub schematic_frequencies: HashMap<SchematicType, f64>,
     pub object_generation_frequencies: HashMap<WorldObject, f64>,

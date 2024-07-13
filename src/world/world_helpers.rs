@@ -68,6 +68,7 @@ pub fn tile_pos_to_world_pos(pos: TileMapPosition, _center: bool) -> Vec2 {
     )
 }
 
+/// offset should not be larger than +/- 15
 pub fn get_neighbour_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {
     let dx = offset.0;
     let dy = offset.1;
@@ -81,17 +82,17 @@ pub fn get_neighbour_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosi
     let mut adjusted_chunk_pos = pos.chunk_pos;
     if x + dx < 0 {
         adjusted_chunk_pos.x = chunk_pos.x - 1;
-        neighbour_wall_pos.x = CHUNK_SIZE - 1;
+        neighbour_wall_pos.x = (CHUNK_SIZE as i8 + (x + dx)) as u32;
     } else if x + dx >= CHUNK_SIZE.try_into().unwrap() {
         adjusted_chunk_pos.x = chunk_pos.x + 1;
-        neighbour_wall_pos.x = 0;
+        neighbour_wall_pos.x = (x + dx) as u32 - CHUNK_SIZE;
     }
     if y + dy < 0 {
         adjusted_chunk_pos.y = chunk_pos.y - 1;
-        neighbour_wall_pos.y = CHUNK_SIZE - 1;
+        neighbour_wall_pos.y = (CHUNK_SIZE as i8 + (y + dy)) as u32;
     } else if y + dy >= CHUNK_SIZE.try_into().unwrap() {
         adjusted_chunk_pos.y = chunk_pos.y + 1;
-        neighbour_wall_pos.y = 0;
+        neighbour_wall_pos.y = (y + dy) as u32 - CHUNK_SIZE;
     }
     TileMapPosition::new(adjusted_chunk_pos, neighbour_wall_pos)
 }

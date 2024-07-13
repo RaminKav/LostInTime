@@ -9,6 +9,7 @@
       stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
+      tree_frequency: 50.0,
       stone_wall_frequency: 0.0,
       object_generation_frequencies: {
         // SmallGreenTree: 0.015,
