@@ -113,11 +113,21 @@ pub struct WorldGeneration {
     pub stone_frequency: f64,
     pub sand_frequency: f64,
     pub dirt_frequency: f64,
-    pub tree_frequency: f64,
+    pub forest_params: ForestGenerationParams,
     pub stone_wall_frequency: f64,
     pub schematic_frequencies: HashMap<SchematicType, f64>,
     pub object_generation_frequencies: HashMap<WorldObject, f64>,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
+}
+
+#[derive(Component, Schematic, Reflect, FromReflect, Default, Debug, Clone)]
+#[reflect(Schematic)]
+pub struct ForestGenerationParams {
+    pub tree_spacing_radius: f32,
+    pub tree_density: f32,
+    pub forest_radius: f32,
+    pub max_trees_per_forest: usize,
+    pub tree_weights: HashMap<WorldObject, f32>,
 }
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {

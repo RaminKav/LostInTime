@@ -46,7 +46,7 @@ use crate::{
     sappling::{GrowsInto, Sappling},
     schematic::{loot_chests::LootChestType, SchematicType},
     ui::{crafting_ui::CraftingContainerType, EssenceOption, EssenceShopChoices},
-    world::WallTextureData,
+    world::{ForestGenerationParams, WallTextureData},
     CustomFlush, GameState, YSort,
 };
 pub struct ProtoPlugin;
@@ -111,6 +111,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<ManaCost>()
             .register_type::<FacingDirection>()
+            .register_type::<ForestGenerationParams>()
             .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
@@ -122,6 +123,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
             .register_type::<HashMap<WorldObject, f64>>()
             .register_type::<HashMap<SchematicType, f64>>()
+            .register_type::<HashMap<WorldObject, f32>>()
             .register_type::<Vec<WorldObject>>()
             .register_type::<Vec<u8>>()
             .register_type::<Vec<f32>>()

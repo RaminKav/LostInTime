@@ -9,7 +9,13 @@
       stone_frequency: 1.0,
       sand_frequency: 0.0,
       dirt_frequency: 0.0,
-      tree_frequency: 0.0,
+      forest_params: (
+              tree_spacing_radius: 0.,
+              tree_density: 0.0,
+              forest_radius: 0.,
+              max_trees_per_forest: 0,
+              tree_weights: {},
+      ),
       stone_wall_frequency: 1.0,
       schematic_frequencies: {
         House: 0.0,
