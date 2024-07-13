@@ -43,9 +43,9 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
 }
 
 pub fn _poisson_disk_sampling(
-    radius: f64,
+    radius: f32,
     k: i8,
-    f: f64,
+    f: f32,
     max_radial_distance: f32,
     max_points: usize,
     start_pos: Vec2,
@@ -65,14 +65,14 @@ pub fn _poisson_disk_sampling(
     let mut active: Vec<(f32, f32)> = vec![];
     let p0 = (start_pos.x * TILE_SIZE.x, start_pos.y * TILE_SIZE.y);
 
-    let cell_size = f64::floor(radius / f64::sqrt(n));
+    let cell_size = f32::floor(radius / f32::sqrt(n));
     let num_cell: usize = max_radial_distance as usize * 2;
     let mut num_points = 1;
     let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
     let insert_point = |g: &mut Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| {
-        let xi: usize = f64::floor(p.0 as f64 / cell_size) as usize;
-        let yi: usize = f64::floor(p.1 as f64 / cell_size) as usize;
+        let xi: usize = f32::floor(p.0 as f32 / cell_size) as usize;
+        let yi: usize = f32::floor(p.1 as f32 / cell_size) as usize;
         g[xi][yi] = Some(p);
     };
 
@@ -87,8 +87,8 @@ pub fn _poisson_disk_sampling(
         }
 
         // check neighboring eight cells
-        let xi: f64 = f64::floor(p.0 as f64 / cell_size);
-        let yi: f64 = f64::floor(p.1 as f64 / cell_size);
+        let xi: f32 = f32::floor(p.0 as f32 / cell_size);
+        let yi: f32 = f32::floor(p.1 as f32 / cell_size);
         let i0 = usize::max((xi - 1.) as usize, 0);
         let i1 = usize::min((xi + 1.) as usize, num_cell - 1. as usize);
         let j0 = usize::max((yi - 1.) as usize, 0);
@@ -110,7 +110,7 @@ pub fn _poisson_disk_sampling(
 
     insert_point(&mut grid, p0);
     num_points += 1;
-    let success = rng.gen::<f64>() < f;
+    let success = rng.gen::<f32>() < f;
 
     if success {
         points.push(p0);
@@ -128,8 +128,8 @@ pub fn _poisson_disk_sampling(
             let new_r = rng.gen_range(radius..(2. * radius));
 
             // create new point from randodm angle r distance away from p
-            let new_px = p.0 as f64 + new_r * theta.to_radians().cos();
-            let new_py = p.1 as f64 + new_r * theta.to_radians().sin();
+            let new_px = p.0 + new_r * theta.to_radians().cos() as f32;
+            let new_py = p.1 + new_r * theta.to_radians().sin() as f32;
             let new_p = (new_px as f32, new_py as f32);
 
             if !is_valid_point(&grid, new_p) {
@@ -137,7 +137,7 @@ pub fn _poisson_disk_sampling(
             }
 
             //add the new point to our lists and break
-            let success = rng.gen::<f64>() < f;
+            let success = rng.gen::<f32>() < f;
 
             if success {
                 points.push(new_p);

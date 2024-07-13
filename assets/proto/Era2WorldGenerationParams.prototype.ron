@@ -9,7 +9,17 @@
       stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
-      tree_frequency: 40.0,
+      forest_params: (
+              tree_spacing_radius: 20.,
+              tree_density: 0.65,
+              forest_radius: 12.,
+              max_trees_per_forest: 35,
+              tree_weights: {
+                Era2LargeTree: 3.0,
+                Era2MediumTree: 5.0,
+                Era2SmallTree: 10.0,
+              },
+      ),
       stone_wall_frequency: 0.0,
       object_generation_frequencies: {
         Era2SmallTree: 0.025,

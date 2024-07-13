@@ -506,6 +506,9 @@ impl WorldObject {
             WorldObject::MediumGreenTree => true,
             WorldObject::MediumYellowTree => true,
             WorldObject::RedTree => true,
+            WorldObject::Era2SmallTree => true,
+            WorldObject::Era2MediumTree => true,
+            WorldObject::Era2LargeTree => true,
             _ => false,
         }
     }

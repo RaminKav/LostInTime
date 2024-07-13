@@ -14,6 +14,7 @@ use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
+use itertools::Itertools;
 use rand_chacha::ChaCha8Rng;
 
 use crate::world::world_helpers::{
@@ -30,8 +31,11 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
-use rand::seq::IteratorRandom;
-use rand::{Rng, SeedableRng};
+
+use rand::{
+    seq::{IteratorRandom, SliceRandom},
+    Rng, SeedableRng,
+};
 
 #[derive(Debug, Clone)]
 pub struct WallBreakEvent {
@@ -134,29 +138,31 @@ impl GenerationPlugin {
     ) -> Vec<(TileMapPosition, WorldObject)> {
         let mut rng = rand::thread_rng();
 
-        //TODO: make these come from proto
-        let TREES = vec![
-            WorldObject::SmallGreenTree,
-            WorldObject::SmallGreenTree,
-            WorldObject::RedTree,
-            WorldObject::SmallYellowTree,
-            WorldObject::MediumYellowTree,
-            WorldObject::MediumGreenTree,
-        ];
+        //TODO: make these come from proto, use frequencies?
+        let TREES = world_generation_params.forest_params.tree_weights.clone();
         let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 };
         let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
         for _ in 0..num_clusters {
-            let picked_trees = TREES.iter().choose_multiple(&mut rng.clone(), 2);
+            let mut picked_trees = TREES
+                .iter()
+                .collect_vec()
+                .choose_multiple_weighted(&mut rng.clone(), 2, |item| *item.1 as f64)
+                .unwrap()
+                .map(|x| x.0)
+                .collect_vec();
+            if picked_trees.contains(&&WorldObject::RedTree) {
+                picked_trees = vec![&WorldObject::RedTree];
+            }
             // for now, every chunk will get 1 forest startt point
             let rand_x = rng.gen_range(0..CHUNK_SIZE) as f32;
             let rand_y = rng.gen_range(0..CHUNK_SIZE) as f32;
             let forest_nucleous = Vec2::new(rand_x, rand_y);
             let noise_points = _poisson_disk_sampling(
-                16.,
+                world_generation_params.forest_params.tree_spacing_radius,
                 30,
-                80.,
-                TILE_SIZE.x * 12.,
-                world_generation_params.tree_frequency as usize,
+                world_generation_params.forest_params.tree_density * 100.,
+                world_generation_params.forest_params.forest_radius * TILE_SIZE.x,
+                world_generation_params.forest_params.max_trees_per_forest as usize,
                 forest_nucleous,
                 rng.clone(),
             );
@@ -246,10 +252,6 @@ impl GenerationPlugin {
         if new_dim.is_empty() {
             return;
         }
-        // if a save state exists, we assume unique objs have already been generated
-        // if let Ok(_) = File::open("save_state.json") {
-        //     return;
-        // }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
         for (obj, _size, _) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {
@@ -257,13 +259,28 @@ impl GenerationPlugin {
 
                 let mut rng = rand::thread_rng();
 
-                let pos = TileMapPosition::new(
+                let mut pos = TileMapPosition::new(
                     IVec2::new(
                         rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
                         rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
                     ),
                     TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
                 );
+                if pos.chunk_pos == IVec2::ZERO {
+                    pos.chunk_pos = IVec2::new(2, 2);
+                }
+                if pos.chunk_pos.x == 1 {
+                    pos.chunk_pos.x = 2;
+                }
+                if pos.chunk_pos.y == 1 {
+                    pos.chunk_pos.y = 2;
+                }
+                if pos.chunk_pos.x == -1 {
+                    pos.chunk_pos.x = -2;
+                }
+                if pos.chunk_pos.y == -1 {
+                    pos.chunk_pos.y = -2;
+                }
                 println!("set up a {obj:?} at {pos:?}");
 
                 game.world_obj_cache.unique_objs.insert(obj, pos);
