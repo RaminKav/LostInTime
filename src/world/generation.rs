@@ -41,9 +41,9 @@ pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2); 2] = [
-    (WorldObject::BossShrine, Vec2::new(8., 8.)),
-    (WorldObject::DungeonEntrance, Vec2::new(2., 2.)),
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
+    (WorldObject::BossShrine, Vec2::new(8., 8.), 8),
+    (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 2),
 ];
 
 #[derive(Resource, Debug, Default, Clone)]
@@ -132,7 +132,7 @@ impl GenerationPlugin {
         chunk_pos: IVec2,
         seed: u64,
     ) -> Vec<(TileMapPosition, WorldObject)> {
-        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+        let mut rng = rand::thread_rng();
 
         //TODO: make these come from proto
         let TREES = vec![
@@ -156,7 +156,7 @@ impl GenerationPlugin {
                 30,
                 80.,
                 TILE_SIZE.x * 12.,
-                50,
+                world_generation_params.tree_frequency as usize,
                 forest_nucleous,
                 rng.clone(),
             );
@@ -251,7 +251,7 @@ impl GenerationPlugin {
         //     return;
         // }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
-        for (obj, _size) in UNIQUE_OBJECTS_DATA {
+        for (obj, _size, _) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj) {
                 println!("NEW UNIQUE OBJ: {obj:?}");
 
@@ -410,7 +410,18 @@ impl GenerationPlugin {
                     })
                     .map(|tp| *tp)
                     .collect::<HashMap<_, _>>();
-
+                // clear out spawn area
+                let clear_tiles = get_radial_tile_positions(
+                    TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
+                    12,
+                );
+                for pos in clear_tiles {
+                    if let Some(obj) = objs.get(&pos) {
+                        if obj.is_tree() {
+                            objs.remove(&pos);
+                        }
+                    }
+                }
                 // UNIQUE OBJECTS
                 if dungeon_check.is_err() {
                     for (obj, pos) in game.world_obj_cache.unique_objs.clone() {
@@ -418,15 +429,15 @@ impl GenerationPlugin {
                             //TODO: this will be funky if size is not even integers
                             let x_halfsize = (UNIQUE_OBJECTS_DATA
                                 .iter()
-                                .find(|(o, _)| o == &obj)
-                                .map(|(_, s)| s)
+                                .find(|(o, _, _)| o == &obj)
+                                .map(|(_, s, _)| s)
                                 .unwrap()
                                 .x
                                 / 2.) as i32;
                             let y_halfsize = (UNIQUE_OBJECTS_DATA
                                 .iter()
-                                .find(|(o, _)| o == &obj)
-                                .map(|(_, s)| s)
+                                .find(|(o, _, _)| o == &obj)
+                                .map(|(_, s, _)| s)
                                 .unwrap()
                                 .y
                                 / 2.) as i32;
@@ -461,6 +472,22 @@ impl GenerationPlugin {
                             game.world_obj_cache.unique_objs.insert(obj, pos);
 
                             objs.insert(pos, obj);
+                            // clear out area
+                            let clear_tiles = get_radial_tile_positions(
+                                pos,
+                                *UNIQUE_OBJECTS_DATA
+                                    .iter()
+                                    .find(|(o, _, _)| o == &obj)
+                                    .map(|(_, _, r)| r)
+                                    .unwrap() as i8,
+                            );
+                            for pos in clear_tiles {
+                                if let Some(obj) = objs.get(&pos) {
+                                    if obj.is_tree() || obj.is_medium_size(&proto_param) {
+                                        objs.remove(&pos);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -710,4 +737,21 @@ fn spawn_debug_chunk_borders(
             })
             .insert(Name::new("debug chunk border x"));
     }
+}
+
+fn get_radial_tile_positions(origin: TileMapPosition, radius: i8) -> Vec<TileMapPosition> {
+    //TODO: add rng padding around edges
+    let mut positions = vec![];
+    let origin_pos = tile_pos_to_world_pos(origin, false);
+    let max_dist = radius as i32 * (TILE_SIZE.x as i32);
+    for x in -radius..=radius {
+        for y in -radius..=radius {
+            let pos = get_neighbour_tile(origin, (x, y));
+            let dist = tile_pos_to_world_pos(pos, false).distance(origin_pos);
+            if dist <= max_dist as f32 {
+                positions.push(pos);
+            }
+        }
+    }
+    positions
 }

@@ -9,6 +9,7 @@
       stone_frequency: 1.0,
       sand_frequency: 0.0,
       dirt_frequency: 0.0,
+      tree_frequency: 0.0,
       stone_wall_frequency: 1.0,
       schematic_frequencies: {
         House: 0.0,

@@ -46,12 +46,12 @@ pub fn _poisson_disk_sampling(
     radius: f64,
     k: i8,
     f: f64,
-    max: f32,
+    max_radial_distance: f32,
     max_points: usize,
     start_pos: Vec2,
-    mut rng: ChaCha8Rng,
+    mut rng: ThreadRng,
 ) -> Vec<(f32, f32)> {
-    if f <= 0. {
+    if f <= 0. || max_points <= 0 {
         return vec![];
     }
     // TODO: fix this to work w 4 quadrants -/+
@@ -66,7 +66,7 @@ pub fn _poisson_disk_sampling(
     let p0 = (start_pos.x * TILE_SIZE.x, start_pos.y * TILE_SIZE.y);
 
     let cell_size = f64::floor(radius / f64::sqrt(n));
-    let num_cell: usize = max as usize * 2;
+    let num_cell: usize = max_radial_distance as usize * 2;
     let mut num_points = 1;
     let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
@@ -79,7 +79,7 @@ pub fn _poisson_disk_sampling(
     let is_valid_point = move |g: &Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| -> bool {
         // make sure p is in the chunk
         let dist_from_orgin = Vec2::new(p.0, p.1).distance(Vec2::new(p0.0, p0.1));
-        if dist_from_orgin >= max {
+        if dist_from_orgin >= max_radial_distance {
             return false;
         }
         if p.0 < 0. || p.0 > num_cell as f32 || p.1 < 0. || p.1 > num_cell as f32 {
