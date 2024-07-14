@@ -17,7 +17,11 @@ use crate::{
     item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
-    world::{generation::GenerationPlugin, world_helpers::world_pos_to_tile_pos},
+    world::{
+        generation::{get_radial_tile_positions, GenerationPlugin},
+        tile,
+        world_helpers::world_pos_to_tile_pos,
+    },
     CustomFlush, GameParam, GameState,
 };
 use loot_chests::*;
@@ -247,6 +251,17 @@ pub fn handle_new_scene_entities_parent_chunk(
                         game.get_obj_entity_at_tile(tile_pos, &proto_param)
                     {
                         commands.entity(existing_obj).despawn_recursive();
+                    }
+                    let clear_tiles = get_radial_tile_positions(tile_pos, 3);
+                    for tile_pos in clear_tiles.iter() {
+                        if let Some(existing_obj) =
+                            game.get_obj_entity_at_tile(*tile_pos, &proto_param)
+                        {
+                            let (obj, _, _) = obj_data.get(existing_obj).unwrap();
+                            if obj.is_tree() {
+                                commands.entity(existing_obj).despawn_recursive();
+                            }
+                        }
                     }
                     place_item_event.send(PlaceItemEvent {
                         obj: *obj,
