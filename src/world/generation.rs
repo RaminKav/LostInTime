@@ -489,20 +489,20 @@ impl GenerationPlugin {
                             game.world_obj_cache.unique_objs.insert(obj, pos);
 
                             objs.insert(pos, obj);
-                            // clear out area
-                            let clear_tiles = get_radial_tile_positions(
-                                pos,
-                                *UNIQUE_OBJECTS_DATA
-                                    .iter()
-                                    .find(|(o, _, _)| o == &obj)
-                                    .map(|(_, _, r)| r)
-                                    .unwrap() as i8,
-                            );
-                            for pos in clear_tiles {
-                                if let Some(obj) = objs.get(&pos) {
-                                    if obj.is_tree() || obj.is_medium_size(&proto_param) {
-                                        objs.remove(&pos);
-                                    }
+                        }
+                        // clear out area
+                        let clear_tiles = get_radial_tile_positions(
+                            pos,
+                            *UNIQUE_OBJECTS_DATA
+                                .iter()
+                                .find(|(o, _, _)| o == &obj)
+                                .map(|(_, _, r)| r)
+                                .unwrap() as i8,
+                        );
+                        for pos in clear_tiles {
+                            if let Some(obj) = objs.get(&pos) {
+                                if obj.is_tree() || obj.is_medium_size(&proto_param) {
+                                    objs.remove(&pos);
                                 }
                             }
                         }
@@ -756,7 +756,7 @@ fn spawn_debug_chunk_borders(
     }
 }
 
-fn get_radial_tile_positions(origin: TileMapPosition, radius: i8) -> Vec<TileMapPosition> {
+pub fn get_radial_tile_positions(origin: TileMapPosition, radius: i8) -> Vec<TileMapPosition> {
     //TODO: add rng padding around edges
     let mut positions = vec![];
     let origin_pos = tile_pos_to_world_pos(origin, false);
@@ -770,5 +770,6 @@ fn get_radial_tile_positions(origin: TileMapPosition, radius: i8) -> Vec<TileMap
             }
         }
     }
+
     positions
 }
