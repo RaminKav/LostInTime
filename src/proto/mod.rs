@@ -246,6 +246,7 @@ impl ProtoPlugin {
         prototypes.load("proto/leather.prototype.ron");
         prototypes.load("proto/rawmeat.prototype.ron");
         prototypes.load("proto/cookedmeat.prototype.ron");
+        prototypes.load("proto/dirtpath.prototype.ron");
         prototypes.load("proto/stingfly.prototype.ron");
         prototypes.load("proto/bushling.prototype.ron");
         prototypes.load("proto/redmushling.prototype.ron");
