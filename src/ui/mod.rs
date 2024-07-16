@@ -1,7 +1,9 @@
 pub mod chest_ui;
 pub mod crafting_ui;
 pub mod damage_numbers;
+pub mod guide_hud;
 pub mod screen_effects;
+use guide_hud::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
 use damage_numbers::handle_clamp_screen_locked_icons;
@@ -184,6 +186,9 @@ impl Plugin for UIPlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             )
+            .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
+            .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
+            .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
