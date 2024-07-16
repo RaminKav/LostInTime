@@ -385,6 +385,7 @@ pub enum WorldObject {
     Era2MagicBoulder,
 
     BossShrine,
+    DirtPath,
 }
 
 #[derive(
