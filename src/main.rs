@@ -383,7 +383,7 @@ impl<'w, 's> GameParam<'w, 's> {
         &self,
         tile: TileMapPosition,
         proto_param: &ProtoParam,
-    ) -> Option<Entity> {
+    ) -> Option<(Entity, WorldObject)> {
         for (obj_e, g_txm, size, obj) in self.world_object_query.iter() {
             let anchor = proto_param
                 .get_component::<SpriteAnchor, _>(*obj)
@@ -396,11 +396,11 @@ impl<'w, 's> GameParam<'w, 's> {
                     .chain(vec![pos].iter())
                 {
                     if neighbour_pos == &tile {
-                        return Some(obj_e);
+                        return Some((obj_e, *obj));
                     }
                 }
             } else if pos == tile {
-                return Some(obj_e);
+                return Some((obj_e, *obj));
             }
         }
 
@@ -411,7 +411,7 @@ impl<'w, 's> GameParam<'w, 's> {
         tile: TileMapPosition,
         proto_param: &ProtoParam,
     ) -> Option<WallTextureData> {
-        if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
+        if let Some((e, _)) = self.get_obj_entity_at_tile(tile, proto_param) {
             if let Ok(data) = self.wall_data_query.get(e) {
                 return Some(data.1.clone());
             }
@@ -423,7 +423,7 @@ impl<'w, 's> GameParam<'w, 's> {
         tile: TileMapPosition,
         proto_param: &ProtoParam,
     ) -> Option<Mut<WallTextureData>> {
-        if let Some(e) = self.get_obj_entity_at_tile(tile, proto_param) {
+        if let Some((e, _)) = self.get_obj_entity_at_tile(tile, proto_param) {
             if let Ok(data) = self.wall_data_query.get_mut(e) {
                 return Some(data.1);
             }

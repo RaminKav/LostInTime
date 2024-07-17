@@ -13,6 +13,7 @@ use crate::{
     juice::bounce::BounceOnHit,
     player::{stats::StatType, Player},
     ui::{spawn_item_stack_icon, STATS_UI_SIZE, TOOLTIP_UI_SIZE},
+    world::TILE_SIZE,
 };
 
 use super::{
@@ -225,8 +226,12 @@ pub fn handle_spawn_inv_item_tooltip(
         }
         if let Some(ability) = &item.item_stack.metadata.item_ability {
             let (obj, dmg) = match ability {
-                ItemAbility::Arc(dmg) => (WorldObject::Feather, dmg),
-                ItemAbility::FireAttack(dmg) => (WorldObject::Fireball, dmg),
+                ItemAbility::Arc(dmg) => (WorldObject::Feather, *dmg),
+                ItemAbility::FireAttack(dmg) => (WorldObject::Fireball, *dmg),
+                ItemAbility::Teleport(dist) => (
+                    WorldObject::OrbOfTransformation,
+                    (dist / TILE_SIZE.x) as i32,
+                ),
             };
             let pos = Vec3::new(28., -size.y / 2. + 12., 1.);
             let icon_e = spawn_item_stack_icon(

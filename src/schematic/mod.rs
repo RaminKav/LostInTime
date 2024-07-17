@@ -234,28 +234,28 @@ pub fn handle_new_scene_entities_parent_chunk(
                 if is_valid_to_spawn {
                     let tile_pos = world_pos_to_tile_pos(pos);
                     if obj.is_medium_size(&proto_param) {
-                        if let Some(existing_obj) =
+                        if let Some((existing_obj, _)) =
                             game.get_obj_entity_at_tile(tile_pos, &proto_param)
                         {
                             commands.entity(existing_obj).despawn_recursive();
                         }
                         for q in 0..3 {
-                            if let Some(existing_obj) = game.get_obj_entity_at_tile(
+                            if let Some((existing_obj, _)) = game.get_obj_entity_at_tile(
                                 tile_pos.get_neighbour_tiles_for_medium_objects()[q],
                                 &proto_param,
                             ) {
                                 commands.entity(existing_obj).despawn_recursive();
                             }
                         }
-                    } else if let Some(existing_obj) =
+                    } else if let Some((existing_obj, _)) =
                         game.get_obj_entity_at_tile(tile_pos, &proto_param)
                     {
                         commands.entity(existing_obj).despawn_recursive();
                     }
                     let clear_tiles = get_radial_tile_positions(tile_pos, 3);
-                    for tile_pos in clear_tiles.iter() {
-                        if let Some(existing_obj) =
-                            game.get_obj_entity_at_tile(*tile_pos, &proto_param)
+                    for clear_tile_pos in clear_tiles.iter() {
+                        if let Some((existing_obj, _)) =
+                            game.get_obj_entity_at_tile(*clear_tile_pos, &proto_param)
                         {
                             let (obj, _, _) = obj_data.get(existing_obj).unwrap();
                             if obj.is_tree() {
