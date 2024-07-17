@@ -34,7 +34,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::Equipment;
+use crate::item::{Equipment, PlaceItemEvent, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
@@ -417,9 +417,14 @@ pub fn toggle_inventory(
         }
         if key_input.just_pressed(KeyCode::O) {
             dim_event.send(DimensionSpawnEvent {
-                generation_params: proto.get_world_gen().unwrap(),
                 swap_to_dim_now: true,
                 new_era: Some(Era::Second),
+            });
+        }
+        if key_input.just_pressed(KeyCode::K) {
+            dim_event.send(DimensionSpawnEvent {
+                swap_to_dim_now: true,
+                new_era: Some(Era::Main),
             });
         }
         if key_input.just_pressed(KeyCode::U) {
@@ -442,12 +447,13 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
+            proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
@@ -559,7 +565,8 @@ pub fn mouse_click_system(
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
         if *DEBUG_MODE && mouse_button_input.just_pressed(MouseButton::Left) {
-            println!("C: {cursor_tile_pos:?}",);
+            let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
+            println!("C: {cursor_tile_pos:?} -> {obj:?}",);
         }
         if attack_timer_option.is_some() {
             return;
@@ -595,7 +602,7 @@ pub fn mouse_click_system(
         {
             return;
         }
-        if let Some(hit_obj) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+        if let Some((hit_obj, _)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
             if *DEBUG_MODE {
                 println!("OBJ: {hit_obj:?}");
             }
@@ -619,7 +626,7 @@ pub fn mouse_click_system(
                 item_actions.run_action(held_obj, &mut item_action_param, &mut game, &proto_param);
             }
         }
-        if let Some(obj_e) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+        if let Some((obj_e, _)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
             if let Ok(obj_action) = obj_actions.get(obj_e) {
                 obj_action.run_action(
                     obj_e,

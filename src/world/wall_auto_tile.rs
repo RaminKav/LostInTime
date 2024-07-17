@@ -251,7 +251,7 @@ pub fn mark_neighbour_walls_dirty(
             };
             if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
                 if let Some(true) = cache.walls.get(&neighbour_pos).cloned() {
-                    let Some(new_wall_entity) =
+                    let Some((new_wall_entity, _)) =
                         game.get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
                     else {
                         continue;
@@ -263,7 +263,7 @@ pub fn mark_neighbour_walls_dirty(
                     .get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
                     .unwrap();
 
-                commands.entity(new_wall_entity).insert(Dirty);
+                commands.entity(new_wall_entity.0).insert(Dirty);
             }
         }
     }

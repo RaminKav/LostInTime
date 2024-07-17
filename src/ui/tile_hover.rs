@@ -59,7 +59,7 @@ pub fn spawn_tile_hover_on_cursor_move(
             }
         }
         // check tool type
-        if let Some(obj_e) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+        if let Some((obj_e, _)) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
             if let Ok(req) = tool_req_query.get(obj_e) {
                 if let Ok(main_hand) = main_hand_obj {
                     if req.0

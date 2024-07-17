@@ -746,7 +746,7 @@ pub fn handle_placing_world_object(
 
         // Delete old object
         if place_event.override_existing_obj {
-            if let Some(old_obj) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+            if let Some((old_obj, _)) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
                 commands.entity(old_obj).despawn_recursive();
             }
         }
