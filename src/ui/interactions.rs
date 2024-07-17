@@ -56,6 +56,7 @@ pub enum UIElement {
     HungerDebuff2,
     HungerDebuff3,
     ScreenIconSlot,
+    Options,
 }
 
 #[derive(Component, Debug, Clone)]

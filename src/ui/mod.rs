@@ -52,6 +52,7 @@ use self::{
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
 pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
+pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
@@ -166,6 +167,11 @@ impl Plugin for UIPlugin {
                     update_sp_text.run_if(in_state(UIState::Stats)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_enter_options_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
             )
             .add_systems(
                 (
