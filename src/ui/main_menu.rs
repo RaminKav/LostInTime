@@ -1,11 +1,11 @@
 use std::process::exit;
 
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     assets::Graphics,
     audio::UpdateBGMTrackEvent,
-    colors::YELLOW_2,
+    colors::{BLACK, YELLOW_2},
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
@@ -13,7 +13,7 @@ use crate::{
     Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };
 
-use super::{Interactable, UIElement};
+use super::{Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
 
 #[derive(Component, Clone)]
 pub enum MenuButton {
@@ -76,6 +76,7 @@ pub fn remove_main_menu(
 pub fn handle_menu_button_click_events(
     mut event_reader: EventReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
 ) {
     for event in event_reader.iter() {
@@ -90,7 +91,7 @@ pub fn handle_menu_button_click_events(
                 commands.init_resource::<EraManager>();
             }
             MenuButton::Options => {
-                println!("OPTIONS");
+                // next_ui_state.0 = Some(UIState::Options);
             }
             MenuButton::Quit => {
                 exit(0);
@@ -186,4 +187,131 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ..default()
         },
     ));
+}
+
+#[derive(Component)]
+pub struct OptionsUI;
+
+pub fn handle_enter_options_ui(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    let (size, texture, t_offset) = (
+        OPTIONS_UI_SIZE,
+        graphics.get_ui_element_texture(UIElement::Options),
+        Vec2::new(0., 0.),
+    );
+
+    let overlay = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
+                custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-t_offset.x, -t_offset.y, -1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("overlay"))
+        .id();
+    let stats_e = commands
+        .spawn(SpriteBundle {
+            texture,
+            sprite: Sprite {
+                custom_size: Some(size),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(t_offset.x, t_offset.y, 10.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(OptionsUI)
+        .insert(Name::new("STATS UI"))
+        .insert(UIState::Options)
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+
+    for i in 0..4 {
+        let translation = Vec3::new(6., (-i as f32 * 21.) + 10., 1.);
+        let mut slot_entity = commands.spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::StatsButton),
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(16., 16.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        slot_entity
+            .set_parent(stats_e)
+            .insert(Interactable::default())
+            .insert(UIElement::StatsButton)
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("STATS BUTTON"));
+
+        let mut text = commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Update",
+                    TextStyle {
+                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                        font_size: 8.0,
+                        color: BLACK,
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(23., (-i as f32 * 21.) + 10., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("STATS TEXT"),
+            RenderLayers::from_layers(&[3]),
+        ));
+        text.set_parent(stats_e)
+            .insert(RenderLayers::from_layers(&[3]));
+    }
+
+    // sp remaining text
+    let mut sp_text = commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Update",
+                TextStyle {
+                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                    font_size: 8.0,
+                    color: BLACK,
+                },
+            ),
+            text_anchor: Anchor::CenterLeft,
+            transform: Transform {
+                translation: Vec3::new(29., 43., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        },
+        Name::new("SP TEXT"),
+        RenderLayers::from_layers(&[3]),
+    ));
+    sp_text
+        .set_parent(stats_e)
+        .insert(RenderLayers::from_layers(&[3]));
+
+    commands.entity(stats_e).push_children(&[overlay]);
 }

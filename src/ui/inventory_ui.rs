@@ -26,6 +26,7 @@ pub enum UIState {
     Crafting,
     Furnace,
     Essence,
+    Options,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {
