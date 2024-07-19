@@ -42,7 +42,7 @@ use bevy::{
 
 mod juice;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier2d::prelude::*;
+use bevy_rapier2d::{na::ComplexField, prelude::*};
 mod ai;
 mod animations;
 mod assets;
@@ -96,11 +96,12 @@ const ZOOM_SCALE: f32 = 1.2;
 const PLAYER_MOVE_SPEED: f32 = 75.;
 const PLAYER_DASH_SPEED: f32 = 215.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
-pub const HEIGHT: f32 = 1920.;
+
+pub const HEIGHT: f32 = 1080.;
 pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
-pub const GAME_WIDTH: f32 = 320. * ZOOM_SCALE;
+pub const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO;
 lazy_static! {
     pub static ref DEBUG_MODE: bool = env::var("DEBUG_MODE").is_ok();
 }
@@ -133,8 +134,8 @@ fn main() {
                 // .disable::<LogPlugin>()
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: WindowResolution::new(WIDTH, HEIGHT)
-                            .with_scale_factor_override(1.0),
+                        resolution: WindowResolution::new(WIDTH, HEIGHT),
+                        // .with_scale_factor_override(1.0),
                         title: "Hiru's Island".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: true,
@@ -499,7 +500,8 @@ fn setup(
         height: GAME_HEIGHT as u32,
         ..default()
     };
-    let game_size = Vec2::new(HEIGHT * ASPECT_RATIO, HEIGHT);
+    let h = HEIGHT - 130.;
+    let game_size = Vec2::new(h * ASPECT_RATIO, h);
 
     // This is the texture that will be rendered to.
     let mut game_image = Image {
