@@ -37,7 +37,7 @@
                 item: Arrow,
                 min: 1,
                 max: 3,
-                rate: 0.1
+                rate: 0.05
             ),
             // (
             //     item: ThrowingStar,
@@ -49,14 +49,14 @@
                 item: Sword,
                 min: 1,
                 max: 1,
-                rate: 0.006
+                rate: 0.015
             ),
-            (
-                item: Dagger,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
+            // (
+            //     item: Dagger,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
             // (
             //     item: BasicStaff,
             //     min: 1,
@@ -75,12 +75,12 @@
             //     max: 1,
             //     rate: 0.006
             // ),
-            (
-                item: WoodBow,
-                min: 1,
-                max: 1,
-                rate: 0.006
-            ),
+            // (
+            //     item: WoodBow,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.006
+            // ),
             // (
             //     item: Claw,
             //     min: 1,
@@ -121,19 +121,19 @@
                 item: LeatherTunic,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.015
             ),
             (
                 item: LeatherPants,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.015
             ),
             (
                 item: LeatherShoes,
                 min: 1,
                 max: 1,
-                rate: 0.0075
+                rate: 0.015
             ),
             // (
             //     item: ForestShirt,
@@ -153,23 +153,23 @@
             //     max: 1,
             //     rate: 0.006
             // ),
-            (
-                item: UpgradeTome,
-                min: 1,
-                max: 1,
-                rate: 0.07
-            ),
-            (
-                item: OrbOfTransformation,
-                min: 1,
-                max: 1,
-                rate: 0.04
-            ),
+            // (
+            //     item: UpgradeTome,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.07
+            // ),
+            // (
+            //     item: OrbOfTransformation,
+            //     min: 1,
+            //     max: 1,
+            //     rate: 0.04
+            // ),
             (
                 item: Essence,
                 min: 1,
                 max: 1,
-                rate: 0.2
+                rate: 0.15
             ),
             ]
         ),
