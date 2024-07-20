@@ -149,16 +149,17 @@ pub fn handle_player_raw_position(
     >,
     mut game: GameParam,
 ) {
-    let (mut raw_pos, mut pos) = player_pos.single_mut();
-    if let Ok(kcc) = kcc.get_single() {
-        raw_pos.0 += kcc.effective_translation;
-    };
-    let delta = raw_pos.0 - pos.translation.truncate();
-    pos.translation.x += delta.x;
-    pos.translation.y += delta.y;
-    pos.translation.x = pos.translation.x.round();
-    pos.translation.y = pos.translation.y.round();
-    game.player_mut().position = pos.translation;
+    if let Ok((mut raw_pos, mut pos)) = player_pos.get_single_mut() {
+        if let Ok(kcc) = kcc.get_single() {
+            raw_pos.0 += kcc.effective_translation;
+        };
+        let delta = raw_pos.0 - pos.translation.truncate();
+        pos.translation.x += delta.x;
+        pos.translation.y += delta.y;
+        pos.translation.x = pos.translation.x.round();
+        pos.translation.y = pos.translation.y.round();
+        game.player_mut().position = pos.translation;
+    }
 }
 fn spawn_player(
     mut commands: Commands,

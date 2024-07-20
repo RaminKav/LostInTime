@@ -40,7 +40,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 translation: Vec3::new(
                     (-GAME_WIDTH + 91.) / 2.,
                     (GAME_HEIGHT - 15.) / 2. - 12.,
-                    10.,
+                    5.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()

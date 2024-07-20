@@ -217,7 +217,6 @@ impl InventoryItemStack {
     // to split a stack, we right click on an existing stack.
     // we do not know where the target stack is, and since the current stack
     // is not moving, we are creating a new entity visual to drag
-    // the drag
     pub fn split_stack(
         &self,
         item_slot_state: &mut InventorySlotState,
