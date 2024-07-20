@@ -681,7 +681,9 @@ pub fn move_camera_with_player(
     time: Res<Time>,
 ) {
     let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
-    let (_player_pos, raw_player_pos, _player_movement_vec) = player_query.single();
+    let Ok((_player_pos, raw_player_pos, _player_movement_vec)) = player_query.get_single() else {
+        return;
+    };
 
     let camera_lookahead_scale = 4.0;
     let delta = raw_player_pos.0 - raw_camera_pos.0;

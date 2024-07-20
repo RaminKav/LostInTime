@@ -97,6 +97,7 @@ pub enum Interaction {
     Hovering,
     Dragging {
         item: Entity,
+        origin_slot: usize,
     },
 }
 
@@ -165,6 +166,11 @@ pub fn handle_drop_in_world_events(
                     commands.entity(new_drag_icon_entity).insert(DraggedItem);
                     parent_interactable.2.change(Interaction::Dragging {
                         item: new_drag_icon_entity,
+                        origin_slot: game_param
+                            .inv_slot_query
+                            .get(parent_e)
+                            .expect("parent is an inv slot")
+                            .slot_index,
                     });
                 }
             }
@@ -256,6 +262,11 @@ pub fn handle_drop_on_slot_events(
                 commands.entity(new_drag_icon_entity).insert(DraggedItem);
                 parent_interactable.2.change(Interaction::Dragging {
                     item: new_drag_icon_entity,
+                    origin_slot: game
+                        .inv_slot_query
+                        .get(drop_event.parent_interactable_entity)
+                        .expect("parent is an inv slot")
+                        .slot_index,
                 });
             }
         }
@@ -429,7 +440,7 @@ pub fn handle_item_drop_clicks(
     };
     for (e, interactable) in interactables.iter_mut() {
         // reset dragged interactables when mouse released
-        if let Interaction::Dragging { item } = interactable.current() {
+        if let Interaction::Dragging { item, origin_slot } = interactable.current() {
             if let Ok(mut item_stack) = item_stack_query.get_mut(*item) {
                 if let Some(drop_target) = hit_test {
                     if let Ok(state) = slot_states.get(drop_target.0) {
@@ -442,7 +453,9 @@ pub fn handle_item_drop_clicks(
                                 stack_empty: true,
                             });
                         } else if right_mouse_pressed {
-                            if right_clicks.contains(&state.slot_index) {
+                            if right_clicks.contains(&state.slot_index)
+                                || state.slot_index == *origin_slot
+                            {
                                 continue;
                             }
                             right_clicks.push(state.slot_index);
@@ -567,7 +580,10 @@ pub fn handle_interaction_clicks(
                                     removed_slot_state: state.clone(),
                                 });
 
-                                interactable.change(Interaction::Dragging { item: item_icon.0 });
+                                interactable.change(Interaction::Dragging {
+                                    item: item_icon.0,
+                                    origin_slot: state.slot_index,
+                                });
                                 let mut inv = inv.single_mut();
                                 let container_items = if state.r#type.is_chest() {
                                     &mut container_param.chest_option.as_mut().unwrap().items
@@ -622,7 +638,10 @@ pub fn handle_interaction_clicks(
                                 );
 
                                 commands.entity(e).insert(DraggedItem);
-                                interactable.change(Interaction::Dragging { item: e });
+                                interactable.change(Interaction::Dragging {
+                                    item: e,
+                                    origin_slot: state.slot_index,
+                                });
                                 mouse_input.clear();
                             }
                         }

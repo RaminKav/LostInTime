@@ -325,7 +325,7 @@ macro_rules! setup_raw_bonus_attributes {
                         {
                             if stringify!($field_name) == picked_attribute {
                                 let value = rng.gen_range(self.$field_name.clone().unwrap());
-                                item_attributes.$field_name = value + rarity.get_rarity_attributes_bonus();
+                                item_attributes.$field_name = f32::ceil(value as f32 * rarity.get_rarity_attributes_bonus()) as i32;
                             }
                         }
                     )*
@@ -453,12 +453,12 @@ impl ItemRarity {
             ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
         }
     }
-    fn get_rarity_attributes_bonus(&self) -> i32 {
+    fn get_rarity_attributes_bonus(&self) -> f32 {
         match self {
-            ItemRarity::Common => 1,
-            ItemRarity::Uncommon => 2,
-            ItemRarity::Rare => 3,
-            ItemRarity::Legendary => 5,
+            ItemRarity::Common => 1.0,
+            ItemRarity::Uncommon => 1.25,
+            ItemRarity::Rare => 1.75,
+            ItemRarity::Legendary => 2.5,
         }
     }
 
