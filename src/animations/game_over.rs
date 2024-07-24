@@ -59,7 +59,7 @@ pub fn handle_game_over_fadeout(
             })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("overlay"))
-            .insert(GameOverFadeout(Timer::from_seconds(4.0, TimerMode::Once)));
+            .insert(GameOverFadeout(Timer::from_seconds(5.0, TimerMode::Once)));
 
         next_state.0 = Some(GameState::GameOver);
         // move player to UI camera to be above the fade out overlay
@@ -129,7 +129,7 @@ pub fn tick_game_over_overlay(
             println!("Setting overlay to {:?}", timer.0.percent());
             let alpha = f32::min(1., timer.0.percent() * 5.);
             sprite.color = overwrite_alpha(sprite.color, alpha);
-            if alpha >= 1. {
+            if alpha >= 0.7 {
                 commands.spawn((
                     Text2dBundle {
                         text: Text::from_section(
@@ -137,7 +137,7 @@ pub fn tick_game_over_overlay(
                             TextStyle {
                                 font: asset_server.load("fonts/alagard.ttf"),
                                 font_size: 30.0,
-                                color: WHITE,
+                                color: WHITE.with_a(f32::min(1., timer.0.percent() * 2.)),
                             },
                         ),
                         transform: Transform {
