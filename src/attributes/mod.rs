@@ -222,8 +222,8 @@ impl ItemAttributes {
     pub fn get_durability_tooltip(&self) -> String {
         format!("{}/{}", self.durability, self.max_durability)
     }
-    pub fn add_attribute_components(&self, entity: &mut EntityCommands) {
-        if self.health > 0 {
+    pub fn add_attribute_components(&self, entity: &mut EntityCommands, old_att: &Self) {
+        if self.health > 0 && self.health != old_att.health {
             entity.insert(MaxHealth(self.health));
         }
         if self.attack_cooldown > 0. {
@@ -663,7 +663,8 @@ fn handle_player_item_attribute_change_events(
             new_att.attack_cooldown = 0.4;
         }
         new_att = stats.apply_stats_to_player_attributes(new_att.clone());
-        new_att.add_attribute_components(&mut commands.entity(player));
+        new_att
+            .add_attribute_components(&mut commands.entity(player), &player_atts.single().clone());
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)

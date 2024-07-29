@@ -26,6 +26,7 @@ pub enum UIElement {
     Inventory,
     ChestInventory,
     InventorySlot,
+    InventorySlotHotbar,
     InventorySlotHover,
     XPBarFrame,
     Tooltip,

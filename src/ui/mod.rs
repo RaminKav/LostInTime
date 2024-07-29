@@ -109,6 +109,7 @@ impl Plugin for UIPlugin {
                 (
                     create_enemy_health_bar,
                     add_previous_health,
+                    handle_flash_bars,
                     update_xp_bar,
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
