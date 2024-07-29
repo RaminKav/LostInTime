@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::Rng;
 
-use crate::{TextureCamera, DEBUG_MODE};
+use crate::{TextureCamera, DEBUG};
 
 #[derive(Component)]
 pub struct ShakeEffect {
@@ -43,7 +43,7 @@ pub fn test_shake(
     keys: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
-    if keys.just_pressed(KeyCode::G) && *DEBUG_MODE {
+    if keys.just_pressed(KeyCode::G) && *DEBUG {
         let mut rng = rand::thread_rng();
         let seed = rng.gen_range(0..100000);
         let speed = 10.;

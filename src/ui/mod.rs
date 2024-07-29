@@ -35,7 +35,7 @@ pub use essence_ui::*;
 
 use crate::{
     client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
-    GameState, DEBUG_MODE,
+    GameState, DEBUG,
 };
 
 use self::{
@@ -218,7 +218,7 @@ pub fn handle_new_ui_state(
         return;
     }
     let next_ui = next_ui_state.0.as_ref().unwrap().clone();
-    if *DEBUG_MODE {
+    if *DEBUG {
         println!("UI State Changed: {:?} -> {:?}", curr_ui_state.0, next_ui);
     }
     let mut should_close_self = false;

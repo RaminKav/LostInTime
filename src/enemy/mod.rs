@@ -197,6 +197,8 @@ pub fn handle_new_mob_state_machine(
                         HurtByPlayer,
                         FollowState {
                             target: game.game.player,
+                            curr_delta: None,
+                            curr_path: None,
                             speed: follow_speed.0,
                         },
                     )
@@ -222,6 +224,8 @@ pub fn handle_new_mob_state_machine(
                         },
                         FollowState {
                             target: game.game.player,
+                            curr_delta: None,
+                            curr_path: None,
                             speed: follow_speed.0,
                         },
                     )
@@ -274,6 +278,8 @@ pub fn handle_new_mob_state_machine(
                     }),
                     FollowState {
                         target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
                         speed: follow_speed.0,
                     },
                 );
@@ -303,6 +309,8 @@ pub fn handle_new_mob_state_machine(
                     }),
                     FollowState {
                         target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
                         speed: follow_speed.0,
                     },
                 );
@@ -314,6 +322,8 @@ pub fn handle_new_mob_state_machine(
                     },
                     FollowState {
                         target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
                         speed: follow_speed.0,
                     },
                 );
@@ -324,6 +334,8 @@ pub fn handle_new_mob_state_machine(
                 NightTimeAggro,
                 FollowState {
                     target: game.game.player,
+                    curr_delta: None,
+                    curr_path: None,
                     speed: follow_speed.0,
                 },
             );

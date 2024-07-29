@@ -74,6 +74,8 @@ pub fn handle_new_red_mushking_state_machine(
             })
             .insert(FollowState {
                 target: game.game.player,
+                curr_delta: None,
+                curr_path: None,
                 speed: follow_speed.0,
             })
             .insert(DamagesWorldObjects)
@@ -125,6 +127,8 @@ pub fn handle_new_red_mushking_state_machine(
                 HurtByPlayer,
                 FollowState {
                     target: game.game.player,
+                    curr_delta: None,
+                    curr_path: None,
                     speed: follow_speed.0,
                 },
             );
@@ -249,6 +253,8 @@ pub fn new_leap_attack(
                 .entity(entity)
                 .insert(FollowState {
                     target: leap_attack.target,
+                    curr_delta: None,
+                    curr_path: None,
                     speed: follow_speed.0,
                 })
                 .insert(EnemyAttackCooldown(
@@ -328,6 +334,8 @@ pub fn summon_attack(
                 .entity(entity)
                 .insert(FollowState {
                     target: game.game.player,
+                    curr_delta: None,
+                    curr_path: None,
                     speed: follow_speed.0,
                 })
                 .insert(EnemyAttackCooldown(Timer::from_seconds(

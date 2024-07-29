@@ -10,6 +10,7 @@ use super::dimension::{dim_spawned, GenerationSeed};
 
 use super::generation::WorldObjectCache;
 use super::world_helpers::get_neighbour_tile;
+use super::y_sort::YSort;
 
 use crate::container::ContainerRegistry;
 use crate::player::{handle_move_player, Player};
@@ -410,7 +411,7 @@ impl ChunkPlugin {
     //TODO: change despawning systems to use playe rpos instead??
     fn despawn_outofrange_chunks(
         game: GameParam,
-        camera_query: Query<&Transform, With<Player>>,
+        player_query: Query<&Transform, (With<Player>, With<YSort>)>,
         mut commands: Commands,
         chunk_query: Query<(&Transform, &Children), With<Chunk>>,
         containers: Query<(
@@ -420,14 +421,14 @@ impl ChunkPlugin {
         )>,
         mut container_reg: ResMut<ContainerRegistry>,
     ) {
-        for camera_transform in camera_query.iter() {
+        for player_transform in player_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
                 CHUNK_SIZE as f32 * TILE_SIZE.y,
             );
             for (chunk_transform, children) in chunk_query.iter() {
                 let chunk_pos = chunk_transform.translation.xy();
-                let distance = camera_transform.translation.xy().distance(chunk_pos);
+                let distance = player_transform.translation.xy().distance(chunk_pos);
                 //TODO: calculate maximum possible distance for 2x2 chunksa
                 let x = (chunk_pos.x / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
                 let y = (chunk_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;

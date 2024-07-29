@@ -7,14 +7,17 @@ use rand::Rng;
 use seldom_state::prelude::*;
 
 use crate::{
+    ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
     animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
     combat::HitEvent,
     enemy::{FollowSpeed, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
-    Game, PLAYER_MOVE_SPEED,
+    Game, GameParam, PLAYER_MOVE_SPEED,
 };
+
+use super::pathfinding::{get_next_tile_A_star, AIPos};
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
@@ -142,6 +145,8 @@ pub struct IdleState {
 #[component(storage = "SparseSet")]
 pub struct FollowState {
     pub target: Entity,
+    pub curr_path: Option<Vec2>,
+    pub curr_delta: Option<Vec2>,
     pub speed: f32,
 }
 // Entities in the `Attack` state should move towards the given entity at the given speed
@@ -170,9 +175,9 @@ pub struct ProjectileAttackState {
 pub fn follow(
     mut transforms: Query<&mut Transform>,
     mut mover: Query<&mut KinematicCharacterController>,
-    follows: Query<(
+    mut follows: Query<(
         Entity,
-        &FollowState,
+        &mut FollowState,
         &TextureAtlasSprite,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
@@ -180,27 +185,46 @@ pub fn follow(
     )>,
     mut commands: Commands,
     time: Res<Time>,
+    mut game: GameParam,
 ) {
-    for (entity, follow, sprite, anim_data, anim_state, att_cooldown) in &follows {
+    for (entity, mut follow, sprite, anim_data, anim_state, att_cooldown) in follows.iter_mut() {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
             return;
         }
         // Get the positions of the follower and target
         let target_translation = transforms.get(follow.target).unwrap().translation;
+
         let follow_transform = &mut transforms.get_mut(entity).unwrap();
-        let follow_translation = follow_transform.translation;
-        let delta = (target_translation - follow_translation)
-            .normalize_or_zero()
-            .truncate();
-        // Find the direction from the follower to the target and go that way
-        // println!(
-        //     "{:?}, {:?}, {:?} {:?} -> {:?}",
-        //     delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds(),
-        //     follow.speed,
-        //     target_translation.y,
-        //     follow_translation.y,
-        //     target_translation.y - follow_translation.y,
-        // );
+        let follow_collider_offset = Vec2::new(0., -3.);
+        let follow_translation = AIPos_to_world_pos(world_pos_to_AIPos(
+            follow_transform.translation.truncate() + follow_collider_offset,
+        ));
+
+        let next_target_tile = get_next_tile_A_star(
+            &target_translation.truncate(),
+            &follow_translation,
+            &mut game,
+        );
+        //convert follower txfm to AIPos too
+        let target_txfm = next_target_tile.unwrap_or(target_translation.truncate());
+        let delta_override: Option<Vec2> = if let Some(curr_path) = follow.curr_path {
+            if curr_path == target_txfm {
+                Some(
+                    follow
+                        .curr_delta
+                        .expect("delta should exist if curr_path exists"),
+                )
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let delta =
+            delta_override.unwrap_or((target_txfm - follow_translation).normalize_or_zero());
+        follow.curr_path = next_target_tile;
+        follow.curr_delta = Some(delta);
+
         mover.get_mut(entity).unwrap().translation =
             Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
         commands
@@ -262,6 +286,8 @@ pub fn leap_attack(
                 if follow_speed.0 > 0. {
                     commands.entity(entity).insert(FollowState {
                         target: attack.target,
+                        curr_delta: None,
+                        curr_path: None,
                         speed: follow_speed.0,
                     });
                 }
@@ -316,6 +342,8 @@ pub fn projectile_attack(
                 .insert(EnemyAnimationState::Walk)
                 .insert(FollowState {
                     target: attack.target,
+                    curr_delta: None,
+                    curr_path: None,
                     speed: follow_speed.0,
                 })
                 .remove::<ProjectileAttackState>()

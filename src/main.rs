@@ -5,7 +5,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use ai::AIPlugin;
+use ai::{
+    pathfinding::{AIPos, DebugPathResetEvent, PathfindingCache},
+    AIPlugin,
+};
 use attributes::{
     Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
@@ -103,7 +106,7 @@ pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
 pub const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO;
 lazy_static! {
-    pub static ref DEBUG_MODE: bool = env::var("DEBUG_MODE").is_ok();
+    pub static ref DEBUG: bool = env::var("DEBUG").is_ok();
 }
 lazy_static! {
     pub static ref NO_GEN: bool = env::var("NO_GEN").is_ok();
@@ -113,6 +116,9 @@ lazy_static! {
 }
 lazy_static! {
     pub static ref COLLIDERS: bool = env::var("COLLIDERS").is_ok();
+}
+lazy_static! {
+    pub static ref DEBUG_AI: bool = env::var("DEBUG_AI").is_ok();
 }
 
 fn main() {
@@ -237,8 +243,11 @@ pub struct GameParam<'w, 's> {
     pub graphics: Res<'w, Graphics>,
     pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
+    pub pathfinding_cache: ResMut<'w, PathfindingCache>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     pub world_obj_cache: ResMut<'w, WorldObjectCache>,
+    pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
+
     //TODO: remove this to use Bevy_Save
     pub player_query: Query<'w, 's, Entity, With<Player>>,
     pub player_stats: Query<
@@ -301,6 +310,14 @@ impl<'w, 's> GameParam<'w, 's> {
 
     pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
         self.world_obj_cache.objects.insert(pos, obj);
+    }
+    pub fn set_pos_validity_for_pathfinding(&mut self, pos: AIPos, validity: bool) {
+        self.pathfinding_cache
+            .tile_valid_cache
+            .insert(pos, validity);
+    }
+    pub fn get_pos_validity_for_pathfinding(&self, pos: AIPos) -> Option<bool> {
+        self.pathfinding_cache.tile_valid_cache.get(&pos).copied()
     }
     pub fn remove_object_from_chunk_cache(&mut self, pos: TileMapPosition) {
         self.world_obj_cache.objects.remove(&pos);
@@ -680,5 +697,5 @@ impl AppExt for App {
 }
 
 pub fn should_show_inspector() -> bool {
-    *DEBUG_MODE
+    *DEBUG
 }
