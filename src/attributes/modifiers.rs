@@ -23,6 +23,9 @@ pub fn handle_modify_mana_event(
 ) {
     for event in event.iter() {
         let mut mana = query.single_mut();
+        if mana.current == mana.max {
+            return;
+        }
         mana.current += event.0 as i32;
     }
 }

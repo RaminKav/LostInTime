@@ -544,53 +544,17 @@ Buttons:
   - save frequency: [15s] [2]
 - Quit.
 
-- [x] shrink hit box on mobs
-- [x] add sapplings asap
-- [x] make breaking trees, etc give exp (Add component mobs get)
-- [x] stats bug
-- [x] stats page re-render bug (its not getting purged, stats menu)
-- [x] chests generate as non-players so they spawn garbage loot :/
-- [x] lower mob stat/dmg scaling
 - sapplings reset timer when despawned... set up resource to track them, or dont despawn them lol...
-- [x] dungeon exiting is broken i think
-- [x] neg stats showing "+ -"
-- [x] unify stat lines in gear
 - add special inv slots for gear/acc
 - add options menu...
 - hitting trees always gives brown or white particles (different from minimap color...)
-- [x] make sword hitbox slightly bigger/forward?
-- [x] weird attack animation/sound bug (multi hits)
 - fade intro step after hitting start
-- [x] only take dmg from enemy when they're in attack anim
 - proj double fire bug!!!
 - helper ui keybind icons for stats, fairy, inv, etc
-- [x] add a way to get weapons
-      -> `Essence of the Forrest` (some way to translate monster killing to get a random piece of loot)
-      -> All monsters can drop essense
-      -> Or, Mob drops can be exchanged for essence
 
-  - -> Right clicking Essence drops you a random piece of gear
-  - -> Right clicking Essence opens a menu to spend on various things (Random gear, Skill Point, dungeon key?, boss summon?)
-  - Genius prairie ida: Fairies!!
-  - -> fairies spawn randomly and want to trade you random loot stuff for essence
-  - -> they have a chance to sell you gear you lost in previous runs!!!!
-
-- [x]buff mobs (hp, dmg, hit box)
-- [x] fix inv bug where you drag and then clsoe and it gets stuck lol
-- [x] cant reopen fairy shop (it breaks ui again lol)
-- [x] i dont think item levels are doign anything lol
-- [x] remove durability, causes inv bug and its useless
 - add way to grow food
-- [x] decrease cost to craft w stone, or new way to obtain it (stone mob?)
-- [x] decrease dagger speed?
 - [ ] upgrade station needs to reset tooltips when task is done
-- BUG commo ngear dropping w 4 lines of stats
 - Problem: You can run aroudn the island to despawn mobs
-- [x] mushroom doesnt do dmg
-- [x] make dmg numbers stray more
-- Risk vs Reward:
-  - shrine to pay resource( hp, essence?) for a reward (resources, food, item?)
-  - [x] shrine to engage in combat to get reward (resource, food, item) (summons a bunch of mobs to kill, with an Elite)
 - Relics/Buffs: Buffs that grant you unique bonuses: gain one after every night?
 
   - regen faster, dash twice, dash further, aoe burst when hit, split dmg in two hits, Knockback enemies on hit, food goes down slower, attack speed up, poison on hit, mp faster, mp discount, -1 damage on every hit, night time aggro distance decreased, more ammo drops, chance to not use ammo, weapon upgrades (drops a weapon of that type), upgrade tomes drop more often, bonus xp, +25% stat bonus (all 4), more chests in dungeons, defelct proj on dash,
@@ -599,8 +563,11 @@ Buttons:
   -BUG shift clicking gear stacks them no matter what
 
 - CLEAN_UP: refactor various resources into 1 mega resource for each era?
+- BUG: picking up weapon you have in inv while inv is full makes it dissapear?
+- BUG: Combat shrine change needs to update cache (they respawn as uncleared)
+
+- BUG: opening inv from craft table window does not remove/insert the right craft res
 - TODO: extract game window size and other options into a resource
-- ui element that sticks to screen edges to show where fairy is
 - [x] can summon inf number of combat shrine mobs until you win
 - change item abilities to use % total dmg instead of fixed
 - mobs shoudl be able to hit w non-weapons
@@ -692,7 +659,98 @@ exp particles
   - maybe fur devil varient that is more undead, bones: drops bones
   - skeleton
 - PLANTS:
+
   - taller more droopy fruit bush
   - spike-y tree
   - bamboo (near water)
   -
+
+- idea: item you can place that shows a hover liek fairy (guide oyu home)
+- make delay for mushling attack longer
+- add guide book for stats, recipes, enemies, mechanics, etc
+- add guiding text prompts for key progression
+- add glows or effects to soem dropped items (rarity, or item of interest)
+- lore idea: things get tougher every night bc corruption from time travel
+  the longer you stay in the past
+- Add starting scenes for first run, furture runs skip this.
+- Time fragment instead of forest essence.
+- death == rewind time to try again? some god-like creature rewinds time to save you?
+
+  ## Guide
+
+  - Show some sort of guide for progression, possible ideas are:
+
+    - Show Items you should craft, along with the recipe items to gather.
+    - Use text to explain what the player should do.
+    - Highlight around objs of interest: Grass, stone, stick
+
+  - Icon Method Ideas:
+
+    - Goal 1: String, Stick, Rock => axe
+    - Goal 2: Wood Plank, Wood Log => Crafting Table
+    - Goal 3: Walls
+    - Goal 4: Stone, Coal -> Furnace, Cauldron
+    - Goal 5: Anvil
+
+  - Structure: - Active Goal: enum -> - Complete Tracker: bool - Goal Item
+    IDEA: maybe turn all item abilities into toggle + they cost mana?
+    TODO: story intro frames (3 frames)
+    <!-- TODO: options menu -->
+    <!-- TODO: plan item drops properly -->
+
+    TODO: Add more item abilities
+    TODO: Add general timing fade ins for start and death (red player model too)
+    TODO: Analytics service
+    TODO: expand tooltip size for mroe text
+    TODO: add all descs to items in proto
+    TODO: turn exp particles into normal entities particles, add animation to exp (float for a sec w/glow, then rush to the xp bar, and xp bar expands and flashes + low magical ressonance noise)
+    TODO: improve mob spawning
+    BUG: Fix dir looking weird
+    TODO: make inv slots pop out more when you are hovering them. reduce opacity on all hotbar slots except the selected one.
+
+    ## NEEDS ART OR DESIGN
+
+    TODO: solidify boss summoning system
+    TODO: add teleporter structure + UI
+    TODO: ui keybind icons
+    TODO: Trinkets (Teleport / Dodge)
+
+    ## ART LIST
+
+    - icons for chest/shoe/pants/acc slots
+    - Era Teleporter statue (aura the color of the sword blade)
+    - UI and Icons for ability selection after lvl up (1 ui screen + buttons, a bunch of icons)
+    - keybind icons (B, I/E/Tab, Left/Right Click), action icons (Inventory bag, abilities, and hand for right click actions )
+
+Wood Sword -> Starting wep + craft
+Sword -> rng mobs, shrine, crates
+Forest Dagger -> Boss 1
+Bow -> low rng shrines + crates + dungeons
+Claw -> Boss 2
+Staffs -> Drops era 2+ crates, dungeon
+Hammer -> slow, powerful attack, drops boss 2
+Metal armor -> boss 2
+Rings/Pendants -> Bosses / Dungeons
+
+Leather Armor -> low chance mobs era 1
+Forest Armor -> Boss 1
+Bug: press i in crafting
+bug: sappling not visible
+bug: grass can spawn under medium objs
+
+## Flood Fill Algo
+
+- start of game: assume every pos is part of default island space
+- before every
+
+## Notes from case study game
+
+- add horizontal random dir to float text
+- turn level-ups into opportunity to gain rewards (pick 1 of 3 abilities)
+  - remove item abilities from items, it was sort of weird anyway
+  - instead they are upgrades given after every level
+  - each upgrade then adds its own upgrade path into the pool of upgrades (teleport adds teleport buffs to the pool)
+  - Vary from passives, on-attack triggers, or a unique skill ability
+  - Passives: perm buffs to stats (crit chance, speed, attack speed, hp), increased loot rate if kill is crit blow, increase dodge distance, double dodge
+  - On-Attack Trigger: Add fire damage, add a wave attack, frail stack (disapear after 1s of not being hit, grants incr chance of crit), slow stack? poison stack?
+  - Unique skills could be like slow down time, teleport (or its a dodge replacement),

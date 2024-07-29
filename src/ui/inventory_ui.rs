@@ -340,6 +340,8 @@ pub fn spawn_inv_slot(
         texture: graphics.get_ui_element_texture(
             if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
                 UIElement::InventorySlotHover
+            } else if slot_type.is_hotbar() {
+                UIElement::InventorySlotHotbar
             } else {
                 UIElement::InventorySlot
             },

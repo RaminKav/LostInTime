@@ -1,18 +1,18 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use crate::{
-    assets::Graphics,
-    attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
-    colors::{BLACK, BLUE, RED, YELLOW},
-    inventory::Inventory,
-    player::{levels::PlayerLevel, Player},
-    GAME_HEIGHT, GAME_WIDTH,
-};
-
 use super::{
     interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
     UIElement, UIState,
 };
+use crate::{
+    assets::Graphics,
+    attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
+    colors::{BLACK, BLUE, RED, WHITE, YELLOW},
+    inventory::Inventory,
+    player::{levels::PlayerLevel, Player},
+    GAME_HEIGHT, GAME_WIDTH,
+};
+use bevy::utils::Duration;
 
 #[derive(Component)]
 pub struct HealthBar;
@@ -26,6 +26,13 @@ pub struct XPBar;
 pub struct XPBarText;
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
+
+#[derive(Component)]
+pub struct BarFlashTimer {
+    pub timer: Timer,
+    pub flash_color: Color,
+    pub color: Color,
+}
 
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
     let hud_bar_frame = commands
@@ -65,6 +72,11 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
             },
             ..default()
         })
+        .insert(BarFlashTimer {
+            timer: Timer::from_seconds(0.1, TimerMode::Once),
+            flash_color: WHITE,
+            color: RED,
+        })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBar)
         .insert(Name::new("inner health bar"))
@@ -84,6 +96,11 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
             },
             ..default()
         })
+        .insert(BarFlashTimer {
+            timer: Timer::from_seconds(0.2, TimerMode::Once),
+            flash_color: WHITE,
+            color: BLUE,
+        })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(ManaBar)
         .insert(Name::new("inner mana bar"))
@@ -102,6 +119,11 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..Default::default()
             },
             ..default()
+        })
+        .insert(BarFlashTimer {
+            timer: Timer::from_seconds(0.2, TimerMode::Once),
+            flash_color: WHITE,
+            color: YELLOW,
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(FoodBar)
@@ -132,6 +154,11 @@ pub fn setup_xp_bar_ui(
                 ..Default::default()
             },
             ..default()
+        })
+        .insert(BarFlashTimer {
+            timer: Timer::from_seconds(0.2, TimerMode::Once),
+            flash_color: WHITE,
+            color: YELLOW,
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(XPBar)
@@ -191,25 +218,28 @@ pub fn update_healthbar(
             With<Player>,
         ),
     >,
-    mut health_bar_query: Query<&mut Sprite, With<HealthBar>>,
+    mut health_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<HealthBar>>,
 ) {
     let Ok((player_health, player_max_health)) = player_health_query.get_single() else {
         return;
     };
-    health_bar_query.single_mut().custom_size = Some(Vec2 {
+    let (mut sprite, mut flash) = health_bar_query.single_mut();
+    sprite.custom_size = Some(Vec2 {
         x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
+    flash.timer.tick(Duration::from_nanos(1));
 }
 pub fn update_xp_bar(
-    player_hunger_query: Query<&PlayerLevel, (With<Player>, Changed<PlayerLevel>)>,
-    mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
+    player_xp_query: Query<&PlayerLevel, (With<Player>, Changed<PlayerLevel>)>,
+    mut xp_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<XPBar>>,
     mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
 ) {
-    let Ok(level) = player_hunger_query.get_single() else {
+    let Ok(level) = player_xp_query.get_single() else {
         return;
     };
-    xp_bar_query.single_mut().custom_size = Some(Vec2 {
+    let (mut sprite, mut flash) = xp_bar_query.single_mut();
+    sprite.custom_size = Some(Vec2 {
         x: 111. * level.xp as f32 / level.next_level_xp as f32,
         y: 1.,
     });
@@ -218,19 +248,33 @@ pub fn update_xp_bar(
     if level.level >= 10 {
         txfm.translation.x = -5.5;
     }
+    flash.timer.tick(Duration::from_nanos(1));
 }
 
+pub fn handle_flash_bars(mut query: Query<(&mut Sprite, &mut BarFlashTimer)>, time: Res<Time>) {
+    for (mut sprite, mut flash) in query.iter_mut() {
+        if flash.timer.finished() {
+            sprite.color = flash.color;
+            flash.timer.reset();
+        } else if flash.timer.percent() != 0. {
+            sprite.color = WHITE;
+            flash.timer.tick(time.delta());
+        }
+    }
+}
 pub fn update_foodbar(
     player_hunger_query: Query<&Hunger, (With<Player>, Changed<Hunger>)>,
-    mut food_bar_query: Query<&mut Sprite, With<FoodBar>>,
+    mut food_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<FoodBar>>,
 ) {
     let Ok(hunger) = player_hunger_query.get_single() else {
         return;
     };
-    food_bar_query.single_mut().custom_size = Some(Vec2 {
+    let (mut sprite, mut flash) = food_bar_query.single_mut();
+    sprite.custom_size = Some(Vec2 {
         x: 53. * hunger.current as f32 / hunger.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
+    flash.timer.tick(Duration::from_nanos(1));
 }
 
 pub fn setup_hotbar_hud(
@@ -263,13 +307,15 @@ pub fn setup_hotbar_hud(
 
 pub fn update_mana_bar(
     player_mana: Query<&Mana, (With<Player>, Changed<Mana>)>,
-    mut mana_bar_query: Query<&mut Sprite, With<ManaBar>>,
+    mut mana_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ManaBar>>,
 ) {
     let Ok(mana) = player_mana.get_single() else {
         return;
     };
-    mana_bar_query.single_mut().custom_size = Some(Vec2 {
+    let (mut sprite, mut flash) = mana_bar_query.single_mut();
+    sprite.custom_size = Some(Vec2 {
         x: 60. * mana.current as f32 / mana.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
+    flash.timer.tick(Duration::from_nanos(1));
 }
