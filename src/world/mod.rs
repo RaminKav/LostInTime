@@ -16,6 +16,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy::{prelude::*, utils::HashMap};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
+use world_helpers::tile_pos_to_world_pos;
 
 use crate::{item::WorldObject, schematic::SchematicType};
 
@@ -87,6 +88,11 @@ impl TileMapPosition {
             get_neighbour_tile(*self, (0, 1)),
             get_neighbour_tile(*self, (1, 0)),
         ]
+    }
+    pub fn distance(&self, other: &TileMapPosition) -> f32 {
+        let p = tile_pos_to_world_pos(*self, true);
+        let other_p = tile_pos_to_world_pos(*other, true);
+        p.distance(other_p)
     }
 }
 impl Display for TileMapPosition {

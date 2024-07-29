@@ -413,7 +413,7 @@ fn animate_foliage_opacity(
         let p_txfm = player.single();
         // check if player is behind tree
         let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-        if delta_t.x <= 23. && delta_t.x >= -23. && delta_t.y <= 54. && delta_t.y >= -20. {
+        if delta_t.x <= 40. && delta_t.x >= -40. && delta_t.y <= 54. && delta_t.y >= -20. {
             commands.entity(e).insert(
                 asset_server
                     .load::<Image, _>(format!("{}_fade.png", obj.to_string().to_lowercase())),

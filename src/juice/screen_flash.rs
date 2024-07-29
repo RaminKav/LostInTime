@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 
-use crate::{DEBUG_MODE, GAME_HEIGHT, GAME_WIDTH};
+use crate::{DEBUG, GAME_HEIGHT, GAME_WIDTH};
 
 #[derive(Resource)]
 pub struct FlashEffect {
@@ -47,7 +47,7 @@ pub fn screen_flash_effect(
 }
 
 pub fn test_flash(keys: Res<Input<KeyCode>>, mut commands: Commands) {
-    if keys.just_pressed(KeyCode::G) && *DEBUG_MODE {
+    if keys.just_pressed(KeyCode::G) && *DEBUG {
         commands.insert_resource(FlashEffect {
             timer: Timer::from_seconds(0.5, TimerMode::Once),
             color: Color::rgba(1., 1., 1., 1.),

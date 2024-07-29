@@ -15,18 +15,14 @@ use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
 use itertools::Itertools;
-use rand_chacha::ChaCha8Rng;
 
-use crate::world::world_helpers::{
-    camera_pos_to_tile_pos, get_neighbour_tile, world_pos_to_chunk_relative_tile_pos,
-    world_pos_to_tile_pos,
-};
-use crate::world::{chunk, noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
+use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
+use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
-use crate::{DEBUG_MODE, NO_GEN};
+use crate::{DEBUG, NO_GEN};
 
 use bevy::prelude::*;
-use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
+use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
@@ -34,7 +30,7 @@ use bevy_rapier2d::prelude::Collider;
 
 use rand::{
     seq::{IteratorRandom, SliceRandom},
-    Rng, SeedableRng,
+    Rng,
 };
 
 #[derive(Debug, Clone)]
@@ -703,7 +699,7 @@ fn spawn_debug_chunk_borders(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if !*DEBUG_MODE {
+    if !*DEBUG {
         return;
     }
     let offset = Vec2::new(-8., -8.);
