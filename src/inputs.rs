@@ -1,5 +1,7 @@
+use std::f32::consts::PI;
 use std::time::Duration;
 
+use crate::ai::pathfinding::{flood_fill, world_pos_to_AIPos};
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
@@ -34,7 +36,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::{Equipment, PlaceItemEvent, WorldObject};
+use crate::item::Equipment;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
@@ -44,9 +46,9 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
-    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED, WIDTH,
+    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
-use crate::{Game, GameUpscale, Player, DEBUG_MODE, HEIGHT, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, GameUpscale, Player, DEBUG, DEBUG_AI, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -174,27 +176,22 @@ fn turn_player(
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
 ) {
-    let dir = if cursor_pos.screen_coords.x > WIDTH / 2. {
-        if cursor_pos.screen_coords.x < 3. * WIDTH / 4.
-            && cursor_pos.screen_coords.y > HEIGHT * 0.65
-        {
+    let angle = f32::atan(cursor_pos.ui_coords.x / cursor_pos.ui_coords.y).abs();
+    let dir = if cursor_pos.ui_coords.y > 0. {
+        if angle < PI / 4. {
             FacingDirection::Up
-        } else if cursor_pos.screen_coords.x < 3. * WIDTH / 4.
-            && cursor_pos.screen_coords.y < HEIGHT * 0.35
-        {
-            FacingDirection::Down
+        } else if cursor_pos.ui_coords.x < 0. {
+            FacingDirection::Left
         } else {
             FacingDirection::Right
         }
     } else {
-        if cursor_pos.screen_coords.x > WIDTH / 4. && cursor_pos.screen_coords.y > HEIGHT * 0.65 {
-            FacingDirection::Up
-        } else if cursor_pos.screen_coords.x > WIDTH / 4.
-            && cursor_pos.screen_coords.y < HEIGHT * 0.35
-        {
+        if angle < PI / 4. {
             FacingDirection::Down
-        } else {
+        } else if cursor_pos.ui_coords.x < 0. {
             FacingDirection::Left
+        } else {
+            FacingDirection::Right
         }
     };
     //TODO: make center point based on player pos on screen?
@@ -406,7 +403,7 @@ pub fn toggle_inventory(
         next_ui_state.set(UIState::Inventory);
     }
 
-    if *DEBUG_MODE {
+    if *DEBUG {
         if key_input.just_pressed(KeyCode::P) {
             spawn_new_dungeon_dimension(
                 &mut game,
@@ -447,14 +444,14 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
+            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            // let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }
@@ -554,6 +551,8 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     obj_actions: Query<&ObjectAction>,
+    // mut meshes: ResMut<Assets<Mesh>>,
+    // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
@@ -564,9 +563,16 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        if *DEBUG_MODE && mouse_button_input.just_pressed(MouseButton::Left) {
+        if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
-            println!("C: {cursor_tile_pos:?} -> {obj:?}",);
+            let ai_pos = world_pos_to_AIPos(cursor_pos.world_coords.truncate());
+            let is_valid = game
+                .get_pos_validity_for_pathfinding(ai_pos)
+                .unwrap_or(true);
+            println!(
+                "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?}",
+                world_pos_to_AIPos(cursor_pos.world_coords.truncate(),)
+            );
         }
         if attack_timer_option.is_some() {
             return;
@@ -603,7 +609,7 @@ pub fn mouse_click_system(
             return;
         }
         if let Some((hit_obj, _)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
-            if *DEBUG_MODE {
+            if *DEBUG {
                 println!("OBJ: {hit_obj:?}");
             }
             hit_event.send(HitEvent {
