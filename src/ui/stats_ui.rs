@@ -70,7 +70,7 @@ pub fn setup_stats_ui(
         })
         .insert(StatsUI)
         .insert(Name::new("STATS UI"))
-        .insert(UIState::Stats)
+        .insert(UIState::Skills)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
 
@@ -168,7 +168,7 @@ pub fn toggle_stats_visibility(
     key_input: ResMut<Input<KeyCode>>,
 ) {
     if key_input.just_pressed(KeyCode::B) {
-        next_inv_state.set(UIState::Stats);
+        next_inv_state.set(UIState::Skills);
     }
 }
 

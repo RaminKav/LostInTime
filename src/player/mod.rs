@@ -13,6 +13,7 @@ use bevy_rapier2d::{
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 pub mod levels;
+pub mod skills;
 pub mod stats;
 use crate::{
     animations::{
@@ -37,6 +38,7 @@ use crate::{
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
+use skills::*;
 
 use self::{
     levels::{
@@ -238,6 +240,7 @@ fn spawn_player(
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
         .insert(Sensor)
+        .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
         .id();
 
@@ -256,6 +259,7 @@ fn spawn_player(
                     data.player_stats,
                     data.skill_points,
                     data.current_health,
+                    data.player_skills,
                     PreviousHealth(data.current_health.0),
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),

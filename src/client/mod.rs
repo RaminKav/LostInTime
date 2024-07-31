@@ -27,11 +27,12 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
+        skills::PlayerSkills,
         stats::{PlayerStats, SkillPoints},
         Player,
     },
     proto::proto_param::ProtoParam,
-    ui::{ChestContainer, FurnaceContainer},
+    ui::{ChestContainer, FurnaceContainer, SkillChoiceQueue},
     vectorize::{vectorize, vectorize_inner},
     world::{
         chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
@@ -144,6 +145,8 @@ pub struct CurrentRunSaveData {
     pub current_health: CurrentHealth,
     pub player_transform: Vec2,
     pub player_hunger: u8,
+    pub player_skills: PlayerSkills,
+    pub player_skill_queue: SkillChoiceQueue,
 
     // Era
     pub current_era: Era,
@@ -238,6 +241,7 @@ pub fn save_state(
             &CurrentHealth,
             &Hunger,
             &Inventory,
+            &PlayerSkills,
         ),
         With<Player>,
     >,
@@ -249,6 +253,7 @@ pub fn save_state(
     check_open_chest: Option<Res<ChestContainer>>,
     check_open_furnace: Option<Res<FurnaceContainer>>,
     key_input: ResMut<Input<KeyCode>>,
+    skills_queue: Res<SkillChoiceQueue>,
     game: GameParam,
 ) {
     timer.timer.tick(time.delta());
@@ -260,7 +265,7 @@ pub fn save_state(
     }
     timer.timer.reset();
     //PlayerData
-    let (player_txfm, stats, level, hp, hunger, inv) = player_data.single();
+    let (player_txfm, stats, level, hp, hunger, inv, skills) = player_data.single();
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
     save_data.player_level = level.clone();
@@ -270,6 +275,8 @@ pub fn save_state(
     save_data.craft_tracker = craft_tracker.clone();
     save_data.current_era = game.era.current_era.clone();
     save_data.visited_eras = game.era.visited_eras.clone();
+    save_data.player_skills = skills.clone();
+    save_data.player_skill_queue = skills_queue.clone();
 
     save_data.placed_objs = game
         .era
@@ -427,6 +434,7 @@ pub fn load_state(
                 commands.insert_resource(ContainerRegistry {
                     containers: data.containers,
                 });
+                commands.insert_resource(data.player_skill_queue);
                 commands.insert_resource(data.craft_tracker);
                 proto_commands.apply(format!(
                     "Era{}WorldGenerationParams",

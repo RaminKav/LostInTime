@@ -205,6 +205,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         ..Default::default()
                     },
                     &asset_server,
+                    Vec2::ZERO,
                 );
                 commands
                     .entity(icon_e)
@@ -243,6 +244,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     ..Default::default()
                 },
                 &asset_server,
+                Vec2::ZERO,
             );
             commands.entity(icon_e).insert(Transform {
                 translation: pos,
@@ -324,7 +326,7 @@ pub fn handle_spawn_inv_player_stats(
                 inv.get_single(),
                 Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),
             )
-        } else if curr_ui_state.0 == UIState::Stats {
+        } else if curr_ui_state.0 == UIState::Skills {
             (
                 stats.get_single(),
                 Vec3::new(-(STATS_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),

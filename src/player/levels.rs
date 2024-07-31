@@ -2,7 +2,11 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{animations::AnimationTimer, ui::UIState, DEBUG, GAME_HEIGHT};
+use crate::{
+    animations::AnimationTimer,
+    ui::{SkillChoiceQueue, UIState},
+    DEBUG, GAME_HEIGHT,
+};
 
 use super::stats::SkillPoints;
 
@@ -64,12 +68,15 @@ impl PlayerLevel {
 // }
 pub fn handle_level_up(
     mut player: Query<(&mut PlayerLevel, &mut SkillPoints), Changed<PlayerLevel>>,
+    mut skills_queue: ResMut<SkillChoiceQueue>,
 ) {
     for (mut player_level, mut sp) in player.iter_mut() {
         if player_level.level == player_level.next_level {
             player_level.next_level += 1;
 
             sp.count += 1;
+            let mut rng = rand::thread_rng();
+            skills_queue.add_new_skills_after_levelup(&mut rng);
         }
     }
 }
@@ -77,14 +84,14 @@ pub fn spawn_particles_when_leveling(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    player_xp: Query<&SkillPoints>,
     existing_particles: Query<Entity, With<LevelUpParticles>>,
     ui_state: Res<State<UIState>>,
+    skill_queue: Res<SkillChoiceQueue>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
     }
-    if player_xp.single().count > 0 && existing_particles.iter().next().is_none() {
+    if !skill_queue.queue.is_empty() && existing_particles.iter().next().is_none() {
         let texture_handle = asset_server.load("textures/effects/levelup.png");
         let texture_atlas =
             TextureAtlas::from_grid(texture_handle, Vec2::new(27.0, 25.0), 4, 1, None, None);
@@ -104,7 +111,7 @@ pub fn spawn_particles_when_leveling(
             RenderLayers::from_layers(&[3]),
             Name::new("Level Particles"),
         ));
-    } else if player_xp.single().count == 0 && existing_particles.iter().next().is_some() {
+    } else if skill_queue.queue.is_empty() && existing_particles.iter().next().is_some() {
         commands.entity(existing_particles.single()).despawn();
     }
 }

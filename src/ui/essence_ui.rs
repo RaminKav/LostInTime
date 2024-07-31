@@ -125,6 +125,7 @@ pub fn setup_essence_ui(
             &graphics,
             &essence_option.item,
             &asset_server,
+            Vec2::ZERO,
         );
         commands.entity(icon).set_parent(slot_entity);
 
@@ -158,6 +159,7 @@ pub fn setup_essence_ui(
             &ItemStack::crate_icon_stack(WorldObject::Essence)
                 .copy_with_count(essence_option.cost as usize),
             &asset_server,
+            Vec2::ZERO,
         );
         commands.entity(cost_icon).set_parent(slot_entity);
     }

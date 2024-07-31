@@ -12,10 +12,12 @@ pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
 pub mod furnace_ui;
+pub use skill_choice_ui::*;
 mod interactions;
 mod inventory_ui;
 pub mod minimap;
 mod player_hud;
+mod skill_choice_ui;
 pub mod stats_ui;
 mod tile_hover;
 mod tooltips;
@@ -40,18 +42,17 @@ use crate::{
 
 use self::{
     crafting_ui::{change_ui_state_to_crafting_when_resource_added, CraftingContainer},
-    // crafting_ui::setup_crafting_slots_ui,
     damage_numbers::{
         add_previous_health, handle_add_damage_numbers_after_hit, handle_add_dodge_text,
         tick_damage_numbers, DodgeEvent,
     },
     minimap::MinimapPlugin,
-    stats_ui::{setup_stats_ui, toggle_stats_visibility, update_sp_text, update_stats_text},
     tile_hover::spawn_tile_hover_on_cursor_move,
 };
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
 pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
+pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
 pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
@@ -152,20 +153,18 @@ impl Plugin for UIPlugin {
                     update_furnace_bar,
                     update_mana_bar,
                     handle_spawn_inv_player_stats.after(CustomFlush),
-                    handle_cursor_stats_buttons.run_if(in_state(UIState::Stats)),
-                    toggle_stats_visibility,
+                    handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
+                    toggle_skills_visibility,
                     spawn_tile_hover_on_cursor_move,
-                    setup_stats_ui
+                    setup_skill_choice_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Stats))),
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<CraftingContainer>()),
                     change_ui_state_to_furnace_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<FurnaceContainer>()),
-                    update_stats_text.run_if(in_state(UIState::Stats)),
-                    update_sp_text.run_if(in_state(UIState::Stats)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -182,6 +181,7 @@ impl Plugin for UIPlugin {
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
                     handle_clamp_screen_locked_icons,
+                    handle_update_player_skills,
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
