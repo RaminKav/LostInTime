@@ -10,6 +10,7 @@ use crate::{
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
+    ui::SkillChoiceQueue,
     world::dimension::EraManager,
     Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };
@@ -87,6 +88,7 @@ pub fn handle_menu_button_click_events(
                 next_state.0 = Some(GameState::Main);
                 commands.init_resource::<Game>();
                 commands.init_resource::<NightTracker>();
+                commands.init_resource::<SkillChoiceQueue>();
                 commands.init_resource::<ContainerRegistry>();
                 commands.init_resource::<PathfindingCache>();
                 commands.init_resource::<CraftingTracker>();

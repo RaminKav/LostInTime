@@ -150,6 +150,7 @@ pub fn spawn_screen_locked_icon(
         graphics,
         &ItemStack::crate_icon_stack(obj),
         asset_server,
+        Vec2::ZERO,
     );
     commands
         .entity(item_icon)

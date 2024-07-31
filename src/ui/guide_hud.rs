@@ -54,6 +54,7 @@ pub fn handle_display_new_goal(
         &graphics,
         &ItemStack::crate_icon_stack(curr_goal_obj),
         &asset_server,
+        Vec2::ZERO,
     );
     let mut slot_entity = commands
         .spawn(SpriteBundle {
@@ -76,6 +77,7 @@ pub fn handle_display_new_goal(
             &graphics,
             &ItemStack::crate_icon_stack(ingredient.clone()),
             &asset_server,
+            Vec2::ZERO,
         );
         let slot_entity = commands
             .spawn(SpriteBundle {

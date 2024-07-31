@@ -1,15 +1,19 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use super::{
-    interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
-    UIElement, UIState,
+    interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon, InventorySlotType,
+    InventoryState, InventoryUI, UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
     attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
-    inventory::Inventory,
-    player::{levels::PlayerLevel, Player},
+    inventory::{Inventory, ItemStack},
+    player::{
+        levels::PlayerLevel,
+        skills::{PlayerSkills, Skill},
+        Player,
+    },
     GAME_HEIGHT, GAME_WIDTH,
 };
 use bevy::utils::Duration;
@@ -275,6 +279,41 @@ pub fn update_foodbar(
         y: INNER_HUD_BAR_SIZE.y,
     });
     flash.timer.tick(Duration::from_nanos(1));
+}
+
+#[derive(Component, Eq, PartialEq)]
+pub struct SkillHudIcon(pub Skill);
+
+pub fn handle_update_player_skills(
+    player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
+    prev_icons: Query<&SkillHudIcon>,
+) {
+    if let Ok(new_skills) = player_skills.get_single() {
+        let prev_skills = prev_icons.iter().map(|s| s.0.clone()).collect::<Vec<_>>();
+        for (i, skill) in new_skills.skills.clone().iter().enumerate() {
+            if prev_skills.contains(skill) {
+                continue;
+            }
+            let offset = Vec2::new(
+                i as f32 * 16.5 + (-GAME_WIDTH) / 2. + 94.,
+                (GAME_HEIGHT - 15.) / 2. - 12.5,
+            );
+            let icon = spawn_item_stack_icon(
+                &mut commands,
+                &graphics,
+                &ItemStack::crate_icon_stack(skill.get_icon()),
+                &asset_server,
+                offset,
+            );
+            commands
+                .entity(icon)
+                .insert(SkillHudIcon(skill.clone()))
+                .insert(Name::new("HUD ICON!!"));
+        }
+    }
 }
 
 pub fn setup_hotbar_hud(

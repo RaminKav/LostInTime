@@ -9,7 +9,7 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
-    player::stats::{PlayerStats, SkillPoints, StatType},
+    player::{skills::PlayerSkills, stats::StatType},
     proto::proto_param::ProtoParam,
     GameParam,
 };
@@ -17,8 +17,8 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
     ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, MenuButton,
-    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SubmitEssenceChoice, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam, UIState,
+    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceQueue, SkillChoiceUI,
+    SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -58,6 +58,7 @@ pub enum UIElement {
     HungerDebuff3,
     ScreenIconSlot,
     Options,
+    SkillChoice,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -162,6 +163,7 @@ pub fn handle_drop_in_world_events(
                         &graphics,
                         item_stacks.get(drop_event.dropped_entity).unwrap(),
                         &asset_server,
+                        Vec2::ZERO,
                     );
 
                     commands.entity(new_drag_icon_entity).insert(DraggedItem);
@@ -258,6 +260,7 @@ pub fn handle_drop_on_slot_events(
                     &graphics,
                     &updated_drag_item,
                     &asset_server,
+                    Vec2::ZERO,
                 );
 
                 commands.entity(new_drag_icon_entity).insert(DraggedItem);
@@ -636,6 +639,7 @@ pub fn handle_interaction_clicks(
                                     &graphics,
                                     &split_stack,
                                     &asset_server,
+                                    Vec2::ZERO,
                                 );
 
                                 commands.entity(e).insert(DraggedItem);
@@ -683,20 +687,22 @@ pub fn handle_interaction_clicks(
     }
 }
 
-pub fn handle_cursor_stats_buttons(
+pub fn handle_cursor_skills_buttons(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut stats_buttons: Query<
-        (Entity, &mut Interactable, &StatsButtonState),
+    mut skill_choices: Query<
+        (Entity, &mut Interactable, &SkillChoiceUI),
         Without<InventorySlotState>,
     >,
-    mut player_stats: Query<(&mut PlayerStats, &mut SkillPoints)>,
+    mut player_skills: Query<&mut PlayerSkills>,
+    mut skill_queue: ResMut<SkillChoiceQueue>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, state) in stats_buttons.iter_mut() {
+    for (e, mut interactable, state) in skill_choices.iter_mut() {
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
@@ -704,25 +710,11 @@ pub fn handle_cursor_stats_buttons(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        let (mut stats, mut sp) = player_stats.single_mut();
-                        if sp.count > 0 {
-                            sp.count -= 1;
-                            match state.index {
-                                0 => {
-                                    stats.str += 1;
-                                }
-                                1 => {
-                                    stats.dex += 1;
-                                }
-                                2 => {
-                                    stats.agi += 1;
-                                }
-                                3 => {
-                                    stats.vit += 1;
-                                }
-                                _ => {}
-                            }
-                        }
+                        let mut skills = player_skills.single_mut();
+                        let picked_skill = state.skill_choice.clone();
+                        skills.skills.push(picked_skill.skill.clone());
+                        skill_queue.handle_pick_skill(picked_skill);
+                        next_ui_state.set(UIState::Closed);
                     }
                 }
                 _ => (),

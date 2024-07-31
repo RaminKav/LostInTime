@@ -22,7 +22,7 @@ pub enum UIState {
     Inventory,
     NPC,
     Chest,
-    Stats,
+    Skills,
     Crafting,
     Furnace,
     Essence,
@@ -333,6 +333,7 @@ pub fn spawn_inv_slot(
             graphics,
             &item.item_stack,
             asset_server,
+            Vec2::ZERO,
         ));
     }
 
@@ -390,6 +391,7 @@ pub fn spawn_item_stack_icon(
     graphics: &Graphics,
     item_stack: &ItemStack,
     asset_server: &AssetServer,
+    offset: Vec2,
 ) -> Entity {
     let has_icon = graphics.icons.as_ref().unwrap().get(&item_stack.obj_type);
     let sprite = if let Some(icon) = has_icon {
@@ -408,7 +410,7 @@ pub fn spawn_item_stack_icon(
             sprite,
             texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
             transform: Transform {
-                translation: Vec3::new(0., 0., 1.),
+                translation: Vec3::new(offset.x, offset.y, 1.),
                 ..Default::default()
             },
             ..Default::default()
