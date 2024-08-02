@@ -4,6 +4,7 @@ use crate::attributes::{CurrentHealth, MaxHealth};
 use crate::combat::{EnemyDeathEvent, MarkedForDeath};
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
 use crate::{
     combat::{AttackTimer, HitEvent},
     inputs::CursorPos,
@@ -47,23 +48,14 @@ pub struct LethalHitUpgrade;
 #[reflect(Component, Schematic)]
 pub struct BurnOnHitUpgrade;
 
+#[derive(Component, Default, Clone)]
+pub struct FrailOnHitUpgrade;
+#[derive(Component, Default, Clone)]
+pub struct SlowOnHitUpgrade;
+
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
 pub struct VenomOnHitUpgrade;
-
-#[derive(Component)]
-pub struct Burning {
-    pub tick_timer: Timer,
-    pub duration_timer: Timer,
-    pub damage: u8,
-}
-
-#[derive(Component)]
-pub struct Poisoned {
-    pub tick_timer: Timer,
-    pub duration_timer: Timer,
-    pub damage: u8,
-}
 
 pub fn handle_delayed_ranged_attack(
     wep_query: Query<&RangedAttack, With<MainHand>>,
@@ -101,6 +93,7 @@ pub fn handle_delayed_ranged_attack(
                 is_followup_proj: true,
                 mana_cost: None,
                 dmg_override: None,
+                pos_override: None,
             });
 
             delayed_ranged_attack.0.reset();
@@ -147,6 +140,7 @@ pub fn handle_spread_arrows_attack(
             is_followup_proj: true,
             mana_cost: None,
             dmg_override: None,
+            pos_override: None,
         });
     }
 }
@@ -159,6 +153,8 @@ pub fn handle_on_hit_upgrades(
             Option<&LightningStaffChainUpgrade>,
             Option<&LethalHitUpgrade>,
             Option<&BurnOnHitUpgrade>,
+            Option<&FrailOnHitUpgrade>,
+            Option<&SlowOnHitUpgrade>,
         ),
         With<Player>,
     >,
@@ -166,11 +162,18 @@ pub fn handle_on_hit_upgrades(
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
     game: GameParam,
-    mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth), With<Mob>>,
-    mut burn_or_venom_mobs: Query<(Option<&mut Burning>, Option<&mut Poisoned>)>,
+    mobs: Query<(Entity, &Mob, &GlobalTransform, &CurrentHealth, &MaxHealth), With<Mob>>,
+    mut burn_or_venom_mobs: Query<(
+        Option<&mut Burning>,
+        Option<&mut Poisoned>,
+        Option<&mut Frail>,
+        Option<&mut Slow>,
+    )>,
     mut elec_count: Local<u8>,
     att_cooldown_query: Query<Option<&AttackTimer>, With<Player>>,
     mut enemy_death_events: EventWriter<EnemyDeathEvent>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut status_event: EventWriter<StatusEffectEvent>,
 ) {
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
@@ -179,52 +182,74 @@ pub fn handle_on_hit_upgrades(
         if hit.hit_entity == game.game.player {
             continue;
         }
-        let Ok((hit_e, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {
+        let Ok((hit_e, mob, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {
             continue;
         };
-        let (fire_aoe_option, lightning_chain_option, lethal_option, burn_option) =
-            upgrades.single();
+        let (
+            fire_aoe_option,
+            lightning_chain_option,
+            lethal_option,
+            burn_option,
+            frail_option,
+            slow_option,
+        ) = upgrades.single();
 
         if let Some(_) = lightning_chain_option {
             if hit.hit_with_projectile == Some(Projectile::Electricity) && *elec_count == 0 {
                 let Some(nearest_mob_t) = mobs.iter().find(|t| {
-                    t.1.translation().distance(hit_entity_txfm.translation()) < 70.
+                    t.2.translation().distance(hit_entity_txfm.translation()) < 70.
                         && t.0 != hit.hit_entity
                 }) else {
                     continue;
                 };
                 *elec_count += 1;
-                proto_commands.spawn_projectile_from_proto(
+                let p = proto_commands.spawn_projectile_from_proto(
                     Projectile::Electricity,
                     &proto,
                     hit_entity_txfm.translation().truncate(),
-                    (nearest_mob_t.1.translation().truncate()
+                    (nearest_mob_t.2.translation().truncate()
                         - hit_entity_txfm.translation().truncate())
                     .normalize_or_zero(),
                 );
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: Projectile::Electricity,
+                    direction: (nearest_mob_t.2.translation().truncate()
+                        - hit_entity_txfm.translation().truncate())
+                    .normalize_or_zero(),
+                    from_enemy: None,
+                    is_followup_proj: true,
+                    mana_cost: None,
+                    dmg_override: None,
+                    pos_override: Some(hit_entity_txfm.translation().truncate()),
+                });
             }
         }
 
         if let Some(_) = fire_aoe_option {
             if hit.hit_with_projectile == Some(Projectile::Fireball) {
-                proto_commands.spawn_projectile_from_proto(
-                    Projectile::FireExplosionAOE,
-                    &proto,
-                    hit_entity_txfm.translation().truncate(),
-                    Vec2::ZERO,
-                );
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: Projectile::FireExplosionAOE,
+                    direction: Vec2::ZERO,
+                    from_enemy: None,
+                    is_followup_proj: true,
+                    mana_cost: None,
+                    dmg_override: None,
+                    pos_override: Some(hit_entity_txfm.translation().truncate()),
+                });
             }
         }
         if let Some(_) = lethal_option {
-            if curr_hp.0 <= max_hp.0 / 4 {
+            if curr_hp.0 <= max_hp.0 / 4 && !mob.is_boss() {
                 commands.entity(hit_e).insert(MarkedForDeath);
                 enemy_death_events.send(EnemyDeathEvent {
                     entity: hit_e,
                     enemy_pos: hit_entity_txfm.translation().truncate(),
+                    killed_by_crit: false,
                 });
             }
         }
-        let Ok((burning_option, _poisoned_option)) = burn_or_venom_mobs.get_mut(hit.hit_entity)
+        let Ok((burning_option, _poisoned_option, frailed_option, slowed_option)) =
+            burn_or_venom_mobs.get_mut(hit.hit_entity)
         else {
             continue;
         };
@@ -237,26 +262,58 @@ pub fn handle_on_hit_upgrades(
                     duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
                     damage: 1,
                 });
+                status_event.send(StatusEffectEvent {
+                    entity: hit_e,
+                    effect: StatusEffect::Poison,
+                    num_stacks: 1,
+                });
             }
         }
-    }
-}
-
-pub fn handle_burning_ticks(
-    mut burning: Query<(Entity, &mut Burning, &mut CurrentHealth)>,
-    time: Res<Time>,
-    mut commands: Commands,
-) {
-    for (e, mut burning, mut curr_hp) in burning.iter_mut() {
-        burning.duration_timer.tick(time.delta());
-        if !burning.duration_timer.just_finished() {
-            burning.tick_timer.tick(time.delta());
-            if burning.tick_timer.just_finished() {
-                curr_hp.0 -= burning.damage as i32;
-                burning.tick_timer.reset();
+        if let Some(_) = frail_option {
+            if let Some(mut frail_stacks) = frailed_option {
+                if frail_stacks.num_stacks < 3 {
+                    frail_stacks.num_stacks += 1;
+                    frail_stacks.timer.reset();
+                    status_event.send(StatusEffectEvent {
+                        entity: hit_e,
+                        effect: StatusEffect::Frail,
+                        num_stacks: frail_stacks.num_stacks as i32,
+                    });
+                }
+            } else {
+                commands.entity(hit_e).insert(Frail {
+                    num_stacks: 1,
+                    timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+                });
+                status_event.send(StatusEffectEvent {
+                    entity: hit_e,
+                    effect: StatusEffect::Frail,
+                    num_stacks: 1,
+                });
             }
-        } else {
-            commands.entity(e).remove::<Burning>();
+        }
+        if let Some(_) = slow_option {
+            if let Some(mut slow_stacks) = slowed_option {
+                if slow_stacks.num_stacks < 3 {
+                    slow_stacks.num_stacks += 1;
+                    slow_stacks.timer.reset();
+                    status_event.send(StatusEffectEvent {
+                        entity: hit_e,
+                        effect: StatusEffect::Slow,
+                        num_stacks: slow_stacks.num_stacks as i32,
+                    });
+                }
+            } else {
+                commands.entity(hit_e).insert(Slow {
+                    num_stacks: 1,
+                    timer: Timer::from_seconds(1.7, TimerMode::Repeating),
+                });
+                status_event.send(StatusEffectEvent {
+                    entity: hit_e,
+                    effect: StatusEffect::Slow,
+                    num_stacks: 1,
+                });
+            }
         }
     }
 }

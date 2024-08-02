@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use bevy_proto::{backend::proto, prelude::ProtoCommands};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
@@ -9,7 +10,10 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
-    player::{skills::PlayerSkills, stats::StatType},
+    player::{
+        skills::{PlayerSkills, SkillChoiceQueue},
+        stats::StatType,
+    },
     proto::proto_param::ProtoParam,
     GameParam,
 };
@@ -17,8 +21,8 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
     ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, MenuButton,
-    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceQueue, SkillChoiceUI,
-    SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
+    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
+    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -695,9 +699,12 @@ pub fn handle_cursor_skills_buttons(
         (Entity, &mut Interactable, &SkillChoiceUI),
         Without<InventorySlotState>,
     >,
-    mut player_skills: Query<&mut PlayerSkills>,
+    mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform)>,
     mut skill_queue: ResMut<SkillChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    proto: ProtoParam,
+    mut proto_commands: ProtoCommands,
+    mut commands: Commands,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -710,10 +717,16 @@ pub fn handle_cursor_skills_buttons(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        let mut skills = player_skills.single_mut();
+                        let (e, mut skills, t) = player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
                         skills.skills.push(picked_skill.skill.clone());
-                        skill_queue.handle_pick_skill(picked_skill);
+                        skill_queue.handle_pick_skill(
+                            picked_skill.clone(),
+                            &mut proto_commands,
+                            &proto,
+                            t.translation().truncate(),
+                        );
+                        picked_skill.skill.add_skill_components(e, &mut commands);
                         next_ui_state.set(UIState::Closed);
                     }
                 }

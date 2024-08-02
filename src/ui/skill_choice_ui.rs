@@ -1,9 +1,14 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use serde::{Deserialize, Serialize};
+use bevy_proto::prelude::ProtoCommands;
 
 use crate::{
-    assets::Graphics, colors::BLACK, inventory::ItemStack, player::skills::Skill, GAME_HEIGHT,
-    GAME_WIDTH,
+    assets::Graphics,
+    colors::BLACK,
+    custom_commands::CommandsExt,
+    inventory::ItemStack,
+    player::skills::{SkillChoiceQueue, SkillChoiceState},
+    proto::proto_param::ProtoParam,
+    GAME_HEIGHT, GAME_WIDTH,
 };
 use rand::seq::IteratorRandom;
 
@@ -20,60 +25,6 @@ pub struct SkillDescText;
 #[derive(Component)]
 pub struct SkillTitleText;
 
-#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
-pub struct SkillChoiceState {
-    pub skill: Skill,
-    pub child_skills: Vec<SkillChoiceState>,
-}
-impl SkillChoiceState {
-    pub fn new(skill: Skill) -> Self {
-        Self {
-            skill,
-            child_skills: Default::default(),
-        }
-    }
-    pub fn with_children(mut self, children: Vec<SkillChoiceState>) -> Self {
-        self.child_skills = children;
-        self
-    }
-}
-
-#[derive(Resource, Clone, Serialize, Deserialize)]
-pub struct SkillChoiceQueue {
-    pub queue: Vec<[SkillChoiceState; 3]>,
-    pub pool: Vec<SkillChoiceState>,
-}
-
-impl Default for SkillChoiceQueue {
-    fn default() -> Self {
-        Self {
-            queue: Default::default(),
-            pool: vec![
-                SkillChoiceState::new(Skill::CritChance).with_children(vec![
-                    SkillChoiceState::new(Skill::CritDamage),
-                    SkillChoiceState::new(Skill::CritLoot),
-                ]),
-                SkillChoiceState::new(Skill::Health),
-                SkillChoiceState::new(Skill::Speed),
-                SkillChoiceState::new(Skill::AttackSpeed),
-                SkillChoiceState::new(Skill::DodgeChance),
-                SkillChoiceState::new(Skill::FireDamage),
-                SkillChoiceState::new(Skill::WaveAttack),
-                SkillChoiceState::new(Skill::FrailStacks),
-                SkillChoiceState::new(Skill::SlowStacks),
-                SkillChoiceState::new(Skill::PoisonStacks),
-                SkillChoiceState::new(Skill::Teleport).with_children(vec![
-                    SkillChoiceState::new(Skill::TeleportShock),
-                    SkillChoiceState::new(Skill::TimeSlow),
-                ]),
-                SkillChoiceState::new(Skill::ClawDoubleThrow),
-                SkillChoiceState::new(Skill::BowMultiShot),
-                SkillChoiceState::new(Skill::ChainLightning),
-            ],
-        }
-    }
-}
-
 impl SkillChoiceQueue {
     pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
         let mut new_skills: [SkillChoiceState; 3] = Default::default();
@@ -84,7 +35,13 @@ impl SkillChoiceQueue {
         self.queue.push(new_skills.clone());
     }
 
-    pub fn handle_pick_skill(&mut self, skill: SkillChoiceState) {
+    pub fn handle_pick_skill(
+        &mut self,
+        skill: SkillChoiceState,
+        proto_commands: &mut ProtoCommands,
+        proto: &ProtoParam,
+        player_pos: Vec2,
+    ) {
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
         for choice in remaining_choices.iter() {
@@ -92,6 +49,16 @@ impl SkillChoiceQueue {
         }
         for child in skill.child_skills.iter() {
             self.pool.push(child.clone());
+        }
+        // handle drops
+        if let Some(drop) = skill.skill.get_instant_drop() {
+            proto_commands.spawn_item_from_proto(
+                drop.clone(),
+                &proto,
+                player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
+                1,
+                Some(1),
+            );
         }
     }
 }

@@ -45,7 +45,7 @@ use bevy::{
 
 mod juice;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
-use bevy_rapier2d::{na::ComplexField, prelude::*};
+use bevy_rapier2d::prelude::*;
 mod ai;
 mod animations;
 mod assets;
@@ -449,10 +449,14 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
 
-    pub fn calculate_player_damage(&self) -> (u32, bool) {
+    pub fn calculate_player_damage(&self, bonus_crit: u32) -> (u32, bool) {
         let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, ..) = self.player_stats.single();
         let mut rng = rand::thread_rng();
-        if rng.gen_ratio(u32::min(100, crit_chance.0.try_into().unwrap_or(0)), 100) {
+
+        if rng.gen_ratio(
+            u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
+            100,
+        ) {
             (
                 ((attack.0 + bonus_dmg.0) as f32 * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
                 true,

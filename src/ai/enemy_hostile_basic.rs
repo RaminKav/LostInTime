@@ -14,10 +14,11 @@ use crate::{
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
+    status_effects::Slow,
     Game, GameParam, PLAYER_MOVE_SPEED,
 };
 
-use super::pathfinding::{get_next_tile_A_star, AIPos};
+use super::pathfinding::get_next_tile_A_star;
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
@@ -182,12 +183,15 @@ pub fn follow(
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&EnemyAttackCooldown>,
+        Option<&Slow>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
     mut game: GameParam,
 ) {
-    for (entity, mut follow, sprite, anim_data, anim_state, att_cooldown) in follows.iter_mut() {
+    for (entity, mut follow, sprite, anim_data, anim_state, att_cooldown, slowed_option) in
+        follows.iter_mut()
+    {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
             return;
         }
@@ -225,8 +229,13 @@ pub fn follow(
         follow.curr_path = next_target_tile;
         follow.curr_delta = Some(delta);
 
-        mover.get_mut(entity).unwrap().translation =
-            Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
+        mover.get_mut(entity).unwrap().translation = Some(
+            delta
+                * follow.speed
+                * PLAYER_MOVE_SPEED
+                * time.delta_seconds()
+                * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+        );
         commands
             .entity(entity)
             .insert(FacingDirection::from_translation(delta));
@@ -248,12 +257,13 @@ pub fn leap_attack(
         &mut TextureAtlasSprite,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
+        Option<&Slow>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
     _game: Res<Game>,
 ) {
-    for (entity, mut kcc, mut attack, follow_speed, sprite, anim_data, anim_state) in
+    for (entity, mut kcc, mut attack, follow_speed, sprite, anim_data, anim_state, slow_option) in
         attacks.iter_mut()
     {
         // Get the positions of the attacker and target
@@ -265,7 +275,10 @@ pub fn leap_attack(
             let delta = target_translation - attack_translation;
             if attack.dir.is_none() {
                 attack.dir = Some(
-                    delta.normalize_or_zero().truncate() * attack.speed * time.delta_seconds(),
+                    delta.normalize_or_zero().truncate()
+                        * attack.speed
+                        * time.delta_seconds()
+                        * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
                 );
             }
 
@@ -336,6 +349,7 @@ pub fn projectile_attack(
                 is_followup_proj: false,
                 mana_cost: None,
                 dmg_override: None,
+                pos_override: None,
             });
             commands
                 .entity(entity)

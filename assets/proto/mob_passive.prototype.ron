@@ -2,6 +2,7 @@
   name: "MobPassive",
   schematics: {
     "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
     "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 2., speed: 0.5),
     "survival_rogue_like::world::y_sort::YSort": (0.),
   }

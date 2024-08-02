@@ -8,6 +8,7 @@ use crate::attributes::hunger::Hunger;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
+use crate::player::skills::{PlayerSkills, Skill};
 use crate::player::MovePlayerEvent;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::dungeon::spawn_new_dungeon_dimension;
@@ -215,6 +216,7 @@ pub fn move_player(
             &Speed,
             &Hunger,
             &mut RunDustTimer,
+            &PlayerSkills,
         ),
         (
             With<Player>,
@@ -245,6 +247,7 @@ pub fn move_player(
         speed,
         hunger,
         mut run_dust_timer,
+        skills,
     ) = player_query.single_mut();
     let player = game.player_mut();
     if player.is_attacking {
@@ -274,7 +277,8 @@ pub fn move_player(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if player.player_dash_cooldown.tick(time.delta()).finished()
+    if !skills.get(Skill::Teleport)
+        && player.player_dash_cooldown.tick(time.delta()).finished()
         && key_input.pressed(KeyCode::Space)
     {
         player.is_dashing = true;
@@ -594,6 +598,7 @@ pub fn mouse_click_system(
                 is_followup_proj: false,
                 mana_cost: mana_cost_option.map(|m| -m.0),
                 dmg_override: None,
+                pos_override: None,
             })
         }
         commands
@@ -614,11 +619,12 @@ pub fn mouse_click_system(
             }
             hit_event.send(HitEvent {
                 hit_entity: hit_obj,
-                damage: game.calculate_player_damage().0 as i32,
+                damage: game.calculate_player_damage(0).0 as i32,
                 dir: Vec2::new(0., 0.),
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,
                 ignore_tool: false,
+                was_crit: false,
             });
         }
     }

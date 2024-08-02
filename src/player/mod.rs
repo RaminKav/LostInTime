@@ -201,7 +201,7 @@ fn spawn_player(
                 ..default()
             },
             Hunger::new(100),
-            HungerTracker::new(5., 8),
+            HungerTracker::new(7., 8),
             InvincibilityCooldown(1.),
             HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
             MovementVector::default(),
@@ -259,12 +259,15 @@ fn spawn_player(
                     data.player_stats,
                     data.skill_points,
                     data.current_health,
-                    data.player_skills,
+                    data.player_skills.clone(),
                     PreviousHealth(data.current_health.0),
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),
                 ));
+                for skill in data.player_skills.skills {
+                    skill.add_skill_components(p, &mut commands);
+                }
 
                 println!("LOADED PLAYER DATA FROM SAVE FILE");
             }

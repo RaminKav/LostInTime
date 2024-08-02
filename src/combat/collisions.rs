@@ -17,7 +17,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
 
-use super::{HitEvent, HitMarker, InvincibilityTimer};
+use super::{Frail, HitEvent, HitMarker, InvincibilityTimer};
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -51,7 +51,7 @@ fn check_melee_hit_collisions(
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     lifesteal: Query<&Lifesteal>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
-    mob_txfms: Query<&GlobalTransform, With<Mob>>,
+    mobs: Query<(&GlobalTransform, Option<&Frail>), With<Mob>>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
     if !game.game.player_state.is_attacking {
@@ -72,10 +72,12 @@ fn check_melee_hit_collisions(
             }
 
             hit_tracker.push(hit_entity);
-            let damage = game.calculate_player_damage().0 as i32;
-            let Ok(mob_txfm) = mob_txfms.get(hit_entity) else {
+            let Ok((mob_txfm, frail_option)) = mobs.get(hit_entity) else {
                 continue;
             };
+            let (damage, was_crit) = game.calculate_player_damage(
+                (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
+            );
             let delta = weapon_t.translation() - mob_txfm.translation();
             if let Ok(lifesteal) = lifesteal.get(game.game.player) {
                 modify_health_events.send(ModifyHealthEvent(f32::floor(
@@ -84,10 +86,11 @@ fn check_melee_hit_collisions(
             }
             hit_event.send(HitEvent {
                 hit_entity,
-                damage,
+                damage: damage as i32,
                 dir: delta.normalize_or_zero().truncate() * -1.,
                 hit_with_melee: Some(*weapon_obj),
                 hit_with_projectile: None,
+                was_crit,
                 ignore_tool: false,
             });
         }
@@ -159,6 +162,7 @@ fn check_projectile_hit_mob_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
+                was_crit: false,
             });
             //non-animating sprites are despawned immediately
             if anim_option.is_none() {
@@ -248,6 +252,7 @@ fn check_projectile_hit_player_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
+                was_crit: false,
             });
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
@@ -353,6 +358,7 @@ fn check_mob_to_player_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: None,
                 ignore_tool: false,
+                was_crit: false,
             });
             // hit back to attacker if we have Thorns
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
@@ -363,6 +369,7 @@ fn check_mob_to_player_collisions(
                     hit_with_melee: None,
                     hit_with_projectile: None,
                     ignore_tool: false,
+                    was_crit: false,
                 });
             }
         }
@@ -407,6 +414,7 @@ fn check_boss_to_objects_collisions(
                     hit_with_melee: Some(WorldObject::WoodAxe),
                     hit_with_projectile: None,
                     ignore_tool: true,
+                    was_crit: false,
                 });
             }
         }

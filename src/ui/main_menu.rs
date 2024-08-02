@@ -10,7 +10,7 @@ use crate::{
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
-    ui::SkillChoiceQueue,
+    player::skills::SkillChoiceQueue,
     world::dimension::EraManager,
     Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };

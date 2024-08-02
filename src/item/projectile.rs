@@ -51,6 +51,7 @@ pub enum Projectile {
     SlimeGooProjectile,
     Arc,
     FireAttack,
+    TeleportShock,
 }
 
 impl Projectile {
@@ -89,6 +90,7 @@ pub struct RangedAttackEvent {
     pub from_enemy: Option<Entity>,
     pub is_followup_proj: bool,
     pub dmg_override: Option<i32>,
+    pub pos_override: Option<Vec2>,
 }
 
 #[derive(Clone, Component)]
@@ -158,7 +160,7 @@ fn handle_ranged_attack_event(
         let p = proto_commands.spawn_projectile_from_proto(
             proj_event.projectile.clone(),
             &proto,
-            t,
+            proj_event.pos_override.unwrap_or(t),
             proj_event.direction,
         );
         if let Some(p) = p {
@@ -168,7 +170,7 @@ fn handle_ranged_attack_event(
             commands.entity(p).insert(Attack(
                 proj_event
                     .dmg_override
-                    .unwrap_or(game.calculate_player_damage().0 as i32),
+                    .unwrap_or(game.calculate_player_damage(0).0 as i32),
             ));
         }
     }

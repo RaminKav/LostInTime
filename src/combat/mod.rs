@@ -1,10 +1,14 @@
 use bevy::prelude::*;
 
 use bevy_proto::prelude::ProtoCommands;
+use combat_helpers::tick_despawn_timer;
 use rand::Rng;
+pub mod status_effects;
+use status_effects::*;
 
 pub mod collisions;
 
+pub mod combat_helpers;
 use crate::{
     ai::{FollowState, LeapAttackState},
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
@@ -21,7 +25,10 @@ use crate::{
         EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
     juice::bounce::BounceOnHit,
-    player::levels::{ExperienceReward, PlayerLevel},
+    player::{
+        levels::{ExperienceReward, PlayerLevel},
+        skills::{PlayerSkills, Skill},
+    },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort, DEBUG,
@@ -36,6 +43,7 @@ pub struct HitEvent {
     pub dir: Vec2,
     pub hit_with_melee: Option<WorldObject>,
     pub hit_with_projectile: Option<Projectile>,
+    pub was_crit: bool,
     pub ignore_tool: bool,
 }
 
@@ -46,6 +54,7 @@ pub struct MarkedForDeath;
 pub struct EnemyDeathEvent {
     pub entity: Entity,
     pub enemy_pos: Vec2,
+    pub killed_by_crit: bool,
 }
 #[derive(Debug, Clone)]
 
@@ -71,15 +80,20 @@ pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-            app.add_event::<HitEvent>().add_event::<EnemyDeathEvent>();
+            app.add_event::<HitEvent>()
+                .add_event::<EnemyDeathEvent>()
+                .add_event::<StatusEffectEvent>();
         })
         .add_event::<ObjBreakEvent>()
         .add_plugin(CollisionPlugion)
         .add_systems(
             (
                 handle_hits,
+                tick_despawn_timer,
                 cleanup_marked_for_death_entities.after(handle_enemy_death),
                 handle_attack_cooldowns.before(CustomFlush),
+                update_status_effect_icons,
+                handle_new_status_effect_event,
                 // spawn_hit_spark_effect.after(handle_hits),
                 handle_invincibility_frames.after(handle_hits),
                 handle_enemy_death.after(handle_hits),
@@ -119,36 +133,22 @@ fn handle_enemy_death(
     mut death_events: EventReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
-    mut player_xp: Query<&mut PlayerLevel>,
+    mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills)>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
 ) {
     for death_event in death_events.iter() {
-        // let t = death_event.enemy_pos;
-        // let texture_handle = asset_server.load("textures/effects/hit-particles.png");
-        // let texture_atlas =
-        //     TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
-        // let texture_atlas_handle = texture_atlases.add(texture_atlas);
-        // commands.spawn((
-        //     SpriteSheetBundle {
-        //         texture_atlas: texture_atlas_handle,
-        //         transform: Transform::from_translation(t.extend(0.)),
-        //         ..default()
-        //     },
-        //     AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-        //     YSort(1.),
-        //     DoneAnimation,
-        //     Name::new("Hit Spark"),
-        // ));
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
             continue;
         };
+        let (mut player_level, skills) = player_xp.single_mut();
+        let is_crit_bonus = skills.get(Skill::CritLoot) && death_event.killed_by_crit;
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(
                 loot_table,
                 &proto_param,
-                loot_bonus.single().0,
+                loot_bonus.single().0 + if is_crit_bonus { 25 } else { 0 },
                 Some(mob_lvl.0),
             ) {
                 let mut rng = rand::thread_rng();
@@ -164,7 +164,6 @@ fn handle_enemy_death(
             }
         }
         //give player xp
-        let mut player_level = player_xp.single_mut();
         player_level.add_xp(mob_xp.0);
     }
 }
@@ -331,6 +330,7 @@ pub fn handle_hits(
                     enemy_death_events.send(EnemyDeathEvent {
                         entity: e,
                         enemy_pos: t.translation().truncate(),
+                        killed_by_crit: hit.was_crit,
                     });
 
                     if let Some(parent_shrine) = shrine_option {
