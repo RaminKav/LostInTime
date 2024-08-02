@@ -27,12 +27,12 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::PlayerSkills,
+        skills::{PlayerSkills, SkillChoiceQueue},
         stats::{PlayerStats, SkillPoints},
         Player,
     },
     proto::proto_param::ProtoParam,
-    ui::{ChestContainer, FurnaceContainer, SkillChoiceQueue},
+    ui::{ChestContainer, FurnaceContainer},
     vectorize::{vectorize, vectorize_inner},
     world::{
         chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},

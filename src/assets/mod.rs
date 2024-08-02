@@ -2,9 +2,7 @@ use std::fs;
 
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::{
-    AsBindGroup, Extent3d, ShaderRef, TextureDimension, TextureFormat,
-};
+use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -13,11 +11,11 @@ use strum::IntoEnumIterator;
 
 use crate::enemy::Mob;
 use crate::item::{
-    CraftingTracker, Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes,
-    Wall, WorldObject, WorldObjectResource,
+    Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
+    WorldObjectResource,
 };
+use crate::status_effects::StatusEffect;
 use crate::ui::UIElement;
-use crate::GameParam;
 use crate::{GameState, ImageAssets};
 use ron::de::from_str;
 
@@ -90,6 +88,7 @@ impl Plugin for GameAssetsPlugin {
                 ui_image_handles: None,
                 player_spritesheets: None,
                 mob_spritesheets: None,
+                status_effect_icons: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -143,6 +142,7 @@ pub struct Graphics {
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub player_spritesheets: Option<Vec<Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
+    pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -150,6 +150,14 @@ impl Graphics {
             .as_ref()
             .unwrap()
             .get(&element)
+            .unwrap()
+            .clone()
+    }
+    pub fn get_status_effect_icon(&self, status: StatusEffect) -> Handle<Image> {
+        self.status_effect_icons
+            .as_ref()
+            .unwrap()
+            .get(&status)
             .unwrap()
             .clone()
     }
@@ -252,6 +260,7 @@ impl GameAssetsPlugin {
         let mut icon_map = HashMap::default();
         let mut ui_image_handles = HashMap::default();
         let mut foliage_material_map = HashMap::default();
+        let mut status_effect_handles = HashMap::default();
         let player_spritesheets = vec![
             asset_server.load("textures/player/player_side.png"),
             asset_server.load("textures/player/player_up.png"),
@@ -351,6 +360,11 @@ impl GameAssetsPlugin {
             let handle = asset_server.load(format!("ui/{u}.png"));
             ui_image_handles.insert(u, handle);
         }
+        // load Status Effect Icons
+        for u in StatusEffect::iter() {
+            let handle = asset_server.load(format!("effects/{u}Icon.png"));
+            status_effect_handles.insert(u, handle);
+        }
 
         let atlas_handle = texture_assets.add(atlas);
         let wall_atlas_handle = texture_assets.add(wall_atlas);
@@ -364,6 +378,7 @@ impl GameAssetsPlugin {
             icons: Some(icon_map),
             player_spritesheets: Some(player_spritesheets),
             mob_spritesheets: Some(mob_spritesheets),
+            status_effect_icons: Some(status_effect_handles),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type

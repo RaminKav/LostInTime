@@ -17,6 +17,9 @@ use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 
 use crate::schematic::loot_chests::get_random_loot_chest_type;
+use crate::status_effects::{
+    handle_burning_ticks, handle_frail_stack_ticks, handle_slow_stack_ticks,
+};
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::dimension::ActiveDimension;
@@ -56,8 +59,7 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 use self::crafting::CraftingPlugin;
 use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
-    handle_burning_ticks, handle_delayed_ranged_attack, handle_on_hit_upgrades,
-    handle_spread_arrows_attack,
+    handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
 use self::projectile::RangedAttackPlugin;
 
@@ -712,6 +714,8 @@ impl Plugin for ItemsPlugin {
                     handle_spread_arrows_attack.after(CustomFlush),
                     handle_burning_ticks,
                     handle_shrine_rewards,
+                    handle_frail_stack_ticks,
+                    handle_slow_stack_ticks,
                     handle_on_hit_upgrades.after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),

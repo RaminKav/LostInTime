@@ -45,6 +45,7 @@ use crate::{
     player::levels::ExperienceReward,
     sappling::{GrowsInto, Sappling},
     schematic::{loot_chests::LootChestType, SchematicType},
+    status_effects::{StatusEffectState, StatusEffectTracker},
     ui::{crafting_ui::CraftingContainerType, EssenceOption, EssenceShopChoices},
     world::{ForestGenerationParams, WallTextureData},
     CustomFlush, GameState, YSort,
@@ -115,9 +116,11 @@ impl Plugin for ProtoPlugin {
             .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
+            .register_type::<StatusEffectTracker>()
             .register_type::<EssenceOption>()
             .register_type::<Vec<EssenceOption>>()
             .register_type::<EssenceShopChoices>()
+            .register_type::<StatusEffectState>()
             .register_type::<CharacterAnimationSpriteSheetData>()
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
@@ -126,6 +129,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<HashMap<WorldObject, f32>>()
             .register_type::<Vec<WorldObject>>()
             .register_type::<Vec<u8>>()
+            .register_type::<Vec<StatusEffectState>>()
             .register_type::<Vec<f32>>()
             .register_type::<Vec<String>>()
             .register_type::<Vec<ItemAction>>()

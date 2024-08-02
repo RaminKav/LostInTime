@@ -2,13 +2,9 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    animations::AnimationTimer,
-    ui::{SkillChoiceQueue, UIState},
-    DEBUG, GAME_HEIGHT,
-};
+use crate::{animations::AnimationTimer, ui::UIState, DEBUG, GAME_HEIGHT};
 
-use super::stats::SkillPoints;
+use super::{stats::SkillPoints, SkillChoiceQueue};
 
 #[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerLevel {
@@ -42,7 +38,7 @@ impl PlayerLevel {
             self.level += 1;
             self.xp = self.xp - self.next_level_xp;
             self.next_level_xp =
-                f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.5 * (self.level as f32 - 1.)))) as u32;
+                f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.3 * (self.level as f32 - 1.)))) as u32;
         }
         if *DEBUG {
             println!(

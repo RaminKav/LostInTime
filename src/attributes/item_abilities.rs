@@ -1,16 +1,19 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     animations::AttackEvent,
+    combat_helpers::spawn_temp_collider,
     inputs::CursorPos,
     inventory::ItemStack,
-    item::{
-        projectile::{Projectile, RangedAttackEvent},
-        MainHand,
+    item::projectile::{Projectile, RangedAttackEvent},
+    player::{
+        skills::{PlayerSkills, Skill},
+        MovePlayerEvent, Player,
     },
-    player::{MovePlayerEvent, Player},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     GameParam,
@@ -52,57 +55,76 @@ pub fn add_ability_to_item_drops(stack: &mut ItemStack) {
 
 pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
-    weapon: Query<&ItemStack, With<MainHand>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
-    player: Query<&GlobalTransform, With<Player>>,
+    player: Query<(&GlobalTransform, &PlayerSkills), With<Player>>,
     mouse_inputs: Res<Input<MouseButton>>,
+    key_input: ResMut<Input<KeyCode>>,
     cursor_pos: Res<CursorPos>,
-    game: GameParam,
+    mut game: GameParam,
     proto_param: ProtoParam,
+    time: Res<Time>,
+    mut commands: Commands,
 ) {
+    let (player_pos, skills) = player.single();
     for attack in attacks.iter() {
-        if let Ok(weapon_stack) = weapon.get_single() {
-            match weapon_stack.metadata.item_ability {
-                Some(ItemAbility::Arc(dmg)) => {
-                    ranged_attack_event.send(RangedAttackEvent {
-                        projectile: Projectile::Arc,
-                        direction: attack.direction,
-                        from_enemy: None,
-                        is_followup_proj: true,
-                        mana_cost: None,
-                        dmg_override: Some(dmg),
-                    });
-                }
-                Some(ItemAbility::FireAttack(dmg)) => ranged_attack_event.send(RangedAttackEvent {
-                    projectile: Projectile::FireAttack,
-                    direction: attack.direction,
-                    from_enemy: None,
-                    is_followup_proj: true,
-                    mana_cost: None,
-                    dmg_override: Some(dmg),
-                }),
-                _ => {}
-            }
+        if skills.get(Skill::WaveAttack) {
+            ranged_attack_event.send(RangedAttackEvent {
+                projectile: Projectile::Arc,
+                direction: attack.direction,
+                from_enemy: None,
+                is_followup_proj: true,
+                mana_cost: None,
+                dmg_override: Some(3),
+                pos_override: None,
+            });
+        }
+        if skills.get(Skill::FireDamage) {
+            ranged_attack_event.send(RangedAttackEvent {
+                projectile: Projectile::FireAttack,
+                direction: attack.direction,
+                from_enemy: None,
+                is_followup_proj: true,
+                mana_cost: None,
+                dmg_override: Some(4),
+                pos_override: None,
+            });
         }
     }
-    if mouse_inputs.just_pressed(MouseButton::Right) {
-        if let Ok(weapon_stack) = weapon.get_single() {
-            match weapon_stack.metadata.item_ability {
-                Some(ItemAbility::Teleport(distance)) => {
-                    let player_pos = player.get_single().unwrap().translation();
-                    let direction = (cursor_pos.world_coords.truncate() - player_pos.truncate())
-                        .normalize_or_zero();
-                    let pos = world_pos_to_tile_pos(player_pos.truncate() + direction * distance);
-                    if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
-                        if obj.is_tree() || obj.is_wall() {
-                            return;
-                        }
-                    }
-                    move_player.send(MovePlayerEvent { pos });
-                }
-                _ => {}
+
+    let player = game.player_mut();
+    if skills.get(Skill::Teleport)
+        && player.player_dash_cooldown.tick(time.delta()).finished()
+        && key_input.just_pressed(KeyCode::Space)
+    {
+        player.player_dash_cooldown.reset();
+        let player_pos = player_pos.translation();
+        let direction =
+            (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
+        let distance = direction * 3. * TILE_SIZE.x;
+        let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
+        if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
+            if obj.is_tree() || obj.is_wall() {
+                return;
             }
         }
+
+        if skills.get(Skill::TeleportShock) {
+            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
+            spawn_temp_collider(
+                &mut commands,
+                Transform::from_translation(Vec3::new(
+                    player_pos.x + (distance.x / 2.),
+                    player_pos.y + (distance.y / 2.),
+                    0.,
+                ))
+                .with_rotation(Quat::from_rotation_z(angle)),
+                Vec2::new(16., 3. * TILE_SIZE.x),
+                0.5,
+                3,
+            )
+        }
+
+        move_player.send(MovePlayerEvent { pos });
     }
 }

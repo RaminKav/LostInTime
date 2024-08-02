@@ -15,7 +15,8 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::{
-        stats::{PlayerStats, StatType},
+        skills::{PlayerSkills, Skill},
+        stats::StatType,
         Limb,
     },
     proto::proto_param::ProtoParam,
@@ -222,25 +223,56 @@ impl ItemAttributes {
     pub fn get_durability_tooltip(&self) -> String {
         format!("{}/{}", self.durability, self.max_durability)
     }
-    pub fn add_attribute_components(&self, entity: &mut EntityCommands, old_att: &Self) {
-        if self.health > 0 && self.health != old_att.health {
-            entity.insert(MaxHealth(self.health));
+    pub fn add_attribute_components(
+        &self,
+        entity: &mut EntityCommands,
+        old_att: &Self,
+        skills: &PlayerSkills,
+    ) {
+        let computed_health = self.health + if skills.get(Skill::Health) { 25 } else { 0 };
+        if self.health > 0 && computed_health != old_att.health {
+            entity.insert(MaxHealth(computed_health));
         }
         if self.attack_cooldown > 0. {
-            entity.insert(AttackCooldown(self.attack_cooldown));
+            entity.insert(AttackCooldown(
+                self.attack_cooldown
+                    * if skills.get(Skill::AttackSpeed) {
+                        0.85
+                    } else {
+                        1.
+                    },
+            ));
         } else {
             entity.remove::<AttackCooldown>();
         }
+
         entity.insert(Attack(self.attack));
-        entity.insert(CritChance(self.crit_chance));
-        entity.insert(CritDamage(self.crit_damage));
+        entity.insert(CritChance(
+            self.crit_chance + if skills.get(Skill::CritChance) { 10 } else { 0 },
+        ));
+        entity.insert(CritDamage(
+            self.crit_damage + if skills.get(Skill::CritDamage) { 15 } else { 0 },
+        ));
         entity.insert(BonusDamage(self.bonus_damage));
         entity.insert(HealthRegen(self.health_regen));
         entity.insert(Healing(self.healing));
-        entity.insert(Thorns(self.thorns));
-        entity.insert(Dodge(self.dodge));
-        entity.insert(Speed(self.speed));
-        entity.insert(Lifesteal(self.lifesteal));
+        entity.insert(Thorns(
+            self.thorns + if skills.get(Skill::Thorns) { 15 } else { 0 },
+        ));
+        entity.insert(Dodge(
+            self.dodge
+                + if skills.get(Skill::DodgeChance) {
+                    10
+                } else {
+                    0
+                },
+        ));
+        entity.insert(Speed(
+            self.speed + if skills.get(Skill::Speed) { 15 } else { 0 },
+        ));
+        entity.insert(Lifesteal(
+            self.lifesteal + if skills.get(Skill::Lifesteal) { 1 } else { 0 },
+        ));
         entity.insert(Defence(self.defence));
         entity.insert(XpRateBonus(self.xp_rate));
         entity.insert(LootRateBonus(self.loot_rate));
@@ -637,16 +669,17 @@ fn clamp_mana(mut health: Query<&mut Mana, With<Player>>) {
 }
 fn handle_player_item_attribute_change_events(
     mut commands: Commands,
-    player: Query<(Entity, &Inventory, &PlayerStats), With<Player>>,
+    player: Query<(Entity, &Inventory), With<Player>>,
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
-    player_atts: Query<&ItemAttributes, With<Player>>,
+    player_atts: Query<(&ItemAttributes, &PlayerSkills), With<Player>>,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
 ) {
     for _event in att_events.iter() {
-        let mut new_att = player_atts.single().clone();
-        let (player, inv, stats) = player.single();
+        let (att, skills) = player_atts.single();
+        let mut new_att = att.clone();
+        let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
             .equipment_items
             .items
@@ -662,9 +695,7 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
-        new_att = stats.apply_stats_to_player_attributes(new_att.clone());
-        new_att
-            .add_attribute_components(&mut commands.entity(player), &player_atts.single().clone());
+        new_att.add_attribute_components(&mut commands.entity(player), &new_att.clone(), skills);
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)

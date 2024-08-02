@@ -4,6 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": RedMushling, 
     "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
     "survival_rogue_like::proto::SensorProto": (),
     "survival_rogue_like::world::y_sort::YSort": (0.),
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
