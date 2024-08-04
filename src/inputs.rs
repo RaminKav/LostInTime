@@ -12,6 +12,7 @@ use crate::player::skills::{PlayerSkills, Skill};
 use crate::player::MovePlayerEvent;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::dungeon::spawn_new_dungeon_dimension;
+use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::PrimaryWindow;
@@ -464,8 +465,24 @@ pub fn toggle_inventory(
 fn handle_hotbar_key_input(
     mut game: GameParam,
     mut key_input: ResMut<Input<KeyCode>>,
+    mut mouse_wheel_event: EventReader<MouseWheel>,
     mut inv_state: ResMut<InventoryState>,
 ) {
+    for e in mouse_wheel_event.iter() {
+        if e.y < 0. {
+            change_hotbar_slot(
+                (inv_state.active_hotbar_slot + 5) % 6,
+                &mut inv_state,
+                &mut game.inv_slot_query,
+            );
+        } else if e.y >= 0. {
+            change_hotbar_slot(
+                (inv_state.active_hotbar_slot + 1) % 6,
+                &mut inv_state,
+                &mut game.inv_slot_query,
+            );
+        }
+    }
     for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
         if key_input.just_pressed(*key) {
             change_hotbar_slot(slot, &mut inv_state, &mut game.inv_slot_query);

@@ -529,6 +529,32 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_melee_weapon(&self) -> bool {
+        match self {
+            WorldObject::WoodSword => true,
+            WorldObject::Sword => true,
+            WorldObject::Dagger => true,
+            _ => false,
+        }
+    }
+    pub fn is_ranged_weapon(&self) -> bool {
+        match self {
+            WorldObject::WoodBow => true,
+            WorldObject::Claw => true,
+            WorldObject::FireStaff => true,
+            WorldObject::BasicStaff => true,
+            WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
+    pub fn is_magic_weapon(&self) -> bool {
+        match self {
+            WorldObject::FireStaff => true,
+            WorldObject::BasicStaff => true,
+            WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
     pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)
