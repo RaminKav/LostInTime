@@ -2,6 +2,7 @@ use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::attributes::ItemAttributes;
+use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
     UI_GRASS_GREEN, YELLOW,
@@ -811,6 +812,7 @@ pub fn handle_break_object(
     xp: Query<&ExperienceReward>,
     mut player_xp: Query<&mut PlayerLevel>,
     particles: Res<Particles>,
+    mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
@@ -878,5 +880,10 @@ pub fn handle_break_object(
             let t = tile_pos_to_world_pos(broken.pos, true);
             spawn_xp_particles(t, &mut commands, particles.xp_particles.clone());
         }
+
+        // Analytics
+        analytics_events.send(AnalyticsUpdateEvent {
+            update_type: AnalyticsTrigger::ObjectBroken(broken.obj),
+        });
     }
 }

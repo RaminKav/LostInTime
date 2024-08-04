@@ -10,7 +10,7 @@ use crate::{
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
     animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
     combat::HitEvent,
-    enemy::{FollowSpeed, MobIsAttacking},
+    enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
@@ -267,6 +267,7 @@ pub fn leap_attack(
     mut transforms: Query<&mut Transform>,
     mut attacks: Query<(
         Entity,
+        &Mob,
         &mut KinematicCharacterController,
         &mut LeapAttackState,
         &FollowSpeed,
@@ -279,8 +280,17 @@ pub fn leap_attack(
     time: Res<Time>,
     _game: Res<Game>,
 ) {
-    for (entity, mut kcc, mut attack, follow_speed, sprite, anim_data, anim_state, slow_option) in
-        attacks.iter_mut()
+    for (
+        entity,
+        mob,
+        mut kcc,
+        mut attack,
+        follow_speed,
+        sprite,
+        anim_data,
+        anim_state,
+        slow_option,
+    ) in attacks.iter_mut()
     {
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
@@ -304,7 +314,7 @@ pub fn leap_attack(
                 commands
                     .entity(entity)
                     .insert(EnemyAnimationState::Attack)
-                    .insert(MobIsAttacking);
+                    .insert(MobIsAttacking(mob.clone()));
             }
         }
 

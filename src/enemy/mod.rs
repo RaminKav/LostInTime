@@ -7,6 +7,7 @@ use bevy::{
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
+use serde::Serialize;
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use crate::{
@@ -63,7 +64,6 @@ impl Plugin for EnemyPlugin {
 #[derive(
     Component,
     Default,
-    Deserialize,
     Debug,
     Clone,
     Hash,
@@ -75,6 +75,8 @@ impl Plugin for EnemyPlugin {
     FromReflect,
     IntoStaticStr,
     EnumIter,
+    Serialize,
+    Deserialize,
 )]
 #[reflect(Schematic)]
 pub enum Mob {
@@ -153,7 +155,7 @@ pub struct LeapAttack {
 }
 
 #[derive(Component)]
-pub struct MobIsAttacking;
+pub struct MobIsAttacking(pub Mob);
 
 #[derive(FromReflect, Default, Reflect, Clone, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]

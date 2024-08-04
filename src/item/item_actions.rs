@@ -5,6 +5,7 @@ use crate::{
         hunger::Hunger,
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
     },
+    client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     inputs::CursorPos,
     inventory::Inventory,
     juice::UseItemEvent,
@@ -59,6 +60,7 @@ pub struct ItemActionParam<'w, 's> {
     pub use_item_event: EventWriter<'w, UseItemEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
     pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
+    pub analytics_event: EventWriter<'w, AnalyticsUpdateEvent>,
     pub next_inv_state: ResMut<'w, NextState<UIState>>,
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
@@ -128,6 +130,11 @@ impl ItemActions {
                         placed_by_player: true,
                         override_existing_obj: false,
                     });
+                    item_action_param
+                        .analytics_event
+                        .send(AnalyticsUpdateEvent {
+                            update_type: AnalyticsTrigger::ObjectPlaced(*obj),
+                        });
                 }
                 ItemAction::Eat(delta) => {
                     for mut hunger in item_action_param.hunger_query.iter_mut() {
@@ -167,6 +174,7 @@ pub fn handle_item_action_success(
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     proto_param: ProtoParam,
+    mut analytics_event: EventWriter<AnalyticsUpdateEvent>,
 ) {
     for e in success_events.iter() {
         if proto_param
@@ -176,6 +184,9 @@ pub fn handle_item_action_success(
             let hotbar_slot = inv_state.active_hotbar_slot;
             let held_item_option = inv.single().items.items[hotbar_slot].clone();
             inv.single_mut().items.items[hotbar_slot] = held_item_option.unwrap().modify_count(-1);
+            analytics_event.send(AnalyticsUpdateEvent {
+                update_type: AnalyticsTrigger::ItemConsumed(e.obj),
+            });
         }
     }
 }

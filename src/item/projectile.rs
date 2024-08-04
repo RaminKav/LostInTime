@@ -96,6 +96,7 @@ pub struct RangedAttackEvent {
 #[derive(Clone, Component)]
 pub struct EnemyProjectile {
     pub entity: Entity,
+    pub mob: Mob,
 }
 
 impl Plugin for RangedAttackPlugin {
@@ -111,7 +112,7 @@ fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
     player_query: Query<(Entity, &Mana, Option<&AttackTimer>), With<Player>>,
     mut proto_commands: ProtoCommands,
-    enemy_transforms: Query<&GlobalTransform, With<Mob>>,
+    enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     game: GameParam,
     proto: ProtoParam,
     mut commands: Commands,
@@ -152,6 +153,7 @@ fn handle_ranged_attack_event(
             enemy_transforms
                 .get(enemy)
                 .unwrap()
+                .0
                 .translation()
                 .truncate()
         } else {
@@ -165,7 +167,10 @@ fn handle_ranged_attack_event(
         );
         if let Some(p) = p {
             if let Some(e) = proj_event.from_enemy {
-                commands.entity(p).insert(EnemyProjectile { entity: e });
+                commands.entity(p).insert(EnemyProjectile {
+                    entity: e,
+                    mob: enemy_transforms.get(e).unwrap().1.clone(),
+                });
             }
             commands.entity(p).insert(Attack(
                 proj_event

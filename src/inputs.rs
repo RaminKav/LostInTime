@@ -624,6 +624,7 @@ pub fn mouse_click_system(
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,
                 ignore_tool: false,
+                hit_by_mob: None,
                 was_crit: false,
             });
         }
