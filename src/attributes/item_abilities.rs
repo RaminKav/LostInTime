@@ -58,7 +58,6 @@ pub fn handle_item_abilitiy_on_attack(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
     player: Query<(&GlobalTransform, &PlayerSkills), With<Player>>,
-    mouse_inputs: Res<Input<MouseButton>>,
     key_input: ResMut<Input<KeyCode>>,
     cursor_pos: Res<CursorPos>,
     mut game: GameParam,
@@ -67,8 +66,11 @@ pub fn handle_item_abilitiy_on_attack(
     mut commands: Commands,
 ) {
     let (player_pos, skills) = player.single();
+    let Some(main_hand) = game.player().main_hand_slot else {
+        return;
+    };
     for attack in attacks.iter() {
-        if skills.get(Skill::WaveAttack) {
+        if skills.get(Skill::WaveAttack) && Skill::WaveAttack.is_obj_valid(main_hand.get_obj()) {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,
                 direction: attack.direction,
@@ -79,7 +81,7 @@ pub fn handle_item_abilitiy_on_attack(
                 pos_override: None,
             });
         }
-        if skills.get(Skill::FireDamage) {
+        if skills.get(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::FireAttack,
                 direction: attack.direction,

@@ -194,8 +194,8 @@ impl InventoryItemStack {
             .insert(Sensor)
             .insert(RigidBody::Fixed)
             .insert(Collider::cuboid(
-                obj_data.size.x / 1.2,
-                obj_data.size.y / 1.2,
+                obj_data.size.x / 1.5,
+                obj_data.size.y / 1.5,
             ))
             .insert(AttackAnimationTimer(
                 Timer::from_seconds(0.18, TimerMode::Once),

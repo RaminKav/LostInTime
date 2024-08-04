@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 
-use bevy_proto::{backend::proto, prelude::ProtoCommands};
+use bevy_proto::prelude::ProtoCommands;
 use strum_macros::{Display, EnumIter};
 
 use crate::{
     assets::Graphics,
-    attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
+    attributes::{
+        attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
+    },
     colors::{DARK_GREEN, YELLOW_2},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
@@ -705,6 +707,7 @@ pub fn handle_cursor_skills_buttons(
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
+    mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -728,6 +731,7 @@ pub fn handle_cursor_skills_buttons(
                         );
                         picked_skill.skill.add_skill_components(e, &mut commands);
                         next_ui_state.set(UIState::Closed);
+                        att_event.send(AttributeChangeEvent);
                     }
                 }
                 _ => (),

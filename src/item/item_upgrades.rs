@@ -4,6 +4,7 @@ use crate::attributes::{CurrentHealth, MaxHealth};
 use crate::combat::{EnemyDeathEvent, MarkedForDeath};
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::player::skills::Skill;
 use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
 use crate::{
     combat::{AttackTimer, HitEvent},
@@ -224,7 +225,9 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-
+        let Some(main_hand) = game.player().main_hand_slot else {
+            continue;
+        };
         if let Some(_) = fire_aoe_option {
             if hit.hit_with_projectile == Some(Projectile::Fireball) {
                 ranged_attack_event.send(RangedAttackEvent {
@@ -239,7 +242,10 @@ pub fn handle_on_hit_upgrades(
             }
         }
         if let Some(_) = lethal_option {
-            if curr_hp.0 <= max_hp.0 / 4 && !mob.is_boss() {
+            if curr_hp.0 <= max_hp.0 / 4
+                && !mob.is_boss()
+                && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
+            {
                 commands.entity(hit_e).insert(MarkedForDeath);
                 enemy_death_events.send(EnemyDeathEvent {
                     entity: hit_e,
@@ -256,7 +262,7 @@ pub fn handle_on_hit_upgrades(
         if let Some(_) = burn_option {
             if let Some(mut burning) = burning_option {
                 (*burning).duration_timer.reset();
-            } else {
+            } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                     duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
@@ -271,7 +277,9 @@ pub fn handle_on_hit_upgrades(
         }
         if let Some(_) = frail_option {
             if let Some(mut frail_stacks) = frailed_option {
-                if frail_stacks.num_stacks < 3 {
+                if frail_stacks.num_stacks < 3
+                    && Skill::FrailStacks.is_obj_valid(main_hand.get_obj())
+                {
                     frail_stacks.num_stacks += 1;
                     frail_stacks.timer.reset();
                     status_event.send(StatusEffectEvent {
@@ -294,7 +302,8 @@ pub fn handle_on_hit_upgrades(
         }
         if let Some(_) = slow_option {
             if let Some(mut slow_stacks) = slowed_option {
-                if slow_stacks.num_stacks < 3 {
+                if slow_stacks.num_stacks < 3 && Skill::SlowStacks.is_obj_valid(main_hand.get_obj())
+                {
                     slow_stacks.num_stacks += 1;
                     slow_stacks.timer.reset();
                     status_event.send(StatusEffectEvent {

@@ -230,6 +230,18 @@ impl Skill {
             _ => {}
         }
     }
+
+    pub fn is_obj_valid(&self, obj: WorldObject) -> bool {
+        match self {
+            Skill::FireDamage => obj.is_melee_weapon(),
+            Skill::WaveAttack => obj.is_melee_weapon(),
+            Skill::FrailStacks => obj.is_melee_weapon(),
+            Skill::SlowStacks => obj.is_melee_weapon(),
+            Skill::PoisonStacks => obj.is_melee_weapon(),
+            Skill::LethalBlow => obj.is_melee_weapon(),
+            _ => true,
+        }
+    }
 }
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
 pub struct SkillChoiceState {
