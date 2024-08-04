@@ -4,6 +4,7 @@ use crate::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
     },
+    client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
     item::{
@@ -91,6 +92,7 @@ fn check_melee_hit_collisions(
                 hit_with_melee: Some(*weapon_obj),
                 hit_with_projectile: None,
                 was_crit,
+                hit_by_mob: None,
                 ignore_tool: false,
             });
         }
@@ -162,6 +164,7 @@ fn check_projectile_hit_mob_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
+                hit_by_mob: None,
                 was_crit: false,
             });
             //non-animating sprites are despawned immediately
@@ -252,6 +255,7 @@ fn check_projectile_hit_player_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
+                hit_by_mob: Some(enemy_proj.mob.clone()),
                 was_crit: false,
             });
             if anim_option.is_none() {
@@ -268,6 +272,7 @@ pub fn check_item_drop_collisions(
     items_query: Query<&ItemStack>,
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
+    mut analytics: EventWriter<AnalyticsUpdateEvent>,
 ) {
     if !game.player().is_moving {
         return;
@@ -281,6 +286,7 @@ pub fn check_item_drop_collisions(
                 continue;
             }
             let item_stack = items_query.get(e2).unwrap().clone();
+            let obj = item_stack.obj_type.clone();
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
             if inv_container.get_first_empty_slot().is_none()
@@ -295,6 +301,9 @@ pub fn check_item_drop_collisions(
             item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
 
             commands.entity(e2).despawn();
+            analytics.send(AnalyticsUpdateEvent {
+                update_type: AnalyticsTrigger::ItemCollected(obj),
+            });
         }
     }
 }
@@ -358,6 +367,7 @@ fn check_mob_to_player_collisions(
                 hit_with_melee: None,
                 hit_with_projectile: None,
                 ignore_tool: false,
+                hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                 was_crit: false,
             });
             // hit back to attacker if we have Thorns
@@ -369,6 +379,7 @@ fn check_mob_to_player_collisions(
                     hit_with_melee: None,
                     hit_with_projectile: None,
                     ignore_tool: false,
+                    hit_by_mob: None,
                     was_crit: false,
                 });
             }
@@ -414,6 +425,7 @@ fn check_boss_to_objects_collisions(
                     hit_with_melee: Some(WorldObject::WoodAxe),
                     hit_with_projectile: None,
                     ignore_tool: true,
+                    hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
                 });
             }

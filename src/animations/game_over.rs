@@ -26,7 +26,7 @@ pub struct GameOverFadeout(Timer);
 
 pub fn handle_game_over_fadeout(
     mut commands: Commands,
-    mut game_over_events: EventReader<GameOverEvent>,
+    game_over_events: EventReader<GameOverEvent>,
     mut next_state: ResMut<NextState<GameState>>,
     mut player: Query<
         (
@@ -41,7 +41,7 @@ pub fn handle_game_over_fadeout(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
 ) {
-    if game_over_events.iter().count() > 0 {
+    if !game_over_events.is_empty() {
         let (player_e, dir, mut player_t, mut sprite, texture_atlas_handle) = player.single_mut();
         commands
             .spawn(SpriteBundle {

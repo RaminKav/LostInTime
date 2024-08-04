@@ -192,7 +192,9 @@ pub fn new_leap_attack(
             *anim_state = AsepriteAnimation::from(RedMushking::tags::ATTACK_HOP);
         } else if frame == 23 {
             // BEGIN DMGING
-            commands.entity(entity).insert(MobIsAttacking);
+            commands
+                .entity(entity)
+                .insert(MobIsAttacking(Mob::RedMushking));
             if att_collider.0.is_none() {
                 let hitbox = commands
                     .spawn((
@@ -200,7 +202,7 @@ pub fn new_leap_attack(
                         attack.clone(),
                         leap_attack.clone(),
                         Collider::capsule(Vec2::new(-17., -15.), Vec2::new(17., -15.), 20.),
-                        MobIsAttacking,
+                        MobIsAttacking(Mob::RedMushking),
                         Sensor,
                         DamagesWorldObjects,
                     ))

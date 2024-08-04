@@ -115,7 +115,7 @@ pub fn gas_attack(
                         TransformBundle::default(),
                         attack.clone(),
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 7.),
-                        MobIsAttacking,
+                        MobIsAttacking(Mob::RedMushling),
                         Sensor,
                     ))
                     .set_parent(entity)

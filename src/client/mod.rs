@@ -13,6 +13,8 @@ use bevy_proto::prelude::ProtoCommands;
 use bevy_save::prelude::*;
 use itertools::Itertools;
 use rand::Rng;
+pub mod analytics;
+use analytics::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -114,6 +116,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(SaveTimer {
                 timer: Timer::from_seconds(15., TimerMode::Repeating),
             })
+            .add_plugin(AnalyticsPlugin)
             .add_system(load_state.in_schedule(OnExit(GameState::MainMenu)))
             .add_systems(
                 (save_state, handle_append_run_data_after_death).in_set(OnUpdate(GameState::Main)),
@@ -151,6 +154,7 @@ pub struct CurrentRunSaveData {
     // Era
     pub current_era: Era,
     pub visited_eras: Vec<Era>,
+    pub analytics_data: AnalyticsData,
 }
 
 #[derive(Default)]
@@ -366,6 +370,7 @@ pub fn save_state(
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;
+    save_data.analytics_data = game.analytics_data.clone();
 
     const PATH: &str = "save_state.json";
 
@@ -435,6 +440,7 @@ pub fn load_state(
                     containers: data.containers,
                 });
                 commands.insert_resource(data.player_skill_queue);
+                commands.insert_resource(data.analytics_data);
                 commands.insert_resource(data.craft_tracker);
                 proto_commands.apply(format!(
                     "Era{}WorldGenerationParams",

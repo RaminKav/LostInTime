@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
+    client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     colors::YELLOW,
     container::Container,
     inventory::{Inventory, InventoryItemStack},
@@ -101,6 +102,7 @@ pub fn handle_crafted_item(
     mut inv: Query<&mut Inventory>,
     mut events: EventReader<CraftedItemEvent>,
     recipes: Res<Recipes>,
+    mut analytics: EventWriter<AnalyticsUpdateEvent>,
 ) {
     for event in events.iter() {
         let mut inv = inv.single_mut();
@@ -131,6 +133,9 @@ pub fn handle_crafted_item(
                 }
             }
         }
+        analytics.send(AnalyticsUpdateEvent {
+            update_type: AnalyticsTrigger::RecipeCrafted(event.obj),
+        });
     }
 }
 

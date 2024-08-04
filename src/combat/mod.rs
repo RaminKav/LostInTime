@@ -14,6 +14,7 @@ use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
+    client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     custom_commands::CommandsExt,
     enemy::{
         red_mushking::{DeathState, ReturnToShrineState, SummonAttackState},
@@ -43,6 +44,7 @@ pub struct HitEvent {
     pub dir: Vec2,
     pub hit_with_melee: Option<WorldObject>,
     pub hit_with_projectile: Option<Projectile>,
+    pub hit_by_mob: Option<Mob>,
     pub was_crit: bool,
     pub ignore_tool: bool,
 }
@@ -234,6 +236,7 @@ pub fn handle_hits(
         &mut CurrentHealth,
         &GlobalTransform,
         Option<&WorldObject>,
+        Option<&Mob>,
         Option<&RequiredEquipmentType>,
         Option<&InvincibilityCooldown>,
         Option<&CombatShrineMob>,
@@ -244,6 +247,7 @@ pub fn handle_hits(
     mut obj_death_events: EventWriter<ObjBreakEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
+    mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -256,6 +260,7 @@ pub fn handle_hits(
             mut hit_health,
             t,
             obj_option,
+            mob_option,
             hit_req_option,
             i_frame_option,
             shrine_option,
@@ -338,6 +343,19 @@ pub fn handle_hits(
                             .send(CombatShrineMobDeathEvent(parent_shrine.parent_shrine));
                     }
                 }
+
+                if is_player {
+                    analytics_events.send(AnalyticsUpdateEvent {
+                        update_type: AnalyticsTrigger::DamageTaken(
+                            hit.hit_by_mob.clone().unwrap_or(Mob::default()),
+                            dmg as u32,
+                        ),
+                    });
+                } else if let Some(mob) = mob_option {
+                    analytics_events.send(AnalyticsUpdateEvent {
+                        update_type: AnalyticsTrigger::DamageDealt(mob.clone(), dmg as u32),
+                    });
+                }
             }
 
             if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
@@ -349,6 +367,7 @@ pub fn handle_hits(
 pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
     dead_query: Query<(Entity, &Mob), With<MarkedForDeath>>,
+    mut analytics: EventWriter<AnalyticsUpdateEvent>,
 ) {
     for (e, mob) in dead_query.iter() {
         if mob.is_boss() {
@@ -363,5 +382,8 @@ pub fn cleanup_marked_for_death_entities(
         } else {
             commands.entity(e).despawn_recursive();
         }
+        analytics.send(AnalyticsUpdateEvent {
+            update_type: AnalyticsTrigger::MobKilled(mob.clone()),
+        });
     }
 }
