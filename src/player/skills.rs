@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumIter};
 
 use crate::item::{
     item_upgrades::{
@@ -10,7 +11,7 @@ use crate::item::{
     WorldObject,
 };
 
-#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
 pub enum Skill {
     // Passives
     #[default]
