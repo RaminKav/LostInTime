@@ -298,18 +298,24 @@ pub fn handle_update_player_skills(
                 continue;
             }
             let offset = Vec2::new(
-                i as f32 * 16.5 + (-GAME_WIDTH) / 2. + 94.,
+                i as f32 * 18.5 + (-GAME_WIDTH) / 2. + 94.,
                 (GAME_HEIGHT - 15.) / 2. - 12.5,
             );
-            let icon = spawn_item_stack_icon(
-                &mut commands,
-                &graphics,
-                &ItemStack::crate_icon_stack(skill.get_icon()),
-                &asset_server,
-                offset,
-            );
             commands
-                .entity(icon)
+                .spawn(SpriteBundle {
+                    texture: graphics.get_skill_icon(skill.clone()),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(16., 16.)),
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: offset.extend(1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
                 .insert(SkillHudIcon(skill.clone()))
                 .insert(Name::new("HUD ICON!!"));
         }

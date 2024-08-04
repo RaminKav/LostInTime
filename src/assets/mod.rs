@@ -14,6 +14,7 @@ use crate::item::{
     Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
 };
+use crate::player::skills::Skill;
 use crate::status_effects::StatusEffect;
 use crate::ui::UIElement;
 use crate::{GameState, ImageAssets};
@@ -89,6 +90,7 @@ impl Plugin for GameAssetsPlugin {
                 player_spritesheets: None,
                 mob_spritesheets: None,
                 status_effect_icons: None,
+                skill_icons: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -143,6 +145,7 @@ pub struct Graphics {
     pub player_spritesheets: Option<Vec<Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
+    pub skill_icons: Option<HashMap<Skill, Handle<Image>>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -158,6 +161,14 @@ impl Graphics {
             .as_ref()
             .unwrap()
             .get(&status)
+            .unwrap()
+            .clone()
+    }
+    pub fn get_skill_icon(&self, skill: Skill) -> Handle<Image> {
+        self.skill_icons
+            .as_ref()
+            .unwrap()
+            .get(&skill)
             .unwrap()
             .clone()
     }
@@ -261,6 +272,7 @@ impl GameAssetsPlugin {
         let mut ui_image_handles = HashMap::default();
         let mut foliage_material_map = HashMap::default();
         let mut status_effect_handles = HashMap::default();
+        let mut skill_handles = HashMap::default();
         let player_spritesheets = vec![
             asset_server.load("textures/player/player_side.png"),
             asset_server.load("textures/player/player_up.png"),
@@ -365,6 +377,11 @@ impl GameAssetsPlugin {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
             status_effect_handles.insert(u, handle);
         }
+        // load Skill Icons
+        for u in Skill::iter() {
+            let handle = asset_server.load(format!("effects/{u}Icon.png"));
+            skill_handles.insert(u, handle);
+        }
 
         let atlas_handle = texture_assets.add(atlas);
         let wall_atlas_handle = texture_assets.add(wall_atlas);
@@ -379,6 +396,7 @@ impl GameAssetsPlugin {
             player_spritesheets: Some(player_spritesheets),
             mob_spritesheets: Some(mob_spritesheets),
             status_effect_icons: Some(status_effect_handles),
+            skill_icons: Some(skill_handles),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
