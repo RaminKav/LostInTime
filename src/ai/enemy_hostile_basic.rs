@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::KinematicCharacterController;
+use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
 
 use rand::Rng;
 use seldom_state::prelude::*;
@@ -15,6 +15,7 @@ use crate::{
     item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
     status_effects::Slow,
+    world::TILE_SIZE,
     Game, GameParam, PLAYER_MOVE_SPEED,
 };
 
@@ -70,7 +71,7 @@ impl Trigger for NightTimeAggro {
 
     // Return `Ok` to trigger and `Err` to not trigger
     fn trigger(&self, _entity: Entity, night_tracker: Self::Param<'_, '_>) -> Result<f32, f32> {
-        if (night_tracker.time - 12.) >= 0. {
+        if night_tracker.is_night() {
             Ok(1.)
         } else {
             Err(0.)
@@ -188,6 +189,7 @@ pub fn follow(
     mut commands: Commands,
     time: Res<Time>,
     mut game: GameParam,
+    night_tracker: Res<NightTracker>,
 ) {
     for (entity, mut follow, sprite, anim_data, anim_state, att_cooldown, slowed_option) in
         follows.iter_mut()
@@ -209,8 +211,16 @@ pub fn follow(
             &follow_translation,
             &mut game,
         );
+
+        let distance_from_target = (target_translation.truncate() - follow_translation).length();
+        let is_far_away = distance_from_target > 12. * TILE_SIZE.x;
         //convert follower txfm to AIPos too
-        let target_txfm = next_target_tile.unwrap_or(target_translation.truncate());
+        let target_txfm = if night_tracker.is_night() && is_far_away {
+            target_translation.truncate()
+        } else {
+            next_target_tile.unwrap_or(target_translation.truncate())
+        };
+        let direct_path_to_target = (target_txfm - follow_translation).normalize_or_zero();
         let delta_override: Option<Vec2> = if let Some(curr_path) = follow.curr_path {
             if curr_path == target_txfm {
                 Some(
@@ -224,12 +234,18 @@ pub fn follow(
         } else {
             None
         };
-        let delta =
-            delta_override.unwrap_or((target_txfm - follow_translation).normalize_or_zero());
+        let delta = delta_override.unwrap_or(direct_path_to_target);
+        let mut mover = mover.get_mut(entity).unwrap();
+        if night_tracker.is_night() && is_far_away {
+            mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
+        } else {
+            mover.filter_groups = Some(CollisionGroups::default());
+        }
+
         follow.curr_path = next_target_tile;
         follow.curr_delta = Some(delta);
 
-        mover.get_mut(entity).unwrap().translation = Some(
+        mover.translation = Some(
             delta
                 * follow.speed
                 * PLAYER_MOVE_SPEED
