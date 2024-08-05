@@ -8,7 +8,7 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::Player};
+use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::Player, GameParam};
 
 use super::AnimationTimer;
 
@@ -58,7 +58,7 @@ impl CharacterAnimationSpriteSheetData {
             2 => EnemyAnimationState::Hit,
             3 => EnemyAnimationState::Death,
             4 => EnemyAnimationState::Attack,
-            _ => EnemyAnimationState::Idle,
+            _ => EnemyAnimationState::Attack,
         }
     }
 }
@@ -66,14 +66,17 @@ impl CharacterAnimationSpriteSheetData {
 pub fn change_anim_offset_when_character_action_state_changes(
     mut query: Query<
         (
+            Entity,
             &mut CharacterAnimationSpriteSheetData,
             &EnemyAnimationState,
             &mut TextureAtlasSprite,
         ),
         Changed<EnemyAnimationState>,
     >,
+    game: GameParam,
 ) {
-    for (mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
+    for (e, mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
+        let is_player = game.game.player == e;
         let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
         match state {
             EnemyAnimationState::Idle => {
@@ -92,8 +95,17 @@ pub fn change_anim_offset_when_character_action_state_changes(
                 sprite.index = (max_frames * 3.) as usize;
             }
             EnemyAnimationState::Attack => {
-                sprite_sheet_data.anim_offset = 4;
-                sprite.index = (max_frames * 4.) as usize;
+                if is_player {
+                    if let Some(main_hand) = game.player().main_hand_slot {
+                        sprite_sheet_data.anim_offset =
+                            4 + main_hand.get_attack_anim_offset() as usize;
+                        sprite.index =
+                            (max_frames * (4. + main_hand.get_attack_anim_offset())) as usize;
+                    }
+                } else {
+                    sprite_sheet_data.anim_offset = 4;
+                    sprite.index = (max_frames * 4.) as usize;
+                }
             }
         }
     }

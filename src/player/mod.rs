@@ -172,7 +172,7 @@ fn spawn_player(
     //spawn player entity with limb spritesheets as children
     let player_texture_handle = asset_server.load("textures/player/player_down.png");
     let player_texture_atlas =
-        TextureAtlas::from_grid(player_texture_handle, Vec2::new(64., 64.), 7, 5, None, None);
+        TextureAtlas::from_grid(player_texture_handle, Vec2::new(64., 64.), 7, 9, None, None);
     let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
     let p = commands
@@ -228,7 +228,7 @@ fn spawn_player(
             ..default()
         })
         .insert(CharacterAnimationSpriteSheetData {
-            animation_frames: vec![6, 6, 4, 6, 7],
+            animation_frames: vec![6, 6, 4, 6, 7, 7, 7, 7, 7],
             anim_offset: 0,
         })
         .insert(FacingDirection::Down)
@@ -284,15 +284,15 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Essence, &proto, Vec2::ZERO, 10, None);
     // proto_commands.spawn_item_from_proto(WorldObject::BedBlock, &proto, Vec2::ZERO, 1, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::MagicGem, &proto, Vec2::ZERO, 1, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::MagicTusk, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodWallBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPlank, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodDoorBlock, &proto, Vec2::ZERO, 40, None);
     // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, Vec2::ZERO, 1, Some(1));
-    // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1,None);
+    // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
     // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, Vec2::ZERO, 1, None);
     // proto_commands.spawn_item_from_proto(WorldObject::MagicWhip, &proto, Vec2::ZERO, 1,None);

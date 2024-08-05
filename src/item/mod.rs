@@ -167,6 +167,20 @@ impl ActiveMainHandState {
     pub fn get_obj(&self) -> WorldObject {
         self.item_stack.obj_type
     }
+    pub fn get_attack_anim_offset(&self) -> f32 {
+        match self.item_stack.obj_type {
+            WorldObject::WoodSword => 1.,
+            WorldObject::Sword => 2.,
+            WorldObject::WoodAxe => 2.,
+            WorldObject::WoodPickaxe => 2.,
+            WorldObject::Dagger => 3.,
+            WorldObject::FireStaff => 4.,
+            WorldObject::BasicStaff => 0.,
+            WorldObject::Claw => 1.,
+            WorldObject::WoodBow => 1.,
+            _ => 0.,
+        }
+    }
 }
 
 #[derive(
