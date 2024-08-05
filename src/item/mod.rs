@@ -403,6 +403,7 @@ pub enum WorldObject {
 
     BossShrine,
     DirtPath,
+    TimeGate,
 }
 
 #[derive(
@@ -566,6 +567,14 @@ impl WorldObject {
             WorldObject::FireStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
+    pub fn is_unique_object(&self) -> bool {
+        match self {
+            WorldObject::TimeGate => true,
+            WorldObject::BossShrine => true,
+            WorldObject::DungeonEntrance => true,
             _ => false,
         }
     }

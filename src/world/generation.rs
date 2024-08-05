@@ -41,9 +41,15 @@ pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
     (WorldObject::BossShrine, Vec2::new(8., 8.), 8),
-    (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 2),
+    (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 3),
+    (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
+];
+const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
+    (WorldObject::Pebble, 1),
+    (WorldObject::DeadSapling, 2),
+    (WorldObject::BrownMushroom, 1),
 ];
 
 #[derive(Resource, Debug, Default, Clone)]
@@ -136,7 +142,7 @@ impl GenerationPlugin {
 
         //TODO: make these come from proto, use frequencies?
         let TREES = world_generation_params.forest_params.tree_weights.clone();
-        let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 };
+        let num_clusters = if rng.gen_ratio(1, 2) { 4 } else { 3 };
         let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
         for _ in 0..num_clusters {
             let mut picked_trees = TREES
@@ -277,8 +283,10 @@ impl GenerationPlugin {
                 if pos.chunk_pos.y == -1 {
                     pos.chunk_pos.y = -2;
                 }
+                if obj == WorldObject::TimeGate {
+                    pos = TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 2));
+                }
                 println!("set up a {obj:?} at {pos:?}");
-
                 game.world_obj_cache.unique_objs.insert(obj, pos);
             }
         }
@@ -352,6 +360,39 @@ impl GenerationPlugin {
                     objs_to_spawn = Box::new(objs_to_spawn.chain(points.into_iter()));
                 }
 
+                // generate starting area objs to ensure player has enough pebbles/sticks
+                if chunk_pos == IVec2::ZERO
+                    || chunk_pos == IVec2::new(-1, 0)
+                    || chunk_pos == IVec2::new(0, -1)
+                    || chunk_pos == IVec2::new(-1, -1)
+                {
+                    let mut starting_objs = vec![];
+                    for (obj, num) in STARTING_ZONE_OBJS.iter() {
+                        let x_range = if chunk_pos.x == 0 {
+                            0..CHUNK_SIZE / 2
+                        } else {
+                            CHUNK_SIZE / 2..CHUNK_SIZE
+                        };
+                        let y_range = if chunk_pos.y == 0 {
+                            0..CHUNK_SIZE / 2
+                        } else {
+                            10..CHUNK_SIZE
+                        };
+                        for _ in 0..*num {
+                            starting_objs.push((
+                                TileMapPosition::new(
+                                    chunk_pos,
+                                    TilePos::new(
+                                        rand::thread_rng().gen_range(x_range.clone()),
+                                        rand::thread_rng().gen_range(y_range.clone()),
+                                    ),
+                                ),
+                                *obj,
+                            ));
+                        }
+                    }
+                    objs_to_spawn = Box::new(objs_to_spawn.chain(starting_objs.into_iter()));
+                }
                 let mut objs_to_spawn =
                     objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
                 if dungeon_check.is_err() {
@@ -426,7 +467,7 @@ impl GenerationPlugin {
                 // clear out spawn area
                 let clear_tiles = get_radial_tile_positions(
                     TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
-                    12,
+                    10,
                 );
                 for pos in clear_tiles {
                     if let Some(obj) = objs.get(&pos) {
@@ -454,7 +495,6 @@ impl GenerationPlugin {
                                 .unwrap()
                                 .y
                                 / 2.) as i32;
-                            println!("SPAWNING UNIQUE {obj:?} at {pos:?} {x_halfsize:?}");
 
                             let mut pos = pos;
                             let mut found_non_water_location = false;
@@ -485,6 +525,7 @@ impl GenerationPlugin {
                             game.world_obj_cache.unique_objs.insert(obj, pos);
 
                             objs.insert(pos, obj);
+                            println!("SPAWNING UNIQUE {obj:?} at {pos:?} {x_halfsize:?}");
                         }
                         // clear out area
                         let clear_tiles = get_radial_tile_positions(
@@ -497,7 +538,9 @@ impl GenerationPlugin {
                         );
                         for pos in clear_tiles {
                             if let Some(obj) = objs.get(&pos) {
-                                if obj.is_tree() || obj.is_medium_size(&proto_param) {
+                                if (obj.is_tree() || obj.is_medium_size(&proto_param))
+                                    && !obj.is_unique_object()
+                                {
                                     objs.remove(&pos);
                                 }
                             }

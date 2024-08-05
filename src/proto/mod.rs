@@ -346,6 +346,7 @@ impl ProtoPlugin {
         prototypes.load("proto/Era2WorldGenerationParams.prototype.ron");
 
         prototypes.load("proto/bossshrine.prototype.ron");
+        prototypes.load("proto/timegate.prototype.ron");
     }
     fn check_proto_ready(prototypes: Prototypes) {
         for obj in WorldObject::iter() {

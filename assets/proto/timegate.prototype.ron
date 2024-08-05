@@ -1,0 +1,15 @@
+(
+  name: "TimeGate",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": TimeGate,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
+  "bevy_proto::custom::VisibilityBundle": (),
+  "survival_rogue_like::proto::ColliderProto": (x: 12., y: 20),
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("textures/TimeGate.png")
+    )
+  }
+)
