@@ -67,6 +67,10 @@ pub fn tile_pos_to_world_pos(pos: TileMapPosition, _center: bool) -> Vec2 {
             + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
     )
 }
+pub fn world_pos_to_ui_screen_pos(pos: Vec2, camera_pos: Vec2) -> Vec2 {
+    let screen_pos = pos - camera_pos;
+    screen_pos
+}
 
 /// offset should not be larger than +/- 15
 pub fn get_neighbour_tile(pos: TileMapPosition, offset: (i8, i8)) -> TileMapPosition {

@@ -34,7 +34,7 @@ use crate::{
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
-    ui::damage_numbers::PreviousHealth,
+    ui::{damage_numbers::PreviousHealth, FlashExpBarEvent},
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
@@ -168,6 +168,7 @@ fn spawn_player(
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut game: ResMut<Game>,
+    mut exp_sync_event: EventWriter<FlashExpBarEvent>,
 ) {
     //spawn player entity with limb spritesheets as children
     let player_texture_handle = asset_server.load("textures/player/player_down.png");
@@ -268,7 +269,7 @@ fn spawn_player(
                 for skill in data.player_skills.skills {
                     skill.add_skill_components(p, &mut commands);
                 }
-
+                exp_sync_event.send_default();
                 println!("LOADED PLAYER DATA FROM SAVE FILE");
             }
             Err(err) => println!("Failed to load data from file {err:?}"),

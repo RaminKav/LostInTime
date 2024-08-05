@@ -927,7 +927,7 @@ pub fn handle_break_object(
             let mut player = player_xp.single_mut();
             player.add_xp(exp.0);
             let t = tile_pos_to_world_pos(broken.pos, true);
-            spawn_xp_particles(t, &mut commands, particles.xp_particles.clone());
+            spawn_xp_particles(t, &mut commands, exp.0 as f32);
         }
 
         // Analytics
