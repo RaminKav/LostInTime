@@ -1,14 +1,14 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use super::{
-    interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon, InventorySlotType,
-    InventoryState, InventoryUI, UIElement, UIState,
+    interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
+    UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
     attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
-    inventory::{Inventory, ItemStack},
+    inventory::Inventory,
     player::{
         levels::PlayerLevel,
         skills::{PlayerSkills, Skill},
@@ -37,6 +37,8 @@ pub struct BarFlashTimer {
     pub flash_color: Color,
     pub color: Color,
 }
+#[derive(Default)]
+pub struct FlashExpBarEvent;
 
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
     let hud_bar_frame = commands
@@ -235,24 +237,26 @@ pub fn update_healthbar(
     flash.timer.tick(Duration::from_nanos(1));
 }
 pub fn update_xp_bar(
-    player_xp_query: Query<&PlayerLevel, (With<Player>, Changed<PlayerLevel>)>,
+    player_xp_query: Query<&PlayerLevel, With<Player>>,
     mut xp_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<XPBar>>,
     mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
+    mut flash_event: EventReader<FlashExpBarEvent>,
 ) {
-    let Ok(level) = player_xp_query.get_single() else {
-        return;
-    };
-    let (mut sprite, mut flash) = xp_bar_query.single_mut();
-    sprite.custom_size = Some(Vec2 {
-        x: 111. * level.xp as f32 / level.next_level_xp as f32,
-        y: 1.,
-    });
-    let (mut text, mut txfm) = xp_bar_text_query.single_mut();
-    text.sections[0].value = format!("{:}", level.level);
-    if level.level >= 10 {
-        txfm.translation.x = -5.5;
+    for _e in flash_event.iter() {
+        let level = player_xp_query.single();
+
+        let (mut sprite, mut flash) = xp_bar_query.single_mut();
+        sprite.custom_size = Some(Vec2 {
+            x: 111. * level.xp as f32 / level.next_level_xp as f32,
+            y: 1.,
+        });
+        let (mut text, mut txfm) = xp_bar_text_query.single_mut();
+        text.sections[0].value = format!("{:}", level.level);
+        if level.level >= 10 {
+            txfm.translation.x = -5.5;
+        }
+        flash.timer.tick(Duration::from_nanos(1));
     }
-    flash.timer.tick(Duration::from_nanos(1));
 }
 
 pub fn handle_flash_bars(mut query: Query<(&mut Sprite, &mut BarFlashTimer)>, time: Res<Time>) {
@@ -287,7 +291,6 @@ pub struct SkillHudIcon(pub Skill);
 pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     prev_icons: Query<&SkillHudIcon>,
 ) {

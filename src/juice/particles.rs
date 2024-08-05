@@ -15,6 +15,8 @@ use crate::{
     Game, GameParam,
 };
 
+use super::{CpuParticleGenerator, CpuParticleType};
+
 const DUST_OFFSET: Vec2 = Vec2::new(3., 4.);
 
 #[derive(Component)]
@@ -426,8 +428,8 @@ pub fn spawn_enemy_death_particles(
                 velocity: Vec3::new(0., 8000., 0.),
             },
         ));
-        if let Ok(_xp) = xp.get(death_event.entity) {
-            spawn_xp_particles(t, &mut commands, particles.xp_particles.clone());
+        if let Ok(xp) = xp.get(death_event.entity) {
+            spawn_xp_particles(t, &mut commands, xp.0 as f32);
         }
     }
 }
@@ -437,7 +439,6 @@ pub fn spawn_obj_death_particles(
     mut death_events: EventReader<ObjBreakEvent>,
     particles: Res<Particles>,
     proto_param: ProtoParam,
-    xp: Query<&ExperienceReward>,
 ) {
     for death_event in death_events.iter() {
         let t = tile_pos_to_world_pos(death_event.pos, true);
@@ -523,24 +524,20 @@ pub fn handle_exp_particles(
     }
 }
 
-pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, handle: Handle<EffectAsset>) {
+pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, amount: f32) {
     commands.spawn((
-        Name::new("emit:burst"),
-        ParticleEffectBundle {
-            effect: ParticleEffect::new(handle.clone())
-                .with_properties::<ParticleEffect>(vec![(
-                    "my_color".to_string(),
-                    graph::Value::Uint(YELLOW.as_linear_rgba_u32()),
-                )])
-                .with_z_layer_2d(Some(999.)),
-            transform: Transform::from_translation(Vec3::new(t.x as f32, t.y + 4., 2.)),
-            ..Default::default()
-        },
-        YSort(1.),
-        ExpParticles,
-        ObjectHitParticles {
-            despawn_timer: Timer::from_seconds(0.5, TimerMode::Once),
-            velocity: Vec3::new(0., 8000., 0.),
+        TransformBundle::from_transform(Transform::from_translation(t.extend(0.))),
+        CpuParticleGenerator {
+            min_particle_size: 1. + f32::floor(amount / 10.),
+            max_particle_size: 2. + f32::floor(amount / 10.),
+            min_particle_count: 1 + f32::floor(amount / 5.) as usize,
+            max_particle_count: 3 + f32::floor(amount / 5.) as usize,
+            pos_offset: Vec2::ZERO,
+            min_spawn_radius: 6.,
+            max_spawn_radius: 12.,
+            color: YELLOW,
+            lifetime: 100.,
+            particle_type: CpuParticleType::Exp,
         },
     ));
 }

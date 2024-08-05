@@ -2,6 +2,7 @@ use bevy::{prelude::*, transform::TransformSystem};
 use bevy_hanabi::HanabiPlugin;
 
 pub mod bounce;
+mod cpu_particles;
 mod particles;
 mod screen_flash;
 mod screen_shake;
@@ -9,6 +10,7 @@ use crate::{
     combat::handle_hits, inputs::move_camera_with_player, item::handle_break_object, CustomFlush,
     GameState,
 };
+pub use cpu_particles::*;
 pub use particles::*;
 pub use screen_flash::*;
 pub use screen_shake::*;
@@ -34,6 +36,8 @@ impl Plugin for JuicePlugin {
                     spawn_obj_hit_particles.after(handle_hits),
                     cleanup_object_particles,
                     spawn_enemy_death_particles,
+                    handle_generate_cpu_particles,
+                    handle_move_exp_particles,
                     spawn_obj_death_particles
                         .before(CustomFlush)
                         .before(handle_break_object),

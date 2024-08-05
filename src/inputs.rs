@@ -592,7 +592,7 @@ pub fn mouse_click_system(
                 .unwrap_or(true);
             println!(
                 "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?}",
-                world_pos_to_AIPos(cursor_pos.world_coords.truncate(),)
+                cursor_pos.ui_coords
             );
         }
         if attack_timer_option.is_some() {

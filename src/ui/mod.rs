@@ -71,6 +71,7 @@ impl Plugin for UIPlugin {
                 timer: Timer::from_seconds(0.3, TimerMode::Once),
             })
             .add_event::<ActionSuccessEvent>()
+            .add_event::<FlashExpBarEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<DodgeEvent>()
             .add_event::<RemoveFromSlotEvent>()
