@@ -1,0 +1,15 @@
+(
+  name: "TimeFragment",
+  templates: ["item_drop"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": TimeFragment,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: TimeFragment,
+        metadata: (
+            name: "Time Fragment", 
+            desc: [""]
+        ),
+        count: 1
+  ),
+  }
+)

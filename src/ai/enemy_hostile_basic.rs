@@ -257,6 +257,7 @@ pub fn follow(
             .insert(FacingDirection::from_translation(delta));
         if sprite.index == anim_data.get_starting_frame_for_animation(anim_state)
             && anim_state != &EnemyAnimationState::Hit
+            && anim_state != &EnemyAnimationState::Walk
         {
             commands.entity(entity).insert(EnemyAnimationState::Walk);
         }

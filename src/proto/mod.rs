@@ -347,6 +347,7 @@ impl ProtoPlugin {
 
         prototypes.load("proto/bossshrine.prototype.ron");
         prototypes.load("proto/timegate.prototype.ron");
+        prototypes.load("proto/timefragment.prototype.ron");
     }
     fn check_proto_ready(prototypes: Prototypes) {
         for obj in WorldObject::iter() {

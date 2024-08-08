@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use std::time::Duration;
 
-use crate::ai::pathfinding::{flood_fill, world_pos_to_AIPos};
+use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
 use crate::attributes::hunger::Hunger;
@@ -50,7 +50,7 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
-use crate::{Game, GameUpscale, Player, DEBUG, DEBUG_AI, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -456,7 +456,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            let f = proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }

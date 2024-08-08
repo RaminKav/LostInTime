@@ -11,6 +11,7 @@ use crate::{
         projectile::{EnemyProjectile, Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
     },
+    player::ModifyTimeFragmentsEvent,
     ui::damage_numbers::DodgeEvent,
     CustomFlush, GameParam, GameState, Player,
 };
@@ -273,6 +274,7 @@ pub fn check_item_drop_collisions(
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
 ) {
     if !game.player().is_moving {
         return;
@@ -287,6 +289,16 @@ pub fn check_item_drop_collisions(
             }
             let item_stack = items_query.get(e2).unwrap().clone();
             let obj = item_stack.obj_type.clone();
+            if obj == WorldObject::TimeFragment {
+                currency_event.send(ModifyTimeFragmentsEvent {
+                    delta: item_stack.count as i32,
+                });
+                commands.entity(e2).despawn();
+                analytics.send(AnalyticsUpdateEvent {
+                    update_type: AnalyticsTrigger::ItemCollected(obj),
+                });
+                continue;
+            }
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
             if inv_container.get_first_empty_slot().is_none()

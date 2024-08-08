@@ -377,7 +377,7 @@ pub fn handle_death(
                     &mut commands,
                     &game.graphics,
                     &asset_server,
-                    WorldObject::Essence,
+                    WorldObject::TimeFragment,
                 );
             }
         }

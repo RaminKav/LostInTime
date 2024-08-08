@@ -11,6 +11,8 @@ use screen_effects::ScreenEffectMaterial;
 pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
+pub mod key_input_guide;
+use key_input_guide::*;
 pub mod furnace_ui;
 pub use skill_choice_ui::*;
 mod interactions;
@@ -104,6 +106,7 @@ impl Plugin for UIPlugin {
                     setup_hotbar_hud,
                     setup_xp_bar_ui.after(load_state),
                     setup_bars_ui.after(load_state),
+                    setup_currency_ui,
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -183,6 +186,8 @@ impl Plugin for UIPlugin {
                     handle_cursor_essence_buttons,
                     handle_clamp_screen_locked_icons,
                     handle_update_player_skills,
+                    spawn_shrine_interact_key_guide,
+                    update_currency_text,
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),

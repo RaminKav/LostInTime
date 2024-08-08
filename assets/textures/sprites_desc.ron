@@ -510,6 +510,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        TimeFragment: WorldObjectData(
+            texture_pos: (12., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MiracleSeed: WorldObjectData(
             texture_pos: (8., 6.),
             size: (16., 16.),

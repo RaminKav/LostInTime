@@ -1,18 +1,19 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{asset::AssetServerError, prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use super::{
-    interactions::Interaction, spawn_inv_slot, InventorySlotType, InventoryState, InventoryUI,
-    UIElement, UIState,
+    interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon, InventorySlotType,
+    InventoryState, InventoryUI, UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
     attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
-    inventory::Inventory,
+    inventory::{Inventory, ItemStack},
+    item::WorldObject,
     player::{
         levels::PlayerLevel,
         skills::{PlayerSkills, Skill},
-        Player,
+        Player, TimeFragmentCurrency,
     },
     GAME_HEIGHT, GAME_WIDTH,
 };
@@ -28,6 +29,8 @@ pub struct ManaBar;
 pub struct XPBar;
 #[derive(Component)]
 pub struct XPBarText;
+#[derive(Component)]
+pub struct CurrencyText;
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
@@ -216,6 +219,60 @@ pub fn setup_xp_bar_ui(
         .entity(xp_bar_frame)
         .push_children(&[inner_xp_prog, text]);
 }
+pub fn setup_currency_ui(
+    mut commands: Commands,
+    currency: Query<&TimeFragmentCurrency>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    let time_fragments = currency.single();
+    let text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("{:}", time_fragments.time_fragments),
+                    TextStyle {
+                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
+                        font_size: 8.0,
+                        color: BLACK,
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(GAME_WIDTH / 2. - 16., GAME_HEIGHT / 2. - 16., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("TIME FRAGMENTS TEXT"),
+            CurrencyText,
+            RenderLayers::from_layers(&[3]),
+        ))
+        .id();
+
+    let item_icon = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::MagicGem),
+        &asset_server,
+        Vec2::new(GAME_WIDTH / 2. - 26., GAME_HEIGHT / 2. - 16.),
+        3,
+    );
+}
+pub fn update_currency_text(
+    currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
+    mut text_query: Query<(&mut Text, &mut Transform), With<CurrencyText>>,
+) {
+    let Ok(time_fragments) = currency.get_single() else {
+        return;
+    };
+    let (mut text, mut txfm) = text_query.single_mut();
+    text.sections[0].value = format!("{:}", time_fragments.time_fragments);
+    if time_fragments.time_fragments >= 10 {
+        txfm.translation.x = GAME_WIDTH / 2. - 16.;
+    }
+}
 pub fn update_healthbar(
     player_health_query: Query<
         (&CurrentHealth, &MaxHealth),
@@ -301,10 +358,10 @@ pub fn handle_update_player_skills(
                 continue;
             }
             let offset = Vec2::new(
-                i as f32 * 18.5 + (-GAME_WIDTH) / 2. + 94.,
+                i as f32 * 19. + (-GAME_WIDTH) / 2. + 98.,
                 (GAME_HEIGHT - 15.) / 2. - 12.5,
             );
-            commands
+            let icon = commands
                 .spawn(SpriteBundle {
                     texture: graphics.get_skill_icon(skill.clone()),
                     sprite: Sprite {
@@ -320,7 +377,24 @@ pub fn handle_update_player_skills(
                 })
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(SkillHudIcon(skill.clone()))
-                .insert(Name::new("HUD ICON!!"));
+                .insert(Name::new("HUD ICON!!"))
+                .id();
+            commands
+                .spawn(SpriteBundle {
+                    sprite: Sprite {
+                        color: BLACK,
+                        custom_size: Some(Vec2::new(18., 18.)),
+                        ..default()
+                    },
+                    transform: Transform {
+                        translation: Vec3::new(0., 0., -1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(icon);
         }
     }
 }

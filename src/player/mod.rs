@@ -12,8 +12,10 @@ use bevy_rapier2d::{
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
+pub mod currency;
 pub mod levels;
 pub mod skills;
+pub use currency::*;
 pub mod stats;
 use crate::{
     animations::{
@@ -102,7 +104,8 @@ impl Limb {
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-            app.add_event::<MovePlayerEvent>();
+            app.add_event::<MovePlayerEvent>()
+                .add_event::<ModifyTimeFragmentsEvent>();
         })
         .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
         .add_systems(
@@ -111,6 +114,7 @@ impl Plugin for PlayerPlugin {
                 handle_level_up,
                 spawn_particles_when_leveling,
                 hide_particles_when_inv_open,
+                handle_modify_time_fragments,
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -240,6 +244,7 @@ fn spawn_player(
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
+        .insert(TimeFragmentCurrency::default())
         .insert(Sensor)
         .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
@@ -262,6 +267,7 @@ fn spawn_player(
                     data.current_health,
                     data.player_skills.clone(),
                     PreviousHealth(data.current_health.0),
+                    TimeFragmentCurrency::new(data.currency),
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),
@@ -269,13 +275,13 @@ fn spawn_player(
                 for skill in data.player_skills.skills {
                     skill.add_skill_components(p, &mut commands);
                 }
-                exp_sync_event.send_default();
                 println!("LOADED PLAYER DATA FROM SAVE FILE");
             }
             Err(err) => println!("Failed to load data from file {err:?}"),
         }
     }
     game.player = p;
+    exp_sync_event.send_default();
 }
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {

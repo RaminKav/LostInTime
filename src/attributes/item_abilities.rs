@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     animations::AttackEvent,
     combat_helpers::spawn_temp_collider,
-    inputs::CursorPos,
+    inputs::MovementVector,
     inventory::ItemStack,
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
@@ -57,15 +57,14 @@ pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
-    player: Query<(&GlobalTransform, &PlayerSkills), With<Player>>,
+    player: Query<(&GlobalTransform, &PlayerSkills, &MovementVector), With<Player>>,
     key_input: ResMut<Input<KeyCode>>,
-    cursor_pos: Res<CursorPos>,
     mut game: GameParam,
     proto_param: ProtoParam,
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    let (player_pos, skills) = player.single();
+    let (player_pos, skills, move_direction) = player.single();
     let Some(main_hand) = game.player().main_hand_slot else {
         return;
     };
@@ -101,8 +100,7 @@ pub fn handle_item_abilitiy_on_attack(
     {
         player.player_dash_cooldown.reset();
         let player_pos = player_pos.translation();
-        let direction =
-            (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
+        let direction = move_direction.0.normalize();
         let distance = direction * 3. * TILE_SIZE.x;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
         if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {

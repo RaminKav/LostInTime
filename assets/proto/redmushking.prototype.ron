@@ -178,7 +178,7 @@
                 rate: 0.85
             ),
             (
-                item: Essence,
+                item: TimeFragment,
                 min: 2,
                 max: 5,
                 rate: 1.

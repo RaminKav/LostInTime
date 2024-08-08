@@ -170,6 +170,7 @@ pub fn handle_drop_in_world_events(
                         item_stacks.get(drop_event.dropped_entity).unwrap(),
                         &asset_server,
                         Vec2::ZERO,
+                        3,
                     );
 
                     commands.entity(new_drag_icon_entity).insert(DraggedItem);
@@ -267,6 +268,7 @@ pub fn handle_drop_on_slot_events(
                     &updated_drag_item,
                     &asset_server,
                     Vec2::ZERO,
+                    3,
                 );
 
                 commands.entity(new_drag_icon_entity).insert(DraggedItem);
@@ -646,6 +648,7 @@ pub fn handle_interaction_clicks(
                                     &split_stack,
                                     &asset_server,
                                     Vec2::ZERO,
+                                    3,
                                 );
 
                                 commands.entity(e).insert(DraggedItem);
