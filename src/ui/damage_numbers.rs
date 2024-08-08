@@ -151,10 +151,10 @@ pub fn spawn_screen_locked_icon(
         &ItemStack::crate_icon_stack(obj),
         asset_server,
         Vec2::ZERO,
+        0,
     );
     commands
         .entity(item_icon)
-        .insert(RenderLayers::from_layers(&[0]))
         .insert(Name::new("SCREEN ICON ITEM"));
 
     let mut slot_entity = commands.spawn(SpriteBundle {

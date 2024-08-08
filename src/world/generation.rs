@@ -48,7 +48,7 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
 ];
 const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
     (WorldObject::Pebble, 1),
-    (WorldObject::DeadSapling, 2),
+    (WorldObject::DeadSapling, 1),
     (WorldObject::BrownMushroom, 1),
 ];
 
@@ -554,32 +554,8 @@ impl GenerationPlugin {
                 for obj_data in objs.clone().iter() {
                     let (pos, obj) = obj_data;
                     let is_medium = obj_data.1.is_medium_size(&proto_param);
-                    if occupied_tiles.contains_key(pos)
-                        || (is_medium
-                            && (occupied_tiles.contains_key(&pos)
-                                || occupied_tiles.contains_key(
-                                    &pos.get_neighbour_tiles_for_medium_objects()[0],
-                                )
-                                || occupied_tiles.contains_key(
-                                    &pos.get_neighbour_tiles_for_medium_objects()[1],
-                                )
-                                || occupied_tiles.contains_key(
-                                    &pos.get_neighbour_tiles_for_medium_objects()[2],
-                                )))
-                    {
-                        // override chests and dungeon exits, skip anything else
-                        if obj == &WorldObject::DungeonExit
-                            || obj == &WorldObject::Chest
-                            || obj == &WorldObject::DungeonEntrance
-                        {
-                            occupied_tiles.remove(pos);
-                            occupied_tiles.insert(*pos, *obj);
-                        } else {
-                            continue;
-                        }
-                    }
                     if is_medium {
-                        occupied_tiles.insert(*pos, obj.clone());
+                        occupied_tiles.insert(pos.clone(), obj.clone());
                         occupied_tiles
                             .insert(pos.get_neighbour_tiles_for_medium_objects()[0], obj.clone());
                         occupied_tiles
@@ -587,8 +563,21 @@ impl GenerationPlugin {
                         occupied_tiles
                             .insert(pos.get_neighbour_tiles_for_medium_objects()[2], obj.clone());
                     } else {
+                        if occupied_tiles.contains_key(pos) {
+                            // override chests and dungeon exits, skip anything else
+                            if obj == &WorldObject::DungeonExit
+                                || obj == &WorldObject::Chest
+                                || obj == &WorldObject::DungeonEntrance
+                            {
+                                occupied_tiles.remove(pos);
+                                occupied_tiles.insert(*pos, *obj);
+                            } else {
+                                continue;
+                            }
+                        }
                         occupied_tiles.insert(pos.clone(), obj.clone());
                     }
+
                     tiles_to_spawn.insert(*pos, *obj);
                 }
                 for (pos, obj) in tiles_to_spawn.iter() {

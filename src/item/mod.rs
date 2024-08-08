@@ -404,6 +404,7 @@ pub enum WorldObject {
     BossShrine,
     DirtPath,
     TimeGate,
+    TimeFragment,
 }
 
 #[derive(
@@ -757,7 +758,7 @@ impl Plugin for ItemsPlugin {
             )
             .add_systems(
                 (
-                    check_for_items_on_shrine,
+                    handle_pay_shrine_cost,
                     handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>()),
                     handle_item_action_success,
                     handle_delayed_ranged_attack,

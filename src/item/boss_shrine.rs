@@ -7,6 +7,7 @@ use crate::{
     enemy::Mob,
     inventory::ItemStack,
     juice::{FlashEffect, ShakeEffect},
+    player::{ModifyTimeFragmentsEvent, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     world::{dimension::ActiveDimension, dungeon::Dungeon, world_helpers::tile_pos_to_world_pos},
     GameParam, TextureCamera,
@@ -50,6 +51,57 @@ pub fn check_for_items_on_shrine(
                     pos: shrine_pos,
                 });
                 commands.entity(e).despawn_recursive();
+
+                // Boss Effects
+                // Screen Shake
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(3.5, TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+            }
+        }
+    }
+}
+pub fn handle_pay_shrine_cost(
+    mut commands: Commands,
+    key_input: ResMut<Input<KeyCode>>,
+    player_query: Query<(&GlobalTransform, &TimeFragmentCurrency)>,
+    game: GameParam,
+    mut game_camera: Query<Entity, With<TextureCamera>>,
+    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
+) {
+    if key_input.just_pressed(KeyCode::F) {
+        let (player_t, currency) = player_query.single();
+        let Some(shrine) = game
+            .world_obj_cache
+            .unique_objs
+            .get(&WorldObject::BossShrine)
+        else {
+            return;
+        };
+        let shrine_pos = tile_pos_to_world_pos(*shrine, false);
+
+        if shrine_pos.distance(player_t.translation().truncate()) < 32. {
+            if currency.time_fragments >= 10 {
+                currency_event.send(ModifyTimeFragmentsEvent { delta: -10 });
+                // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, shrine_pos);
+                commands.insert_resource(DelayedSpawn {
+                    timer: Timer::from_seconds(3., TimerMode::Once),
+                    mob: Mob::RedMushking,
+                    pos: shrine_pos,
+                });
 
                 // Boss Effects
                 // Screen Shake

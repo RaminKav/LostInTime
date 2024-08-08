@@ -31,7 +31,7 @@ use crate::{
         levels::PlayerLevel,
         skills::{PlayerSkills, SkillChoiceQueue},
         stats::{PlayerStats, SkillPoints},
-        Player,
+        Player, TimeFragmentCurrency,
     },
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer},
@@ -150,6 +150,7 @@ pub struct CurrentRunSaveData {
     pub player_hunger: u8,
     pub player_skills: PlayerSkills,
     pub player_skill_queue: SkillChoiceQueue,
+    pub currency: i32,
 
     // Era
     pub current_era: Era,
@@ -246,6 +247,7 @@ pub fn save_state(
             &Hunger,
             &Inventory,
             &PlayerSkills,
+            &TimeFragmentCurrency,
         ),
         With<Player>,
     >,
@@ -269,7 +271,7 @@ pub fn save_state(
     }
     timer.timer.reset();
     //PlayerData
-    let (player_txfm, stats, level, hp, hunger, inv, skills) = player_data.single();
+    let (player_txfm, stats, level, hp, hunger, inv, skills, currency) = player_data.single();
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
     save_data.player_level = level.clone();
@@ -281,6 +283,7 @@ pub fn save_state(
     save_data.visited_eras = game.era.visited_eras.clone();
     save_data.player_skills = skills.clone();
     save_data.player_skill_queue = skills_queue.clone();
+    save_data.currency = currency.time_fragments;
 
     save_data.placed_objs = game
         .era

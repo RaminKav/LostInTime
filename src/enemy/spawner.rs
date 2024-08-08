@@ -340,7 +340,7 @@ fn handle_spawn_mobs(
                         &mut commands,
                         &game.graphics,
                         &asset_server,
-                        WorldObject::Essence,
+                        WorldObject::TimeFragment,
                     );
                 }
                 if rng.gen::<f32>() < ELITE_SPAWN_RATE

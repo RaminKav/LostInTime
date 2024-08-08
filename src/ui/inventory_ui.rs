@@ -334,6 +334,7 @@ pub fn spawn_inv_slot(
             &item.item_stack,
             asset_server,
             Vec2::ZERO,
+            3,
         ));
     }
 
@@ -392,6 +393,7 @@ pub fn spawn_item_stack_icon(
     item_stack: &ItemStack,
     asset_server: &AssetServer,
     offset: Vec2,
+    render_layer: u8,
 ) -> Entity {
     let has_icon = graphics.icons.as_ref().unwrap().get(&item_stack.obj_type);
     let sprite = if let Some(icon) = has_icon {
@@ -416,7 +418,7 @@ pub fn spawn_item_stack_icon(
             ..Default::default()
         })
         .insert(item_stack.clone())
-        .insert(RenderLayers::from_layers(&[3]))
+        .insert(RenderLayers::from_layers(&[render_layer]))
         .id();
     if item_stack.count > 1 {
         let text = commands
@@ -439,7 +441,7 @@ pub fn spawn_item_stack_icon(
                     ..default()
                 },
                 Name::new("TEXT"),
-                RenderLayers::from_layers(&[3]),
+                RenderLayers::from_layers(&[render_layer]),
             ))
             .id();
         commands.entity(item).push_children(&[text]);

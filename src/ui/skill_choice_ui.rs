@@ -3,16 +3,15 @@ use bevy_proto::prelude::ProtoCommands;
 
 use crate::{
     assets::Graphics,
-    colors::BLACK,
+    colors::{BLACK, WHITE},
     custom_commands::CommandsExt,
-    inventory::ItemStack,
     player::skills::{SkillChoiceQueue, SkillChoiceState},
     proto::proto_param::ProtoParam,
     GAME_HEIGHT, GAME_WIDTH,
 };
 use rand::seq::IteratorRandom;
 
-use super::{spawn_item_stack_icon, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE};
+use super::{Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE};
 
 #[derive(Component)]
 pub struct SkillChoiceUI {
@@ -130,14 +129,41 @@ pub fn setup_skill_choice_ui(
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         // icon
-        let icon = spawn_item_stack_icon(
-            &mut commands,
-            &graphics,
-            &ItemStack::crate_icon_stack(choice.skill.get_icon()),
-            &asset_server,
-            Vec2::new(0., 25.),
-        );
-        commands.entity(icon).set_parent(skills_e);
+        let icon = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_skill_icon(choice.skill.clone()),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(32., 32.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec2::new(0., 25.).extend(4.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("SKILL ICON!!"))
+            .set_parent(skills_e)
+            .id();
+        commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: BLACK,
+                    custom_size: Some(Vec2::new(34., 34.)),
+                    ..default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(0., 0., -1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(icon);
+
         let mut text_title = commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -145,7 +171,7 @@ pub fn setup_skill_choice_ui(
                     TextStyle {
                         font: asset_server.load("fonts/Kitchen Sink.ttf"),
                         font_size: 8.0,
-                        color: BLACK,
+                        color: WHITE,
                     },
                 ),
                 text_anchor: Anchor::Center,
@@ -169,12 +195,12 @@ pub fn setup_skill_choice_ui(
                         TextStyle {
                             font: asset_server.load("fonts/Kitchen Sink.ttf"),
                             font_size: 8.0,
-                            color: BLACK,
+                            color: WHITE,
                         },
                     ),
                     text_anchor: Anchor::Center,
                     transform: Transform {
-                        translation: Vec3::new(0., 4. - i as f32 * 9., 1.),
+                        translation: Vec3::new(0., 2. - i as f32 * 9., 1.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },

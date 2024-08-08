@@ -206,6 +206,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     },
                     &asset_server,
                     Vec2::ZERO,
+                    3,
                 );
                 commands
                     .entity(icon_e)
@@ -245,6 +246,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 },
                 &asset_server,
                 Vec2::ZERO,
+                3,
             );
             commands.entity(icon_e).insert(Transform {
                 translation: pos,
