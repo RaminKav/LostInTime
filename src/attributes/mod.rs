@@ -1,7 +1,8 @@
-use item_abilities::{add_ability_to_item_drops, handle_item_abilitiy_on_attack};
+use item_abilities::handle_item_abilitiy_on_attack;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Range, RangeInclusive};
+use strum_macros::{Display, EnumIter};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -9,6 +10,7 @@ pub mod health_regen;
 pub mod modifiers;
 use crate::{
     animations::AnimatedTextureMaterial,
+    assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     client::GameOverEvent,
     colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
@@ -474,6 +476,12 @@ pub enum ItemRarity {
     Rare,
     Legendary,
 }
+#[derive(EnumIter, Display, Eq, PartialEq, Clone, Hash)]
+pub enum ItemGlow {
+    Green,
+    Blue,
+    Red,
+}
 
 impl ItemRarity {
     fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
@@ -516,6 +524,14 @@ impl ItemRarity {
             ItemRarity::Uncommon => ItemRarity::Rare,
             ItemRarity::Rare => ItemRarity::Legendary,
             ItemRarity::Legendary => ItemRarity::Legendary,
+        }
+    }
+    pub fn get_item_glow(&self) -> Option<ItemGlow> {
+        match self {
+            ItemRarity::Common => None,
+            ItemRarity::Uncommon => Some(ItemGlow::Green),
+            ItemRarity::Rare => Some(ItemGlow::Blue),
+            ItemRarity::Legendary => Some(ItemGlow::Red),
         }
     }
 }
@@ -835,10 +851,13 @@ fn handle_new_items_raw_attributes(
         ),
         Or<(Added<RawItemBaseAttributes>, Added<RawItemBonusAttributes>)>,
     >,
+    graphics: Res<Graphics>,
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
         let rarity = get_rarity_rng(rand::thread_rng());
-        let mut new_stack = build_item_stack_with_parsed_attributes(
+        add_item_glows(&mut commands, &graphics, e, rarity.clone());
+
+        let new_stack = build_item_stack_with_parsed_attributes(
             stack,
             raw_base_att,
             raw_bonus_att_option,
@@ -846,9 +865,32 @@ fn handle_new_items_raw_attributes(
             eqp_type,
             item_level.map(|l| l.0),
         );
-        if new_stack.obj_type.is_weapon() {
-            add_ability_to_item_drops(&mut new_stack);
-        }
+
         commands.entity(e).insert(new_stack);
+    }
+}
+
+pub fn add_item_glows(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    new_item_e: Entity,
+    rarity: ItemRarity,
+) {
+    if let Some(glow) = rarity.get_item_glow() {
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_item_glow(glow.clone()),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(16., 16.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(0., 0., -1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .set_parent(new_item_e);
     }
 }

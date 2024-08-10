@@ -37,7 +37,7 @@ impl Default for ItemAbility {
 // perhapse a 3rd item upgrade can add or override abilities on items
 // when AttackEvent is fired, we match on enum and handle teh ability.
 const ITEM_ABILITY_CHANCE: u32 = 25;
-pub fn add_ability_to_item_drops(stack: &mut ItemStack) {
+pub fn _add_ability_to_item_drops(stack: &mut ItemStack) {
     let mut rng = rand::thread_rng();
     let chance = rng.gen_range(0..100);
     if chance <= ITEM_ABILITY_CHANCE {

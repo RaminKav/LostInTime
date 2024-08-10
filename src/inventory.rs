@@ -3,7 +3,7 @@ use std::cmp::min;
 
 use crate::{
     animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
-    attributes::{AttributeModifier, ItemAttributes, ItemRarity},
+    attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
     container::Container,
     inputs::FacingDirection,
     item::{
@@ -380,6 +380,7 @@ impl ItemStack {
             obj_data.size.x / 3.5,
             obj_data.size.y / 4.5,
         ));
+        add_item_glows(commands, &game.graphics, item, self.rarity.clone());
         item
     }
     pub fn copy_with_attributes(&self, attributes: &ItemAttributes) -> Self {
