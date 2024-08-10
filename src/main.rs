@@ -241,7 +241,6 @@ pub struct ImageAssets {
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
-    pub analytics_data: Res<'w, AnalyticsData>,
     pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub pathfinding_cache: ResMut<'w, PathfindingCache>,

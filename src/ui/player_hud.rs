@@ -251,10 +251,10 @@ pub fn setup_currency_ui(
         ))
         .id();
 
-    let item_icon = spawn_item_stack_icon(
+    spawn_item_stack_icon(
         &mut commands,
         &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::MagicGem),
+        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
         Vec2::new(GAME_WIDTH / 2. - 26., GAME_HEIGHT / 2. - 16.),
         3,

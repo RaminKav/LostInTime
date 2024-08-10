@@ -1,5 +1,4 @@
 use std::fs::File;
-
 /*
     Analytics System:
     track various data points through event listeners.
@@ -24,13 +23,20 @@ use std::fs::File;
 */
 use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
+use ws::{connect, CloseCode};
 
-use crate::{enemy::Mob, item::WorldObject, world::dimension::GenerationSeed, GameState};
-
-use super::GameOverEvent;
+use crate::{
+    enemy::Mob,
+    item::WorldObject,
+    player::skills::{PlayerSkills, Skill},
+    world::dimension::GenerationSeed,
+    GameState,
+};
 
 #[derive(Debug, Clone, Resource, Default, Serialize, Deserialize)]
 pub struct AnalyticsData {
+    pub user_id: String,
+
     pub mobs_killed: HashMap<Mob, u32>,
     pub items_collected: HashMap<WorldObject, u32>,
     pub recipes_crafted: HashMap<WorldObject, u32>,
@@ -45,6 +51,7 @@ pub struct AnalyticsData {
     pub total_objects_placed: u32,
     pub items_consumed: HashMap<WorldObject, u32>,
     pub total_items_consumed: u32,
+    pub skills: Vec<Skill>,
 }
 
 pub struct AnalyticsPlugin;
@@ -52,6 +59,7 @@ pub struct AnalyticsPlugin;
 impl Plugin for AnalyticsPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AnalyticsUpdateEvent>()
+            .add_event::<SendAnalyticsDataToServerEvent>()
             .add_system(handle_analytics_update.run_if(resource_exists::<AnalyticsData>()))
             .add_system(add_analytics_resource_on_start.in_schedule(OnExit(GameState::MainMenu)))
             .add_system(
@@ -63,6 +71,9 @@ impl Plugin for AnalyticsPlugin {
 pub struct AnalyticsUpdateEvent {
     pub update_type: AnalyticsTrigger,
 }
+
+#[derive(Default)]
+pub struct SendAnalyticsDataToServerEvent;
 
 #[derive(Debug, Clone)]
 pub enum AnalyticsTrigger {
@@ -120,12 +131,13 @@ pub fn add_analytics_resource_on_start(mut commands: Commands) {
     commands.insert_resource(AnalyticsData::default());
 }
 pub fn save_analytics_data_to_file_on_game_over(
-    analytics_data: Res<AnalyticsData>,
+    mut analytics_data: ResMut<AnalyticsData>,
     seed: Res<GenerationSeed>,
-    game_over_events: EventReader<GameOverEvent>,
-    key_input: ResMut<Input<KeyCode>>,
+    events: EventReader<SendAnalyticsDataToServerEvent>,
+    mut commands: Commands,
+    skills: Query<&PlayerSkills>,
 ) {
-    if game_over_events.is_empty() && !key_input.just_pressed(KeyCode::U) {
+    if events.is_empty() {
         return;
     }
     let PATH: &str = &format!("analytics_{}.json", seed.seed).to_string();
@@ -136,5 +148,34 @@ pub fn save_analytics_data_to_file_on_game_over(
         println!("Failed to save game state: {result:?}");
     } else {
         println!("SAVED ANALYTICS!");
+    }
+    analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+    connect_server(analytics_data.clone());
+    commands.remove_resource::<AnalyticsData>();
+}
+
+fn connect_server(data: AnalyticsData) {
+    println!("Connecting...");
+    if let Err(error) = connect("wss://bevy-analytics.shuttleapp.rs/ws", |out| {
+        // Queue a message to be sent when the WebSocket is open
+        let json = serde_json::to_string(&data).expect("data serializes");
+        if out.send(json).is_err() {
+            println!("Websocket couldn't queue an initial message.")
+        } else {
+            println!("Client sent message 'Hello WebSocket'. ")
+        }
+        out.close(CloseCode::Normal);
+
+        // The handler needs to take ownership of out, so we use move
+        move |msg| {
+            // Handle messages received on this connection
+            println!("Client got message: '{}'. ", msg);
+
+            // Close the connection
+            out.close(CloseCode::Normal)
+        }
+    }) {
+        // Inform the user of failure
+        println!("Failed to create WebSocket due to: {:?}", error);
     }
 }

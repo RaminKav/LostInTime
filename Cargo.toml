@@ -31,6 +31,7 @@ lazy_static = "1.4.0"
 bevy_aseprite = "0.10"
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
+ws = {version = "0.9.2", features = ['ssl']}
 bevy_hanabi = { version = "0.6", default-features = false, features = [ "2d" ] }
 
 [features]

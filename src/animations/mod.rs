@@ -105,7 +105,6 @@ impl Plugin for AnimationsPlugin {
                     animate_hit,
                     animate_spritesheet_animations.after(mouse_click_system),
                     animate_foliage_opacity,
-                    // handle_add_foliage_material,
                     handle_game_over_fadeout,
                 )
                     .in_set(OnUpdate(GameState::Main)),
