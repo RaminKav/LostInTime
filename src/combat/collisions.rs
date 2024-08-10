@@ -312,7 +312,7 @@ pub fn check_item_drop_collisions(
 
             item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
 
-            commands.entity(e2).despawn();
+            commands.entity(e2).despawn_recursive();
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
