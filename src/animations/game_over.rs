@@ -3,7 +3,7 @@ use std::fs;
 use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
-    client::GameOverEvent,
+    client::{analytics::SendAnalyticsDataToServerEvent, GameOverEvent},
     colors::{overwrite_alpha, WHITE},
     container::ContainerRegistry,
     enemy::Mob,
@@ -96,6 +96,7 @@ pub fn tick_game_over_overlay(
             With<Mob>,
             With<Chunk>,
             With<Sprite>,
+            With<TextureAtlasSprite>,
             With<Player>,
             With<Text>,
             With<ActiveDimension>,
@@ -105,8 +106,14 @@ pub fn tick_game_over_overlay(
     >,
     mut next_state: ResMut<NextState<GameState>>,
     asset_server: Res<AssetServer>,
+    mut analytics_events: EventWriter<SendAnalyticsDataToServerEvent>,
+    mut analytics_check: Local<bool>,
 ) {
     for (e, mut timer, mut sprite) in query.iter_mut() {
+        if timer.0.percent() >= 50. && !*analytics_check {
+            analytics_events.send_default();
+            *analytics_check = true;
+        }
         timer.0.tick(time.delta());
         if timer.0.finished() {
             println!("Despawning everything, Sending to main menu");

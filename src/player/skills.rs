@@ -43,7 +43,11 @@ pub enum Skill {
     ChainLightning,
     FireStaffAoE,
     BowArrowSpeed,
-    //Chance to not use arrow
+    //BLUE: ManaGain
+    //GREEN: chance to not consume arrows/throwing stars
+    //YELLOW: bonus dash
+    //YELLOW: first hit after a dash is crit
+    //RED: Your swords do bonus dmg
     //
 }
 

@@ -1,6 +1,10 @@
 use std::{fs::File, io::BufReader};
 
-use bevy::{math::Vec3Swizzles, prelude::*, utils::HashMap};
+use bevy::{
+    math::Vec3Swizzles,
+    prelude::*,
+    utils::{HashMap, Uuid},
+};
 use bevy_ecs_tilemap::{
     prelude::{
         TilemapGridSize, TilemapId, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize,
@@ -119,7 +123,15 @@ impl Plugin for ClientPlugin {
             .add_plugin(AnalyticsPlugin)
             .add_system(load_state.in_schedule(OnExit(GameState::MainMenu)))
             .add_systems(
-                (save_state, handle_append_run_data_after_death).in_set(OnUpdate(GameState::Main)),
+                (
+                    save_state.run_if(resource_exists::<AnalyticsData>()),
+                    tick_save_timer,
+                    handle_append_run_data_after_death
+                        .before(save_analytics_data_to_file_on_game_over)
+                        .run_if(resource_exists::<AnalyticsData>()),
+                )
+                    .before(save_analytics_data_to_file_on_game_over)
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -171,62 +183,67 @@ pub struct GameData {
     pub num_runs: u128,
     pub longest_run: u8,
     pub seen_gear: Vec<ItemStack>,
+    pub user_id: String,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
     inv: Query<&Inventory>,
     proto_param: ProtoParam,
-    game_over: EventReader<GameOverEvent>,
+    mut game_over: EventReader<GameOverEvent>,
+    mut analytics_data: ResMut<AnalyticsData>,
 ) {
-    if game_over.is_empty() {
-        return;
-    }
-    println!("GAME OVER! Storing run data in game_data.json...");
-    let mut game_data: GameData = GameData::default();
+    for _event in game_over.iter() {
+        println!("GAME OVER! Storing run data in game_data.json...");
+        let mut game_data: GameData = GameData::default();
+        if let Ok(file_file) = File::open("game_data.json") {
+            let reader = BufReader::new(file_file);
 
-    if let Ok(file_file) = File::open("game_data.json") {
-        let reader = BufReader::new(file_file);
-
-        // Read the JSON contents of the file as an instance of `User`.
-        match serde_json::from_reader::<_, GameData>(reader) {
-            Ok(data) => game_data = data,
-            Err(err) => println!("Failed to load data from game_data.json file {err:?}"),
+            // Read the JSON contents of the file as an instance of `User`.
+            match serde_json::from_reader::<_, GameData>(reader) {
+                Ok(data) => game_data = data,
+                Err(err) => println!("Failed to load data from game_data.json file {err:?}"),
+            }
+        };
+        game_data.num_runs += 1;
+        if game_data.longest_run < night.days {
+            game_data.longest_run = night.days;
         }
-    };
-    game_data.num_runs += 1;
-    if game_data.longest_run < night.days {
-        game_data.longest_run = night.days;
-    }
-    let inv = inv.single();
-    for item in inv.items.items.clone().iter().flatten() {
-        if item.slot < 6 {
-            //hotbar item
-            if let Some(eqp_type) = item.get_obj().get_equip_type(&proto_param) {
-                if eqp_type != EquipmentType::Axe && eqp_type != EquipmentType::Pickaxe {
-                    game_data.seen_gear.push(item.item_stack.clone());
+        let inv = inv.single();
+        for item in inv.items.items.clone().iter().flatten() {
+            if item.slot < 6 {
+                //hotbar item
+                if let Some(eqp_type) = item.get_obj().get_equip_type(&proto_param) {
+                    if eqp_type != EquipmentType::Axe && eqp_type != EquipmentType::Pickaxe {
+                        game_data.seen_gear.push(item.item_stack.clone());
+                    }
                 }
             }
         }
+        if game_data.user_id.is_empty() {
+            game_data.user_id = Uuid::new_v4().to_string();
+        }
+        analytics_data.user_id = game_data.user_id.clone();
+        for item in inv.equipment_items.items.iter().flatten() {
+            game_data.seen_gear.push(item.item_stack.clone());
+        }
+
+        const PATH: &str = "game_data.json";
+
+        let file = File::create(PATH).expect("Could not create game data file for serialization");
+
+        // let json_Data: String = serde_json::to_string(&save_data).unwrap();
+        if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
+            println!("Failed to save game data after death: {result:?}");
+        } else {
+            println!("UPDATED GAME DATA...");
+        }
     }
-
-    for item in inv.equipment_items.items.iter().flatten() {
-        game_data.seen_gear.push(item.item_stack.clone());
-    }
-
-    const PATH: &str = "game_data.json";
-
-    let file = File::create(PATH).expect("Could not create game data file for serialization");
-
-    // let json_Data: String = serde_json::to_string(&save_data).unwrap();
-    if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
-        println!("Failed to save game data after death: {result:?}");
-    } else {
-        println!("UPDATED GAME DATA...");
-    }
+}
+pub fn tick_save_timer(mut timer: ResMut<SaveTimer>, time: Res<Time>) {
+    timer.timer.tick(time.delta());
 }
 pub fn save_state(
     mut timer: ResMut<SaveTimer>,
-    time: Res<Time>,
     placed_objs: Query<
         (
             &GlobalTransform,
@@ -260,9 +277,9 @@ pub fn save_state(
     check_open_furnace: Option<Res<FurnaceContainer>>,
     key_input: ResMut<Input<KeyCode>>,
     skills_queue: Res<SkillChoiceQueue>,
+    analytics_data: Res<AnalyticsData>,
     game: GameParam,
 ) {
-    timer.timer.tick(time.delta());
     // only save if the timer is done and we are not in a dungeon
     if (!timer.timer.just_finished() || dungeon_check.get_single().is_ok())
         && !key_input.just_pressed(KeyCode::U)
@@ -373,7 +390,7 @@ pub fn save_state(
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;
-    save_data.analytics_data = game.analytics_data.clone();
+    save_data.analytics_data = analytics_data.clone();
 
     const PATH: &str = "save_state.json";
 
