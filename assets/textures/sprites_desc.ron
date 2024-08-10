@@ -511,7 +511,7 @@
             anchor: None,
         ),
         TimeFragment: WorldObjectData(
-            texture_pos: (12., 6.),
+            texture_pos: (15., 3.),
             size: (16., 16.),
             anchor: None,
         ),
