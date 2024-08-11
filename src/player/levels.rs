@@ -92,21 +92,36 @@ pub fn spawn_particles_when_leveling(
         let texture_atlas =
             TextureAtlas::from_grid(texture_handle, Vec2::new(27.0, 25.0), 4, 1, None, None);
         let texture_atlas_handle = texture_atlases.add(texture_atlas);
-        commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas_handle,
-                transform: Transform::from_translation(Vec3::new(
-                    9.5,
-                    -GAME_HEIGHT / 2. + 40.5,
-                    5.,
-                )),
-                ..default()
-            },
-            AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
-            LevelUpParticles,
-            RenderLayers::from_layers(&[3]),
-            Name::new("Level Particles"),
-        ));
+        let particles = commands
+            .spawn((
+                SpriteSheetBundle {
+                    texture_atlas: texture_atlas_handle,
+                    transform: Transform::from_translation(Vec3::new(
+                        9.5,
+                        -GAME_HEIGHT / 2. + 40.5,
+                        5.,
+                    )),
+                    ..default()
+                },
+                AnimationTimer(Timer::from_seconds(0.2, TimerMode::Repeating)),
+                LevelUpParticles,
+                RenderLayers::from_layers(&[3]),
+                Name::new("Level Particles"),
+            ))
+            .id();
+        commands
+            .spawn(SpriteBundle {
+                texture: asset_server.load("textures/BKey.png"),
+                transform: Transform::from_translation(Vec3::new(0., 15., 1.)),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(11., 11.)),
+                    ..Default::default()
+                },
+                visibility: Visibility::Inherited,
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(particles);
     } else if skill_queue.queue.is_empty() && existing_particles.iter().next().is_some() {
         commands.entity(existing_particles.single()).despawn();
     }
@@ -119,7 +134,7 @@ pub fn hide_particles_when_inv_open(
 ) {
     if ui_state.0 != UIState::Closed {
         for p in particles.iter() {
-            commands.entity(p).despawn();
+            commands.entity(p).despawn_recursive();
         }
     }
 }
