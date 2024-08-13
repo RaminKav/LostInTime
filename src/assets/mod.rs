@@ -5,12 +5,14 @@ use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
+use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::attributes::ItemGlow;
 use crate::enemy::Mob;
+use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::{
     Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
@@ -93,6 +95,7 @@ impl Plugin for GameAssetsPlugin {
                 status_effect_icons: None,
                 skill_icons: None,
                 item_glows: None,
+                combat_shrine_anim: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -149,6 +152,7 @@ pub struct Graphics {
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
     pub skill_icons: Option<HashMap<Skill, Handle<Image>>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
+    pub combat_shrine_anim: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -415,6 +419,7 @@ impl GameAssetsPlugin {
             status_effect_icons: Some(status_effect_handles),
             skill_icons: Some(skill_handles),
             item_glows: Some(item_glow_handles),
+            combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
@@ -436,7 +441,7 @@ impl GameAssetsPlugin {
         if let Some(item_map) = item_map {
             for (e, mut sprite, spritesheet, world_object) in to_update_query.iter_mut() {
                 if let Some(texture_atlas) = texture_atlases.get(&spritesheet) {
-                    if texture_atlas.textures.len() < 40 {
+                    if texture_atlas.textures.len() < 100 {
                         continue;
                     }
                 }

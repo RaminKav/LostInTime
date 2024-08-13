@@ -139,7 +139,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "Options",
+                "Discord",
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,

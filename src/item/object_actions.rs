@@ -1,4 +1,4 @@
-use super::combat_shrine::CombatShrine;
+use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
@@ -11,6 +11,7 @@ use crate::item::LootTable;
 use crate::juice::ShakeEffect;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
+use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 
@@ -22,6 +23,7 @@ use crate::{
     world::world_helpers::world_pos_to_tile_pos,
 };
 use bevy::prelude::*;
+use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 
@@ -148,6 +150,8 @@ impl ObjectAction {
                     .insert(CombatShrine {
                         num_mobs_left: num_spawns_left,
                     })
+                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
+                    .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
                 let possible_spawns =
                     [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];

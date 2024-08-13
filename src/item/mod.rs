@@ -32,7 +32,9 @@ use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, 
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
-use combat_shrine::{handle_shrine_rewards, CombatShrineMobDeathEvent};
+use combat_shrine::{
+    add_shrine_visuals_on_spawn, handle_shrine_rewards, CombatShrineMobDeathEvent,
+};
 use rand::Rng;
 
 mod crafting;
@@ -687,6 +689,7 @@ impl Plugin for ItemsPlugin {
                     handle_spread_arrows_attack.after(CustomFlush),
                     handle_burning_ticks,
                     handle_shrine_rewards,
+                    add_shrine_visuals_on_spawn,
                     handle_frail_stack_ticks,
                     handle_slow_stack_ticks,
                     handle_on_hit_upgrades.after(handle_hits),
