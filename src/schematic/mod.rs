@@ -19,10 +19,9 @@ use crate::{
     proto::proto_param::ProtoParam,
     world::{
         generation::{get_radial_tile_positions, GenerationPlugin},
-        tile,
         world_helpers::world_pos_to_tile_pos,
     },
-    CustomFlush, GameParam, GameState,
+    CustomFlush, GameParam, GameState, DEBUG,
 };
 use loot_chests::*;
 
@@ -165,7 +164,7 @@ fn load_schematic(
     key_input: Res<Input<KeyCode>>,
     game: GameParam,
 ) {
-    if key_input.just_pressed(KeyCode::M) {
+    if key_input.just_pressed(KeyCode::M) && *DEBUG {
         println!(
             "Loading schematic scene... {} {:?}",
             game.player().position,
@@ -173,7 +172,7 @@ fn load_schematic(
         );
         commands
             .spawn(DynamicSceneBundle {
-                scene: asset_server.load("scenes/house.scn.ron"),
+                scene: asset_server.load("scenes/CombatShrine.scn.ron"),
                 transform: Transform::from_translation(game.player().position),
                 ..default()
             })

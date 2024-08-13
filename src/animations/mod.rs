@@ -404,11 +404,11 @@ pub struct FadeOpacity;
 
 fn animate_foliage_opacity(
     mut commands: Commands,
-    tree_query: Query<(Entity, &GlobalTransform, &WorldObject), With<FadeOpacity>>,
+    mut tree_query: Query<(Entity, &GlobalTransform, &WorldObject, &mut Sprite), With<FadeOpacity>>,
     player: Query<&GlobalTransform, With<Player>>,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, txfm, obj) in tree_query.iter() {
+    for (e, txfm, obj, mut sprite) in tree_query.iter_mut() {
         let p_txfm = player.single();
         // check if player is behind tree
         let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
@@ -417,10 +417,12 @@ fn animate_foliage_opacity(
                 asset_server
                     .load::<Image, _>(format!("{}_fade.png", obj.to_string().to_lowercase())),
             );
+            sprite.color = sprite.color.with_a(0.0);
         } else {
             commands.entity(e).insert(
                 asset_server.load::<Image, _>(format!("{}.png", obj.to_string().to_lowercase())),
             );
+            sprite.color = sprite.color.with_a(1.0);
         }
     }
 }
