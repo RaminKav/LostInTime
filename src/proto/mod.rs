@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 
 use bevy::{
     prelude::*,
@@ -25,8 +25,8 @@ use crate::{
     },
     assets::{SpriteAnchor, SpriteSize},
     attributes::{
-        Attack, ItemAttributes, ItemRarity, MaxHealth, RawItemBaseAttributes,
-        RawItemBonusAttributes,
+        Attack, AttributeQuality, AttributeValue, ItemAttributes, ItemRarity, MaxHealth,
+        RawItemBaseAttributes, RawItemBonusAttributes,
     },
     enemy::{
         CombatAlignment, EnemyMaterial, FollowSpeed, LeapAttack, Mob, MobLevel, ProjectileAttack,
@@ -96,6 +96,8 @@ impl Plugin for ProtoPlugin {
             .register_type::<SpriteAnchor>()
             .register_type::<ItemAction>()
             .register_type::<ItemActions>()
+            .register_type::<AttributeValue>()
+            .register_type::<AttributeQuality>()
             .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
@@ -134,9 +136,12 @@ impl Plugin for ProtoPlugin {
             .register_type::<Vec<String>>()
             .register_type::<Vec<ItemAction>>()
             .register_type::<Option<Range<i32>>>()
+            .register_type::<Option<RangeInclusive<i32>>>()
             .register_type::<Option<u8>>()
             .register_type::<Range<i32>>()
+            .register_type::<RangeInclusive<i32>>()
             .register_type_data::<Range<i32>, ReflectDeserialize>()
+            .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
             .add_system(Self::load_prototypes.in_set(OnUpdate(GameState::Loading)))
@@ -155,6 +160,7 @@ impl ProtoPlugin {
         prototypes.load("proto/item_drop.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
         prototypes.load("proto/smallgreentree.prototype.ron");
+        prototypes.load("proto/inventorybag.prototype.ron");
         prototypes.load("proto/redtree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");
         prototypes.load("proto/smallyellowtree.prototype.ron");

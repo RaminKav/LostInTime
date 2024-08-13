@@ -6,19 +6,17 @@ use crate::{
     client::{analytics::SendAnalyticsDataToServerEvent, GameOverEvent},
     colors::{overwrite_alpha, WHITE},
     container::ContainerRegistry,
-    enemy::Mob,
     inputs::FacingDirection,
     item::CraftingTracker,
     night::NightTracker,
     player::Player,
-    ui::{screen_effects::HealthScreenEffect, ChestContainer, FurnaceContainer},
+    ui::{ChestContainer, FurnaceContainer},
     world::{
-        chunk::Chunk,
         dimension::{ActiveDimension, EraManager},
         generation::WorldObjectCache,
         y_sort::YSort,
     },
-    Game, GameState, RawPosition, GAME_HEIGHT, GAME_WIDTH,
+    DoNotDespawnOnGameOver, Game, GameState, RawPosition, GAME_HEIGHT, GAME_WIDTH,
 };
 
 #[derive(Component)]
@@ -92,17 +90,10 @@ pub fn tick_game_over_overlay(
     mut query: Query<(Entity, &mut GameOverFadeout, &mut Sprite)>,
     everything: Query<
         Entity,
-        Or<(
-            With<Mob>,
-            With<Chunk>,
-            With<Sprite>,
-            With<TextureAtlasSprite>,
-            With<Player>,
-            With<Text>,
-            With<ActiveDimension>,
-            With<HealthScreenEffect>,
-            With<YSort>,
-        )>,
+        (
+            Or<(With<Visibility>, With<ActiveDimension>)>,
+            Without<DoNotDespawnOnGameOver>,
+        ),
     >,
     mut next_state: ResMut<NextState<GameState>>,
     asset_server: Res<AssetServer>,
@@ -110,15 +101,16 @@ pub fn tick_game_over_overlay(
     mut analytics_check: Local<bool>,
 ) {
     for (e, mut timer, mut sprite) in query.iter_mut() {
-        if timer.0.percent() >= 50. && !*analytics_check {
+        if timer.0.percent() >= 0.5 && !*analytics_check {
             analytics_events.send_default();
             *analytics_check = true;
         }
         timer.0.tick(time.delta());
         if timer.0.finished() {
+            *analytics_check = false;
             println!("Despawning everything, Sending to main menu");
             for e in everything.iter() {
-                commands.entity(e).despawn_recursive();
+                commands.entity(e).despawn();
             }
             commands.entity(e).despawn();
             let _ = fs::remove_file("save_state.json");
@@ -133,7 +125,6 @@ pub fn tick_game_over_overlay(
             commands.remove_resource::<EraManager>();
             commands.remove_resource::<WorldObjectCache>();
         } else {
-            println!("Setting overlay to {:?}", timer.0.percent());
             let alpha = f32::min(1., timer.0.percent() * 5.);
             sprite.color = overwrite_alpha(sprite.color, alpha);
             if alpha >= 0.7 {

@@ -4,6 +4,7 @@ use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
+use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
 use crate::container::ContainerRegistry;
 use crate::enemy::spawn_helpers::is_tile_water;
@@ -12,8 +13,11 @@ use crate::item::{handle_break_object, WorldObject};
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
+use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
+use bevy_aseprite::anim::AsepriteAnimation;
+use bevy_aseprite::{aseprite, AsepriteBundle};
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
@@ -41,17 +45,20 @@ pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
     (WorldObject::BossShrine, Vec2::new(8., 8.), 8),
     (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 3),
-    (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
+    // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
 const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
     (WorldObject::Pebble, 1),
     (WorldObject::DeadSapling, 1),
     (WorldObject::BrownMushroom, 1),
 ];
+aseprite!(pub Portal, "textures/portal/portal.ase");
 
+#[derive(Component)]
+pub struct TimePortal;
 #[derive(Resource, Debug, Default, Clone)]
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
@@ -250,6 +257,9 @@ impl GenerationPlugin {
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
         new_dim: Query<Entity, Added<SpawnDimension>>,
+        mut commands: Commands,
+        asset_server: Res<AssetServer>,
+        dungeon_check: Query<&Dungeon>,
     ) {
         if new_dim.is_empty() {
             return;
@@ -283,12 +293,33 @@ impl GenerationPlugin {
                 if pos.chunk_pos.y == -1 {
                     pos.chunk_pos.y = -2;
                 }
-                if obj == WorldObject::TimeGate {
-                    pos = TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 2));
-                }
                 println!("set up a {obj:?} at {pos:?}");
                 game.world_obj_cache.unique_objs.insert(obj, pos);
             }
+        }
+        if dungeon_check.get_single().is_err() {
+            // summon portal
+            commands
+                .spawn(VisibilityBundle::default())
+                .insert(YSort(0.))
+                .insert(TimePortal)
+                .insert(InteractionGuideTrigger {
+                    key: None,
+                    text: Some("???".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: None,
+                })
+                .insert(Collider::capsule(
+                    Vec2::new(0., 10.),
+                    Vec2::new(0., -18.),
+                    11.,
+                ))
+                .insert(AsepriteBundle {
+                    aseprite: asset_server.load(Portal::PATH),
+                    animation: AsepriteAnimation::from(Portal::tags::IDLE),
+                    transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
+                    ..Default::default()
+                });
         }
     }
     pub fn generate_and_cache_objects(
@@ -474,6 +505,16 @@ impl GenerationPlugin {
                         if obj.is_tree() {
                             objs.remove(&pos);
                         }
+                    }
+                }
+                // clear out portal area
+                let clear_tiles = get_radial_tile_positions(
+                    TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 2)),
+                    2,
+                );
+                for pos in clear_tiles {
+                    if let Some(_obj) = objs.get(&pos) {
+                        objs.remove(&pos);
                     }
                 }
                 // UNIQUE OBJECTS

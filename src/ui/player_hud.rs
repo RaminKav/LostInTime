@@ -1,4 +1,4 @@
-use bevy::{asset::AssetServerError, prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use super::{
     interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon, InventorySlotType,
@@ -239,7 +239,7 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(GAME_WIDTH / 2. - 16., GAME_HEIGHT / 2. - 16., 1.),
+                    translation: Vec3::new(-GAME_WIDTH / 2. + 18., GAME_HEIGHT / 2. - 42., 5.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -251,14 +251,35 @@ pub fn setup_currency_ui(
         ))
         .id();
 
-    spawn_item_stack_icon(
+    let stack = spawn_item_stack_icon(
         &mut commands,
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
-        Vec2::new(GAME_WIDTH / 2. - 26., GAME_HEIGHT / 2. - 16.),
+        Vec2::new(-6., 1.),
         3,
     );
+    commands.entity(stack).set_parent(text);
+    let bag_icon = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
+        &asset_server,
+        Vec2::new(-GAME_WIDTH / 2. + 18., -GAME_HEIGHT / 2. + 14.),
+        3,
+    );
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load("textures/IKey.png"),
+            transform: Transform::from_translation(Vec3::new(-0.5, 13.5, 1.)),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(11., 11.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(bag_icon);
 }
 pub fn update_currency_text(
     currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,

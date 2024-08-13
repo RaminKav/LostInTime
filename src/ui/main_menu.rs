@@ -95,7 +95,9 @@ pub fn handle_menu_button_click_events(
                 commands.init_resource::<EraManager>();
             }
             MenuButton::Options => {
-                // next_ui_state.0 = Some(UIState::Options);
+                if webbrowser::open("https://discord.gg/c4Aqd6RXGm").is_ok() {
+                    // ...
+                }
             }
             MenuButton::Quit => {
                 exit(0);

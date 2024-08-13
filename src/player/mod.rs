@@ -25,8 +25,9 @@ use crate::{
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
-        Attack, AttackCooldown, CritChance, CritDamage, HealthRegen, InvincibilityCooldown,
-        ItemAttributes, Mana, ManaRegen, MaxHealth, PlayerAttributeBundle,
+        Attack, AttackCooldown, AttributeQuality, AttributeValue, CritChance, CritDamage,
+        HealthRegen, InvincibilityCooldown, ItemAttributes, Mana, ManaRegen, MaxHealth,
+        PlayerAttributeBundle,
     },
     client::CurrentRunSaveData,
     container::Container,
@@ -198,11 +199,11 @@ fn spawn_player(
             },
             //TODO: remove itematt and construct from components?
             ItemAttributes {
-                health: 100,
-                attack: 0,
-                health_regen: 2,
-                crit_chance: 5,
-                crit_damage: 150,
+                health: AttributeValue::new(100, AttributeQuality::Low),
+                attack: AttributeValue::new(0, AttributeQuality::Low),
+                health_regen: AttributeValue::new(2, AttributeQuality::Low),
+                crit_chance: AttributeValue::new(5, AttributeQuality::Low),
+                crit_damage: AttributeValue::new(150, AttributeQuality::Low),
                 ..default()
             },
             Hunger::new(100),

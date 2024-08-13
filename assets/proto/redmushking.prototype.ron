@@ -55,7 +55,7 @@
                 item: Dagger,
                 min: 1,
                 max: 1,
-                rate: 0.35
+                rate: 0.8
             ),
             // (
             //     item: BasicStaff,
@@ -73,7 +73,7 @@
                 item: MagicWhip,
                 min: 1,
                 max: 1,
-                rate: 0.1
+                rate: 0.8
             ),
             // (
             //     item: WoodBow,
@@ -90,14 +90,14 @@
             (
                 item: Ring,
                 min: 1,
-                max: 1,
-                rate: 0.3
+                max: 2,
+                rate: 1.
             ),
             (
                 item: Pendant,
                 min: 1,
                 max: 1,
-                rate: 0.2
+                rate: 0.8
             ),
             // (
             //     item: Chestplate,
@@ -139,37 +139,37 @@
                 item: ForestShirt,
                 min: 1,
                 max: 1,
-                rate: 0.35
+                rate: 0.85
             ),
             (
                 item: ForestPants,
                 min: 1,
                 max: 1,
-                rate: 0.35
+                rate: 0.85
             ),
             (
                 item: ForestShoes,
                 min: 1,
                 max: 1,
-                rate: 0.35
+                rate: 0.85
             ),
             (
                 item: UpgradeTome,
                 min: 1,
                 max: 2,
-                rate: 0.65
+                rate: 0.75
             ),
             (
                 item: UpgradeTome,
                 min: 1,
                 max: 2,
-                rate: 0.35
+                rate: 0.45
             ),
             (
                 item: OrbOfTransformation,
                 min: 1,
                 max: 1,
-                rate: 0.25
+                rate: 0.85
             ),
             (
                 item: OrbOfTransformation,

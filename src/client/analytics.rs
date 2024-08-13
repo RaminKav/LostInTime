@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{create_dir, File};
 /*
     Analytics System:
     track various data points through event listeners.
@@ -140,16 +140,18 @@ pub fn save_analytics_data_to_file_on_game_over(
     if events.is_empty() {
         return;
     }
-    let PATH: &str = &format!("analytics_{}.json", seed.seed).to_string();
-
-    let file = File::create(PATH).expect("Could not open file for serialization");
-
-    if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
-        println!("Failed to save game state: {result:?}");
-    } else {
-        println!("SAVED ANALYTICS!");
-    }
     analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+    if let Ok(()) = create_dir("analytics") {
+        let PATH: &str = &format!("analytics/analytics_{}.json", seed.seed).to_string();
+
+        let file = File::create(PATH).expect("Could not open file for serialization");
+
+        if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
+            println!("Failed to save game state: {result:?}");
+        } else {
+            println!("SAVED ANALYTICS!");
+        }
+    }
     connect_server(analytics_data.clone());
     commands.remove_resource::<AnalyticsData>();
 }

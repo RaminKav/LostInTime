@@ -5,18 +5,19 @@
   "survival_rogue_like::item::WorldObject": MagicWhip,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 5, end: 8)),
+        attack: Some((start: 3, end: 6)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        crit_damage: Some((start: 2, end: 25)),
-        crit_chance: Some((start: 2, end: 12)),
-        healing: Some((start: 2, end: 8)),
-        bonus_damage: Some((start: 1, end: 6)),
-        speed: Some((start: 4, end: 10)),
-        health_regen: Some((start: 1, end: 4)),
-        thorns: Some((start: 3, end: 5)),
-        dodge: Some((start: 1, end: 5)),
-        loot_rate: Some((start: 3, end: 7)),
+        crit_damage: Some((start: 2, end: 5)),
+        crit_chance: Some((start: 2, end: 5)),
+        healing: Some((start: 3, end: 8)),
+        bonus_damage: Some((start: 1, end: 2)),
+        speed: Some((start: 4, end: 15)),
+        health_regen: Some((start: 1, end: 3)),
+        thorns: Some((start: 3, end: 15)),
+        dodge: Some((start: 1, end: 6)),
+        loot_rate: Some((start: 3, end: 15)),
+        xp_rate: Some((start: 4, end: 15)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::item::item_actions::ManaCost": (10),
@@ -24,7 +25,6 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: MagicWhip,
         attributes: (
-            max_durability: 100,
             attack_cooldown: 0.85
         ),
         metadata: (

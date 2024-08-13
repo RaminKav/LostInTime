@@ -1,0 +1,7 @@
+(
+  name: "InventoryBag",
+  templates: ["world_object"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": InventoryBag,
+  }
+)

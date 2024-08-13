@@ -22,7 +22,6 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: DualStaff,
         attributes: (
-            max_durability: 100,
             attack_cooldown: 0.6
         ),
         metadata: (

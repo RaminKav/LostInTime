@@ -3,7 +3,7 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": GreenSapplingStage1,
-  "survival_rogue_like::item::Foliage": GreenSapplingStage1,
+  "survival_rogue_like::animations::FadeOpacity": (),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::sappling::GrowsInto": (GreenSapplingStage2),
   "survival_rogue_like::proto::SapplingProto": (60.),
@@ -12,8 +12,10 @@
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -10., x2: 0., y2: -6., r: 1.5),
   "survival_rogue_like::attributes::MaxHealth": (1),
   "survival_rogue_like::world::y_sort::YSort": (0.),
-  "survival_rogue_like::player::levels::ExperienceReward": (5),
   "bevy_proto::custom::VisibilityBundle": (),
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("GreenSapplingStage1.png")
+   ),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: GreenSapplingBlock,
