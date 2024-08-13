@@ -40,6 +40,8 @@ pub struct BarFlashTimer {
     pub flash_color: Color,
     pub color: Color,
 }
+#[derive(Component)]
+pub struct CurrencyIcon;
 #[derive(Default)]
 pub struct FlashExpBarEvent;
 
@@ -49,13 +51,13 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
             texture: graphics.get_ui_element_texture(UIElement::PlayerHUDBars),
 
             sprite: Sprite {
-                custom_size: Some(Vec2::new(84.5, 33.)),
+                custom_size: Some(Vec2::new(84.5, 48.)),
                 ..Default::default()
             },
             transform: Transform {
                 translation: Vec3::new(
                     (-GAME_WIDTH + 91.) / 2.,
-                    (GAME_HEIGHT - 15.) / 2. - 12.,
+                    (GAME_HEIGHT - 15.) / 2. - 19.5,
                     5.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -75,7 +77,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 10., -1.),
+                translation: Vec3::new(-25., 17., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -99,7 +101,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 2., -1.),
+                translation: Vec3::new(-25., 9., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -123,7 +125,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., -6., -1.),
+                translation: Vec3::new(-25., 1., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -239,7 +241,7 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-GAME_WIDTH / 2. + 18., GAME_HEIGHT / 2. - 42., 5.),
+                    translation: Vec3::new(-GAME_WIDTH / 2. + 17., GAME_HEIGHT / 2. - 44., 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -259,7 +261,7 @@ pub fn setup_currency_ui(
         Vec2::new(-6., 1.),
         3,
     );
-    commands.entity(stack).set_parent(text);
+    commands.entity(stack).insert(CurrencyIcon).set_parent(text);
     let bag_icon = spawn_item_stack_icon(
         &mut commands,
         &graphics,
@@ -282,17 +284,15 @@ pub fn setup_currency_ui(
         .set_parent(bag_icon);
 }
 pub fn update_currency_text(
-    currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
-    mut text_query: Query<(&mut Text, &mut Transform), With<CurrencyText>>,
+    mut currency: Query<&mut TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
+    mut text_query: Query<&mut Text, With<CurrencyText>>,
 ) {
-    let Ok(time_fragments) = currency.get_single() else {
+    let Ok(mut time_fragments) = currency.get_single_mut() else {
         return;
     };
-    let (mut text, mut txfm) = text_query.single_mut();
+
+    let mut text = text_query.single_mut();
     text.sections[0].value = format!("{:}", time_fragments.time_fragments);
-    if time_fragments.time_fragments >= 10 {
-        txfm.translation.x = GAME_WIDTH / 2. - 16.;
-    }
 }
 pub fn update_healthbar(
     player_health_query: Query<

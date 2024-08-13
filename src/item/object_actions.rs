@@ -30,7 +30,7 @@ use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use rand::Rng;
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[derive(Component, Reflect, FromReflect, Schematic, Clone, Default)]
 #[reflect(Component, Schematic)]
 pub enum ObjectAction {
     #[default]

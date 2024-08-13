@@ -256,7 +256,7 @@ impl GenerationPlugin {
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
-        new_dim: Query<Entity, Added<SpawnDimension>>,
+        new_dim: Query<Entity, Added<ActiveDimension>>,
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         dungeon_check: Query<&Dungeon>,

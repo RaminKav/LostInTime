@@ -4,6 +4,7 @@ use std::time::Duration;
 use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
 use crate::animations::AttackEvent;
+use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
@@ -681,7 +682,13 @@ pub fn mouse_click_system(
 }
 
 pub fn handle_interact_objects(
-    objs: Query<(Entity, &GlobalTransform, &ObjectAction, &WorldObject)>,
+    objs: Query<(
+        Entity,
+        &GlobalTransform,
+        &ObjectAction,
+        &WorldObject,
+        &SpriteAnchor,
+    )>,
     mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
     mut proto_param: ProtoParam,
@@ -690,8 +697,8 @@ pub fn handle_interact_objects(
     key_input: ResMut<Input<KeyCode>>,
 ) {
     if key_input.just_pressed(KeyCode::F) {
-        for (obj_e, t, obj_action, obj) in objs.iter() {
-            let obj_t = t.translation().truncate();
+        for (obj_e, t, obj_action, obj, anchor) in objs.iter() {
+            let obj_t = t.translation().truncate() - anchor.0;
             let (player_t, mut inv) = player_query.single_mut();
             if obj_t.distance(player_t.translation().truncate()) <= 32. {
                 obj_action.run_action(
