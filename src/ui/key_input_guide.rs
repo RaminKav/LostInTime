@@ -1,6 +1,8 @@
 use bevy::{prelude::*, sprite::Anchor};
 
-use crate::{inventory::ItemStack, item::WorldObject, player::Player, GameParam};
+use crate::{
+    assets::SpriteAnchor, inventory::ItemStack, item::WorldObject, player::Player, GameParam,
+};
 
 use super::{damage_numbers::spawn_text, spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
 
@@ -66,13 +68,13 @@ pub fn spawn_shrine_interact_key_guide(
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     game: GameParam,
     already_exists: Query<Entity, With<InteractGuide>>,
-    guides: Query<(&GlobalTransform, &InteractionGuideTrigger)>,
+    guides: Query<(&GlobalTransform, &InteractionGuideTrigger, &SpriteAnchor)>,
 ) {
     let (player_e, player_t) = player_query.single();
 
     if already_exists.iter().count() == 0 {
-        for (txfm, guide) in guides.iter() {
-            let guide_pos = txfm.translation().truncate();
+        for (txfm, guide, anchor) in guides.iter() {
+            let guide_pos = txfm.translation().truncate() - anchor.0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
                 let parent_entity = commands
                     .spawn(SpatialBundle::from_transform(Transform::from_translation(
@@ -136,7 +138,7 @@ pub fn spawn_shrine_interact_key_guide(
                                     .get_ui_element_texture(UIElement::ScreenIconSlot),
                                 transform: Transform::from_translation(Vec3::new(0., 18.5, 1.)),
                                 sprite: Sprite {
-                                    custom_size: Some(Vec2::new(UI_SLOT_SIZE, UI_SLOT_SIZE)),
+                                    custom_size: Some(Vec2::new(16., 16.)),
                                     ..Default::default()
                                 },
                                 ..Default::default()
@@ -151,8 +153,8 @@ pub fn spawn_shrine_interact_key_guide(
             }
         }
     } else {
-        for (txfm, guide) in guides.iter() {
-            let guide_pos = txfm.translation().truncate();
+        for (txfm, guide, anchor) in guides.iter() {
+            let guide_pos = txfm.translation().truncate() - anchor.0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
                 return;
             }

@@ -6,8 +6,10 @@ use rand::seq::IteratorRandom;
 use crate::{
     assets::{Graphics, SpriteAnchor},
     custom_commands::CommandsExt,
+    inventory::ItemStack,
     item::object_actions::ObjectAction,
     proto::proto_param::ProtoParam,
+    ui::key_input_guide::InteractionGuideTrigger,
     world::world_helpers::world_pos_to_tile_pos,
     GameParam,
 };
@@ -42,9 +44,12 @@ pub fn handle_gamble_shrine_rewards(
     mut game: GameParam,
 ) {
     for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
+        // println!("FRAME: {:?}, {:?}", anim.current_frame(), shrine.success);
         if shrine.success {
-            if anim.current_frame() == 50 {
+            if anim.current_frame() == 44 {
                 *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
+                commands.entity(e).remove::<GambleShrine>();
+
                 let drop_list = [
                     WorldObject::WoodSword,
                     WorldObject::WoodSword,
@@ -67,7 +72,7 @@ pub fn handle_gamble_shrine_rewards(
                         .unwrap()
                         .clone(),
                     &proto,
-                    t.translation().truncate() + Vec2::new(0., -18.), // offset so it doesn't spawn on the shrine
+                    t.translation().truncate() + Vec2::new(0., -64.), // offset so it doesn't spawn on the shrine
                     1,
                     Some(1),
                 );
@@ -84,14 +89,27 @@ pub fn handle_gamble_shrine_rewards(
                 );
             }
         } else {
-            if anim.current_frame() == 86 {
-                *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
+            if anim.current_frame() == 74 {
+                *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);
+                let obj_action = proto
+                    .get_component::<ObjectAction, _>(WorldObject::GambleShrine)
+                    .expect("Gamble shrine missing ObjectAction");
+                commands
+                    .entity(e)
+                    .remove::<GambleShrine>()
+                    .insert(InteractionGuideTrigger {
+                        key: Some("F".to_string()),
+                        text: Some("Interact".to_string()),
+                        activation_distance: 32.,
+                        icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    })
+                    .insert(obj_action.clone());
             }
         }
     }
 }
 
-aseprite!(pub GambleShrineAnim, "textures/gamble_shrine/GambleShrine.ase");
+aseprite!(pub GambleShrineAnim, "textures/gamble_shrine/gamble_shrine.ase");
 
 pub fn add_gamble_visuals_on_spawn(
     mut commands: Commands,

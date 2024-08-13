@@ -417,12 +417,12 @@ fn animate_foliage_opacity(
                 asset_server
                     .load::<Image, _>(format!("{}_fade.png", obj.to_string().to_lowercase())),
             );
-            sprite.color = sprite.color.with_a(0.0);
+            // sprite.color = sprite.color.with_a(0.0);
         } else {
             commands.entity(e).insert(
                 asset_server.load::<Image, _>(format!("{}.png", obj.to_string().to_lowercase())),
             );
-            sprite.color = sprite.color.with_a(1.0);
+            // sprite.color = sprite.color.with_a(1.0);
         }
     }
 }

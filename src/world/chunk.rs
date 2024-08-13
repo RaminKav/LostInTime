@@ -8,6 +8,7 @@ use bevy_rapier2d::prelude::Collider;
 
 use super::dimension::{dim_spawned, GenerationSeed};
 
+use super::dungeon::Dungeon;
 use super::generation::WorldObjectCache;
 use super::world_helpers::get_neighbour_tile;
 use super::y_sort::YSort;
@@ -130,7 +131,14 @@ pub struct Chunk {
     pub chunk_pos: IVec2,
 }
 
-pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
+pub fn generate_and_cache_island_chunks(
+    mut game: GameParam,
+    seed: Res<GenerationSeed>,
+    dungeon_check: Query<&Dungeon>,
+) {
+    if dungeon_check.iter().next().is_some() {
+        return;
+    }
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
     println!(

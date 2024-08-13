@@ -58,7 +58,7 @@ pub fn spawn_new_dungeon_dimension(
             player_pos.truncate(),
         )));
     let grid = gen_new_dungeon(
-        6000,
+        3000,
         (CHUNK_SIZE * 4 * 2) as usize,
         Bias {
             bias: super::dungeon_generation::Direction::Left,
