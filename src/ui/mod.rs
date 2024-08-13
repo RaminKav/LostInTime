@@ -156,7 +156,6 @@ impl Plugin for UIPlugin {
                     update_foodbar,
                     update_furnace_bar,
                     update_mana_bar,
-                    handle_spawn_inv_player_stats.after(CustomFlush),
                     handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
                     toggle_skills_visibility,
                     spawn_tile_hover_on_cursor_move,
@@ -172,6 +171,7 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
             .add_system(
                 handle_enter_options_ui
                     .before(CustomFlush)
@@ -187,6 +187,7 @@ impl Plugin for UIPlugin {
                     handle_clamp_screen_locked_icons,
                     handle_update_player_skills,
                     spawn_shrine_interact_key_guide,
+                    add_guide_to_unique_objs,
                     update_currency_text,
                     setup_essence_ui
                         .before(CustomFlush)

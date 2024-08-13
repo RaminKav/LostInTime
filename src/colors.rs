@@ -6,6 +6,7 @@ pub const DMG_NUM_GREEN: Color = Color::rgba(185. / 255., 185. / 255., 110. / 25
 pub const DMG_NUM_PURPLE: Color = Color::rgba(81. / 255., 65. / 255., 104. / 255., 1.);
 pub const DMG_NUM_YELLOW: Color = Color::rgba(231. / 255., 193. / 255., 111. / 255., 1.);
 pub const GOLD: Color = Color::rgba(201. / 255., 114. / 255., 69. / 255., 1.);
+pub const ORANGE: Color = Color::rgba(201. / 255., 109. / 255., 69. / 255., 1.);
 pub const LIGHT_RED: Color = Color::rgba(202. / 255., 53. / 255., 55. / 255., 1.);
 pub const LIGHT_GREY: Color = Color::rgba(160. / 255., 155. / 255., 131. / 255., 1.);
 pub const LIGHT_GREEN: Color = Color::rgba(163. / 255., 182. / 255., 69. / 255., 1.);

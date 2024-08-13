@@ -1,7 +1,7 @@
 use item_abilities::handle_item_abilitiy_on_attack;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::ops::{Range, RangeInclusive};
+use std::ops::{Add, RangeInclusive};
 use strum_macros::{Display, EnumIter};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
@@ -13,7 +13,7 @@ use crate::{
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     client::GameOverEvent,
-    colors::{LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
+    colors::{GREY, LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED, ORANGE},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::{
@@ -55,146 +55,317 @@ pub struct BlockAttributeBundle {
 )]
 #[reflect(Schematic, Default)]
 pub struct ItemAttributes {
-    pub health: i32,
-    pub attack: i32,
-    pub durability: i32,
-    pub max_durability: i32,
+    pub health: AttributeValue,
+    pub attack: AttributeValue,
+    pub durability: AttributeValue,
+    pub max_durability: AttributeValue,
     pub attack_cooldown: f32,
     pub invincibility_cooldown: f32,
-    pub crit_chance: i32,
-    pub crit_damage: i32,
-    pub bonus_damage: i32,
-    pub health_regen: i32,
-    pub healing: i32,
-    pub thorns: i32,
-    pub dodge: i32,
-    pub speed: i32,
-    pub lifesteal: i32,
-    pub defence: i32,
-    pub xp_rate: i32,
-    pub loot_rate: i32,
+    pub crit_chance: AttributeValue,
+    pub crit_damage: AttributeValue,
+    pub bonus_damage: AttributeValue,
+    pub health_regen: AttributeValue,
+    pub healing: AttributeValue,
+    pub thorns: AttributeValue,
+    pub dodge: AttributeValue,
+    pub speed: AttributeValue,
+    pub lifesteal: AttributeValue,
+    pub defence: AttributeValue,
+    pub xp_rate: AttributeValue,
+    pub loot_rate: AttributeValue,
+}
+
+#[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+pub struct AttributeValue {
+    pub value: i32,
+    pub quality: AttributeQuality,
+}
+impl AttributeValue {
+    pub fn new(value: i32, quality: AttributeQuality) -> Self {
+        Self { value, quality }
+    }
+}
+impl std::fmt::Display for AttributeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+impl Add<AttributeValue> for AttributeValue {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            value: self.value + rhs.value,
+            quality: self.quality.get_higher(&rhs.quality),
+        }
+    }
+}
+
+impl Add<i32> for AttributeValue {
+    type Output = Self;
+
+    fn add(self, rhs: i32) -> Self::Output {
+        Self {
+            value: self.value + rhs,
+            quality: self.quality,
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
+pub enum AttributeQuality {
+    #[default]
+    Low,
+    Average,
+    High,
+}
+
+impl AttributeQuality {
+    pub fn get_higher(&self, other: &Self) -> Self {
+        match self {
+            AttributeQuality::Low => match other {
+                AttributeQuality::Low => AttributeQuality::Low,
+                AttributeQuality::Average => AttributeQuality::Average,
+                AttributeQuality::High => AttributeQuality::High,
+            },
+            AttributeQuality::Average => match other {
+                AttributeQuality::Low => AttributeQuality::Average,
+                AttributeQuality::Average => AttributeQuality::Average,
+                AttributeQuality::High => AttributeQuality::High,
+            },
+            AttributeQuality::High => match other {
+                AttributeQuality::Low => AttributeQuality::High,
+                AttributeQuality::Average => AttributeQuality::High,
+                AttributeQuality::High => AttributeQuality::High,
+            },
+        }
+    }
+    pub fn get_quality(range: RangeInclusive<i32>, value: i32) -> Self {
+        let total_range = range.end() - range.start();
+        let percent_of_total_range = (value - range.start()) as f32 / total_range as f32;
+        if percent_of_total_range < 0.33 {
+            AttributeQuality::Low
+        } else if percent_of_total_range < 0.66 {
+            AttributeQuality::Average
+        } else {
+            AttributeQuality::High
+        }
+    }
+    pub fn get_color(&self) -> Color {
+        match self {
+            AttributeQuality::Low => LIGHT_GREY,
+            AttributeQuality::Average => GREY,
+            AttributeQuality::High => ORANGE,
+        }
+    }
 }
 
 impl ItemAttributes {
-    pub fn get_tooltips(&self) -> Vec<String> {
-        let mut tooltips: Vec<String> = vec![];
+    pub fn get_tooltips(&self) -> Vec<(String, AttributeQuality)> {
+        let mut tooltips: Vec<(String, AttributeQuality)> = vec![];
         let is_positive = |val: i32| val > 0;
-        if self.health != 0 {
-            tooltips.push(format!(
-                "{}{} HP",
-                if is_positive(self.health) { "+" } else { "" },
-                self.health
+        if self.health.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} HP",
+                    if is_positive(self.health.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.health.value
+                ),
+                self.health.quality,
             ));
         }
-        if self.defence != 0 {
-            tooltips.push(format!(
-                "{}{} Defence",
-                if is_positive(self.defence) { "+" } else { "" },
-                self.defence
+        if self.defence.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Defence",
+                    if is_positive(self.defence.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.defence.value
+                ),
+                self.defence.quality,
             ));
         }
-        if self.attack != 0 {
-            tooltips.push(format!(
-                "{}{} DMG",
-                if is_positive(self.attack) { "+" } else { "" },
-                self.attack
+        if self.attack.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} DMG",
+                    if is_positive(self.attack.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.attack.value
+                ),
+                self.attack.quality,
             ));
         }
         if self.attack_cooldown != 0. {
-            tooltips.push(format!("{:.2} Hits/s", 1. / self.attack_cooldown));
-        }
-        if self.crit_chance != 0 {
-            tooltips.push(format!(
-                "{}{}% Crit",
-                if is_positive(self.crit_chance) {
-                    "+"
-                } else {
-                    ""
-                },
-                self.crit_chance
+            tooltips.push((
+                format!("{:.2} Hits/s", 1. / self.attack_cooldown),
+                AttributeQuality::Average,
             ));
         }
-        if self.crit_damage != 0 {
-            tooltips.push(format!(
-                "{}{}% Crit DMG",
-                if is_positive(self.crit_damage) {
-                    "+"
-                } else {
-                    ""
-                },
-                self.crit_damage
+        if self.crit_chance.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Crit",
+                    if is_positive(self.crit_chance.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.crit_chance.value
+                ),
+                self.crit_chance.quality,
             ));
         }
-        if self.bonus_damage != 0 {
-            tooltips.push(format!(
-                "{}{} DMG",
-                if is_positive(self.bonus_damage) {
-                    "+"
-                } else {
-                    ""
-                },
-                self.bonus_damage
+        if self.crit_damage.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Crit DMG",
+                    if is_positive(self.crit_damage.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.crit_damage.value
+                ),
+                self.crit_damage.quality,
             ));
         }
-        if self.health_regen != 0 {
-            tooltips.push(format!(
-                "{}{} HP Regen",
-                if is_positive(self.health_regen) {
-                    "+"
-                } else {
-                    ""
-                },
-                self.health_regen
+        if self.bonus_damage.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} DMG",
+                    if is_positive(self.bonus_damage.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.bonus_damage.value
+                ),
+                self.bonus_damage.quality,
             ));
         }
-        if self.healing != 0 {
-            tooltips.push(format!(
-                "{}{}% Healing",
-                if is_positive(self.healing) { "+" } else { "" },
-                self.healing
+        if self.health_regen.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} HP Regen",
+                    if is_positive(self.health_regen.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.health_regen.value
+                ),
+                self.health_regen.quality,
             ));
         }
-        if self.thorns != 0 {
-            tooltips.push(format!(
-                "{}{}% Thorns",
-                if is_positive(self.thorns) { "+" } else { "" },
-                self.thorns
+        if self.healing.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Healing",
+                    if is_positive(self.healing.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.healing.value
+                ),
+                self.healing.quality,
             ));
         }
-        if self.dodge != 0 {
-            tooltips.push(format!(
-                "{}{}% Dodge",
-                if is_positive(self.dodge) { "+" } else { "" },
-                self.dodge
+        if self.thorns.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Thorns",
+                    if is_positive(self.thorns.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.thorns.value
+                ),
+                self.thorns.quality,
             ));
         }
-        if self.speed != 0 {
-            tooltips.push(format!(
-                "{}{}% Speed",
-                if is_positive(self.speed) { "+" } else { "" },
-                self.speed
+        if self.dodge.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Dodge",
+                    if is_positive(self.dodge.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.dodge.value
+                ),
+                self.dodge.quality,
             ));
         }
-        if self.lifesteal != 0 {
-            tooltips.push(format!(
-                "{}{} Lifesteal",
-                if is_positive(self.lifesteal) { "+" } else { "" },
-                self.lifesteal
+        if self.speed.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Speed",
+                    if is_positive(self.speed.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.speed.value
+                ),
+                self.speed.quality,
+            ));
+        }
+        if self.lifesteal.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Lifesteal",
+                    if is_positive(self.lifesteal.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.lifesteal.value
+                ),
+                self.lifesteal.quality,
             ));
         }
 
-        if self.xp_rate != 0 {
-            tooltips.push(format!(
-                "{}{}% XP",
-                if is_positive(self.xp_rate) { "+" } else { "" },
-                self.xp_rate
+        if self.xp_rate.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% XP",
+                    if is_positive(self.xp_rate.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.xp_rate.value
+                ),
+                self.xp_rate.quality,
             ));
         }
-        if self.loot_rate != 0 {
-            tooltips.push(format!(
-                "{}{}% Loot",
-                if is_positive(self.loot_rate) { "+" } else { "" },
-                self.loot_rate
+        if self.loot_rate.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{}% Loot",
+                    if is_positive(self.loot_rate.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.loot_rate.value
+                ),
+                self.loot_rate.quality,
             ));
         }
 
@@ -217,13 +388,10 @@ impl ItemAttributes {
         tooltips.push(("Speed:    ".to_string(), format!("{}", self.speed)));
         tooltips.push(("Leech:    ".to_string(), format!("{}", self.lifesteal)));
 
-        // tooltips.push(format!("XP: {}", self.xp_rate));
-        // tooltips.push(format!("Loot: {}", self.loot_rate));
+        tooltips.push(("XP:".to_string(), format!("{}", self.xp_rate)));
+        tooltips.push(("Loot:".to_string(), format!("{}", self.loot_rate)));
 
         tooltips
-    }
-    pub fn get_durability_tooltip(&self) -> String {
-        format!("{}/{}", self.durability, self.max_durability)
     }
     pub fn add_attribute_components(
         &self,
@@ -232,8 +400,8 @@ impl ItemAttributes {
         skills: &PlayerSkills,
     ) {
         let computed_health = self.health + if skills.get(Skill::Health) { 25 } else { 0 };
-        if self.health > 0 && computed_health != old_att.health {
-            entity.insert(MaxHealth(computed_health));
+        if self.health.value > 0 && computed_health.value != old_att.health.value {
+            entity.insert(MaxHealth(computed_health.value));
         }
         if self.attack_cooldown > 0. {
             entity.insert(AttackCooldown(
@@ -248,21 +416,21 @@ impl ItemAttributes {
             entity.remove::<AttackCooldown>();
         }
 
-        entity.insert(Attack(self.attack));
+        entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
-            self.crit_chance + if skills.get(Skill::CritChance) { 10 } else { 0 },
+            self.crit_chance.value + if skills.get(Skill::CritChance) { 10 } else { 0 },
         ));
         entity.insert(CritDamage(
-            self.crit_damage + if skills.get(Skill::CritDamage) { 15 } else { 0 },
+            self.crit_damage.value + if skills.get(Skill::CritDamage) { 15 } else { 0 },
         ));
-        entity.insert(BonusDamage(self.bonus_damage));
-        entity.insert(HealthRegen(self.health_regen));
-        entity.insert(Healing(self.healing));
+        entity.insert(BonusDamage(self.bonus_damage.value));
+        entity.insert(HealthRegen(self.health_regen.value));
+        entity.insert(Healing(self.healing.value));
         entity.insert(Thorns(
-            self.thorns + if skills.get(Skill::Thorns) { 15 } else { 0 },
+            self.thorns.value + if skills.get(Skill::Thorns) { 15 } else { 0 },
         ));
         entity.insert(Dodge(
-            self.dodge
+            self.dodge.value
                 + if skills.get(Skill::DodgeChance) {
                     10
                 } else {
@@ -270,21 +438,21 @@ impl ItemAttributes {
                 },
         ));
         entity.insert(Speed(
-            self.speed + if skills.get(Skill::Speed) { 15 } else { 0 },
+            self.speed.value + if skills.get(Skill::Speed) { 15 } else { 0 },
         ));
         entity.insert(Lifesteal(
-            self.lifesteal + if skills.get(Skill::Lifesteal) { 1 } else { 0 },
+            self.lifesteal.value + if skills.get(Skill::Lifesteal) { 1 } else { 0 },
         ));
-        entity.insert(Defence(self.defence));
-        entity.insert(XpRateBonus(self.xp_rate));
-        entity.insert(LootRateBonus(self.loot_rate));
+        entity.insert(Defence(self.defence.value));
+        entity.insert(XpRateBonus(self.xp_rate.value));
+        entity.insert(LootRateBonus(self.loot_rate.value));
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {
-            "health" => self.health += modifier.delta,
-            "attack" => self.attack += modifier.delta,
-            "durability" => self.durability += modifier.delta,
-            "max_durability" => self.max_durability += modifier.delta,
+            "health" => self.health.value += modifier.delta,
+            "attack" => self.attack.value += modifier.delta,
+            "durability" => self.durability.value += modifier.delta,
+            "max_durability" => self.max_durability.value += modifier.delta,
             "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,
             "invincibility_cooldown" => self.invincibility_cooldown += modifier.delta as f32,
             _ => warn!("Got an unexpected attribute: {:?}", modifier.modifier),
@@ -358,8 +526,13 @@ macro_rules! setup_raw_bonus_attributes {
                     $(
                         {
                             if stringify!($field_name) == picked_attribute {
-                                let value = rng.gen_range(self.$field_name.clone().unwrap());
-                                item_attributes.$field_name = f32::ceil(value as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let min = (*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let max = (*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let range = (min)..=(max);
+                                let value = rng.gen_range(range.clone());
+                                item_attributes.$field_name = AttributeValue::new(
+                                        f32::ceil(value as f32 * rarity.get_rarity_attributes_bonus()) as i32,
+                                        AttributeQuality::get_quality(range, value));
                             }
                         }
                     )*
@@ -384,9 +557,9 @@ macro_rules! setup_raw_base_attributes {
 
             pub fn into_item_attributes(
                 &self,
+                rarity: ItemRarity,
                 attack_cooldown: f32,
             ) -> ItemAttributes {
-                // take pick an i32 attribute value from fields of Range<i32>
                 let mut rng = rand::thread_rng();
                 let mut item_attributes = ItemAttributes{ attack_cooldown, ..default()};
                 let valid_attributes = {
@@ -402,8 +575,12 @@ macro_rules! setup_raw_base_attributes {
                     $(
                         {
                             if stringify!($field_name) == *att {
-                                let value = rng.gen_range(self.$field_name.clone().unwrap());
-                                item_attributes.$field_name = value;
+                                let min = (*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let max = (*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let range = (min)..=(max);
+                                let value = rng.gen_range(range.clone());
+                                item_attributes.$field_name = AttributeValue::new(value,
+                                   AttributeQuality::get_quality(range, value));
                             }
                         }
                     )*
@@ -416,43 +593,43 @@ macro_rules! setup_raw_base_attributes {
 }
 
 setup_raw_bonus_attributes! { struct RawItemBonusAttributes {
-    attack: Option<Range<i32>>,
-     health: Option<Range<i32>>,
-     defence: Option<Range<i32>>,
-     durability: Option<Range<i32>>,
-     max_durability: Option<Range<i32>>,
+    attack: Option<RangeInclusive<i32>>,
+     health: Option<RangeInclusive<i32>>,
+     defence: Option<RangeInclusive<i32>>,
+     durability: Option<RangeInclusive<i32>>,
+     max_durability: Option<RangeInclusive<i32>>,
     //
-     crit_chance: Option<Range<i32>>,
-     crit_damage: Option<Range<i32>>,
-     bonus_damage: Option<Range<i32>>,
-     health_regen: Option<Range<i32>>,
-     healing: Option<Range<i32>>,
-     thorns: Option<Range<i32>>,
-     dodge: Option<Range<i32>>,
-     speed: Option<Range<i32>>,
-     lifesteal: Option<Range<i32>>,
-     xp_rate: Option<Range<i32>>,
-     loot_rate: Option<Range<i32>>,
+     crit_chance: Option<RangeInclusive<i32>>,
+     crit_damage: Option<RangeInclusive<i32>>,
+     bonus_damage: Option<RangeInclusive<i32>>,
+     health_regen: Option<RangeInclusive<i32>>,
+     healing: Option<RangeInclusive<i32>>,
+     thorns: Option<RangeInclusive<i32>>,
+     dodge: Option<RangeInclusive<i32>>,
+     speed: Option<RangeInclusive<i32>>,
+     lifesteal: Option<RangeInclusive<i32>>,
+     xp_rate: Option<RangeInclusive<i32>>,
+     loot_rate: Option<RangeInclusive<i32>>,
 }}
 
 setup_raw_base_attributes! { struct RawItemBaseAttributes {
-    attack: Option<Range<i32>>,
-     health: Option<Range<i32>>,
-     defence: Option<Range<i32>>,
-     durability: Option<Range<i32>>,
-     max_durability: Option<Range<i32>>,
+    attack: Option<RangeInclusive<i32>>,
+     health: Option<RangeInclusive<i32>>,
+     defence: Option<RangeInclusive<i32>>,
+     durability: Option<RangeInclusive<i32>>,
+     max_durability: Option<RangeInclusive<i32>>,
     //
-     crit_chance: Option<Range<i32>>,
-     crit_damage: Option<Range<i32>>,
-     bonus_damage: Option<Range<i32>>,
-     health_regen: Option<Range<i32>>,
-     healing: Option<Range<i32>>,
-     thorns: Option<Range<i32>>,
-     dodge: Option<Range<i32>>,
-     speed: Option<Range<i32>>,
-     lifesteal: Option<Range<i32>>,
-     xp_rate: Option<Range<i32>>,
-     loot_rate: Option<Range<i32>>,
+     crit_chance: Option<RangeInclusive<i32>>,
+     crit_damage: Option<RangeInclusive<i32>>,
+     bonus_damage: Option<RangeInclusive<i32>>,
+     health_regen: Option<RangeInclusive<i32>>,
+     healing: Option<RangeInclusive<i32>>,
+     thorns: Option<RangeInclusive<i32>>,
+     dodge: Option<RangeInclusive<i32>>,
+     speed: Option<RangeInclusive<i32>>,
+     lifesteal: Option<RangeInclusive<i32>>,
+     xp_rate: Option<RangeInclusive<i32>>,
+     loot_rate: Option<RangeInclusive<i32>>,
 }}
 
 #[derive(
@@ -496,9 +673,9 @@ impl ItemRarity {
     fn get_rarity_attributes_bonus(&self) -> f32 {
         match self {
             ItemRarity::Common => 1.0,
-            ItemRarity::Uncommon => 1.25,
-            ItemRarity::Rare => 1.75,
-            ItemRarity::Legendary => 2.5,
+            ItemRarity::Uncommon => 1.2,
+            ItemRarity::Rare => 1.45,
+            ItemRarity::Legendary => 1.8,
         }
     }
 
@@ -875,22 +1052,27 @@ pub fn add_item_glows(
     graphics: &Graphics,
     new_item_e: Entity,
     rarity: ItemRarity,
-) {
+) -> Option<Entity> {
     if let Some(glow) = rarity.get_item_glow() {
-        commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_item_glow(glow.clone()),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(16., 16.)),
+        Some(
+            commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_item_glow(glow.clone()),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(16., 16.)),
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: Vec3::new(0., 0., -1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(0., 0., -1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .set_parent(new_item_e);
+                })
+                .set_parent(new_item_e)
+                .id(),
+        )
+    } else {
+        None
     }
 }

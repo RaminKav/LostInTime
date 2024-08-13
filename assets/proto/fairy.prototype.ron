@@ -12,7 +12,6 @@
         (item: (
         obj_type: FireStaff,
         attributes: (
-            max_durability: 100,
             attack_cooldown: 0.85
         ),
         metadata: (

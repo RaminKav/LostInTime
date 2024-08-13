@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, sprite::Anchor};
 use rand::Rng;
 
 use crate::{
@@ -236,6 +236,7 @@ pub fn spawn_floating_text_with_shadow(
             },
             if i == 0 { BLACK } else { color },
             text.clone(),
+            Anchor::Center,
         );
         commands.entity(entity).insert(DamageNumber {
             timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -250,6 +251,7 @@ pub fn spawn_text(
     pos: Vec3,
     color: Color,
     text: String,
+    anchor: Anchor,
 ) -> Entity {
     commands
         .spawn(Text2dBundle {
@@ -265,6 +267,7 @@ pub fn spawn_text(
                 translation: pos,
                 ..Default::default()
             },
+            text_anchor: anchor,
             ..Default::default()
         })
         .id()

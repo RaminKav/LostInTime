@@ -81,7 +81,11 @@ pub fn handle_pay_shrine_cost(
     game: GameParam,
     mut game_camera: Query<Entity, With<TextureCamera>>,
     mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
+    dungeon_check: Query<&Dungeon>,
 ) {
+    if dungeon_check.get_single().is_ok() {
+        return;
+    }
     if key_input.just_pressed(KeyCode::F) {
         let (player_t, currency) = player_query.single();
         let Some(shrine) = game

@@ -3,7 +3,10 @@
   templates: [],
   schematics: {
   "survival_rogue_like::item::WorldObject": YellowSapplingStage2,
-  "survival_rogue_like::item::Foliage": YellowSapplingStage2,
+  "survival_rogue_like::animations::FadeOpacity": (),
+  "bevy_proto::custom::SpriteBundle": (
+      texture: AssetPath("YellowSapplingStage2.png")
+   ),
   "survival_rogue_like::sappling::GrowsInto": (YellowSapplingStage3),
   "survival_rogue_like::proto::SapplingProto": (80.),
   "survival_rogue_like::assets::SpriteSize": Small,

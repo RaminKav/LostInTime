@@ -8,23 +8,20 @@
         defence: Some((start: 2, end: 7)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        crit_damage: Some((start: 2, end: 20)),
-        crit_chance: Some((start: 4, end: 10)),
-        healing: Some((start: 8, end: 20)),
-        bonus_damage: Some((start: 1, end: 5)),
-        speed: Some((start: 4, end: 10)),
-        health_regen: Some((start: 1, end: 4)),
-        thorns: Some((start: 4, end: 10)),
-        dodge: Some((start: 1, end: 11)),
-      //   xp_rate: Some((start: 4, end: 10)),
+        crit_damage: Some((start: 2, end: 6)),
+        crit_chance: Some((start: 2, end: 6)),
+        healing: Some((start: 8, end: 7)),
+        bonus_damage: Some((start: 1, end: 2)),
+        speed: Some((start: 4, end: 20)),
+        health_regen: Some((start: 1, end: 3)),
+        thorns: Some((start: 4, end: 5)),
+        dodge: Some((start: 1, end: 7)),
         loot_rate: Some((start: 4, end: 10)),
+        xp_rate: Some((start: 4, end: 10)),
   ),
   "survival_rogue_like::item::EquipmentType": Chest,
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: LeatherTunic,
-        attributes: (
-            max_durability: 100,
-        ),
         metadata: (
             name: "Leather Tunic", 
             desc: ["Nice."]

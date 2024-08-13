@@ -81,6 +81,7 @@ impl Plugin for InputsPlugin {
                     handle_open_essence_ui,
                     close_container,
                     diagnostics,
+                    handle_interact_objects,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -449,7 +450,13 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
+            // proto_commands.spawn_item_from_proto(
+            //     WorldObject::LeatherShoes,
+            //     &proto,
+            //     pos,
+            //     1,
+            //     Some(1),
+            // );
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
@@ -661,6 +668,32 @@ pub fn mouse_click_system(
                 obj_action.run_action(
                     obj_e,
                     cursor_tile_pos,
+                    &mut game,
+                    &mut item_action_param,
+                    &mut commands,
+                    &mut proto_param,
+                );
+            }
+        }
+    }
+}
+
+pub fn handle_interact_objects(
+    objs: Query<(Entity, &GlobalTransform, &ObjectAction)>,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    mut game: GameParam,
+    mut proto_param: ProtoParam,
+    mut item_action_param: ItemActionParam,
+    mut commands: Commands,
+    key_input: ResMut<Input<KeyCode>>,
+) {
+    if key_input.just_pressed(KeyCode::F) {
+        for (obj_e, t, obj_action) in objs.iter() {
+            let obj_t = t.translation().truncate();
+            if obj_t.distance(player_query.single().translation().truncate()) <= 32. {
+                obj_action.run_action(
+                    obj_e,
+                    world_pos_to_tile_pos(obj_t),
                     &mut game,
                     &mut item_action_param,
                     &mut commands,

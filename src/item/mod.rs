@@ -1,7 +1,5 @@
-use crate::animations::AttackAnimationTimer;
 use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
-use crate::attributes::ItemAttributes;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
@@ -30,7 +28,7 @@ use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
 use crate::world::TileMapPosition;
-use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState, YSort};
+use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
@@ -51,7 +49,7 @@ pub mod projectile;
 pub use crafting::*;
 pub use loot_table::*;
 
-use bevy_rapier2d::prelude::{Collider, Sensor};
+use bevy_rapier2d::prelude::Collider;
 use lazy_static::lazy_static;
 
 use serde::{Deserialize, Serialize};
@@ -102,9 +100,9 @@ impl EquipmentType {
             EquipmentType::Chest => vec![2],
             EquipmentType::Legs => vec![1],
             EquipmentType::Feet => vec![0],
-            EquipmentType::Ring => vec![3, 2],
-            EquipmentType::Pendant => vec![1],
-            EquipmentType::Trinket => vec![0],
+            EquipmentType::Ring => vec![2, 1],
+            EquipmentType::Pendant => vec![0],
+            EquipmentType::Trinket => vec![3],
             _ => vec![],
         }
     }
@@ -405,6 +403,7 @@ pub enum WorldObject {
     DirtPath,
     TimeGate,
     TimeFragment,
+    InventoryBag,
 }
 
 #[derive(
@@ -590,83 +589,6 @@ impl WorldObject {
             return Some(eq_type.clone());
         }
         None
-    }
-
-    pub fn spawn_equipment_on_player(
-        self,
-        commands: &mut Commands,
-        game: &mut GameParam,
-    ) -> Entity {
-        let item_map = &game.graphics.spritesheet_map;
-        if item_map.is_none() {
-            panic!("graphics not loaded");
-        }
-        let sprite = game
-            .graphics
-            .spritesheet_map
-            .as_ref()
-            .unwrap()
-            .get(&self)
-            .unwrap_or_else(|| panic!("No graphic for object {self:?}"))
-            .clone();
-        let player_e = game.player_query.single();
-        let obj_data = game.world_obj_data.properties.get(&self).unwrap();
-        let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
-        let position;
-        let attributes = ItemAttributes {
-            durability: 100,
-            max_durability: 100,
-            attack: 20,
-            attack_cooldown: 0.4,
-            ..Default::default()
-        };
-
-        position = Vec3::new(
-            PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x + anchor.x * obj_data.size.x,
-            PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].y + anchor.y * obj_data.size.y,
-            500. - (PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].y + anchor.y * obj_data.size.y) * 0.1,
-        );
-        let item = commands
-            .spawn(SpriteSheetBundle {
-                sprite,
-                texture_atlas: game.graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: position,
-                    scale: Vec3::new(1., 1., 1.),
-                    // rotation: Quat::from_rotation_z(0.8),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(attributes)
-            .insert(ItemDisplayMetaData {
-                name: self.to_string(),
-                level: None,
-                desc: vec!["A cool piece of Equipment".to_string()],
-                item_ability: None,
-            })
-            .insert(Equipment(Limb::Hands))
-            .insert(YSort(0.))
-            .insert(Name::new("EquipItem"))
-            .insert(self)
-            .id();
-
-        let mut item_entity = commands.entity(item);
-
-        item_entity
-            .insert(Collider::cuboid(
-                obj_data.size.x / 3.5,
-                obj_data.size.y / 4.5,
-            ))
-            .insert(Sensor);
-
-        item_entity.insert(AttackAnimationTimer(
-            Timer::from_seconds(0.125, TimerMode::Once),
-            0.,
-        ));
-        item_entity.set_parent(player_e);
-
-        item
     }
 
     pub fn get_obj_color(&self) -> Color {

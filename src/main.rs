@@ -237,6 +237,9 @@ pub struct ImageAssets {
     pub walls_sheet: Handle<Image>,
 }
 
+#[derive(Component)]
+pub struct DoNotDespawnOnGameOver;
+
 #[derive(SystemParam)]
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
@@ -577,6 +580,7 @@ fn setup(
             },
             ..default()
         },
+        DoNotDespawnOnGameOver,
         TextureCamera,
         RawPosition::default(),
     ));
@@ -593,6 +597,7 @@ fn setup(
             },
             ..default()
         },
+        DoNotDespawnOnGameOver,
         RenderLayers::from_layers(&[3]),
     ));
 
@@ -621,6 +626,7 @@ fn setup(
                 ..default()
             },
             TextureTarget,
+            DoNotDespawnOnGameOver,
             first_pass_layer,
         ))
         .id();
@@ -644,6 +650,7 @@ fn setup(
                 material: ui_render_material_handle,
                 ..default()
             },
+            DoNotDespawnOnGameOver,
             // TextureTarget,
             second_pass_layer,
         ))
@@ -661,6 +668,7 @@ fn setup(
             },
             ..default()
         },
+        DoNotDespawnOnGameOver,
         MainCamera,
         GameUpscale(HEIGHT / img_size.height as f32),
         first_pass_layer,
@@ -677,6 +685,7 @@ fn setup(
             ..default()
         },
         UICamera,
+        DoNotDespawnOnGameOver,
         GameUpscale(HEIGHT / img_size.height as f32),
         second_pass_layer,
     ));

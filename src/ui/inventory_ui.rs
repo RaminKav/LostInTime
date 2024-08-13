@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
     assets::Graphics,
-    attributes::AttributeChangeEvent,
+    attributes::{add_item_glows, AttributeChangeEvent},
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
     ui::{CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
@@ -198,7 +198,7 @@ pub fn setup_inv_slots_ui(
         );
 
         // equipment slots
-        if slot_index < 4 && should_spawn_equipment {
+        if slot_index < 3 && should_spawn_equipment {
             spawn_inv_slot(
                 &mut commands,
                 &inv_state,
@@ -213,7 +213,7 @@ pub fn setup_inv_slots_ui(
             );
         }
         // accessoyr slots
-        if slot_index < 4 && should_spawn_equipment {
+        if slot_index < 3 && should_spawn_equipment {
             spawn_inv_slot(
                 &mut commands,
                 &inv_state,
@@ -338,6 +338,45 @@ pub fn spawn_inv_slot(
         ));
     }
 
+    // Inv Slot Icon //
+    let slot_icon = match slot_type.clone() {
+        InventorySlotType::Equipment => match slot_index {
+            2 => Some("ui/icons/ChestSlotIcon.png"),
+            1 => Some("ui/icons/PantsSlotIcon.png"),
+            0 => Some("ui/icons/ShoesSlotIcon.png"),
+            _ => None,
+        },
+        InventorySlotType::Accessory => match slot_index {
+            2 => Some("ui/icons/RingSlotIcon.png"),
+            1 => Some("ui/icons/RingSlotIcon.png"),
+            0 => Some("ui/icons/NecklaceSlotIcon.png"),
+            _ => None,
+        },
+        _ => None,
+    };
+    let icon_entity_option = if let Some(slot_icon) = slot_icon {
+        Some(
+            commands
+                .spawn(SpriteBundle {
+                    texture: asset_server.load(slot_icon),
+                    transform: Transform {
+                        translation: Vec3::new(0., 0., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(16., 16.)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .id(),
+        )
+    } else {
+        None
+    };
+
     let mut slot_entity = commands.spawn(SpriteBundle {
         texture: graphics.get_ui_element_texture(
             if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
@@ -385,6 +424,10 @@ pub fn spawn_inv_slot(
             .set_parent(inv_e)
             .insert(Interactable::from_state(interactable_state));
     }
+
+    if let Some(icon_entity) = icon_entity_option {
+        slot_entity.push_children(&[icon_entity]);
+    }
     slot_entity.id()
 }
 pub fn spawn_item_stack_icon(
@@ -407,12 +450,12 @@ pub fn spawn_item_stack_icon(
             .unwrap_or_else(|| panic!("No graphic for object {:?}", item_stack.obj_type))
             .clone()
     };
-    let item = commands
+    let item_entity = commands
         .spawn(SpriteSheetBundle {
             sprite,
             texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
             transform: Transform {
-                translation: Vec3::new(offset.x, offset.y, 1.),
+                translation: Vec3::new(offset.x, offset.y, 2.),
                 ..Default::default()
             },
             ..Default::default()
@@ -420,6 +463,15 @@ pub fn spawn_item_stack_icon(
         .insert(item_stack.clone())
         .insert(RenderLayers::from_layers(&[render_layer]))
         .id();
+    // glow effect for rarity
+    if let Some(glow_e) =
+        add_item_glows(commands, &graphics, item_entity, item_stack.rarity.clone())
+    {
+        commands
+            .entity(glow_e)
+            .insert(RenderLayers::from_layers(&[3]));
+    }
+
     if item_stack.count > 1 {
         let text = commands
             .spawn((
@@ -434,7 +486,7 @@ pub fn spawn_item_stack_icon(
                     )
                     .with_alignment(TextAlignment::Center),
                     transform: Transform {
-                        translation: Vec3::new(7., -6., 1.),
+                        translation: Vec3::new(7., -6., 2.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -444,9 +496,9 @@ pub fn spawn_item_stack_icon(
                 RenderLayers::from_layers(&[render_layer]),
             ))
             .id();
-        commands.entity(item).push_children(&[text]);
+        commands.entity(item_entity).push_children(&[text]);
     }
-    item
+    item_entity
 }
 //TODO: make event?
 pub fn change_hotbar_slot(

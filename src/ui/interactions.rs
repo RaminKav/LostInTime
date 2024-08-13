@@ -36,6 +36,7 @@ pub enum UIElement {
     InventorySlotHover,
     XPBarFrame,
     Tooltip,
+    StatTooltip,
     LargeTooltipCommon,
     LargeTooltipUncommon,
     LargeTooltipRare,

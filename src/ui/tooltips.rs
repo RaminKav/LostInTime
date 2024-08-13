@@ -3,11 +3,11 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::Graphics,
     attributes::{
-        item_abilities::ItemAbility, Attack, BonusDamage, CritChance, CritDamage, Defence, Dodge,
-        Healing, HealthRegen, ItemAttributes, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns,
-        XpRateBonus,
+        item_abilities::ItemAbility, Attack, AttributeQuality, AttributeValue, BonusDamage,
+        CritChance, CritDamage, Defence, Dodge, Healing, HealthRegen, ItemAttributes, Lifesteal,
+        LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
     },
-    colors::{BLACK, DARK_GREEN, GOLD, GREY, LIGHT_GREEN, LIGHT_RED},
+    colors::{BLACK, DARK_GREEN, GREY, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::ItemStack,
     item::{Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -122,26 +122,32 @@ pub fn handle_spawn_inv_item_tooltip(
             ))
             .id();
 
-        let mut tooltip_text: Vec<(String, f32)> = vec![];
-        tooltip_text.push((item.item_stack.metadata.name.clone(), 0.));
+        let mut tooltip_text: Vec<(String, f32, AttributeQuality)> = vec![];
+        tooltip_text.push((
+            item.item_stack.metadata.name.clone(),
+            0.,
+            AttributeQuality::High,
+        ));
 
         if should_show_attributes {
-            for a in attributes.iter().clone() {
-                tooltip_text.push((a.to_string(), 0.));
+            for (i, (a, q)) in attributes.iter().enumerate().clone() {
+                let d = if i >= 2 { 3. } else { 0. };
+                tooltip_text.push((a.to_string(), d, *q));
             }
             if let Some(level) = level {
                 tooltip_text.push((
                     "Level ".to_string() + &level.to_string(),
                     size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
+                    AttributeQuality::Low,
                 ));
             }
         } else {
             for desc_string in item.item_stack.metadata.desc.iter().clone() {
-                tooltip_text.push((desc_string.to_string(), 0.));
+                tooltip_text.push((desc_string.to_string(), 0., AttributeQuality::Average));
             }
         }
 
-        for (i, (text, d)) in tooltip_text.iter().enumerate() {
+        for (i, (text, d, quality)) in tooltip_text.iter().enumerate() {
             let text_pos = if i == 0 {
                 Vec3::new(
                     -(f32::ceil((text.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
@@ -165,12 +171,12 @@ pub fn handle_spawn_inv_item_tooltip(
                                 font_size: 8.0,
                                 color: if i == 0 {
                                     item.item_stack.rarity.get_color()
-                                } else if i > 1 && i == tooltip_text.len() - 1 {
-                                    GREY
-                                } else if i > 2 && should_show_attributes {
-                                    GOLD
                                 } else {
-                                    GREY
+                                    match quality {
+                                        AttributeQuality::Low => LIGHT_GREY,
+                                        AttributeQuality::Average => GREY,
+                                        AttributeQuality::High => quality.get_color(),
+                                    }
                                 },
                             },
                         ),
@@ -316,13 +322,14 @@ pub fn handle_spawn_inv_player_stats(
     >,
     inv: Query<Entity, With<InventoryUI>>,
     stats: Query<Entity, With<StatsUI>>,
-    tooltip_manager: Res<TooltipsManager>,
+    mut tooltip_manager: ResMut<TooltipsManager>,
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
 ) {
     if updates.iter().len() > 0 && tooltip_manager.timer.finished() {
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
         }
+        tooltip_manager.timer.reset();
         let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
             (
                 inv.get_single(),
@@ -357,20 +364,20 @@ pub fn handle_spawn_inv_player_stats(
             loot_rate_bonus,
         ) = player_stats.single();
         let attributes = ItemAttributes {
-            attack: attack.0,
-            health: max_health.0,
-            defence: defence.0,
-            crit_chance: crit_chance.0,
-            crit_damage: crit_damage.0,
-            bonus_damage: bonus_damage.0,
-            health_regen: health_regen.0,
-            healing: healing.0,
-            thorns: thorns.0,
-            dodge: dodge.0,
-            speed: speed.0,
-            lifesteal: lifesteal.0,
-            xp_rate: xp_rate_bonus.0,
-            loot_rate: loot_rate_bonus.0,
+            attack: AttributeValue::new(attack.0, AttributeQuality::Low),
+            health: AttributeValue::new(max_health.0, AttributeQuality::Low),
+            defence: AttributeValue::new(defence.0, AttributeQuality::Low),
+            crit_chance: AttributeValue::new(crit_chance.0, AttributeQuality::Low),
+            crit_damage: AttributeValue::new(crit_damage.0, AttributeQuality::Low),
+            bonus_damage: AttributeValue::new(bonus_damage.0, AttributeQuality::Low),
+            health_regen: AttributeValue::new(health_regen.0, AttributeQuality::Low),
+            healing: AttributeValue::new(healing.0, AttributeQuality::Low),
+            thorns: AttributeValue::new(thorns.0, AttributeQuality::Low),
+            dodge: AttributeValue::new(dodge.0, AttributeQuality::Low),
+            speed: AttributeValue::new(speed.0, AttributeQuality::Low),
+            lifesteal: AttributeValue::new(lifesteal.0, AttributeQuality::Low),
+            xp_rate: AttributeValue::new(xp_rate_bonus.0, AttributeQuality::Low),
+            loot_rate: AttributeValue::new(loot_rate_bonus.0, AttributeQuality::Low),
             ..default()
         }
         .get_stats_summary();
@@ -378,7 +385,7 @@ pub fn handle_spawn_inv_player_stats(
         let tooltip = commands
             .spawn((
                 SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::LargeTooltipCommon),
+                    texture: graphics.get_ui_element_texture(UIElement::StatTooltip),
                     transform: Transform {
                         translation,
                         scale: Vec3::new(1., 1., 1.),
@@ -391,7 +398,7 @@ pub fn handle_spawn_inv_player_stats(
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
-                UIElement::LargeTooltipCommon,
+                UIElement::StatTooltip,
                 PlayerStatsTooltip,
                 Name::new("TOOLTIP"),
             ))
@@ -402,12 +409,24 @@ pub fn handle_spawn_inv_player_stats(
         for (_i, a) in attributes.iter().enumerate().clone() {
             tooltip_text.push(((a.0.clone(), a.1.clone()), 0.));
         }
-
+        let total_tooltips = tooltip_text.len();
         for (i, (text, d)) in tooltip_text.iter().enumerate() {
             let text_pos = if i == 0 {
                 Vec3::new(
                     -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
                     TOOLTIP_UI_SIZE.y / 2. - 12.,
+                    1.,
+                )
+            } else if i == total_tooltips - 1 {
+                Vec3::new(
+                    -TOOLTIP_UI_SIZE.x / 2. + 38.,
+                    TOOLTIP_UI_SIZE.y / 2. - 12. - ((i as f32 - 1.) * 8.) - d - 2.,
+                    1.,
+                )
+            } else if i == total_tooltips - 2 {
+                Vec3::new(
+                    -TOOLTIP_UI_SIZE.x / 2. + 8.,
+                    TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
                     1.,
                 )
             } else {

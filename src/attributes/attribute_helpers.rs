@@ -71,10 +71,10 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
 }
 
 pub fn get_rarity_rng(mut rng: ThreadRng) -> ItemRarity {
-    let rarity_rng = rng.gen_range(0..40);
+    let rarity_rng = rng.gen_range(0..32);
     if rarity_rng == 0 {
         ItemRarity::Legendary
-    } else if rarity_rng < 4 {
+    } else if rarity_rng < 5 {
         ItemRarity::Rare
     } else if rarity_rng < 13 {
         ItemRarity::Uncommon
@@ -96,15 +96,16 @@ pub fn build_item_stack_with_parsed_attributes(
     } else {
         ItemAttributes::default()
     };
-    let parsed_base_att = raw_base_att.into_item_attributes(stack.attributes.attack_cooldown);
+    let parsed_base_att =
+        raw_base_att.into_item_attributes(rarity.clone(), stack.attributes.attack_cooldown);
     let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
     let mut level = 1;
     if let Some(item_level) = level_option {
         if equip_type.is_weapon() {
-            final_att.attack += max(0, (item_level - 1) as i32);
+            final_att.attack = final_att.attack + max(0, (item_level - 1) as i32);
         } else if equip_type.is_equipment() && !equip_type.is_accessory() {
-            final_att.health += max(0, ((item_level * 2) - 1) as i32);
-            final_att.defence += max(0, (item_level - 1) as i32);
+            final_att.health = final_att.health + max(0, ((item_level * 2) - 1) as i32);
+            final_att.defence = final_att.defence + max(0, (item_level - 1) as i32);
         }
         level = item_level;
     }

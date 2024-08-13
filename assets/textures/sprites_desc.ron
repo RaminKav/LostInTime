@@ -575,6 +575,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        InventoryBag: WorldObjectData(
+            texture_pos: (3., 1.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MetalBar: WorldObjectData(
             texture_pos: (14., 3.),
             size: (16., 16.),
