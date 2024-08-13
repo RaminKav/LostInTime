@@ -1,0 +1,13 @@
+(
+  name: "GambleShrine",
+  templates: [],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": GambleShrine,
+  "survival_rogue_like::item::object_actions::ObjectAction": GambleShrine,
+  "survival_rogue_like::item::object_actions::ObjectActionCost": TimeFragment(1),
+  "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 12.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -10., y1: -13., x2: 10., y2: -13., r: 5.5),
+  }
+)

@@ -62,6 +62,7 @@
         House: 0.00,
         DungeonEntrance: 0.0,
         CombatShrine: 0.06,
+        GambleShrine: 0.06,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],
@@ -102,6 +103,7 @@
         TimeGate: [GrassTile, ],
         DungeonEntrance: [GrassTile, ],
         CombatShrine: [GrassTile, ],
+        GambleShrine: [GrassTile, ],
       }
     ),
   }

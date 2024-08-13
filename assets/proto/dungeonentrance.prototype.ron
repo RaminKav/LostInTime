@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": DungeonEntrance,
   "survival_rogue_like::item::object_actions::ObjectAction": DungeonTeleport,
+  "survival_rogue_like::item::object_actions::ObjectActionCost": Item(Key, 1),
   "survival_rogue_like::assets::SpriteSize": Medium,
   "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
   "survival_rogue_like::proto::ColliderProto": (x: 12., y: 12),

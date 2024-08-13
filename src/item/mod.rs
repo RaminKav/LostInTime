@@ -35,6 +35,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic
 use combat_shrine::{
     add_shrine_visuals_on_spawn, handle_shrine_rewards, CombatShrineMobDeathEvent,
 };
+use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
 use rand::Rng;
 
 mod crafting;
@@ -42,6 +43,7 @@ pub mod item_actions;
 
 pub mod boss_shrine;
 pub mod combat_shrine;
+pub mod gamble_shrine;
 use boss_shrine::*;
 pub mod item_upgrades;
 mod loot_table;
@@ -268,6 +270,8 @@ pub enum WorldObject {
     DungeonEntranceBlock,
     CombatShrine,
     CombatShrineDone,
+    GambleShrine,
+    GambleShrineDone,
     Grass,
     Grass2,
     Grass3,
@@ -666,6 +670,7 @@ impl Plugin for ItemsPlugin {
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
             .add_event::<CombatShrineMobDeathEvent>()
+            .add_event::<GambleShrineEvent>()
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
             .add_plugin(LootTablePlugin)
@@ -690,6 +695,8 @@ impl Plugin for ItemsPlugin {
                     handle_burning_ticks,
                     handle_shrine_rewards,
                     add_shrine_visuals_on_spawn,
+                    handle_gamble_shrine_rewards,
+                    add_gamble_visuals_on_spawn,
                     handle_frail_stack_ticks,
                     handle_slow_stack_ticks,
                     handle_on_hit_upgrades.after(handle_hits),

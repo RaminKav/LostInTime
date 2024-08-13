@@ -38,7 +38,7 @@ use crate::item::item_upgrades::{
 };
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
-use crate::item::Equipment;
+use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
@@ -572,7 +572,7 @@ pub fn mouse_click_system(
     mut hit_event: EventWriter<HitEvent>,
 
     player_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
-    inv: Query<&mut Inventory>,
+    mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     ui_state: Res<State<UIState>>,
     ranged_query: Query<&RangedAttack, With<Equipment>>,
@@ -663,15 +663,17 @@ pub fn mouse_click_system(
                 item_actions.run_action(held_obj, &mut item_action_param, &mut game, &proto_param);
             }
         }
-        if let Some((obj_e, _)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+        if let Some((obj_e, obj)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
             if let Ok(obj_action) = obj_actions.get(obj_e) {
                 obj_action.run_action(
                     obj_e,
                     cursor_tile_pos,
+                    obj,
                     &mut game,
                     &mut item_action_param,
                     &mut commands,
                     &mut proto_param,
+                    &mut inv.single_mut(),
                 );
             }
         }
@@ -679,8 +681,8 @@ pub fn mouse_click_system(
 }
 
 pub fn handle_interact_objects(
-    objs: Query<(Entity, &GlobalTransform, &ObjectAction)>,
-    player_query: Query<&GlobalTransform, With<Player>>,
+    objs: Query<(Entity, &GlobalTransform, &ObjectAction, &WorldObject)>,
+    mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
     mut proto_param: ProtoParam,
     mut item_action_param: ItemActionParam,
@@ -688,16 +690,19 @@ pub fn handle_interact_objects(
     key_input: ResMut<Input<KeyCode>>,
 ) {
     if key_input.just_pressed(KeyCode::F) {
-        for (obj_e, t, obj_action) in objs.iter() {
+        for (obj_e, t, obj_action, obj) in objs.iter() {
             let obj_t = t.translation().truncate();
-            if obj_t.distance(player_query.single().translation().truncate()) <= 32. {
+            let (player_t, mut inv) = player_query.single_mut();
+            if obj_t.distance(player_t.translation().truncate()) <= 32. {
                 obj_action.run_action(
                     obj_e,
                     world_pos_to_tile_pos(obj_t),
+                    obj.clone(),
                     &mut game,
                     &mut item_action_param,
                     &mut commands,
                     &mut proto_param,
+                    &mut inv,
                 );
             }
         }

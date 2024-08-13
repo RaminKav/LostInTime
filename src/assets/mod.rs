@@ -13,6 +13,7 @@ use strum::IntoEnumIterator;
 use crate::attributes::ItemGlow;
 use crate::enemy::Mob;
 use crate::item::combat_shrine::CombatShrineAnim;
+use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::{
     Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
@@ -96,6 +97,7 @@ impl Plugin for GameAssetsPlugin {
                 skill_icons: None,
                 item_glows: None,
                 combat_shrine_anim: None,
+                gamble_shrine_anim: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -153,6 +155,7 @@ pub struct Graphics {
     pub skill_icons: Option<HashMap<Skill, Handle<Image>>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
+    pub gamble_shrine_anim: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -420,6 +423,7 @@ impl GameAssetsPlugin {
             skill_icons: Some(skill_handles),
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
+            gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type

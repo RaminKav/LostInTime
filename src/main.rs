@@ -69,13 +69,13 @@ use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
-use client::{analytics::AnalyticsData, ClientPlugin};
+use client::ClientPlugin;
 use combat::*;
 use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
 use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
-use player::{Player, PlayerPlugin, PlayerState};
+use player::{Player, PlayerPlugin, PlayerState, TimeFragmentCurrency};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
@@ -252,7 +252,7 @@ pub struct GameParam<'w, 's> {
     pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
 
     //TODO: remove this to use Bevy_Save
-    pub player_query: Query<'w, 's, Entity, With<Player>>,
+    pub player_query: Query<'w, 's, (Entity, &'static TimeFragmentCurrency), With<Player>>,
     pub player_stats: Query<
         'w,
         's,
@@ -301,6 +301,9 @@ impl<'w, 's> GameParam<'w, 's> {
     }
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state
+    }
+    pub fn get_time_fragments(&self) -> i32 {
+        self.player_query.single().1.time_fragments
     }
     pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<Entity> {
         for (e, chunk) in self.chunk_query.iter() {

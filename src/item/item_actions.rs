@@ -10,7 +10,7 @@ use crate::{
     inventory::Inventory,
     juice::UseItemEvent,
     night::NightTracker,
-    player::{stats::SkillPoints, MovePlayerEvent},
+    player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer, InventoryState, UIState},
     world::{
@@ -22,7 +22,9 @@ use crate::{
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use super::{CraftingTracker, PlaceItemEvent, Recipes, WorldObject};
+use super::{
+    gamble_shrine::GambleShrineEvent, CraftingTracker, PlaceItemEvent, Recipes, WorldObject,
+};
 
 #[derive(Component, Reflect, FromReflect, Clone, Schematic, Default, PartialEq)]
 #[reflect(Component, Schematic)]
@@ -58,6 +60,8 @@ pub struct ActionSuccessEvent {
 pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
     pub use_item_event: EventWriter<'w, UseItemEvent>,
+    pub gamble_shrine_event: EventWriter<'w, GambleShrineEvent>,
+    pub currency_event: EventWriter<'w, ModifyTimeFragmentsEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
     pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
     pub analytics_event: EventWriter<'w, AnalyticsUpdateEvent>,
@@ -72,7 +76,7 @@ pub struct ItemActionParam<'w, 's> {
     pub crafting_tracker: Res<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
     pub night_tracker: Res<'w, NightTracker>,
-    pub skill_points: Query<'w, 's, &'static mut SkillPoints>,
+    pub skill_points_query: Query<'w, 's, &'static mut SkillPoints>,
     pub game_camera: Query<'w, 's, Entity, With<TextureCamera>>,
 
     #[system_param(ignore)]
@@ -154,7 +158,7 @@ impl ItemActions {
                     // );
                 }
                 ItemAction::GrantSkillPoint(amount) => {
-                    let mut sp = item_action_param.skill_points.single_mut();
+                    let mut sp = item_action_param.skill_points_query.single_mut();
                     sp.count += *amount;
 
                     item_action_param.use_item_event.send(UseItemEvent(obj));
