@@ -46,6 +46,7 @@ pub enum SchematicType {
     House,
     DungeonEntrance,
     CombatShrine,
+    GambleShrine,
 }
 
 #[derive(Component)]
@@ -172,7 +173,7 @@ fn load_schematic(
         );
         commands
             .spawn(DynamicSceneBundle {
-                scene: asset_server.load("scenes/CombatShrine.scn.ron"),
+                scene: asset_server.load("scenes/GambleShrine.scn.ron"),
                 transform: Transform::from_translation(game.player().position),
                 ..default()
             })

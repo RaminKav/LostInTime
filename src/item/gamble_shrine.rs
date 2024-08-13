@@ -20,18 +20,20 @@ pub struct CombatShrineMob {
 }
 
 #[derive(Component)]
-pub struct CombatShrine {
-    pub num_mobs_left: usize,
+pub struct GambleShrine {
+    pub success: bool,
 }
 
-pub struct CombatShrineMobDeathEvent(pub Entity);
+pub struct GambleShrineEvent {
+    pub entity: Entity,
+    pub success: bool,
+}
 
-pub fn handle_shrine_rewards(
-    mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
+pub fn handle_gamble_shrine_rewards(
     mut shrines: Query<(
         Entity,
         &GlobalTransform,
-        &mut CombatShrine,
+        &GambleShrine,
         &mut AsepriteAnimation,
     )>,
     mut proto_commands: ProtoCommands,
@@ -39,27 +41,24 @@ pub fn handle_shrine_rewards(
     mut commands: Commands,
     mut game: GameParam,
 ) {
-    for event in shrine_mob_event.iter() {
-        if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
-            if anim.current_frame() == 55 {
-                *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-            }
-            shrine.num_mobs_left -= 1;
-            let drop_list = [
-                WorldObject::WoodSword,
-                WorldObject::WoodSword,
-                WorldObject::WoodSword,
-                WorldObject::Sword,
-                WorldObject::Sword,
-                WorldObject::Dagger,
-                WorldObject::WoodBow,
-                WorldObject::Claw,
-                // WorldObject::MiracleSeed,
-                WorldObject::FireStaff,
-                WorldObject::BasicStaff,
-                WorldObject::MagicWhip,
-            ];
-            if shrine.num_mobs_left == 0 {
+    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
+        if shrine.success {
+            if anim.current_frame() == 50 {
+                *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
+                let drop_list = [
+                    WorldObject::WoodSword,
+                    WorldObject::WoodSword,
+                    WorldObject::WoodSword,
+                    WorldObject::Sword,
+                    WorldObject::Sword,
+                    WorldObject::Dagger,
+                    WorldObject::WoodBow,
+                    WorldObject::Claw,
+                    // WorldObject::MiracleSeed,
+                    WorldObject::FireStaff,
+                    WorldObject::BasicStaff,
+                    WorldObject::MagicWhip,
+                ];
                 // give rewards
                 proto_commands.spawn_item_from_proto(
                     drop_list
@@ -74,49 +73,52 @@ pub fn handle_shrine_rewards(
                 );
                 commands
                     .entity(e)
-                    .insert(WorldObject::CombatShrineDone)
+                    .insert(WorldObject::GambleShrineDone)
                     .remove::<ObjectAction>();
-                *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
                 let anchor = proto
-                    .get_component::<SpriteAnchor, _>(WorldObject::CombatShrine)
+                    .get_component::<SpriteAnchor, _>(WorldObject::GambleShrine)
                     .unwrap_or(&SpriteAnchor(Vec2::ZERO));
                 game.add_object_to_chunk_cache(
                     world_pos_to_tile_pos(t.translation().truncate() - anchor.0),
-                    WorldObject::CombatShrineDone,
+                    WorldObject::GambleShrineDone,
                 );
+            }
+        } else {
+            if anim.current_frame() == 86 {
+                *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
             }
         }
     }
 }
 
-aseprite!(pub CombatShrineAnim, "textures/combat_shrine/combat_shrine.ase");
+aseprite!(pub GambleShrineAnim, "textures/gamble_shrine/GambleShrine.ase");
 
-pub fn add_shrine_visuals_on_spawn(
+pub fn add_gamble_visuals_on_spawn(
     mut commands: Commands,
     new_shrines: Query<(Entity, &WorldObject, &Transform), Added<WorldObject>>,
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
-        if obj == &WorldObject::CombatShrine {
+        if obj == &WorldObject::GambleShrine {
             commands
                 .entity(e)
                 .insert(AsepriteBundle {
                     transform: *t,
-                    animation: AsepriteAnimation::from(CombatShrineAnim::tags::IDLE),
-                    aseprite: graphics.combat_shrine_anim.as_ref().unwrap().clone(),
+                    animation: AsepriteAnimation::from(GambleShrineAnim::tags::IDLE),
+                    aseprite: graphics.gamble_shrine_anim.as_ref().unwrap().clone(),
                     ..default()
                 })
-                .insert(Name::new("COMBAT"));
-        } else if obj == &WorldObject::CombatShrineDone {
+                .insert(Name::new("GAMBLE"));
+        } else if obj == &WorldObject::GambleShrineDone {
             commands
                 .entity(e)
                 .insert(AsepriteBundle {
                     transform: *t,
-                    animation: AsepriteAnimation::from(CombatShrineAnim::tags::DONE),
-                    aseprite: graphics.combat_shrine_anim.as_ref().unwrap().clone(),
+                    animation: AsepriteAnimation::from(GambleShrineAnim::tags::DONE),
+                    aseprite: graphics.gamble_shrine_anim.as_ref().unwrap().clone(),
                     ..default()
                 })
-                .insert(Name::new("COMBAT_DONE"));
+                .insert(Name::new("GAMBLE_DONE"));
         }
     }
 }

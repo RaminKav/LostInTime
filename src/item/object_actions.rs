@@ -1,4 +1,5 @@
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
+use super::gamble_shrine::{GambleShrine, GambleShrineAnim, GambleShrineEvent};
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
@@ -6,9 +7,11 @@ use crate::container::Container;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::{CombatAlignment, EliteMob, Mob};
+use crate::inventory::Inventory;
 use crate::item::combat_shrine::CombatShrineMob;
 use crate::item::LootTable;
 use crate::juice::ShakeEffect;
+use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
@@ -42,6 +45,16 @@ pub enum ObjectAction {
     ChangeObject(WorldObject),
     SetHome,
     CombatShrine,
+    GambleShrine,
+}
+
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub enum ObjectActionCost {
+    #[default]
+    None,
+    TimeFragment(i32),
+    Item(WorldObject, usize),
 }
 
 impl ObjectAction {
@@ -49,11 +62,43 @@ impl ObjectAction {
         &self,
         e: Entity,
         obj_pos: TileMapPosition,
+        obj: WorldObject,
         game: &mut GameParam,
         item_action_param: &mut ItemActionParam,
         commands: &mut Commands,
         proto_param: &mut ProtoParam,
+        inv: &mut Inventory,
     ) {
+        let maybe_cost: Option<&ObjectActionCost> =
+            proto_param.get_component::<ObjectActionCost, _>(obj);
+        if let Some(cost) = maybe_cost {
+            match cost {
+                ObjectActionCost::TimeFragment(cost) => {
+                    if game.get_time_fragments() >= cost.clone() {
+                        item_action_param
+                            .currency_event
+                            .send(ModifyTimeFragmentsEvent { delta: -cost });
+                    } else {
+                        //TODO: SCREEN SHAKE
+                        return;
+                    }
+                }
+                ObjectActionCost::Item(obj, count) => {
+                    if inv.items.get_item_count_in_container(*obj) >= count.clone() {
+                        if let Err(err) =
+                            inv.items.remove_from_inventory(count.clone(), obj.clone())
+                        {
+                            println!("Error removing item from inventory: {:?}", err);
+                            return;
+                        }
+                    } else {
+                        //TODO: SCREEN SHAKE
+                        return;
+                    }
+                }
+                _ => {}
+            }
+        }
         match self {
             ObjectAction::ModifyHealth(delta) => {
                 item_action_param
@@ -186,6 +231,45 @@ impl ObjectAction {
                                 .insert(CombatShrineMob { parent_shrine: e });
                         }
                     }
+                }
+            }
+            ObjectAction::GambleShrine => {
+                // Screen Shake
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in item_action_param.game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(1.5, TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+                let mut rng = rand::thread_rng();
+                commands
+                    .entity(e)
+                    .remove::<InteractionGuideTrigger>()
+                    .remove::<ObjectAction>();
+                if rng.gen_bool(0.35) {
+                    commands
+                        .entity(e)
+                        .insert(GambleShrine { success: true })
+                        .insert(AsepriteAnimation::from(
+                            GambleShrineAnim::tags::ACTIVATE_SUCCESS,
+                        ));
+                } else {
+                    commands
+                        .entity(e)
+                        .insert(GambleShrine { success: false })
+                        .insert(AsepriteAnimation::from(
+                            GambleShrineAnim::tags::ACTIVATE_FAIL,
+                        ));
                 }
             }
             _ => {}

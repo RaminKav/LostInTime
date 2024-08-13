@@ -50,7 +50,7 @@ pub fn spawn_new_dungeon_dimension(
     move_player_event: &mut EventWriter<MovePlayerEvent>,
 ) {
     game.clear_dungeon_cache();
-    let player = game.player_query.single();
+    let player = game.player_query.single().0;
     let player_pos = game.player().position;
     commands
         .entity(player)

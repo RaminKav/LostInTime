@@ -330,7 +330,7 @@ pub fn handle_hits(
                         Timer::from_seconds(i_frames.0, TimerMode::Once),
                     ));
                 }
-                if hit_health.0 <= 0 && game.player_query.single() != e {
+                if hit_health.0 <= 0 && game.player_query.single().0 != e {
                     commands.entity(e).insert(MarkedForDeath);
                     enemy_death_events.send(EnemyDeathEvent {
                         entity: e,

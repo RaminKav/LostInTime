@@ -21,6 +21,7 @@
         House: 0.0,
         DungeonEntrance: 0.0,
         CombatShrine: 0.0,
+        GambleShrine: 0.0,
       },
       object_generation_frequencies: {
         Grass: 0.0,
@@ -45,7 +46,8 @@
         Crate: [GrassTile, StoneTile],
         BrownMushroom: [GrassTile, StoneTile],
         StoneWall: [GrassTile, StoneTile],
-        DungeonExit: [GrassTile, StoneTile]
+        DungeonExit: [GrassTile, StoneTile],
+        GambleShrine: [GrassTile, ],
       }
     ),
   }

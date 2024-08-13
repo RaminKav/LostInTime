@@ -37,7 +37,7 @@ use crate::{
         item_actions::{ConsumableItem, ItemAction, ItemActions, ManaCost},
         item_upgrades::ClawUpgradeMultiThrow,
         melee::MeleeAttack,
-        object_actions::ObjectAction,
+        object_actions::{ObjectAction, ObjectActionCost},
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
         Block, BreaksWith, EquipmentType, FoliageSize, ItemDisplayMetaData, Loot, LootTable,
         PlacesInto, RequiredEquipmentType, Wall, WorldObject,
@@ -112,6 +112,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<LeftFacingSideProfile>()
             .register_type::<RequiredEquipmentType>()
             .register_type::<ClawUpgradeMultiThrow>()
+            .register_type::<ObjectActionCost>()
             .register_type::<ManaCost>()
             .register_type::<FacingDirection>()
             .register_type::<ForestGenerationParams>()
@@ -310,6 +311,8 @@ impl ProtoPlugin {
         prototypes.load("proto/miracleseed.prototype.ron");
         prototypes.load("proto/combatshrine.prototype.ron");
         prototypes.load("proto/combatshrinedone.prototype.ron");
+        prototypes.load("proto/gambleshrine.prototype.ron");
+        prototypes.load("proto/gambleshrinedone.prototype.ron");
 
         // Sapplings
         prototypes.load("proto/redsapplingblock.prototype.ron");
