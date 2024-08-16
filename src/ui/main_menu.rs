@@ -6,7 +6,7 @@ use crate::{
     ai::pathfinding::PathfindingCache,
     assets::Graphics,
     audio::UpdateBGMTrackEvent,
-    colors::{BLACK, YELLOW_2},
+    colors::{overwrite_alpha, BLACK, YELLOW_2},
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
@@ -30,6 +30,9 @@ pub struct MenuButtonClickEvent {
 
 #[derive(Component)]
 pub struct MainMenu;
+
+#[derive(Component)]
+pub struct GameStartFadein(Timer);
 
 pub fn display_main_menu(
     mut commands: Commands,
@@ -78,13 +81,30 @@ pub fn remove_main_menu(
 pub fn handle_menu_button_click_events(
     mut event_reader: EventReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
 ) {
     for event in event_reader.iter() {
         match event.button {
             MenuButton::Start => {
                 println!("START GAME");
+                commands
+                    .spawn(SpriteBundle {
+                        sprite: Sprite {
+                            color: Color::rgba(0., 0., 0., 0.),
+                            custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 20.)),
+                            ..default()
+                        },
+                        transform: Transform {
+                            translation: Vec3::new(0., 0., 10.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .insert(Name::new("overlay"))
+                    .insert(GameStartFadein(Timer::from_seconds(3.0, TimerMode::Once)));
+
                 next_state.0 = Some(GameState::Main);
                 commands.init_resource::<Game>();
                 commands.init_resource::<NightTracker>();
@@ -320,4 +340,20 @@ pub fn handle_enter_options_ui(
         .insert(RenderLayers::from_layers(&[3]));
 
     commands.entity(stats_e).push_children(&[overlay]);
+}
+
+pub fn tick_game_start_overlay(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(Entity, &mut GameStartFadein, &mut Sprite)>,
+) {
+    for (e, mut timer, mut sprite) in query.iter_mut() {
+        timer.0.tick(time.delta());
+        if timer.0.finished() {
+            commands.entity(e).despawn();
+        } else {
+            let alpha = f32::max(0., 1. - timer.0.percent());
+            sprite.color = overwrite_alpha(sprite.color, alpha);
+        }
+    }
 }

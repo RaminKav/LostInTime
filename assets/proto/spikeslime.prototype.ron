@@ -6,7 +6,7 @@
     "survival_rogue_like::enemy::CombatAlignment": Neutral,
     "survival_rogue_like::enemy::FollowSpeed": (0.32),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 60., startup: 0.7, duration: 0.2, cooldown: 1.5, speed: 145.),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 38., startup: 0.7, duration: 0.2, cooldown: 1.5, speed: 145.),
     "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 120., cooldown: 2.0, projectile: SlimeGooProjectile),
 //    "survival_rogue_like::proto::EnemyMaterialMesh2DProto": (asset: "textures/slime/slime-move-0.png", size: (x: 32., y: 32.)),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/spikeslime/spikeslime_down.png", size: (x: 32., y: 32.), cols: 6, rows: 5),
@@ -161,6 +161,12 @@
                 min: 1,
                 max: 1,
                 rate: 0.04
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.015
             ),
             (
                 item: TimeFragment,

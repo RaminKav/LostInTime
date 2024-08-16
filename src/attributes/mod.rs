@@ -24,7 +24,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         stats_ui::StatsButtonState, DropOnSlotEvent, InventoryState, RemoveFromSlotEvent,
-        ShowInvPlayerStatsEvent, UIElement,
+        ShowInvPlayerStatsEvent, UIElement, UIState,
     },
     CustomFlush, GameParam, GameState, Player,
 };
@@ -79,10 +79,15 @@ pub struct ItemAttributes {
 pub struct AttributeValue {
     pub value: i32,
     pub quality: AttributeQuality,
+    pub range_percentage: f32,
 }
 impl AttributeValue {
-    pub fn new(value: i32, quality: AttributeQuality) -> Self {
-        Self { value, quality }
+    pub fn new(value: i32, quality: AttributeQuality, range_percentage: f32) -> Self {
+        Self {
+            value,
+            quality,
+            range_percentage,
+        }
     }
 }
 impl std::fmt::Display for AttributeValue {
@@ -98,6 +103,7 @@ impl Add<AttributeValue> for AttributeValue {
         Self {
             value: self.value + rhs.value,
             quality: self.quality.get_higher(&rhs.quality),
+            range_percentage: f32::max(self.range_percentage, rhs.range_percentage),
         }
     }
 }
@@ -109,6 +115,7 @@ impl Add<i32> for AttributeValue {
         Self {
             value: self.value + rhs,
             quality: self.quality,
+            range_percentage: self.range_percentage,
         }
     }
 }
@@ -162,9 +169,17 @@ impl AttributeQuality {
 }
 
 impl ItemAttributes {
-    pub fn get_tooltips(&self) -> Vec<(String, AttributeQuality)> {
-        let mut tooltips: Vec<(String, AttributeQuality)> = vec![];
+    pub fn get_tooltips(
+        &self,
+        rarity: ItemRarity,
+        base_att: Option<&RawItemBaseAttributes>,
+        bonus_att: Option<&RawItemBonusAttributes>,
+    ) -> (Vec<(String, String, AttributeQuality)>, f32, f32) {
+        let mut tooltips: Vec<(String, String, AttributeQuality)> = vec![];
         let is_positive = |val: i32| val > 0;
+        let r = rarity.get_rarity_attributes_bonus();
+        let mut total_score = 0.;
+        let mut total_atts = 0.;
         if self.health.value != 0 {
             tooltips.push((
                 format!(
@@ -176,8 +191,24 @@ impl ItemAttributes {
                     },
                     self.health.value
                 ),
+                if let Some(health) = &base_att.unwrap().health {
+                    format!(
+                        "({}-{})",
+                        f32::round(*health.start() as f32 * r) as i32,
+                        f32::round(*health.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().health.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().health.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.health.quality,
             ));
+            total_score += self.health.range_percentage;
         }
         if self.defence.value != 0 {
             tooltips.push((
@@ -190,13 +221,29 @@ impl ItemAttributes {
                     },
                     self.defence.value
                 ),
+                if let Some(defence) = &base_att.unwrap().defence {
+                    format!(
+                        "({}-{})",
+                        f32::round(*defence.start() as f32 * r) as i32,
+                        f32::round(*defence.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().defence.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().defence.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.defence.quality,
             ));
+            total_score += self.defence.range_percentage;
         }
         if self.attack.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} DMG",
+                    "{}{} Damage",
                     if is_positive(self.attack.value) {
                         "+"
                     } else {
@@ -204,19 +251,36 @@ impl ItemAttributes {
                     },
                     self.attack.value
                 ),
+                if let Some(attack) = &base_att.unwrap().attack {
+                    format!(
+                        "({}-{})",
+                        f32::round(*attack.start() as f32 * r) as i32,
+                        f32::round(*attack.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().attack.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().attack.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.attack.quality,
             ));
+            total_score += self.attack.range_percentage;
         }
         if self.attack_cooldown != 0. {
             tooltips.push((
                 format!("{:.2} Hits/s", 1. / self.attack_cooldown),
+                "".to_string(),
                 AttributeQuality::Average,
             ));
         }
         if self.crit_chance.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Crit",
+                    "{}{}% Crit Chance",
                     if is_positive(self.crit_chance.value) {
                         "+"
                     } else {
@@ -224,13 +288,32 @@ impl ItemAttributes {
                     },
                     self.crit_chance.value
                 ),
+                if let Some(crit_chance) = &base_att.unwrap().crit_chance {
+                    format!(
+                        "({}-{})",
+                        f32::round(*crit_chance.start() as f32 * r) as i32,
+                        f32::round(*crit_chance.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().crit_chance.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(
+                            *bonus_att.unwrap().crit_chance.clone().unwrap().end() as f32 * r
+                        ) as i32
+                    )
+                },
                 self.crit_chance.quality,
             ));
+            total_atts += 1.;
+            total_score += self.crit_chance.range_percentage;
         }
         if self.crit_damage.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Crit DMG",
+                    "{}{}% Crit Damage",
                     if is_positive(self.crit_damage.value) {
                         "+"
                     } else {
@@ -238,13 +321,32 @@ impl ItemAttributes {
                     },
                     self.crit_damage.value
                 ),
+                if let Some(crit_damage) = &base_att.unwrap().crit_damage {
+                    format!(
+                        "({}-{})",
+                        f32::round(*crit_damage.start() as f32 * r) as i32,
+                        f32::round(*crit_damage.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().crit_damage.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(
+                            *bonus_att.unwrap().crit_damage.clone().unwrap().end() as f32 * r
+                        ) as i32
+                    )
+                },
                 self.crit_damage.quality,
             ));
+            total_atts += 1.;
+            total_score += self.crit_damage.range_percentage;
         }
         if self.bonus_damage.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} DMG",
+                    "{}{} Damage",
                     if is_positive(self.bonus_damage.value) {
                         "+"
                     } else {
@@ -252,8 +354,27 @@ impl ItemAttributes {
                     },
                     self.bonus_damage.value
                 ),
+                if let Some(bonus_damage) = &base_att.unwrap().bonus_damage {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_damage.start() as f32 * r) as i32,
+                        f32::round(*bonus_damage.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().bonus_damage.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(
+                            *bonus_att.unwrap().bonus_damage.clone().unwrap().end() as f32 * r
+                        ) as i32
+                    )
+                },
                 self.bonus_damage.quality,
             ));
+            total_atts += 1.;
+            total_score += self.bonus_damage.range_percentage;
         }
         if self.health_regen.value != 0 {
             tooltips.push((
@@ -266,13 +387,32 @@ impl ItemAttributes {
                     },
                     self.health_regen.value
                 ),
+                if let Some(health_regen) = &base_att.unwrap().health_regen {
+                    format!(
+                        "({}-{})",
+                        f32::round(*health_regen.start() as f32 * r) as i32,
+                        f32::round(*health_regen.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().health_regen.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(
+                            *bonus_att.unwrap().health_regen.clone().unwrap().end() as f32 * r
+                        ) as i32
+                    )
+                },
                 self.health_regen.quality,
             ));
+            total_atts += 1.;
+            total_score += self.health_regen.range_percentage;
         }
         if self.healing.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Healing",
+                    "{}{} Healing",
                     if is_positive(self.healing.value) {
                         "+"
                     } else {
@@ -280,13 +420,30 @@ impl ItemAttributes {
                     },
                     self.healing.value
                 ),
+                if let Some(healing) = &base_att.unwrap().healing {
+                    format!(
+                        "({}-{})",
+                        f32::round(*healing.start() as f32 * r) as i32,
+                        f32::round(*healing.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().healing.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().healing.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.healing.quality,
             ));
+            total_atts += 1.;
+            total_score += self.healing.range_percentage;
         }
         if self.thorns.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Thorns",
+                    "{}{} Thorns",
                     if is_positive(self.thorns.value) {
                         "+"
                     } else {
@@ -294,13 +451,30 @@ impl ItemAttributes {
                     },
                     self.thorns.value
                 ),
+                if let Some(thorns) = &base_att.unwrap().thorns {
+                    format!(
+                        "({}-{})",
+                        f32::round(*thorns.start() as f32 * r) as i32,
+                        f32::round(*thorns.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().thorns.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().thorns.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.thorns.quality,
             ));
+            total_atts += 1.;
+            total_score += self.thorns.range_percentage;
         }
         if self.dodge.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Dodge",
+                    "{}{} Dodge",
                     if is_positive(self.dodge.value) {
                         "+"
                     } else {
@@ -308,13 +482,30 @@ impl ItemAttributes {
                     },
                     self.dodge.value
                 ),
+                if let Some(dodge) = &base_att.unwrap().dodge {
+                    format!(
+                        "({}-{})",
+                        f32::round(*dodge.start() as f32 * r) as i32,
+                        f32::round(*dodge.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.dodge.quality,
             ));
+            total_atts += 1.;
+            total_score += self.dodge.range_percentage;
         }
         if self.speed.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Speed",
+                    "{}{} Speed",
                     if is_positive(self.speed.value) {
                         "+"
                     } else {
@@ -322,8 +513,25 @@ impl ItemAttributes {
                     },
                     self.speed.value
                 ),
+                if let Some(speed) = &base_att.unwrap().speed {
+                    format!(
+                        "({}-{})",
+                        f32::round(*speed.start() as f32 * r) as i32,
+                        f32::round(*speed.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().speed.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().speed.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.speed.quality,
             ));
+            total_atts += 1.;
+            total_score += self.speed.range_percentage;
         }
         if self.lifesteal.value != 0 {
             tooltips.push((
@@ -336,8 +544,26 @@ impl ItemAttributes {
                     },
                     self.lifesteal.value
                 ),
+                if let Some(lifesteal) = &base_att.unwrap().lifesteal {
+                    format!(
+                        "({}-{})",
+                        f32::round(*lifesteal.start() as f32 * r) as i32,
+                        f32::round(*lifesteal.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().lifesteal.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(*bonus_att.unwrap().lifesteal.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.lifesteal.quality,
             ));
+            total_atts += 1.;
+            total_score += self.lifesteal.range_percentage;
         }
 
         if self.xp_rate.value != 0 {
@@ -351,8 +577,25 @@ impl ItemAttributes {
                     },
                     self.xp_rate.value
                 ),
+                if let Some(xp_rate) = &base_att.unwrap().xp_rate {
+                    format!(
+                        "({}-{})",
+                        f32::round(*xp_rate.start() as f32 * r) as i32,
+                        f32::round(*xp_rate.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().xp_rate.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().xp_rate.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.xp_rate.quality,
             ));
+            total_atts += 1.;
+            total_score += self.xp_rate.range_percentage;
         }
         if self.loot_rate.value != 0 {
             tooltips.push((
@@ -365,52 +608,81 @@ impl ItemAttributes {
                     },
                     self.loot_rate.value
                 ),
+                if let Some(loot_rate) = &base_att.unwrap().loot_rate {
+                    format!(
+                        "({}-{})",
+                        f32::round(*loot_rate.start() as f32 * r) as i32,
+                        f32::round(*loot_rate.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().loot_rate.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(*bonus_att.unwrap().loot_rate.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
                 self.loot_rate.quality,
             ));
+            total_atts += 1.;
+            total_score += self.loot_rate.range_percentage;
         }
-
-        tooltips
+        let ratio = if total_atts == 0. {
+            0.
+        } else {
+            total_score / total_atts
+        };
+        (tooltips, ratio, total_atts)
     }
     pub fn get_stats_summary(&self) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
-        tooltips.push(("HP:       ".to_string(), format!("{}", self.health)));
+        tooltips.push(("Health:          ".to_string(), format!("{}", self.health)));
         tooltips.push((
-            "Att:      ".to_string(),
+            "Attack:             ".to_string(),
             format!("{}", self.attack + self.bonus_damage),
         ));
-        tooltips.push(("Defence:  ".to_string(), format!("{}", self.defence)));
-        tooltips.push(("Crit:     ".to_string(), format!("{}", self.crit_chance)));
-        tooltips.push(("Crit DMG: ".to_string(), format!("{}", self.crit_damage)));
-        tooltips.push(("HP Regen: ".to_string(), format!("{}", self.health_regen)));
-        tooltips.push(("Healing:  ".to_string(), format!("{}", self.healing)));
-        tooltips.push(("Thorns:   ".to_string(), format!("{}", self.thorns)));
-        tooltips.push(("Dodge:    ".to_string(), format!("{}", self.dodge)));
-        tooltips.push(("Speed:    ".to_string(), format!("{}", self.speed)));
-        tooltips.push(("Leech:    ".to_string(), format!("{}", self.lifesteal)));
+        tooltips.push(("Defence:        ".to_string(), format!("{}", self.defence)));
+        tooltips.push((
+            "Crit Chance:     ".to_string(),
+            format!("{}", self.crit_chance),
+        ));
+        tooltips.push((
+            "Crit Damage:   ".to_string(),
+            format!("{}", self.crit_damage),
+        ));
+        tooltips.push((
+            "Health Regen:  ".to_string(),
+            format!("{}", self.health_regen),
+        ));
+        tooltips.push(("Healing:         ".to_string(), format!("{}", self.healing)));
+        tooltips.push(("Thorns:           ".to_string(), format!("{}", self.thorns)));
+        tooltips.push(("Dodge:            ".to_string(), format!("{}", self.dodge)));
+        tooltips.push(("Speed:          ".to_string(), format!("{}", self.speed)));
+        tooltips.push((
+            "Lifesteal:      ".to_string(),
+            format!("{}", self.lifesteal),
+        ));
 
-        tooltips.push(("XP:".to_string(), format!("{}", self.xp_rate)));
-        tooltips.push(("Loot:".to_string(), format!("{}", self.loot_rate)));
+        tooltips.push(("XP: ".to_string(), format!("{}", self.xp_rate)));
+        tooltips.push(("Loot: ".to_string(), format!("{}", self.loot_rate)));
 
         tooltips
     }
     pub fn add_attribute_components(
         &self,
         entity: &mut EntityCommands,
-        old_att: &Self,
+        old_max_health: i32,
         skills: &PlayerSkills,
     ) {
-        let computed_health = self.health + if skills.get(Skill::Health) { 25 } else { 0 };
-        if self.health.value > 0 && computed_health.value != old_att.health.value {
+        let computed_health = self.health + skills.get_count(Skill::Health) * 25;
+        if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
         }
         if self.attack_cooldown > 0. {
             entity.insert(AttackCooldown(
-                self.attack_cooldown
-                    * if skills.get(Skill::AttackSpeed) {
-                        0.85
-                    } else {
-                        1.
-                    },
+                self.attack_cooldown * (1.0 - skills.get_count(Skill::AttackSpeed) as f32 * 0.15),
             ));
         } else {
             entity.remove::<AttackCooldown>();
@@ -418,30 +690,26 @@ impl ItemAttributes {
 
         entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
-            self.crit_chance.value + if skills.get(Skill::CritChance) { 10 } else { 0 },
+            self.crit_chance.value + skills.get_count(Skill::CritChance) * 10,
         ));
         entity.insert(CritDamage(
-            self.crit_damage.value + if skills.get(Skill::CritDamage) { 15 } else { 0 },
+            self.crit_damage.value + skills.get_count(Skill::CritDamage) * 15,
         ));
         entity.insert(BonusDamage(self.bonus_damage.value));
         entity.insert(HealthRegen(self.health_regen.value));
         entity.insert(Healing(self.healing.value));
         entity.insert(Thorns(
-            self.thorns.value + if skills.get(Skill::Thorns) { 15 } else { 0 },
+            self.thorns.value + skills.get_count(Skill::Thorns) * 15,
         ));
-        entity.insert(Dodge(
-            self.dodge.value
-                + if skills.get(Skill::DodgeChance) {
-                    10
-                } else {
-                    0
-                },
-        ));
+        entity.insert(Dodge(i32::min(
+            80,
+            self.dodge.value + skills.get_count(Skill::DodgeChance) * 10,
+        )));
         entity.insert(Speed(
-            self.speed.value + if skills.get(Skill::Speed) { 15 } else { 0 },
+            self.speed.value + skills.get_count(Skill::Speed) * 15,
         ));
         entity.insert(Lifesteal(
-            self.lifesteal.value + if skills.get(Skill::Lifesteal) { 1 } else { 0 },
+            self.lifesteal.value + skills.get_count(Skill::Lifesteal) * 10,
         ));
         entity.insert(Defence(self.defence.value));
         entity.insert(XpRateBonus(self.xp_rate.value));
@@ -526,13 +794,17 @@ macro_rules! setup_raw_bonus_attributes {
                     $(
                         {
                             if stringify!($field_name) == picked_attribute {
-                                let min = (*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
-                                let max = (*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let min = f32::round(*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let max = f32::round(*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
                                 let range = (min)..=(max);
+                                let total_range = range.end() - range.start();
                                 let value = rng.gen_range(range.clone());
+                                let percent_of_total_range = (value - range.start()) as f32 / total_range as f32;
                                 item_attributes.$field_name = AttributeValue::new(
-                                        f32::ceil(value as f32 * rarity.get_rarity_attributes_bonus()) as i32,
-                                        AttributeQuality::get_quality(range, value));
+                                        value,
+                                        AttributeQuality::get_quality(range, value),
+                                        percent_of_total_range
+                                    );
                             }
                         }
                     )*
@@ -575,12 +847,17 @@ macro_rules! setup_raw_base_attributes {
                     $(
                         {
                             if stringify!($field_name) == *att {
-                                let min = (*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
-                                let max = (*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let min = f32::round(*self.$field_name.clone().unwrap().start() as f32 * rarity.get_rarity_attributes_bonus()) as i32;
+                                let max = f32::round(*self.$field_name.clone().unwrap().end()  as f32 * rarity.get_rarity_attributes_bonus()) as i32;
                                 let range = (min)..=(max);
+                                let total_range = range.end() - range.start();
                                 let value = rng.gen_range(range.clone());
-                                item_attributes.$field_name = AttributeValue::new(value,
-                                   AttributeQuality::get_quality(range, value));
+                                let percent_of_total_range = (value - range.start()) as f32 / total_range as f32;
+                                item_attributes.$field_name = AttributeValue::new(
+                                                value,
+                                                AttributeQuality::get_quality(range, value),
+                                                percent_of_total_range
+                                            );
                             }
                         }
                     )*
@@ -661,7 +938,7 @@ pub enum ItemGlow {
 }
 
 impl ItemRarity {
-    fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
+    pub fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
         let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
         match self {
             ItemRarity::Common => (0 + acc_offset)..=(1 + acc_offset),
@@ -866,11 +1143,12 @@ fn handle_player_item_attribute_change_events(
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
-    player_atts: Query<(&ItemAttributes, &PlayerSkills), With<Player>>,
+    player_atts: Query<(&ItemAttributes, &PlayerSkills, &MaxHealth), With<Player>>,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
+    ui_state: Res<State<UIState>>,
 ) {
     for _event in att_events.iter() {
-        let (att, skills) = player_atts.single();
+        let (att, skills, old_health) = player_atts.single();
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -888,7 +1166,11 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
-        new_att.add_attribute_components(&mut commands.entity(player), &new_att.clone(), skills);
+        new_att.add_attribute_components(
+            &mut commands.entity(player),
+            old_health.clone().0,
+            skills,
+        );
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)
@@ -897,7 +1179,9 @@ fn handle_player_item_attribute_change_events(
         } else {
             None
         };
-        stats_event.send(ShowInvPlayerStatsEvent { stat });
+        if ui_state.0.is_inv_open() {
+            stats_event.send(ShowInvPlayerStatsEvent { stat });
+        }
     }
 }
 

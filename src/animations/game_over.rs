@@ -1,6 +1,9 @@
-use std::fs;
-
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use rand::seq::IteratorRandom;
+use std::{
+    fs::{self, File},
+    io::BufReader,
+};
 
 use crate::{
     client::{analytics::SendAnalyticsDataToServerEvent, GameOverEvent},
@@ -10,7 +13,7 @@ use crate::{
     item::CraftingTracker,
     night::NightTracker,
     player::Player,
-    ui::{ChestContainer, FurnaceContainer},
+    ui::{damage_numbers::spawn_text, ChestContainer, FurnaceContainer, UIState},
     world::{
         dimension::{ActiveDimension, EraManager},
         generation::WorldObjectCache,
@@ -38,9 +41,11 @@ pub fn handle_game_over_fadeout(
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
 ) {
     if !game_over_events.is_empty() {
         let (player_e, dir, mut player_t, mut sprite, texture_atlas_handle) = player.single_mut();
+        next_ui_state.set(UIState::Closed);
         commands
             .spawn(SpriteBundle {
                 sprite: Sprite {
@@ -57,7 +62,7 @@ pub fn handle_game_over_fadeout(
             })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("overlay"))
-            .insert(GameOverFadeout(Timer::from_seconds(5.0, TimerMode::Once)));
+            .insert(GameOverFadeout(Timer::from_seconds(6.5, TimerMode::Once)));
 
         next_state.0 = Some(GameState::GameOver);
         // move player to UI camera to be above the fade out overlay
@@ -99,11 +104,36 @@ pub fn tick_game_over_overlay(
     asset_server: Res<AssetServer>,
     mut analytics_events: EventWriter<SendAnalyticsDataToServerEvent>,
     mut analytics_check: Local<bool>,
+    mut tip_check: Local<bool>,
 ) {
     for (e, mut timer, mut sprite) in query.iter_mut() {
         if timer.0.percent() >= 0.5 && !*analytics_check {
             analytics_events.send_default();
             *analytics_check = true;
+        }
+        if timer.0.percent() >= 0.25 && !*tip_check {
+            *tip_check = true;
+            // Try to load tips from save
+            if let Ok(tips_file) = File::open("assets/tips.json") {
+                let reader = BufReader::new(tips_file);
+
+                match serde_json::from_reader::<_, Vec<String>>(reader) {
+                    Ok(data) => {
+                        let picked_tip = data.iter().choose(&mut rand::thread_rng()).unwrap();
+                        spawn_text(
+                            &mut commands,
+                            &asset_server,
+                            Vec3::new(0., -GAME_HEIGHT / 2. + 40., 21.),
+                            WHITE,
+                            format!("Tip: {}", picked_tip.to_string()),
+                            Anchor::Center,
+                            1.,
+                            3,
+                        );
+                    }
+                    Err(err) => println!("Failed to load data from file {err:?}"),
+                }
+            }
         }
         timer.0.tick(time.delta());
         if timer.0.finished() {

@@ -6,6 +6,7 @@ use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, 
 use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
+use crate::assets::SpriteAnchor;
 use crate::container::ContainerRegistry;
 use crate::enemy::spawn_helpers::is_tile_water;
 use crate::enemy::Mob;
@@ -303,6 +304,8 @@ impl GenerationPlugin {
                 .spawn(VisibilityBundle::default())
                 .insert(YSort(0.))
                 .insert(TimePortal)
+                .insert(WorldObject::TimePortal)
+                .insert(SpriteAnchor(Vec2::new(0., 10.)))
                 .insert(InteractionGuideTrigger {
                     key: None,
                     text: Some("???".to_string()),
@@ -319,7 +322,8 @@ impl GenerationPlugin {
                     animation: AsepriteAnimation::from(Portal::tags::IDLE),
                     transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
                     ..Default::default()
-                });
+                })
+                .insert(Name::new("Time Portal"));
         }
     }
     pub fn generate_and_cache_objects(

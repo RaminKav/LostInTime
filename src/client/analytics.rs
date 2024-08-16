@@ -22,12 +22,14 @@ use std::fs::{create_dir, File};
 
 */
 use bevy::{prelude::*, utils::HashMap};
+use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use ws::{connect, CloseCode};
 
 use crate::{
     enemy::Mob,
     item::WorldObject,
+    night::NightTracker,
     player::skills::{PlayerSkills, Skill},
     world::dimension::GenerationSeed,
     GameState,
@@ -52,6 +54,8 @@ pub struct AnalyticsData {
     pub items_consumed: HashMap<WorldObject, u32>,
     pub total_items_consumed: u32,
     pub skills: Vec<Skill>,
+    pub nights_survived: u32,
+    pub timestamp: String,
 }
 
 pub struct AnalyticsPlugin;
@@ -136,11 +140,14 @@ pub fn save_analytics_data_to_file_on_game_over(
     events: EventReader<SendAnalyticsDataToServerEvent>,
     mut commands: Commands,
     skills: Query<&PlayerSkills>,
+    night_tracker: Res<NightTracker>,
 ) {
     if events.is_empty() {
         return;
     }
     analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+    analytics_data.timestamp = chrono::offset::Local::now().to_string();
+    analytics_data.nights_survived = night_tracker.days as u32;
     if let Ok(()) = create_dir("analytics") {
         let PATH: &str = &format!("analytics/analytics_{}.json", seed.seed).to_string();
 

@@ -101,11 +101,13 @@ pub fn build_item_stack_with_parsed_attributes(
     let mut final_att = parsed_bonus_att.combine(&parsed_base_att);
     let mut level = 1;
     if let Some(item_level) = level_option {
-        if equip_type.is_weapon() {
-            final_att.attack = final_att.attack + max(0, (item_level - 1) as i32);
-        } else if equip_type.is_equipment() && !equip_type.is_accessory() {
-            final_att.health = final_att.health + max(0, ((item_level * 2) - 1) as i32);
-            final_att.defence = final_att.defence + max(0, (item_level - 1) as i32);
+        if item_level > 1 {
+            if equip_type.is_weapon() {
+                final_att.attack = final_att.attack + max(0, (item_level - 1) as i32);
+            } else if equip_type.is_equipment() && !equip_type.is_accessory() {
+                final_att.health = final_att.health + max(0, ((item_level * 2) - 1) as i32);
+                final_att.defence = final_att.defence + max(0, (item_level - 1) as i32);
+            }
         }
         level = item_level;
     }

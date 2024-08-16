@@ -1,5 +1,5 @@
 use std::fs;
-
+pub mod asset_helpers;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};

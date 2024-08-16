@@ -159,6 +159,17 @@ impl ObjectAction {
                     items: Container { items },
                 };
                 commands.insert_resource(crafting_container_res.clone());
+
+                if !item_action_param
+                    .crafting_tracker
+                    .discovered_crafting_types
+                    .contains(crafting_type)
+                {
+                    item_action_param
+                        .crafting_tracker
+                        .discovered_crafting_types
+                        .push(crafting_type.clone());
+                }
             }
             ObjectAction::Furnace => {
                 let furnace_res = item_action_param.furnace_query.get(e).unwrap();

@@ -284,7 +284,7 @@ pub fn spawn_inv_slot(
 
         y = -((slot_index / 8) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
             + 7. * UI_SLOT_SIZE
-            + 10.;
+            + 15.;
         if inv_ui_state.0 == UIState::Inventory {
             x -= 2.;
             y -= 29.;
@@ -479,20 +479,20 @@ pub fn spawn_item_stack_icon(
                     text: Text::from_section(
                         item_stack.count.to_string(),
                         TextStyle {
-                            font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                            font_size: 8.0,
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
                             color: Color::WHITE,
                         },
                     )
                     .with_alignment(TextAlignment::Center),
                     transform: Transform {
-                        translation: Vec3::new(7., -6., 2.),
+                        translation: Vec3::new(7., -5.5, 3.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
                     ..default()
                 },
-                Name::new("TEXT"),
+                Name::new("ITEM STACK TEXT"),
                 RenderLayers::from_layers(&[render_layer]),
             ))
             .id();

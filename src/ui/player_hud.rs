@@ -10,6 +10,7 @@ use crate::{
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
+    juice::bounce::BounceOnHit,
     player::{
         levels::PlayerLevel,
         skills::{PlayerSkills, Skill},
@@ -199,14 +200,14 @@ pub fn setup_xp_bar_ui(
                 text: Text::from_section(
                     "",
                     TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
                         color: BLACK,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-3., 3., 1.),
+                    translation: Vec3::new(-3., 3.5, 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -234,14 +235,14 @@ pub fn setup_currency_ui(
                 text: Text::from_section(
                     format!("{:}", time_fragments.time_fragments),
                     TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
                         color: BLACK,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-GAME_WIDTH / 2. + 17., GAME_HEIGHT / 2. - 44., 6.),
+                    translation: Vec3::new(-GAME_WIDTH / 2. + 20., GAME_HEIGHT / 2. - 42.5, 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -258,7 +259,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
-        Vec2::new(-6., 1.),
+        Vec2::new(-7., 1.),
         3,
     );
     commands.entity(stack).insert(CurrencyIcon).set_parent(text);
@@ -284,12 +285,16 @@ pub fn setup_currency_ui(
         .set_parent(bag_icon);
 }
 pub fn update_currency_text(
-    mut currency: Query<&mut TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
+    mut currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
     mut text_query: Query<&mut Text, With<CurrencyText>>,
+    icon: Query<Entity, With<CurrencyIcon>>,
+    mut commands: Commands,
 ) {
-    let Ok(mut time_fragments) = currency.get_single_mut() else {
+    let Ok(time_fragments) = currency.get_single_mut() else {
         return;
     };
+    let icon_e = icon.single();
+    commands.entity(icon_e).insert(BounceOnHit::new());
 
     let mut text = text_query.single_mut();
     text.sections[0].value = format!("{:}", time_fragments.time_fragments);
@@ -370,14 +375,14 @@ pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    prev_icons: Query<&SkillHudIcon>,
+    mut prev_icons_tracker: Local<PlayerSkills>,
 ) {
     if let Ok(new_skills) = player_skills.get_single() {
-        let prev_skills = prev_icons.iter().map(|s| s.0.clone()).collect::<Vec<_>>();
         for (i, skill) in new_skills.skills.clone().iter().enumerate() {
-            if prev_skills.contains(skill) {
+            if prev_icons_tracker.skills.get(i) == Some(&skill) {
                 continue;
             }
+            prev_icons_tracker.skills.push(skill.clone());
             let offset = Vec2::new(
                 i as f32 * 19. + (-GAME_WIDTH) / 2. + 98.,
                 (GAME_HEIGHT - 15.) / 2. - 12.5,

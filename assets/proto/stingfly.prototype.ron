@@ -7,7 +7,7 @@
     "survival_rogue_like::enemy::FollowSpeed": (0.4),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),
-    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 150., startup: 0.7, duration: 0.52, cooldown: 1.8, speed: 144.),
+    "survival_rogue_like::enemy::LeapAttack": (activation_distance: 72., startup: 0.7, duration: 0.52, cooldown: 1.8, speed: 144.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 6.),
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/stingfly/stingfly_down.png", size: (x: 38., y: 38.), cols: 10, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.08),
@@ -159,6 +159,12 @@
                 min: 1,
                 max: 1,
                 rate: 0.04
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.015
             ),
             (
                 item: TimeFragment,

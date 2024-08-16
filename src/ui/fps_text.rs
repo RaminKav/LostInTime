@@ -14,10 +14,10 @@ pub fn spawn_fps_text(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "FPS: ",
+                "v0.1  FPS: ",
                 TextStyle {
-                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                    font_size: 8.0,
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
                     color: Color::Rgba {
                         red: 75. / 255.,
                         green: 61. / 255.,
@@ -26,9 +26,9 @@ pub fn spawn_fps_text(mut commands: Commands, asset_server: Res<AssetServer>) {
                     },
                 },
             )
-            .with_alignment(TextAlignment::Right),
+            .with_alignment(TextAlignment::Left),
             transform: Transform {
-                translation: Vec3::new(GAME_WIDTH / 2. - 10., -GAME_HEIGHT / 2. + 10., 1.),
+                translation: Vec3::new(GAME_WIDTH / 2. - 32.5, -GAME_HEIGHT / 2. + 5., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -47,7 +47,7 @@ pub fn text_update_system(
         if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
                 // Update the value of the second section
-                text.sections[0].value = format!("{value:.2}");
+                text.sections[0].value = format!("v0.1  FPS: {value:.0}");
             }
         }
     }
