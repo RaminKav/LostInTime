@@ -124,7 +124,9 @@ pub fn handle_spawn_inv_item_tooltip(
             raw_base_attributes,
             raw_bonus_attributes,
         );
-        let num_stars = get_num_stars(score, num_attributes, item_rarity.clone(), equip_type);
+
+        //subtract 2 for the base attributes, only want bonus attributes
+        let num_stars = get_num_stars(score, num_attributes - 2., item_rarity.clone(), equip_type);
         // let durability = item.item_stack.attributes.get_durability_tooltip();
         let level = item.item_stack.metadata.level;
         let item_actions = proto.get_component::<ItemActions, _>(item.item_stack.obj_type);
@@ -650,5 +652,5 @@ pub fn get_num_stars(
     } else if score > 0.45 {
         num_stars = 1.;
     }
-    f32::min(num_stars, max_possible_stars) as usize
+    f32::min(f32::min(num_stars, max_possible_stars), 3.) as usize
 }

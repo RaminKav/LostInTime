@@ -208,6 +208,7 @@ impl ItemAttributes {
                 },
                 self.health.quality,
             ));
+            total_atts += 1.;
             total_score += self.health.range_percentage;
         }
         if self.defence.value != 0 {
@@ -238,6 +239,7 @@ impl ItemAttributes {
                 },
                 self.defence.quality,
             ));
+            total_atts += 1.;
             total_score += self.defence.range_percentage;
         }
         if self.attack.value != 0 {
@@ -268,6 +270,7 @@ impl ItemAttributes {
                 },
                 self.attack.quality,
             ));
+            total_atts += 1.;
             total_score += self.attack.range_percentage;
         }
         if self.attack_cooldown != 0. {
