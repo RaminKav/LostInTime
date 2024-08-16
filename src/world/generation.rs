@@ -374,11 +374,14 @@ impl GenerationPlugin {
                 // generate all objs
                 let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
                     Box::new(stone.into_iter().chain(trees.into_iter()));
+                let mut occupied_tiles: HashMap<TileMapPosition, WorldObject> = HashMap::new();
+
                 for (obj, frequency) in game
                     .world_generation_params
                     .object_generation_frequencies
                     .iter()
                 {
+                    let mut validated_objs: Vec<(TileMapPosition, WorldObject)> = vec![];
                     let raw_points = get_object_points_for_chunk(seed.seed, *frequency);
                     let points = raw_points
                         .iter()
@@ -392,7 +395,41 @@ impl GenerationPlugin {
                             (relative_tp, *obj)
                         })
                         .collect::<Vec<(TileMapPosition, WorldObject)>>();
-                    objs_to_spawn = Box::new(objs_to_spawn.chain(points.into_iter()));
+                    for (pos, obj) in points.iter() {
+                        // check if tile(s) already occupied by another object waiting to spawn
+                        let is_medium = obj.is_medium_size(&proto_param);
+                        let tiles_obj_wants_to_take_up = if is_medium {
+                            pos.get_neighbour_tiles_for_medium_objects()
+                                .into_iter()
+                                .chain(vec![*pos])
+                                .collect_vec()
+                        } else {
+                            vec![*pos]
+                        };
+                        if tiles_obj_wants_to_take_up
+                            .iter()
+                            .any(|p| occupied_tiles.contains_key(p))
+                        {
+                            // override chests and dungeon exits, skip anything else
+                            if obj == &WorldObject::DungeonExit
+                                || obj == &WorldObject::Chest
+                                || obj == &WorldObject::DungeonEntrance
+                            {
+                                occupied_tiles.remove(pos);
+                                occupied_tiles.insert(*pos, *obj);
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        // mark tiles as occupied for future objects
+                        tiles_obj_wants_to_take_up.iter().for_each(|p| {
+                            occupied_tiles.insert(*p, obj.clone());
+                        });
+                        validated_objs.push((*pos, *obj));
+                    }
+
+                    objs_to_spawn = Box::new(objs_to_spawn.chain(validated_objs.into_iter()));
                 }
 
                 // generate starting area objs to ensure player has enough pebbles/sticks
@@ -593,39 +630,7 @@ impl GenerationPlugin {
                     }
                 }
 
-                // now spawn them, keeping track of duplicates on the same tile
-                let mut tiles_to_spawn: HashMap<TileMapPosition, WorldObject> = HashMap::new();
-                let mut occupied_tiles: HashMap<TileMapPosition, WorldObject> = HashMap::new();
-                for obj_data in objs.clone().iter() {
-                    let (pos, obj) = obj_data;
-                    let is_medium = obj_data.1.is_medium_size(&proto_param);
-                    if is_medium {
-                        occupied_tiles.insert(pos.clone(), obj.clone());
-                        occupied_tiles
-                            .insert(pos.get_neighbour_tiles_for_medium_objects()[0], obj.clone());
-                        occupied_tiles
-                            .insert(pos.get_neighbour_tiles_for_medium_objects()[1], obj.clone());
-                        occupied_tiles
-                            .insert(pos.get_neighbour_tiles_for_medium_objects()[2], obj.clone());
-                    } else {
-                        if occupied_tiles.contains_key(pos) {
-                            // override chests and dungeon exits, skip anything else
-                            if obj == &WorldObject::DungeonExit
-                                || obj == &WorldObject::Chest
-                                || obj == &WorldObject::DungeonEntrance
-                            {
-                                occupied_tiles.remove(pos);
-                                occupied_tiles.insert(*pos, *obj);
-                            } else {
-                                continue;
-                            }
-                        }
-                        occupied_tiles.insert(pos.clone(), obj.clone());
-                    }
-
-                    tiles_to_spawn.insert(*pos, *obj);
-                }
-                for (pos, obj) in tiles_to_spawn.iter() {
+                for (pos, obj) in objs.iter() {
                     let mut is_touching_air = false;
                     if let Ok(dungeon) = dungeon_check {
                         for x in -1_i32..2 {
