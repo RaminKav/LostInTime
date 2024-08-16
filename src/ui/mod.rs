@@ -6,7 +6,7 @@ pub mod screen_effects;
 use guide_hud::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
-use damage_numbers::handle_clamp_screen_locked_icons;
+use damage_numbers::{handle_clamp_screen_locked_icons, NewRecipeTextTimer};
 use screen_effects::ScreenEffectMaterial;
 pub use ui_container_param::*;
 mod enemy_health_bar;
@@ -52,7 +52,7 @@ use self::{
     tile_hover::spawn_tile_hover_on_cursor_move,
 };
 
-pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 135.);
+pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 145.);
 pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
 pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
@@ -69,8 +69,9 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
             .insert_resource(InventoryState::default())
+            .insert_resource(NewRecipeTextTimer::new(0.8))
             .insert_resource(TooltipsManager {
-                timer: Timer::from_seconds(0.3, TimerMode::Once),
+                timer: Timer::from_seconds(0.7, TimerMode::Once),
             })
             .add_event::<ActionSuccessEvent>()
             .add_event::<FlashExpBarEvent>()
@@ -195,6 +196,7 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(tick_game_start_overlay)
             .add_system(
                 handle_new_ui_state
                     .in_base_set(CoreSet::PostUpdate)

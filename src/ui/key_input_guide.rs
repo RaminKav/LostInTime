@@ -85,11 +85,16 @@ pub fn spawn_shrine_interact_key_guide(
                     .insert(Name::new("Interact Guide"))
                     .id();
                 let key_entity = if let Some(key) = guide.key.clone() {
+                    let x_offset = if guide.text.is_some() { 10. } else { 0. };
                     Some(
                         commands
                             .spawn(SpriteBundle {
                                 texture: asset_server.load(format!("textures/{}Key.png", key)),
-                                transform: Transform::from_translation(Vec3::new(-29.5, 0., 1.)),
+                                transform: Transform::from_translation(Vec3::new(
+                                    -29.5 + x_offset,
+                                    0.,
+                                    1.,
+                                )),
                                 sprite: Sprite {
                                     custom_size: Some(Vec2::new(11., 11.)),
                                     ..Default::default()
@@ -103,7 +108,7 @@ pub fn spawn_shrine_interact_key_guide(
                     None
                 };
                 let text_entity = if let Some(text) = guide.text.clone() {
-                    let x = if key_entity.is_some() { -20.5 } else { 0. };
+                    let x = if key_entity.is_some() { -10.5 } else { 0. };
                     let text_e = spawn_text(
                         &mut commands,
                         &asset_server,
@@ -115,6 +120,8 @@ pub fn spawn_shrine_interact_key_guide(
                         } else {
                             Anchor::Center
                         },
+                        1.,
+                        0,
                     );
                     commands.entity(text_e).set_parent(parent_entity);
                     Some(text_e)

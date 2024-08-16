@@ -3,7 +3,7 @@
   templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Berries,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(5), ModifyHealth(5)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(10), ModifyHealth(5)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Berries,

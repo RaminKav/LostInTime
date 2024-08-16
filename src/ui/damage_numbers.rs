@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use rand::Rng;
 
 use crate::{
@@ -30,6 +30,20 @@ pub struct ScreenLockedIcon {
     parent: Entity,
 }
 
+#[derive(Resource)]
+pub struct NewRecipeTextTimer {
+    pub timer: Timer,
+    pub queue: Vec<WorldObject>,
+}
+impl NewRecipeTextTimer {
+    pub fn new(secs: f32) -> Self {
+        NewRecipeTextTimer {
+            timer: Timer::from_seconds(secs, TimerMode::Once),
+            queue: Vec::new(),
+        }
+    }
+}
+
 pub fn add_previous_health(
     mut commands: Commands,
     query: Query<(Entity, &MaxHealth), (Added<MaxHealth>, Without<PreviousHealth>)>,
@@ -59,10 +73,10 @@ pub fn handle_add_damage_numbers_after_hit(
             continue;
         }
         let mut rng = rand::thread_rng();
-        let drop_spread = 10.;
+        let drop_spread = 16.;
         let pos_offset = Vec3::new(
             rng.gen_range(-drop_spread..drop_spread) as f32,
-            rng.gen_range(-drop_spread..drop_spread) as f32,
+            rng.gen_range(0_f64..drop_spread) as f32,
             2.,
         );
         prev_health.0 = changed_health.0;
@@ -98,10 +112,10 @@ pub fn handle_add_dodge_text(
 ) {
     for event in dodge_events.iter() {
         let mut rng = rand::thread_rng();
-        let drop_spread = 10.;
+        let drop_spread = 16.;
         let pos_offset = Vec3::new(
             i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
-            i32::max(5 + rng.gen_range(-drop_spread..drop_spread) as i32, 10) as f32,
+            i32::max(5 + rng.gen_range(0_f64..drop_spread) as i32, 10) as f32,
             2.,
         );
         spawn_floating_text_with_shadow(
@@ -122,8 +136,8 @@ pub fn tick_damage_numbers(
 ) {
     for (entity, mut text, mut damage_number, mut t) in query.iter_mut() {
         damage_number.timer.tick(time.delta());
-        t.translation.y += damage_number.velocity * time.delta_seconds();
         if damage_number.timer.percent() > 0.3 {
+            t.translation.y += damage_number.velocity * time.delta_seconds();
             for section in text.sections.iter_mut() {
                 section
                     .style
@@ -224,7 +238,8 @@ pub fn spawn_floating_text_with_shadow(
     pos: Vec3,
     color: Color,
     text: String,
-) {
+) -> Entity {
+    let mut shadow_e = Entity::from_raw(0);
     for i in 0..2 {
         let entity = spawn_text(
             commands,
@@ -237,12 +252,18 @@ pub fn spawn_floating_text_with_shadow(
             if i == 0 { BLACK } else { color },
             text.clone(),
             Anchor::Center,
+            1.0,
+            0,
         );
+        if i == 0 {
+            shadow_e = entity;
+        }
         commands.entity(entity).insert(DamageNumber {
-            timer: Timer::from_seconds(0.7, TimerMode::Once),
+            timer: Timer::from_seconds(0.85, TimerMode::Once),
             velocity: 0.,
         });
     }
+    shadow_e
 }
 
 pub fn spawn_text(
@@ -252,14 +273,16 @@ pub fn spawn_text(
     color: Color,
     text: String,
     anchor: Anchor,
+    font_scale: f32,
+    render_layer: u8,
 ) -> Entity {
     commands
         .spawn(Text2dBundle {
             text: Text::from_section(
                 text,
                 TextStyle {
-                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                    font_size: 8.0,
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0 * font_scale,
                     color,
                 },
             ),
@@ -270,5 +293,6 @@ pub fn spawn_text(
             text_anchor: anchor,
             ..Default::default()
         })
+        .insert(RenderLayers::from_layers(&[render_layer]))
         .id()
 }

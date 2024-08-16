@@ -410,6 +410,7 @@ pub enum WorldObject {
     TimeGate,
     TimeFragment,
     InventoryBag,
+    TimePortal,
 }
 
 #[derive(

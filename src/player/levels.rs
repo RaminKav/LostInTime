@@ -2,7 +2,12 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::{Deserialize, Serialize};
 
-use crate::{animations::AnimationTimer, ui::UIState, DEBUG, GAME_HEIGHT};
+use crate::{
+    animations::AnimationTimer,
+    colors::YELLOW,
+    ui::{damage_numbers::spawn_floating_text_with_shadow, UIState},
+    DEBUG, GAME_HEIGHT,
+};
 
 use super::{stats::SkillPoints, SkillChoiceQueue};
 
@@ -49,30 +54,26 @@ impl PlayerLevel {
     }
 }
 
-//TODO: move player xp after mob death system here, out of combat.rs handle_enemy_death
-// pub fn player_xp_system(
-//     mut player_query: Query<(&mut PlayerLevel, &mut ExperienceReward)>,
-//     mut xp_query: Query<&mut ExperienceReward>,
-// ) {
-//     for (mut player_level, mut xp_reward) in player_query.iter_mut() {
-//         player_level.add_xp(xp_reward.0);
-//         xp_reward.0 = 0;
-//     }
-//     for mut xp_reward in xp_query.iter_mut() {
-//         xp_reward.0 = 0;
-//     }
-// }
 pub fn handle_level_up(
-    mut player: Query<(&mut PlayerLevel, &mut SkillPoints), Changed<PlayerLevel>>,
+    mut player: Query<(&mut PlayerLevel, &mut SkillPoints, &GlobalTransform), Changed<PlayerLevel>>,
     mut skills_queue: ResMut<SkillChoiceQueue>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
-    for (mut player_level, mut sp) in player.iter_mut() {
+    for (mut player_level, mut sp, player_t) in player.iter_mut() {
         if player_level.level == player_level.next_level {
             player_level.next_level += 1;
 
             sp.count += 1;
             let mut rng = rand::thread_rng();
             skills_queue.add_new_skills_after_levelup(&mut rng);
+            spawn_floating_text_with_shadow(
+                &mut commands,
+                &asset_server,
+                player_t.translation() + Vec3::new(0., 15., 0.),
+                YELLOW,
+                "LEVEL UP!".to_string(),
+            );
         }
     }
 }

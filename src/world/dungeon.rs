@@ -139,8 +139,8 @@ pub fn spawn_dungeon_text(
                 text: Text::from_section(
                     "Time Left: 3:00",
                     TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
                         color: Color::Rgba {
                             red: 75. / 255.,
                             green: 61. / 255.,

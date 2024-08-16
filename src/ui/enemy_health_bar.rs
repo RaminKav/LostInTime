@@ -17,6 +17,7 @@ pub fn create_enemy_health_bar(
     mut commands: Commands,
     mut query: Query<Entity, (Added<Mob>, With<MaxHealth>)>,
 ) {
+    return;
     for entity in query.iter_mut() {
         let bar_frame = commands
             .spawn(SpriteBundle {

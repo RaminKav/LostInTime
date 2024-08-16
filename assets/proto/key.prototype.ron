@@ -10,6 +10,7 @@
             name: "Key", 
             desc: ["A key that", "will let you", "enter the", "dungeon once."]
         ),
+        rarity: Legendary,
         count: 1
   ),
   }

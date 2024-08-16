@@ -1,14 +1,20 @@
 use bevy::prelude::*;
+use bevy_proto::prelude::ProtoCommands;
+use rand::seq::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
-use crate::item::{
-    item_upgrades::{
-        ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
-        FireStaffAOEUpgrade, FrailOnHitUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade,
-        SlowOnHitUpgrade,
+use crate::{
+    custom_commands::CommandsExt,
+    item::{
+        item_upgrades::{
+            ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
+            FireStaffAOEUpgrade, FrailOnHitUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade,
+            SlowOnHitUpgrade,
+        },
+        WorldObject,
     },
-    WorldObject,
+    proto::proto_param::ProtoParam,
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
@@ -81,120 +87,150 @@ impl Skill {
     }
     pub fn get_title(&self) -> String {
         match self {
-            Skill::CritChance => "Crit Chance".to_string(),
-            Skill::CritDamage => "Crit Damage".to_string(),
-            Skill::Health => "Health".to_string(),
-            Skill::Speed => "Speed".to_string(),
-            Skill::Thorns => "Thorns".to_string(),
-            Skill::Lifesteal => "Lifesteal".to_string(),
-            Skill::AttackSpeed => "Attack Speed".to_string(),
-            Skill::CritLoot => "Crit Loot".to_string(),
-            Skill::DodgeChance => "Dodge Chance".to_string(),
-            Skill::FireDamage => "Fire Damage".to_string(),
-            Skill::WaveAttack => "Wave Attack".to_string(),
-            Skill::FrailStacks => "Frail".to_string(),
-            Skill::SlowStacks => "Slow".to_string(),
-            Skill::PoisonStacks => "Poison".to_string(),
+            Skill::CritChance => "Keen Eyes".to_string(),
+            Skill::CritDamage => "Powerful Blows".to_string(),
+            Skill::Health => "Healthly".to_string(),
+            Skill::Speed => "Nible Feet".to_string(),
+            Skill::Thorns => "Forest Scales".to_string(),
+            Skill::Lifesteal => "Drain Blood".to_string(),
+            Skill::AttackSpeed => "Swift Blows".to_string(),
+            Skill::CritLoot => "Eye on the Prize".to_string(),
+            Skill::DodgeChance => "Evasion".to_string(),
+            Skill::FireDamage => "Fire Aspect".to_string(),
+            Skill::WaveAttack => "Sonic Wave".to_string(),
+            Skill::FrailStacks => "Frail Blow".to_string(),
+            Skill::SlowStacks => "Freezing Blow".to_string(),
+            Skill::PoisonStacks => "Toxic Blow".to_string(),
             Skill::LethalBlow => "Lethal Blow".to_string(),
             Skill::Teleport => "Teleport".to_string(),
-            Skill::TeleportShock => "Teleport II".to_string(),
+            Skill::TeleportShock => "Shock Step".to_string(),
             Skill::TimeSlow => "Time Slow".to_string(),
-            Skill::ClawDoubleThrow => "Claw ++".to_string(),
-            Skill::BowMultiShot => "Bow ++".to_string(),
-            Skill::BowArrowSpeed => "Faster Arrows".to_string(),
-            Skill::ChainLightning => "Staff ++".to_string(),
-            Skill::FireStaffAoE => "Fire Staff ++".to_string(),
+            Skill::ClawDoubleThrow => "Double Throw".to_string(),
+            Skill::BowMultiShot => "Multi Shot".to_string(),
+            Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
+            Skill::ChainLightning => "Chain Lightning".to_string(),
+            Skill::FireStaffAoE => "Explosive Blast".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
-            Skill::CritChance => vec!["+10% Crit".to_string(), "Chance".to_string()],
-            Skill::CritDamage => vec!["+15% Crit.".to_string(), "Damage".to_string()],
-            Skill::Health => vec!["+25 Health".to_string()],
-            Skill::Speed => vec!["+15 Speed".to_string()],
-            Skill::Thorns => vec!["+15% Thorns".to_string()],
-            Skill::Lifesteal => vec!["+1 Lifesteal".to_string()],
-            Skill::AttackSpeed => vec!["+15% Attack".to_string(), "Speed".to_string()],
+            Skill::CritChance => vec![
+                "Grants +10% Critical".to_string(),
+                "Chance, permanantly.".to_string(),
+            ],
+            Skill::CritDamage => vec![
+                "Grants +15% Critical".to_string(),
+                "Damage, permanently".to_string(),
+            ],
+            Skill::Health => vec!["Grants +25 Health,".to_string(), "permanently.".to_string()],
+            Skill::Speed => vec!["Grants +15 Speed,".to_string(), "permanently.".to_string()],
+            Skill::Thorns => vec![
+                "Grants +15% Thorns, ".to_string(),
+                "permanently.".to_string(),
+            ],
+            Skill::Lifesteal => vec![
+                "Grants +1 Lifesteal,".to_string(),
+                "permanently.".to_string(),
+            ],
+            Skill::AttackSpeed => vec![
+                "Grants +15% Attack".to_string(),
+                "Speed, permanently.".to_string(),
+            ],
             Skill::CritLoot => vec![
-                "Enemies slayn".to_string(),
-                "with a crit hit".to_string(),
-                "have +25% drop".to_string(),
-                "chance".to_string(),
+                "Enemies slayn with a".to_string(),
+                "critical hit have a".to_string(),
+                "+25% loot drop".to_string(),
+                "chance.".to_string(),
             ],
-            Skill::DodgeChance => vec!["+10% Dodge".to_string(), "Chance".to_string()],
+            Skill::DodgeChance => vec![
+                "Grants +10% Dodge".to_string(),
+                "Chance, permanently.".to_string(),
+            ],
             Skill::FireDamage => vec![
-                "Attacks deal a".to_string(),
-                "second fire".to_string(),
-                "attack".to_string(),
+                "Your melee attacks".to_string(),
+                "deal a second fire".to_string(),
+                "attack to enemies.".to_string(),
             ],
-            Skill::WaveAttack => vec!["Attacks send a".to_string(), "wave attack".to_string()],
+            Skill::WaveAttack => vec![
+                "Your melee Attacks".to_string(),
+                "send a sonic wave ".to_string(),
+                "attackt hat travels".to_string(),
+                "a short distance.".to_string(),
+            ],
             Skill::FrailStacks => vec![
-                "Hits apply a".to_string(),
-                "Frail stack that".to_string(),
-                "gives 3% bonus".to_string(),
-                "crit chance".to_string(),
+                "Melee attacks apply".to_string(),
+                "a Frail stack that ".to_string(),
+                "gives +3% critical".to_string(),
+                "chance on hits".to_string(),
             ],
             Skill::SlowStacks => vec![
-                "Hits apply a".to_string(),
-                "Slow effect to".to_string(),
-                "enemies".to_string(),
+                "Melee attacks apply".to_string(),
+                "a Slow stack to".to_string(),
+                "enemies, reducing".to_string(),
+                "speed by 15%.".to_string(),
             ],
             Skill::PoisonStacks => vec![
-                "Hits apply a".to_string(),
-                "Poison stack".to_string(),
-                "that deals dmg".to_string(),
-                "over time".to_string(),
+                "Melee attacks apply".to_string(),
+                "Poison to enemies.".to_string(),
+                "Poisoned enemies".to_string(),
+                "lose health over".to_string(),
+                "time.".to_string(),
             ],
             Skill::LethalBlow => vec![
-                "Hits have a".to_string(),
-                "chance to".to_string(),
-                "execute low".to_string(),
-                "health enemies".to_string(),
+                "Melee attacks ".to_string(),
+                "execute enemies".to_string(),
+                "below 25% health.".to_string(),
             ],
             Skill::Teleport => vec![
-                "Your dodge".to_string(),
-                "becomes a".to_string(),
-                "Teleport".to_string(),
+                "Your dodge action".to_string(),
+                "becomes Teleport.".to_string(),
             ],
             Skill::TeleportShock => vec![
-                "Teleporting".to_string(),
-                "shocks enemies".to_string(),
-                "in your path".to_string(),
+                "Teleporting through".to_string(),
+                "enemies damages".to_string(),
+                "them.".to_string(),
             ],
             Skill::TimeSlow => vec!["Slow down".to_string(), "Time briefly".to_string()],
             Skill::ClawDoubleThrow => vec![
                 "Gain a Claw.".to_string(),
-                "Claws throw 2".to_string(),
-                "stars at once".to_string(),
+                "Your Claws throw 2".to_string(),
+                "stars in quick".to_string(),
+                "succession.".to_string(),
             ],
             Skill::BowMultiShot => vec![
                 "Gain a Bow.".to_string(),
-                "Bows shoot 3".to_string(),
-                "arrows, spread".to_string(),
+                "Your Bows shoot 3".to_string(),
+                "arrows in a spread".to_string(),
+                "pattern.".to_string(),
             ],
             Skill::ChainLightning => vec![
-                "Gain a Staff.".to_string(),
-                "Lighting now".to_string(),
-                "chains to".to_string(),
-                "other enemies".to_string(),
+                "Gain a Lightning ".to_string(),
+                "Staff.".to_string(),
+                "Lighting Staff".to_string(),
+                "bolts now chain to".to_string(),
+                "nearby enemies.".to_string(),
             ],
             Skill::FireStaffAoE => vec![
-                "Gain a Fire".to_string(),
-                "Staff.".to_string(),
-                "Its fireballs".to_string(),
-                "explode on hit".to_string(),
+                "Gain a Fire Staff".to_string(),
+                "Fire Staff fireballs".to_string(),
+                "explode on contact,".to_string(),
+                "dealing dmg in an".to_string(),
+                "area.".to_string(),
             ],
-            Skill::BowArrowSpeed => vec!["Arrows move".to_string(), "faster.".to_string()],
+            Skill::BowArrowSpeed => {
+                vec!["Your Bow's Arrows".to_string(), "move faster.".to_string()]
+            }
         }
     }
 
-    pub fn get_instant_drop(&self) -> Option<WorldObject> {
+    pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
-            Skill::ClawDoubleThrow => Some(WorldObject::Claw),
-            Skill::BowMultiShot => Some(WorldObject::WoodBow),
-            Skill::ChainLightning => Some(WorldObject::BasicStaff),
-            Skill::FireStaffAoE => Some(WorldObject::FireStaff),
+            Skill::ClawDoubleThrow => Some((WorldObject::Claw, 1)),
+            Skill::BowMultiShot => Some((WorldObject::WoodBow, 1)),
+            Skill::ChainLightning => Some((WorldObject::BasicStaff, 1)),
+            Skill::FireStaffAoE => Some((WorldObject::FireStaff, 1)),
+            Skill::BowArrowSpeed => Some((WorldObject::Arrow, 24)),
             _ => None,
         }
     }
@@ -247,20 +283,27 @@ impl Skill {
         }
     }
 }
+
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
 pub struct SkillChoiceState {
     pub skill: Skill,
     pub child_skills: Vec<SkillChoiceState>,
+    pub is_one_time_skill: bool,
 }
 impl SkillChoiceState {
     pub fn new(skill: Skill) -> Self {
         Self {
             skill,
             child_skills: Default::default(),
+            is_one_time_skill: true,
         }
     }
     pub fn with_children(mut self, children: Vec<SkillChoiceState>) -> Self {
         self.child_skills = children;
+        self
+    }
+    pub fn set_repeatable(mut self) -> Self {
+        self.is_one_time_skill = false;
         self
     }
 }
@@ -276,21 +319,28 @@ impl Default for SkillChoiceQueue {
         Self {
             queue: Default::default(),
             pool: vec![
-                SkillChoiceState::new(Skill::CritChance).with_children(vec![
-                    SkillChoiceState::new(Skill::CritDamage),
-                    SkillChoiceState::new(Skill::CritLoot),
-                ]),
-                SkillChoiceState::new(Skill::Health).with_children(vec![
-                    SkillChoiceState::new(Skill::Lifesteal),
-                    SkillChoiceState::new(Skill::Thorns),
-                ]),
-                SkillChoiceState::new(Skill::Speed),
-                SkillChoiceState::new(Skill::AttackSpeed),
+                SkillChoiceState::new(Skill::CritChance)
+                    .set_repeatable()
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::CritDamage).set_repeatable(),
+                        SkillChoiceState::new(Skill::CritLoot),
+                        SkillChoiceState::new(Skill::FrailStacks),
+                    ]),
+                SkillChoiceState::new(Skill::Health)
+                    .set_repeatable()
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::Lifesteal).set_repeatable(),
+                        SkillChoiceState::new(Skill::Thorns).set_repeatable(),
+                    ]),
+                SkillChoiceState::new(Skill::Speed)
+                    .set_repeatable()
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::AttackSpeed).set_repeatable(),
+                        SkillChoiceState::new(Skill::WaveAttack),
+                    ]),
                 SkillChoiceState::new(Skill::LethalBlow),
-                SkillChoiceState::new(Skill::DodgeChance),
+                SkillChoiceState::new(Skill::DodgeChance).set_repeatable(),
                 SkillChoiceState::new(Skill::FireDamage),
-                SkillChoiceState::new(Skill::WaveAttack),
-                SkillChoiceState::new(Skill::FrailStacks),
                 SkillChoiceState::new(Skill::SlowStacks),
                 SkillChoiceState::new(Skill::PoisonStacks),
                 SkillChoiceState::new(Skill::Teleport).with_children(vec![
@@ -298,10 +348,69 @@ impl Default for SkillChoiceQueue {
                     // SkillChoiceState::new(Skill::TimeSlow),
                 ]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),
-                SkillChoiceState::new(Skill::BowMultiShot),
+                SkillChoiceState::new(Skill::BowMultiShot)
+                    .with_children(vec![SkillChoiceState::new(Skill::BowArrowSpeed)]),
                 SkillChoiceState::new(Skill::ChainLightning),
                 SkillChoiceState::new(Skill::FireStaffAoE),
             ],
+        }
+    }
+}
+impl SkillChoiceQueue {
+    pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
+        //only push if queue is empty
+        if self.queue.is_empty() {
+            let mut new_skills: [SkillChoiceState; 3] = Default::default();
+            let mut add_back_to_pool: Vec<SkillChoiceState> = vec![];
+            for i in 0..3 {
+                if let Some(picked_skill) = self.pool.iter().choose(rng) {
+                    if !picked_skill.is_one_time_skill {
+                        add_back_to_pool.push(picked_skill.clone());
+                    }
+                    new_skills[i] = picked_skill.clone();
+                    self.pool.retain(|x| x != &new_skills[i]);
+                }
+            }
+            for skill in add_back_to_pool.iter() {
+                self.pool.push(skill.clone());
+            }
+
+            self.queue.push(new_skills.clone());
+        }
+    }
+
+    pub fn handle_pick_skill(
+        &mut self,
+        skill: SkillChoiceState,
+        proto_commands: &mut ProtoCommands,
+        proto: &ProtoParam,
+        player_pos: Vec2,
+        player_skills: PlayerSkills,
+        player_level: u8,
+    ) {
+        let mut remaining_choices = self.queue.remove(0).to_vec();
+        remaining_choices.retain(|x| x != &skill);
+        for choice in remaining_choices.iter() {
+            self.pool.push(choice.clone());
+        }
+        for child in skill.child_skills.iter() {
+            if !player_skills.skills.contains(&child.skill) {
+                self.pool.push(child.clone());
+            }
+        }
+        // handle drops
+        if let Some((drop, count)) = skill.skill.get_instant_drop() {
+            proto_commands.spawn_item_from_proto(
+                drop.clone(),
+                &proto,
+                player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
+                count,
+                Some(1),
+            );
+        }
+        //repopulate the queue after each skill selection, if there are skills missing
+        if player_skills.skills.len() < player_level as usize - 1 {
+            self.add_new_skills_after_levelup(&mut rand::thread_rng());
         }
     }
 }
@@ -314,5 +423,8 @@ pub struct PlayerSkills {
 impl PlayerSkills {
     pub fn get(&self, skill: Skill) -> bool {
         self.skills.contains(&skill)
+    }
+    pub fn get_count(&self, skill: Skill) -> i32 {
+        self.skills.iter().filter(|&s| *s == skill).count() as i32
     }
 }

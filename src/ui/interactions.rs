@@ -13,6 +13,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
     player::{
+        levels::PlayerLevel,
         skills::{PlayerSkills, SkillChoiceQueue},
         stats::StatType,
     },
@@ -66,6 +67,8 @@ pub enum UIElement {
     ScreenIconSlot,
     Options,
     SkillChoice,
+    SkillChoiceHover,
+    StarIcon,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -328,9 +331,13 @@ pub fn handle_hovering(
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
     mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
     mut stats_update_events: EventWriter<ShowInvPlayerStatsEvent>,
+    key_input: Res<Input<KeyCode>>,
 ) {
     // iter all interactables, find ones in hover state.
     // match the UIElement type to swap to a new image
+    let shift_key_pressed = key_input.pressed(KeyCode::LShift);
+    let shift_key_just_pressed = key_input.just_pressed(KeyCode::LShift);
+    let shift_key_just_released = key_input.just_released(KeyCode::LShift);
     for (e, ui, interactable, state_option, essence_option, stats_option) in
         interactables.iter_mut()
     {
@@ -361,7 +368,38 @@ pub fn handle_hovering(
                         tooltip_update_events.send(ToolTipUpdateEvent {
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
+                            show_range: shift_key_pressed,
                         });
+                    }
+                }
+            }
+            if ui == &UIElement::InventorySlotHover {
+                if shift_key_just_pressed || shift_key_just_released {
+                    tooltip_teardown_events.send_default();
+                    let state = state_option.unwrap();
+
+                    if let Some(_item_e) = state.item {
+                        let item = if state.r#type.is_chest() {
+                            chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                        } else if state.r#type.is_furnace() {
+                            furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                        } else {
+                            if state.r#type.is_crafting() && crafting_option.is_some() {
+                                crafting_option.as_ref().unwrap().items.items[state.slot_index]
+                                    .clone()
+                            } else {
+                                inv.single().get_items_from_slot_type(state.r#type).items
+                                    [state.slot_index]
+                                    .clone()
+                            }
+                        };
+                        if let Some(item) = item {
+                            tooltip_update_events.send(ToolTipUpdateEvent {
+                                item_stack: item.item_stack,
+                                is_recipe: state.r#type.is_crafting(),
+                                show_range: shift_key_pressed,
+                            });
+                        }
                     }
                 }
             }
@@ -391,6 +429,7 @@ pub fn handle_hovering(
                 tooltip_update_events.send(ToolTipUpdateEvent {
                     item_stack: essence.item.clone(),
                     is_recipe: false,
+                    show_range: shift_key_pressed,
                 });
             }
         }
@@ -705,13 +744,14 @@ pub fn handle_cursor_skills_buttons(
         (Entity, &mut Interactable, &SkillChoiceUI),
         Without<InventorySlotState>,
     >,
-    mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform)>,
+    mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform, &PlayerLevel)>,
     mut skill_queue: ResMut<SkillChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
+    graphics: Res<Graphics>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -721,10 +761,15 @@ pub fn handle_cursor_skills_buttons(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    // swap to hover img
+                    commands.entity(e).insert(UIElement::SkillChoiceHover);
+                    commands
+                        .entity(e)
+                        .insert(graphics.get_ui_element_texture(UIElement::SkillChoiceHover));
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        let (e, mut skills, t) = player_skills.single_mut();
+                        let (e, mut skills, t, level) = player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
                         skills.skills.push(picked_skill.skill.clone());
                         skill_queue.handle_pick_skill(
@@ -732,6 +777,8 @@ pub fn handle_cursor_skills_buttons(
                             &mut proto_commands,
                             &proto,
                             t.translation().truncate(),
+                            skills.clone(),
+                            level.level,
                         );
                         picked_skill.skill.add_skill_components(e, &mut commands);
                         next_ui_state.set(UIState::Closed);
@@ -747,6 +794,10 @@ pub fn handle_cursor_skills_buttons(
                 };
 
                 interactable.change(Interaction::None);
+                commands.entity(e).insert(UIElement::SkillChoice);
+                commands
+                    .entity(e)
+                    .insert(graphics.get_ui_element_texture(UIElement::SkillChoice));
             }
         }
     }

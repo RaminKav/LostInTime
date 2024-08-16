@@ -9,6 +9,7 @@ use crate::attributes::hunger::Hunger;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
+use crate::player::levels::PlayerLevel;
 use crate::player::skills::{PlayerSkills, Skill};
 use crate::player::MovePlayerEvent;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -42,7 +43,9 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{change_hotbar_slot, EssenceShopChoices, InventoryState, UIState};
+use crate::ui::{
+    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
+};
 use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::world_pos_to_tile_pos;
@@ -402,6 +405,8 @@ pub fn toggle_inventory(
     mut move_player_event: EventWriter<MovePlayerEvent>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     cursor: Res<CursorPos>,
+    mut player_xp: Query<&mut PlayerLevel>,
+    mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
     if key_input.just_pressed(KeyCode::I)
         || key_input.just_pressed(KeyCode::Tab)
@@ -424,6 +429,10 @@ pub fn toggle_inventory(
                 swap_to_dim_now: true,
                 new_era: Some(Era::Second),
             });
+        }
+        if key_input.just_pressed(KeyCode::C) {
+            player_xp.single_mut().add_xp(100);
+            flash_event.send_default();
         }
         if key_input.just_pressed(KeyCode::K) {
             dim_event.send(DimensionSpawnEvent {
@@ -458,6 +467,7 @@ pub fn toggle_inventory(
             //     1,
             //     Some(1),
             // );
+            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
@@ -477,13 +487,13 @@ fn handle_hotbar_key_input(
     mut inv_state: ResMut<InventoryState>,
 ) {
     for e in mouse_wheel_event.iter() {
-        if e.y < 0. {
+        if e.y < -2. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 5) % 6,
                 &mut inv_state,
                 &mut game.inv_slot_query,
             );
-        } else if e.y >= 0. {
+        } else if e.y >= 2. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 1) % 6,
                 &mut inv_state,

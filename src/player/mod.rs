@@ -199,11 +199,11 @@ fn spawn_player(
             },
             //TODO: remove itematt and construct from components?
             ItemAttributes {
-                health: AttributeValue::new(100, AttributeQuality::Low),
-                attack: AttributeValue::new(0, AttributeQuality::Low),
-                health_regen: AttributeValue::new(2, AttributeQuality::Low),
-                crit_chance: AttributeValue::new(5, AttributeQuality::Low),
-                crit_damage: AttributeValue::new(150, AttributeQuality::Low),
+                health: AttributeValue::new(100, AttributeQuality::Low, 0.),
+                attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
+                health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
+                crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
+                crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
                 ..default()
             },
             Hunger::new(100),

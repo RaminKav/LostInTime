@@ -2,18 +2,20 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    assets::Graphics,
     attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     colors::YELLOW,
     container::Container,
-    inventory::{Inventory, InventoryItemStack},
+    inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
     player::Player,
     proto::proto_param::ProtoParam,
     ui::{
-        crafting_ui::CraftingContainerType, damage_numbers::spawn_floating_text_with_shadow,
-        handle_hovering, mark_slot_dirty, FurnaceContainer, FurnaceState, InventorySlotState,
-        InventorySlotType,
+        crafting_ui::CraftingContainerType,
+        damage_numbers::{spawn_floating_text_with_shadow, NewRecipeTextTimer},
+        handle_hovering, mark_slot_dirty, spawn_item_stack_icon, FurnaceContainer, FurnaceState,
+        InventorySlotState, InventorySlotType,
     },
     GameState,
 };
@@ -62,6 +64,7 @@ pub struct CraftingTracker {
     pub craftable: Vec<WorldObject>,
     pub discovered_objects: Vec<WorldObject>,
     pub discovered_recipes: Vec<WorldObject>,
+    pub discovered_crafting_types: Vec<CraftingContainerType>,
     pub crafting_type_map: HashMap<CraftingContainerType, Vec<WorldObject>>,
 }
 
@@ -302,11 +305,37 @@ pub fn handle_inv_changed_update_crafting_tracker(
     player_t: Query<&GlobalTransform, With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
+    mut text_timer: ResMut<NewRecipeTextTimer>,
+    time: Res<Time>,
 ) {
+    // queue processing
+    if !text_timer.timer.finished() {
+        text_timer.timer.tick(time.delta());
+    } else if text_timer.queue.len() > 0 {
+        let shadow = spawn_floating_text_with_shadow(
+            &mut commands,
+            &asset_server,
+            player_t.single().translation() + Vec3::new(0., 15., 0.),
+            YELLOW,
+            "New Recipe!".to_string(),
+        );
+        let icon = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &ItemStack::crate_icon_stack(text_timer.queue.pop().expect("queue is not empty")),
+            &asset_server,
+            Vec2::new(30., 2.),
+            0,
+        );
+        commands.entity(icon).set_parent(shadow);
+        text_timer.timer.reset();
+    }
+
+    // detect new items in inventory and add to queue
     if inv.get_single().is_err() {
         return;
     }
-
     let mut inv = inv.single_mut();
     for slot in inv.items.items.iter() {
         if let Some(item) = slot {
@@ -316,9 +345,13 @@ pub fn handle_inv_changed_update_crafting_tracker(
             }
 
             for (result, recipe) in recipes.crafting_list.iter() {
-                if craft_tracker.discovered_recipes.contains(&result) {
+                if craft_tracker.discovered_recipes.contains(&result)
+                    || (!craft_tracker.discovered_crafting_types.contains(&recipe.1)
+                        && recipe.1 != CraftingContainerType::Inventory)
+                {
                     continue;
                 }
+
                 for ingredient in recipe.0.iter() {
                     if ingredient.item == new_obj {
                         craft_tracker.discovered_recipes.push(result.clone());
@@ -327,13 +360,8 @@ pub fn handle_inv_changed_update_crafting_tracker(
                             .entry(recipe.1.clone())
                             .or_insert(vec![])
                             .push(result.clone());
-                        spawn_floating_text_with_shadow(
-                            &mut commands,
-                            &asset_server,
-                            player_t.single().translation() + Vec3::new(0., 10., 0.),
-                            YELLOW,
-                            "New Recipe!".to_string(),
-                        );
+                        text_timer.queue.push(result.clone());
+                        println!("pushed to recipe queue {:?}", text_timer.queue);
                         continue;
                     }
                 }

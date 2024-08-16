@@ -40,11 +40,49 @@ pub enum ItemAction {
     DungeonKey,
     GrantSkillPoint(u8),
 }
+impl ItemAction {
+    pub fn get_tooltip(&self) -> Option<String> {
+        match self {
+            ItemAction::ModifyHealth(delta) => Some(format!("+{} HP", delta)),
+            ItemAction::ModifyMana(delta) => Some(format!("+{} Mana", delta)),
+            ItemAction::Eat(delta) => Some(format!("+{} Food", delta)),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
 pub struct ItemActions {
     pub actions: Vec<ItemAction>,
+}
+
+impl ItemActions {
+    pub fn get_action_type(&self) -> String {
+        let mut has_eat = false;
+        let mut has_places_into = false;
+        let mut has_consumable = false;
+
+        for action in &self.actions {
+            match action {
+                ItemAction::Eat(_) => has_eat = true,
+                ItemAction::PlacesInto(_) => has_places_into = true,
+                ItemAction::ModifyHealth(_) => has_consumable = true,
+                ItemAction::ModifyMana(_) => has_consumable = true,
+                _ => {}
+            }
+        }
+
+        if has_eat {
+            "Consumable".to_string()
+        } else if has_places_into {
+            "Placeable".to_string()
+        } else if has_consumable {
+            "Consumable".to_string()
+        } else {
+            "Useable".to_string()
+        }
+    }
 }
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
@@ -73,7 +111,7 @@ pub struct ItemActionParam<'w, 's> {
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
     pub chest_query: Query<'w, 's, &'static ChestContainer>,
     pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
-    pub crafting_tracker: Res<'w, CraftingTracker>,
+    pub crafting_tracker: ResMut<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
     pub night_tracker: Res<'w, NightTracker>,
     pub skill_points_query: Query<'w, 's, &'static mut SkillPoints>,

@@ -7,6 +7,17 @@
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
         attack: Some((start: 5, end: 8)),
   ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+        crit_damage: Some((start: 2, end: 6)),
+        crit_chance: Some((start: 2, end: 6)),
+        healing: Some((start: 2, end: 8)),
+        bonus_damage: Some((start: 1, end: 2)),
+        speed: Some((start: 4, end: 10)),
+        health_regen: Some((start: 1, end: 2)),
+        thorns: Some((start: 3, end: 5)),
+        dodge: Some((start: 1, end: 5)),
+        loot_rate: Some((start: 3, end: 7)),
+  ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: WoodAxe,
