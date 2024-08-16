@@ -142,6 +142,45 @@ impl ObjectAction {
                 });
             }
             ObjectAction::Crafting(crafting_type) => {
+                if !item_action_param
+                    .crafting_tracker
+                    .discovered_crafting_types
+                    .contains(crafting_type)
+                {
+                    for item in item_action_param
+                        .crafting_tracker
+                        .discovered_objects
+                        .clone()
+                    {
+                        for (result, recipe) in item_action_param.recipes.crafting_list.iter() {
+                            if recipe.1 != *crafting_type {
+                                continue;
+                            }
+                            if item_action_param
+                                .crafting_tracker
+                                .discovered_recipes
+                                .contains(&result)
+                            {
+                                continue;
+                            }
+                            for ingredient in recipe.0.iter() {
+                                if ingredient.item == item {
+                                    item_action_param
+                                        .crafting_tracker
+                                        .discovered_recipes
+                                        .push(result.clone());
+                                    item_action_param
+                                        .crafting_tracker
+                                        .crafting_type_map
+                                        .entry(recipe.1.clone())
+                                        .or_insert(vec![])
+                                        .push(result.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+
                 let items = if let Some(crafting_items) = item_action_param
                     .crafting_tracker
                     .crafting_type_map
@@ -160,16 +199,10 @@ impl ObjectAction {
                 };
                 commands.insert_resource(crafting_container_res.clone());
 
-                if !item_action_param
+                item_action_param
                     .crafting_tracker
                     .discovered_crafting_types
-                    .contains(crafting_type)
-                {
-                    item_action_param
-                        .crafting_tracker
-                        .discovered_crafting_types
-                        .push(crafting_type.clone());
-                }
+                    .push(crafting_type.clone());
             }
             ObjectAction::Furnace => {
                 let furnace_res = item_action_param.furnace_query.get(e).unwrap();

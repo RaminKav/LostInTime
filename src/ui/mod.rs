@@ -228,10 +228,15 @@ pub fn handle_new_ui_state(
         return;
     }
     let next_ui = next_ui_state.0.as_ref().unwrap().clone();
-    if *DEBUG {
-        println!("UI State Changed: {:?} -> {:?}", curr_ui_state.0, next_ui);
-    }
     let mut should_close_self = false;
+    let should_reset_crafting_container =
+        next_ui != curr_ui_state.0 && curr_ui_state.0.is_inv_open();
+    if *DEBUG {
+        println!(
+            "UI State Changed: {:?} -> {:?} | should reset: {should_reset_crafting_container:?}",
+            curr_ui_state.0, next_ui
+        );
+    }
     if next_ui == curr_ui_state.0 {
         next_ui_state.set(UIState::Closed);
         should_close_self = true;
@@ -257,7 +262,7 @@ pub fn handle_new_ui_state(
             commands.remove_resource::<FurnaceContainer>();
         }
     }
-    if !next_ui.is_inv_open() || should_close_self {
+    if !next_ui.is_inv_open() || should_close_self || should_reset_crafting_container {
         commands.remove_resource::<CraftingContainer>();
     }
     if next_ui != UIState::Essence {

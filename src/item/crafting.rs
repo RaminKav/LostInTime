@@ -95,7 +95,9 @@ pub fn handle_crafting_update_when_inv_changes(
             }
         }
         if can_craft {
-            craft_tracker.craftable.push(result);
+            if !craft_tracker.craftable.contains(&result) {
+                craft_tracker.craftable.push(result);
+            }
         } else {
             craft_tracker.craftable.retain(|x| x != &result);
         }
@@ -340,9 +342,6 @@ pub fn handle_inv_changed_update_crafting_tracker(
     for slot in inv.items.items.iter() {
         if let Some(item) = slot {
             let new_obj = item.item_stack.obj_type;
-            if craft_tracker.discovered_objects.contains(&new_obj) {
-                continue;
-            }
 
             for (result, recipe) in recipes.crafting_list.iter() {
                 if craft_tracker.discovered_recipes.contains(&result)
