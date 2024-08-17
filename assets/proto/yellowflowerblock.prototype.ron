@@ -9,7 +9,7 @@
         obj_type: YellowFlowerBlock,
         metadata: (
             name: "Yellow Flower ", 
-            desc: ["Mmmm!"]
+            desc: ["A Yellow Flower.", "It glows with","wisdom."]
         ),
         count: 1
   ),

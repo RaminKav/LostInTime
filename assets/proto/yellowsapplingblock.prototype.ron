@@ -8,8 +8,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: YellowSapplingBlock,
         metadata: (
-            name: "Ylw. Sappling",
-            desc: ["Grows into a", "tree when placed", "on the ground."],
+            name: "Yellow Sappling",
+            desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1
   ),

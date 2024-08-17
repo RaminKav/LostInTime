@@ -28,8 +28,8 @@
             attack_cooldown: 0.85
         ),
         metadata: (
-            name: "Basic Staff", 
-            desc: ["A basic staff."]
+            name: "Lightning Staff", 
+            desc: ["A magical staff."]
         ),
         count: 1
   ),

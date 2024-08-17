@@ -7,7 +7,7 @@
         obj_type: Coal,
         metadata: (
             name: "Coal", 
-            desc: ["A chunk of coal."]
+            desc: ["A chunk of coal.", "Use it in the", "Furnace."]
         ),
         count: 1
   ),

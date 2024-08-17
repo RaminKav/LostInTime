@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: MetalShard,
         metadata: (
-            name: "Metal Shard", 
-            desc: ["A metal shard."]
+            name: "Metal Shard ", 
+            desc: ["A metal shard. Not", "very useful in this", "state."]
         ),
         count: 1
   ),

@@ -8,9 +8,10 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: MagicTusk,
         metadata: (
-            name: "Magic Tusk", 
-            desc: ["Guides you", "home."]
+            name: "Magic Tusk ", 
+            desc: ["Guides you home."]
         ),
+        rarity: Rare,
         count: 1
   ),
   }

@@ -23,7 +23,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: LeatherShoes,
         metadata: (
-            name: "Leather Shoes", 
+            name: "Leather Shoes ", 
             desc: ["Nice."]
         ),
         count: 1

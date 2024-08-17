@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Feather,
         metadata: (
-            name: "Feather", 
-            desc: ["A feather."]
+            name: "Feather ", 
+            desc: ["Very fluffy.", "Useful in crafting."]
         ),
         count: 1
   ),

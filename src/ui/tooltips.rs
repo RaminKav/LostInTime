@@ -207,7 +207,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         tooltip_text.push(TooltipTextProps::new(
                             vec!["".to_string()],
                             0.,
-                            AttributeQuality::Low,
+                            AttributeQuality::High,
                             Anchor::CenterLeft,
                         ));
                     }
@@ -227,7 +227,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         tooltip_text.push(TooltipTextProps::new(
                             vec![combined_actions],
                             0.,
-                            AttributeQuality::Low,
+                            AttributeQuality::High,
                             Anchor::CenterLeft,
                         ));
                     }

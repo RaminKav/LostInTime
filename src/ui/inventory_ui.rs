@@ -276,7 +276,12 @@ pub fn spawn_inv_slot(
 
     if slot_type.is_hotbar() {
         y = -GAME_HEIGHT / 2. + 14.;
-        x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
+        x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE
+            + if slot_index == 5 || slot_index == 2 {
+                0.5
+            } else {
+                0.
+            };
     } else if slot_type.is_crafting() {
         x = ((slot_index % 8) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
             + UI_SLOT_SIZE / 2.

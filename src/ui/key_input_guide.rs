@@ -26,7 +26,7 @@ pub fn add_guide_to_unique_objs(
             WorldObject::BossShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
                     key: Some("F".to_string()),
-                    text: Some("Interact".to_string()),
+                    text: Some("Summon".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(
                         ItemStack::crate_icon_stack(WorldObject::TimeFragment).copy_with_count(10),

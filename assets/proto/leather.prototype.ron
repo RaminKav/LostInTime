@@ -7,7 +7,7 @@
         obj_type: Leather,
         metadata: (
             name: "Leather", 
-            desc: ["strong!"]
+            desc: ["Strong and durable.", "Useful in crafting."],
         ),
         count: 1
   ),

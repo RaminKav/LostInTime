@@ -117,7 +117,7 @@ impl Skill {
         match self {
             Skill::CritChance => vec![
                 "Grants +10% Critical".to_string(),
-                "Chance, permanantly.".to_string(),
+                "Chance, permanantly. ".to_string(),
             ],
             Skill::CritDamage => vec![
                 "Grants +15% Critical".to_string(),

@@ -9,7 +9,7 @@
         obj_type: BridgeBlock,
         metadata: (
             name: "Bridge", 
-            desc: ["walk on water!"]
+            desc: ["Place over water" , "to help walk over", "it!"]
         ),
         count: 1
   ),

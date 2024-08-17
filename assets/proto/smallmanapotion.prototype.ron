@@ -9,8 +9,9 @@
         obj_type: SmallManaPotion,
         metadata: (
             name: "Small Mana Potion", 
-            desc: ["Heals 40 mana."]
+            desc: ["For rookie Mana", "enjoyers."]
         ),
+        rarity: Uncommon,
         count: 1
   ),
   }

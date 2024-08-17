@@ -7,7 +7,7 @@
         obj_type: StoneChunk,
         metadata: (
             name: "Stone", 
-            desc: ["A big chunk of stone."]
+            desc: ["A big chunk of", "stone. Can be used", "to craft various", "tools."]
         ),
         count: 1
   ),

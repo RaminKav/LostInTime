@@ -9,7 +9,7 @@
         obj_type: AlchemyTableBlock,
         metadata: (
             name: "Alchemy Table", 
-            desc: ["Stores items."]
+            desc: ["Allows you to", "craft potions."],
         ),
         count: 1
   ),

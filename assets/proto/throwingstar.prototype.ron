@@ -14,7 +14,7 @@
             obj_type: ThrowingStar,
             metadata: (
                 name: "Throwing Star", 
-                desc: ["A throwing star."]
+                desc: ["A throwing star.", "Throwable with the", "Claw weapon."]
             ),
             count: 1
       ),

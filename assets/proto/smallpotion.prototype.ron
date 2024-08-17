@@ -8,9 +8,10 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: SmallPotion,
         metadata: (
-            name: "Small Potion", 
-            desc: ["Heals 20 health."]
+            name: "Small Potion ", 
+            desc: ["A fine thing to", "have in your", "pocket."]
         ),
+        rarity: Uncommon,
         count: 1
   ),
   }
