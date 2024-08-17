@@ -9,7 +9,7 @@
         obj_type: RedSapplingBlock,
         metadata: (
             name: "Red Sappling", 
-            desc: ["Grows into a", "tree when placed", "on the ground."],
+            desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1
   ),

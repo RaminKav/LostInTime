@@ -9,7 +9,7 @@
         obj_type: FurnaceBlock,
         metadata: (
             name: "Furnace", 
-            desc: ["Stores items."]
+            desc: ["Allows you to", "smelt or cook raw", "food."]
         ),
         count: 1
   ),

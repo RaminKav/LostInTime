@@ -8,8 +8,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: CauldronBlock,
         metadata: (
-            name: "Cauldron", 
-            desc: ["Stores items."]
+            name: "Cauldron ", 
+            desc: ["Allows you to", "cook better food."]
         ),
         count: 1
   ),

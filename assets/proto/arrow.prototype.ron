@@ -13,7 +13,7 @@
           obj_type: Arrow,
           metadata: (
               name: "Arrow", 
-              desc: ["An arrow."]
+              desc: ["An arrow. Used with", "a Bow."]
           ),
           count: 1
         ),

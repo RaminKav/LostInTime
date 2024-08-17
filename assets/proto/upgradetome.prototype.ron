@@ -7,7 +7,7 @@
         obj_type: UpgradeTome,
         metadata: (
             name: "Upgrade Tome", 
-            desc: ["Use in the", "upgrade stn.", "to upgrade an", "item's Level."],
+            desc: ["Use in the upgrade", "station to upgrade", "an item's Level", "once, making it", "stronger."],
         ),
         count: 1,
         rarity: Rare

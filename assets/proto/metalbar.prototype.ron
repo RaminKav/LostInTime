@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: MetalBar,
         metadata: (
-            name: "Metal Bar", 
-            desc: ["A metal Bar."]
+            name: "Metal Bar ", 
+            desc: ["A metal ingot.", "Useful in crafting."],
         ),
         count: 1
   ),

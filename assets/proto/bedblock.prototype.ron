@@ -9,7 +9,7 @@
         obj_type: BedBlock,
         metadata: (
             name: "Bed", 
-            desc: ["Marks your home."]
+            desc: ["Right-Click to","mark your home.", "Return home with a", "Magic Tusk."]
         ),
         count: 1
   ),

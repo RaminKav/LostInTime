@@ -6,9 +6,10 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: MagicGem,
         metadata: (
-            name: "Magic Gem", 
-            desc: ["A magical gem."]
+            name: "Magic Gem ", 
+            desc: ["A magical gem. I", "wonder what it can", "do?"]
         ),
+        rarity: Rare,
         count: 1
   ),
   }

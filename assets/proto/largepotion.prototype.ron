@@ -9,9 +9,10 @@
         obj_type: LargePotion,
         rarity: Uncommon,
         metadata: (
-            name: "Large Potion", 
-            desc: ["Heals 35 HP",]
+            name: "Large Potion ", 
+            desc: ["The good stuff...", "No strings", "attached."]
         ),
+        rarity: Rare,
         count: 1
   ),
   }

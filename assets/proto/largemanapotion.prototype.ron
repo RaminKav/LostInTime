@@ -10,8 +10,9 @@
         rarity: Uncommon,
         metadata: (
             name: "Large Mana Potion", 
-            desc: ["Heals 75 mana."]
+            desc: ["For advanced Mana", "enjoyers."]
         ),
+        rarity: Rare,
         count: 1
   ),
   }

@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Flint,
         metadata: (
-            name: "Stone Shard", 
-            desc: ["A chipped piece of Stone."]
+            name: "Stone Shard ", 
+            desc: ["A chipped piece", "of Stone."]
         ),
         count: 1
   ),

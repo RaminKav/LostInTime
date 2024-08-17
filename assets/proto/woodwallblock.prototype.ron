@@ -9,7 +9,7 @@
         obj_type: WoodWallBlock,
         metadata: (
             name: "Wood Wall", 
-            desc: ["Creates a Wood Wall."]
+            desc: ["Creates a Wood", "Wall."]
         ),
         count: 1
   ),

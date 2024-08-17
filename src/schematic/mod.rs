@@ -252,7 +252,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                     {
                         commands.entity(existing_obj).despawn_recursive();
                     }
-                    let clear_tiles = get_radial_tile_positions(tile_pos, 3);
+                    let clear_tiles = get_radial_tile_positions(tile_pos, 4);
                     for clear_tile_pos in clear_tiles.iter() {
                         if let Some((existing_obj, _)) =
                             game.get_obj_entity_at_tile(*clear_tile_pos, &proto_param)

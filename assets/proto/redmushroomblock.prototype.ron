@@ -9,7 +9,7 @@
         obj_type: RedMushroomBlock,
         metadata: (
             name: "Red Mushroom", 
-            desc: ["Mmmm!"]
+            desc: ["Smells funny...", "Looks cool though!", "I should try", "cooking it."]
         ),
         count: 1
   ),

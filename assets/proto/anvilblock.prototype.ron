@@ -9,7 +9,7 @@
         obj_type: AnvilBlock,
         metadata: (
             name: "Anvil", 
-            desc: ["Stores items."]
+            desc: ["Allows you to craft", "weapons and armor."],
         ),
         count: 1
   ),

@@ -9,8 +9,9 @@
         obj_type: RedStew,
         metadata: (
             name: "Red Stew", 
-            desc: ["Crunchy!"]
+            desc: ["Mmmm, now we're", "talking. Could use", "some salt though..."]
         ),
+        rarity: Uncommon,
         count: 1
   ),
   }

@@ -7,7 +7,7 @@
         obj_type: OrbOfTransformation,
         metadata: (
             name: "Orb Of ???", 
-            desc: ["A mysterious", "orb that", "transforms", "items when", "used in the", "upgrade stn."],
+            desc: ["A mysterious orb.", "It seems to be", "drawn to your", "equipment..."],
         ),
         count: 1,
         rarity: Legendary

@@ -7,7 +7,7 @@
         obj_type: String,
         metadata: (
             name: "String", 
-            desc: ["A String."]
+            desc: ["Some string. Helps", "to craft various tools."]
         ),
         count: 1
   ),

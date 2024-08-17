@@ -3,13 +3,13 @@
   templates: ["item_drop"],
   schematics: {
   "survival_rogue_like::item::WorldObject": CookedMeat,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(45)]),
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(45), ModifyHealth(10)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: CookedMeat,
         metadata: (
-            name: "Cooked Meat", 
-            desc: ["Crunchy!"]
+            name: "Cooked Meat ", 
+            desc: ["This tastes much", "better than raw", "meat!"]
         ),
         count: 1
   ),

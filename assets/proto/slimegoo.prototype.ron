@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: SlimeGoo,
         metadata: (
-            name: "Slime Goo", 
-            desc: ["A glob of Slime Goo."]
+            name: "Slime Goo ", 
+            desc: ["A glob of Slime", "Goo. Probably", "can't eat it. But it", " might be useful."]
         ),
         count: 1
   ),

@@ -43,9 +43,19 @@ pub enum ItemAction {
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
         match self {
-            ItemAction::ModifyHealth(delta) => Some(format!("+{} HP", delta)),
-            ItemAction::ModifyMana(delta) => Some(format!("+{} Mana", delta)),
-            ItemAction::Eat(delta) => Some(format!("+{} Food", delta)),
+            ItemAction::ModifyHealth(delta) => {
+                Some(format!("{}{} HP", if delta > &0 { "+" } else { "" }, delta))
+            }
+            ItemAction::ModifyMana(delta) => Some(format!(
+                "{}{} Mana",
+                if delta > &0 { "+" } else { "" },
+                delta
+            )),
+            ItemAction::Eat(delta) => Some(format!(
+                "{}{} Food",
+                if delta > &0 { "+" } else { "" },
+                delta
+            )),
             _ => None,
         }
     }
