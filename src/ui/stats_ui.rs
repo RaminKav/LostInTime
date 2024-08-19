@@ -4,7 +4,6 @@ use crate::{
     assets::Graphics,
     colors::BLACK,
     player::stats::{PlayerStats, SkillPoints},
-    GAME_HEIGHT, GAME_WIDTH,
 };
 
 use super::{Interactable, ShowInvPlayerStatsEvent, UIElement, UIState, STATS_UI_SIZE};
@@ -42,7 +41,7 @@ pub fn setup_stats_ui(
     //     .spawn(SpriteBundle {
     //         sprite: Sprite {
     //             color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-    //             custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+    //             custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 10.)),
     //             ..default()
     //         },
     //         transform: Transform {

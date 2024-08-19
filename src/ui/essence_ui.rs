@@ -12,7 +12,7 @@ use crate::{
     item::WorldObject,
     player::Player,
     proto::proto_param::ProtoParam,
-    GameParam, GAME_HEIGHT, GAME_WIDTH,
+    GameParam, ScreenResolution, GAME_HEIGHT,
 };
 
 use super::{spawn_item_stack_icon, Interactable, UIElement, UIState, ESSENCE_UI_SIZE};
@@ -48,6 +48,7 @@ pub fn setup_essence_ui(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     shop: Res<EssenceShopChoices>,
+    resolution: Res<ScreenResolution>,
 ) {
     let (size, texture, t_offset) = (
         ESSENCE_UI_SIZE,
@@ -59,7 +60,7 @@ pub fn setup_essence_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+                custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 10.)),
                 ..default()
             },
             transform: Transform {

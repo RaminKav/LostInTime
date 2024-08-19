@@ -16,7 +16,7 @@ use crate::{
         dimension::{ActiveDimension, EraManager},
         generation::WorldObjectCache,
     },
-    DoNotDespawnOnGameOver, Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
+    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, GAME_HEIGHT, ZOOM_SCALE,
 };
 
 use super::{Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
@@ -46,6 +46,7 @@ pub fn display_main_menu(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    res: Res<ScreenResolution>,
 ) {
     let mut menu = commands.spawn(SpriteBundle {
         texture: graphics.get_ui_element_texture(UIElement::MainMenu),
@@ -56,7 +57,10 @@ pub fn display_main_menu(
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(GAME_WIDTH / ZOOM_SCALE, GAME_HEIGHT / ZOOM_SCALE)),
+            custom_size: Some(Vec2::new(
+                res.game_width / ZOOM_SCALE,
+                GAME_HEIGHT / ZOOM_SCALE,
+            )),
             ..Default::default()
         },
         ..Default::default()
@@ -98,6 +102,7 @@ pub fn handle_menu_button_click_events(
             Without<DoNotDespawnOnGameOver>,
         ),
     >,
+    res: Res<ScreenResolution>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -107,7 +112,7 @@ pub fn handle_menu_button_click_events(
                     .spawn(SpriteBundle {
                         sprite: Sprite {
                             color: Color::rgba(0., 0., 0., 0.),
-                            custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 20.)),
+                            custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 20.)),
                             ..default()
                         },
                         transform: Transform {
@@ -356,6 +361,7 @@ pub fn handle_enter_options_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
 ) {
     let (size, texture, t_offset) = (
         OPTIONS_UI_SIZE,
@@ -367,7 +373,7 @@ pub fn handle_enter_options_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 10.)),
                 ..default()
             },
             transform: Transform {

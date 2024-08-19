@@ -15,7 +15,7 @@ use bevy::{
 use crate::{
     attributes::{hunger::Hunger, CurrentHealth, MaxHealth},
     player::Player,
-    GAME_HEIGHT, GAME_WIDTH,
+    ScreenResolution, GAME_HEIGHT,
 };
 const BLEND_ADD: BlendState = BlendState {
     color: BlendComponent {
@@ -72,6 +72,7 @@ pub fn setup_screen_effects(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ScreenEffectMaterial>>,
     hp: Query<(&CurrentHealth, &MaxHealth, &Hunger), (Added<CurrentHealth>, With<Player>)>,
+    res: Res<ScreenResolution>,
 ) {
     let Ok((current_hp, max_hp, hunger)) = hp.get_single() else {
         return;
@@ -91,7 +92,7 @@ pub fn setup_screen_effects(
     });
     commands.spawn((
         Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(GAME_WIDTH, GAME_HEIGHT),
+            size: Vec2::new(res.game_width, GAME_HEIGHT),
             ..Default::default()
         }))),
         hp_effect_material.clone(),
@@ -102,7 +103,7 @@ pub fn setup_screen_effects(
     ));
     commands.spawn((
         Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(GAME_WIDTH, GAME_HEIGHT),
+            size: Vec2::new(res.game_width, GAME_HEIGHT),
             ..Default::default()
         }))),
         hunger_effect_material.clone(),

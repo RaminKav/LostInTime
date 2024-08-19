@@ -16,7 +16,7 @@ use crate::{
         skills::{PlayerSkills, Skill},
         Player, TimeFragmentCurrency,
     },
-    GAME_HEIGHT, GAME_WIDTH,
+    ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
 
@@ -46,7 +46,7 @@ pub struct CurrencyIcon;
 #[derive(Default)]
 pub struct FlashExpBarEvent;
 
-pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
+pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<ScreenResolution>) {
     let hud_bar_frame = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::PlayerHUDBars),
@@ -57,7 +57,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>) {
             },
             transform: Transform {
                 translation: Vec3::new(
-                    (-GAME_WIDTH + 91.) / 2.,
+                    (-res.game_width + 91.) / 2.,
                     (GAME_HEIGHT - 15.) / 2. - 19.5,
                     5.,
                 ),
@@ -227,6 +227,7 @@ pub fn setup_currency_ui(
     currency: Query<&TimeFragmentCurrency>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
 ) {
     let time_fragments = currency.single();
     let text = commands
@@ -242,7 +243,7 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(-GAME_WIDTH / 2. + 22., GAME_HEIGHT / 2. - 43.5, 6.),
+                    translation: Vec3::new(-res.game_width / 2. + 22., GAME_HEIGHT / 2. - 43.5, 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -271,7 +272,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(-GAME_WIDTH / 2. + 18.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(-res.game_width / 2. + 18.5, -GAME_HEIGHT / 2. + 14.),
         Vec2::new(0., 0.),
         3,
     );
@@ -294,7 +295,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::Dodge),
         &asset_server,
-        Vec2::new(-GAME_WIDTH / 2. + 42.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(-res.game_width / 2. + 42.5, -GAME_HEIGHT / 2. + 14.),
         Vec2::new(0., 0.),
         3,
     );
@@ -403,6 +404,7 @@ pub fn handle_update_player_skills(
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut prev_icons_tracker: Local<PlayerSkills>,
+    res: Res<ScreenResolution>,
 ) {
     if let Ok(new_skills) = player_skills.get_single() {
         for (i, skill) in new_skills.skills.clone().iter().enumerate() {
@@ -411,7 +413,7 @@ pub fn handle_update_player_skills(
             }
             prev_icons_tracker.skills.push(skill.clone());
             let offset = Vec2::new(
-                i as f32 * 19. + (-GAME_WIDTH) / 2. + 98.,
+                i as f32 * 19. + (-res.game_width) / 2. + 98.,
                 (GAME_HEIGHT - 15.) / 2. - 12.5,
             );
             let icon = commands

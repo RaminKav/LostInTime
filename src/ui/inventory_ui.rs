@@ -6,7 +6,7 @@ use crate::{
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
     ui::{CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
-    GAME_HEIGHT, GAME_WIDTH,
+    ScreenResolution, GAME_HEIGHT,
 };
 
 use super::{
@@ -93,6 +93,7 @@ pub fn setup_inv_ui(
     mut inv_state: ResMut<InventoryState>,
     cur_inv_state: Res<State<UIState>>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    resolution: Res<ScreenResolution>,
 ) {
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory => (
@@ -122,7 +123,7 @@ pub fn setup_inv_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(GAME_WIDTH, GAME_HEIGHT)),
+                custom_size: Some(Vec2::new(resolution.game_width, GAME_HEIGHT)),
                 ..default()
             },
             transform: Transform {

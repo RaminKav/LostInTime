@@ -6,7 +6,7 @@ use crate::item::WorldObject;
 use crate::world::dimension::SpawnDimension;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE};
-use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, GAME_WIDTH, MINIMAP};
+use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, MINIMAP};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -243,7 +243,7 @@ fn setup_mini_map(
                     ..Default::default()
                 },
                 transform: Transform::from_translation(Vec3::new(
-                    (GAME_WIDTH - ((num_tiles + 1) * 2) as f32) / 2. - 2.,
+                    (game.resolution.game_width - ((num_tiles + 1) * 2) as f32) / 2. - 2.,
                     (GAME_HEIGHT - ((num_tiles + 1) * 2 + 1) as f32) / 2. - 2.,
                     1.,
                 )),

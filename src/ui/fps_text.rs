@@ -4,12 +4,16 @@ use bevy::{
     render::view::RenderLayers,
 };
 
-use crate::{GAME_HEIGHT, GAME_WIDTH};
+use crate::{ScreenResolution, GAME_HEIGHT};
 
 #[derive(Component)]
 pub struct FPSText;
 
-pub fn spawn_fps_text(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn spawn_fps_text(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    resolution: Res<ScreenResolution>,
+) {
     // DEBUG FPS
     commands.spawn((
         Text2dBundle {
@@ -28,7 +32,11 @@ pub fn spawn_fps_text(mut commands: Commands, asset_server: Res<AssetServer>) {
             )
             .with_alignment(TextAlignment::Left),
             transform: Transform {
-                translation: Vec3::new(GAME_WIDTH / 2. - 32.5, -GAME_HEIGHT / 2. + 5., 1.),
+                translation: Vec3::new(
+                    resolution.game_width / 2. - 32.5,
+                    -GAME_HEIGHT / 2. + 5.,
+                    1.,
+                ),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

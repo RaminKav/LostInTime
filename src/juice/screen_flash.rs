@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 
-use crate::{DEBUG, GAME_HEIGHT, GAME_WIDTH};
+use crate::{ScreenResolution, DEBUG, GAME_HEIGHT};
 
 #[derive(Resource)]
 pub struct FlashEffect {
@@ -16,6 +16,7 @@ pub fn screen_flash_effect(
     mut flash_state: ResMut<FlashEffect>,
     mut existing_flash: Query<(Entity, &mut Sprite), With<ScreenFlash>>,
     time: Res<Time>,
+    resolution: Res<ScreenResolution>,
 ) {
     if let Ok((e, mut flash)) = existing_flash.get_single_mut() {
         if flash_state.timer.finished() {
@@ -29,7 +30,7 @@ pub fn screen_flash_effect(
             .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: flash_state.color,
-                    custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+                    custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 10.)),
                     ..default()
                 },
                 transform: Transform {

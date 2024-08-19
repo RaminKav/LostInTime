@@ -104,7 +104,7 @@ pub const HEIGHT: f32 = 1080.;
 pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
 pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
-pub const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO;
+const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO;
 lazy_static! {
     pub static ref DEBUG: bool = env::var("DEBUG").is_ok();
 }
@@ -249,6 +249,7 @@ pub struct DoNotDespawnOnGameOver;
 pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
+    pub resolution: Res<'w, ScreenResolution>,
     pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub pathfinding_cache: ResMut<'w, PathfindingCache>,
@@ -524,6 +525,8 @@ pub struct UITextureMaterial {
 pub struct ScreenResolution {
     pub width: f32,
     pub height: f32,
+    pub game_width: f32,
+    pub game_height: f32,
     pub aspect_ratio: f32,
 }
 fn setup(
@@ -537,11 +540,15 @@ fn setup(
     let mut resolution = ScreenResolution {
         width: WIDTH,
         height: HEIGHT,
+        game_width: GAME_WIDTH,
+        game_height: GAME_HEIGHT,
         aspect_ratio: ASPECT_RATIO,
     };
     if let Ok(window) = window_query.get_single() {
         resolution = ScreenResolution {
             width: window.width(),
+            game_width: GAME_HEIGHT * window.width() / window.height(),
+            game_height: GAME_HEIGHT,
             height: window.height(),
             aspect_ratio: window.width() / window.height(),
         };

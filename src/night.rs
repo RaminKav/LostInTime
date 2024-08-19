@@ -6,7 +6,7 @@ use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
     colors::{overwrite_alpha, NIGHT},
     world::dimension::dim_spawned,
-    GameState, GAME_HEIGHT, GAME_WIDTH,
+    GameState, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -51,12 +51,16 @@ impl Plugin for NightPlugin {
     }
 }
 
-pub fn spawn_night(mut commands: Commands, night_tracker: Res<NightTracker>) {
+pub fn spawn_night(
+    mut commands: Commands,
+    night_tracker: Res<NightTracker>,
+    res: Res<ScreenResolution>,
+) {
     commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: overwrite_alpha(NIGHT, night_tracker.get_alpha()),
-                custom_size: Some(Vec2::new(GAME_WIDTH, GAME_HEIGHT)),
+                custom_size: Some(Vec2::new(res.game_width, GAME_HEIGHT)),
                 ..default()
             },
             transform: Transform {

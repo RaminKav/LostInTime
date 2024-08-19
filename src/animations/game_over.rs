@@ -12,7 +12,7 @@ use crate::{
     player::Player,
     ui::{damage_numbers::spawn_text, Interactable, MenuButton, UIElement, UIState},
     world::{dimension::ActiveDimension, y_sort::YSort},
-    DoNotDespawnOnGameOver, GameState, RawPosition, GAME_HEIGHT, GAME_WIDTH,
+    DoNotDespawnOnGameOver, GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -35,6 +35,7 @@ pub fn handle_game_over_fadeout(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     asset_server: Res<AssetServer>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    resolution: Res<ScreenResolution>,
 ) {
     if !game_over_events.is_empty() {
         let (player_e, dir, mut player_t, mut sprite, texture_atlas_handle) = player.single_mut();
@@ -44,7 +45,7 @@ pub fn handle_game_over_fadeout(
             .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgba(0., 0., 0., 0.),
-                    custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 20.)),
+                    custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.)),
                     ..default()
                 },
                 transform: Transform {

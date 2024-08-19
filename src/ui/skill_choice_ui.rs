@@ -4,7 +4,7 @@ use crate::{
     assets::Graphics,
     colors::{BLACK, WHITE},
     player::skills::{SkillChoiceQueue, SkillChoiceState},
-    GAME_HEIGHT, GAME_WIDTH,
+    ScreenResolution, GAME_HEIGHT,
 };
 
 use super::{damage_numbers::spawn_text, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE};
@@ -26,6 +26,7 @@ pub fn setup_skill_choice_ui(
     asset_server: Res<AssetServer>,
     choices_queue: Res<SkillChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    res: Res<ScreenResolution>,
 ) {
     if choices_queue.queue.is_empty() {
         next_ui_state.set(UIState::Closed);
@@ -53,7 +54,7 @@ pub fn setup_skill_choice_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(GAME_WIDTH + 10., GAME_HEIGHT + 10.)),
+                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 10.)),
                 ..default()
             },
             transform: Transform {
