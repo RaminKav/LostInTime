@@ -55,6 +55,7 @@ pub fn handle_display_new_goal(
         &ItemStack::crate_icon_stack(curr_goal_obj),
         &asset_server,
         Vec2::ZERO,
+        Vec2::new(0., 0.),
         3,
     );
 
@@ -80,6 +81,7 @@ pub fn handle_display_new_goal(
             &ItemStack::crate_icon_stack(ingredient.clone()),
             &asset_server,
             Vec2::ZERO,
+            Vec2::new(0., 0.),
             3,
         );
         let slot_entity = commands

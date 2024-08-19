@@ -80,8 +80,8 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use ui::{
-    display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
-    InventorySlotState, UIPlugin,
+    display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
+    spawn_menu_text_buttons, InventorySlotState, UIPlugin,
 };
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
@@ -186,7 +186,12 @@ fn main() {
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
         .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
-        .add_system(handle_menu_button_click_events.in_set(OnUpdate(GameState::MainMenu)))
+        .add_system(
+            spawn_info_modal
+                .in_schedule(OnEnter(GameState::MainMenu))
+                .run_if(run_once()),
+        )
+        .add_system(handle_menu_button_click_events)
         .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));
 
     if *COLLIDERS {

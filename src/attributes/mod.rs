@@ -13,7 +13,7 @@ use crate::{
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     client::GameOverEvent,
-    colors::{GREY, LIGHT_BLUE, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED, ORANGE},
+    colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType},
     player::{
@@ -283,7 +283,7 @@ impl ItemAttributes {
         if self.crit_chance.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Crit Chance",
+                    "{}{}% Crit",
                     if is_positive(self.crit_chance.value) {
                         "+"
                     } else {
@@ -316,7 +316,7 @@ impl ItemAttributes {
         if self.crit_damage.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Crit Damage",
+                    "{}{}% Crit DMG",
                     if is_positive(self.crit_damage.value) {
                         "+"
                     } else {
@@ -970,7 +970,7 @@ impl ItemRarity {
     pub fn get_color(&self) -> Color {
         match self {
             ItemRarity::Common => LIGHT_GREY,
-            ItemRarity::Uncommon => LIGHT_GREEN,
+            ItemRarity::Uncommon => UNCOMMON_GREEN,
             ItemRarity::Rare => LIGHT_BLUE,
             ItemRarity::Legendary => LIGHT_RED,
         }
@@ -1183,7 +1183,10 @@ fn handle_player_item_attribute_change_events(
             None
         };
         if ui_state.0.is_inv_open() {
-            stats_event.send(ShowInvPlayerStatsEvent { stat });
+            stats_event.send(ShowInvPlayerStatsEvent {
+                stat,
+                ignore_timer: true,
+            });
         }
     }
 }
@@ -1346,7 +1349,7 @@ pub fn add_item_glows(
                 .spawn(SpriteBundle {
                     texture: graphics.get_item_glow(glow.clone()),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(16., 16.)),
+                        custom_size: Some(Vec2::new(18., 18.)),
                         ..Default::default()
                     },
                     transform: Transform {

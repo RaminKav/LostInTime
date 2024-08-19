@@ -14,6 +14,7 @@ pub const LIGHT_BLUE: Color = Color::rgba(98. / 255., 153. / 255., 178. / 255., 
 pub const LIGHT_BROWN: Color = Color::rgba(168. / 255., 112. / 255., 71. / 255., 1.);
 pub const UI_GRASS_GREEN: Color = Color::rgba(154. / 255., 169. / 255., 76. / 255., 1.);
 pub const GREY: Color = Color::rgba(123. / 255., 119. / 255., 101. / 255., 1.);
+pub const UNCOMMON_GREEN: Color = Color::rgba(51. / 255., 116. / 255., 60. / 255., 1.);
 pub const DARK_GREEN: Color = Color::rgba(31. / 255., 85. / 255., 49. / 255., 1.);
 pub const _BLACK_GREEN: Color = Color::rgba(45. / 255., 61. / 255., 56. / 255., 1.);
 pub const DARK_BROWN: Color = Color::rgba(101. / 255., 58. / 255., 12. / 255., 1.);

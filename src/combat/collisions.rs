@@ -293,7 +293,7 @@ pub fn check_item_drop_collisions(
                 currency_event.send(ModifyTimeFragmentsEvent {
                     delta: item_stack.count as i32,
                 });
-                commands.entity(e2).despawn();
+                commands.entity(e2).despawn_recursive();
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });

@@ -1,14 +1,15 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
-use rand::seq::IteratorRandom;
+use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     assets::{Graphics, SpriteAnchor},
     custom_commands::CommandsExt,
-    item::object_actions::ObjectAction,
+    enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
+    item::{object_actions::ObjectAction, LootTable},
     proto::proto_param::ProtoParam,
-    world::world_helpers::world_pos_to_tile_pos,
+    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     GameParam,
 };
 
@@ -25,7 +26,54 @@ pub struct CombatShrine {
 }
 
 pub struct CombatShrineMobDeathEvent(pub Entity);
-
+pub fn handle_combat_shrine_activate_animation(
+    mut shrines: Query<(
+        Entity,
+        &GlobalTransform,
+        &mut CombatShrine,
+        &mut AsepriteAnimation,
+    )>,
+    mut proto_param: ProtoParam,
+    mut commands: Commands,
+    game: GameParam,
+) {
+    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
+        if anim.current_frame() == 55 {
+            *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
+            let mut num_to_spawn = shrine.num_mobs_left.clone();
+            let possible_spawns = [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
+            let mut fallback_count = 0;
+            let mut rng = rand::thread_rng();
+            while num_to_spawn > 0 {
+                let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
+                    * Vec2::splat(TILE_SIZE.x);
+                let spawn_pos = t.translation().truncate() + offset;
+                let choice_mob = rng.gen_range(0..possible_spawns.len());
+                if can_spawn_mob_here(spawn_pos, &game, &proto_param, fallback_count >= 10) {
+                    if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+                        possible_spawns[choice_mob].clone(),
+                        &proto_param.prototypes,
+                        spawn_pos,
+                    ) {
+                        fallback_count = 0;
+                        num_to_spawn -= 1;
+                        //last mob is elite
+                        if num_to_spawn == 0 {
+                            commands.entity(mob).insert(EliteMob);
+                        }
+                        proto_param
+                            .proto_commands
+                            .commands()
+                            .entity(mob)
+                            .insert(CombatAlignment::Hostile)
+                            .insert(LootTable::default())
+                            .insert(CombatShrineMob { parent_shrine: e });
+                    }
+                }
+            }
+        }
+    }
+}
 pub fn handle_shrine_rewards(
     mut shrine_mob_event: EventReader<CombatShrineMobDeathEvent>,
     mut shrines: Query<(
@@ -41,9 +89,6 @@ pub fn handle_shrine_rewards(
 ) {
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
-            if anim.current_frame() == 55 {
-                *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-            }
             shrine.num_mobs_left -= 1;
             let drop_list = [
                 WorldObject::WoodSword,
@@ -68,7 +113,7 @@ pub fn handle_shrine_rewards(
                         .unwrap()
                         .clone(),
                     &proto,
-                    t.translation().truncate() + Vec2::new(0., -18.), // offset so it doesn't spawn on the shrine
+                    t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
                     1,
                     Some(1),
                 );

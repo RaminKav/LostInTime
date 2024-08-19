@@ -1,7 +1,8 @@
 use super::chunk::{GenerateObjectsEvent, TileSpriteData};
-use super::dimension::{ActiveDimension, GenerationSeed, SpawnDimension};
+use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
+use super::portal::{Portal, TimePortal};
 use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, ChunkWallCache};
 use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
@@ -14,11 +15,12 @@ use crate::item::{handle_break_object, WorldObject};
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::loot_chests::get_random_loot_chest_type;
+use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
 
 use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_aseprite::{aseprite, AsepriteBundle};
+use bevy_aseprite::AsepriteBundle;
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
@@ -56,10 +58,7 @@ const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
     (WorldObject::DeadSapling, 1),
     (WorldObject::BrownMushroom, 1),
 ];
-aseprite!(pub Portal, "textures/portal/portal.ase");
 
-#[derive(Component)]
-pub struct TimePortal;
 #[derive(Resource, Debug, Default, Clone)]
 pub struct WorldObjectCache {
     pub objects: HashMap<TileMapPosition, WorldObject>,
@@ -343,6 +342,7 @@ impl GenerationPlugin {
             (Without<WorldObject>, Without<Mob>, Without<Player>),
         >,
         mut done_event: EventWriter<DoneGeneratingEvent>,
+        mut schematic_spawn_event: EventWriter<SchematicSpawnEvent>,
     ) {
         if *NO_GEN {
             return;
@@ -373,8 +373,9 @@ impl GenerationPlugin {
 
                 // generate all objs
                 let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
-                    Box::new(stone.into_iter().chain(trees.into_iter()));
-                let mut occupied_tiles: HashMap<TileMapPosition, WorldObject> = HashMap::new();
+                    Box::new(stone.clone().into_iter().chain(trees.clone().into_iter()));
+                let mut occupied_tiles: HashMap<TileMapPosition, WorldObject> =
+                    stone.into_iter().chain(trees.into_iter()).collect();
 
                 for (obj, frequency) in game
                     .world_generation_params
@@ -723,6 +724,9 @@ impl GenerationPlugin {
                 } else {
                     game.set_dungeon_chunk_generated(chunk_pos);
                 }
+
+                // send schematic event to spawn structures
+                schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = if dungeon_check.is_ok() {
                     game.get_objects_from_dungeon_cache(chunk_pos)

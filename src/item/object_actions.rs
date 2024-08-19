@@ -223,7 +223,7 @@ impl ObjectAction {
                 let dir = Vec2::new(1., 1.);
                 for e in item_action_param.game_camera.iter_mut() {
                     commands.entity(e).insert(ShakeEffect {
-                        timer: Timer::from_seconds(3.5, TimerMode::Once),
+                        timer: Timer::from_seconds(4., TimerMode::Once),
                         speed,
                         seed,
                         max_mag,
@@ -232,8 +232,8 @@ impl ObjectAction {
                     });
                 }
                 let mut rng = rand::thread_rng();
-                let num_days = 3 + item_action_param.night_tracker.days;
-                let mut num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
+                let num_days = 2 + item_action_param.night_tracker.days;
+                let num_spawns_left = rng.gen_range(num_days..=(num_days + 2)) as usize;
                 commands
                     .entity(e)
                     .insert(CombatShrine {
@@ -242,40 +242,6 @@ impl ObjectAction {
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
-                let possible_spawns =
-                    [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
-                let mut fallback_count = 0;
-                while num_spawns_left > 0 {
-                    let offset = Vec2::new(rng.gen_range(-3. ..=3.), rng.gen_range(-3. ..=3.))
-                        * Vec2::splat(TILE_SIZE.x);
-                    let choice_mob = rng.gen_range(0..possible_spawns.len());
-                    if can_spawn_mob_here(
-                        tile_pos_to_world_pos(obj_pos, true) + offset,
-                        game,
-                        proto_param,
-                        fallback_count >= 10,
-                    ) {
-                        if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                            possible_spawns[choice_mob].clone(),
-                            &proto_param.prototypes,
-                            tile_pos_to_world_pos(obj_pos, true) + offset,
-                        ) {
-                            fallback_count = 0;
-                            num_spawns_left -= 1;
-                            //last mob is elite
-                            if num_spawns_left == 0 {
-                                commands.entity(mob).insert(EliteMob);
-                            }
-                            proto_param
-                                .proto_commands
-                                .commands()
-                                .entity(mob)
-                                .insert(CombatAlignment::Hostile)
-                                .insert(LootTable::default())
-                                .insert(CombatShrineMob { parent_shrine: e });
-                        }
-                    }
-                }
             }
             ObjectAction::GambleShrine => {
                 // Screen Shake

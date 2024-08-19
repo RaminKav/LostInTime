@@ -7,7 +7,6 @@
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: LargePotion,
-        rarity: Uncommon,
         metadata: (
             name: "Large Potion ", 
             desc: ["The good stuff...", "No strings", "attached."]

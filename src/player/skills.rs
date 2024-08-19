@@ -90,7 +90,7 @@ impl Skill {
             Skill::CritChance => "Keen Eyes".to_string(),
             Skill::CritDamage => "Powerful Blows".to_string(),
             Skill::Health => "Healthly".to_string(),
-            Skill::Speed => "Nible Feet".to_string(),
+            Skill::Speed => "Nimble Feet".to_string(),
             Skill::Thorns => "Forest Scales".to_string(),
             Skill::Lifesteal => "Drain Blood".to_string(),
             Skill::AttackSpeed => "Swift Blows".to_string(),

@@ -2,9 +2,12 @@
   "Enemies get tougher every night. If you take too long, they will overpower you!",
   "Stars represent the overall quality of the stat lines on equipment.",
   "If your hunger bar is empty, you will move slower and lose health over time.",
-  "Press Shift while inspecting an item to view the range of possible values for each stat line.",
+  "Press Shift while inspecting an item to view the range\n\n     of possible values for each stat line.",
   "You can drop an item by dragging it out of your inventory.",
   "The forest is dense. Craft an Axe as soon as you can.",
   "Elite mobs are much tougher, but they give more exp and drop more loot.",
-  "At night, enemies will hunt you down. Be prepared!"
+  "At night, enemies will hunt you down. Be prepared!",
+  "Build a Crafting table as soon as possible to unlock important recipes.",
+  "Item colors correspond to rarity:\n\n     Common (Grey), Uncommon (green), Rare (blue), Legendary (Red).",
+  "Press Shift + Left Click to quickly move items\n\n     between your hotbar, inventory, and chests."
 ]

@@ -74,6 +74,7 @@ pub fn handle_enemy_health_visibility(
     >,
     mut healthbars: Query<&mut Visibility, Without<Text>>,
 ) {
+    return;
     for (children, max_health, current_health) in changed_mobs.iter_mut() {
         for child in children.iter() {
             let Ok(mut v) = healthbars.get_mut(*child) else {
@@ -97,7 +98,7 @@ pub fn add_ui_icon_for_elite_mobs(
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::EliteStar),
                 transform: Transform {
-                    translation: Vec3::new(0., 13., 0.),
+                    translation: Vec3::new(0., 6., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },

@@ -1,28 +1,36 @@
-use std::process::exit;
+use std::{fs, process::exit};
 
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
     ai::pathfinding::PathfindingCache,
-    assets::Graphics,
+    assets::{asset_helpers::spawn_sprite, Graphics},
     audio::UpdateBGMTrackEvent,
-    colors::{overwrite_alpha, BLACK, YELLOW_2},
+    colors::{overwrite_alpha, BLACK, WHITE, YELLOW_2},
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
     player::skills::SkillChoiceQueue,
-    world::dimension::EraManager,
-    Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
+    ui::{ChestContainer, FurnaceContainer},
+    world::{
+        dimension::{ActiveDimension, EraManager},
+        generation::WorldObjectCache,
+    },
+    DoNotDespawnOnGameOver, Game, GameState, GAME_HEIGHT, GAME_WIDTH, ZOOM_SCALE,
 };
 
 use super::{Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
     Start,
     Options,
     Quit,
+    InfoOK,
+    GameOverOK,
 }
+#[derive(Component)]
+pub struct InfoModal;
 
 pub struct MenuButtonClickEvent {
     pub button: MenuButton,
@@ -82,6 +90,14 @@ pub fn handle_menu_button_click_events(
     mut event_reader: EventReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
     mut commands: Commands,
+    info_modal: Query<Entity, With<InfoModal>>,
+    everything: Query<
+        Entity,
+        (
+            Or<(With<Visibility>, With<ActiveDimension>)>,
+            Without<DoNotDespawnOnGameOver>,
+        ),
+    >,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -122,6 +138,28 @@ pub fn handle_menu_button_click_events(
             MenuButton::Quit => {
                 exit(0);
             }
+            MenuButton::InfoOK => {
+                for e in info_modal.iter() {
+                    commands.entity(e).despawn_recursive();
+                }
+            }
+            MenuButton::GameOverOK => {
+                println!("Despawning everything, Sending to main menu");
+                for e in everything.iter() {
+                    commands.entity(e).despawn();
+                }
+                let _ = fs::remove_file("save_state.json");
+                next_state.0 = Some(GameState::MainMenu);
+                //cleanup resources with Entity refs
+                commands.remove_resource::<ChestContainer>();
+                commands.remove_resource::<FurnaceContainer>();
+                commands.remove_resource::<Game>();
+                commands.remove_resource::<NightTracker>();
+                commands.remove_resource::<ContainerRegistry>();
+                commands.remove_resource::<CraftingTracker>();
+                commands.remove_resource::<EraManager>();
+                commands.remove_resource::<WorldObjectCache>();
+            }
         }
     }
 }
@@ -155,35 +193,43 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ..default()
         },
     ));
+    let discord_icon = spawn_sprite(
+        &mut commands,
+        Vec3::new(-40., 0.5, 1.),
+        asset_server.load("ui/icons/DiscordIcon.png"),
+        3,
+    );
 
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Discord",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Discord",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: YELLOW_2,
+                    },
+                ),
+                // .with_alignment(TextAlignment::Right),
+                transform: Transform {
+                    translation: Vec3::new(-8., -49.5, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
                 },
-            ),
-            // .with_alignment(TextAlignment::Right),
-            transform: Transform {
-                translation: Vec3::new(-8., -49.5, 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
+                ..default()
             },
-            ..default()
-        },
-        Name::new("MENU TEXT"),
-        RenderLayers::from_layers(&[3]),
-        Interactable::default(),
-        UIElement::MenuButton,
-        MenuButton::Options,
-        Sprite {
-            custom_size: Some(Vec2::new(58., 11.)),
-            ..default()
-        },
-    ));
+            Name::new("MENU TEXT"),
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            UIElement::MenuButton,
+            MenuButton::Options,
+            Sprite {
+                custom_size: Some(Vec2::new(58., 11.)),
+                ..default()
+            },
+        ))
+        .add_child(discord_icon);
 
     commands.spawn((
         Text2dBundle {
@@ -213,6 +259,94 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
             ..default()
         },
     ));
+}
+
+pub fn spawn_info_modal(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
+) {
+    // OK BUTTON
+    let ok_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "OK!",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: BLACK,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., -64.5, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("INFO OK TEXT"),
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            UIElement::MenuButton,
+            MenuButton::InfoOK,
+            Sprite {
+                custom_size: Some(Vec2::new(20., 11.)),
+                ..default()
+            },
+        ))
+        .id();
+    // OK BUTTON
+    let info_texts = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_sections([TextSection::new(
+                    "                Note \n\n",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 10.0,
+                        color: WHITE,
+                    },
+                ),
+                TextSection::new(
+                    "This is an alpha release. It is also the first time\n\nanyone's playtested this game! As such, many features\n\nmay be incomplete, unbalanced, or potentially buggy.\n\nAdditionally, some artwork and UI are placeholders.\n\n\nJoin the discord channel to follow along with the\n\nproject. If you encounter any issues or bugs, or have\n\nany feedback, please let me know.\n\n\nThank you for play testing my game.\n\nI hope you enjoy it!\n\n\n                                                                 - Fleam",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: WHITE,
+                    },
+                )]),
+                transform: Transform {
+                    translation: Vec3::new(0., 7.5, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+        ))
+        .id();
+
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::InfoModal),
+            transform: Transform {
+                translation: Vec3::new(0.5, 0.5, 10.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(251., 161.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(UIElement::InfoModal)
+        .insert(InfoModal)
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("Info Modal"))
+        .add_child(ok_text)
+        .add_child(info_texts);
 }
 
 #[derive(Component)]

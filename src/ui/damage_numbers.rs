@@ -165,6 +165,7 @@ pub fn spawn_screen_locked_icon(
         &ItemStack::crate_icon_stack(obj),
         asset_server,
         Vec2::ZERO,
+        Vec2::new(0., 0.),
         0,
     );
     commands

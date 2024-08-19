@@ -44,7 +44,7 @@ pub fn add_guide_to_unique_objs(
             WorldObject::CombatShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
                     key: Some("F".to_string()),
-                    text: Some("Interact".to_string()),
+                    text: Some("Fight".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });
@@ -52,7 +52,7 @@ pub fn add_guide_to_unique_objs(
             WorldObject::GambleShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
                     key: Some("F".to_string()),
-                    text: Some("Interact".to_string()),
+                    text: Some("Pay Offering".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
                 });
@@ -91,12 +91,12 @@ pub fn spawn_shrine_interact_key_guide(
                             .spawn(SpriteBundle {
                                 texture: asset_server.load(format!("textures/{}Key.png", key)),
                                 transform: Transform::from_translation(Vec3::new(
-                                    -29.5 + x_offset,
-                                    0.,
+                                    -29. + x_offset,
+                                    0.5,
                                     1.,
                                 )),
                                 sprite: Sprite {
-                                    custom_size: Some(Vec2::new(11., 11.)),
+                                    custom_size: Some(Vec2::new(10., 10.)),
                                     ..Default::default()
                                 },
                                 ..Default::default()
@@ -135,6 +135,7 @@ pub fn spawn_shrine_interact_key_guide(
                         &icon_stack,
                         &asset_server,
                         Vec2::ZERO,
+                        Vec2::new(0.0, 0.),
                         0,
                     );
                     Some(

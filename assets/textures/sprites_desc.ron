@@ -580,6 +580,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Dodge: WorldObjectData(
+            texture_pos: (5., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TooltipInspect: WorldObjectData(
+            texture_pos: (6., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MetalBar: WorldObjectData(
             texture_pos: (14., 3.),
             size: (16., 16.),

@@ -206,7 +206,7 @@ impl Plugin for UIPlugin {
             .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
-            .add_system(handle_cursor_main_menu_buttons.in_set(OnUpdate(GameState::MainMenu)))
+            .add_system(handle_cursor_main_menu_buttons)
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
