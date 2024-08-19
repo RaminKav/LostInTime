@@ -57,11 +57,14 @@ pub struct SchematicToggle {
     enabled: bool,
     chest_type: LootChestType,
 }
+
+pub struct SchematicSpawnEvent(pub IVec2);
 pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SchematicToggle::default())
             .register_type::<SchematicToggle>()
+            .add_event::<SchematicSpawnEvent>()
             // .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
             .add_systems(
                 (
@@ -73,7 +76,7 @@ impl Plugin for SchematicPlugin {
                     mark_new_world_obj_as_schematic,
                     attempt_to_spawn_schematic_in_chunk,
                     give_chunks_schematic_spawners
-                        .before(GenerationPlugin::generate_and_cache_objects),
+                        .after(GenerationPlugin::generate_and_cache_objects),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -173,7 +176,7 @@ fn load_schematic(
         );
         commands
             .spawn(DynamicSceneBundle {
-                scene: asset_server.load("scenes/GambleShrine.scn.ron"),
+                scene: asset_server.load("scenes/CombatShrine.scn.ron"),
                 transform: Transform::from_translation(game.player().position),
                 ..default()
             })
@@ -252,7 +255,10 @@ pub fn handle_new_scene_entities_parent_chunk(
                     {
                         commands.entity(existing_obj).despawn_recursive();
                     }
-                    let clear_tiles = get_radial_tile_positions(tile_pos, 4);
+                    let clear_tiles = get_radial_tile_positions(
+                        world_pos_to_tile_pos(pos + Vec2::new(0., -48.)),
+                        4,
+                    );
                     for clear_tile_pos in clear_tiles.iter() {
                         if let Some((existing_obj, _)) =
                             game.get_obj_entity_at_tile(*clear_tile_pos, &proto_param)

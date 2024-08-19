@@ -4,6 +4,7 @@ pub mod dungeon;
 mod dungeon_generation;
 pub mod generation;
 mod noise_helpers;
+pub mod portal;
 pub mod tile;
 pub mod wall_auto_tile;
 pub mod world_helpers;
@@ -15,6 +16,7 @@ use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 
 use bevy::{prelude::*, utils::HashMap};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use portal::handle_player_near_portal;
 use serde::{Deserialize, Serialize};
 use world_helpers::tile_pos_to_world_pos;
 
@@ -149,7 +151,8 @@ impl Plugin for WorldPlugin {
             // .add_plugin(ResourceInspectorPlugin::<Bias>::default())
             .init_resource::<NumSteps>()
             .init_resource::<GridSize>()
-            .init_resource::<Bias>();
+            .init_resource::<Bias>()
+            .add_system(handle_player_near_portal);
         // .register_type::<NumSteps>()
         // .register_type::<GridSize>()
         // .register_type::<Bias>();

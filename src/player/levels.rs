@@ -113,9 +113,9 @@ pub fn spawn_particles_when_leveling(
         commands
             .spawn(SpriteBundle {
                 texture: asset_server.load("textures/BKey.png"),
-                transform: Transform::from_translation(Vec3::new(0., 15., 1.)),
+                transform: Transform::from_translation(Vec3::new(0.5, 15.5, 1.)),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(11., 11.)),
+                    custom_size: Some(Vec2::new(10., 10.)),
                     ..Default::default()
                 },
                 visibility: Visibility::Inherited,

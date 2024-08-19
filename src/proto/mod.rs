@@ -160,6 +160,8 @@ impl ProtoPlugin {
         //TODO: automate this
         prototypes.load("proto/item_drop.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
+        prototypes.load("proto/dodge.prototype.ron");
+        prototypes.load("proto/tooltipinspect.prototype.ron");
         prototypes.load("proto/smallgreentree.prototype.ron");
         prototypes.load("proto/inventorybag.prototype.ron");
         prototypes.load("proto/redtree.prototype.ron");

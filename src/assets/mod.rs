@@ -10,8 +10,9 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::attributes::ItemGlow;
+use crate::attributes::{add_item_glows, ItemGlow};
 use crate::enemy::Mob;
+use crate::inventory::ItemStack;
 use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::{
@@ -434,6 +435,7 @@ impl GameAssetsPlugin {
                 &mut TextureAtlasSprite,
                 &Handle<TextureAtlas>,
                 &WorldObject,
+                Option<&ItemStack>,
             ),
             (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
         >,
@@ -443,7 +445,9 @@ impl GameAssetsPlugin {
     ) {
         let item_map = &&graphics.spritesheet_map;
         if let Some(item_map) = item_map {
-            for (e, mut sprite, spritesheet, world_object) in to_update_query.iter_mut() {
+            for (e, mut sprite, spritesheet, world_object, maybe_stack) in
+                to_update_query.iter_mut()
+            {
                 if let Some(texture_atlas) = texture_atlases.get(&spritesheet) {
                     if texture_atlas.textures.len() < 100 {
                         continue;
@@ -461,6 +465,9 @@ impl GameAssetsPlugin {
                     .entity(e)
                     .insert(graphics.texture_atlas.as_ref().unwrap().clone());
                 sprite.clone_from(new_sprite);
+                if let Some(stack) = maybe_stack {
+                    add_item_glows(&mut commands, &graphics, e, stack.rarity.clone());
+                }
             }
         }
     }

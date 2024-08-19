@@ -240,9 +240,9 @@ pub fn setup_currency_ui(
                         color: BLACK,
                     },
                 ),
-                text_anchor: Anchor::CenterLeft,
+                text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(-GAME_WIDTH / 2. + 20., GAME_HEIGHT / 2. - 42.5, 6.),
+                    translation: Vec3::new(-GAME_WIDTH / 2. + 22., GAME_HEIGHT / 2. - 43.5, 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -259,30 +259,57 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
-        Vec2::new(-7., 1.),
+        Vec2::new(-10., 1.),
+        Vec2::new(0., 0.),
         3,
     );
     commands.entity(stack).insert(CurrencyIcon).set_parent(text);
+
+    // INVENTORY ICON
     let bag_icon = spawn_item_stack_icon(
         &mut commands,
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(-GAME_WIDTH / 2. + 18., -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(-GAME_WIDTH / 2. + 18.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(0., 0.),
         3,
     );
     commands
         .spawn(SpriteBundle {
-            texture: asset_server.load("textures/IKey.png"),
-            transform: Transform::from_translation(Vec3::new(-0.5, 13.5, 1.)),
+            texture: asset_server.load("textures/EKey.png"),
+            transform: Transform::from_translation(Vec3::new(-0.5, 13., 1.)),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(11., 11.)),
+                custom_size: Some(Vec2::new(10., 10.)),
                 ..Default::default()
             },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(bag_icon);
+
+    // DODGE ICON
+    let dodge_icon = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::Dodge),
+        &asset_server,
+        Vec2::new(-GAME_WIDTH / 2. + 42.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands
+        .spawn(SpriteBundle {
+            texture: asset_server.load("textures/SpaceKey.png"),
+            transform: Transform::from_translation(Vec3::new(-0.5, 13.0, 1.)),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(30., 10.)),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(dodge_icon);
 }
 pub fn update_currency_text(
     mut currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,

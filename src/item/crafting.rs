@@ -328,6 +328,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
             &ItemStack::crate_icon_stack(text_timer.queue.pop().expect("queue is not empty")),
             &asset_server,
             Vec2::new(30., 2.),
+            Vec2::new(0., 0.),
             0,
         );
         commands.entity(icon).set_parent(shadow);

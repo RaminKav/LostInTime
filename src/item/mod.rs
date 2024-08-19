@@ -33,7 +33,8 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
-    add_shrine_visuals_on_spawn, handle_shrine_rewards, CombatShrineMobDeathEvent,
+    add_shrine_visuals_on_spawn, handle_combat_shrine_activate_animation, handle_shrine_rewards,
+    CombatShrineMobDeathEvent,
 };
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
 use rand::Rng;
@@ -410,6 +411,8 @@ pub enum WorldObject {
     TimeGate,
     TimeFragment,
     InventoryBag,
+    Dodge,
+    TooltipInspect,
     TimePortal,
 }
 
@@ -700,6 +703,7 @@ impl Plugin for ItemsPlugin {
                     add_gamble_visuals_on_spawn,
                     handle_frail_stack_ticks,
                     handle_slow_stack_ticks,
+                    handle_combat_shrine_activate_animation,
                     handle_on_hit_upgrades.after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),

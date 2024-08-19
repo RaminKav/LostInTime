@@ -13,7 +13,7 @@
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),
   "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -30., x2: 0., y2: -22., r: 5.),
-  "survival_rogue_like::attributes::MaxHealth": (35),
+  "survival_rogue_like::attributes::MaxHealth": (25),
   "survival_rogue_like::world::y_sort::YSort": (0.),
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::player::levels::ExperienceReward": (15),

@@ -1,4 +1,4 @@
-use super::SchematicType;
+use super::{SchematicSpawnEvent, SchematicType};
 use crate::{
     world::{
         chunk::{Chunk, GenerateObjectsEvent},
@@ -44,13 +44,10 @@ pub fn attempt_to_spawn_schematic_in_chunk(
 pub fn give_chunks_schematic_spawners(
     mut commands: Commands,
     game: GameParam,
-    mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
+    mut spawn_event: EventReader<SchematicSpawnEvent>,
 ) {
-    for chunk in chunk_spawn_event.iter() {
-        if let Some(e) = game.get_chunk_entity(chunk.chunk_pos) {
-            if game.is_chunk_generated(chunk.chunk_pos) {
-                continue;
-            }
+    for chunk in spawn_event.iter() {
+        if let Some(e) = game.get_chunk_entity(chunk.0) {
             let mut rng = rand::thread_rng();
             for (schematic, frequency) in game.world_generation_params.schematic_frequencies.iter()
             {

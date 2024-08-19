@@ -9,6 +9,7 @@
             name: "Time Fragment", 
             desc: [""]
         ),
+        rarity: Rare,
         count: 1
   ),
   }

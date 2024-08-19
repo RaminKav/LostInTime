@@ -45,6 +45,7 @@ pub struct ToolTipUpdateEvent {
 
 pub struct ShowInvPlayerStatsEvent {
     pub stat: Option<StatType>,
+    pub ignore_timer: bool,
 }
 
 pub struct TooltipTextProps {
@@ -181,6 +182,29 @@ pub fn handle_spawn_inv_item_tooltip(
                     Anchor::CenterLeft,
                 ));
             }
+            // Tooltip Inspect ICON
+            let tooltip_icon = spawn_item_stack_icon(
+                &mut commands,
+                &graphics,
+                &ItemStack::crate_icon_stack(WorldObject::TooltipInspect),
+                &asset_server,
+                Vec2::new(-6.5, -106.5),
+                Vec2::new(0., 0.),
+                3,
+            );
+            commands.entity(tooltip_icon).set_parent(tooltip);
+            commands
+                .spawn(SpriteBundle {
+                    texture: asset_server.load("textures/ShiftKey.png"),
+                    transform: Transform::from_translation(Vec3::new(0.0, 13., 1.)),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(26., 10.)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(tooltip_icon);
         } else {
             if item.is_recipe {
                 tooltip_text.push(TooltipTextProps::new(
@@ -338,6 +362,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     },
                     &asset_server,
                     Vec2::ZERO,
+                    Vec2::new(0., 0.),
                     3,
                 );
                 commands
@@ -413,7 +438,9 @@ pub fn handle_spawn_inv_player_stats(
         tooltip_manager.timer.tick(d);
         return;
     }
-    if updates.iter().len() > 0 && tooltip_manager.timer.finished() {
+    if updates.iter().len() > 0
+        && (tooltip_manager.timer.finished() || updates.iter().next().unwrap().ignore_timer)
+    {
         for t in old_tooltips.iter() {
             commands.entity(t).despawn_recursive();
         }

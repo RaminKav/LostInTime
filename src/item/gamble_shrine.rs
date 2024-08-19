@@ -43,10 +43,9 @@ pub fn handle_gamble_shrine_rewards(
     mut commands: Commands,
     mut game: GameParam,
 ) {
-    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
-        // println!("FRAME: {:?}, {:?}", anim.current_frame(), shrine.success);
+    for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if shrine.success {
-            if anim.current_frame() == 44 {
+            if anim.current_frame() == 53 {
                 *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
                 commands.entity(e).remove::<GambleShrine>();
 
@@ -72,7 +71,7 @@ pub fn handle_gamble_shrine_rewards(
                         .unwrap()
                         .clone(),
                     &proto,
-                    t.translation().truncate() + Vec2::new(0., -64.), // offset so it doesn't spawn on the shrine
+                    t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
                     1,
                     Some(1),
                 );
@@ -89,7 +88,7 @@ pub fn handle_gamble_shrine_rewards(
                 );
             }
         } else {
-            if anim.current_frame() == 74 {
+            if anim.current_frame() == 92 {
                 *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);
                 let obj_action = proto
                     .get_component::<ObjectAction, _>(WorldObject::GambleShrine)

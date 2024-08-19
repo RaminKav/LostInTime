@@ -158,7 +158,10 @@ pub fn setup_inv_ui(
     inv_state.inv_size = size;
     commands.entity(inv_e).push_children(&[overlay]);
 
-    stats_event.send_default();
+    stats_event.send(ShowInvPlayerStatsEvent {
+        stat: None,
+        ignore_timer: true,
+    });
 }
 
 pub fn setup_inv_slots_ui(
@@ -262,26 +265,20 @@ pub fn spawn_inv_slot(
     // the slot's parent is set to the inv ui entity.
     let inv_slot_offset = match inv_ui_state.0 {
         UIState::Chest => Vec2::new(0., 0.),
+        UIState::Crafting => Vec2::new(0., -4.),
         _ => Vec2::new(0., 0.),
     };
 
     let mut x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
         + UI_SLOT_SIZE / 2.
-        + 4.
-        + inv_slot_offset.x;
+        + 4.;
     let mut y = ((slot_index / 6) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
         + 7.
-        + UI_SLOT_SIZE / 2.
-        + inv_slot_offset.y;
+        + UI_SLOT_SIZE / 2.;
 
     if slot_type.is_hotbar() {
         y = -GAME_HEIGHT / 2. + 14.;
-        x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE
-            + if slot_index == 5 || slot_index == 2 {
-                0.5
-            } else {
-                0.
-            };
+        x = ((slot_index % 6) as f32 * UI_SLOT_SIZE) - 2. * UI_SLOT_SIZE;
     } else if slot_type.is_crafting() {
         x = ((slot_index % 8) as f32 * UI_SLOT_SIZE) - (inv_state.inv_size.x) / 2.
             + UI_SLOT_SIZE / 2.
@@ -322,7 +319,7 @@ pub fn spawn_inv_slot(
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
-    let translation = Vec3::new(x, y, 1.);
+    let translation = Vec3::new(x, y, 1.) + inv_slot_offset.extend(0.);
     let mut item_icon_option = None;
     let mut item_type_option = None;
     let mut item_count_option = None;
@@ -339,6 +336,11 @@ pub fn spawn_inv_slot(
             &item.item_stack,
             asset_server,
             Vec2::ZERO,
+            if slot_index == 5 || slot_index == 2 {
+                Vec2::new(0.5, 0.)
+            } else {
+                Vec2::ZERO
+            },
             3,
         ));
     }
@@ -440,7 +442,8 @@ pub fn spawn_item_stack_icon(
     graphics: &Graphics,
     item_stack: &ItemStack,
     asset_server: &AssetServer,
-    offset: Vec2,
+    icon_offset: Vec2,
+    text_offset: Vec2,
     render_layer: u8,
 ) -> Entity {
     let has_icon = graphics.icons.as_ref().unwrap().get(&item_stack.obj_type);
@@ -460,7 +463,7 @@ pub fn spawn_item_stack_icon(
             sprite,
             texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
             transform: Transform {
-                translation: Vec3::new(offset.x, offset.y, 2.),
+                translation: Vec3::new(icon_offset.x, icon_offset.y, 2.),
                 ..Default::default()
             },
             ..Default::default()
@@ -491,7 +494,7 @@ pub fn spawn_item_stack_icon(
                     )
                     .with_alignment(TextAlignment::Center),
                     transform: Transform {
-                        translation: Vec3::new(7., -5.5, 3.),
+                        translation: Vec3::new(7., -5.5, 3.) + text_offset.extend(0.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },

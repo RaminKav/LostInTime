@@ -126,6 +126,7 @@ pub fn setup_essence_ui(
             &essence_option.item,
             &asset_server,
             Vec2::ZERO,
+            Vec2::new(0., 0.),
             3,
         );
         commands.entity(icon).set_parent(slot_entity);
@@ -161,6 +162,7 @@ pub fn setup_essence_ui(
                 .copy_with_count(essence_option.cost as usize),
             &asset_server,
             Vec2::ZERO,
+            Vec2::new(0., 0.),
             3,
         );
         commands.entity(cost_icon).set_parent(slot_entity);

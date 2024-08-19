@@ -9,7 +9,7 @@
         obj_type: BrownMushroomBlock,
         metadata: (
             name: "Brown Mushroom", 
-            desc: ["Mmm! A nice source", "of food. Must be", " better cooked", "though!"]
+            desc: ["Mmm! A nice source", "of food. Must be", "better cooked", "though!"]
         ),
         count: 1
   ),

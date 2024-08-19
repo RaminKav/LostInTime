@@ -266,19 +266,19 @@ pub fn move_player(
         * (1. + speed.0 as f32 / 100.)
         * (if hunger.is_starving() { 0.7 } else { 1. });
 
-    if key_input.pressed(KeyCode::A) {
+    if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
         d.x -= 1.;
         player.is_moving = true;
     }
-    if key_input.pressed(KeyCode::D) {
+    if key_input.pressed(KeyCode::D) || key_input.pressed(KeyCode::Right) {
         d.x += 1.;
         player.is_moving = true;
     }
-    if key_input.pressed(KeyCode::W) {
+    if key_input.pressed(KeyCode::W) || key_input.pressed(KeyCode::Up) {
         d.y += 1.;
         player.is_moving = true;
     }
-    if key_input.pressed(KeyCode::S) {
+    if key_input.pressed(KeyCode::S) || key_input.pressed(KeyCode::Down) {
         d.y -= 1.;
         player.is_moving = true;
     }

@@ -8,7 +8,7 @@ use crate::{
     attributes::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
     },
-    colors::{DARK_GREEN, YELLOW_2},
+    colors::{DARK_GREEN, RED, WHITE, YELLOW_2},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{CraftedItemEvent, EquipmentType},
@@ -69,6 +69,7 @@ pub enum UIElement {
     SkillChoice,
     SkillChoiceHover,
     StarIcon,
+    InfoModal,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -174,6 +175,7 @@ pub fn handle_drop_in_world_events(
                         item_stacks.get(drop_event.dropped_entity).unwrap(),
                         &asset_server,
                         Vec2::ZERO,
+                        Vec2::new(0., 0.),
                         3,
                     );
 
@@ -272,6 +274,7 @@ pub fn handle_drop_on_slot_events(
                     &updated_drag_item,
                     &asset_server,
                     Vec2::ZERO,
+                    Vec2::new(0., 0.),
                     3,
                 );
 
@@ -416,6 +419,7 @@ pub fn handle_hovering(
                             .index
                             .clone(),
                     )),
+                    ignore_timer: true,
                 });
             }
             if ui == &UIElement::EssenceButton {
@@ -688,6 +692,7 @@ pub fn handle_interaction_clicks(
                                     &split_stack,
                                     &asset_server,
                                     Vec2::ZERO,
+                                    Vec2::new(0., 0.),
                                     3,
                                 );
 
@@ -703,16 +708,17 @@ pub fn handle_interaction_clicks(
                         if state.r#type.is_crafting() {
                             continue;
                         }
+                        let is_furnace = container_param.furnace_option.is_some();
                         let mut inv = inv.single_mut();
                         if let Some(mut active_container) =
                             container_param.get_active_ui_container_mut()
                         {
-                            if state.r#type.is_inventory() {
+                            if state.r#type.is_inventory() && !is_furnace {
                                 inv.items.move_item_to_target_container(
                                     &mut active_container,
                                     state.slot_index,
                                 )
-                            } else {
+                            } else if !state.r#type.is_inventory() {
                                 active_container
                                     .move_item_to_target_container(&mut inv.items, state.slot_index)
                             }
@@ -819,7 +825,14 @@ pub fn handle_cursor_main_menu_buttons(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    text.get_mut(e).unwrap().sections[0].style.color = DARK_GREEN;
+                    let color = if menu_button == &MenuButton::GameOverOK
+                        || menu_button == &MenuButton::InfoOK
+                    {
+                        RED
+                    } else {
+                        DARK_GREEN
+                    };
+                    text.get_mut(e).unwrap().sections[0].style.color = color;
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
@@ -835,9 +848,15 @@ pub fn handle_cursor_main_menu_buttons(
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
-
+                let color = if menu_button == &MenuButton::GameOverOK
+                    || menu_button == &MenuButton::InfoOK
+                {
+                    WHITE
+                } else {
+                    YELLOW_2
+                };
                 interactable.change(Interaction::None);
-                text.get_mut(e).unwrap().sections[0].style.color = YELLOW_2;
+                text.get_mut(e).unwrap().sections[0].style.color = color;
             }
         }
     }

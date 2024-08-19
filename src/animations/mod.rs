@@ -20,6 +20,7 @@ use crate::inputs::{mouse_click_system, FacingDirection, MovementVector};
 use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
+use crate::sappling::Sappling;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player};
 use crate::{GameParam, GameState};
@@ -109,7 +110,7 @@ impl Plugin for AnimationsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(tick_game_over_overlay.in_set(OnUpdate(GameState::GameOver)));
+            .add_system(tick_game_over_overlay);
     }
 }
 
@@ -404,7 +405,10 @@ pub struct FadeOpacity;
 
 fn animate_foliage_opacity(
     mut commands: Commands,
-    mut tree_query: Query<(Entity, &GlobalTransform, &WorldObject, &mut Sprite), With<FadeOpacity>>,
+    mut tree_query: Query<
+        (Entity, &GlobalTransform, &WorldObject, &mut Sprite),
+        (With<FadeOpacity>, Without<Sappling>),
+    >,
     player: Query<&GlobalTransform, With<Player>>,
     asset_server: Res<AssetServer>,
 ) {

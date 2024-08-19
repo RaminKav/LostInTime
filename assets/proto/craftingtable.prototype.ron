@@ -7,6 +7,7 @@
   "survival_rogue_like::assets::SpriteAnchor": ((x: 8., y: 8.)),
   "survival_rogue_like::item::object_actions::ObjectAction": Crafting(CraftingTable),
   "survival_rogue_like::proto::ColliderProto": (x: 10., y: 4),
+  "survival_rogue_like::world::y_sort::YSort": (-0.1),
   "survival_rogue_like::attributes::MaxHealth": (25),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

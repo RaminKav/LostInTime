@@ -91,16 +91,21 @@ pub fn handle_new_status_effect_event(
 }
 
 pub fn update_status_effect_icons(
-    mut query: Query<(Entity, &Children, &StatusEffectTracker), Changed<StatusEffectTracker>>,
+    mut query: Query<
+        (Entity, Option<&Children>, &StatusEffectTracker),
+        Changed<StatusEffectTracker>,
+    >,
     mut commands: Commands,
     graphics: Res<Graphics>,
     prev_status_icons: Query<(Entity, &StatusEffectIcon)>,
 ) {
-    for (entity, children, tracker) in query.iter_mut() {
+    for (entity, maybe_children, tracker) in query.iter_mut() {
         // remove old icons
-        for prev_icon in prev_status_icons.iter() {
-            if children.iter().any(|c| c == &prev_icon.0) {
-                commands.entity(prev_icon.0).despawn_recursive();
+        if let Some(children) = maybe_children {
+            for prev_icon in prev_status_icons.iter() {
+                if children.iter().any(|c| c == &prev_icon.0) {
+                    commands.entity(prev_icon.0).despawn_recursive();
+                }
             }
         }
         for (height, effect) in tracker.effects.iter().enumerate() {
@@ -113,7 +118,7 @@ pub fn update_status_effect_icons(
                 let h = height as f32;
                 let translation = Vec3::new(
                     i * (s + d) - (total_stacks - 1.) * (s / 2.) - d,
-                    7. * h + 16.,
+                    7. * h + 12.,
                     1.,
                 );
                 commands
