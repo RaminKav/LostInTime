@@ -32,7 +32,7 @@ use bevy::{
     prelude::*,
     reflect::TypeUuid,
     render::{
-        camera::RenderTarget,
+        camera::{RenderTarget, ScalingMode},
         render_resource::{
             AsBindGroup, Extent3d, ShaderRef, TextureDescriptor, TextureDimension, TextureFormat,
             TextureUsages,
@@ -40,7 +40,7 @@ use bevy::{
         view::RenderLayers,
     },
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
-    window::{PresentMode, WindowMode, WindowResolution},
+    window::{PresentMode, PrimaryWindow, WindowMode, WindowResolution},
 };
 
 mod juice;
@@ -140,8 +140,8 @@ fn main() {
                 // .disable::<LogPlugin>()
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: WindowResolution::new(WIDTH, HEIGHT),
-                        // .with_scale_factor_override(1.0),
+                        resolution: WindowResolution::new(WIDTH, HEIGHT)
+                            .with_scale_factor_override(1.0),
                         title: "Lost in Time".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: true,
@@ -520,20 +520,40 @@ pub struct UITextureMaterial {
     pub source_texture: Option<Handle<Image>>,
 }
 
+#[derive(Resource, Copy, Clone)]
+pub struct ScreenResolution {
+    pub width: f32,
+    pub height: f32,
+    pub aspect_ratio: f32,
+}
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut game_render_materials: ResMut<Assets<ColorMaterial>>,
     mut ui_render_materials: ResMut<Assets<UITextureMaterial>>,
     mut images: ResMut<Assets<Image>>,
+    window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
+    let mut resolution = ScreenResolution {
+        width: WIDTH,
+        height: HEIGHT,
+        aspect_ratio: ASPECT_RATIO,
+    };
+    if let Ok(window) = window_query.get_single() {
+        resolution = ScreenResolution {
+            width: window.width(),
+            height: window.height(),
+            aspect_ratio: window.width() / window.height(),
+        };
+    }
+    commands.insert_resource(resolution);
+
     let img_size = Extent3d {
-        width: GAME_WIDTH as u32,
+        width: (GAME_HEIGHT * resolution.aspect_ratio) as u32,
         height: GAME_HEIGHT as u32,
         ..default()
     };
-    let h = HEIGHT - 130.;
-    let game_size = Vec2::new(h * ASPECT_RATIO, h);
+    let game_size = Vec2::new(HEIGHT * resolution.aspect_ratio, HEIGHT);
 
     // This is the texture that will be rendered to.
     let mut game_image = Image {
@@ -674,6 +694,11 @@ fn setup(
             camera_2d: Camera2d {
                 clear_color: ClearColorConfig::None,
             },
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical(HEIGHT),
+                scale: 0.99,
+                ..default()
+            },
             ..default()
         },
         DoNotDespawnOnGameOver,
@@ -689,6 +714,10 @@ fn setup(
             },
             camera_2d: Camera2d {
                 clear_color: ClearColorConfig::None,
+            },
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical(HEIGHT),
+                ..default()
             },
             ..default()
         },
