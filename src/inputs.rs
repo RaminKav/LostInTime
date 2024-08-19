@@ -12,6 +12,7 @@ use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::levels::PlayerLevel;
 use crate::player::skills::{PlayerSkills, Skill};
 use crate::player::MovePlayerEvent;
+use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 use bevy::input::mouse::MouseWheel;
@@ -692,13 +693,16 @@ pub fn mouse_click_system(
 }
 
 pub fn handle_interact_objects(
-    objs: Query<(
-        Entity,
-        &GlobalTransform,
-        &ObjectAction,
-        &WorldObject,
-        &SpriteAnchor,
-    )>,
+    objs: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &ObjectAction,
+            &WorldObject,
+            &SpriteAnchor,
+        ),
+        With<InteractionGuideTrigger>,
+    >,
     mut player_query: Query<(&GlobalTransform, &mut Inventory), With<Player>>,
     mut game: GameParam,
     mut proto_param: ProtoParam,
