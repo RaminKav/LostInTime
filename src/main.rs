@@ -142,7 +142,7 @@ fn main() {
                     primary_window: Some(Window {
                         resolution: WindowResolution::new(WIDTH, HEIGHT),
                         // .with_scale_factor_override(1.0),
-                        title: "Hiru's Island".to_string(),
+                        title: "Lost in Time".to_string(),
                         present_mode: PresentMode::Fifo,
                         resizable: true,
                         transparent: true,
