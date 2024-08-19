@@ -488,10 +488,10 @@ impl ChunkPlugin {
                 let pos = ft.translation().xy();
                 let distance = camera_transform.translation.xy().distance(pos);
                 if (*v == Visibility::Visible || *v == Visibility::Inherited)
-                    && distance > (MAX_VISIBILITY * 2_u32) as f32
+                    && distance > (MAX_VISIBILITY) as f32
                 {
                     *v = Visibility::Hidden;
-                } else if *v != Visibility::Visible && distance <= (MAX_VISIBILITY * 2_u32) as f32 {
+                } else if *v != Visibility::Visible && distance <= (MAX_VISIBILITY) as f32 {
                     *v = Visibility::Visible;
                 }
             }
