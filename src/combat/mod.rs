@@ -161,7 +161,7 @@ fn handle_enemy_death(
                     &proto_param,
                     death_event.enemy_pos + drop_offset,
                     drop.count,
-                    Some(mob_lvl.0),
+                    Some(player_level.level),
                 );
             }
         }

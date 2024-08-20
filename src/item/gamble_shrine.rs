@@ -8,6 +8,7 @@ use crate::{
     custom_commands::CommandsExt,
     inventory::ItemStack,
     item::object_actions::ObjectAction,
+    player::levels::PlayerLevel,
     proto::proto_param::ProtoParam,
     ui::key_input_guide::InteractionGuideTrigger,
     world::world_helpers::world_pos_to_tile_pos,
@@ -42,6 +43,7 @@ pub fn handle_gamble_shrine_rewards(
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
+    level: Query<&PlayerLevel>,
 ) {
     for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if shrine.success {
@@ -79,7 +81,7 @@ pub fn handle_gamble_shrine_rewards(
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
                     1,
-                    Some(1),
+                    Some(level.single().level),
                 );
                 commands
                     .entity(e)

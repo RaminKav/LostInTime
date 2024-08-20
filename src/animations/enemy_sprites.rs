@@ -97,10 +97,12 @@ pub fn change_anim_offset_when_character_action_state_changes(
             EnemyAnimationState::Attack => {
                 if is_player {
                     if let Some(main_hand) = game.player().main_hand_slot {
-                        sprite_sheet_data.anim_offset =
-                            4 + main_hand.get_attack_anim_offset() as usize;
-                        sprite.index =
-                            (max_frames * (4. + main_hand.get_attack_anim_offset())) as usize;
+                        if main_hand.item_stack.obj_type.is_weapon() {
+                            sprite_sheet_data.anim_offset =
+                                4 + main_hand.get_attack_anim_offset() as usize;
+                            sprite.index =
+                                (max_frames * (4. + main_hand.get_attack_anim_offset())) as usize;
+                        }
                     }
                 } else {
                     sprite_sheet_data.anim_offset = 4;

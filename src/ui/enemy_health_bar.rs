@@ -15,10 +15,12 @@ const BAR_SIZE: f32 = 25.;
 
 pub fn create_enemy_health_bar(
     mut commands: Commands,
-    mut query: Query<Entity, (Added<Mob>, With<MaxHealth>)>,
+    mut query: Query<(Entity, &Mob), (Added<Mob>, With<MaxHealth>)>,
 ) {
-    return;
-    for entity in query.iter_mut() {
+    for (entity, mob) in query.iter_mut() {
+        if !mob.is_boss() {
+            continue;
+        }
         let bar_frame = commands
             .spawn(SpriteBundle {
                 transform: Transform {
@@ -30,7 +32,7 @@ pub fn create_enemy_health_bar(
                     color: YELLOW,
                     ..default()
                 },
-                visibility: Visibility::Hidden,
+                visibility: Visibility::Visible,
                 ..default()
             })
             .id();
@@ -41,7 +43,7 @@ pub fn create_enemy_health_bar(
                     scale: Vec3::new(BAR_SIZE, 2., 1.),
                     ..default()
                 },
-                visibility: Visibility::Hidden,
+                visibility: Visibility::Visible,
                 sprite: Sprite {
                     color: RED,
                     ..default()
