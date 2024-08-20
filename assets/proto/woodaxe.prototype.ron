@@ -22,7 +22,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: WoodAxe,
         attributes: (
-            attack_cooldown: 0.9
+            attack_cooldown: 0.8
         ),
         metadata: (
             name: "Wood Axe ", 
