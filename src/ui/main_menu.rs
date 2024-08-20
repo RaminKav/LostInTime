@@ -107,6 +107,9 @@ pub fn handle_menu_button_click_events(
     for event in event_reader.iter() {
         match event.button {
             MenuButton::Start => {
+                if info_modal.iter().count() != 0 {
+                    continue;
+                }
                 println!("START GAME");
                 commands
                     .spawn(SpriteBundle {
@@ -136,11 +139,17 @@ pub fn handle_menu_button_click_events(
                 commands.init_resource::<EraManager>();
             }
             MenuButton::Options => {
+                if info_modal.iter().count() != 0 {
+                    continue;
+                }
                 if webbrowser::open("https://discord.gg/c4Aqd6RXGm").is_ok() {
                     // ...
                 }
             }
             MenuButton::Quit => {
+                if info_modal.iter().count() != 0 {
+                    continue;
+                }
                 exit(0);
             }
             MenuButton::InfoOK => {
