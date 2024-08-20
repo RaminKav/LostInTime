@@ -280,6 +280,37 @@ impl ItemAttributes {
                 AttributeQuality::Average,
             ));
         }
+        if self.dodge.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Dodge",
+                    if is_positive(self.dodge.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.dodge.value
+                ),
+                if let Some(dodge) = &base_att.unwrap().dodge {
+                    format!(
+                        "({}-{})",
+                        f32::round(*dodge.start() as f32 * r) as i32,
+                        f32::round(*dodge.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
+                self.dodge.quality,
+            ));
+            total_atts += 1.;
+            total_score += self.dodge.range_percentage;
+        }
         if self.crit_chance.value != 0 {
             tooltips.push((
                 format!(
@@ -473,37 +504,6 @@ impl ItemAttributes {
             ));
             total_atts += 1.;
             total_score += self.thorns.range_percentage;
-        }
-        if self.dodge.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Dodge",
-                    if is_positive(self.dodge.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.dodge.value
-                ),
-                if let Some(dodge) = &base_att.unwrap().dodge {
-                    format!(
-                        "({}-{})",
-                        f32::round(*dodge.start() as f32 * r) as i32,
-                        f32::round(*dodge.end() as f32 * r) as i32
-                    )
-                } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
-                },
-                self.dodge.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.dodge.range_percentage;
         }
         if self.speed.value != 0 {
             tooltips.push((

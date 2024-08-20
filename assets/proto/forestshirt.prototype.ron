@@ -5,10 +5,10 @@
   "survival_rogue_like::item::WorldObject": ForestShirt,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
         health: Some((start: 2, end: 6)),
-        dodge: Some((start: 4, end: 10)),
+        defence: Some((start: 2, end: 6)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-      //   defence: Some((start: 2, end: 6)),
+        dodge: Some((start: 4, end: 10)),
         crit_damage: Some((start: 4, end: 12)),
         crit_chance: Some((start: 4, end: 10)),
         healing: Some((start: 2, end: 5)),

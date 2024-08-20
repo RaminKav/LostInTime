@@ -185,7 +185,7 @@ fn load_schematic(
 }
 
 pub fn handle_new_scene_entities_parent_chunk(
-    game: GameParam,
+    mut game: GameParam,
     proto_param: ProtoParam,
     new_scenes: Query<
         (Entity, &Children, &GlobalTransform),
@@ -257,15 +257,31 @@ pub fn handle_new_scene_entities_parent_chunk(
                     }
                     let clear_tiles = get_radial_tile_positions(
                         world_pos_to_tile_pos(pos + Vec2::new(0., -48.)),
-                        4,
+                        6,
                     );
                     for clear_tile_pos in clear_tiles.iter() {
                         if let Some((existing_obj, _)) =
                             game.get_obj_entity_at_tile(*clear_tile_pos, &proto_param)
                         {
-                            let (obj, _, _) = obj_data.get(existing_obj).unwrap();
-                            if obj.is_tree() {
+                            let (obj_to_clear, _, _) = obj_data.get(existing_obj).unwrap();
+                            if obj_to_clear.is_tree() {
                                 commands.entity(existing_obj).despawn_recursive();
+                                game.remove_object_from_chunk_cache(*clear_tile_pos);
+                            }
+                        }
+                    }
+                    let clear_tiles = get_radial_tile_positions(
+                        world_pos_to_tile_pos(pos + Vec2::new(0., 0.)),
+                        3,
+                    );
+                    for clear_tile_pos in clear_tiles.iter() {
+                        if let Some((existing_obj, _)) =
+                            game.get_obj_entity_at_tile(*clear_tile_pos, &proto_param)
+                        {
+                            let (obj_to_clear, _, _) = obj_data.get(existing_obj).unwrap();
+                            if obj_to_clear.is_tree() {
+                                commands.entity(existing_obj).despawn_recursive();
+                                game.remove_object_from_chunk_cache(*clear_tile_pos);
                             }
                         }
                     }

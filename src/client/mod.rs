@@ -118,7 +118,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(AppMappingMode::new(MappingMode::Strict))
             .insert_resource(CurrentRunSaveData::default())
             .insert_resource(SaveTimer {
-                timer: Timer::from_seconds(600., TimerMode::Repeating),
+                timer: Timer::from_seconds(200., TimerMode::Repeating),
             })
             .add_plugin(AnalyticsPlugin)
             .add_system(load_state.in_schedule(OnExit(GameState::MainMenu)))
@@ -281,9 +281,10 @@ pub fn save_state(
     game: GameParam,
 ) {
     // only save if the timer is done and we are not in a dungeon
-    if (!timer.timer.just_finished() || dungeon_check.get_single().is_ok())
-        && !key_input.just_pressed(KeyCode::Escape)
-    {
+    if dungeon_check.get_single().is_ok() {
+        return;
+    }
+    if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::Escape) {
         return;
     }
     timer.timer.reset();

@@ -13,7 +13,7 @@ use crate::{
     GameParam,
 };
 
-use super::WorldObject;
+use super::{Loot, WorldObject};
 
 #[derive(Component)]
 pub struct CombatShrineMob {
@@ -66,7 +66,14 @@ pub fn handle_combat_shrine_activate_animation(
                             .commands()
                             .entity(mob)
                             .insert(CombatAlignment::Hostile)
-                            .insert(LootTable::default())
+                            .insert(LootTable {
+                                drops: vec![Loot {
+                                    item: WorldObject::TimeFragment,
+                                    min: 1,
+                                    max: 1,
+                                    rate: 0.2,
+                                }],
+                            })
                             .insert(CombatShrineMob { parent_shrine: e });
                     }
                 }

@@ -488,13 +488,13 @@ fn handle_hotbar_key_input(
     mut inv_state: ResMut<InventoryState>,
 ) {
     for e in mouse_wheel_event.iter() {
-        if e.y < -2. {
+        if e.y > 0. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 5) % 6,
                 &mut inv_state,
                 &mut game.inv_slot_query,
             );
-        } else if e.y >= 2. {
+        } else if e.y <= 0. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 1) % 6,
                 &mut inv_state,
@@ -603,7 +603,8 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
+        // if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
+        if mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
             let ai_pos = world_pos_to_AIPos(cursor_pos.world_coords.truncate());
             let is_valid = game
