@@ -588,6 +588,15 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_structure(&self) -> bool {
+        match self {
+            WorldObject::CombatShrine => true,
+            WorldObject::CombatShrineDone => true,
+            WorldObject::GambleShrine => true,
+            WorldObject::GambleShrineDone => true,
+            _ => false,
+        }
+    }
     pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)

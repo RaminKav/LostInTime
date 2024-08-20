@@ -52,8 +52,6 @@ pub fn handle_gamble_shrine_rewards(
                 let drop_list = [
                     WorldObject::WoodSword,
                     WorldObject::WoodSword,
-                    WorldObject::WoodSword,
-                    WorldObject::Sword,
                     WorldObject::Sword,
                     WorldObject::Dagger,
                     WorldObject::WoodBow,
@@ -62,6 +60,14 @@ pub fn handle_gamble_shrine_rewards(
                     WorldObject::FireStaff,
                     WorldObject::BasicStaff,
                     WorldObject::MagicWhip,
+                    WorldObject::LeatherPants,
+                    WorldObject::LeatherShoes,
+                    WorldObject::LeatherTunic,
+                    WorldObject::LeatherPants,
+                    WorldObject::LeatherShoes,
+                    WorldObject::LeatherTunic,
+                    WorldObject::Ring,
+                    WorldObject::Pendant,
                 ];
                 // give rewards
                 proto_commands.spawn_item_from_proto(

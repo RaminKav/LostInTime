@@ -659,7 +659,7 @@ impl GenerationPlugin {
                     }
                 }
 
-                for (pos, obj_to_clear) in objs.iter() {
+                for (pos, obj_to_spawn) in objs.iter() {
                     let mut is_touching_air = false;
                     if let Ok(dungeon) = dungeon_check {
                         for x in -1_i32..2 {
@@ -687,43 +687,43 @@ impl GenerationPlugin {
                         || game.is_chunk_generated(pos.chunk_pos)
                     {
                         proto_commands.spawn_object_from_proto(
-                            *obj_to_clear,
-                            tile_pos_to_world_pos(*pos, obj_to_clear.is_medium_size(&proto_param)),
+                            *obj_to_spawn,
+                            tile_pos_to_world_pos(*pos, obj_to_spawn.is_medium_size(&proto_param)),
                             &prototypes,
                             &mut proto_param,
                             is_touching_air,
                         )
                     } else {
-                        game.add_object_to_chunk_cache(*pos, *obj_to_clear);
+                        game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
                         None
                     };
 
                     if let Some(spawned_obj) = obj_e {
-                        if obj_to_clear.is_medium_size(&proto_param) {
+                        if obj_to_spawn.is_medium_size(&proto_param) {
                             minimap_update.send(UpdateMiniMapEvent {
                                 pos: Some(*pos),
-                                new_tile: Some(*obj_to_clear),
+                                new_tile: Some(*obj_to_spawn),
                             });
                             for q in 0..3 {
                                 minimap_update.send(UpdateMiniMapEvent {
                                     pos: Some(pos.get_neighbour_tiles_for_medium_objects()[q]),
-                                    new_tile: Some(*obj_to_clear),
+                                    new_tile: Some(*obj_to_spawn),
                                 });
                             }
                         } else {
                             minimap_update.send(UpdateMiniMapEvent {
                                 pos: Some(*pos),
-                                new_tile: Some(*obj_to_clear),
+                                new_tile: Some(*obj_to_spawn),
                             });
                         }
 
-                        if obj_to_clear == &WorldObject::Chest
+                        if obj_to_spawn == &WorldObject::Chest
                             && container_reg.containers.get(pos).is_none()
                         {
                             commands
                                 .entity(spawned_obj)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
-                        } else if obj_to_clear == &WorldObject::Bridge {
+                        } else if obj_to_spawn == &WorldObject::Bridge {
                             for (e, _c, t) in water_colliders.iter() {
                                 if t.translation()
                                     .truncate()
@@ -740,12 +740,12 @@ impl GenerationPlugin {
 
                         if let Ok(_) = dungeon_check {
                             let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                            if obj_to_clear.is_wall() {
+                            if obj_to_spawn.is_wall() {
                                 wall_cache.walls.insert(*pos, true);
                             }
-                            game.add_object_to_dungeon_cache(*pos, *obj_to_clear);
+                            game.add_object_to_dungeon_cache(*pos, *obj_to_spawn);
                         } else {
-                            game.add_object_to_chunk_cache(*pos, *obj_to_clear);
+                            game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
                         }
                     }
                 }

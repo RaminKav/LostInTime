@@ -25,7 +25,7 @@
             attack_cooldown: 0.9
         ),
         metadata: (
-            name: "Wood Axe", 
+            name: "Wood Axe ", 
             desc: ["A rusty Wood Axe."]
         ),
         count: 1

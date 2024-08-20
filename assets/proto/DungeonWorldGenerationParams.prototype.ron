@@ -18,8 +18,6 @@
       ),
       stone_wall_frequency: 1.0,
       schematic_frequencies: {
-        House: 0.0,
-        DungeonEntrance: 0.0,
         CombatShrine: 0.0,
         GambleShrine: 0.0,
       },

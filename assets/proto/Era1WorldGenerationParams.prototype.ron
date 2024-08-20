@@ -59,8 +59,6 @@
         WaterBoulder2: 0.02,
       },
       schematic_frequencies: {
-        House: 0.00,
-        DungeonEntrance: 0.0,
         CombatShrine: 0.065,
         GambleShrine: 0.065,
       },

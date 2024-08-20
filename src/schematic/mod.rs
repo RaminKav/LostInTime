@@ -43,8 +43,6 @@ use self::schematic_spawner::{
 )]
 pub enum SchematicType {
     #[default]
-    House,
-    DungeonEntrance,
     CombatShrine,
     GambleShrine,
 }
