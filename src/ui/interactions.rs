@@ -152,7 +152,7 @@ pub fn handle_drop_in_world_events(
     asset_server: Res<AssetServer>,
 ) {
     for drop_event in events.iter() {
-        let pos = game_param.player().position.truncate() + Vec2::new(12., 2.);
+        let pos = game_param.player().position.truncate() + Vec2::new(20., 2.);
         drop_event
             .dropped_item_stack
             .spawn_as_drop(&mut commands, &mut game_param, pos);

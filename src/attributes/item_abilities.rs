@@ -19,6 +19,8 @@ use crate::{
     GameParam,
 };
 
+use super::Attack;
+
 #[derive(Debug, PartialEq, Reflect, FromReflect, Clone, Serialize, Deserialize)]
 #[reflect(Default)]
 pub enum ItemAbility {
@@ -57,14 +59,56 @@ pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
-    player: Query<(&GlobalTransform, &PlayerSkills, &MovementVector), With<Player>>,
+    player: Query<(&GlobalTransform, &PlayerSkills, &MovementVector, &Attack), With<Player>>,
     key_input: ResMut<Input<KeyCode>>,
     mut game: GameParam,
     proto_param: ProtoParam,
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    let (player_pos, skills, move_direction) = player.single();
+    let (player_pos, skills, move_direction, dmg) = player.single();
+
+    let player = game.player_mut();
+    if skills.get(Skill::Teleport)
+        && player.player_dash_cooldown.tick(time.delta()).finished()
+        && key_input.just_pressed(KeyCode::Space)
+    {
+        player.player_dash_cooldown.reset();
+        if move_direction.0.length() != 0. {
+            let player_pos = player_pos.translation();
+            let direction = move_direction.0.normalize();
+            let distance = direction * 2. * TILE_SIZE.x;
+            let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
+            if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
+                if obj.is_tree() || obj.is_wall() {
+                    return;
+                }
+            }
+
+            if skills.get(Skill::TeleportShock) {
+                let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
+                spawn_temp_collider(
+                    &mut commands,
+                    Transform::from_translation(Vec3::new(
+                        player_pos.x + (distance.x / 2.),
+                        player_pos.y + (distance.y / 2.),
+                        0.,
+                    ))
+                    .with_rotation(Quat::from_rotation_z(angle)),
+                    Vec2::new(16., 3. * TILE_SIZE.x),
+                    0.5,
+                    dmg.0 / 5,
+                )
+            }
+            info!(
+                "Teleport {pos:?} {player_pos:?} | {:?} {:?}",
+                player_pos.truncate() + distance,
+                distance
+            );
+
+            move_player.send(MovePlayerEvent { pos });
+        }
+    }
     let Some(main_hand) = game.player().main_hand_slot else {
         return;
     };
@@ -76,7 +120,7 @@ pub fn handle_item_abilitiy_on_attack(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(3),
+                dmg_override: Some(dmg.0 / 5),
                 pos_override: None,
             });
         }
@@ -87,44 +131,9 @@ pub fn handle_item_abilitiy_on_attack(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(4),
+                dmg_override: Some(dmg.0 / 3),
                 pos_override: None,
             });
         }
-    }
-
-    let player = game.player_mut();
-    if skills.get(Skill::Teleport)
-        && player.player_dash_cooldown.tick(time.delta()).finished()
-        && key_input.just_pressed(KeyCode::Space)
-    {
-        player.player_dash_cooldown.reset();
-        let player_pos = player_pos.translation();
-        let direction = move_direction.0.normalize();
-        let distance = direction * 3. * TILE_SIZE.x;
-        let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
-        if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
-            if obj.is_tree() || obj.is_wall() {
-                return;
-            }
-        }
-
-        if skills.get(Skill::TeleportShock) {
-            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-            spawn_temp_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::new(
-                    player_pos.x + (distance.x / 2.),
-                    player_pos.y + (distance.y / 2.),
-                    0.,
-                ))
-                .with_rotation(Quat::from_rotation_z(angle)),
-                Vec2::new(16., 3. * TILE_SIZE.x),
-                0.5,
-                3,
-            )
-        }
-
-        move_player.send(MovePlayerEvent { pos });
     }
 }

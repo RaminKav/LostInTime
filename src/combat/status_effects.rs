@@ -65,9 +65,9 @@ pub fn handle_new_status_effect_event(
     mut events: EventReader<StatusEffectEvent>,
 ) {
     for event in events.iter() {
-        let mut tracker = query
-            .get_mut(event.entity)
-            .expect("mob should have status effect tracker");
+        let Ok(mut tracker) = query.get_mut(event.entity) else {
+            continue;
+        };
 
         if event.num_stacks == 0 {
             tracker.effects.retain(|e| e.effect != event.effect);

@@ -288,7 +288,7 @@ pub fn save_state(
     if dungeon_check.get_single().is_ok() {
         return;
     }
-    if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::Escape) {
+    if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::U) {
         return;
     }
     timer.timer.reset();

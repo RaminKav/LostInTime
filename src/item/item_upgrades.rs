@@ -236,7 +236,7 @@ pub fn handle_on_hit_upgrades(
                     from_enemy: None,
                     is_followup_proj: true,
                     mana_cost: None,
-                    dmg_override: None,
+                    dmg_override: Some(hit.damage / 3),
                     pos_override: Some(hit_entity_txfm.translation().truncate()),
                 });
             }

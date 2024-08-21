@@ -376,10 +376,6 @@ impl ItemStack {
             .insert(obj)
             .id();
 
-        commands.entity(item).insert(Collider::cuboid(
-            obj_data.size.x / 3.5,
-            obj_data.size.y / 4.5,
-        ));
         add_item_glows(commands, &game.graphics, item, self.rarity.clone());
         item
     }
