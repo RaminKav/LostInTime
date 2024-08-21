@@ -24,7 +24,7 @@ use std::fs::{create_dir, File};
 use bevy::{prelude::*, utils::HashMap};
 use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
-use ws::{connect, CloseCode};
+use tungstenite::{connect, Message};
 
 use crate::{
     enemy::Mob,
@@ -164,27 +164,16 @@ pub fn save_analytics_data_to_file_on_game_over(
 }
 
 fn connect_server(data: AnalyticsData) {
-    info!("Connecting...");
-    if let Err(error) = connect("wss://bevy-analytics.shuttleapp.rs/ws", |out| {
-        // Queue a message to be sent when the WebSocket is open
-        let json = serde_json::to_string(&data).expect("data serializes");
-        if out.send(json).is_err() {
-            warn!("Websocket couldn't queue an initial message.")
-        } else {
-            debug!("Client sent message 'Hello WebSocket'. ")
-        }
-        out.close(CloseCode::Normal);
+    info!("Connecting to server...");
+    let json = serde_json::to_string(&data).expect("data serializes");
+    info!("analytics data {json}");
 
-        // The handler needs to take ownership of out, so we use move
-        move |msg| {
-            // Handle messages received on this connection
-            debug!("Client got message: '{}'. ", msg);
-
-            // Close the connection
-            out.close(CloseCode::Normal)
+    match connect("wss://bevy-analytics.shuttleapp.rs/ws") {
+        Ok((mut socket, response)) => {
+            if let Err(e) = socket.send(Message::Text(json)) {
+                error!("failed to send txt {e}");
+            }
         }
-    }) {
-        // Inform the user of failure
-        error!("Failed to create WebSocket due to: {:?}", error);
+        Err(e) => error!("failed to connect {e}"),
     }
 }

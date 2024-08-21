@@ -121,7 +121,11 @@ impl Plugin for ClientPlugin {
                 timer: Timer::from_seconds(200., TimerMode::Repeating),
             })
             .add_plugin(AnalyticsPlugin)
-            .add_system(load_state.in_schedule(OnExit(GameState::MainMenu)))
+            .add_system(
+                load_state
+                    .after(add_analytics_resource_on_start)
+                    .in_schedule(OnExit(GameState::MainMenu)),
+            )
             .add_systems(
                 (
                     save_state.run_if(resource_exists::<AnalyticsData>()),
