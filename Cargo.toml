@@ -6,13 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = {version = "0.10.1"}
+bevy = { version = "0.10.1" }
 bevy_asset_loader = "0.16.0"
-bevy_rapier2d = {version = "0.21.0", features = ["simd-stable","parallel"]  }
+bevy_rapier2d = { version = "0.21.0", features = ["simd-stable", "parallel"] }
 bevy_ecs_tilemap = "0.10.0"
 bevy_diagnostics_explorer = "0.1.0"
 bevy-inspector-egui = "0.18"
-bevy_proto = {version = "0.10.0", features = ["bevy_sprite", "ron", "bevy_render"]}
+bevy_proto = { version = "0.10.0", features = [
+    "bevy_sprite",
+    "ron",
+    "bevy_render",
+] }
 seldom_state = "0.6.3"
 ron = "0.8.0"
 serde = "1.0.136"
@@ -31,11 +35,16 @@ lazy_static = "1.4.0"
 bevy_aseprite = "0.10"
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
-ws = {version = "0.9.2", features = ['ssl']}
+ws = { version = "0.9.2", features = ['ssl'] }
 webbrowser = "1.0.1"
-bevy_hanabi = { version = "0.6", default-features = false, features = [ "2d" ] }
+bevy_hanabi = { version = "0.6", default-features = false, features = ["2d"] }
 chrono = "0.4.38"
 openssl = { version = "0.10.66", features = ["vendored"] }
+logs-wheel = "0.3.1"
+tracing-subscriber = "0.3.18"
+tracing = "0.1.40"
+native-dialog = "0.7.0"
+tracing-panic = "0.1.2"
 
 [features]
 release-bundle = []
