@@ -233,14 +233,17 @@ fn init_global_logger() {
 
     let subscriber = tracing_subscriber::registry()
         .with(
-            EnvFilter::from_default_env().add_directive(
-                if *DEBUG {
-                    LevelFilter::TRACE
-                } else {
-                    LevelFilter::INFO
-                }
-                .into(),
-            ),
+            EnvFilter::from_default_env()
+                // renderer won't stfu lol
+                .add_directive("bevy_render::renderer=warn".parse().unwrap())
+                .add_directive(
+                    if *DEBUG {
+                        LevelFilter::DEBUG
+                    } else {
+                        LevelFilter::INFO
+                    }
+                    .into(),
+                ),
         )
         .with(
             tracing_subscriber::fmt::layer()
