@@ -154,9 +154,9 @@ pub fn save_analytics_data_to_file_on_game_over(
         let file = File::create(PATH).expect("Could not open file for serialization");
 
         if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
-            println!("Failed to save game state: {result:?}");
+            error!("Failed to save game state: {result:?}");
         } else {
-            println!("SAVED ANALYTICS!");
+            info!("SAVED ANALYTICS!");
         }
     }
     connect_server(analytics_data.clone());
@@ -164,27 +164,27 @@ pub fn save_analytics_data_to_file_on_game_over(
 }
 
 fn connect_server(data: AnalyticsData) {
-    println!("Connecting...");
+    info!("Connecting...");
     if let Err(error) = connect("wss://bevy-analytics.shuttleapp.rs/ws", |out| {
         // Queue a message to be sent when the WebSocket is open
         let json = serde_json::to_string(&data).expect("data serializes");
         if out.send(json).is_err() {
-            println!("Websocket couldn't queue an initial message.")
+            warn!("Websocket couldn't queue an initial message.")
         } else {
-            println!("Client sent message 'Hello WebSocket'. ")
+            debug!("Client sent message 'Hello WebSocket'. ")
         }
         out.close(CloseCode::Normal);
 
         // The handler needs to take ownership of out, so we use move
         move |msg| {
             // Handle messages received on this connection
-            println!("Client got message: '{}'. ", msg);
+            debug!("Client got message: '{}'. ", msg);
 
             // Close the connection
             out.close(CloseCode::Normal)
         }
     }) {
         // Inform the user of failure
-        println!("Failed to create WebSocket due to: {:?}", error);
+        error!("Failed to create WebSocket due to: {:?}", error);
     }
 }

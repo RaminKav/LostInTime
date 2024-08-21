@@ -264,7 +264,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                     }
                 }
                 Err(err) => {
-                    println!("No previous runs found, no gear to populate shop with {err:?}");
+                    warn!("No previous runs found, no gear to populate shop with {err:?}");
                     shop_choices = GENERIC_SHOP_OPTIONS;
                 }
             }

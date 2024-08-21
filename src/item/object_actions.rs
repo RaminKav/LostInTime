@@ -88,7 +88,7 @@ impl ObjectAction {
                         if let Err(err) =
                             inv.items.remove_from_inventory(count.clone(), obj.clone())
                         {
-                            println!("Error removing item from inventory: {:?}", err);
+                            error!("Error removing item from inventory: {:?}", err);
                             return;
                         }
                     } else {

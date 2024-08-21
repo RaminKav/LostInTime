@@ -298,7 +298,7 @@ pub fn handle_hits(
                 }
                 hit_health.0 -= dmg;
                 if *DEBUG {
-                    println!("HP {:?} {:?}", e, hit_health.0);
+                    debug!("HP {:?} {:?}", e, hit_health.0);
                 }
                 if hit_health.0 <= 0 {
                     obj_death_events.send(ObjBreakEvent {
@@ -312,7 +312,7 @@ pub fn handle_hits(
                 let is_player = game.game.player == e;
                 hit_health.0 -= dmg;
                 if *DEBUG {
-                    println!("HP {:?}", hit_health.0);
+                    debug!("HP {:?}", hit_health.0);
                 }
 
                 // let has_i_frames = has_i_frames.get(hit.hit_entity);

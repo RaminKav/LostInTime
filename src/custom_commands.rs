@@ -178,7 +178,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
     ) -> Option<Entity> {
         let p = <T as Into<&str>>::into(obj.clone()).to_owned();
         if !prototypes.is_ready(&p) {
-            println!("Prototype {} is not ready", p);
+            error!("Prototype {} is not ready", p);
             return None;
         }
         //TODO: add parent to spawned entity

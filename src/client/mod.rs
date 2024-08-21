@@ -193,7 +193,7 @@ pub fn handle_append_run_data_after_death(
     mut analytics_data: ResMut<AnalyticsData>,
 ) {
     for _event in game_over.iter() {
-        println!("GAME OVER! Storing run data in game_data.json...");
+        info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
         if let Ok(file_file) = File::open("game_data.json") {
             let reader = BufReader::new(file_file);
@@ -201,7 +201,7 @@ pub fn handle_append_run_data_after_death(
             // Read the JSON contents of the file as an instance of `User`.
             match serde_json::from_reader::<_, GameData>(reader) {
                 Ok(data) => game_data = data,
-                Err(err) => println!("Failed to load data from game_data.json file {err:?}"),
+                Err(err) => error!("Failed to load data from game_data.json file {err:?}"),
             }
         };
         game_data.num_runs += 1;
@@ -233,9 +233,9 @@ pub fn handle_append_run_data_after_death(
 
         // let json_Data: String = serde_json::to_string(&save_data).unwrap();
         if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
-            println!("Failed to save game data after death: {result:?}");
+            error!("Failed to save game data after death: {result:?}");
         } else {
-            println!("UPDATED GAME DATA...");
+            info!("UPDATED GAME DATA...");
         }
     }
 }
@@ -399,9 +399,9 @@ pub fn save_state(
 
     // let json_Data: String = serde_json::to_string(&save_data).unwrap();
     if let Err(result) = serde_json::to_writer(file, &save_data.clone()) {
-        println!("Failed to save game state: {result:?}");
+        error!("Failed to save game state: {result:?}");
     } else {
-        println!("SAVED GAME STATE!");
+        info!("SAVED GAME STATE!");
     }
 }
 
@@ -487,5 +487,5 @@ pub fn load_state(
         new_era: None,
     });
 
-    println!("DONE LOADING GAME DATA");
+    info!("DONE LOADING GAME DATA");
 }

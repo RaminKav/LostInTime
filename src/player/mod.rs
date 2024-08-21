@@ -136,7 +136,7 @@ pub fn handle_move_player(
     mut move_events: EventReader<MovePlayerEvent>,
 ) {
     for m in move_events.iter() {
-        println!("MOVING PLAYER TO {:?}", m.pos);
+        debug!("MOVING PLAYER TO {:?}", m.pos);
         //TODO: Add world helper to get chunk -> world pos, lots of copy code in item.rs
 
         let world_pos = tile_pos_to_world_pos(m.pos, false);
@@ -276,9 +276,9 @@ fn spawn_player(
                 for skill in data.player_skills.skills {
                     skill.add_skill_components(p, &mut commands);
                 }
-                println!("LOADED PLAYER DATA FROM SAVE FILE");
+                info!("LOADED PLAYER DATA FROM SAVE FILE");
             }
-            Err(err) => println!("Failed to load data from file {err:?}"),
+            Err(err) => error!("Failed to load data from file {err:?}"),
         }
     }
     game.player = p;

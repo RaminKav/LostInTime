@@ -46,7 +46,7 @@ impl PlayerLevel {
                 f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.25 * (self.level as f32 - 1.)))) as u32;
         }
         if *DEBUG {
-            println!(
+            debug!(
                 "EXP: {:?} LEVEL: {:?} NEXT: {:?}",
                 self.xp, self.level, self.next_level_xp
             );

@@ -124,7 +124,7 @@ fn save_schematic_scene(world: &mut World) {
     )> = SystemState::new(world);
     let (query, key_input) = state.get(world);
     if key_input.just_pressed(KeyCode::J) {
-        println!("Saving schematic scene...");
+        info!("Saving schematic scene...");
         let type_registry = AppTypeRegistry::default();
         {
             let mut writer = type_registry.write();
@@ -167,7 +167,7 @@ fn load_schematic(
     game: GameParam,
 ) {
     if key_input.just_pressed(KeyCode::M) && *DEBUG {
-        println!(
+        info!(
             "Loading schematic scene... {} {:?}",
             game.player().position,
             world_pos_to_tile_pos(game.player().position.truncate())
@@ -290,7 +290,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                         override_existing_obj: false,
                     });
                 } else {
-                    println!("did not spawn, Invalid tile type for object: {:?}", obj);
+                    error!("did not spawn, Invalid tile type for object: {:?}", obj);
                 }
             }
         }

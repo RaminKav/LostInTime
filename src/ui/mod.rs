@@ -232,7 +232,7 @@ pub fn handle_new_ui_state(
     let should_reset_crafting_container =
         next_ui != curr_ui_state.0 && curr_ui_state.0.is_inv_open();
     if *DEBUG {
-        println!(
+        debug!(
             "UI State Changed: {:?} -> {:?} | should reset: {should_reset_crafting_container:?}",
             curr_ui_state.0, next_ui
         );

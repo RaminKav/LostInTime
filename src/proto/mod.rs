@@ -156,7 +156,7 @@ impl Plugin for ProtoPlugin {
 
 impl ProtoPlugin {
     fn load_prototypes(mut prototypes: PrototypesMut) {
-        println!("Loading prototypes...");
+        info!("Loading prototypes...");
         //TODO: automate this
         prototypes.load("proto/item_drop.prototype.ron");
         prototypes.load("proto/world_object.prototype.ron");
@@ -372,7 +372,7 @@ impl ProtoPlugin {
             let p = <WorldObject as Into<&str>>::into(obj.clone()).to_owned();
 
             if !prototypes.is_ready(&p) {
-                println!("proto {p:?} not ready");
+                warn!("proto {p:?} not ready");
                 return;
             }
         }
@@ -383,11 +383,11 @@ impl ProtoPlugin {
             let p = <Mob as Into<&str>>::into(mob.clone()).to_owned();
 
             if !prototypes.is_ready(&p) {
-                println!("proto {p:?} not ready");
+                warn!("proto {p:?} not ready");
                 return;
             }
         }
-        println!("READY, ENTERING GAME STATE");
+        info!("READY, ENTERING GAME STATE");
     }
 }
 #[derive(Schematic, Reflect, FromReflect)]
