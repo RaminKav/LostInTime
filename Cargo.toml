@@ -46,6 +46,7 @@ tracing = "0.1.40"
 native-dialog = "0.7.0"
 tracing-panic = "0.1.2"
 bevy_embedded_assets = "0.7"
+directories = "5.0.1"
 
 [features]
 release-bundle = []

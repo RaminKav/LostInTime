@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# crash if it fails lol
+set -euo pipefail
+
 APP_NAME="Lost In Time"
 OUT_FOLDER="build"
 RUST_CRATE_NAME="survival-rogue-like" # from ur cargo toml

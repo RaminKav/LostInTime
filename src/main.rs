@@ -15,9 +15,9 @@ use attributes::{
 };
 mod audio;
 mod container;
-mod vectorize;
-
+mod datafiles;
 mod panic_handler;
+mod vectorize;
 
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
@@ -228,7 +228,7 @@ fn main() {
 fn init_global_logger() {
     // init logging
     let log_file = LogFileInitializer {
-        directory: "logs",
+        directory: datafiles::logs_dir(),
         filename: "survival-game.log",
         max_n_old_files: 5,
         preferred_max_file_size_mib: 1,
