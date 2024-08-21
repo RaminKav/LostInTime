@@ -110,7 +110,7 @@ pub fn handle_menu_button_click_events(
                 if info_modal.iter().count() != 0 {
                     continue;
                 }
-                println!("START GAME");
+                info!("START GAME");
                 commands
                     .spawn(SpriteBundle {
                         sprite: Sprite {
@@ -158,7 +158,7 @@ pub fn handle_menu_button_click_events(
                 }
             }
             MenuButton::GameOverOK => {
-                println!("Despawning everything, Sending to main menu");
+                info!("Despawning everything, Sending to main menu");
                 for e in everything.iter() {
                     commands.entity(e).despawn();
                 }

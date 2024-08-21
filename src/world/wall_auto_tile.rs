@@ -163,7 +163,7 @@ pub fn update_wall(
             (*wall_sprite).index =
                 (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
         } else {
-            println!("missing {:?}", new_wall_pos);
+            warn!("missing {:?}", new_wall_pos);
         }
     }
 }

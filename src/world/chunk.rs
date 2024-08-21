@@ -141,7 +141,7 @@ pub fn generate_and_cache_island_chunks(
     }
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
-    println!(
+    debug!(
         "Caching ALL chunks {:?}",
         game.world_generation_params.water_frequency,
     );
@@ -214,7 +214,7 @@ impl ChunkPlugin {
             let map_type = TilemapType::default();
             let mut water_colliders = vec![];
 
-            println!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
+            debug!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
@@ -443,13 +443,13 @@ impl ChunkPlugin {
                 if distance > max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
                     && game.get_chunk_entity(IVec2::new(x, y)).is_some()
                 {
-                    println!("            despawning chunk {x:?},{y:?}");
+                    debug!("            despawning chunk {x:?},{y:?}");
 
                     // add all containers in this chunk into the registry so their contents are safe
                     for child in children.iter() {
                         if let Ok((t, furnace_option, chest_option)) = containers.get(*child) {
                             if let Some(furnace) = furnace_option {
-                                println!(
+                                debug!(
                                     "furnace: {:?}",
                                     world_pos_to_tile_pos(t.translation().xy())
                                 );
@@ -459,7 +459,7 @@ impl ChunkPlugin {
                                 );
                             }
                             if let Some(chest) = chest_option {
-                                println!(
+                                debug!(
                                     "chest: {:?}",
                                     world_pos_to_tile_pos(t.translation().xy())
                                 );

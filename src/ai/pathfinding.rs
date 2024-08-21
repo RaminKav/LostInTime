@@ -163,11 +163,11 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
             return None;
         }
         if max_iteration > 499 {
-            println!("Pathfinding took too long, aborting");
+            warn!("Pathfinding took too long, aborting");
             return None;
         }
         if *DEBUG_AI {
-            println!("Result len {:?} {max_iteration:?}", result.0.len());
+            debug!("Result len {:?} {max_iteration:?}", result.0.len());
             // game.debug_ai_path_event.send(DebugPathResetEvent {
             //     path: result.0.clone(),
             // });

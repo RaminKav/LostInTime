@@ -131,10 +131,10 @@ pub fn handle_update_goal_progress(
             .find(|i| i.get_obj() == &curr_goal_obj)
             .is_some()
         {
-            println!("got goal item");
+            debug!("got goal item");
             commands.remove_resource::<CurrentGoal>();
             for e in icons.iter() {
-                println!("DELETE!!");
+                debug!("DELETE!!");
                 commands.entity(e).despawn_recursive();
             }
         }

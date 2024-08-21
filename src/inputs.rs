@@ -569,9 +569,9 @@ pub fn diagnostics(
     spawners: Query<&ChunkSpawners>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Right) {
-        println!("[DEBUG] Entity Count: {:?}", entities.iter().count());
-        println!("[DEBUG] Mob Count: {:?}", mobs.iter().count());
-        println!("[DEBUG] Spawner Count: {:?}", spawners.iter().count());
+        debug!("Entity Count: {:?}", entities.iter().count());
+        debug!("Mob Count: {:?}", mobs.iter().count());
+        debug!("Spawner Count: {:?}", spawners.iter().count());
     }
 }
 pub fn mouse_click_system(
@@ -610,7 +610,7 @@ pub fn mouse_click_system(
             let is_valid = game
                 .get_pos_validity_for_pathfinding(ai_pos)
                 .unwrap_or(true);
-            println!(
+            debug!(
                 "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?}",
                 cursor_pos.ui_coords
             );
@@ -652,7 +652,7 @@ pub fn mouse_click_system(
         }
         if let Some((hit_obj, _)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
             if *DEBUG {
-                println!("OBJ: {hit_obj:?}");
+                debug!("OBJ: {hit_obj:?}");
             }
             hit_event.send(HitEvent {
                 hit_entity: hit_obj,

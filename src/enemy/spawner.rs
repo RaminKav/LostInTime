@@ -239,7 +239,7 @@ fn handle_add_fairy_spawners(
         let player_chunk = camera_pos_to_chunk_pos(&player_pos.single().translation().truncate());
         for (chunk, mut spawners) in chunk_query.iter_mut() {
             if chunk.chunk_pos == player_chunk {
-                println!("ADDED FAIRY SPAWNER TO {player_chunk:?}");
+                debug!("ADDED FAIRY SPAWNER TO {player_chunk:?}");
                 spawners.spawners.push(Spawner {
                     enemy: Mob::Fairy,
                     chunk_pos: player_chunk,
@@ -334,7 +334,7 @@ fn handle_spawn_mobs(
                 proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
             {
                 if mob.clone() == Mob::Fairy {
-                    println!("SPAWNED A FAIRY!!! {spawned_mob:?}");
+                    debug!("SPAWNED A FAIRY!!! {spawned_mob:?}");
                     spawn_screen_locked_icon(
                         spawned_mob,
                         &mut commands,

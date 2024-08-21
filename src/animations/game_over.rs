@@ -182,7 +182,7 @@ pub fn tick_game_over_overlay(
                             3,
                         );
                     }
-                    Err(err) => println!("Failed to load data from file {err:?}"),
+                    Err(err) => error!("Failed to load data from file {err:?}"),
                 }
             }
         }

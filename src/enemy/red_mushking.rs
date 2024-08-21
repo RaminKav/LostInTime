@@ -495,7 +495,7 @@ pub fn return_to_shrine(
         let follow_translation = follow_transform.translation;
         let delta = shrine_pos.extend(0.) - follow_translation;
         let normal_delta = (delta).normalize_or_zero().truncate();
-        println!("d {normal_delta:?}");
+        debug!("d {normal_delta:?}");
         // Find the direction from the follower to the target and go that way
         mover.translation = Some(normal_delta * 2. * PLAYER_MOVE_SPEED * time.delta_seconds());
 

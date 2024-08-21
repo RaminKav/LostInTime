@@ -280,7 +280,7 @@ impl GenerationPlugin {
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
         for (obj_to_clear, _size, _) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj_to_clear) {
-                println!("NEW UNIQUE OBJ: {obj_to_clear:?}");
+                debug!("NEW UNIQUE OBJ: {obj_to_clear:?}");
 
                 let mut rng = rand::thread_rng();
 
@@ -306,7 +306,7 @@ impl GenerationPlugin {
                 if pos.chunk_pos.y == -1 {
                     pos.chunk_pos.y = -2;
                 }
-                println!("set up a {obj_to_clear:?} at {pos:?}");
+                debug!("set up a {obj_to_clear:?} at {pos:?}");
                 game.world_obj_cache.unique_objs.insert(obj_to_clear, pos);
             }
         }
@@ -370,7 +370,7 @@ impl GenerationPlugin {
                 game.is_chunk_generated(chunk_pos)
             };
             if !is_chunk_generated {
-                println!("Generating new objects for {chunk_pos:?}");
+                debug!("Generating new objects for {chunk_pos:?}");
                 // generate stone walls for dungeons
                 let stone = Self::generate_stone_for_chunk(
                     &game.world_generation_params,
@@ -627,7 +627,7 @@ impl GenerationPlugin {
                                                     rng.gen_range(0..15),
                                                 ),
                                             );
-                                            println!("relocating {unique_obj:?} to {pos:?}");
+                                            debug!("relocating {unique_obj:?} to {pos:?}");
                                             continue 'repeat;
                                         }
                                     }
@@ -637,7 +637,7 @@ impl GenerationPlugin {
                             game.world_obj_cache.unique_objs.insert(unique_obj, pos);
 
                             objs.insert(pos, unique_obj);
-                            println!("SPAWNING UNIQUE {unique_obj:?} at {pos:?} {x_halfsize:?}");
+                            debug!("SPAWNING UNIQUE {unique_obj:?} at {pos:?} {x_halfsize:?}");
                         }
                         // clear out area
                         let clear_tiles = get_radial_tile_positions(

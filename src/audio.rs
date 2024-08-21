@@ -58,7 +58,7 @@ pub fn sword_swing_sound(
         if attack_timer_option.is_some() {
             return;
         }
-        println!("AUDIO!!");
+        trace!("AUDIO!!");
 
         let swing1 = asset_server.load("sounds/swing.ogg");
         let swing2 = asset_server.load("sounds/swing2.ogg");

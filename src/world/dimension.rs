@@ -115,7 +115,7 @@ impl DimensionPlugin {
         mut proto_commands: ProtoCommands,
     ) {
         for new_dim in spawn_event.iter() {
-            println!("SPAWNING NEW DIMENSION");
+            debug!("SPAWNING NEW DIMENSION");
 
             let dim_e = commands.spawn((Dimension,)).id();
             if new_dim.swap_to_dim_now {
@@ -144,13 +144,13 @@ impl DimensionPlugin {
 
                 proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
             } else {
-                println!("USE CURR ERA: {:?}", game.era.current_era.index());
+                debug!("USE CURR ERA: {:?}", game.era.current_era.index());
                 proto_commands.apply(format!(
                     "Era{}WorldGenerationParams",
                     game.era.current_era.index() + 1
                 ));
                 if let Some(era_cache) = game.era.era_generation_cache.get(&game.era.current_era) {
-                    println!("APPLYING ERA CACHE");
+                    debug!("APPLYING ERA CACHE");
                     commands.insert_resource(era_cache.clone());
                 }
             }
@@ -170,7 +170,7 @@ impl DimensionPlugin {
         // event sent out when we enter a new dimension
         for d in new_dim.iter() {
             //despawn all entities with positions, except the player
-            println!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
+            debug!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
             for e in entity_query.iter() {
                 commands.entity(e).despawn_recursive();
             }

@@ -361,7 +361,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
                             .or_insert(vec![])
                             .push(result.clone());
                         text_timer.queue.push(result.clone());
-                        println!("pushed to recipe queue {:?}", text_timer.queue);
+                        debug!("pushed to recipe queue {:?}", text_timer.queue);
                         continue;
                     }
                 }

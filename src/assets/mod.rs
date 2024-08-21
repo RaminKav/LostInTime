@@ -268,11 +268,11 @@ impl GameAssetsPlugin {
         let recipe_desc = fs::read_to_string("./assets/recipes/recipes.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
-            println!("Failed to load config for graphics: {e}");
+            error!("Failed to load config for graphics: {e}");
             std::process::exit(1);
         });
         let recipes_desc: RecipeListProto = from_str(&recipe_desc).unwrap_or_else(|e| {
-            println!("Failed to load config for recipes: {e}");
+            error!("Failed to load config for recipes: {e}");
             std::process::exit(1);
         });
 
@@ -388,7 +388,7 @@ impl GameAssetsPlugin {
         };
         // load UI
         for u in UIElement::iter() {
-            println!("LOADED UI ASSET {:?}", u.to_string());
+            debug!("LOADED UI ASSET {:?}", u.to_string());
             let handle = asset_server.load(format!("ui/{u}.png"));
             ui_image_handles.insert(u, handle);
         }
