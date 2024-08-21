@@ -268,12 +268,10 @@ impl GameAssetsPlugin {
         let recipe_desc = fs::read_to_string("./assets/recipes/recipes.ron").unwrap();
 
         let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
-            error!("Failed to load config for graphics: {e}");
-            std::process::exit(1);
+            panic!("Failed to load config for graphics: {e}");
         });
         let recipes_desc: RecipeListProto = from_str(&recipe_desc).unwrap_or_else(|e| {
-            error!("Failed to load config for recipes: {e}");
-            std::process::exit(1);
+            panic!("Failed to load config for recipes: {e}");
         });
 
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
