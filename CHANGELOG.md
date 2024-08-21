@@ -8,6 +8,7 @@
 - Added wayland support
 - Added log files
 - Added an error popup when the game crashes
+- Added Anvil, Upgrade Station, and Alchemy Table recipes to the crafting table (forgot to enable them, whoops)
 
 ### Changes
 
