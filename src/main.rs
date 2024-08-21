@@ -17,6 +17,8 @@ mod audio;
 mod container;
 mod vectorize;
 
+mod panic_handler;
+
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
 
@@ -29,6 +31,7 @@ use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::{schedule::ScheduleLabel, system::SystemParam},
+    log::LogPlugin,
     prelude::*,
     reflect::TypeUuid,
     render::{
@@ -79,6 +82,12 @@ use player::{Player, PlayerPlugin, PlayerState, TimeFragmentCurrency};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::{
+    fmt::{format::FmtSpan, writer::MakeWriterExt},
+    layer::SubscriberExt,
+    EnvFilter,
+};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
     spawn_menu_text_buttons, InventorySlotState, UIPlugin,
@@ -94,6 +103,9 @@ use world::{dimension::EraManager, WorldGeneration};
 
 use crate::assets::SpriteAnchor;
 use lazy_static::lazy_static;
+
+use logs_wheel::LogFileInitializer;
+use std::sync::Mutex;
 
 const ZOOM_SCALE: f32 = 1.2;
 const PLAYER_MOVE_SPEED: f32 = 75.;
@@ -122,6 +134,9 @@ lazy_static! {
 }
 
 fn main() {
+    init_global_logger();
+
+    // ok now run the game :)
     let mut app = App::new();
     let app = app
         .insert_resource(ClearColor(Color::BLACK))
@@ -137,7 +152,6 @@ fn main() {
                     ..default()
                 })
                 .set(ImagePlugin::default_nearest())
-                // .disable::<LogPlugin>()
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         resolution: WindowResolution::new(WIDTH, HEIGHT)
@@ -150,10 +164,13 @@ fn main() {
                         ..Default::default()
                     }),
                     ..default()
-                }),
+                })
+                .build()
+                .disable::<LogPlugin>(), // we handle logging ourselves
         )
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+        .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
@@ -199,6 +216,50 @@ fn main() {
     }
 
     app.run();
+}
+
+fn init_global_logger() {
+    // init logging
+    let log_file = LogFileInitializer {
+        directory: "logs",
+        filename: "survival-game.log",
+        max_n_old_files: 5,
+        preferred_max_file_size_mib: 1,
+    }
+    .init()
+    .expect("Failed to initialize log file");
+
+    let file_writer = Mutex::new(log_file);
+
+    let subscriber = tracing_subscriber::registry()
+        .with(
+            EnvFilter::from_default_env().add_directive(
+                if *DEBUG {
+                    LevelFilter::TRACE
+                } else {
+                    LevelFilter::INFO
+                }
+                .into(),
+            ),
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(file_writer)
+                .with_ansi(false)
+                .with_span_events(FmtSpan::CLOSE),
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(std::io::stdout)
+                .with_ansi(true)
+                .with_span_events(FmtSpan::CLOSE),
+        );
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("unable to set global logs subscriber");
+
+    // this is kind of stupid but we have to set an early hook in case we panic before the plugins are all initialized lol
+    std::panic::set_hook(Box::new(tracing_panic::panic_hook));
 }
 
 #[derive(Resource)]
