@@ -366,7 +366,9 @@ pub fn handle_inv_changed_update_crafting_tracker(
                     }
                 }
             }
-            craft_tracker.discovered_objects.push(new_obj);
+            if !craft_tracker.discovered_objects.contains(&new_obj) {
+                craft_tracker.discovered_objects.push(new_obj);
+            }
         }
     }
     if let Some(inv_recipes) = craft_tracker
