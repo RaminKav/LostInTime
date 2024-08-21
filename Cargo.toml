@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.10.1" }
+bevy = { version = "0.10.1", features = ["wayland"] }
 bevy_asset_loader = "0.16.0"
 bevy_rapier2d = { version = "0.21.0", features = ["simd-stable", "parallel"] }
 bevy_ecs_tilemap = "0.10.0"
