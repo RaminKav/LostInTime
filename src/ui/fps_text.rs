@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{ScreenResolution, GAME_HEIGHT};
-
+const VERSION: &str = "v0.1.2-alpha";
 #[derive(Component)]
 pub struct FPSText;
 
@@ -18,7 +18,7 @@ pub fn spawn_fps_text(
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                "v0.1  FPS: ",
+                format!("{VERSION}  FPS: "),
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
@@ -55,7 +55,7 @@ pub fn text_update_system(
         if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
                 // Update the value of the second section
-                text.sections[0].value = format!("v0.1  FPS: {value:.0}");
+                text.sections[0].value = format!("{VERSION}  FPS: {value:.0}");
             }
         }
     }
