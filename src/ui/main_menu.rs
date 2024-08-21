@@ -150,6 +150,7 @@ pub fn handle_menu_button_click_events(
                 if info_modal.iter().count() != 0 {
                     continue;
                 }
+                info!("Quit button pressed, quitting!");
                 exit(0);
             }
             MenuButton::InfoOK => {
