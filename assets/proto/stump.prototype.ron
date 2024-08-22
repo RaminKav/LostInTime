@@ -1,6 +1,6 @@
 (
   name: "Stump",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Stump,
   "survival_rogue_like::item::RequiredEquipmentType": (Axe),

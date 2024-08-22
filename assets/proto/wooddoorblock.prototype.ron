@@ -1,6 +1,6 @@
 (
   name: "WoodDoorBlock",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": WoodDoorBlock,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(WoodDoor)]),

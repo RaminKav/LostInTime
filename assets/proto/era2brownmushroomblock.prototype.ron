@@ -1,6 +1,6 @@
 (
   name: "Era2BrownMushroomBlock",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2BrownMushroomBlock,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(10)]),

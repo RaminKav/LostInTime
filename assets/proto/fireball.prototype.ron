@@ -1,6 +1,6 @@
 (
   name: "Fireball",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::WorldObject": Fireball,
         "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),

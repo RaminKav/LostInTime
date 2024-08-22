@@ -1,6 +1,6 @@
 (
   name: "GreenWhip",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": GreenWhip,
         // "survival_rogue_like::proto::ColliderProto": (x: 24., y: 8.),

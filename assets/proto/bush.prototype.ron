@@ -1,6 +1,6 @@
 (
   name: "Bush",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Bush,
   "survival_rogue_like::assets::SpriteSize": Medium,

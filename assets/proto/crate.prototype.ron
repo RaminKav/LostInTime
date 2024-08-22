@@ -1,6 +1,6 @@
 (
   name: "Crate",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Crate,
   "survival_rogue_like::attributes::MaxHealth": (15),

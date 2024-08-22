@@ -1,6 +1,6 @@
 (
   name: "PinkFlower",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": PinkFlower,
   "survival_rogue_like::attributes::MaxHealth": (1),

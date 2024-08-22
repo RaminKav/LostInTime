@@ -1,6 +1,6 @@
 (
   name: "Era2Boulder",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2Boulder,
   "survival_rogue_like::assets::SpriteSize": Medium,

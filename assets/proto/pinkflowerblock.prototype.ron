@@ -1,6 +1,6 @@
 (
   name: "PinkFlowerBlock",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": PinkFlowerBlock,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(PinkFlower)]),

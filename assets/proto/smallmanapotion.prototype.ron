@@ -1,6 +1,6 @@
 (
   name: "SmallManaPotion",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": SmallManaPotion,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [ ModifyMana(40)]),

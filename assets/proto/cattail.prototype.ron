@@ -1,6 +1,6 @@
 (
   name: "Cattail",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Cattail,
   "survival_rogue_like::assets::SpriteSize": Small,

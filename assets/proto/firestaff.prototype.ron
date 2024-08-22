@@ -1,6 +1,6 @@
 (
   name: "FireStaff",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": FireStaff,
   "survival_rogue_like::item::EquipmentType": Weapon,

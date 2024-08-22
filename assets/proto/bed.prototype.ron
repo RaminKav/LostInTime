@@ -1,6 +1,6 @@
 (
   name: "Bed",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Bed,
   "survival_rogue_like::assets::SpriteSize": Medium,

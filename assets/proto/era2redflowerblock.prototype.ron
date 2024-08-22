@@ -1,6 +1,6 @@
 (
   name: "Era2RedFlowerBlock",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Era2RedFlowerBlock,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Era2RedFlower)]),

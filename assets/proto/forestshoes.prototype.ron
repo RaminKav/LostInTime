@@ -1,6 +1,6 @@
 (
   name: "ForestShoes",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": ForestShoes,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (

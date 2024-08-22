@@ -1,6 +1,6 @@
 (
   name: "Slime",
-  templates: ["mob_basic"],
+  templates: ["mob_basic.prototype.ron"],
   schematics: {
     "survival_rogue_like::enemy::Mob": Slime,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,

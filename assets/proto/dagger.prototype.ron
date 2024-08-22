@@ -1,6 +1,6 @@
 (
   name: "Dagger",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Dagger,
   "survival_rogue_like::item::EquipmentType": Weapon,
