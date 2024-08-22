@@ -32,7 +32,7 @@ use crate::{
     night::NightTracker,
     player::skills::{PlayerSkills, Skill},
     world::dimension::GenerationSeed,
-    GameState,
+    GameState, DEBUG,
 };
 
 #[derive(Debug, Clone, Resource, Default, Serialize, Deserialize)]
@@ -135,19 +135,14 @@ pub fn add_analytics_resource_on_start(mut commands: Commands) {
     commands.insert_resource(AnalyticsData::default());
 }
 pub fn save_analytics_data_to_file_on_game_over(
-    mut analytics_data: ResMut<AnalyticsData>,
+    analytics_data: Res<AnalyticsData>,
     seed: Res<GenerationSeed>,
-    events: EventReader<SendAnalyticsDataToServerEvent>,
+    mut events: EventReader<SendAnalyticsDataToServerEvent>,
     mut commands: Commands,
-    skills: Query<&PlayerSkills>,
-    night_tracker: Res<NightTracker>,
 ) {
-    if events.is_empty() {
+    if events.iter().count() == 0 {
         return;
     }
-    analytics_data.skills = skills.iter().next().unwrap().skills.clone();
-    analytics_data.timestamp = chrono::offset::Local::now().to_string();
-    analytics_data.nights_survived = night_tracker.days as u32;
     if let Ok(()) = create_dir("analytics") {
         let PATH: &str = &format!("analytics/analytics_{}.json", seed.seed).to_string();
 
@@ -159,8 +154,10 @@ pub fn save_analytics_data_to_file_on_game_over(
             info!("SAVED ANALYTICS!");
         }
     }
-    connect_server(analytics_data.clone());
-    commands.remove_resource::<AnalyticsData>();
+    info!("Sending analytics data to server...");
+    if !*DEBUG {
+        connect_server(analytics_data.clone());
+    }
 }
 
 fn connect_server(data: AnalyticsData) {

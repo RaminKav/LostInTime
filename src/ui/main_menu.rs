@@ -6,11 +6,12 @@ use crate::{
     ai::pathfinding::PathfindingCache,
     assets::{asset_helpers::spawn_sprite, Graphics},
     audio::UpdateBGMTrackEvent,
+    client::analytics::AnalyticsData,
     colors::{overwrite_alpha, BLACK, WHITE, YELLOW_2},
     container::ContainerRegistry,
     item::CraftingTracker,
     night::NightTracker,
-    player::skills::SkillChoiceQueue,
+    player::skills::{PlayerSkills, SkillChoiceQueue},
     ui::{ChestContainer, FurnaceContainer},
     world::{
         dimension::{ActiveDimension, EraManager},
@@ -103,6 +104,9 @@ pub fn handle_menu_button_click_events(
         ),
     >,
     res: Res<ScreenResolution>,
+    mut analytics_data: Option<ResMut<AnalyticsData>>,
+    skills: Query<&PlayerSkills>,
+    night_tracker: Option<Res<NightTracker>>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -165,9 +169,17 @@ pub fn handle_menu_button_click_events(
                 }
                 let _ = fs::remove_file("save_state.json");
                 next_state.0 = Some(GameState::MainMenu);
+                //set end of game analytics data
+                let analytics_data = analytics_data.as_mut().unwrap();
+                let night_tracker = night_tracker.as_ref().unwrap();
+                analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+                analytics_data.timestamp = chrono::offset::Local::now().to_string();
+                analytics_data.nights_survived = night_tracker.days as u32;
                 //cleanup resources with Entity refs
                 commands.remove_resource::<ChestContainer>();
                 commands.remove_resource::<FurnaceContainer>();
+                commands.remove_resource::<AnalyticsData>();
+                commands.remove_resource::<SkillChoiceQueue>();
                 commands.remove_resource::<Game>();
                 commands.remove_resource::<NightTracker>();
                 commands.remove_resource::<ContainerRegistry>();
