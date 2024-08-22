@@ -25,6 +25,7 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{hunger::Hunger, CurrentHealth},
     container::{Container, ContainerRegistry},
+    datafiles,
     inventory::{Inventory, ItemStack},
     item::{
         projectile::Projectile, CraftingTracker, EquipmentType, Foliage, MainHand, Wall,
@@ -199,7 +200,8 @@ pub fn handle_append_run_data_after_death(
     for _event in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
-        if let Ok(file_file) = File::open("game_data.json") {
+        let save_file_path = datafiles::save_file();
+        if let Ok(file_file) = File::open(save_file_path) {
             let reader = BufReader::new(file_file);
 
             // Read the JSON contents of the file as an instance of `User`.
@@ -231,9 +233,10 @@ pub fn handle_append_run_data_after_death(
             game_data.seen_gear.push(item.item_stack.clone());
         }
 
-        const PATH: &str = "game_data.json";
+        let game_data_path = datafiles::save_file();
 
-        let file = File::create(PATH).expect("Could not create game data file for serialization");
+        let file = File::create(game_data_path)
+            .expect("Could not create game data file for serialization");
 
         // let json_Data: String = serde_json::to_string(&save_data).unwrap();
         if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
@@ -397,9 +400,7 @@ pub fn save_state(
     save_data.seed = seed.seed;
     save_data.analytics_data = analytics_data.clone();
 
-    const PATH: &str = "save_state.json";
-
-    let file = File::create(PATH).expect("Could not open file for serialization");
+    let file = File::create(datafiles::save_file()).expect("Could not open file for serialization");
 
     // let json_Data: String = serde_json::to_string(&save_data).unwrap();
     if let Err(result) = serde_json::to_writer(file, &save_data.clone()) {
@@ -423,7 +424,7 @@ pub fn load_state(
     let mut seed = rng.gen_range(0..100000);
 
     // Load data if it exists
-    if let Ok(file_file) = File::open("save_state.json") {
+    if let Ok(file_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(file_file);
 
         // Read the JSON contents of the file as an instance of `User`.

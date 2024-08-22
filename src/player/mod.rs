@@ -32,6 +32,7 @@ use crate::{
     client::CurrentRunSaveData,
     container::Container,
     custom_commands::CommandsExt,
+    datafiles,
     inputs::{move_camera_with_player, FacingDirection, MovementVector},
     inventory::{Inventory, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
@@ -253,7 +254,7 @@ fn spawn_player(
 
     let mut hunger = Hunger::new(100);
     // Try to load inv from save
-    if let Ok(save_file) = File::open("save_state.json") {
+    if let Ok(save_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(save_file);
 
         // Read the JSON contents of the file as an instance of `User`.
@@ -286,7 +287,7 @@ fn spawn_player(
 }
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
-    if let Ok(_) = File::open("save_state.json") {
+    if let Ok(_) = File::open(datafiles::save_file()) {
         return;
     }
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1, Some(1));

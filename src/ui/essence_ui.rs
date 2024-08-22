@@ -8,6 +8,7 @@ use crate::{
     assets::Graphics,
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     client::GameData,
+    datafiles,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     player::Player,
@@ -239,7 +240,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         ];
 
         let mut shop_choices = vec![];
-        if let Ok(file_file) = File::open("game_data.json") {
+        if let Ok(file_file) = File::open(datafiles::save_file()) {
             let reader = BufReader::new(file_file);
             let mut rng = rand::thread_rng();
             // Read the JSON contents of the file as an instance of `User`.
