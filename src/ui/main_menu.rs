@@ -9,6 +9,7 @@ use crate::{
     client::analytics::AnalyticsData,
     colors::{overwrite_alpha, BLACK, WHITE, YELLOW_2},
     container::ContainerRegistry,
+    datafiles,
     item::CraftingTracker,
     night::NightTracker,
     player::skills::{PlayerSkills, SkillChoiceQueue},
@@ -167,7 +168,7 @@ pub fn handle_menu_button_click_events(
                 for e in everything.iter() {
                     commands.entity(e).despawn();
                 }
-                let _ = fs::remove_file("save_state.json");
+                let _ = fs::remove_file(datafiles::save_file());
                 next_state.0 = Some(GameState::MainMenu);
                 //set end of game analytics data
                 let analytics_data = analytics_data.as_mut().unwrap();

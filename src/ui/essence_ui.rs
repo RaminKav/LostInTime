@@ -8,6 +8,7 @@ use crate::{
     assets::Graphics,
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     client::GameData,
+    datafiles,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     player::Player,
@@ -183,9 +184,10 @@ pub fn handle_submit_essence_choice(
 ) {
     for choice in ev.iter() {
         let mut inv = inv.single_mut();
-        if let Ok(_) = inv
+        if inv
             .items
             .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence)
+            .is_ok()
         {
             choice.choice.item.spawn_as_drop(
                 &mut commands,
@@ -239,7 +241,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         ];
 
         let mut shop_choices = vec![];
-        if let Ok(file_file) = File::open("game_data.json") {
+        if let Ok(file_file) = File::open(datafiles::game_data()) {
             let reader = BufReader::new(file_file);
             let mut rng = rand::thread_rng();
             // Read the JSON contents of the file as an instance of `User`.
