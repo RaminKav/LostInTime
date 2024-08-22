@@ -83,11 +83,7 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{
-    fmt::{format::FmtSpan, writer::MakeWriterExt},
-    layer::SubscriberExt,
-    EnvFilter,
-};
+use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, EnvFilter};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
     spawn_menu_text_buttons, InventorySlotState, UIPlugin,
@@ -135,6 +131,16 @@ lazy_static! {
 
 fn main() {
     init_global_logger();
+
+    // migrate old save files
+    let old_game_data = std::path::Path::new("game_data.json");
+    if old_game_data.is_file() {
+        std::fs::rename(old_game_data, datafiles::save_file()).expect("move game data file");
+    }
+    let old_save_state = std::path::Path::new("save_state.json");
+    if old_save_state.is_file() {
+        std::fs::rename(old_save_state, datafiles::save_file()).expect("move save file");
+    }
 
     // ok now run the game :)
     let mut app = App::new();

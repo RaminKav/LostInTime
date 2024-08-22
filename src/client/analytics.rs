@@ -1,4 +1,4 @@
-use std::fs::{create_dir, File};
+use std::fs::{create_dir_all, File};
 /*
     Analytics System:
     track various data points through event listeners.
@@ -27,6 +27,8 @@ use serde::{Deserialize, Serialize};
 use tungstenite::{connect, Message};
 
 use crate::{
+    client::analytics,
+    datafiles::{self, analytics_dir},
     enemy::Mob,
     item::WorldObject,
     night::NightTracker,
@@ -143,10 +145,14 @@ pub fn save_analytics_data_to_file_on_game_over(
     if events.iter().count() == 0 {
         return;
     }
-    if let Ok(()) = create_dir("analytics") {
-        let PATH: &str = &format!("analytics/analytics_{}.json", seed.seed).to_string();
-
-        let file = File::create(PATH).expect("Could not open file for serialization");
+    let analytics_dir = datafiles::analytics_dir();
+    if let Ok(()) = create_dir_all(analytics_dir) {
+        let analytics_file = {
+            let mut file = datafiles::analytics_dir();
+            file.push(format!("analytics_{}.json", seed.seed));
+            file
+        };
+        let file = File::create(analytics_file).expect("Could not open file for serialization");
 
         if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
             error!("Failed to save game state: {result:?}");
