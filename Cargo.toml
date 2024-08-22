@@ -35,7 +35,7 @@ lazy_static = "1.4.0"
 bevy_aseprite = "0.10"
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
-tungstenite = { version = "0.23.0", features = ['native-tls-vendored',] }
+tungstenite = { version = "0.23.0", features = ['native-tls-vendored'] }
 webbrowser = "1.0.1"
 bevy_hanabi = { version = "0.6", default-features = false, features = ["2d"] }
 chrono = "0.4.38"
@@ -47,6 +47,10 @@ native-dialog = "0.7.0"
 tracing-panic = "0.1.2"
 bevy_embedded_assets = "0.7"
 directories = "5.0.1"
+
+
+[dev-dependencies]
+bevy = { version = "0.10.1", features = ["wayland", "dynamic_linking"] }
 
 [features]
 release-bundle = []
