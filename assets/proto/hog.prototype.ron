@@ -1,6 +1,6 @@
 (
   name: "Hog",
-  templates: ["mob_passive"],
+  templates: ["mob_passive.prototype.ron"],
   schematics: {
     "survival_rogue_like::enemy::Mob": Hog,
     "survival_rogue_like::enemy::CombatAlignment": Passive,

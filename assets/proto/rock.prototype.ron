@@ -1,6 +1,6 @@
 (
   name: "Rock",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::WorldObject": Flint,
         "survival_rogue_like::item::projectile::Projectile": Rock,

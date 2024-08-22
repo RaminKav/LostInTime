@@ -1,6 +1,6 @@
 (
   name: "StingFly",
-  templates: ["mob_basic"],
+  templates: ["mob_basic.prototype.ron"],
   schematics: {
     "survival_rogue_like::enemy::Mob": StingFly,
     "survival_rogue_like::enemy::CombatAlignment": Neutral,

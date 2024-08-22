@@ -1,6 +1,6 @@
 (
   name: "ThrowingStar",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::WorldObject": ThrowingStar,
         "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),

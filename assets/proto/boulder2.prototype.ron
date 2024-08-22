@@ -1,6 +1,6 @@
 (
   name: "Boulder2",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Boulder2,
   "survival_rogue_like::assets::SpriteSize": Medium,

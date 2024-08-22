@@ -211,7 +211,7 @@ fn main() {
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(
-            LoadingState::new(GameState::Loading).continue_to_state(GameState::MainMenu),
+            LoadingState::new(GameState::Loading).continue_to_state(GameState::LoadingProtos),
         )
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
@@ -302,6 +302,7 @@ pub enum CoreGameSet {
 pub enum GameState {
     #[default]
     Loading,
+    LoadingProtos,
     MainMenu,
     Main,
     GameOver,

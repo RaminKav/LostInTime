@@ -1,6 +1,6 @@
 (
   name: "Log",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Log,
   // "survival_rogue_like::item::PlacesInto": (Sma),

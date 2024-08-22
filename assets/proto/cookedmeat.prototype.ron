@@ -1,6 +1,6 @@
 (
   name: "CookedMeat",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": CookedMeat,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [Eat(45), ModifyHealth(10)]),

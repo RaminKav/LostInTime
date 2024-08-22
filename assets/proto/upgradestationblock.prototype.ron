@@ -1,6 +1,6 @@
 (
   name: "UpgradeStationBlock",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": UpgradeStationBlock,
   "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(UpgradeStation)]),

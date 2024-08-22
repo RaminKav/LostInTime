@@ -1,6 +1,6 @@
 (
   name: "Arc",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": Arc,
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 155., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -20., y: -20.)),

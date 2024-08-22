@@ -1,6 +1,6 @@
 (
   name: "DungeonEntrance",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": DungeonEntrance,
   "survival_rogue_like::item::object_actions::ObjectAction": DungeonTeleport,

@@ -1,6 +1,6 @@
 (
   name: "Anvil",
-  templates: ["world_object"],
+  templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Anvil,
   "survival_rogue_like::item::object_actions::ObjectAction": Crafting(Anvil),

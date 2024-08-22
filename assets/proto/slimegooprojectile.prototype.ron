@@ -1,6 +1,6 @@
 (
   name: "SlimeGooProjectile",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::WorldObject": SlimeGooProjectile,
         "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),

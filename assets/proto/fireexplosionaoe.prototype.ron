@@ -1,6 +1,6 @@
 (
   name: "FireExplosionAOE",
-  templates: ["projectile"],
+  templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": FireExplosionAOE,
         "survival_rogue_like::proto::ColliderProto": (x: 26., y: 26.),

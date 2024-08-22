@@ -1,6 +1,6 @@
 (
   name: "Stick",
-  templates: ["item_drop"],
+  templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Stick,
   "survival_rogue_like::inventory::ItemStack": (
