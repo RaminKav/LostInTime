@@ -22,11 +22,6 @@ mod panic_handler;
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
 
-use juice::JuicePlugin;
-use night::NightPlugin;
-use rand::Rng;
-use sappling::SapplingPlugin;
-
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
@@ -45,6 +40,11 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
     window::{PresentMode, PrimaryWindow, WindowMode, WindowResolution},
 };
+use bevy_embedded_assets::EmbeddedAssetPlugin;
+use juice::JuicePlugin;
+use night::NightPlugin;
+use rand::Rng;
+use sappling::SapplingPlugin;
 
 mod juice;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -138,6 +138,13 @@ fn main() {
 
     // ok now run the game :)
     let mut app = App::new();
+
+    // macos bundles into a .app anyways, so we don't need to bundle assets.
+    // doing it in the universal binary would double it since MacOS does M1 + Intel
+    if cfg!(not(target_os = "macos")) {
+        app.add_plugin(EmbeddedAssetPlugin::default());
+    }
+
     let app = app
         .insert_resource(ClearColor(Color::BLACK))
         .add_state::<GameState>()

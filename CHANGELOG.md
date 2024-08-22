@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3
+
+### Changes
+
+- Assets are now embedded in the binary
+
 ## 0.1.2
 
 ### Features

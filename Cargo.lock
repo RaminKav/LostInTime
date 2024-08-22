@@ -131,7 +131,7 @@ dependencies = [
 name = "actix-macros"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e01ed3140b2f8d422c68afa1ed2e85d996ea619c988ac834d255db32138655cgb"
+checksum = "e01ed3140b2f8d422c68afa1ed2e85d996ea619c988ac834d255db32138655cb"
 dependencies = [
  "quote 1.0.36",
  "syn 2.0.72",
@@ -893,6 +893,16 @@ dependencies = [
  "egui",
  "thread_local",
  "webbrowser 0.8.12",
+]
+
+[[package]]
+name = "bevy_embedded_assets"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a1d4ecf67c553196cfdef560cf0748f1f699db5a86ed2aa211c958e2a379451"
+dependencies = [
+ "bevy",
+ "cargo-emit",
 ]
 
 [[package]]
@@ -1767,6 +1777,12 @@ dependencies = [
  "thiserror",
  "vec_map",
 ]
+
+[[package]]
+name = "cargo-emit"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1582e1c9e755dd6ad6b224dcffb135d199399a4568d454bd89fe515ca8425695"
 
 [[package]]
 name = "cc"
@@ -5156,6 +5172,7 @@ dependencies = [
  "bevy_asset_loader",
  "bevy_diagnostics_explorer",
  "bevy_ecs_tilemap",
+ "bevy_embedded_assets",
  "bevy_hanabi",
  "bevy_pkv",
  "bevy_proto",
