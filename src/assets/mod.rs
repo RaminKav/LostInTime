@@ -23,7 +23,6 @@ use crate::player::skills::Skill;
 use crate::status_effects::StatusEffect;
 use crate::ui::UIElement;
 use crate::{GameState, ImageAssets};
-use ron::de::from_str;
 
 pub struct GameAssetsPlugin;
 
@@ -247,6 +246,7 @@ impl GameAssetsPlugin {
         mut world_obj_data: ResMut<WorldObjectResource>,
         asset_server: Res<AssetServer>,
         graphics_desc: Res<Assets<GraphicsDesc>>,
+        recipes_desc: Res<Assets<RecipeListProto>>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -266,13 +266,10 @@ impl GameAssetsPlugin {
             .unwrap();
         }
 
-        let recipe_desc = fs::read_to_string("./assets/recipes/recipes.ron").unwrap();
-        let s: Handle<GraphicsDesc> = asset_server.load("textures/sprites_desc.ron");
-        let sprite_desc = graphics_desc.get(&s).unwrap();
-        let recipes_desc: RecipeListProto = from_str(&recipe_desc).unwrap_or_else(|e| {
-            panic!("Failed to load config for recipes: {e}");
-        });
-
+        let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
+        let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
+        let sprite_desc = graphics_desc.get(&sprite_desc_handle).unwrap();
+        let recipes_desc: &RecipeListProto = recipes_desc.get(&recipes_desc_handle).unwrap();
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),

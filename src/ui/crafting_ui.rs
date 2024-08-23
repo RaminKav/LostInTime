@@ -1,4 +1,5 @@
 pub use bevy::prelude::*;
+use bevy::reflect::TypeUuid;
 use serde::{Deserialize, Serialize};
 
 use crate::{container::Container, item::CraftingTracker};
@@ -11,8 +12,20 @@ pub struct CraftingContainer {
 }
 
 #[derive(
-    Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Reflect, FromReflect,
+    Default,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    Reflect,
+    FromReflect,
+    TypeUuid,
 )]
+#[uuid = "413be529-bfeb-41d3-9db0-4b8b380a2c36"]
+
 pub enum CraftingContainerType {
     #[default]
     Inventory,

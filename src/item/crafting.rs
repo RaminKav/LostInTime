@@ -1,4 +1,4 @@
-use bevy::{prelude::*, utils::HashMap};
+use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -45,7 +45,8 @@ pub struct Recipes {
     pub upgradeable_items: Vec<WorldObject>,
 }
 
-#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq, TypeUuid)]
+#[uuid = "413bd529-bfeb-41b3-9db0-4b8b380a2c36"]
 pub struct RecipeItem {
     pub item: WorldObject,
     pub count: usize,
@@ -53,6 +54,7 @@ pub struct RecipeItem {
 
 pub type RecipeList = HashMap<WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize)>;
 pub type FurnaceRecipeList = HashMap<WorldObject, WorldObject>;
+
 pub type RecipeListProto = (
     Vec<(WorldObject, (Vec<RecipeItem>, CraftingContainerType, usize))>,
     Vec<(WorldObject, WorldObject)>,

@@ -79,7 +79,7 @@ use combat::*;
 use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
 use inventory::ItemStack;
-use item::{Equipment, ItemsPlugin, WorldObject, WorldObjectResource};
+use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectResource};
 use player::{Player, PlayerPlugin, PlayerState, TimeFragmentCurrency};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
@@ -183,7 +183,8 @@ fn main() {
                 .build()
                 .disable::<LogPlugin>(), // we handle logging ourselves
         )
-        .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["ron"]))
+        .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
+        .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .add_plugin(panic_handler::PanicHandler::new().build())
@@ -318,8 +319,10 @@ pub struct ImageAssets {
     pub tiles_sheet: Handle<Image>,
     #[asset(path = "SmallWallTextures.png")]
     pub walls_sheet: Handle<Image>,
-    #[asset(path = "textures/sprites_desc.ron")]
+    #[asset(path = "textures/sprites.desc.ron")]
     pub sprite_desc: Handle<GraphicsDesc>,
+    #[asset(path = "recipes/recipes.ron")]
+    pub recipes: Handle<RecipeListProto>,
 }
 
 #[derive(Component)]
