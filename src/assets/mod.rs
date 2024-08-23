@@ -297,9 +297,12 @@ impl GameAssetsPlugin {
                 (
                     mob.clone(),
                     vec![
-                        asset_server.load(format!("textures/{}/{}_side.png", mob, mob)),
-                        asset_server.load(format!("textures/{}/{}_up.png", mob, mob)),
-                        asset_server.load(format!("textures/{}/{}_down.png", mob, mob)),
+                        asset_server
+                            .load(format!("textures/{}/{}_side.png", mob, mob).to_lowercase()),
+                        asset_server
+                            .load(format!("textures/{}/{}_up.png", mob, mob).to_lowercase()),
+                        asset_server
+                            .load(format!("textures/{}/{}_down.png", mob, mob).to_lowercase()),
                     ],
                 )
             })

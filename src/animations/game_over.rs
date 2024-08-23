@@ -123,8 +123,8 @@ pub fn handle_game_over_fadeout(
             FacingDirection::Down => "down",
         };
         // set player to death sprite
-        let player_texture_handle =
-            asset_server.load(format!("textures/player/player_{}_dead.png", dir_str));
+        let player_texture_handle = asset_server
+            .load(format!("textures/player/player_{}_dead.png", dir_str).to_lowercase());
         texture_atlas.texture = player_texture_handle.clone();
         if dir == &FacingDirection::Left {
             sprite.flip_x = true;
