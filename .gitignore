@@ -1,9 +1,6 @@
 /target
 .DS_Store
-save_state.json
-game_data.json
+/dev_data
 notes.md
-/analytics
 /build
 .direnv
-/logs
