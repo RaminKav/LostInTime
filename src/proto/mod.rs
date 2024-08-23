@@ -12,7 +12,6 @@ use bevy_proto::{
     prelude::{Prototypes, PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
-use strum::IntoEnumIterator;
 
 pub mod proto_param;
 use crate::{
@@ -145,8 +144,13 @@ impl Plugin for ProtoPlugin {
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
-            .add_system(Self::load_prototypes.in_schedule(OnEnter(GameState::Loading)))
-            .add_system(Self::check_proto_ready.in_set(OnUpdate(GameState::LoadingProtos)));
+            .add_system(Self::load_prototypes.in_set(OnUpdate(GameState::LoadingProtos)))
+            .add_system(
+                Self::check_proto_ready
+                    .run_if(resource_exists::<AllProtos>())
+                    .after(Self::load_prototypes)
+                    .in_set(OnUpdate(GameState::LoadingProtos)),
+            );
     }
 }
 
@@ -166,6 +170,7 @@ impl ProtoPlugin {
     ) {
         for p in &handles.0 {
             if !prototypes.is_ready_handle(p) {
+                println!("Proto not ready yet {p:?}",);
                 return;
             }
         }

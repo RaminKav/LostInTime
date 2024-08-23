@@ -76,7 +76,8 @@ impl SpriteSize {
 pub struct SpriteAnchor(pub Vec2);
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
-#[derive(Deserialize)]
+#[derive(Deserialize, TypeUuid)]
+#[uuid = "413be529-bfeb-41b3-9db0-4b8b380a2c36"]
 pub struct GraphicsDesc {
     items: HashMap<WorldObject, WorldObjectData>,
     icons: HashMap<WorldObject, SpriteData>,
@@ -245,6 +246,7 @@ impl GameAssetsPlugin {
         mut texture_assets: ResMut<Assets<TextureAtlas>>,
         mut world_obj_data: ResMut<WorldObjectResource>,
         asset_server: Res<AssetServer>,
+        graphics_desc: Res<Assets<GraphicsDesc>>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -264,12 +266,9 @@ impl GameAssetsPlugin {
             .unwrap();
         }
 
-        let sprite_desc = fs::read_to_string("./assets/textures/sprites_desc.ron").unwrap();
         let recipe_desc = fs::read_to_string("./assets/recipes/recipes.ron").unwrap();
-
-        let sprite_desc: GraphicsDesc = from_str(&sprite_desc).unwrap_or_else(|e| {
-            panic!("Failed to load config for graphics: {e}");
-        });
+        let s: Handle<GraphicsDesc> = asset_server.load("textures/sprites_desc.ron");
+        let sprite_desc = graphics_desc.get(&s).unwrap();
         let recipes_desc: RecipeListProto = from_str(&recipe_desc).unwrap_or_else(|e| {
             panic!("Failed to load config for recipes: {e}");
         });
@@ -314,8 +313,7 @@ impl GameAssetsPlugin {
 
         for (item, rect) in sprite_desc.items.iter() {
             {
-                let mut sprite =
-                    TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+                let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
                 //Set the size to be proportional to the source rectangle
                 sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
