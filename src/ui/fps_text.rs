@@ -33,7 +33,7 @@ pub fn spawn_fps_text(
             .with_alignment(TextAlignment::Left),
             transform: Transform {
                 translation: Vec3::new(
-                    resolution.game_width / 2. - 32.5,
+                    resolution.game_width / 2. - 38.5,
                     -GAME_HEIGHT / 2. + 5.,
                     1.,
                 ),

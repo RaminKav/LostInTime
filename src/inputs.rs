@@ -6,6 +6,7 @@ use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyA
 use crate::animations::AttackEvent;
 use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
+use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
@@ -77,19 +78,21 @@ impl Plugin for InputsPlugin {
             })
             .add_systems(
                 (
-                    move_player,
-                    turn_player,
-                    mouse_click_system.after(CustomFlush),
+                    move_player.run_if(is_not_paused),
+                    turn_player.run_if(is_not_paused),
+                    mouse_click_system.run_if(is_not_paused).after(CustomFlush),
                     handle_hotbar_key_input,
-                    tick_dash_timer,
-                    toggle_inventory,
+                    tick_dash_timer.run_if(is_not_paused),
                     handle_open_essence_ui,
-                    close_container,
                     diagnostics,
-                    handle_interact_objects,
+                    handle_interact_objects.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((
+                toggle_inventory.run_if(in_state(GameState::Main)),
+                close_container.run_if(in_state(GameState::Main)),
+            ))
             .add_system(update_cursor_pos.after(move_player))
             .add_system(
                 move_camera_with_player

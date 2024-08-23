@@ -2,6 +2,7 @@ mod enemy_hostile_basic;
 pub mod pathfinding;
 
 use crate::{
+    client::is_not_paused,
     enemy::{
         fairy::{new_idle, trade_anim},
         red_mushking::{
@@ -26,21 +27,21 @@ impl Plugin for AIPlugin {
             .add_systems((spawn_new_debug_path,).in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
-                    follow,
-                    new_follow,
-                    new_idle,
-                    handle_death,
-                    return_to_shrine,
-                    trade_anim,
-                    leap_attack,
-                    summon_attack,
-                    new_leap_attack,
-                    gas_attack,
-                    sprout,
-                    projectile_attack,
-                    tick_enemy_attack_cooldowns,
-                    cache_ai_path_on_new_obj_spawn,
-                    idle,
+                    follow.run_if(is_not_paused),
+                    new_follow.run_if(is_not_paused),
+                    new_idle.run_if(is_not_paused),
+                    handle_death.run_if(is_not_paused),
+                    return_to_shrine.run_if(is_not_paused),
+                    trade_anim.run_if(is_not_paused),
+                    leap_attack.run_if(is_not_paused),
+                    summon_attack.run_if(is_not_paused),
+                    new_leap_attack.run_if(is_not_paused),
+                    gas_attack.run_if(is_not_paused),
+                    sprout.run_if(is_not_paused),
+                    projectile_attack.run_if(is_not_paused),
+                    tick_enemy_attack_cooldowns.run_if(is_not_paused),
+                    cache_ai_path_on_new_obj_spawn.run_if(is_not_paused),
+                    idle.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );

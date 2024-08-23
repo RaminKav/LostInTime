@@ -38,8 +38,10 @@ mod essence_ui;
 pub use essence_ui::*;
 
 use crate::{
-    client::load_state, combat::handle_hits, item::item_actions::ActionSuccessEvent, CustomFlush,
-    GameState, DEBUG,
+    client::{load_state, ClientState},
+    combat::handle_hits,
+    item::item_actions::ActionSuccessEvent,
+    CustomFlush, GameState, DEBUG,
 };
 
 use self::{
@@ -128,12 +130,6 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    setup_inv_slots_ui,
-                    setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
-                    change_ui_state_to_chest_when_resource_added
-                        .before(CustomFlush)
-                        .run_if(resource_added::<ChestContainer>()),
-                    text_update_system,
                     handle_item_drop_clicks,
                     handle_drop_dragged_items_on_inv_close,
                     handle_dragging,
@@ -144,25 +140,20 @@ impl Plugin for UIPlugin {
                         .run_if(not(in_state(UIState::Closed))),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
-                    update_healthbar,
                     handle_update_inv_item_entities,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
                 (
+                    change_ui_state_to_chest_when_resource_added
+                        .before(CustomFlush)
+                        .run_if(resource_added::<ChestContainer>()),
+                    text_update_system,
                     add_inv_to_new_chest_objs,
                     add_container_to_new_furnace_objs,
-                    setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                     update_foodbar,
-                    update_furnace_bar,
-                    update_mana_bar,
-                    handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
-                    toggle_skills_visibility,
-                    spawn_tile_hover_on_cursor_move,
-                    setup_skill_choice_ui
-                        .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                    update_healthbar,
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<CraftingContainer>()),
@@ -180,27 +171,41 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
+                    setup_inv_slots_ui,
+                    setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     tick_tooltip_timer,
                     handle_tooltip_teardown,
                     handle_submit_essence_choice,
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
-                    handle_clamp_screen_locked_icons,
+                    handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
+                    update_furnace_bar,
+                    setup_skill_choice_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
                     handle_update_player_skills,
-                    spawn_shrine_interact_key_guide,
-                    add_guide_to_unique_objs,
-                    update_currency_text,
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(tick_game_start_overlay)
+            .add_systems(
+                (
+                    tick_game_start_overlay,
+                    handle_clamp_screen_locked_icons,
+                    spawn_shrine_interact_key_guide,
+                    add_guide_to_unique_objs,
+                    toggle_skills_visibility,
+                    update_currency_text,
+                    update_mana_bar,
+                    spawn_tile_hover_on_cursor_move,
+                    setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(
-                handle_new_ui_state
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                handle_new_ui_state.in_base_set(CoreSet::PostUpdate), // .run_if(in_state(GameState::Main)),
             )
             .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
             .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
@@ -217,6 +222,7 @@ fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
 
 pub fn handle_new_ui_state(
     mut next_ui_state: ResMut<NextState<UIState>>,
+    mut next_client_state: ResMut<NextState<ClientState>>,
     curr_ui_state: Res<State<UIState>>,
     old_ui: Query<(Entity, &UIState), With<UIState>>,
     mut commands: Commands,
@@ -228,6 +234,7 @@ pub fn handle_new_ui_state(
         return;
     }
     let next_ui = next_ui_state.0.as_ref().unwrap().clone();
+
     let mut should_close_self = false;
     let should_reset_crafting_container =
         next_ui != curr_ui_state.0 && curr_ui_state.0.is_inv_open();
@@ -279,5 +286,11 @@ pub fn handle_new_ui_state(
                 Visibility::Inherited
             };
         }
+    }
+    info!("{:?}", next_ui);
+    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed {
+        next_client_state.set(ClientState::Paused);
+    } else {
+        next_client_state.set(ClientState::Unpaused);
     }
 }

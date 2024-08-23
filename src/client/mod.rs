@@ -64,6 +64,7 @@ pub struct ClientPlugin;
 impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<GameOverEvent>()
+            .add_state::<ClientState>()
             .add_plugins(SavePlugins)
             .register_saveable::<GenerationSeed>()
             .register_saveable::<Dimension>()
@@ -183,6 +184,12 @@ pub struct SaveTimer {
     timer: Timer,
 }
 
+#[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
+pub enum ClientState {
+    #[default]
+    Unpaused,
+    Paused,
+}
 #[derive(Resource, Clone, Serialize, Deserialize, Default)]
 pub struct GameData {
     pub num_runs: u128,
@@ -493,4 +500,8 @@ pub fn load_state(
     });
 
     info!("DONE LOADING GAME DATA");
+}
+
+pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
+    state.0 == ClientState::Unpaused
 }

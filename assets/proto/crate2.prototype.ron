@@ -38,23 +38,29 @@
                 rate: 0.05
             ),
             (
+                item: WoodSword,
+                min: 1,
+                max: 1,
+                rate: 0.05
+            ),
+            (
                 item: WoodBow,
                 min: 1,
                 max: 1,
                 rate: 0.03
             ),
-            // (
-            //     item: Ring,
-            //     min: 1,
-            //     max: 1,
-            //     rate: 0.01
-            // ),
-            //  (
-            //     item: Pendant,
-            //     min: 1,
-            //     max: 1,
-            //     rate: 0.01
-            // ),
+            (
+                item: Ring,
+                min: 1,
+                max: 1,
+                rate: 0.01
+            ),
+             (
+                item: Pendant,
+                min: 1,
+                max: 1,
+                rate: 0.01
+            ),
             (
                 item: SmallPotion,
                 min: 1,
@@ -95,13 +101,13 @@
                 item: RedMushroomBlock,
                 min: 1,
                 max: 1,
-                rate: 0.07
+                rate: 0.2
             ),
             (
                 item: BrownMushroomBlock,
                 min: 1,
                 max: 1,
-                rate: 0.07
+                rate: 0.2
             ),
             (
                 item: Flint,
@@ -125,6 +131,19 @@
                 item: Arrow,
                 min: 4,
                 max: 16,
+                rate: 0.35
+            ),
+            (
+                item: ThrowingStar,
+                min: 4,
+                max: 16,
+                rate: 0.35
+            ),
+            
+            (
+                item: TimeFragment,
+                min: 1,
+                max: 1,
                 rate: 0.05
             ),
             ]

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
+    client::is_not_paused,
     colors::{overwrite_alpha, NIGHT},
     GameState, ScreenResolution, GAME_HEIGHT,
 };
@@ -44,8 +45,16 @@ impl Plugin for NightPlugin {
         app.register_type::<NightTracker>()
             .add_event::<NewDayEvent>()
             // .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
-            .add_system(spawn_night.in_schedule(OnEnter(GameState::Main)))
-            .add_system(tick_night_color.in_set(OnUpdate(GameState::Main)));
+            .add_system(
+                spawn_night
+                    .run_if(is_not_paused)
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
+                tick_night_color
+                    .run_if(is_not_paused)
+                    .in_set(OnUpdate(GameState::Main)),
+            );
     }
 }
 
@@ -94,9 +103,7 @@ pub fn tick_night_color(
                 new_day_event.send_default();
             }
             // change music
-            if night_tracker.is_night()
-                && bgm_tracker.current_track != *"sounds/bgm_night.ogg"
-            {
+            if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
                 bgm_track_event.send(UpdateBGMTrackEvent {
                     asset_path: "sounds/bgm_night.ogg".to_owned(),
                 });

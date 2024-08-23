@@ -5,10 +5,13 @@
 ### Changes
 
 - Assets are now embedded in the binary
+- Crates drop slightly better loot
+- EXP curve adjusted to be quadratic
 
 ### Features
 
-- Allow placing some objects o nwater blocks
+- Allow placing some objects on water blocks
+- Pause during any Inventory/menus!
 
 ### Bugfixes
 
