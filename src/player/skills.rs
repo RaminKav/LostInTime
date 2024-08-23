@@ -329,7 +329,7 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::Health)
                     .set_repeatable()
                     .with_children(vec![
-                        SkillChoiceState::new(Skill::Lifesteal).set_repeatable(),
+                        SkillChoiceState::new(Skill::Lifesteal),
                         SkillChoiceState::new(Skill::Thorns).set_repeatable(),
                     ]),
                 SkillChoiceState::new(Skill::Speed)
