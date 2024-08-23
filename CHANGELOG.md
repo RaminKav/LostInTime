@@ -17,6 +17,7 @@
 - fix water collider not returning after breaking bridges
 - skills now give weapons that scale with player level
 - actually fix shrine depth...
+- fix spacing on guide input hovers
 
 ## 0.1.2
 

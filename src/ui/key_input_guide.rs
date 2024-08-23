@@ -85,15 +85,17 @@ pub fn spawn_shrine_interact_key_guide(
                     .insert(Name::new("Interact Guide"))
                     .id();
                 let key_entity = if let Some(key) = guide.key.clone() {
-                    let x_offset = if guide.text.is_some() { 20. } else { 0. };
+                    let x_offset = if guide.text.is_some() {
+                        f32::round(guide.text.as_ref().unwrap().chars().count() as f32 * -2.7 - 4.)
+                    } else {
+                        0.
+                    };
                     Some(
                         commands
                             .spawn(SpriteBundle {
                                 texture: asset_server.load(format!("textures/{}Key.png", key)),
                                 transform: Transform::from_translation(Vec3::new(
-                                    -29. + x_offset,
-                                    0.5,
-                                    1.,
+                                    x_offset, 0.5, 1.,
                                 )),
                                 sprite: Sprite {
                                     custom_size: Some(Vec2::new(10., 10.)),
@@ -107,8 +109,8 @@ pub fn spawn_shrine_interact_key_guide(
                 } else {
                     None
                 };
-                let text_entity = if let Some(text) = guide.text.clone() {
-                    let x = if key_entity.is_some() { 20.5 } else { 0. };
+                if let Some(text) = guide.text.clone() {
+                    let x = if key_entity.is_some() { 6. } else { 0.5 };
                     let text_e = spawn_text(
                         &mut commands,
                         &asset_server,
@@ -116,19 +118,19 @@ pub fn spawn_shrine_interact_key_guide(
                         Color::WHITE,
                         text,
                         if key_entity.is_some() {
-                            Anchor::CenterLeft
+                            Anchor::Center
                         } else {
                             Anchor::Center
                         },
                         1.,
                         0,
                     );
+                    if let Some(key_e) = key_entity {
+                        commands.entity(key_e).set_parent(text_e);
+                    }
                     commands.entity(text_e).set_parent(parent_entity);
-                    Some(text_e)
-                } else {
-                    None
                 };
-                let item_icon = if let Some(icon_stack) = guide.icon_stack.clone() {
+                if let Some(icon_stack) = guide.icon_stack.clone() {
                     let icon = spawn_item_stack_icon(
                         &mut commands,
                         &game.graphics,
@@ -138,25 +140,21 @@ pub fn spawn_shrine_interact_key_guide(
                         Vec2::new(0.0, 0.),
                         0,
                     );
-                    Some(
-                        commands
-                            .spawn(SpriteBundle {
-                                texture: game
-                                    .graphics
-                                    .get_ui_element_texture(UIElement::ScreenIconSlot),
-                                transform: Transform::from_translation(Vec3::new(0., 18.5, 1.)),
-                                sprite: Sprite {
-                                    custom_size: Some(Vec2::new(16., 16.)),
-                                    ..Default::default()
-                                },
+
+                    commands
+                        .spawn(SpriteBundle {
+                            texture: game
+                                .graphics
+                                .get_ui_element_texture(UIElement::ScreenIconSlot),
+                            transform: Transform::from_translation(Vec3::new(0., 18.5, 1.)),
+                            sprite: Sprite {
+                                custom_size: Some(Vec2::new(16., 16.)),
                                 ..Default::default()
-                            })
-                            .set_parent(parent_entity)
-                            .push_children(&[icon])
-                            .id(),
-                    )
-                } else {
-                    None
+                            },
+                            ..Default::default()
+                        })
+                        .set_parent(parent_entity)
+                        .push_children(&[icon]);
                 };
             }
         }
