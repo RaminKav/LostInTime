@@ -10,7 +10,6 @@ use crate::{
         projectile::{ProjectileState, RangedAttack},
         WorldObject,
     },
-    world::WorldGeneration,
 };
 
 use super::SpriteSheetProto;

@@ -376,7 +376,7 @@ fn juice_up_spawned_elite_mobs(
             .drops
             .iter()
             .map(|l| Loot {
-                item: l.item.clone(),
+                item: l.item,
                 min: l.min,
                 max: l.max,
                 rate: l.rate * 2.5,

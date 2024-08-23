@@ -347,7 +347,7 @@ pub fn spawn_inv_slot(
     }
 
     // Inv Slot Icon //
-    let slot_icon = match slot_type.clone() {
+    let slot_icon = match slot_type {
         InventorySlotType::Equipment => match slot_index {
             2 => Some("ui/icons/ChestSlotIcon.png"),
             1 => Some("ui/icons/PantsSlotIcon.png"),
@@ -362,9 +362,7 @@ pub fn spawn_inv_slot(
         },
         _ => None,
     };
-    let icon_entity_option = if let Some(slot_icon) = slot_icon {
-        Some(
-            commands
+    let icon_entity_option = slot_icon.map(|slot_icon| commands
                 .spawn(SpriteBundle {
                     texture: asset_server.load(slot_icon),
                     transform: Transform {
@@ -379,11 +377,7 @@ pub fn spawn_inv_slot(
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
-                .id(),
-        )
-    } else {
-        None
-    };
+                .id());
 
     let mut slot_entity = commands.spawn(SpriteBundle {
         texture: graphics.get_ui_element_texture(
@@ -474,7 +468,7 @@ pub fn spawn_item_stack_icon(
         .id();
     // glow effect for rarity
     if let Some(glow_e) =
-        add_item_glows(commands, &graphics, item_entity, item_stack.rarity.clone())
+        add_item_glows(commands, graphics, item_entity, item_stack.rarity.clone())
     {
         commands
             .entity(glow_e)

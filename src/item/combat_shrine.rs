@@ -38,10 +38,10 @@ pub fn handle_combat_shrine_activate_animation(
     mut commands: Commands,
     game: GameParam,
 ) {
-    for (e, t, mut shrine, mut anim) in shrines.iter_mut() {
+    for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if anim.current_frame() == 55 {
             *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-            let mut num_to_spawn = shrine.num_mobs_left.clone();
+            let mut num_to_spawn = shrine.num_mobs_left;
             let possible_spawns = [Mob::FurDevil, Mob::Bushling, Mob::StingFly, Mob::SpikeSlime];
             let mut fallback_count = 0;
             let mut rng = rand::thread_rng();
@@ -122,11 +122,10 @@ pub fn handle_shrine_rewards(
             if shrine.num_mobs_left == 0 {
                 // give rewards
                 proto_commands.spawn_item_from_proto(
-                    drop_list
+                    *drop_list
                         .iter()
                         .choose(&mut rand::thread_rng())
-                        .unwrap()
-                        .clone(),
+                        .unwrap(),
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
                     1,

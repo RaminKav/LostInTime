@@ -184,7 +184,7 @@ impl GenerationPlugin {
                     1.,
                 ),
                 world_generation_params.forest_params.forest_radius * TILE_SIZE.x,
-                world_generation_params.forest_params.max_trees_per_forest as usize,
+                world_generation_params.forest_params.max_trees_per_forest,
                 forest_nucleous,
                 rng.clone(),
             );
@@ -362,7 +362,7 @@ impl GenerationPlugin {
         }
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap().clone();
+            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
             let dungeon_check = dungeon_check.get_single();
             let is_chunk_generated = if dungeon_check.is_ok() {
                 game.is_dungeon_chunk_generated(chunk_pos)
@@ -451,7 +451,7 @@ impl GenerationPlugin {
 
                         // mark tiles as occupied for future objects
                         tiles_obj_wants_to_take_up.iter().for_each(|p| {
-                            occupied_tiles.insert(*p, obj_to_clear.clone());
+                            occupied_tiles.insert(*p, *obj_to_clear);
                         });
                         validated_objs.push((*pos, *obj_to_clear));
                     }
@@ -556,7 +556,9 @@ impl GenerationPlugin {
                             .world_generation_params
                             .obj_allowed_tiles_map
                             .get(&tp.1)
-                            .expect(&format!("no allowed tiles for obj_to_clear {:?}", &tp.1));
+                            .unwrap_or_else(|| {
+                                panic!("no allowed tiles for obj_to_clear {:?}", &tp.1)
+                            });
                         for allowed_tile in filter.iter() {
                             if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
                                 return true;
@@ -564,7 +566,7 @@ impl GenerationPlugin {
                         }
                         false
                     })
-                    .map(|tp| *tp)
+                    .copied()
                     .collect::<HashMap<_, _>>();
                 // clear out spawn area
                 let clear_tiles = get_radial_tile_positions(
@@ -617,7 +619,7 @@ impl GenerationPlugin {
                                             get_neighbour_tile(pos, (x as i8, y as i8)),
                                             false,
                                         );
-                                        if is_tile_water(n_pos, &mut game).is_ok_and(|x| x) {
+                                        if is_tile_water(n_pos, &game).is_ok_and(|x| x) {
                                             let mut rng = rand::thread_rng();
 
                                             pos = TileMapPosition::new(
@@ -751,7 +753,7 @@ impl GenerationPlugin {
                             .entity(spawned_obj)
                             .set_parent(game.get_chunk_entity(pos.chunk_pos).unwrap());
 
-                        if let Ok(_) = dungeon_check {
+                        if dungeon_check.is_ok() {
                             let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
                             if obj_to_spawn.is_wall() {
                                 wall_cache.walls.insert(*pos, true);

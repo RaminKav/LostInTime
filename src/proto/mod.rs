@@ -8,9 +8,8 @@ use bevy::{
     utils::HashMap,
 };
 use bevy_proto::{
-    backend::{proto, schematics::FromSchematicInput},
+    backend::schematics::FromSchematicInput,
     prelude::{Prototypes, PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
-    proto::Prototype,
 };
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
 use strum::IntoEnumIterator;

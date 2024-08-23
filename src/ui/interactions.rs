@@ -306,13 +306,10 @@ pub fn handle_dragging(
     // if dropped outside inventory space, remove item and spawn dropped entity item stack
     // else, it is an invalid drag, reset the its original location
     for (_e, interactable) in interactables.iter_mut() {
-        match interactable.current() {
-            Interaction::Dragging { item, .. } => {
-                if let Ok((_e, mut t)) = drag_query.get_mut(*item) {
-                    t.translation = cursor_pos.ui_coords.truncate().extend(998.);
-                }
+        if let Interaction::Dragging { item, .. } = interactable.current() {
+            if let Ok((_e, mut t)) = drag_query.get_mut(*item) {
+                t.translation = cursor_pos.ui_coords.truncate().extend(998.);
             }
-            _ => {}
         }
     }
 }
@@ -358,14 +355,12 @@ pub fn handle_hovering(
                         chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_furnace() {
                         furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                    } else if state.r#type.is_crafting() && crafting_option.is_some() {
+                        crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
-                        if state.r#type.is_crafting() && crafting_option.is_some() {
-                            crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
-                        } else {
-                            inv.single().get_items_from_slot_type(state.r#type).items
-                                [state.slot_index]
-                                .clone()
-                        }
+                        inv.single().get_items_from_slot_type(state.r#type).items
+                            [state.slot_index]
+                            .clone()
                     };
                     if let Some(item) = item {
                         tooltip_update_events.send(ToolTipUpdateEvent {
@@ -376,33 +371,29 @@ pub fn handle_hovering(
                     }
                 }
             }
-            if ui == &UIElement::InventorySlotHover {
-                if shift_key_just_pressed || shift_key_just_released {
-                    tooltip_teardown_events.send_default();
-                    let state = state_option.unwrap();
+            if ui == &UIElement::InventorySlotHover && (shift_key_just_pressed || shift_key_just_released) {
+                tooltip_teardown_events.send_default();
+                let state = state_option.unwrap();
 
-                    if let Some(_item_e) = state.item {
-                        let item = if state.r#type.is_chest() {
-                            chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
-                        } else if state.r#type.is_furnace() {
-                            furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
-                        } else {
-                            if state.r#type.is_crafting() && crafting_option.is_some() {
-                                crafting_option.as_ref().unwrap().items.items[state.slot_index]
-                                    .clone()
-                            } else {
-                                inv.single().get_items_from_slot_type(state.r#type).items
-                                    [state.slot_index]
-                                    .clone()
-                            }
-                        };
-                        if let Some(item) = item {
-                            tooltip_update_events.send(ToolTipUpdateEvent {
-                                item_stack: item.item_stack,
-                                is_recipe: state.r#type.is_crafting(),
-                                show_range: shift_key_pressed,
-                            });
-                        }
+                if let Some(_item_e) = state.item {
+                    let item = if state.r#type.is_chest() {
+                        chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                    } else if state.r#type.is_furnace() {
+                        furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                    } else if state.r#type.is_crafting() && crafting_option.is_some() {
+                        crafting_option.as_ref().unwrap().items.items[state.slot_index]
+                            .clone()
+                    } else {
+                        inv.single().get_items_from_slot_type(state.r#type).items
+                            [state.slot_index]
+                            .clone()
+                    };
+                    if let Some(item) = item {
+                        tooltip_update_events.send(ToolTipUpdateEvent {
+                            item_stack: item.item_stack,
+                            is_recipe: state.r#type.is_crafting(),
+                            show_range: shift_key_pressed,
+                        });
                     }
                 }
             }
@@ -416,8 +407,7 @@ pub fn handle_hovering(
                     stat: Some(StatType::from_index(
                         stats_option
                             .expect("stats buttons have stats state")
-                            .index
-                            .clone(),
+                            .index,
                     )),
                     ignore_timer: true,
                 });
@@ -710,12 +700,12 @@ pub fn handle_interaction_clicks(
                         }
                         let is_furnace = container_param.furnace_option.is_some();
                         let mut inv = inv.single_mut();
-                        if let Some(mut active_container) =
+                        if let Some(active_container) =
                             container_param.get_active_ui_container_mut()
                         {
                             if state.r#type.is_inventory() && !is_furnace {
                                 inv.items.move_item_to_target_container(
-                                    &mut active_container,
+                                    active_container,
                                     state.slot_index,
                                 )
                             } else if !state.r#type.is_inventory() {

@@ -1,9 +1,9 @@
 use super::{SchematicSpawnEvent, SchematicType};
 use crate::{
     world::{
-        chunk::{Chunk, GenerateObjectsEvent},
+        chunk::Chunk,
         world_helpers::tile_pos_to_world_pos,
-        TileMapPosition, CHUNK_SIZE,
+        TileMapPosition,
     },
     GameParam,
 };

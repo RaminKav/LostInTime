@@ -69,15 +69,15 @@ impl Direction {
         let is_biased = rng.gen_ratio(50 + bias.strength, 100);
         let which_dir = rng.gen_ratio(1, 2);
         if is_biased {
-            return match which_dir {
+            match which_dir {
                 true => bias.bias,
                 false => bias.bias.get_opposite(),
-            };
+            }
         } else {
-            return match which_dir {
+            match which_dir {
                 true => bias.bias.get_neighbour(),
                 false => bias.bias.get_opposite().get_neighbour(),
-            };
+            }
         }
     }
     fn get_opposite(&self) -> Self {
@@ -114,16 +114,16 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
         if let Some((x, _)) = picked_tile {
             let player_tile_pos = TileMapPosition::new(
                 IVec2::new(
-                    f64::floor((x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64)
+                    f64::floor((x as f64 - 3. * CHUNK_SIZE as f64) / (CHUNK_SIZE) as f64)
                         as i32,
                     f64::floor(
-                        ((3. * CHUNK_SIZE as f64) - y as f64 - 1.) as f64 / (CHUNK_SIZE) as f64,
+                        ((3. * CHUNK_SIZE as f64) - y as f64 - 1.) / (CHUNK_SIZE) as f64,
                     ) as i32
                         + 1,
                 ),
                 TilePos {
                     x: f64::floor(x as f64 % (CHUNK_SIZE) as f64) as u32,
-                    y: f64::ceil(CHUNK_SIZE as f64 - (y as f64 % (CHUNK_SIZE) as f64) as f64)
+                    y: f64::ceil(CHUNK_SIZE as f64 - (y as f64 % (CHUNK_SIZE) as f64))
                         as u32
                         - 1,
                 },
@@ -137,7 +137,7 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
 }
 //TODO: add seed to this rng
 pub fn gen_new_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>> {
-    let mut grid: Vec<Vec<i8>> = vec![vec![0; grid_size as usize]; grid_size as usize];
+    let mut grid: Vec<Vec<i8>> = vec![vec![0; grid_size]; grid_size];
     let mut walker = Walker {
         pos: Vec2::new((grid_size / 2) as f32, (grid_size / 2) as f32),
     };
@@ -178,30 +178,28 @@ pub fn add_dungeon_chests(
     while num_chests_left_to_spawn > 0 {
         picked_x = rng.gen_range(0..grid_size - 1);
         picked_y = rng.gen_range(0..grid_size - 1);
-        if dungeon.grid[picked_y][picked_x] == 1 {
-            if dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
-                let pos = TileMapPosition::new(
-                    IVec2::new(
-                        f64::floor(
-                            (picked_x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64,
-                        ) as i32,
-                        f64::floor(
-                            ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.) as f64
-                                / (CHUNK_SIZE) as f64,
-                        ) as i32
-                            + 1,
-                    ),
-                    TilePos {
-                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
-                        y: f64::ceil(
-                            CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64) as f64,
-                        ) as u32
-                            - 1,
-                    },
-                );
-                chest_positions.push(pos);
-                num_chests_left_to_spawn -= 1;
-            }
+        if dungeon.grid[picked_y][picked_x] == 1 && dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
+            let pos = TileMapPosition::new(
+                IVec2::new(
+                    f64::floor(
+                        (picked_x as f64 - 3. * CHUNK_SIZE as f64) / (CHUNK_SIZE) as f64,
+                    ) as i32,
+                    f64::floor(
+                        ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.)
+                            / (CHUNK_SIZE) as f64,
+                    ) as i32
+                        + 1,
+                ),
+                TilePos {
+                    x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
+                    y: f64::ceil(
+                        CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64),
+                    ) as u32
+                        - 1,
+                },
+            );
+            chest_positions.push(pos);
+            num_chests_left_to_spawn -= 1;
         }
     }
     for (_i, pos) in chest_positions.iter().enumerate() {
@@ -230,30 +228,28 @@ pub fn add_dungeon_exit_block(
     while num_exits_left_to_spawn > 0 {
         picked_x = rng.gen_range(0..grid_size - 1);
         picked_y = rng.gen_range(0..grid_size - 1);
-        if dungeon.grid[picked_y][picked_x] == 1 {
-            if dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
-                let pos = TileMapPosition::new(
-                    IVec2::new(
-                        f64::floor(
-                            (picked_x as f64 - 3. * CHUNK_SIZE as f64) as f64 / (CHUNK_SIZE) as f64,
-                        ) as i32,
-                        f64::floor(
-                            ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.) as f64
-                                / (CHUNK_SIZE) as f64,
-                        ) as i32
-                            + 1,
-                    ),
-                    TilePos {
-                        x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
-                        y: f64::ceil(
-                            CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64) as f64,
-                        ) as u32
-                            - 1,
-                    },
-                );
-                chest_positions.push(pos);
-                num_exits_left_to_spawn -= 1;
-            }
+        if dungeon.grid[picked_y][picked_x] == 1 && dungeon.grid[0.max(picked_y as i32 - 1) as usize][picked_x] == 0 {
+            let pos = TileMapPosition::new(
+                IVec2::new(
+                    f64::floor(
+                        (picked_x as f64 - 3. * CHUNK_SIZE as f64) / (CHUNK_SIZE) as f64,
+                    ) as i32,
+                    f64::floor(
+                        ((3. * CHUNK_SIZE as f64) - picked_y as f64 - 1.)
+                            / (CHUNK_SIZE) as f64,
+                    ) as i32
+                        + 1,
+                ),
+                TilePos {
+                    x: f64::floor(picked_x as f64 % (CHUNK_SIZE) as f64) as u32,
+                    y: f64::ceil(
+                        CHUNK_SIZE as f64 - (picked_y as f64 % (CHUNK_SIZE) as f64),
+                    ) as u32
+                        - 1,
+                },
+            );
+            chest_positions.push(pos);
+            num_exits_left_to_spawn -= 1;
         }
     }
     for (_i, pos) in chest_positions.iter().enumerate() {

@@ -41,7 +41,7 @@ impl PlayerLevel {
         self.xp += xp;
         if self.xp >= self.next_level_xp {
             self.level += 1;
-            self.xp = self.xp - self.next_level_xp;
+            self.xp -= self.next_level_xp;
             self.next_level_xp =
                 f32::floor(BASE_LEVEL_EXP_REQ * (1. + (0.25 * (self.level as f32 - 1.)))) as u32;
         }

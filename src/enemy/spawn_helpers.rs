@@ -13,7 +13,7 @@ pub fn can_spawn_mob_here(
 ) -> bool {
     let tile_pos = world_pos_to_tile_pos(pos);
     if !ignore_objs {
-        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+        if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, proto_param) {
             return false;
         }
     }

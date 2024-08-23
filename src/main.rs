@@ -83,7 +83,11 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, EnvFilter};
+use tracing_subscriber::{
+    fmt::format::FmtSpan,
+    layer::SubscriberExt,
+    EnvFilter,
+};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
     spawn_menu_text_buttons, InventorySlotState, UIPlugin,
@@ -148,7 +152,7 @@ fn main() {
     // macos bundles into a .app anyways, so we don't need to bundle assets.
     // doing it in the universal binary would double it since MacOS does M1 + Intel
     if cfg!(not(target_os = "macos")) {
-        app.add_plugin(EmbeddedAssetPlugin::default());
+        app.add_plugin(EmbeddedAssetPlugin);
     }
 
     let app = app
@@ -185,7 +189,7 @@ fn main() {
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_plugin(Material2dPlugin::<UITextureMaterial>::default())
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .add_plugin(WorldInspectorPlugin::new().run_if(should_show_inspector))
@@ -501,7 +505,7 @@ impl<'w, 's> GameParam<'w, 's> {
                 for neighbour_pos in pos
                     .get_neighbour_tiles_for_medium_objects()
                     .iter()
-                    .chain(vec![pos].iter())
+                    .chain([pos].iter())
                 {
                     if neighbour_pos == &tile {
                         return Some((obj_e, *obj));

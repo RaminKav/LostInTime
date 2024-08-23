@@ -944,7 +944,7 @@ impl ItemRarity {
     pub fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
         let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
         match self {
-            ItemRarity::Common => (0 + acc_offset)..=(1 + acc_offset),
+            ItemRarity::Common => acc_offset..=(1 + acc_offset),
             ItemRarity::Uncommon => (1 + acc_offset)..=(2 + acc_offset),
             ItemRarity::Rare => (2 + acc_offset)..=(3 + acc_offset),
             ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
@@ -1171,7 +1171,7 @@ fn handle_player_item_attribute_change_events(
         }
         new_att.add_attribute_components(
             &mut commands.entity(player),
-            old_health.clone().0,
+            old_health.0,
             skills,
         );
         let stat = if let Some((_, stat_state)) = stat_button
@@ -1269,7 +1269,7 @@ fn update_attributes_and_sprite_with_equipment_change(
                         let mat = materials.get_mut(mat).unwrap();
                         let armor_texture_handle = asset_server.load(format!(
                             "textures/player/{}.png",
-                            drop.dropped_item_stack.obj_type.to_string()
+                            drop.dropped_item_stack.obj_type
                         ));
                         mat.lookup_texture = Some(armor_texture_handle);
                     }
@@ -1343,9 +1343,7 @@ pub fn add_item_glows(
     new_item_e: Entity,
     rarity: ItemRarity,
 ) -> Option<Entity> {
-    if let Some(glow) = rarity.get_item_glow() {
-        Some(
-            commands
+    rarity.get_item_glow().map(|glow| commands
                 .spawn(SpriteBundle {
                     texture: graphics.get_item_glow(glow.clone()),
                     sprite: Sprite {
@@ -1360,9 +1358,5 @@ pub fn add_item_glows(
                     ..Default::default()
                 })
                 .set_parent(new_item_e)
-                .id(),
-        )
-    } else {
-        None
-    }
+                .id())
 }

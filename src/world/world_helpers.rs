@@ -68,8 +68,8 @@ pub fn tile_pos_to_world_pos(pos: TileMapPosition, _center: bool) -> Vec2 {
     )
 }
 pub fn world_pos_to_ui_screen_pos(pos: Vec2, camera_pos: Vec2) -> Vec2 {
-    let screen_pos = pos - camera_pos;
-    screen_pos
+    
+    pos - camera_pos
 }
 
 /// offset should not be larger than +/- 15
@@ -115,10 +115,8 @@ pub fn get_neighbour_wall_data(
 ) -> Option<WallTextureData> {
     let pos = get_neighbour_quadrant(pos, offset);
 
-    if game.get_chunk_entity(pos.chunk_pos).is_none() {
-        return None;
-    }
-    game.get_wall_data_at_tile(pos, &proto_param)
+    game.get_chunk_entity(pos.chunk_pos)?;
+    game.get_wall_data_at_tile(pos, proto_param)
 }
 
 pub fn can_object_be_placed_here(
@@ -137,30 +135,30 @@ pub fn can_object_be_placed_here(
     let is_medium = obj.is_medium_size(proto_param);
     if is_medium
         && (game
-            .get_obj_entity_at_tile(tile_pos, &proto_param)
+            .get_obj_entity_at_tile(tile_pos, proto_param)
             .is_some()
             || game
                 .get_obj_entity_at_tile(
                     tile_pos.get_neighbour_tiles_for_medium_objects()[0],
-                    &proto_param,
+                    proto_param,
                 )
                 .is_some()
             || game
                 .get_obj_entity_at_tile(
                     tile_pos.get_neighbour_tiles_for_medium_objects()[1],
-                    &proto_param,
+                    proto_param,
                 )
                 .is_some()
             || game
                 .get_obj_entity_at_tile(
                     tile_pos.get_neighbour_tiles_for_medium_objects()[2],
-                    &proto_param,
+                    proto_param,
                 )
                 .is_some())
     {
         debug!("obj exists here {tile_pos:?}");
         return false;
-    } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
+    } else if let Some(_existing_object) = game.get_obj_entity_at_tile(tile_pos, proto_param) {
         debug!("obj exists here {tile_pos:?}");
         return false;
     }

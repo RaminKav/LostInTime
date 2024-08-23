@@ -103,12 +103,10 @@ impl Container {
                         existing_item.modify_count(container_a_item_count as i8);
                     self.items[slot] = None;
                 }
-            } else {
-                if let Some(next_avail_slot) = Self::get_first_empty_slot(target_container) {
-                    target_container.items[next_avail_slot] =
-                        Some(container_a_item.modify_slot(next_avail_slot));
-                    self.items[slot] = None;
-                }
+            } else if let Some(next_avail_slot) = Self::get_first_empty_slot(target_container) {
+                target_container.items[next_avail_slot] =
+                    Some(container_a_item.modify_slot(next_avail_slot));
+                self.items[slot] = None;
             }
         }
     }
@@ -155,20 +153,16 @@ impl Container {
                     self.items[existing_item.slot] = existing_item.modify_count(stack_count as i8);
                     self.items[slot] = None;
                 }
-            } else {
-                if !is_from_hotbar {
-                    if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(self) {
-                        self.items[next_avail_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_slot));
-                        self.items[slot] = None;
-                    }
-                } else {
-                    if let Some(next_avail_slot) = Self::get_first_empty_non_hotbar_slot(self) {
-                        self.items[next_avail_slot] =
-                            Some(inv_item_stack.modify_slot(next_avail_slot));
-                        self.items[slot] = None;
-                    }
+            } else if !is_from_hotbar {
+                if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(self) {
+                    self.items[next_avail_slot] =
+                        Some(inv_item_stack.modify_slot(next_avail_slot));
+                    self.items[slot] = None;
                 }
+            } else if let Some(next_avail_slot) = Self::get_first_empty_non_hotbar_slot(self) {
+                self.items[next_avail_slot] =
+                    Some(inv_item_stack.modify_slot(next_avail_slot));
+                self.items[slot] = None;
             }
         }
     }
@@ -231,7 +225,7 @@ impl Container {
             cont_param.crafted_event.send(CraftedItemEvent {
                 obj: dragging_item_type,
             });
-            return new_item;
+            new_item
         } else {
             Some(dragging_item)
         }
@@ -263,26 +257,26 @@ impl Container {
         item: WorldObject,
     ) -> Result<(), InventoryError> {
         let mut remaining_cost = amount;
-        while remaining_cost > 0 && self.get_item_count_in_container(item.clone()) > 0 {
+        while remaining_cost > 0 && self.get_item_count_in_container(item) > 0 {
             let ingredient_slot = self
                 .get_slot_for_item_in_container(&item)
                 .expect("player crafted item but does not have the required ingredients?");
             let stack = self.items[ingredient_slot].as_mut().unwrap();
             if stack.item_stack.count >= amount {
                 self.items[ingredient_slot] = stack.modify_count(-(amount as i8));
-                remaining_cost = 0 as usize;
+                remaining_cost = 0_usize;
             } else {
                 let count = stack.item_stack.count;
                 self.items[ingredient_slot] = None;
-                remaining_cost -= count as usize;
+                remaining_cost -= count;
             }
         }
         if remaining_cost > 0 {
-            return Err(InventoryError::NotEnoughItems(
+            Err(InventoryError::NotEnoughItems(
                 "Not enough items".to_string(),
-            ));
+            ))
         } else {
-            return Ok(());
+            Ok(())
         }
     }
 }

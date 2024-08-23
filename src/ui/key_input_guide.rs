@@ -4,7 +4,7 @@ use crate::{
     assets::SpriteAnchor, inventory::ItemStack, item::WorldObject, player::Player, GameParam,
 };
 
-use super::{damage_numbers::spawn_text, spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
+use super::{damage_numbers::spawn_text, spawn_item_stack_icon, UIElement};
 
 #[derive(Component)]
 pub struct InteractGuide;

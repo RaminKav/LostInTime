@@ -870,7 +870,7 @@ pub fn handle_break_object(
         }
 
         // EXP Reward
-        if let Some(exp) = xp.get(broken.entity).ok() {
+        if let Ok(exp) = xp.get(broken.entity) {
             let mut player = player_xp.single_mut();
             player.add_xp(exp.0);
             let t = tile_pos_to_world_pos(broken.pos, true);

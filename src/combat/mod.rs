@@ -115,7 +115,7 @@ pub fn handle_attack_cooldowns(
 ) {
     let (player_e, cooldown, timer_option) = player.single_mut();
 
-    if attack_event.len() > 0 && timer_option.is_none() {
+    if !attack_event.is_empty() && timer_option.is_none() {
         let mut attack_cd_timer = AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
         attack_cd_timer.0.tick(time.delta());
         commands.entity(player_e).insert(attack_cd_timer);
@@ -273,11 +273,11 @@ pub fn handle_hits(
             let dmg = if hit.damage == 0 && hit.hit_entity != game.game.player {
                 1
             } else {
-                hit.damage as i32
+                hit.damage
             };
             if let Some(obj) = obj_option {
                 let anchor = proto_param
-                    .get_component::<SpriteAnchor, _>(obj.clone())
+                    .get_component::<SpriteAnchor, _>(*obj)
                     .unwrap_or(&SpriteAnchor(Vec2::ZERO));
                 let pos = world_pos_to_tile_pos(t.translation().truncate() - anchor.0);
 

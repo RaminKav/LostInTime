@@ -188,7 +188,7 @@ pub fn new_leap_attack(
         if anim_state.is_paused() {
             anim_state.play();
         }
-        if frame < 14 || frame > 28 {
+        if !(14..=28).contains(&frame) {
             *anim_state = AsepriteAnimation::from(RedMushking::tags::ATTACK_HOP);
         } else if frame == 23 {
             // BEGIN DMGING
@@ -199,7 +199,7 @@ pub fn new_leap_attack(
                 let hitbox = commands
                     .spawn((
                         TransformBundle::default(),
-                        attack.clone(),
+                        *attack,
                         leap_attack.clone(),
                         Collider::capsule(Vec2::new(-17., -15.), Vec2::new(17., -15.), 20.),
                         MobIsAttacking(Mob::RedMushking),
@@ -232,18 +232,16 @@ pub fn new_leap_attack(
             transforms.get(leap_attack.target).unwrap().translation + Vec3::new(0., 18., 0.);
         let attack_transform = transforms.get_mut(entity).unwrap();
         let attack_translation = attack_transform.translation;
-        if frame == 16 {
-            if leap_attack.dir.is_none() {
-                let delta = (target_translation - attack_translation).clamp(
-                    Vec3::splat(-MAX_JUMP_DISTANCE),
-                    Vec3::splat(MAX_JUMP_DISTANCE),
-                );
-                leap_attack.dir = Some(delta.truncate());
-            }
+        if frame == 16 && leap_attack.dir.is_none() {
+            let delta = (target_translation - attack_translation).clamp(
+                Vec3::splat(-MAX_JUMP_DISTANCE),
+                Vec3::splat(MAX_JUMP_DISTANCE),
+            );
+            leap_attack.dir = Some(delta.truncate());
         }
 
         // BEGIN MOVING
-        if frame >= 18 && frame <= 23 {
+        if (18..=23).contains(&frame) {
             // println!("      begin moveing {:?}", time.delta_seconds());
             kcc.translation =
                 Some((leap_attack.dir.unwrap_or(Vec2::ZERO) * time.delta_seconds()) * 10. / 6.);
@@ -291,11 +289,11 @@ pub fn summon_attack(
         if anim_state.is_paused() {
             anim_state.play();
         }
-        if frame < 29 || frame > 42 {
+        if !(29..=42).contains(&frame) {
             *anim_state = AsepriteAnimation::from(RedMushking::tags::START_SUMMON);
         } else if frame == 33 {
             *anim_state = AsepriteAnimation::from(RedMushking::tags::SUMMONING);
-        } else if frame >= 33 && frame <= 39 {
+        } else if (33..=39).contains(&frame) {
             // SUMMONING
 
             if summon_attack.num_summons_left > 0
@@ -422,10 +420,10 @@ impl BoolTrigger for JumpTimer {
     type Param<'w, 's> = Query<'w, 's, &'static EnemyAttackCooldown>;
 
     fn trigger(&self, entity: Entity, attack_cooldown: Self::Param<'_, '_>) -> bool {
-        if let Ok(_) = attack_cooldown.get(entity) {
+        if attack_cooldown.get(entity).is_ok() {
             return false;
         }
-        return true;
+        true
     }
 }
 #[derive(Component)]
@@ -526,7 +524,7 @@ impl Trigger for ShrineLOS {
             let delta = tfxm.translation.truncate() - self.shrine_pos;
 
             let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-            return (distance <= self.range).then_some(distance).ok_or(distance);
+            (distance <= self.range).then_some(distance).ok_or(distance)
         } else {
             Err(0.)
         }

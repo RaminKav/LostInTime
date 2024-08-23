@@ -141,7 +141,7 @@ fn save_schematic_scene(world: &mut World) {
             writer.register::<Vec3A>();
         }
         let mut builder =
-            DynamicSceneBuilder::from_world_with_type_registry(&world, type_registry.clone());
+            DynamicSceneBuilder::from_world_with_type_registry(world, type_registry.clone());
         for e in query.iter() {
             builder.extract_entity(e);
         }
@@ -152,7 +152,7 @@ fn save_schematic_scene(world: &mut World) {
         IoTaskPool::get()
             .spawn(async move {
                 // Write the scene RON data to file
-                File::create(format!("assets/scenes/test.scn.ron"))
+                File::create("assets/scenes/test.scn.ron")
                     .and_then(|mut file| file.write(serialized_scene.as_bytes()))
                     .expect("Error while writing scene to file");
             })

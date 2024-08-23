@@ -293,7 +293,7 @@ fn handle_spawn_mobs(
                     && !no_more_spawns_left
                 {
                     let player_pos = player_t.single().translation().truncate();
-                    let mut pos = player_pos.clone();
+                    let mut pos = player_pos;
                     let mut can_spawn_mob_here_check = false;
                     let mut fallback_attempts = 20;
                     while pos.distance(player_pos) <= TILE_SIZE.x * 10. || !can_spawn_mob_here_check

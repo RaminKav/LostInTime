@@ -195,73 +195,65 @@ pub fn handle_on_hit_upgrades(
             slow_option,
         ) = upgrades.single();
 
-        if let Some(_) = lightning_chain_option {
-            if hit.hit_with_projectile == Some(Projectile::Electricity) && *elec_count == 0 {
-                let Some(nearest_mob_t) = mobs.iter().find(|t| {
-                    t.2.translation().distance(hit_entity_txfm.translation()) < 70.
-                        && t.0 != hit.hit_entity
-                }) else {
-                    continue;
-                };
-                *elec_count += 1;
-                let p = proto_commands.spawn_projectile_from_proto(
-                    Projectile::Electricity,
-                    &proto,
-                    hit_entity_txfm.translation().truncate(),
-                    (nearest_mob_t.2.translation().truncate()
-                        - hit_entity_txfm.translation().truncate())
-                    .normalize_or_zero(),
-                );
-                ranged_attack_event.send(RangedAttackEvent {
-                    projectile: Projectile::Electricity,
-                    direction: (nearest_mob_t.2.translation().truncate()
-                        - hit_entity_txfm.translation().truncate())
-                    .normalize_or_zero(),
-                    from_enemy: None,
-                    is_followup_proj: true,
-                    mana_cost: None,
-                    dmg_override: None,
-                    pos_override: Some(hit_entity_txfm.translation().truncate()),
-                });
-            }
+        if lightning_chain_option.is_some() && hit.hit_with_projectile == Some(Projectile::Electricity) && *elec_count == 0 {
+            let Some(nearest_mob_t) = mobs.iter().find(|t| {
+                t.2.translation().distance(hit_entity_txfm.translation()) < 70.
+                    && t.0 != hit.hit_entity
+            }) else {
+                continue;
+            };
+            *elec_count += 1;
+            let p = proto_commands.spawn_projectile_from_proto(
+                Projectile::Electricity,
+                &proto,
+                hit_entity_txfm.translation().truncate(),
+                (nearest_mob_t.2.translation().truncate()
+                    - hit_entity_txfm.translation().truncate())
+                .normalize_or_zero(),
+            );
+            ranged_attack_event.send(RangedAttackEvent {
+                projectile: Projectile::Electricity,
+                direction: (nearest_mob_t.2.translation().truncate()
+                    - hit_entity_txfm.translation().truncate())
+                .normalize_or_zero(),
+                from_enemy: None,
+                is_followup_proj: true,
+                mana_cost: None,
+                dmg_override: None,
+                pos_override: Some(hit_entity_txfm.translation().truncate()),
+            });
         }
         let Some(main_hand) = game.player().main_hand_slot else {
             continue;
         };
-        if let Some(_) = fire_aoe_option {
-            if hit.hit_with_projectile == Some(Projectile::Fireball) {
-                ranged_attack_event.send(RangedAttackEvent {
-                    projectile: Projectile::FireExplosionAOE,
-                    direction: Vec2::ZERO,
-                    from_enemy: None,
-                    is_followup_proj: true,
-                    mana_cost: None,
-                    dmg_override: Some(hit.damage / 3),
-                    pos_override: Some(hit_entity_txfm.translation().truncate()),
-                });
-            }
+        if fire_aoe_option.is_some() && hit.hit_with_projectile == Some(Projectile::Fireball) {
+            ranged_attack_event.send(RangedAttackEvent {
+                projectile: Projectile::FireExplosionAOE,
+                direction: Vec2::ZERO,
+                from_enemy: None,
+                is_followup_proj: true,
+                mana_cost: None,
+                dmg_override: Some(hit.damage / 3),
+                pos_override: Some(hit_entity_txfm.translation().truncate()),
+            });
         }
-        if let Some(_) = lethal_option {
-            if curr_hp.0 <= max_hp.0 / 4
-                && !mob.is_boss()
-                && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
-            {
-                commands.entity(hit_e).insert(MarkedForDeath);
-                enemy_death_events.send(EnemyDeathEvent {
-                    entity: hit_e,
-                    enemy_pos: hit_entity_txfm.translation().truncate(),
-                    killed_by_crit: false,
-                });
-            }
+        if lethal_option.is_some() && curr_hp.0 <= max_hp.0 / 4
+                && !mob.is_boss() && Skill::LethalBlow.is_obj_valid(main_hand.get_obj()) {
+            commands.entity(hit_e).insert(MarkedForDeath);
+            enemy_death_events.send(EnemyDeathEvent {
+                entity: hit_e,
+                enemy_pos: hit_entity_txfm.translation().truncate(),
+                killed_by_crit: false,
+            });
         }
         let Ok((burning_option, _poisoned_option, frailed_option, slowed_option)) =
             burn_or_venom_mobs.get_mut(hit.hit_entity)
         else {
             continue;
         };
-        if let Some(_) = burn_option {
+        if burn_option.is_some() {
             if let Some(mut burning) = burning_option {
-                (*burning).duration_timer.reset();
+                burning.duration_timer.reset();
             } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
@@ -275,7 +267,7 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if let Some(_) = frail_option {
+        if frail_option.is_some() {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
                     && Skill::FrailStacks.is_obj_valid(main_hand.get_obj())
@@ -300,7 +292,7 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if let Some(_) = slow_option {
+        if slow_option.is_some() {
             if let Some(mut slow_stacks) = slowed_option {
                 if slow_stacks.num_stacks < 3 && Skill::SlowStacks.is_obj_valid(main_hand.get_obj())
                 {

@@ -113,7 +113,7 @@ pub fn spawn_new_debug_path(
         }
         for quad in path.path.clone() {
             let pos = AIPos_to_world_pos(quad);
-            let is_last_pos = quad == path.path.last().unwrap().clone();
+            let is_last_pos = quad == *path.path.last().unwrap();
 
             commands
                 .spawn(MaterialMesh2dBundle {
@@ -172,7 +172,7 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
             //     path: result.0.clone(),
             // });
         }
-        return Some(AIPos_to_world_pos(result.0[1]));
+        Some(AIPos_to_world_pos(result.0[1]))
     } else {
         warn!("No path found for ASTAR");
         None

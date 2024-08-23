@@ -1,15 +1,10 @@
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
-use super::gamble_shrine::{GambleShrine, GambleShrineAnim, GambleShrineEvent};
+use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::container::Container;
-use crate::custom_commands::CommandsExt;
-use crate::enemy::spawn_helpers::can_spawn_mob_here;
-use crate::enemy::{CombatAlignment, EliteMob, Mob};
 use crate::inventory::Inventory;
-use crate::item::combat_shrine::CombatShrineMob;
-use crate::item::LootTable;
 use crate::juice::ShakeEffect;
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
@@ -18,8 +13,7 @@ use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::DimensionSpawnEvent;
 use crate::world::dungeon::spawn_new_dungeon_dimension;
 
-use crate::world::world_helpers::tile_pos_to_world_pos;
-use crate::world::{TileMapPosition, TILE_SIZE};
+use crate::world::TileMapPosition;
 use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
@@ -74,7 +68,7 @@ impl ObjectAction {
         if let Some(cost) = maybe_cost {
             match cost {
                 ObjectActionCost::TimeFragment(cost) => {
-                    if game.get_time_fragments() >= cost.clone() {
+                    if game.get_time_fragments() >= *cost {
                         item_action_param
                             .currency_event
                             .send(ModifyTimeFragmentsEvent { delta: -cost });
@@ -84,9 +78,9 @@ impl ObjectAction {
                     }
                 }
                 ObjectActionCost::Item(obj, count) => {
-                    if inv.items.get_item_count_in_container(*obj) >= count.clone() {
+                    if inv.items.get_item_count_in_container(*obj) >= *count {
                         if let Err(err) =
-                            inv.items.remove_from_inventory(count.clone(), obj.clone())
+                            inv.items.remove_from_inventory(*count, *obj)
                         {
                             error!("Error removing item from inventory: {:?}", err);
                             return;
@@ -159,7 +153,7 @@ impl ObjectAction {
                             if item_action_param
                                 .crafting_tracker
                                 .discovered_recipes
-                                .contains(&result)
+                                .contains(result)
                             {
                                 continue;
                             }
@@ -168,13 +162,13 @@ impl ObjectAction {
                                     item_action_param
                                         .crafting_tracker
                                         .discovered_recipes
-                                        .push(result.clone());
+                                        .push(*result);
                                     item_action_param
                                         .crafting_tracker
                                         .crafting_type_map
                                         .entry(recipe.1.clone())
                                         .or_insert(vec![])
-                                        .push(result.clone());
+                                        .push(*result);
                                 }
                             }
                         }

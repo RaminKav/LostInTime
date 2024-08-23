@@ -300,7 +300,7 @@ pub fn save_state(
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
     save_data.player_level = level.clone();
-    save_data.current_health = hp.clone();
+    save_data.current_health = *hp;
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
     save_data.craft_tracker = craft_tracker.clone();
@@ -321,11 +321,11 @@ pub fn save_state(
         .iter()
         .map(|(p, w, _, _)| {
             let anchor = proto_param
-                .get_component::<SpriteAnchor, _>(w.clone())
+                .get_component::<SpriteAnchor, _>(*w)
                 .unwrap_or(&SpriteAnchor(Vec2::ZERO));
             (
                 world_pos_to_tile_pos(p.translation().truncate() - anchor.0),
-                w.clone(),
+                *w,
             )
         })
         .map_into()
@@ -355,7 +355,7 @@ pub fn save_state(
     save_data.containers = container_reg
         .containers
         .iter()
-        .map(|(k, v)| (k.clone(), v.clone()))
+        .map(|(k, v)| (*k, v.clone()))
         .chain(placed_objs.iter().filter_map(|(p, _, c, f)| {
             if let Some(chest) = c {
                 return Some((

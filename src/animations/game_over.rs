@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use rand::seq::IteratorRandom;
 use std::{
-    fs::{self, File},
+    fs::{File},
     io::BufReader,
 };
 
@@ -11,8 +11,7 @@ use crate::{
     inputs::FacingDirection,
     player::Player,
     ui::{damage_numbers::spawn_text, Interactable, MenuButton, UIElement, UIState},
-    world::{dimension::ActiveDimension, y_sort::YSort},
-    DoNotDespawnOnGameOver, GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
+    world::y_sort::YSort, GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -176,7 +175,7 @@ pub fn tick_game_over_overlay(
                             &asset_server,
                             Vec3::new(0., -GAME_HEIGHT / 2. + 56.5, 21.),
                             WHITE,
-                            format!("Tip: {}", picked_tip.to_string()),
+                            format!("Tip: {}", picked_tip),
                             Anchor::Center,
                             1.,
                             3,

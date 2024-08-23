@@ -172,7 +172,7 @@ impl ItemActions {
                         world_pos_to_tile_pos(pos),
                         game,
                         *obj,
-                        &proto_param,
+                        proto_param,
                     ) {
                         return;
                     }

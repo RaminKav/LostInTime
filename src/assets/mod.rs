@@ -287,7 +287,7 @@ impl GameAssetsPlugin {
         let mut spritesheet_map = HashMap::default();
         let mut icon_map = HashMap::default();
         let mut ui_image_handles = HashMap::default();
-        let mut foliage_material_map = HashMap::default();
+        let foliage_material_map = HashMap::default();
         let mut status_effect_handles = HashMap::default();
         let mut skill_handles = HashMap::default();
         let mut item_glow_handles = HashMap::default();
@@ -313,15 +313,13 @@ impl GameAssetsPlugin {
         let mut upgradeable_items = Vec::new();
 
         for (item, rect) in sprite_desc.items.iter() {
-            match item {
-                _ => {
-                    let mut sprite =
-                        TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+            {
+                let mut sprite =
+                    TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
 
-                    //Set the size to be proportional to the source rectangle
-                    sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
-                    spritesheet_map.insert(*item, sprite);
-                }
+                //Set the size to be proportional to the source rectangle
+                sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
+                spritesheet_map.insert(*item, sprite);
             }
             //TODO: maybe we can clean up our spawning code with this vvv
             //Position the sprite anchor if one is defined
@@ -372,7 +370,7 @@ impl GameAssetsPlugin {
         }
         // load furnace recipes
         for (result, recipe) in recipes_desc.1.iter() {
-            furnace_list.insert(*result, recipe.clone());
+            furnace_list.insert(*result, *recipe);
         }
         // load upgradeable items
         for item in recipes_desc.2.iter() {
@@ -446,16 +444,16 @@ impl GameAssetsPlugin {
             for (e, mut sprite, spritesheet, world_object, maybe_stack) in
                 to_update_query.iter_mut()
             {
-                if let Some(texture_atlas) = texture_atlases.get(&spritesheet) {
+                if let Some(texture_atlas) = texture_atlases.get(spritesheet) {
                     if texture_atlas.textures.len() < 100 {
                         continue;
                     }
                 }
-                let has_icon = graphics.icons.as_ref().unwrap().get(&world_object);
+                let has_icon = graphics.icons.as_ref().unwrap().get(world_object);
                 let new_sprite = if let Some(icon) = has_icon {
                     icon
                 } else {
-                    &item_map
+                    item_map
                         .get(world_object)
                         .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
                 };
