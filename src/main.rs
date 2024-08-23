@@ -41,6 +41,7 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin, MaterialMesh2dBundle},
     window::{PresentMode, PrimaryWindow, WindowMode, WindowResolution},
 };
+use bevy_common_assets::ron::RonAssetPlugin;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
 use juice::JuicePlugin;
 use night::NightPlugin;
@@ -70,7 +71,7 @@ mod schematic;
 mod ui;
 mod world;
 use animations::AnimationsPlugin;
-use assets::{GameAssetsPlugin, Graphics, SpriteSize};
+use assets::{GameAssetsPlugin, Graphics, GraphicsDesc, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
 use client::ClientPlugin;
@@ -182,6 +183,7 @@ fn main() {
                 .build()
                 .disable::<LogPlugin>(), // we handle logging ourselves
         )
+        .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["ron"]))
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
         .add_plugin(panic_handler::PanicHandler::new().build())
@@ -316,6 +318,8 @@ pub struct ImageAssets {
     pub tiles_sheet: Handle<Image>,
     #[asset(path = "SmallWallTextures.png")]
     pub walls_sheet: Handle<Image>,
+    #[asset(path = "textures/sprites_desc.ron")]
+    pub sprite_desc: Handle<GraphicsDesc>,
 }
 
 #[derive(Component)]

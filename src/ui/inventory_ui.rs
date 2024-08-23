@@ -362,22 +362,24 @@ pub fn spawn_inv_slot(
         },
         _ => None,
     };
-    let icon_entity_option = slot_icon.map(|slot_icon| commands
-                .spawn(SpriteBundle {
-                    texture: asset_server.load(slot_icon),
-                    transform: Transform {
-                        translation: Vec3::new(0., 0., 1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(16., 16.)),
-                        ..Default::default()
-                    },
+    let icon_entity_option = slot_icon.map(|slot_icon| {
+        commands
+            .spawn(SpriteBundle {
+                texture: asset_server.load(slot_icon),
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .id());
+                },
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(16., 16.)),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .id()
+    });
 
     let mut slot_entity = commands.spawn(SpriteBundle {
         texture: graphics.get_ui_element_texture(
@@ -467,8 +469,7 @@ pub fn spawn_item_stack_icon(
         .insert(RenderLayers::from_layers(&[render_layer]))
         .id();
     // glow effect for rarity
-    if let Some(glow_e) =
-        add_item_glows(commands, graphics, item_entity, item_stack.rarity.clone())
+    if let Some(glow_e) = add_item_glows(commands, graphics, item_entity, item_stack.rarity.clone())
     {
         commands
             .entity(glow_e)
