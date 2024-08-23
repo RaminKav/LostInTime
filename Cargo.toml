@@ -67,3 +67,6 @@ opt-level = 3
 [profile.release]
 codegen-units = 1
 lto = "thin"
+
+[build-dependencies]
+embed-resource = "2.4.3"
