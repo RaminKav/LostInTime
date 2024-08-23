@@ -195,7 +195,10 @@ pub fn handle_on_hit_upgrades(
             slow_option,
         ) = upgrades.single();
 
-        if lightning_chain_option.is_some() && hit.hit_with_projectile == Some(Projectile::Electricity) && *elec_count == 0 {
+        if lightning_chain_option.is_some()
+            && hit.hit_with_projectile == Some(Projectile::Electricity)
+            && *elec_count == 0
+        {
             let Some(nearest_mob_t) = mobs.iter().find(|t| {
                 t.2.translation().distance(hit_entity_txfm.translation()) < 70.
                     && t.0 != hit.hit_entity
@@ -219,7 +222,7 @@ pub fn handle_on_hit_upgrades(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: None,
+                dmg_override: Some(hit.damage / 2),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
             });
         }
@@ -237,8 +240,11 @@ pub fn handle_on_hit_upgrades(
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
             });
         }
-        if lethal_option.is_some() && curr_hp.0 <= max_hp.0 / 4
-                && !mob.is_boss() && Skill::LethalBlow.is_obj_valid(main_hand.get_obj()) {
+        if lethal_option.is_some()
+            && curr_hp.0 <= max_hp.0 / 4
+            && !mob.is_boss()
+            && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
+        {
             commands.entity(hit_e).insert(MarkedForDeath);
             enemy_death_events.send(EnemyDeathEvent {
                 entity: hit_e,

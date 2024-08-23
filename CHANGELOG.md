@@ -7,6 +7,8 @@
 - Assets are now embedded in the binary
 - Crates drop slightly better loot
 - EXP curve adjusted to be quadratic
+- nerf: lightnign staff chain lightning upgrade does half of original dmg
+- nerf: Lifesteal is not longer a repeatable skill
 
 ### Features
 
