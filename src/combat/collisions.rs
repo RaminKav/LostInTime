@@ -288,7 +288,7 @@ pub fn check_item_drop_collisions(
                 continue;
             }
             let item_stack = items_query.get(e2).unwrap().clone();
-            let obj = item_stack.obj_type.clone();
+            let obj = item_stack.obj_type;
             if obj == WorldObject::TimeFragment {
                 currency_event.send(ModifyTimeFragmentsEvent {
                     delta: item_stack.count as i32,

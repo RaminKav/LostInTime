@@ -131,7 +131,7 @@ pub fn handle_spawn_inv_item_tooltip(
         // let durability = item.item_stack.attributes.get_durability_tooltip();
         let level = item.item_stack.metadata.level;
         let item_actions = proto.get_component::<ItemActions, _>(item.item_stack.obj_type);
-        let should_show_attributes = attributes.len() > 0 && !item.is_recipe;
+        let should_show_attributes = !attributes.is_empty() && !item.is_recipe;
         let size = Vec2::new(93., 120.5);
         let tooltip = commands
             .spawn((
@@ -219,56 +219,54 @@ pub fn handle_spawn_inv_item_tooltip(
                     AttributeQuality::Average,
                     Anchor::CenterLeft,
                 ));
-            } else {
-                if let Some(item_actions) = item_actions {
-                    let action_type = item_actions.get_action_type();
-                    let action_texts: Vec<String> = item_actions
-                        .actions
-                        .iter()
-                        .flat_map(|a| a.get_tooltip())
-                        .collect();
-                    if action_texts.len() == 0 {
-                        tooltip_text.push(TooltipTextProps::new(
-                            vec!["".to_string()],
-                            0.,
-                            AttributeQuality::High,
-                            Anchor::CenterLeft,
-                        ));
-                    }
-                    tooltip_text.push(TooltipTextProps::new(
-                        vec![action_type],
-                        0.,
-                        AttributeQuality::Low,
-                        Anchor::CenterLeft,
-                    ));
-                    if action_texts.len() != 0 {
-                        let mut combined_actions = "".to_string();
-                        for action_text in action_texts.iter() {
-                            combined_actions += action_text;
-                            combined_actions += " ";
-                        }
-
-                        tooltip_text.push(TooltipTextProps::new(
-                            vec![combined_actions],
-                            0.,
-                            AttributeQuality::High,
-                            Anchor::CenterLeft,
-                        ));
-                    }
-                } else {
+            } else if let Some(item_actions) = item_actions {
+                let action_type = item_actions.get_action_type();
+                let action_texts: Vec<String> = item_actions
+                    .actions
+                    .iter()
+                    .flat_map(|a| a.get_tooltip())
+                    .collect();
+                if action_texts.is_empty() {
                     tooltip_text.push(TooltipTextProps::new(
                         vec!["".to_string()],
                         0.,
-                        AttributeQuality::Low,
-                        Anchor::CenterLeft,
-                    ));
-                    tooltip_text.push(TooltipTextProps::new(
-                        vec!["Material".to_string()],
-                        0.,
-                        AttributeQuality::Low,
+                        AttributeQuality::High,
                         Anchor::CenterLeft,
                     ));
                 }
+                tooltip_text.push(TooltipTextProps::new(
+                    vec![action_type],
+                    0.,
+                    AttributeQuality::Low,
+                    Anchor::CenterLeft,
+                ));
+                if !action_texts.is_empty() {
+                    let mut combined_actions = "".to_string();
+                    for action_text in action_texts.iter() {
+                        combined_actions += action_text;
+                        combined_actions += " ";
+                    }
+
+                    tooltip_text.push(TooltipTextProps::new(
+                        vec![combined_actions],
+                        0.,
+                        AttributeQuality::High,
+                        Anchor::CenterLeft,
+                    ));
+                }
+            } else {
+                tooltip_text.push(TooltipTextProps::new(
+                    vec!["".to_string()],
+                    0.,
+                    AttributeQuality::Low,
+                    Anchor::CenterLeft,
+                ));
+                tooltip_text.push(TooltipTextProps::new(
+                    vec!["Material".to_string()],
+                    0.,
+                    AttributeQuality::Low,
+                    Anchor::CenterLeft,
+                ));
             }
             for (i, desc_string) in item.item_stack.metadata.desc.iter().enumerate().clone() {
                 tooltip_text.push(TooltipTextProps::new(
@@ -434,7 +432,7 @@ pub fn handle_spawn_inv_player_stats(
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
 ) {
     if ui_state.0 == UIState::Closed {
-        let d = tooltip_manager.timer.duration().clone();
+        let d = tooltip_manager.timer.duration();
         tooltip_manager.timer.tick(d);
         return;
     }
@@ -668,7 +666,7 @@ pub fn get_num_stars(
 ) -> usize {
     let mut num_stars = 0.;
     let max_possible_stars = if let Some(eqp_type) = equip_type {
-        3. + total_atts - rarity.get_num_bonus_attributes(eqp_type).end().clone() as f32
+        3. + total_atts - *rarity.get_num_bonus_attributes(eqp_type).end() as f32
     } else {
         3.
     };

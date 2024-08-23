@@ -122,10 +122,8 @@ fn handle_ranged_attack_event(
     for proj_event in events.iter() {
         let (_player_e, mana, player_cooldown) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
-        if proj_event.from_enemy.is_none() {
-            if player_cooldown.is_some() && !proj_event.is_followup_proj {
-                continue;
-            }
+        if proj_event.from_enemy.is_none() && player_cooldown.is_some() && !proj_event.is_followup_proj {
+            continue;
         }
         if let Some(mana_cost) = proj_event.mana_cost {
             if mana_cost.abs() > mana.current {

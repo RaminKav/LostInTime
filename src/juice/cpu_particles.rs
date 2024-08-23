@@ -109,7 +109,7 @@ pub fn handle_move_exp_particles(
         if exp_state.delay.finished() {
             let delta_dist = target_pos - g_txfm.translation().truncate();
             p.acceleration = delta_dist.normalize();
-            let acc = p.acceleration.clone();
+            let acc = p.acceleration;
             p.velocity += acc;
             p.velocity = p.velocity.clamp_length_max(3.);
         } else {

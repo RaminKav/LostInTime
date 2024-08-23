@@ -7,7 +7,7 @@ use crate::{
     enemy::Mob,
     item::Equipment,
     player::{MovePlayerEvent, Player},
-    CustomFlush, GameParam, GameState, WorldGeneration,
+    CustomFlush, GameParam, GameState,
 };
 
 use super::{
@@ -137,7 +137,7 @@ impl DimensionPlugin {
                 let new_world_cache = game
                     .era
                     .era_generation_cache
-                    .get(&new_era)
+                    .get(new_era)
                     .cloned()
                     .unwrap_or(WorldObjectCache::default());
                 commands.insert_resource(new_world_cache);

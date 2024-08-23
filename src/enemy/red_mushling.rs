@@ -113,7 +113,7 @@ pub fn gas_attack(
                 let hitbox = commands
                     .spawn((
                         TransformBundle::default(),
-                        attack.clone(),
+                        *attack,
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 7.),
                         MobIsAttacking(Mob::RedMushling),
                         Sensor,

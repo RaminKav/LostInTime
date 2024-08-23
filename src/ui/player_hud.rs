@@ -408,7 +408,7 @@ pub fn handle_update_player_skills(
 ) {
     if let Ok(new_skills) = player_skills.get_single() {
         for (i, skill) in new_skills.skills.clone().iter().enumerate() {
-            if prev_icons_tracker.skills.get(i) == Some(&skill) {
+            if prev_icons_tracker.skills.get(i) == Some(skill) {
                 continue;
             }
             prev_icons_tracker.skills.push(skill.clone());

@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use rand_chacha::ChaCha8Rng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
@@ -38,8 +37,7 @@ pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
     let e2 = (n2.get([x * base_oct * 8., y * base_oct * 8.]) + 1.) / 2.;
     let e3 = (n3.get([x * base_oct * 16., y * base_oct * 16.]) + 1.) / 2.;
 
-    let e = (f64::min(e1, f64::min(e2, e3) + 0.1)).clamp(0., 1.);
-    e
+    (f64::min(e1, f64::min(e2, e3) + 0.1)).clamp(0., 1.)
 }
 
 pub fn _poisson_disk_sampling(
@@ -51,7 +49,7 @@ pub fn _poisson_disk_sampling(
     start_pos: Vec2,
     mut rng: ThreadRng,
 ) -> Vec<(f32, f32)> {
-    if f <= 0. || max_points <= 0 {
+    if f <= 0. || max_points == 0 {
         return vec![];
     }
     // TODO: fix this to work w 4 quadrants -/+
@@ -71,8 +69,8 @@ pub fn _poisson_disk_sampling(
     let mut grid: Vec<Vec<Option<(f32, f32)>>> = vec![vec![None; num_cell]; num_cell];
 
     let insert_point = |g: &mut Vec<Vec<Option<(f32, f32)>>>, p: (f32, f32)| {
-        let xi: usize = f32::floor(p.0 as f32 / cell_size) as usize;
-        let yi: usize = f32::floor(p.1 as f32 / cell_size) as usize;
+        let xi: usize = f32::floor(p.0 / cell_size) as usize;
+        let yi: usize = f32::floor(p.1 / cell_size) as usize;
         g[xi][yi] = Some(p);
     };
 
@@ -87,8 +85,8 @@ pub fn _poisson_disk_sampling(
         }
 
         // check neighboring eight cells
-        let xi: f32 = f32::floor(p.0 as f32 / cell_size);
-        let yi: f32 = f32::floor(p.1 as f32 / cell_size);
+        let xi: f32 = f32::floor(p.0 / cell_size);
+        let yi: f32 = f32::floor(p.1 / cell_size);
         let i0 = usize::max((xi - 1.) as usize, 0);
         let i1 = usize::min((xi + 1.) as usize, num_cell - 1. as usize);
         let j0 = usize::max((yi - 1.) as usize, 0);
@@ -99,7 +97,7 @@ pub fn _poisson_disk_sampling(
                 if let Some(sample_point) = g[i][j] {
                     let sample_point_vec = Vec2::new(sample_point.0, sample_point.1);
                     let p_vec = Vec2::new(p.0, p.1);
-                    if sample_point_vec.distance(p_vec) < radius as f32 {
+                    if sample_point_vec.distance(p_vec) < radius {
                         return false;
                     }
                 }
@@ -130,7 +128,7 @@ pub fn _poisson_disk_sampling(
             // create new point from randodm angle r distance away from p
             let new_px = p.0 + new_r * theta.to_radians().cos() as f32;
             let new_py = p.1 + new_r * theta.to_radians().sin() as f32;
-            let new_p = (new_px as f32, new_py as f32);
+            let new_p = (new_px, new_py);
 
             if !is_valid_point(&grid, new_p) {
                 continue;

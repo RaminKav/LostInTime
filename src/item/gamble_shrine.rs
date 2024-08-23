@@ -73,11 +73,10 @@ pub fn handle_gamble_shrine_rewards(
                 ];
                 // give rewards
                 proto_commands.spawn_item_from_proto(
-                    drop_list
+                    *drop_list
                         .iter()
                         .choose(&mut rand::thread_rng())
-                        .unwrap()
-                        .clone(),
+                        .unwrap(),
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
                     1,
@@ -95,23 +94,21 @@ pub fn handle_gamble_shrine_rewards(
                     WorldObject::GambleShrineDone,
                 );
             }
-        } else {
-            if anim.current_frame() == 92 {
-                *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);
-                let obj_action = proto
-                    .get_component::<ObjectAction, _>(WorldObject::GambleShrine)
-                    .expect("Gamble shrine missing ObjectAction");
-                commands
-                    .entity(e)
-                    .remove::<GambleShrine>()
-                    .insert(InteractionGuideTrigger {
-                        key: Some("F".to_string()),
-                        text: Some("Interact".to_string()),
-                        activation_distance: 32.,
-                        icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
-                    })
-                    .insert(obj_action.clone());
-            }
+        } else if anim.current_frame() == 92 {
+            *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);
+            let obj_action = proto
+                .get_component::<ObjectAction, _>(WorldObject::GambleShrine)
+                .expect("Gamble shrine missing ObjectAction");
+            commands
+                .entity(e)
+                .remove::<GambleShrine>()
+                .insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Interact".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                })
+                .insert(obj_action.clone());
         }
     }
 }

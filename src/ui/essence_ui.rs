@@ -186,8 +186,7 @@ pub fn handle_submit_essence_choice(
         let mut inv = inv.single_mut();
         if inv
             .items
-            .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence)
-            .is_ok()
+            .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence).is_ok()
         {
             choice.choice.item.spawn_as_drop(
                 &mut commands,

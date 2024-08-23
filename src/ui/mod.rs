@@ -224,7 +224,7 @@ pub fn handle_new_ui_state(
     furnace_option: Option<Res<FurnaceContainer>>,
     mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
 ) {
-    if !next_ui_state.0.is_some() {
+    if next_ui_state.0.is_none() {
         return;
     }
     let next_ui = next_ui_state.0.as_ref().unwrap().clone();

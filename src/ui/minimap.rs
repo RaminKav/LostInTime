@@ -156,19 +156,19 @@ fn setup_mini_map(
                         let mut tile_y = p_tp.y as i32 + y;
 
                         while tile_x >= CHUNK_SIZE as i32 {
-                            tile_x = tile_x - CHUNK_SIZE as i32;
+                            tile_x -= CHUNK_SIZE as i32;
                             chunk_pos.x += 1;
                         }
                         while tile_x < 0 {
-                            tile_x = CHUNK_SIZE as i32 + tile_x;
+                            tile_x += CHUNK_SIZE as i32;
                             chunk_pos.x -= 1;
                         }
                         while tile_y >= CHUNK_SIZE as i32 {
-                            tile_y = tile_y - CHUNK_SIZE as i32;
+                            tile_y -= CHUNK_SIZE as i32;
                             chunk_pos.y += 1;
                         }
                         while tile_y < 0 {
-                            tile_y = CHUNK_SIZE as i32 + tile_y;
+                            tile_y += CHUNK_SIZE as i32;
                             chunk_pos.y -= 1;
                         }
                         let tile_pos = TilePos {

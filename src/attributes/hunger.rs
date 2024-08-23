@@ -41,7 +41,7 @@ impl Hunger {
     }
     pub fn modify_hunger(&mut self, amount: i8) {
         if amount < 0 {
-            self.current -= amount.abs() as u8;
+            self.current -= amount.unsigned_abs();
         } else {
             self.current += amount as u8;
             if self.current >= self.max {
@@ -84,7 +84,7 @@ pub fn handle_actions_drain_hunger(
     action_events: EventReader<ActionSuccessEvent>,
     attack_event: EventReader<AttackEvent>,
 ) {
-    if action_events.len() > 0 || attack_event.len() > 0 {
+    if !action_events.is_empty() || !attack_event.is_empty() {
         for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
             tracker.action_fatigue += 1;
             if tracker.is_fatigued() {

@@ -21,7 +21,7 @@ pub mod vectorize {
         V: Deserialize<'de>,
     {
         let container: Vec<_> = serde::Deserialize::deserialize(des)?;
-        Ok(T::from_iter(container.into_iter()))
+        Ok(T::from_iter(container))
     }
 }
 pub mod vectorize_inner {
@@ -36,7 +36,7 @@ pub mod vectorize_inner {
         V: Serialize,
     {
         let serialized: Vec<_> = target
-            .into_iter()
+            .iter()
             .map(|hashmap| hashmap.into_iter().collect::<Vec<_>>())
             .collect();
 
@@ -53,7 +53,7 @@ pub mod vectorize_inner {
 
         let result: Vec<HashMap<K, V>> = deserialized
             .into_iter()
-            .map(|vec| HashMap::from_iter(vec))
+            .map(HashMap::from_iter)
             .collect();
 
         Ok(result)

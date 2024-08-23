@@ -117,7 +117,7 @@ pub fn handle_crafted_item(
             .expect("crafted item does not have recipe?")
             .0
             .clone();
-        while remaining_cost.len() > 0 {
+        while !remaining_cost.is_empty() {
             for item in remaining_cost.clone().iter() {
                 let ingredient_slot = inv
                     .items
@@ -132,8 +132,8 @@ pub fn handle_crafted_item(
                     inv.items.items[ingredient_slot] = None;
                     remaining_cost.retain(|x| x != item);
                     remaining_cost.push(RecipeItem {
-                        item: item.item.clone(),
-                        count: (item.count - count) as usize,
+                        item: item.item,
+                        count: (item.count - count),
                     });
                 }
             }
@@ -151,7 +151,7 @@ pub fn get_crafting_inventory_item_stacks(
 ) -> Vec<Option<InventoryItemStack>> {
     let mut list = vec![];
     for (slot, obj) in objs.iter().enumerate() {
-        let recipe = rec.crafting_list.get(&obj).expect("no recipe for item?");
+        let recipe = rec.crafting_list.get(obj).expect("no recipe for item?");
         let mut default_stack = proto.get_item_data(*obj).unwrap().clone();
         let stack_count = recipe.2;
         let desc = recipe
@@ -204,7 +204,7 @@ pub fn handle_furnace_slot_update(
                 .expect("incorrect furnace recipe?")
         };
         if let Some(curr_result) = curr_result_obj {
-            if curr_result.item_stack.obj_type != expected_result.clone() {
+            if curr_result.item_stack.obj_type != *expected_result {
                 // the ingredient in slot 1 does not match the current output in slot 2
                 furnace.timer.reset();
                 return;
@@ -314,7 +314,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
     // queue processing
     if !text_timer.timer.finished() {
         text_timer.timer.tick(time.delta());
-    } else if text_timer.queue.len() > 0 {
+    } else if !text_timer.queue.is_empty() {
         let shadow = spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -345,7 +345,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
             let new_obj = item.item_stack.obj_type;
 
             for (result, recipe) in recipes.crafting_list.iter() {
-                if craft_tracker.discovered_recipes.contains(&result)
+                if craft_tracker.discovered_recipes.contains(result)
                     || (!craft_tracker.discovered_crafting_types.contains(&recipe.1)
                         && recipe.1 != CraftingContainerType::Inventory)
                 {
@@ -354,13 +354,13 @@ pub fn handle_inv_changed_update_crafting_tracker(
 
                 for ingredient in recipe.0.iter() {
                     if ingredient.item == new_obj {
-                        craft_tracker.discovered_recipes.push(result.clone());
+                        craft_tracker.discovered_recipes.push(*result);
                         craft_tracker
                             .crafting_type_map
                             .entry(recipe.1.clone())
                             .or_insert(vec![])
-                            .push(result.clone());
-                        text_timer.queue.push(result.clone());
+                            .push(*result);
+                        text_timer.queue.push(*result);
                         debug!("pushed to recipe queue {:?}", text_timer.queue);
                         continue;
                     }

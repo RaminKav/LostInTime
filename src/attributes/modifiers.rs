@@ -26,6 +26,6 @@ pub fn handle_modify_mana_event(
         if mana.current == mana.max && event.0 > 0 {
             return;
         }
-        mana.current += event.0 as i32;
+        mana.current += event.0;
     }
 }

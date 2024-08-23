@@ -128,12 +128,12 @@ pub fn add_container_to_new_furnace_objs(
                 let ing: Vec<_> = recipes
                     .furnace_list
                     .iter()
-                    .map(|(k, _)| k.clone())
+                    .map(|(k, _)| *k)
                     .collect();
                 let results: Vec<_> = recipes
                     .furnace_list
                     .iter()
-                    .map(|(_, v)| v.clone())
+                    .map(|(_, v)| *v)
                     .collect();
                 commands.entity(e).insert(FurnaceContainer {
                     items: existing_cont_option

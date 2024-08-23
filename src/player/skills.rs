@@ -401,8 +401,8 @@ impl SkillChoiceQueue {
         // handle drops
         if let Some((drop, count)) = skill.skill.get_instant_drop() {
             proto_commands.spawn_item_from_proto(
-                drop.clone(),
-                &proto,
+                drop,
+                proto,
                 player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
                 count,
                 Some(1),

@@ -22,17 +22,14 @@ use std::fs::{create_dir_all, File};
 
 */
 use bevy::{prelude::*, utils::HashMap};
-use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use tungstenite::{connect, Message};
 
 use crate::{
-    client::analytics,
-    datafiles::{self, analytics_dir},
+    datafiles::{self},
     enemy::Mob,
     item::WorldObject,
-    night::NightTracker,
-    player::skills::{PlayerSkills, Skill},
+    player::skills::Skill,
     world::dimension::GenerationSeed,
     GameState, DEBUG,
 };
@@ -140,7 +137,7 @@ pub fn save_analytics_data_to_file_on_game_over(
     analytics_data: Res<AnalyticsData>,
     seed: Res<GenerationSeed>,
     mut events: EventReader<SendAnalyticsDataToServerEvent>,
-    mut commands: Commands,
+    commands: Commands,
 ) {
     if events.iter().count() == 0 {
         return;

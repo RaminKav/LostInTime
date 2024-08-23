@@ -3,7 +3,7 @@ use bevy::{prelude::*, render::view::RenderLayers};
 use crate::{
     assets::Graphics,
     inventory::{Inventory, ItemStack},
-    item::{CraftingTracker, Recipes, WorldObject},
+    item::{Recipes, WorldObject},
 };
 
 use super::{spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
@@ -22,7 +22,7 @@ pub struct CurrentGoal {
     pub goal: WorldObject,
 }
 
-pub fn init_starting_goal(mut commands: Commands) {
+pub fn init_starting_goal(commands: Commands) {
     // commands.insert_resource(CurrentGoal {
     //     goal: WorldObject::WoodAxe,
     // });
@@ -46,7 +46,7 @@ pub fn handle_display_new_goal(
         .unwrap()
         .0
         .iter()
-        .map(|r| r.item.clone())
+        .map(|r| r.item)
         .collect::<Vec<WorldObject>>();
 
     let goal_icon = spawn_item_stack_icon(
@@ -59,7 +59,7 @@ pub fn handle_display_new_goal(
         3,
     );
 
-    let mut slot_entity = commands
+    let slot_entity = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
             transform: Transform::from_translation(Vec3::new(-170., -100., 0.)),
@@ -78,7 +78,7 @@ pub fn handle_display_new_goal(
         let ingredient_icon = spawn_item_stack_icon(
             &mut commands,
             &graphics,
-            &ItemStack::crate_icon_stack(ingredient.clone()),
+            &ItemStack::crate_icon_stack(*ingredient),
             &asset_server,
             Vec2::ZERO,
             Vec2::new(0., 0.),
@@ -89,7 +89,7 @@ pub fn handle_display_new_goal(
                 texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
                 transform: Transform::from_translation(Vec3::new(
                     -170. + 20. * (i) as f32,
-                    -100. + 22. as f32,
+                    -100. + 22_f32,
                     0.,
                 )),
                 sprite: Sprite {
@@ -128,8 +128,7 @@ pub fn handle_update_goal_progress(
             .items
             .iter()
             .flatten()
-            .find(|i| i.get_obj() == &curr_goal_obj)
-            .is_some()
+            .any(|i| i.get_obj() == &curr_goal_obj)
         {
             debug!("got goal item");
             commands.remove_resource::<CurrentGoal>();

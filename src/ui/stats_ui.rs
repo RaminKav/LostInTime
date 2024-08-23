@@ -1,12 +1,11 @@
-use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy::prelude::*;
 
 use crate::{
     assets::Graphics,
-    colors::BLACK,
     player::stats::{PlayerStats, SkillPoints},
 };
 
-use super::{Interactable, ShowInvPlayerStatsEvent, UIElement, UIState, STATS_UI_SIZE};
+use super::{ShowInvPlayerStatsEvent, UIState};
 
 #[derive(Component)]
 pub struct StatsUI;
@@ -25,9 +24,9 @@ pub struct StatsButtonState {
 
 // STATS ARE DEPRIECATED
 pub fn setup_stats_ui(
-    mut commands: Commands,
+    commands: Commands,
     graphics: Res<Graphics>,
-    mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
+    stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     asset_server: Res<AssetServer>,
     player_stats: Query<(&PlayerStats, &SkillPoints)>,
 ) {
@@ -173,7 +172,7 @@ pub fn toggle_stats_visibility(
 }
 
 pub fn update_stats_text(
-    mut stats_text_query: Query<(&mut Text, &StatsText)>,
+    stats_text_query: Query<(&mut Text, &StatsText)>,
     player_stats: Query<&PlayerStats, Changed<PlayerStats>>,
 ) {
     // let Ok(stats) = player_stats.get_single() else {

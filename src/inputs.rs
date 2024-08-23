@@ -133,16 +133,14 @@ impl FacingDirection {
     pub fn from_translation(translation: Vec2) -> Self {
         if translation.x.abs() > translation.y.abs() {
             if translation.x > 0. {
-                return Self::Right;
+                Self::Right
             } else {
-                return Self::Left;
+                Self::Left
             }
+        } else if translation.y > 0. {
+            Self::Up
         } else {
-            if translation.y > 0. {
-                return Self::Up;
-            } else {
-                return Self::Down;
-            }
+            Self::Down
         }
     }
     pub fn get_next_rand_dir(&self, mut rng: ThreadRng) -> &Self {
@@ -193,14 +191,12 @@ fn turn_player(
         } else {
             FacingDirection::Right
         }
+    } else if angle < PI / 4. {
+        FacingDirection::Down
+    } else if cursor_pos.ui_coords.x < 0. {
+        FacingDirection::Left
     } else {
-        if angle < PI / 4. {
-            FacingDirection::Down
-        } else if cursor_pos.ui_coords.x < 0. {
-            FacingDirection::Left
-        } else {
-            FacingDirection::Right
-        }
+        FacingDirection::Right
     };
     //TODO: make center point based on player pos on screen?
     //TODO: add some way for attack to know dir
@@ -369,12 +365,10 @@ pub fn move_player(
                 audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.35))
             });
         }
-    } else {
-        if curr_anim != &EnemyAnimationState::Idle
-            && anim_state.is_done_current_animation(sprite.index)
-        {
-            commands.entity(player_e).insert(EnemyAnimationState::Idle);
-        }
+    } else if curr_anim != &EnemyAnimationState::Idle
+        && anim_state.is_done_current_animation(sprite.index)
+    {
+        commands.entity(player_e).insert(EnemyAnimationState::Idle);
     }
 }
 pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
@@ -719,7 +713,7 @@ pub fn handle_interact_objects(
                 obj_action.run_action(
                     obj_e,
                     world_pos_to_tile_pos(obj_t),
-                    obj.clone(),
+                    *obj,
                     &mut game,
                     &mut item_action_param,
                     &mut commands,
@@ -777,7 +771,7 @@ pub fn move_camera_with_player(
 
     let camera_lookahead_scale = 4.0;
     let delta = raw_player_pos.0 - raw_camera_pos.0;
-    raw_camera_pos.0 = raw_camera_pos.0 + delta * camera_lookahead_scale * time.delta_seconds();
+    raw_camera_pos.0 += delta * camera_lookahead_scale * time.delta_seconds();
 
     let decimals = 10i32.pow(3) as f32;
 

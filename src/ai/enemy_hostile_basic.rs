@@ -53,7 +53,7 @@ impl Trigger for LineOfSight {
                 - tfxm.translation.truncate();
 
             let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-            return (distance <= self.range).then_some(distance).ok_or(distance);
+            (distance <= self.range).then_some(distance).ok_or(distance)
         } else {
             Err(0.)
         }
@@ -91,7 +91,7 @@ impl BoolTrigger for HurtByPlayer {
                 return true;
             }
         }
-        return false;
+        false
     }
 }
 // This trigger checks if the enemy is within the the given range of the target
@@ -115,7 +115,7 @@ impl Trigger for AttackDistance {
         entity: Entity,
         (transforms, _time): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        if let Some(_) = transforms.get(entity).unwrap().1 {
+        if transforms.get(entity).unwrap().1.is_some() {
             return Err(0.);
         }
         let delta = transforms

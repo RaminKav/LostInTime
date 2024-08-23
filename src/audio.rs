@@ -63,7 +63,7 @@ pub fn sword_swing_sound(
         let swing1 = asset_server.load("sounds/swing.ogg");
         let swing2 = asset_server.load("sounds/swing2.ogg");
         let swing3 = asset_server.load("sounds/swing3.ogg");
-        let swings = vec![swing1, swing2, swing3];
+        let swings = [swing1, swing2, swing3];
         swings.iter().choose(&mut rand::thread_rng()).map(|sound| {
             audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.5))
         });
@@ -114,7 +114,7 @@ pub fn use_item_audio(
             let crunch1 = asset_server.load("sounds/crunch.ogg");
             let crunch2 = asset_server.load("sounds/crunch2.ogg");
             let crunch3 = asset_server.load("sounds/crunch3.ogg");
-            let crunchs = vec![crunch1, crunch2, crunch3];
+            let crunchs = [crunch1, crunch2, crunch3];
             crunchs.iter().choose(&mut rand::thread_rng()).map(|sound| {
                 audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.5))
             });

@@ -335,7 +335,7 @@ impl ChunkPlugin {
     ) {
         for e in create_events.iter() {
             let chunk_pos = e.chunk_pos;
-            if !game.get_chunk_entity(chunk_pos).is_some() {
+            if game.get_chunk_entity(chunk_pos).is_none() {
                 continue;
             }
 
@@ -343,7 +343,7 @@ impl ChunkPlugin {
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let pos = TileMapPosition::new(chunk_pos, TilePos { x, y });
-                    let tile_data = game.get_tile_data(pos.clone()).unwrap();
+                    let tile_data = game.get_tile_data(pos).unwrap();
 
                     for dy in -1i8..=1 {
                         for dx in -1i8..=1 {
@@ -351,7 +351,7 @@ impl ChunkPlugin {
                                 chunk_pos: adjusted_chunk_pos,
                                 tile_pos: neighbour_tile_pos,
                                 ..
-                            } = get_neighbour_tile(pos.clone(), (dx, dy));
+                            } = get_neighbour_tile(pos, (dx, dy));
                             if adjusted_chunk_pos != chunk_pos
                                 && game.get_chunk_entity(adjusted_chunk_pos).is_some()
                             {

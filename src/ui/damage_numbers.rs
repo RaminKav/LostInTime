@@ -225,10 +225,8 @@ pub fn handle_clamp_screen_locked_icons(
             } else {
                 *v = Visibility::Visible;
             }
-        } else {
-            if commands.get_entity(screen_locked_icon.parent).is_none() {
-                commands.entity(e).despawn_recursive();
-            }
+        } else if commands.get_entity(screen_locked_icon.parent).is_none() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }

@@ -360,7 +360,7 @@ pub fn spawn_obj_hit_particles(
                     )])
                     .with_z_layer_2d(Some(999.)),
                 transform: Transform::from_translation(
-                    Vec3::new(hit_pos.x as f32, hit_pos.y + 4., 2.) + (anchor.extend(0.) * -1.),
+                    Vec3::new(hit_pos.x, hit_pos.y + 4., 2.) + (anchor.extend(0.) * -1.),
                 ),
                 ..Default::default()
             },
@@ -391,7 +391,7 @@ pub fn spawn_use_item_particles(
                 effect: ParticleEffect::new(particles.use_item_particle.clone())
                     .with_z_layer_2d(Some(999.)),
                 transform: Transform::from_translation(Vec3::new(
-                    hit_pos.x as f32,
+                    hit_pos.x,
                     hit_pos.y + 5.,
                     2.,
                 )),
@@ -419,7 +419,7 @@ pub fn spawn_enemy_death_particles(
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.enemy_death_particle.clone())
                     .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(t.x as f32, t.y + 4., 2.)),
+                transform: Transform::from_translation(Vec3::new(t.x, t.y + 4., 2.)),
                 ..Default::default()
             },
             YSort(1.),

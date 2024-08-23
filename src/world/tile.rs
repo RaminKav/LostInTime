@@ -232,8 +232,8 @@ impl TilePlugin {
                         .iter()
                         .enumerate()
                         .map(|(i, b)| match b {
-                            WorldObject::WaterTile => 1 * (u8::pow(2, i as u32)) as u8,
-                            _ => 0 as u8,
+                            WorldObject::WaterTile => u8::pow(2, i as u32),
+                            _ => 0_u8,
                         })
                         .sum();
 

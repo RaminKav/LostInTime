@@ -1,11 +1,9 @@
 use bevy::{prelude::*, render::view::RenderLayers};
-use bevy_inspector_egui::quick::ResourceInspectorPlugin;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
     colors::{overwrite_alpha, NIGHT},
-    world::dimension::dim_spawned,
     GameState, ScreenResolution, GAME_HEIGHT,
 };
 
@@ -21,7 +19,7 @@ pub struct NightTracker {
 impl NightTracker {
     pub fn get_alpha(&self) -> f32 {
         if self.time < 6. {
-            return 0.;
+            0.
         } else if self.time >= 6. && self.time < 18. {
             return (self.time - 6.) * 0.05833333;
         } else {
@@ -97,13 +95,13 @@ pub fn tick_night_color(
             }
             // change music
             if night_tracker.is_night()
-                && bgm_tracker.current_track != "sounds/bgm_night.ogg".to_owned()
+                && bgm_tracker.current_track != *"sounds/bgm_night.ogg"
             {
                 bgm_track_event.send(UpdateBGMTrackEvent {
                     asset_path: "sounds/bgm_night.ogg".to_owned(),
                 });
             } else if !night_tracker.is_night()
-                && bgm_tracker.current_track != "sounds/bgm_day.ogg".to_owned()
+                && bgm_tracker.current_track != *"sounds/bgm_day.ogg"
             {
                 bgm_track_event.send(UpdateBGMTrackEvent {
                     asset_path: "sounds/bgm_day.ogg".to_owned(),

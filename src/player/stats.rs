@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::attributes::{AttributeChangeEvent, ItemAttributes};
+use crate::attributes::AttributeChangeEvent;
 
 #[derive(Clone, Debug)]
 pub enum StatType {

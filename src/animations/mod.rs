@@ -214,18 +214,15 @@ fn animate_hit(
             if e == p_e {
                 let d = hit.dir * hit.knockback * time.delta_seconds();
                 kcc.translation = Some(d);
-            } else {
-                if let Ok(mut hit_t) = transforms.get_mut(e) {
-                    hit_t.translation += hit.dir.extend(0.) * hit.knockback * time.delta_seconds();
-                }
+            } else if let Ok(mut hit_t) = transforms.get_mut(e) {
+                hit_t.translation += hit.dir.extend(0.) * hit.knockback * time.delta_seconds();
             }
         }
 
         if hit.timer.finished() {
             if mob_option.is_some() {
                 let (anim_data, sprite) = anim_state.get(e).unwrap();
-                if sprite.index
-                    == anim_data.get_starting_frame_for_animation(mob_option.unwrap()) as usize
+                if sprite.index == anim_data.get_starting_frame_for_animation(mob_option.unwrap())
                     && mob_option.unwrap() == &EnemyAnimationState::Hit
                 {
                     commands
@@ -248,7 +245,7 @@ fn handle_held_item_direction_change(
     >,
 ) {
     if let Ok((obj, mut t, mut sprite)) = tool_query.get_single_mut() {
-        let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+        let obj_data = game.world_obj_data.properties.get(obj).unwrap();
         let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
 
         let is_facing_left = game.player().direction == FacingDirection::Left;
@@ -256,11 +253,7 @@ fn handle_held_item_direction_change(
         t.translation.x = PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x
             + anchor.x * obj_data.size.x
             + if is_facing_left { 0. } else { 11. };
-        if is_facing_left {
-            sprite.flip_x = true;
-        } else {
-            sprite.flip_x = false;
-        }
+        sprite.flip_x = is_facing_left;
     }
 }
 fn animate_attack(
@@ -318,7 +311,7 @@ fn animate_attack(
                 at.0.reset();
                 at.1 = 0.;
                 t.rotation = Quat::from_rotation_z(-at.1);
-                let obj_data = game.world_obj_data.properties.get(&obj).unwrap();
+                let obj_data = game.world_obj_data.properties.get(obj).unwrap();
                 let anchor = obj_data.anchor.unwrap_or(Vec2::ZERO);
                 t.translation.x =
                     PLAYER_EQUIPMENT_POSITIONS[&Limb::Hands].x + anchor.x * obj_data.size.x;
@@ -412,7 +405,7 @@ fn animate_foliage_opacity(
     player: Query<&GlobalTransform, With<Player>>,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, txfm, obj, mut sprite) in tree_query.iter_mut() {
+    for (e, txfm, obj, sprite) in tree_query.iter_mut() {
         let p_txfm = player.single();
         // check if player is behind tree
         let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();

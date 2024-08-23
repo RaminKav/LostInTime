@@ -53,7 +53,7 @@ pub fn update_wall(
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos, (dx, dy));
                 let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
                     // println!("NEIGHBOUR CHUNK MISSING {:?}", neighbour_pos.chunk_pos);
                     continue 'outer;
@@ -77,7 +77,7 @@ pub fn update_wall(
 
                 // only use neighbours that are a wall
                 let mut neighbour_is_wall = false;
-                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos, (dx, dy));
 
                 if let Some(is_wall) = neighbour_walls.get(&neighbour_pos) {
                     if *is_wall {
@@ -107,7 +107,7 @@ pub fn update_wall(
                     continue;
                 }
                 // only use neighbours that are walls
-                let neighbour_pos = get_neighbour_tile(new_wall_pos.clone(), (dx, dy));
+                let neighbour_pos = get_neighbour_tile(new_wall_pos, (dx, dy));
 
                 let mut this_corner_neighbour_is_wall = false;
 
@@ -155,12 +155,12 @@ pub fn update_wall(
             }
         }
         if let Some(mut new_wall_data) =
-            game.get_wall_data_at_tile_mut(new_wall_pos.clone(), &proto_param)
+            game.get_wall_data_at_tile_mut(new_wall_pos, &proto_param)
         {
             commands.entity(wall_entity).remove::<Dirty>();
 
             new_wall_data.obj_bit_index = final_sprite_index;
-            (*wall_sprite).index =
+            wall_sprite.index =
                 (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
         } else {
             warn!("missing {:?}", new_wall_pos);
@@ -178,13 +178,13 @@ pub fn handle_wall_break(
     for broken_wall in obj_break_events.iter() {
         let chunk_e = game.get_chunk_entity(broken_wall.pos.chunk_pos).unwrap();
         if let Ok(mut cache) = chunk_wall_cache.get_mut(chunk_e) {
-            cache.walls.insert(broken_wall.pos.clone(), false);
-            removed_wall_pos.push(broken_wall.pos.clone());
+            cache.walls.insert(broken_wall.pos, false);
+            removed_wall_pos.push(broken_wall.pos);
         }
     }
     for broken_wall_pos in removed_wall_pos.iter() {
         mark_neighbour_walls_dirty(
-            broken_wall_pos.clone(),
+            *broken_wall_pos,
             &mut game,
             &proto_param,
             &mut commands,
@@ -217,12 +217,12 @@ pub fn handle_wall_placed(
         };
         if let Ok(mut cache) = chunk_wall_cache.get_mut(chunk_e) {
             cache.walls.insert(world_pos_to_tile_pos(*pos), true);
-            new_walls_pos.push(new_wall_pos.clone());
+            new_walls_pos.push(new_wall_pos);
         }
     }
     for new_wall_pos in new_walls_pos.iter() {
         mark_neighbour_walls_dirty(
-            new_wall_pos.clone(),
+            *new_wall_pos,
             &mut game,
             &proto_param,
             &mut commands,
@@ -245,22 +245,22 @@ pub fn mark_neighbour_walls_dirty(
                 continue;
             }
             let wall_pos = target_pos;
-            let neighbour_pos = get_neighbour_tile(wall_pos.clone(), (dx, dy));
+            let neighbour_pos = get_neighbour_tile(wall_pos, (dx, dy));
             let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
                 continue;
             };
             if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
                 if let Some(true) = cache.walls.get(&neighbour_pos).cloned() {
                     let Some((new_wall_entity, _)) =
-                        game.get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
+                        game.get_obj_entity_at_tile(neighbour_pos, proto_param)
                     else {
                         continue;
                     };
                     commands.entity(new_wall_entity).insert(Dirty);
                 }
-            } else if let Some(_) = get_neighbour_wall_data(wall_pos, (dx, dy), game, proto_param) {
+            } else if get_neighbour_wall_data(wall_pos, (dx, dy), game, proto_param).is_some() {
                 let new_wall_entity = game
-                    .get_obj_entity_at_tile(neighbour_pos.clone(), proto_param)
+                    .get_obj_entity_at_tile(neighbour_pos, proto_param)
                     .unwrap();
 
                 commands.entity(new_wall_entity.0).insert(Dirty);

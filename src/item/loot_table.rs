@@ -52,7 +52,7 @@ impl LootTablePlugin {
         for drop in loot_table.drops.iter() {
             let r: f32 = rng.gen();
             if r <= drop.rate * (1.0 + loot_bonus as f32 / 100.0) {
-                let mut stack = proto.get_item_data(drop.item.clone()).unwrap().clone();
+                let mut stack = proto.get_item_data(drop.item).unwrap().clone();
                 stack.metadata.level = level;
                 loot.push(stack.copy_with_count(if drop.min == drop.max {
                     drop.min

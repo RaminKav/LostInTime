@@ -70,11 +70,11 @@ pub fn handle_enemy_health_bar_change(
     }
 }
 pub fn handle_enemy_health_visibility(
-    mut changed_mobs: Query<
+    changed_mobs: Query<
         (&Children, &MaxHealth, &CurrentHealth),
         (With<Mob>, Changed<CurrentHealth>),
     >,
-    mut healthbars: Query<&mut Visibility, Without<Text>>,
+    healthbars: Query<&mut Visibility, Without<Text>>,
 ) {
     return;
     for (children, max_health, current_health) in changed_mobs.iter_mut() {
