@@ -30,6 +30,7 @@ use crate::world::world_helpers::{
 use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
+use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
@@ -227,8 +228,10 @@ pub struct Size(pub Vec2);
     Ord,
     PartialOrd,
     EnumIter,
+    TypeUuid,
 )]
 #[reflect(Component, Schematic)]
+#[uuid = "413be529-bfeb-41b3-9dc0-4b8b380a4c36"]
 pub enum WorldObject {
     #[default]
     None,
