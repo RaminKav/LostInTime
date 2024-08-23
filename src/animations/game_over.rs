@@ -1,9 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use rand::seq::IteratorRandom;
-use std::{
-    fs::{File},
-    io::BufReader,
-};
+use std::{fs::File, io::BufReader};
 
 use crate::{
     client::{analytics::SendAnalyticsDataToServerEvent, GameOverEvent},
@@ -11,7 +8,8 @@ use crate::{
     inputs::FacingDirection,
     player::Player,
     ui::{damage_numbers::spawn_text, Interactable, MenuButton, UIElement, UIState},
-    world::y_sort::YSort, GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
+    world::y_sort::YSort,
+    GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -164,26 +162,34 @@ pub fn tick_game_over_overlay(
         if timer.0.percent() >= 0.25 && !*tip_check {
             *tip_check = true;
             // Try to load tips from save
-            if let Ok(tips_file) = File::open("assets/tips.json") {
-                let reader = BufReader::new(tips_file);
+            let tips = vec![
+                "Enemies get tougher every night. If you take too long, they will overpower you!",
+                "Stars represent the overall quality of the stat lines on equipment.",
+                "If your hunger bar is empty, you will move slower and lose health over time.",
+                "Press Shift while inspecting an item to view the range\n\n     of possible values for each stat line.",
+                "You can drop an item by dragging it out of your inventory.",
+                "The forest is dense. Craft an Axe as soon as you can.",
+                "Elite mobs are much tougher, but they give more exp and drop more loot.",
+                "At night, enemies will hunt you down. Be prepared!",
+                "Build a Crafting table as soon as possible to unlock important recipes.",
+                "Item colors correspond to rarity:\n\n     Common (Grey), Uncommon (green), Rare (blue), Legendary (Red).",
+                "Press Shift + Left Click to quickly move items\n\n     between your hotbar, inventory, and chests.",
+                "Exploring the dense forest can be dangerous, especially at night!\n\n     You have more room to fight in clearings.",
+                "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear have better base stats.",
+                "Press ESC to manually save your game! Otherwise it will save every 200s."
+              ];
 
-                match serde_json::from_reader::<_, Vec<String>>(reader) {
-                    Ok(data) => {
-                        let picked_tip = data.iter().choose(&mut rand::thread_rng()).unwrap();
-                        spawn_text(
-                            &mut commands,
-                            &asset_server,
-                            Vec3::new(0., -GAME_HEIGHT / 2. + 56.5, 21.),
-                            WHITE,
-                            format!("Tip: {}", picked_tip),
-                            Anchor::Center,
-                            1.,
-                            3,
-                        );
-                    }
-                    Err(err) => error!("Failed to load data from file {err:?}"),
-                }
-            }
+            let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();
+            spawn_text(
+                &mut commands,
+                &asset_server,
+                Vec3::new(0., -GAME_HEIGHT / 2. + 56.5, 21.),
+                WHITE,
+                format!("Tip: {}", picked_tip),
+                Anchor::Center,
+                1.,
+                3,
+            );
         }
         timer.0.tick(time.delta());
 
