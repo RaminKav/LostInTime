@@ -4,3 +4,5 @@
 notes.md
 /build
 .direnv
+/logs
+/analytics

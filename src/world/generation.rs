@@ -158,7 +158,7 @@ impl GenerationPlugin {
         } else {
             0
         };
-        let num_clusters = if rng.gen_ratio(1, 2) { 4 } else { 3 } + spawn_ring_offset;
+        let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 } + spawn_ring_offset;
         let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
         for _ in 0..num_clusters {
             let mut picked_trees = TREES
@@ -383,13 +383,15 @@ impl GenerationPlugin {
                     chunk_pos,
                     seed.seed,
                 );
+
+                // random size forest clearings
                 if chunk_pos.x.abs() > 1 || chunk_pos.y.abs() > 1 {
                     let mut rng = rand::thread_rng();
                     let rng_x = rng.gen_range(0..CHUNK_SIZE);
                     let rng_y = rng.gen_range(0..CHUNK_SIZE);
                     let clear_tiles = get_radial_tile_positions(
                         TileMapPosition::new(chunk_pos, TilePos::new(rng_x, rng_y)),
-                        rng.gen_range(3..7),
+                        rng.gen_range(4..8),
                     );
                     trees = trees
                         .into_iter()

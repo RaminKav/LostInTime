@@ -405,7 +405,7 @@ impl SkillChoiceQueue {
                 proto,
                 player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
                 count,
-                Some(1),
+                Some(player_level),
             );
         }
         //repopulate the queue after each skill selection, if there are skills missing

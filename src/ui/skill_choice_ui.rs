@@ -69,7 +69,7 @@ pub fn setup_skill_choice_ui(
 
     for i in -1..2 {
         let translation = Vec3::new(i as f32 * (size.x + 16.), 0., 1.);
-        let choice = choices[i as usize + 1].clone();
+        let choice = choices[(i + 1) as usize].clone();
         let skills_e = commands
             .spawn(SpriteBundle {
                 texture: texture.clone(),

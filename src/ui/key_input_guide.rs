@@ -85,7 +85,7 @@ pub fn spawn_shrine_interact_key_guide(
                     .insert(Name::new("Interact Guide"))
                     .id();
                 let key_entity = if let Some(key) = guide.key.clone() {
-                    let x_offset = if guide.text.is_some() { 10. } else { 0. };
+                    let x_offset = if guide.text.is_some() { 20. } else { 0. };
                     Some(
                         commands
                             .spawn(SpriteBundle {
@@ -108,7 +108,7 @@ pub fn spawn_shrine_interact_key_guide(
                     None
                 };
                 let text_entity = if let Some(text) = guide.text.clone() {
-                    let x = if key_entity.is_some() { -10.5 } else { 0. };
+                    let x = if key_entity.is_some() { 20.5 } else { 0. };
                     let text_e = spawn_text(
                         &mut commands,
                         &asset_server,

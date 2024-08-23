@@ -15,6 +15,8 @@
 - fix skill points carrying over to the next run
 - fix end of run crash
 - fix water collider not returning after breaking bridges
+- skills now give weapons that scale with player level
+- actually fix shrine depth...
 
 ## 0.1.2
 
