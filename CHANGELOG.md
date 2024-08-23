@@ -6,6 +6,16 @@
 
 - Assets are now embedded in the binary
 
+### Features
+
+- Allow placing some objects o nwater blocks
+
+### Bugfixes
+
+- fix skill points carrying over to the next run
+- fix end of run crash
+- fix water collider not returning after breaking bridges
+
 ## 0.1.2
 
 ### Features

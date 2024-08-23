@@ -128,7 +128,7 @@ pub fn can_object_be_placed_here(
     proto_param: &ProtoParam,
 ) -> bool {
     if let Some(tile_data) = game.get_tile_data(tile_pos) {
-        if tile_data.block_type.contains(&WorldObject::WaterTile) && obj != WorldObject::Bridge {
+        if tile_data.block_type.contains(&WorldObject::WaterTile) && !obj.is_water_placeable() {
             debug!("water here {tile_pos:?}");
             return false;
         }

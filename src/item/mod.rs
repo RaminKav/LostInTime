@@ -27,7 +27,7 @@ use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
-use crate::world::TileMapPosition;
+use crate::world::{TileMapPosition, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
 use bevy::utils::HashMap;
@@ -54,7 +54,7 @@ pub mod projectile;
 pub use crafting::*;
 pub use loot_table::*;
 
-use bevy_rapier2d::prelude::Collider;
+use bevy_rapier2d::prelude::{Collider, Sensor};
 use lazy_static::lazy_static;
 
 use serde::{Deserialize, Serialize};
@@ -609,6 +609,31 @@ impl WorldObject {
         }
         None
     }
+    pub fn is_water_placeable(&self) -> bool {
+        match self {
+            WorldObject::Bridge => true,
+            WorldObject::WoodWallBlock => true,
+            WorldObject::WoodWall => true,
+            WorldObject::StoneWallBlock => true,
+            WorldObject::StoneWall => true,
+            WorldObject::PinkFlowerBlock => true,
+            WorldObject::PinkFlower => true,
+            WorldObject::RedFlowerBlock => true,
+            WorldObject::RedFlower => true,
+            WorldObject::YellowFlowerBlock => true,
+            WorldObject::YellowFlower => true,
+            WorldObject::WoodDoorBlock => true,
+            WorldObject::WoodDoor => true,
+            WorldObject::WoodDoorOpen => true,
+            WorldObject::Pebble => true,
+            WorldObject::PebbleBlock => true,
+            WorldObject::Cattail => true,
+            WorldObject::WaterBoulder => true,
+            WorldObject::WaterBoulder2 => true,
+            WorldObject::Lillypad => true,
+            _ => false,
+        }
+    }
 
     pub fn get_obj_color(&self) -> Color {
         match self {
@@ -737,7 +762,6 @@ pub fn handle_placing_world_object(
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
-
         let tile_pos = world_pos_to_tile_pos(pos);
         if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param)
             && !place_event.override_existing_obj
@@ -775,14 +799,14 @@ pub fn handle_placing_world_object(
                     new_tile: Some(place_event.obj),
                 });
 
-                if place_event.obj == WorldObject::Bridge {
+                if place_event.obj.is_water_placeable() {
                     for (e, _c, t) in water_colliders.iter() {
                         if t.translation()
                             .truncate()
                             .distance(tile_pos_to_world_pos(tile_pos, false))
                             <= 6.
                         {
-                            commands.entity(e).despawn();
+                            commands.entity(e).insert(Sensor);
                         }
                     }
                 }
@@ -798,7 +822,7 @@ pub fn handle_placing_world_object(
 pub fn handle_break_object(
     mut commands: Commands,
     proto_param: ProtoParam,
-    mut game_param: GameParam,
+    mut game: GameParam,
     mut proto_commands: ProtoCommands,
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
@@ -807,8 +831,11 @@ pub fn handle_break_object(
     chest_containers: Query<&ChestContainer>,
     xp: Query<&ExperienceReward>,
     mut player_xp: Query<&mut PlayerLevel>,
-    particles: Res<Particles>,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
+    water_colliders: Query<
+        (Entity, &Collider, &GlobalTransform),
+        (Without<WorldObject>, Without<Mob>, Without<Player>),
+    >,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
@@ -819,15 +846,31 @@ pub fn handle_break_object(
                 for item_option in chest.items.items.iter() {
                     if let Some(item) = item_option {
                         let pos = tile_pos_to_world_pos(broken.pos, false);
-                        item.item_stack
-                            .spawn_as_drop(&mut commands, &mut game_param, pos);
+                        item.item_stack.spawn_as_drop(&mut commands, &mut game, pos);
+                    }
+                }
+            }
+        }
+
+        // Water Placeable Objs
+        if let Some(tile_data) = game.get_tile_data(broken.pos) {
+            if tile_data.block_type.contains(&WorldObject::WaterTile)
+                && broken.obj.is_water_placeable()
+            {
+                for (e, _c, t) in water_colliders.iter() {
+                    if t.translation()
+                        .truncate()
+                        .distance(tile_pos_to_world_pos(broken.pos, false))
+                        <= 6.
+                    {
+                        commands.entity(e).remove::<Sensor>();
                     }
                 }
             }
         }
 
         commands.entity(broken.entity).despawn_recursive();
-        game_param.remove_object_from_chunk_cache(broken.pos);
+        game.remove_object_from_chunk_cache(broken.pos);
 
         if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {
             wall_break_event.send(WallBreakEvent { pos: broken.pos })
