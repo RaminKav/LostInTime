@@ -83,11 +83,7 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{
-    fmt::format::FmtSpan,
-    layer::SubscriberExt,
-    EnvFilter,
-};
+use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, EnvFilter};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
     spawn_menu_text_buttons, InventorySlotState, UIPlugin,
@@ -240,8 +236,8 @@ fn init_global_logger() {
     let log_file = LogFileInitializer {
         directory: datafiles::logs_dir(),
         filename: "survival-game.log",
-        max_n_old_files: 5,
-        preferred_max_file_size_mib: 1,
+        max_n_old_files: 10,
+        preferred_max_file_size_mib: 0,
     }
     .init()
     .expect("Failed to initialize log file");
@@ -277,9 +273,6 @@ fn init_global_logger() {
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("unable to set global logs subscriber");
-
-    // this is kind of stupid but we have to set an early hook in case we panic before the plugins are all initialized lol
-    std::panic::set_hook(Box::new(tracing_panic::panic_hook));
 }
 
 #[derive(Resource)]
