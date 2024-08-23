@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"] // hide console bcus we have nice logs :)
 #![allow(non_snake_case)]
 use std::{
     env,
