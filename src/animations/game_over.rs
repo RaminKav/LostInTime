@@ -1,9 +1,8 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use rand::seq::IteratorRandom;
-use std::{fs::File, io::BufReader};
 
 use crate::{
-    client::{analytics::SendAnalyticsDataToServerEvent, GameOverEvent},
+    client::GameOverEvent,
     colors::{overwrite_alpha, WHITE},
     inputs::FacingDirection,
     player::Player,
@@ -77,36 +76,34 @@ pub fn handle_game_over_fadeout(
             RenderLayers::from_layers(&[3]),
         ));
         // OK BUTTON
-        let ok_text = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        "Try Again",
-                        TextStyle {
-                            font: asset_server.load("fonts/alagard.ttf"),
-                            font_size: 15.0,
-                            color: WHITE.with_a(0.),
-                        },
-                    ),
-                    transform: Transform {
-                        translation: Vec3::new(0., -100.5, 23.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Try Again",
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE.with_a(0.),
                     },
-                    ..default()
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., -100.5, 23.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
                 },
-                Name::new("INFO OK TEXT"),
-                RenderLayers::from_layers(&[3]),
-                Interactable::default(),
-                UIElement::MenuButton,
-                GameOverText,
-                MenuButton::GameOverOK,
-                Sprite {
-                    custom_size: Some(Vec2::new(70., 13.)),
-                    ..default()
-                },
-            ))
-            .id();
+                ..default()
+            },
+            Name::new("INFO OK TEXT"),
+            RenderLayers::from_layers(&[3]),
+            Interactable::default(),
+            UIElement::MenuButton,
+            GameOverText,
+            MenuButton::GameOverOK,
+            Sprite {
+                custom_size: Some(Vec2::new(70., 13.)),
+                ..default()
+            },
+        ));
         next_state.0 = Some(GameState::GameOver);
         // move player to UI camera to be above the fade out overlay
         commands
@@ -145,20 +142,13 @@ pub fn tick_game_over_overlay(
     time: Res<Time>,
     mut query: Query<(Entity, &mut GameOverFadeout, &mut Sprite), Without<GameOverText>>,
     asset_server: Res<AssetServer>,
-    mut analytics_events: EventWriter<SendAnalyticsDataToServerEvent>,
     mut game_over_text: Query<&mut Text, With<GameOverText>>,
-    mut analytics_check: Local<bool>,
     mut tip_check: Local<bool>,
 ) {
     if query.iter().count() == 0 {
-        *analytics_check = false;
         *tip_check = false;
     }
     for (_e, mut timer, mut sprite) in query.iter_mut() {
-        if timer.0.percent() >= 0.5 && !*analytics_check {
-            analytics_events.send_default();
-            *analytics_check = true;
-        }
         if timer.0.percent() >= 0.25 && !*tip_check {
             *tip_check = true;
             // Try to load tips from save
@@ -176,7 +166,8 @@ pub fn tick_game_over_overlay(
                 "Press Shift + Left Click to quickly move items\n\n     between your hotbar, inventory, and chests.",
                 "Exploring the dense forest can be dangerous, especially at night!\n\n     You have more room to fight in clearings.",
                 "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear have better base stats.",
-                "Press ESC to manually save your game! Otherwise it will save every 200s."
+                "Press ESC to manually save your game! Otherwise it will save every 200s.",
+                "Inventory, Crafting, and Chest menus pause the game."
               ];
 
             let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();

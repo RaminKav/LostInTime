@@ -1,4 +1,7 @@
-use std::{fs, process::exit};
+use std::{
+    fs::{self, create_dir_all, File},
+    process::exit,
+};
 
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
@@ -6,7 +9,7 @@ use crate::{
     ai::pathfinding::PathfindingCache,
     assets::{asset_helpers::spawn_sprite, Graphics},
     audio::UpdateBGMTrackEvent,
-    client::analytics::AnalyticsData,
+    client::analytics::{connect_server, AnalyticsData},
     colors::{overwrite_alpha, BLACK, WHITE, YELLOW_2},
     container::ContainerRegistry,
     datafiles,
@@ -15,10 +18,10 @@ use crate::{
     player::skills::{PlayerSkills, SkillChoiceQueue},
     ui::{ChestContainer, FurnaceContainer},
     world::{
-        dimension::{ActiveDimension, EraManager},
+        dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
     },
-    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, GAME_HEIGHT, ZOOM_SCALE,
+    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
 };
 
 use super::{Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
@@ -108,6 +111,7 @@ pub fn handle_menu_button_click_events(
     mut analytics_data: Option<ResMut<AnalyticsData>>,
     skills: Query<&PlayerSkills>,
     night_tracker: Option<Res<NightTracker>>,
+    seed: Res<GenerationSeed>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -164,18 +168,44 @@ pub fn handle_menu_button_click_events(
                 }
             }
             MenuButton::GameOverOK => {
+                let analytics_data = analytics_data.as_mut().unwrap();
+
+                //set end of game analytics data
+                let night_tracker = night_tracker.as_ref().unwrap();
+                analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+                analytics_data.timestamp = chrono::offset::Local::now().to_string();
+                analytics_data.nights_survived = night_tracker.days as u32;
+                let analytics_dir = datafiles::analytics_dir();
+
+                // save analytics to file
+                if let Ok(()) = create_dir_all(analytics_dir) {
+                    let analytics_file = {
+                        let mut file = datafiles::analytics_dir();
+                        file.push(format!("analytics_{}.json", seed.seed));
+                        file
+                    };
+                    let file = File::create(analytics_file)
+                        .expect("Could not open file for serialization");
+
+                    if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
+                        error!("Failed to save game state: {result:?}");
+                    } else {
+                        info!("SAVED ANALYTICS!");
+                    }
+                }
+
+                // send server analytics
+                info!("Sending analytics data to server...");
+                if !*DEBUG {
+                    connect_server(analytics_data.clone());
+                }
                 info!("Despawning everything, Sending to main menu");
                 for e in everything.iter() {
                     commands.entity(e).despawn();
                 }
                 let _ = fs::remove_file(datafiles::save_file());
                 next_state.0 = Some(GameState::MainMenu);
-                //set end of game analytics data
-                let analytics_data = analytics_data.as_mut().unwrap();
-                let night_tracker = night_tracker.as_ref().unwrap();
-                analytics_data.skills = skills.iter().next().unwrap().skills.clone();
-                analytics_data.timestamp = chrono::offset::Local::now().to_string();
-                analytics_data.nights_survived = night_tracker.days as u32;
+
                 //cleanup resources with Entity refs
                 commands.remove_resource::<ChestContainer>();
                 commands.remove_resource::<FurnaceContainer>();

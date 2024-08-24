@@ -132,11 +132,8 @@ impl Plugin for ClientPlugin {
                 (
                     save_state.run_if(resource_exists::<AnalyticsData>()),
                     tick_save_timer,
-                    handle_append_run_data_after_death
-                        .before(save_analytics_data_to_file_on_game_over)
-                        .run_if(resource_exists::<AnalyticsData>()),
+                    handle_append_run_data_after_death.run_if(resource_exists::<AnalyticsData>()),
                 )
-                    .before(save_analytics_data_to_file_on_game_over)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));

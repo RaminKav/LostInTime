@@ -1,4 +1,3 @@
-use std::fs::{create_dir_all, File};
 /*
     Analytics System:
     track various data points through event listeners.
@@ -25,14 +24,7 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 use tungstenite::{connect, Message};
 
-use crate::{
-    datafiles::{self},
-    enemy::Mob,
-    item::WorldObject,
-    player::skills::Skill,
-    world::dimension::GenerationSeed,
-    GameState, DEBUG,
-};
+use crate::{enemy::Mob, item::WorldObject, player::skills::Skill, GameState};
 
 #[derive(Debug, Clone, Resource, Default, Serialize, Deserialize)]
 pub struct AnalyticsData {
@@ -62,21 +54,14 @@ pub struct AnalyticsPlugin;
 impl Plugin for AnalyticsPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<AnalyticsUpdateEvent>()
-            .add_event::<SendAnalyticsDataToServerEvent>()
             .add_system(handle_analytics_update.run_if(resource_exists::<AnalyticsData>()))
-            .add_system(add_analytics_resource_on_start.in_schedule(OnExit(GameState::MainMenu)))
-            .add_system(
-                save_analytics_data_to_file_on_game_over.run_if(resource_exists::<AnalyticsData>()),
-            );
+            .add_system(add_analytics_resource_on_start.in_schedule(OnExit(GameState::MainMenu)));
     }
 }
 
 pub struct AnalyticsUpdateEvent {
     pub update_type: AnalyticsTrigger,
 }
-
-#[derive(Default)]
-pub struct SendAnalyticsDataToServerEvent;
 
 #[derive(Debug, Clone)]
 pub enum AnalyticsTrigger {
@@ -133,43 +118,14 @@ pub fn handle_analytics_update(
 pub fn add_analytics_resource_on_start(mut commands: Commands) {
     commands.insert_resource(AnalyticsData::default());
 }
-pub fn save_analytics_data_to_file_on_game_over(
-    analytics_data: Res<AnalyticsData>,
-    seed: Res<GenerationSeed>,
-    mut events: EventReader<SendAnalyticsDataToServerEvent>,
-    commands: Commands,
-) {
-    if events.iter().count() == 0 {
-        return;
-    }
-    let analytics_dir = datafiles::analytics_dir();
-    if let Ok(()) = create_dir_all(analytics_dir) {
-        let analytics_file = {
-            let mut file = datafiles::analytics_dir();
-            file.push(format!("analytics_{}.json", seed.seed));
-            file
-        };
-        let file = File::create(analytics_file).expect("Could not open file for serialization");
 
-        if let Err(result) = serde_json::to_writer(file, &analytics_data.clone()) {
-            error!("Failed to save game state: {result:?}");
-        } else {
-            info!("SAVED ANALYTICS!");
-        }
-    }
-    info!("Sending analytics data to server...");
-    if !*DEBUG {
-        connect_server(analytics_data.clone());
-    }
-}
-
-fn connect_server(data: AnalyticsData) {
+pub fn connect_server(data: AnalyticsData) {
     info!("Connecting to server...");
     let json = serde_json::to_string(&data).expect("data serializes");
     info!("analytics data {json}");
 
     match connect("wss://bevy-analytics.shuttleapp.rs/ws") {
-        Ok((mut socket, response)) => {
+        Ok((mut socket, _response)) => {
             if let Err(e) = socket.send(Message::Text(json)) {
                 error!("failed to send txt {e}");
             }
