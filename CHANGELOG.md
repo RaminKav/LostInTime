@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.4
+
+### Features
+
+- Shift+hotbar number auto-consumes items without swapping the hotbar slot
+- Consuming a consumable item in teh hotbar slot will attempt to replenish the slot with a matching consumable type if the slot becomes empty.
+
+### Changes
+
+### Bugfixes
+
+- Fix macos going crazy with the hotbar trackpad sensitivity
+
 ## 0.1.3
 
 ### Changes

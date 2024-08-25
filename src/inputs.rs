@@ -46,7 +46,8 @@ use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{
-    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
+    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventorySlotState, InventoryState,
+    UIState,
 };
 use crate::world::chunk::Chunk;
 
@@ -85,6 +86,7 @@ impl Plugin for InputsPlugin {
                     tick_dash_timer.run_if(is_not_paused),
                     handle_open_essence_ui,
                     diagnostics,
+                    handle_quick_hotbar_consume.before(handle_hotbar_key_input),
                     handle_interact_objects.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -480,7 +482,7 @@ pub fn toggle_inventory(
 }
 fn handle_hotbar_key_input(
     mut game: GameParam,
-    mut key_input: ResMut<Input<KeyCode>>,
+    key_input: ResMut<Input<KeyCode>>,
     mut mouse_wheel_event: EventReader<MouseWheel>,
     mut inv_state: ResMut<InventoryState>,
 ) {
@@ -491,7 +493,7 @@ fn handle_hotbar_key_input(
                 &mut inv_state,
                 &mut game.inv_slot_query,
             );
-        } else if e.y <= 0. {
+        } else if e.y < 0. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 1) % 6,
                 &mut inv_state,
@@ -502,7 +504,6 @@ fn handle_hotbar_key_input(
     for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
         if key_input.just_pressed(*key) {
             change_hotbar_slot(slot, &mut inv_state, &mut game.inv_slot_query);
-            key_input.clear();
         }
     }
 }
@@ -522,6 +523,38 @@ pub fn update_cursor_pos(
                 ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, cam),
                 screen_coords: cursor_moved.position.extend(0.),
             };
+        }
+    }
+}
+pub fn handle_quick_hotbar_consume(
+    mut key_input: ResMut<Input<KeyCode>>,
+    mut game: GameParam,
+    proto_param: ProtoParam,
+
+    mut inv: Query<&mut Inventory>,
+    mut item_action_param: ItemActionParam,
+) {
+    let shift_key_pressed =
+        key_input.pressed(KeyCode::LShift) || key_input.pressed(KeyCode::RShift);
+    let hot_bar_key_pressed = HOTBAR_KEYCODES.iter().any(|k| key_input.just_pressed(*k));
+    if shift_key_pressed && hot_bar_key_pressed {
+        let hotbar_slot = HOTBAR_KEYCODES
+            .iter()
+            .position(|k| key_input.just_pressed(*k))
+            .unwrap();
+        key_input.clear_just_pressed(HOTBAR_KEYCODES[hotbar_slot]);
+        let held_item_option = inv.single().items.items[hotbar_slot].clone();
+        if let Some(held_item) = held_item_option {
+            let held_obj = *held_item.get_obj();
+            if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
+                item_actions.run_action(
+                    held_obj,
+                    held_item.slot,
+                    &mut item_action_param,
+                    &mut game,
+                    &proto_param,
+                );
+            }
         }
     }
 }
@@ -670,7 +703,13 @@ pub fn mouse_click_system(
         if let Some(held_item) = held_item_option {
             let held_obj = *held_item.get_obj();
             if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
-                item_actions.run_action(held_obj, &mut item_action_param, &mut game, &proto_param);
+                item_actions.run_action(
+                    held_obj,
+                    held_item.slot,
+                    &mut item_action_param,
+                    &mut game,
+                    &proto_param,
+                );
             }
         }
         if let Some((obj_e, obj)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {

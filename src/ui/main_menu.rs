@@ -111,7 +111,7 @@ pub fn handle_menu_button_click_events(
     mut analytics_data: Option<ResMut<AnalyticsData>>,
     skills: Query<&PlayerSkills>,
     night_tracker: Option<Res<NightTracker>>,
-    seed: Res<GenerationSeed>,
+    seed: Option<Res<GenerationSeed>>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -181,7 +181,7 @@ pub fn handle_menu_button_click_events(
                 if let Ok(()) = create_dir_all(analytics_dir) {
                     let analytics_file = {
                         let mut file = datafiles::analytics_dir();
-                        file.push(format!("analytics_{}.json", seed.seed));
+                        file.push(format!("analytics_{}.json", seed.as_ref().unwrap().seed));
                         file
                     };
                     let file = File::create(analytics_file)

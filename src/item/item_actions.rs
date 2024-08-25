@@ -12,7 +12,7 @@ use crate::{
     night::NightTracker,
     player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
-    ui::{ChestContainer, FurnaceContainer, InventoryState, UIState},
+    ui::{ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, UIState},
     world::{
         dimension::DimensionSpawnEvent,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
@@ -103,6 +103,7 @@ pub struct ConsumableItem;
 
 pub struct ActionSuccessEvent {
     pub obj: WorldObject,
+    pub item_slot: usize,
 }
 #[derive(SystemParam)]
 pub struct ItemActionParam<'w, 's> {
@@ -135,6 +136,7 @@ impl ItemActions {
     pub fn run_action(
         &self,
         obj: WorldObject,
+        item_slot: usize,
         item_action_param: &mut ItemActionParam,
         game: &mut GameParam,
         proto_param: &ProtoParam,
@@ -217,28 +219,94 @@ impl ItemActions {
 
         item_action_param
             .action_success_event
-            .send(ActionSuccessEvent { obj });
+            .send(ActionSuccessEvent { obj, item_slot });
     }
 }
 
 pub fn handle_item_action_success(
     mut success_events: EventReader<ActionSuccessEvent>,
     mut inv: Query<&mut Inventory>,
-    inv_state: Res<InventoryState>,
     proto_param: ProtoParam,
     mut analytics_event: EventWriter<AnalyticsUpdateEvent>,
+    mut inv_slots: Query<&mut InventorySlotState>,
 ) {
     for e in success_events.iter() {
         if proto_param
             .get_component::<ConsumableItem, _>(e.obj)
             .is_some()
         {
-            let hotbar_slot = inv_state.active_hotbar_slot;
-            let held_item_option = inv.single().items.items[hotbar_slot].clone();
-            inv.single_mut().items.items[hotbar_slot] = held_item_option.unwrap().modify_count(-1);
+            let mut item_action_item = inv.single().items.items[e.item_slot].clone().unwrap();
+            inv.single_mut().items.items[e.item_slot] = item_action_item.modify_count(-1);
             analytics_event.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemConsumed(e.obj),
             });
+
+            let was_last_consumable_in_slot = item_action_item.item_stack.count == 0;
+            if was_last_consumable_in_slot {
+                let FOOD = vec![
+                    WorldObject::Apple,
+                    WorldObject::BrownMushroomBlock,
+                    WorldObject::RedMushroomBlock,
+                    WorldObject::RedStew,
+                    WorldObject::Berries,
+                    WorldObject::CookedMeat,
+                ];
+                let HEALING = vec![
+                    WorldObject::SmallPotion,
+                    WorldObject::LargePotion,
+                    WorldObject::Bandage,
+                    WorldObject::Apple,
+                    WorldObject::CookedMeat,
+                    WorldObject::RedStew,
+                    WorldObject::RedMushroomBlock,
+                    WorldObject::Berries,
+                ];
+                let consumable_slot = item_action_item.slot;
+                let mut was_food = false;
+                let mut was_healing = false;
+                let item_actions = proto_param
+                    .get_component::<ItemActions, _>(e.obj)
+                    .expect("response to an item without an action");
+                item_actions.actions.iter().for_each(|a| match a {
+                    &ItemAction::Eat(_) => was_food = true,
+                    &ItemAction::ModifyHealth(_) => was_healing = true,
+                    _ => {}
+                });
+                let mut inv = inv.single_mut();
+                if was_food {
+                    // find another food item in inv and place it in this slot
+                    for food in FOOD.iter() {
+                        if let Some(matching_slot) = inv.items.get_slot_for_item_in_container(food)
+                        {
+                            let next_consumable_item_stack = inv.items.items[matching_slot]
+                                .as_ref()
+                                .unwrap()
+                                .modify_slot(consumable_slot);
+                            next_consumable_item_stack
+                                .add_to_inventory(&mut inv.items, &mut inv_slots);
+                            inv.items.items[matching_slot] = None;
+                            return;
+                        }
+                    }
+                }
+                if was_healing {
+                    // find another food item in inv and place it in this slot
+                    for healing_item in HEALING.iter() {
+                        if let Some(matching_slot) =
+                            inv.items.get_slot_for_item_in_container(healing_item)
+                        {
+                            let next_consumable_item_stack = inv.items.items[matching_slot]
+                                .as_ref()
+                                .unwrap()
+                                .modify_slot(consumable_slot);
+                            next_consumable_item_stack
+                                .add_to_inventory(&mut inv.items, &mut inv_slots);
+                            inv.items.items[matching_slot] = None;
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
 }
