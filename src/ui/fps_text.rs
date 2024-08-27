@@ -18,7 +18,7 @@ pub fn spawn_fps_text(
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                format!("{VERSION}  FPS: "),
+                format!("FPS: \n\n{VERSION}"),
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
@@ -30,11 +30,11 @@ pub fn spawn_fps_text(
                     },
                 },
             )
-            .with_alignment(TextAlignment::Left),
+            .with_alignment(TextAlignment::Right),
             transform: Transform {
                 translation: Vec3::new(
-                    resolution.game_width / 2. - 38.5,
-                    -GAME_HEIGHT / 2. + 5.,
+                    resolution.game_width / 2. - 28.5,
+                    -GAME_HEIGHT / 2. + 10.5,
                     1.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -55,7 +55,7 @@ pub fn text_update_system(
         if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
             if let Some(value) = fps.smoothed() {
                 // Update the value of the second section
-                text.sections[0].value = format!("{VERSION}  FPS: {value:.0}");
+                text.sections[0].value = format!("FPS: {value:.0}\n\n{VERSION}");
             }
         }
     }
