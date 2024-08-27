@@ -210,6 +210,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Scrapper: WorldObjectData(
+            texture_pos: (1., 9.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ScrapperBlock: WorldObjectData(
+            texture_pos: (1., 9.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Cauldron: WorldObjectData(
             texture_pos: (2., 8.),
             size: (16., 16.),

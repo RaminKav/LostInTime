@@ -15,7 +15,7 @@ use crate::{
     client::GameOverEvent,
     colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
     inventory::{Inventory, ItemStack},
-    item::{Equipment, EquipmentType},
+    item::{Equipment, EquipmentType, WorldObject},
     player::{
         skills::{PlayerSkills, Skill},
         stats::StatType,
@@ -23,8 +23,10 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::{
-        stats_ui::StatsButtonState, DropOnSlotEvent, InventoryState, RemoveFromSlotEvent,
-        ShowInvPlayerStatsEvent, UIElement, UIState,
+        scrapper_ui::{Scrap, ScrapsInto},
+        stats_ui::StatsButtonState,
+        DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
+        UIState,
     },
     CustomFlush, GameParam, GameState, Player,
 };
@@ -991,6 +993,22 @@ impl ItemRarity {
             ItemRarity::Legendary => Some(ItemGlow::Red),
         }
     }
+    pub fn get_scrap(&self) -> ScrapsInto {
+        match self {
+            ItemRarity::Common => ScrapsInto(vec![]),
+            ItemRarity::Uncommon => ScrapsInto(vec![Scrap::new(WorldObject::UpgradeTome, 0.06)]),
+            ItemRarity::Rare => ScrapsInto(vec![
+                Scrap::new(WorldObject::OrbOfTransformation, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 0.17),
+            ]),
+            ItemRarity::Legendary => ScrapsInto(vec![
+                Scrap::new(WorldObject::OrbOfTransformation, 1.),
+                Scrap::new(WorldObject::OrbOfTransformation, 1.),
+                Scrap::new(WorldObject::OrbOfTransformation, 0.5),
+                Scrap::new(WorldObject::UpgradeTome, 0.4),
+            ]),
+        }
+    }
 }
 
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
@@ -1169,11 +1187,7 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
-        new_att.add_attribute_components(
-            &mut commands.entity(player),
-            old_health.0,
-            skills,
-        );
+        new_att.add_attribute_components(&mut commands.entity(player), old_health.0, skills);
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)
@@ -1343,20 +1357,22 @@ pub fn add_item_glows(
     new_item_e: Entity,
     rarity: ItemRarity,
 ) -> Option<Entity> {
-    rarity.get_item_glow().map(|glow| commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_item_glow(glow.clone()),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(18., 18.)),
-                        ..Default::default()
-                    },
-                    transform: Transform {
-                        translation: Vec3::new(0., 0., -1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
+    rarity.get_item_glow().map(|glow| {
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_item_glow(glow.clone()),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(18., 18.)),
                     ..Default::default()
-                })
-                .set_parent(new_item_e)
-                .id())
+                },
+                transform: Transform {
+                    translation: Vec3::new(0., 0., -1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .set_parent(new_item_e)
+            .id()
+    })
 }

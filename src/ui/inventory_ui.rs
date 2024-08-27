@@ -27,11 +27,13 @@ pub enum UIState {
     Furnace,
     Essence,
     Options,
+    Scrapper,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {
         self == &UIState::Inventory
             || self == &UIState::Chest
+            || self == &UIState::Scrapper
             || self == &UIState::Crafting
             || self == &UIState::Furnace
     }
@@ -63,6 +65,7 @@ pub enum InventorySlotType {
     Accessory,
     Chest,
     Furnace,
+    Scrapper,
 }
 impl InventorySlotType {
     pub fn is_crafting(self) -> bool {
@@ -86,6 +89,9 @@ impl InventorySlotType {
     pub fn is_chest(self) -> bool {
         self == InventorySlotType::Chest
     }
+    pub fn is_scrapper(self) -> bool {
+        self == InventorySlotType::Scrapper
+    }
 }
 pub fn setup_inv_ui(
     mut commands: Commands,
@@ -102,6 +108,11 @@ pub fn setup_inv_ui(
             Vec2::new(22., 0.5),
         ),
         UIState::Chest => (
+            CHEST_INVENTORY_UI_SIZE,
+            graphics.get_ui_element_texture(UIElement::ChestInventory),
+            Vec2::new(22.5, 0.),
+        ),
+        UIState::Scrapper => (
             CHEST_INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::ChestInventory),
             Vec2::new(22.5, 0.),
@@ -184,6 +195,7 @@ pub fn setup_inv_slots_ui(
         UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
         UIState::Crafting => (true, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
+        UIState::Scrapper => (false, None),
         UIState::Furnace => (true, None),
         _ => return,
     };
@@ -304,7 +316,7 @@ pub fn spawn_inv_slot(
             + UI_SLOT_SIZE
             + 1. * slot_index as f32
             + 4.;
-    } else if slot_type.is_chest() {
+    } else if slot_type.is_chest() || slot_type.is_scrapper() {
         y += 4. * UI_SLOT_SIZE + 11.;
     } else if slot_type.is_furnace() {
         if slot_index == 0 {
@@ -543,6 +555,8 @@ pub fn update_inventory_ui(
         let interactable_option = interactables.get(e);
         let item_option = if slot_state.r#type.is_chest() {
             cont_param.chest_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+        } else if slot_state.r#type.is_scrapper() {
+            cont_param.scrapper_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else if slot_state.r#type.is_furnace() {
             cont_param.furnace_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else if slot_state.r#type.is_crafting() && cont_param.crafting_option.is_some() {

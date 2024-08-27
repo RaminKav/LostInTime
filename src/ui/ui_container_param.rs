@@ -10,11 +10,15 @@ use crate::{
     item::{CraftedItemEvent, CraftingTracker, Recipes},
 };
 
-use super::{crafting_ui::CraftingContainer, ChestContainer, FurnaceContainer, UIState};
+use super::{
+    crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, ChestContainer,
+    FurnaceContainer, UIState,
+};
 
 #[derive(SystemParam)]
 pub struct UIContainersParam<'w, 's> {
     pub chest_option: Option<ResMut<'w, ChestContainer>>,
+    pub scrapper_option: Option<ResMut<'w, ScrapperContainer>>,
     pub furnace_option: Option<ResMut<'w, FurnaceContainer>>,
     pub crafting_option: Option<ResMut<'w, CraftingContainer>>,
 
@@ -41,6 +45,7 @@ impl<'w, 's> UIContainersParam<'w, 's> {
             UIState::Chest => self.chest_option.as_mut().map(|c| &mut c.items),
             UIState::Furnace => self.furnace_option.as_mut().map(|c| &mut c.items),
             UIState::Crafting => self.crafting_option.as_mut().map(|c| &mut c.items),
+            UIState::Scrapper => self.scrapper_option.as_mut().map(|c| &mut c.items),
             _ => None,
         }
     }

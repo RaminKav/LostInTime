@@ -417,6 +417,9 @@ pub enum WorldObject {
     Dodge,
     TooltipInspect,
     TimePortal,
+
+    Scrapper,
+    ScrapperBlock,
 }
 
 #[derive(

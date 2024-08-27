@@ -12,7 +12,10 @@ use crate::{
     night::NightTracker,
     player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
-    ui::{ChestContainer, FurnaceContainer, InventorySlotState, InventoryState, UIState},
+    ui::{
+        scrapper_ui::ScrapperContainer, ChestContainer, FurnaceContainer, InventorySlotState,
+        InventorySlotType, UIState,
+    },
     world::{
         dimension::DimensionSpawnEvent,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
@@ -121,6 +124,7 @@ pub struct ItemActionParam<'w, 's> {
     pub cursor_pos: Res<'w, CursorPos>,
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
     pub chest_query: Query<'w, 's, &'static ChestContainer>,
+    pub scrapper_query: Query<'w, 's, &'static ScrapperContainer>,
     pub furnace_query: Query<'w, 's, &'static FurnaceContainer>,
     pub crafting_tracker: ResMut<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,
@@ -282,8 +286,11 @@ pub fn handle_item_action_success(
                                 .as_ref()
                                 .unwrap()
                                 .modify_slot(consumable_slot);
-                            next_consumable_item_stack
-                                .add_to_inventory(&mut inv.items, &mut inv_slots);
+                            next_consumable_item_stack.add_to_container(
+                                &mut inv.items,
+                                InventorySlotType::Normal,
+                                &mut inv_slots,
+                            );
                             inv.items.items[matching_slot] = None;
                             return;
                         }
@@ -299,8 +306,11 @@ pub fn handle_item_action_success(
                                 .as_ref()
                                 .unwrap()
                                 .modify_slot(consumable_slot);
-                            next_consumable_item_stack
-                                .add_to_inventory(&mut inv.items, &mut inv_slots);
+                            next_consumable_item_stack.add_to_container(
+                                &mut inv.items,
+                                InventorySlotType::Normal,
+                                &mut inv_slots,
+                            );
                             inv.items.items[matching_slot] = None;
                             return;
                         }

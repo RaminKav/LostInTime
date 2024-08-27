@@ -1,0 +1,17 @@
+(
+  name: "ScrapperBlock",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ScrapperBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(Scrapper)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ScrapperBlock,
+        metadata: (
+            name: "Scrapper ", 
+            desc: ["Can get rid of", "unwanted items. Some", "items can return", "resources."],
+        ),
+        count: 1
+  ),
+  }
+)

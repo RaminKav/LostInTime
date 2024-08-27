@@ -45,7 +45,11 @@ use crate::{
     sappling::{GrowsInto, Sappling},
     schematic::{loot_chests::LootChestType, SchematicType},
     status_effects::{StatusEffectState, StatusEffectTracker},
-    ui::{crafting_ui::CraftingContainerType, EssenceOption, EssenceShopChoices},
+    ui::{
+        crafting_ui::CraftingContainerType,
+        scrapper_ui::{Scrap, ScrapsInto},
+        EssenceOption, EssenceShopChoices,
+    },
     world::{ForestGenerationParams, WallTextureData},
     CustomFlush, GameState, YSort,
 };
@@ -118,6 +122,9 @@ impl Plugin for ProtoPlugin {
             .register_type::<CraftingContainerType>()
             .register_type::<LeapAttack>()
             .register_type::<ProjectileAttack>()
+            .register_type::<Scrap>()
+            .register_type::<ScrapsInto>()
+            .register_type::<Vec<Scrap>>()
             .register_type::<StatusEffectTracker>()
             .register_type::<EssenceOption>()
             .register_type::<Vec<EssenceOption>>()

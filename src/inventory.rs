@@ -233,13 +233,14 @@ impl InventoryItemStack {
         self.item_stack.copy_with_count(amount_split)
     }
 
-    pub fn add_to_inventory(
+    pub fn add_to_container(
         &self,
         container: &mut Container,
+        slot_type: InventorySlotType,
         inv_slots: &mut Query<&mut InventorySlotState>,
     ) {
         container.items[self.slot] = Some(self.clone());
-        mark_slot_dirty(self.slot, InventorySlotType::Normal, inv_slots);
+        mark_slot_dirty(self.slot, slot_type, inv_slots);
     }
     pub fn remove_from_inventory(self, container: &mut Container) {
         container.items[self.slot] = None
@@ -443,7 +444,7 @@ impl ItemStack {
                 item_stack: self,
                 slot,
             };
-            item.add_to_inventory(container, inv_slots);
+            item.add_to_container(container, InventorySlotType::Normal, inv_slots);
         }
     }
     pub fn try_add_to_target_inventory_slot(
@@ -467,7 +468,7 @@ impl ItemStack {
                 slot,
             };
 
-            item.add_to_inventory(container, inv_slots);
+            item.add_to_container(container, InventorySlotType::Normal, inv_slots);
 
             Ok(())
         }

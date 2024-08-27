@@ -34,8 +34,9 @@ pub enum ObjectAction {
     DungeonTeleport,
     DungeonExit,
     Chest,
-    Crafting(CraftingContainerType), //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
-    Furnace, //MobRune - obj that if activated spawns a bunch of mobs, and when slain gives a chest reward?
+    Scrapper,
+    Crafting(CraftingContainerType),
+    Furnace,
     ChangeObject(WorldObject),
     SetHome,
     CombatShrine,
@@ -79,9 +80,7 @@ impl ObjectAction {
                 }
                 ObjectActionCost::Item(obj, count) => {
                     if inv.items.get_item_count_in_container(*obj) >= *count {
-                        if let Err(err) =
-                            inv.items.remove_from_inventory(*count, *obj)
-                        {
+                        if let Err(err) = inv.items.remove_from_inventory(*count, *obj) {
                             error!("Error removing item from inventory: {:?}", err);
                             return;
                         }
@@ -122,6 +121,10 @@ impl ObjectAction {
             ObjectAction::Chest => {
                 let chest_inv = item_action_param.chest_query.get(e).unwrap();
                 commands.insert_resource(chest_inv.clone());
+            }
+            ObjectAction::Scrapper => {
+                let scrapper_inv = item_action_param.scrapper_query.get(e).unwrap();
+                commands.insert_resource(scrapper_inv.clone());
             }
             ObjectAction::ChangeObject(new_obj) => {
                 commands.entity(e).despawn_recursive();

@@ -32,5 +32,6 @@
         ),
         count: 1
   ),
+  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: WoodPlank, chance: 1.), (obj: WoodPlank, chance: 0.5)]),
   }
 )

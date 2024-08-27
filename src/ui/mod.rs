@@ -2,11 +2,16 @@ pub mod chest_ui;
 pub mod crafting_ui;
 pub mod damage_numbers;
 pub mod guide_hud;
+pub mod scrapper_ui;
 pub mod screen_effects;
 use guide_hud::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
 use damage_numbers::{handle_clamp_screen_locked_icons, NewRecipeTextTimer};
+use scrapper_ui::{
+    add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
+    handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
+};
 use screen_effects::ScreenEffectMaterial;
 pub use ui_container_param::*;
 mod enemy_health_bar;
@@ -76,6 +81,7 @@ impl Plugin for UIPlugin {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
             })
             .add_event::<ActionSuccessEvent>()
+            .add_event::<ScrapperEvent>()
             .add_event::<FlashExpBarEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<DodgeEvent>()
@@ -97,6 +103,9 @@ impl Plugin for UIPlugin {
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Chest))),
+                setup_inv_ui
+                    .before(CustomFlush)
+                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Scrapper))),
                 setup_inv_ui
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Crafting))),
@@ -149,8 +158,13 @@ impl Plugin for UIPlugin {
                     change_ui_state_to_chest_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<ChestContainer>()),
+                    change_ui_state_to_scrapper_when_resource_added
+                        .before(CustomFlush)
+                        .run_if(resource_added::<ScrapperContainer>()),
+                    handle_scrap_items_in_scrapper.run_if(in_state(UIState::Scrapper)),
                     text_update_system,
                     add_inv_to_new_chest_objs,
+                    add_inv_to_new_scrapper_objs,
                     add_container_to_new_furnace_objs,
                     update_foodbar,
                     update_healthbar,
@@ -173,6 +187,7 @@ impl Plugin for UIPlugin {
                 (
                     setup_inv_slots_ui,
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
+                    setup_scrapper_slots_ui.run_if(in_state(UIState::Scrapper)),
                     tick_tooltip_timer,
                     handle_tooltip_teardown,
                     handle_submit_essence_choice,
@@ -227,6 +242,7 @@ pub fn handle_new_ui_state(
     old_ui: Query<(Entity, &UIState), With<UIState>>,
     mut commands: Commands,
     chest_option: Option<Res<ChestContainer>>,
+    scrapper_option: Option<Res<ScrapperContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
     mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
 ) {
@@ -259,6 +275,14 @@ pub fn handle_new_ui_state(
         }
         if next_ui != UIState::Chest {
             commands.remove_resource::<ChestContainer>();
+        }
+    }
+    if let Some(scrapper) = scrapper_option {
+        if let Some(mut scrapper_parent) = commands.get_entity(scrapper.parent) {
+            scrapper_parent.insert(scrapper.to_owned());
+        }
+        if next_ui != UIState::Scrapper {
+            commands.remove_resource::<ScrapperContainer>();
         }
     }
     if let Some(furnace) = furnace_option {

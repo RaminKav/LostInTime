@@ -22,10 +22,10 @@ use crate::{
 };
 
 use super::{
-    crafting_ui::CraftingContainer, spawn_item_stack_icon, stats_ui::StatsButtonState, ui_helpers,
-    ChestContainer, EssenceOption, FurnaceContainer, InventorySlotState, MenuButton,
-    MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
-    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
+    crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
+    stats_ui::StatsButtonState, ui_helpers, ChestContainer, EssenceOption, FurnaceContainer,
+    InventorySlotState, MenuButton, MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceUI,
+    SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
@@ -238,6 +238,8 @@ pub fn handle_drop_on_slot_events(
             let mut inv = inv.single_mut();
             let container = if slot_type.is_chest() {
                 &mut cont_param.chest_option.as_mut().unwrap().items
+            } else if slot_type.is_scrapper() {
+                &mut cont_param.scrapper_option.as_mut().unwrap().items
             } else if slot_type.is_furnace() {
                 &mut cont_param.furnace_option.as_mut().unwrap().items
             } else {
@@ -326,6 +328,7 @@ pub fn handle_hovering(
     mut commands: Commands,
     inv: Query<&Inventory>,
     chest_option: Option<Res<ChestContainer>>,
+    scrapper_option: Option<Res<ScrapperContainer>>,
     crafting_option: Option<Res<CraftingContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
@@ -353,13 +356,14 @@ pub fn handle_hovering(
                 if let Some(_item_e) = state.item {
                     let item = if state.r#type.is_chest() {
                         chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                    } else if state.r#type.is_scrapper() {
+                        scrapper_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_furnace() {
                         furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_crafting() && crafting_option.is_some() {
                         crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
-                        inv.single().get_items_from_slot_type(state.r#type).items
-                            [state.slot_index]
+                        inv.single().get_items_from_slot_type(state.r#type).items[state.slot_index]
                             .clone()
                     };
                     if let Some(item) = item {
@@ -371,21 +375,23 @@ pub fn handle_hovering(
                     }
                 }
             }
-            if ui == &UIElement::InventorySlotHover && (shift_key_just_pressed || shift_key_just_released) {
+            if ui == &UIElement::InventorySlotHover
+                && (shift_key_just_pressed || shift_key_just_released)
+            {
                 tooltip_teardown_events.send_default();
                 let state = state_option.unwrap();
 
                 if let Some(_item_e) = state.item {
                     let item = if state.r#type.is_chest() {
                         chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
+                    } else if state.r#type.is_scrapper() {
+                        scrapper_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_furnace() {
                         furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_crafting() && crafting_option.is_some() {
-                        crafting_option.as_ref().unwrap().items.items[state.slot_index]
-                            .clone()
+                        crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
-                        inv.single().get_items_from_slot_type(state.r#type).items
-                            [state.slot_index]
+                        inv.single().get_items_from_slot_type(state.r#type).items[state.slot_index]
                             .clone()
                     };
                     if let Some(item) = item {
@@ -405,9 +411,7 @@ pub fn handle_hovering(
                     .insert(graphics.get_ui_element_texture(UIElement::StatsButtonHover));
                 stats_update_events.send(ShowInvPlayerStatsEvent {
                     stat: Some(StatType::from_index(
-                        stats_option
-                            .expect("stats buttons have stats state")
-                            .index,
+                        stats_option.expect("stats buttons have stats state").index,
                     )),
                     ignore_timer: true,
                 });
@@ -633,6 +637,8 @@ pub fn handle_interaction_clicks(
                                 let mut inv = inv.single_mut();
                                 let container_items = if state.r#type.is_chest() {
                                     &mut container_param.chest_option.as_mut().unwrap().items
+                                } else if state.r#type.is_scrapper() {
+                                    &mut container_param.scrapper_option.as_mut().unwrap().items
                                 } else if state.r#type.is_furnace() {
                                     &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
@@ -666,6 +672,8 @@ pub fn handle_interaction_clicks(
                                 let mut inv = inv.single_mut();
                                 let container = if state.r#type.is_chest() {
                                     &mut container_param.chest_option.as_mut().unwrap().items
+                                } else if state.r#type.is_scrapper() {
+                                    &mut container_param.scrapper_option.as_mut().unwrap().items
                                 } else if state.r#type.is_furnace() {
                                     &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
@@ -817,6 +825,7 @@ pub fn handle_cursor_main_menu_buttons(
                     interactable.change(Interaction::Hovering);
                     let color = if menu_button == &MenuButton::GameOverOK
                         || menu_button == &MenuButton::InfoOK
+                        || menu_button == &MenuButton::Scrapper
                     {
                         RED
                     } else {
@@ -840,6 +849,7 @@ pub fn handle_cursor_main_menu_buttons(
                 };
                 let color = if menu_button == &MenuButton::GameOverOK
                     || menu_button == &MenuButton::InfoOK
+                    || menu_button == &MenuButton::Scrapper
                 {
                     WHITE
                 } else {

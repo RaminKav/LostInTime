@@ -31,5 +31,6 @@
         ),
         count: 1
   ),
+  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: MetalBar, chance: 1.), (obj: MetalBar, chance: 0.5)]),
   }
 )

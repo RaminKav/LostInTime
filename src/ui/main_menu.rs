@@ -24,7 +24,7 @@ use crate::{
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
 };
 
-use super::{Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
+use super::{scrapper_ui::ScrapperEvent, Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
 
 #[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
@@ -33,6 +33,7 @@ pub enum MenuButton {
     Quit,
     InfoOK,
     GameOverOK,
+    Scrapper,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -112,6 +113,7 @@ pub fn handle_menu_button_click_events(
     skills: Query<&PlayerSkills>,
     night_tracker: Option<Res<NightTracker>>,
     seed: Option<Res<GenerationSeed>>,
+    mut scrapper_event: EventWriter<ScrapperEvent>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -166,6 +168,9 @@ pub fn handle_menu_button_click_events(
                 for e in info_modal.iter() {
                     commands.entity(e).despawn_recursive();
                 }
+            }
+            MenuButton::Scrapper => {
+                scrapper_event.send_default();
             }
             MenuButton::GameOverOK => {
                 let analytics_data = analytics_data.as_mut().unwrap();
@@ -354,7 +359,7 @@ pub fn spawn_info_modal(
             },
         ))
         .id();
-    // OK BUTTON
+    // INFO TEXT
     let info_texts = commands
         .spawn((
             Text2dBundle {

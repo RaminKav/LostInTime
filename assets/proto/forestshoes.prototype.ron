@@ -28,5 +28,6 @@
         ),
         count: 1
   ),
+  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: BushlingScale, chance: 1.), (obj: BushlingScale, chance: 0.5)]),
   }
 )
