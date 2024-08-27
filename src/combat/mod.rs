@@ -14,7 +14,10 @@ use crate::{
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
-    client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
+    client::{
+        analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
+        is_not_paused,
+    },
     custom_commands::CommandsExt,
     enemy::{
         red_mushking::{DeathState, ReturnToShrineState, SummonAttackState},
@@ -93,7 +96,9 @@ impl Plugin for CombatPlugin {
                 handle_hits,
                 tick_despawn_timer,
                 cleanup_marked_for_death_entities.after(handle_enemy_death),
-                handle_attack_cooldowns.before(CustomFlush),
+                handle_attack_cooldowns
+                    .before(CustomFlush)
+                    .run_if(is_not_paused),
                 update_status_effect_icons,
                 handle_new_status_effect_event,
                 // spawn_hit_spark_effect.after(handle_hits),
