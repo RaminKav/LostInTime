@@ -6,6 +6,7 @@
 
 - Shift+hotbar number auto-consumes items without swapping the hotbar slot
 - Consuming a consumable item in teh hotbar slot will attempt to replenish the slot with a matching consumable type if the slot becomes empty.
+- Added Item Scrapper: craft this station to get rid of unwanted items, and turn equipment and weapons into resources!
 
 ### Changes
 
