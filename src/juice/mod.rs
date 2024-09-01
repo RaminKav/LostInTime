@@ -42,13 +42,13 @@ impl Plugin for JuicePlugin {
                         .before(CustomFlush)
                         .before(handle_break_object),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(
+                PostUpdate,
                 shake_effect
                     .after(move_camera_with_player)
                     .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             );
     }

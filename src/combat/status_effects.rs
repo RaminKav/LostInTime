@@ -31,6 +31,7 @@ pub struct StatusEffectTracker {
 #[derive(Component)]
 pub struct StatusEffectIcon;
 
+#[derive(Event)]
 pub struct StatusEffectEvent {
     pub effect: StatusEffect,
     pub num_stacks: i32,

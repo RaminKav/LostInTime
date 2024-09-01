@@ -24,7 +24,7 @@ impl Plugin for AIPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<DebugPathResetEvent>()
             .add_plugin(StateMachinePlugin)
-            .add_systems((spawn_new_debug_path,).in_set(OnUpdate(GameState::Main)))
+            .add_systems((spawn_new_debug_path,).in_set(Update(GameState::Main)))
             .add_systems(
                 (
                     follow.run_if(is_not_paused),
@@ -43,7 +43,7 @@ impl Plugin for AIPlugin {
                     cache_ai_path_on_new_obj_spawn.run_if(is_not_paused),
                     idle.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }

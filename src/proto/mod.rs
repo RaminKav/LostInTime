@@ -151,12 +151,12 @@ impl Plugin for ProtoPlugin {
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
-            .add_system(Self::load_prototypes.in_set(OnUpdate(GameState::LoadingProtos)))
+            .add_system(Self::load_prototypes.in_set(Update(GameState::LoadingProtos)))
             .add_system(
                 Self::check_proto_ready
                     .run_if(resource_exists::<AllProtos>())
                     .after(Self::load_prototypes)
-                    .in_set(OnUpdate(GameState::LoadingProtos)),
+                    .in_set(Update(GameState::LoadingProtos)),
             );
     }
 }
@@ -307,12 +307,7 @@ impl FromSchematicInput<EnemyMaterialMesh2DProto> for MaterialMesh2dBundle<Enemy
         });
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         MaterialMesh2dBundle {
-            mesh: meshes
-                .add(Mesh::from(shape::Quad {
-                    size: input.size,
-                    ..Default::default()
-                }))
-                .into(),
+            mesh: meshes.add(Rectangle::new(input.size.x, input.size.y)),
             material: enemy_material,
             ..default()
         }

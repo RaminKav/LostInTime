@@ -40,7 +40,7 @@ impl Scrap {
 #[reflect(Schematic)]
 pub struct ScrapsInto(pub Vec<Scrap>);
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct ScrapperEvent;
 
 pub fn setup_scrapper_slots_ui(
@@ -57,7 +57,7 @@ pub fn setup_scrapper_slots_ui(
     if inv_spawn_check.get_single().is_err() {
         return;
     }
-    if inv_state.0 != UIState::Scrapper {
+    if inv_state.get() != UIState::Scrapper {
         return;
     };
     for (slot_index, item) in inv.items.items.iter().enumerate() {

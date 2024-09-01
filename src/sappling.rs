@@ -20,7 +20,7 @@ pub struct SapplingPlugin;
 
 impl Plugin for SapplingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(tick_sappling_color.in_set(OnUpdate(GameState::Main)));
+        app.add_system(tick_sappling_color.in_set(Update(GameState::Main)));
     }
 }
 

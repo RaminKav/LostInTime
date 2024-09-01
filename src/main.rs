@@ -24,12 +24,10 @@ use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
 
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
     diagnostic::FrameTimeDiagnosticsPlugin,
     ecs::{schedule::ScheduleLabel, system::SystemParam},
     log::LogPlugin,
     prelude::*,
-    reflect::TypeUuid,
     render::{
         camera::{RenderTarget, ScalingMode},
         render_resource::{
@@ -150,22 +148,20 @@ fn main() {
     // macos bundles into a .app anyways, so we don't need to bundle assets.
     // doing it in the universal binary would double it since MacOS does M1 + Intel
     if cfg!(not(target_os = "macos")) {
-        app.add_plugin(EmbeddedAssetPlugin);
+        app.add_plugin(EmbeddedAssetPlugin {
+            mode: bevy_embedded_assets::PluginMode::ReplaceDefault,
+        });
     }
 
     let app = app
         .insert_resource(ClearColor(Color::BLACK))
         .add_state::<GameState>()
-        .edit_schedule(CoreSchedule::FixedUpdate, |s| {
+        .edit_schedule(FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
         })
         .add_plugins(
             DefaultPlugins
-                .set(AssetPlugin {
-                    // Enable hot-reloading of assets:
-                    watch_for_changes: false,
-                    ..default()
-                })
+                .set(AssetPlugin { ..default() })
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
@@ -186,7 +182,7 @@ fn main() {
         .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
         .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
         .insert_resource(Msaa::Off)
-        .insert_resource(FixedTime::new_from_secs(TIME_STEP))
+        .insert_resource(Time::<Fixed>::new_from_secs(TIME_STEP))
         .add_plugin(panic_handler::PanicHandler::new().build())
         .add_plugin(AsepritePlugin)
         .add_plugin(FrameTimeDiagnosticsPlugin)
@@ -596,8 +592,7 @@ impl Material2d for UITextureMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "9600f1e5-1911-4286-9810-e9bd9ff685e2"]
+#[derive(AsBindGroup, TypePath, Debug, Clone)]
 pub struct UITextureMaterial {
     #[texture(0)]
     #[sampler(1)]
@@ -731,13 +726,7 @@ fn setup(
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(game_size.x, game_size.y),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
+                    .add(Rectangle::new(game_size.x, game_size.y).into())
                     .into(),
                 transform: Transform::from_scale(Vec3::new(1., 1., 1.)),
                 material: game_render_material_handle,
@@ -751,15 +740,7 @@ fn setup(
     let _ui_texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(game_size.x, game_size.y),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
-                    .into(),
+                mesh: meshes.add(Rectangle::new(game_size.x, game_size.y)),
                 transform: Transform {
                     translation: Vec3::new(0., 0., 1.),
                     scale: Vec3::new(1., 1., 1.),

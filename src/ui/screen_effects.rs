@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    reflect::TypeUuid,
+    reflect::TypePath,
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -56,8 +56,7 @@ impl Material2d for ScreenEffectMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "3e77336e-4012-4d79-b559-7267288b4d16"]
+#[derive(AsBindGroup, TypePath, Debug, Clone)]
 pub struct ScreenEffectMaterial {
     #[uniform(0)]
     pub opacity: f32,
@@ -91,10 +90,7 @@ pub fn setup_screen_effects(
         opacity: 1. - hunger_percent,
     });
     commands.spawn((
-        Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(res.game_width, GAME_HEIGHT),
-            ..Default::default()
-        }))),
+        Mesh2dHandle::from(meshes.add(Rectangle::new(res.game_width, GAME_HEIGHT))),
         hp_effect_material.clone(),
         HealthScreenEffect,
         RenderLayers::from_layers(&[3]),
@@ -102,10 +98,7 @@ pub fn setup_screen_effects(
         SpatialBundle::from_transform(Transform::from_xyz(0., 0., 1.)),
     ));
     commands.spawn((
-        Mesh2dHandle::from(meshes.add(Mesh::from(shape::Quad {
-            size: Vec2::new(res.game_width, GAME_HEIGHT),
-            ..Default::default()
-        }))),
+        Mesh2dHandle::from(meshes.add(Rectangle::new(res.game_width, GAME_HEIGHT))),
         hunger_effect_material.clone(),
         HungerScreenEffect,
         RenderLayers::from_layers(&[3]),

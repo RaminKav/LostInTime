@@ -37,7 +37,7 @@ impl NightTracker {
 
 pub struct NightPlugin;
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct NewDayEvent;
 
 impl Plugin for NightPlugin {
@@ -53,7 +53,7 @@ impl Plugin for NightPlugin {
             .add_system(
                 tick_night_color
                     .run_if(is_not_paused)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }

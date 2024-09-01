@@ -117,7 +117,7 @@ pub enum Interaction {
 #[derive(Component)]
 pub struct DraggedItem;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct DropOnSlotEvent {
     pub dropped_entity: Entity,
@@ -126,14 +126,14 @@ pub struct DropOnSlotEvent {
     pub parent_interactable_entity: Entity,
     pub stack_empty: bool,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct RemoveFromSlotEvent {
     pub removed_item_stack: ItemStack,
     pub removed_slot_state: InventorySlotState,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct DropInWorldEvent {
     pub dropped_entity: Entity,
@@ -482,7 +482,7 @@ pub fn handle_item_drop_clicks(
     if !right_mouse_pressed {
         right_clicks.clear();
     }
-    let inv_open = ui_state.0.is_inv_open();
+    let inv_open = ui_state.get().is_inv_open();
     let hit_test = if inv_open {
         ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None)
     } else {
@@ -560,7 +560,7 @@ pub fn handle_drop_dragged_items_on_inv_close(
     ui_state: ResMut<State<UIState>>,
     dragging_query: Query<(Entity, &ItemStack), With<DraggedItem>>,
 ) {
-    if ui_state.0.is_inv_open() {
+    if ui_state.get().is_inv_open() {
         return;
     }
     for (e, item_stack) in dragging_query.iter() {
@@ -591,7 +591,7 @@ pub fn handle_interaction_clicks(
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
-    if !ui_state.0.is_inv_open() {
+    if !ui_state.get().is_inv_open() {
         return;
     }
 

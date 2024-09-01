@@ -22,6 +22,7 @@ pub struct DamageNumber {
 #[derive(Component)]
 pub struct PreviousHealth(pub i32);
 
+#[derive(Event)]
 pub struct DodgeEvent {
     pub entity: Entity,
 }

@@ -101,7 +101,7 @@ pub fn setup_inv_ui(
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     resolution: Res<ScreenResolution>,
 ) {
-    let (size, texture, pos_offset) = match cur_inv_state.0 {
+    let (size, texture, pos_offset) = match cur_inv_state.get() {
         UIState::Inventory => (
             INVENTORY_UI_SIZE,
             graphics.get_ui_element_texture(UIElement::Inventory),
@@ -162,7 +162,7 @@ pub fn setup_inv_ui(
             ..Default::default()
         })
         .insert(InventoryUI)
-        .insert(cur_inv_state.0.clone())
+        .insert(cur_inv_state.get().clone())
         .insert(Name::new("INVENTORY"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
@@ -191,7 +191,7 @@ pub fn setup_inv_slots_ui(
     if inv_spawn_check.get_single().is_err() {
         return;
     }
-    let (should_spawn_equipment, crafting_items_option) = match inv_state.0 {
+    let (should_spawn_equipment, crafting_items_option) = match inv_state.get() {
         UIState::Inventory => (true, Some(inv.single().crafting_items.clone())),
         UIState::Crafting => (true, Some(crafting_container.unwrap().items.clone())),
         UIState::Chest => (false, None),
@@ -276,7 +276,7 @@ pub fn spawn_inv_slot(
 ) -> Entity {
     // spawns an inv slot, with an item icon as its child if an item exists in that inv slot.
     // the slot's parent is set to the inv ui entity.
-    let inv_slot_offset = match inv_ui_state.0 {
+    let inv_slot_offset = match inv_ui_state.get() {
         UIState::Chest => Vec2::new(0., 0.),
         UIState::Crafting => Vec2::new(0., -4.),
         _ => Vec2::new(0., 0.),
@@ -300,7 +300,7 @@ pub fn spawn_inv_slot(
         y = -((slot_index / 8) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
             + 7. * UI_SLOT_SIZE
             + 15.;
-        if inv_ui_state.0 == UIState::Inventory {
+        if inv_ui_state.get() == UIState::Inventory {
             x -= 2.;
             y -= 29.;
         }
@@ -500,7 +500,7 @@ pub fn spawn_item_stack_icon(
                             color: Color::WHITE,
                         },
                     )
-                    .with_alignment(TextAlignment::Center),
+                    .with_justify(JustifyText::Center),
                     transform: Transform {
                         translation: Vec3::new(7., -5.5, 3.) + text_offset.extend(0.),
                         scale: Vec3::new(1., 1., 1.),
@@ -548,7 +548,7 @@ pub fn update_inventory_ui(
 
         // hotbars are hidden when inventory is open, so defer update
         // untile inv is closed again.
-        if inv_ui_state.0.is_inv_open() && slot_state.r#type.is_hotbar() {
+        if inv_ui_state.get().is_inv_open() && slot_state.r#type.is_hotbar() {
             continue;
         }
 
@@ -602,7 +602,7 @@ pub fn handle_update_inv_item_entities(
     mut commands: Commands,
     ui_state: Res<State<UIState>>,
 ) {
-    if !ui_state.0.is_inv_open() {
+    if !ui_state.get().is_inv_open() {
         return;
     }
     if let Ok(inv) = inv.get_single_mut() {

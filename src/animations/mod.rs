@@ -4,7 +4,6 @@ mod game_over;
 use std::cmp::max;
 use std::f32::consts::PI;
 
-use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
@@ -58,12 +57,11 @@ pub struct AttackAnimationTimer(pub Timer, pub f32);
 #[reflect(Schematic)]
 pub struct DoneAnimation;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Event)]
 pub struct AttackEvent {
     pub direction: Vec2,
 }
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "f690fdae-d598-45ab-8225-97e2a3f056f0"]
+#[derive(AsBindGroup, TypePath, Debug, Clone)]
 pub struct AnimatedTextureMaterial {
     #[texture(0)]
     #[sampler(1)]
@@ -108,7 +106,7 @@ impl Plugin for AnimationsPlugin {
                     animate_foliage_opacity,
                     handle_game_over_fadeout,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(tick_game_over_overlay);
     }
@@ -198,7 +196,7 @@ fn animate_hit(
         ),
         With<Player>,
     >,
-    anim_state: Query<(&CharacterAnimationSpriteSheetData, &TextureAtlasSprite)>,
+    anim_state: Query<(&CharacterAnimationSpriteSheetData, &TextureAtlas)>,
     time: Res<Time>,
 ) {
     let (p_e, mut kcc, _mv) = player.single_mut();
@@ -240,7 +238,7 @@ fn animate_hit(
 fn handle_held_item_direction_change(
     game: GameParam,
     mut tool_query: Query<
-        (&WorldObject, &mut Transform, &mut TextureAtlasSprite),
+        (&WorldObject, &mut Transform, &mut TextureAtlas),
         (With<MainHand>, Without<Chunk>),
     >,
 ) {
@@ -332,7 +330,7 @@ fn animate_spritesheet_animations(
         (
             Entity,
             &mut AnimationTimer,
-            &mut TextureAtlasSprite,
+            &mut Sprite,
             &Handle<TextureAtlas>,
             Option<&Children>,
             Option<&ArcProjectileData>,

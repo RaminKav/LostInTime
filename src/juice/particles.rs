@@ -35,6 +35,7 @@ pub struct Particles {
 pub struct DustParticles;
 #[derive(Component)]
 pub struct ExpParticles;
+#[derive(Event)]
 pub struct UseItemEvent(pub WorldObject);
 
 #[derive(Component)]
@@ -390,11 +391,7 @@ pub fn spawn_use_item_particles(
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.use_item_particle.clone())
                     .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(
-                    hit_pos.x,
-                    hit_pos.y + 5.,
-                    2.,
-                )),
+                transform: Transform::from_translation(Vec3::new(hit_pos.x, hit_pos.y + 5., 2.)),
                 ..Default::default()
             },
             YSort(1.),

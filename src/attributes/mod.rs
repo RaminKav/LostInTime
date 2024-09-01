@@ -1020,7 +1020,7 @@ pub struct AttributeModifier {
     pub delta: i32,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Event)]
 pub struct AttributeChangeEvent;
 
 #[derive(Bundle, Clone, Debug, Copy, Default)]
@@ -1131,7 +1131,7 @@ impl Plugin for AttributesPlugin {
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }
@@ -1196,7 +1196,7 @@ fn handle_player_item_attribute_change_events(
         } else {
             None
         };
-        if ui_state.0.is_inv_open() {
+        if ui_state.get().is_inv_open() {
             stats_event.send(ShowInvPlayerStatsEvent {
                 stat,
                 ignore_timer: true,

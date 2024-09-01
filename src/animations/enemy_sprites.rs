@@ -69,7 +69,7 @@ pub fn change_anim_offset_when_character_action_state_changes(
             Entity,
             &mut CharacterAnimationSpriteSheetData,
             &EnemyAnimationState,
-            &mut TextureAtlasSprite,
+            &mut TextureAtlas,
         ),
         Changed<EnemyAnimationState>,
     >,
@@ -116,7 +116,7 @@ pub fn change_character_anim_direction(
     mut mob_query: Query<
         (
             &FacingDirection,
-            &mut TextureAtlasSprite,
+            &mut TextureAtlas,
             &mut Handle<TextureAtlas>,
             Option<&Mob>,
             Option<&LeftFacingSideProfile>,
@@ -202,7 +202,7 @@ pub fn animate_character_spritesheet_animations(
         Entity,
         &mut AnimationTimer,
         &CharacterAnimationSpriteSheetData,
-        &mut TextureAtlasSprite,
+        &mut TextureAtlas,
         Option<&Player>,
     )>,
 ) {

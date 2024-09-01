@@ -33,7 +33,7 @@ pub struct TooltipsManager {
     pub timer: Timer,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct ToolTipUpdateEvent {
     pub item_stack: ItemStack,
@@ -41,7 +41,7 @@ pub struct ToolTipUpdateEvent {
     pub show_range: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Event)]
 
 pub struct ShowInvPlayerStatsEvent {
     pub stat: Option<StatType>,
@@ -65,7 +65,7 @@ impl TooltipTextProps {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct TooltipTeardownEvent;
 
 pub fn tick_tooltip_timer(time: Res<Time>, mut tooltip_manager: ResMut<TooltipsManager>) {
@@ -106,7 +106,7 @@ pub fn handle_spawn_inv_item_tooltip(
     proto: ProtoParam,
 ) {
     for item in updates.iter() {
-        let parent_inv_size = match cur_inv_state.0 {
+        let parent_inv_size = match cur_inv_state.get() {
             UIState::Inventory => INVENTORY_UI_SIZE,
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
@@ -431,7 +431,7 @@ pub fn handle_spawn_inv_player_stats(
     mut tooltip_manager: ResMut<TooltipsManager>,
     old_tooltips: Query<Entity, With<PlayerStatsTooltip>>,
 ) {
-    if ui_state.0 == UIState::Closed {
+    if ui_state.get() == UIState::Closed {
         let d = tooltip_manager.timer.duration();
         tooltip_manager.timer.tick(d);
         return;
@@ -443,7 +443,7 @@ pub fn handle_spawn_inv_player_stats(
             commands.entity(t).despawn_recursive();
         }
         tooltip_manager.timer.reset();
-        let (Ok(parent_e), translation) = (if curr_ui_state.0 == UIState::Inventory {
+        let (Ok(parent_e), translation) = (if curr_ui_state.get() == UIState::Inventory {
             (
                 inv.get_single(),
                 Vec3::new(-(INVENTORY_UI_SIZE.x + TOOLTIP_UI_SIZE.x + 2.) / 2., 0., 2.),

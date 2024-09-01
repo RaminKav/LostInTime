@@ -40,7 +40,7 @@ use crate::{
 
 use self::collisions::CollisionPlugion;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub struct HitEvent {
     pub hit_entity: Entity,
     pub damage: i32,
@@ -54,14 +54,14 @@ pub struct HitEvent {
 
 #[derive(Component, Debug, Clone)]
 pub struct MarkedForDeath;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct EnemyDeathEvent {
     pub entity: Entity,
     pub enemy_pos: Vec2,
     pub killed_by_crit: bool,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 
 pub struct ObjBreakEvent {
     pub entity: Entity,
@@ -84,7 +84,7 @@ pub struct JustGotHit;
 pub struct CombatPlugin;
 impl Plugin for CombatPlugin {
     fn build(&self, app: &mut App) {
-        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+        app.with_default_schedule(FixedUpdate, |app| {
             app.add_event::<HitEvent>()
                 .add_event::<EnemyDeathEvent>()
                 .add_event::<StatusEffectEvent>();
@@ -105,7 +105,7 @@ impl Plugin for CombatPlugin {
                 handle_invincibility_frames.after(handle_hits),
                 handle_enemy_death.after(handle_hits),
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .in_set(Update(GameState::Main)),
         )
         .add_system(apply_system_buffers.in_set(CustomFlush));
     }

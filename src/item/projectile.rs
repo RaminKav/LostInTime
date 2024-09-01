@@ -83,6 +83,7 @@ pub struct ArcProjectileData {
     pub col_points: Vec<f32>,
 }
 
+#[derive(Event)]
 pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
@@ -103,7 +104,7 @@ impl Plugin for RangedAttackPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<RangedAttackEvent>().add_systems(
             (handle_ranged_attack_event, handle_translate_projectiles)
-                .in_set(OnUpdate(GameState::Main)),
+                .in_set(Update(GameState::Main)),
         );
     }
 }
@@ -122,7 +123,10 @@ fn handle_ranged_attack_event(
     for proj_event in events.iter() {
         let (_player_e, mana, player_cooldown) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
-        if proj_event.from_enemy.is_none() && player_cooldown.is_some() && !proj_event.is_followup_proj {
+        if proj_event.from_enemy.is_none()
+            && player_cooldown.is_some()
+            && !proj_event.is_followup_proj
+        {
             continue;
         }
         if let Some(mana_cost) = proj_event.mana_cost {

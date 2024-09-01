@@ -26,6 +26,7 @@ pub struct CombatShrine {
     pub num_mobs_left: usize,
 }
 
+#[derive(Event)]
 pub struct CombatShrineMobDeathEvent(pub Entity);
 pub fn handle_combat_shrine_activate_animation(
     mut shrines: Query<(
@@ -122,10 +123,7 @@ pub fn handle_shrine_rewards(
             if shrine.num_mobs_left == 0 {
                 // give rewards
                 proto_commands.spawn_item_from_proto(
-                    *drop_list
-                        .iter()
-                        .choose(&mut rand::thread_rng())
-                        .unwrap(),
+                    *drop_list.iter().choose(&mut rand::thread_rng()).unwrap(),
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
                     1,

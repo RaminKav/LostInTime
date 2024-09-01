@@ -38,6 +38,7 @@ pub enum MenuButton {
 #[derive(Component)]
 pub struct InfoModal;
 
+#[derive(Event)]
 pub struct MenuButtonClickEvent {
     pub button: MenuButton,
 }
@@ -238,7 +239,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
                     color: YELLOW_2,
                 },
             ),
-            // .with_alignment(TextAlignment::Right),
+            // .with_justify(JustifyText::Right),
             transform: Transform {
                 translation: Vec3::new(14., -28.5, 1.),
                 scale: Vec3::new(1., 1., 1.),
@@ -274,7 +275,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
                         color: YELLOW_2,
                     },
                 ),
-                // .with_alignment(TextAlignment::Right),
+                // .with_justify(JustifyText::Right),
                 transform: Transform {
                     translation: Vec3::new(-8., -49.5, 1.),
                     scale: Vec3::new(1., 1., 1.),
@@ -304,7 +305,7 @@ pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetSe
                     color: YELLOW_2,
                 },
             ),
-            // .with_alignment(TextAlignment::Right),
+            // .with_justify(JustifyText::Right),
             transform: Transform {
                 translation: Vec3::new(-39.5, -74., 1.),
                 scale: Vec3::new(1., 1., 1.),

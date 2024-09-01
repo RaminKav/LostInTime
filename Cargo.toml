@@ -6,37 +6,37 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.10.1", features = ["wayland"] }
-bevy_asset_loader = "0.16.0"
-bevy_rapier2d = { version = "0.21.0", features = ["simd-stable", "parallel"] }
-bevy_ecs_tilemap = "0.10.0"
-bevy-inspector-egui = "0.18"
-bevy_proto = { version = "0.10.0", features = [
-    "bevy_sprite",
-    "ron",
-    "bevy_render",
-] }
-seldom_state = "0.6.3"
-ron = "0.8.0"
-serde = "1.0.136"
-serde_with = "3.8.1"
+bevy_aseprite = { git = "https://github.com/VergilUa/bevy_aseprite.git", rev = "7e5a3df3295f2e49462a7cac3533a4aad55a035d" }
+bevy = { version = "0.14.1", features = ["wayland"] }
+bevy_asset_loader = "0.21.0"
+bevy_rapier2d = { version = "0.27.0", features = ["simd-stable", "parallel"] }
+bevy_ecs_tilemap = "0.14.0"
+bevy-inspector-egui = "0.25.2"
+# bevy_proto = { version = "0.11.0", features = [
+#     "bevy_sprite",
+#     "ron",
+#     "bevy_render",
+# ] }
+seldom_state = "0.11"
+ron = "0.8.1"
+serde = "1.0.209"
+serde_with = "3.9.0"
 rand = "0.8.5"
 rand_xorshift = "^0.3"
 itertools = "^0.8"
 noise = "0.8.2"
-bevy_save = "0.8"
-bevy_pkv = "0.6"
+bevy_save = { git = "https://github.com/perry-blueberry/bevy_save.git", rev = "fcf237a15cd9fc79540ef5acdbb378622c48b29d" }
+bevy_pkv = "0.11.1"
 serde_json = "1.0"
 strum = "^0.15"
 strum_macros = "^0.15"
 interpolation = "0.2.0"
 lazy_static = "1.4.0"
-bevy_aseprite = "0.10"
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
 tungstenite = { version = "0.23.0", features = ['native-tls-vendored'] }
 webbrowser = "1.0.1"
-bevy_hanabi = { version = "0.6", default-features = false, features = ["2d"] }
+bevy_hanabi = { version = "0.12", default-features = false, features = ["2d"] }
 chrono = "0.4.38"
 openssl = { version = "0.10.66", features = ["vendored"] }
 logs-wheel = "0.3.1"
@@ -44,13 +44,13 @@ tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
 native-dialog = "0.7.0"
 tracing-panic = "0.1.2"
-bevy_embedded_assets = "0.7"
+bevy_embedded_assets = "0.11"
 directories = "5.0.1"
-bevy_common_assets = {version = "0.6", features = ["ron"]}
+bevy_common_assets = { version = "0.11", features = ["ron"] }
 
 
 [dev-dependencies]
-bevy = { version = "0.10.1", features = ["wayland", "dynamic_linking"] }
+bevy = { version = "0.14.1", features = ["wayland", "dynamic_linking"] }
 
 [features]
 release-bundle = []

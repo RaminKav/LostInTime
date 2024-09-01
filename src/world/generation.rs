@@ -40,10 +40,11 @@ use rand::{
     Rng,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub struct WallBreakEvent {
     pub pos: TileMapPosition,
 }
+#[derive(Event)]
 pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
@@ -81,21 +82,15 @@ impl Plugin for GenerationPlugin {
                         .before(handle_break_object),
                     handle_wall_placed.before(CustomFlush),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
-            .add_system(
-                Self::generate_unique_objects_for_new_world.in_set(OnUpdate(GameState::Main)),
-            )
+            .add_system(Self::generate_unique_objects_for_new_world.in_set(Update(GameState::Main)))
             .add_system(
                 Self::generate_and_cache_objects.before(CustomFlush).run_if(
                     resource_exists::<GenerationSeed>().and_then(in_state(GameState::Main)),
                 ),
             )
-            .add_system(
-                update_wall
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
-            )
+            .add_system(PostUpdate, update_wall.run_if(in_state(GameState::Main)))
             .add_system(spawn_debug_chunk_borders.in_schedule(OnEnter(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -840,15 +835,7 @@ fn spawn_debug_chunk_borders(
     for i in -10..10 {
         commands
             .spawn(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(1.0, 100000.0),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
-                    .into(),
+                mesh: meshes.add(Rectangle::new(1.0, 100000.0)),
                 transform: Transform::from_translation(Vec3::new(
                     i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x + offset.x,
                     0. + offset.y,
@@ -864,15 +851,7 @@ fn spawn_debug_chunk_borders(
     for i in -10..10 {
         commands
             .spawn(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(100000.0, 1.0),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
-                    .into(),
+                mesh: meshes.add(Rectangle::new(100000.0, 1.0)),
                 transform: Transform::from_translation(Vec3::new(
                     offset.x,
                     i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y + offset.y,

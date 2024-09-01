@@ -27,6 +27,7 @@ pub struct GambleShrine {
     pub success: bool,
 }
 
+#[derive(Event)]
 pub struct GambleShrineEvent {
     pub entity: Entity,
     pub success: bool,
@@ -73,10 +74,7 @@ pub fn handle_gamble_shrine_rewards(
                 ];
                 // give rewards
                 proto_commands.spawn_item_from_proto(
-                    *drop_list
-                        .iter()
-                        .choose(&mut rand::thread_rng())
-                        .unwrap(),
+                    *drop_list.iter().choose(&mut rand::thread_rng()).unwrap(),
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
                     1,

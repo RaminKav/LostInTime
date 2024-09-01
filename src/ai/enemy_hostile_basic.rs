@@ -180,7 +180,7 @@ pub fn follow(
     mut follows: Query<(
         Entity,
         &mut FollowState,
-        &TextureAtlasSprite,
+        &TextureAtlas,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&EnemyAttackCooldown>,
@@ -272,7 +272,7 @@ pub fn leap_attack(
         &mut KinematicCharacterController,
         &mut LeapAttackState,
         &FollowSpeed,
-        &mut TextureAtlasSprite,
+        &mut TextureAtlas,
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&Slow>,

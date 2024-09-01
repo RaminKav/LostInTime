@@ -33,7 +33,7 @@ impl Plugin for CollisionPlugion {
                 check_projectile_hit_player_collisions,
                 check_item_drop_collisions.after(CustomFlush),
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .in_set(Update(GameState::Main)),
         );
     }
 }

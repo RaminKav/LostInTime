@@ -52,6 +52,7 @@ use self::{
 };
 pub struct PlayerPlugin;
 
+#[derive(Event)]
 pub struct MovePlayerEvent {
     pub pos: TileMapPosition,
 }
@@ -105,7 +106,7 @@ impl Limb {
 }
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+        app.with_default_schedule(FixedUpdate, |app| {
             app.add_event::<MovePlayerEvent>()
                 .add_event::<ModifyTimeFragmentsEvent>();
         })
@@ -118,17 +119,17 @@ impl Plugin for PlayerPlugin {
                 hide_particles_when_inv_open,
                 handle_modify_time_fragments,
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .in_set(Update(GameState::Main)),
         )
         .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
         .add_system(handle_move_player.before(CustomFlush))
         .add_system(
+            PostUpdate,
             handle_player_raw_position
                 .run_if(in_state(GameState::Main))
                 .after(PhysicsSet::SyncBackendFlush)
                 .before(TransformSystem::TransformPropagate)
-                .before(move_camera_with_player)
-                .in_base_set(CoreSet::PostUpdate),
+                .before(move_camera_with_player),
         );
     }
 }

@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    reflect::TypeUuid,
+    reflect::TypePath,
     render::render_resource::{AsBindGroup, ShaderRef},
     sprite::{Material2d, Material2dPlugin},
 };
@@ -41,10 +41,10 @@ pub struct EnemyPlugin;
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<EnemyMaterial>::default())
-            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+            .with_default_schedule(FixedUpdate, |app| {
                 app.add_event::<EnemySpawnEvent>();
             })
-            .add_system(handle_boss_health_threshold.in_base_set(CoreSet::PreUpdate))
+            .add_system(PreUpdate, handle_boss_health_threshold)
             .add_systems(
                 (
                     handle_new_red_mushling_state_machine,
@@ -55,7 +55,7 @@ impl Plugin for EnemyPlugin {
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_plugin(SpawnerPlugin);
     }
@@ -135,6 +135,7 @@ pub struct EliteMob;
 #[reflect(Schematic)]
 pub struct FollowSpeed(pub f32);
 
+#[derive(Event)]
 pub struct EnemySpawnEvent {
     pub enemy: Mob,
     pub pos: TileMapPosition,
@@ -404,9 +405,8 @@ impl Material2d for EnemyMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Reflect, FromReflect, Default, Debug, Clone)]
+#[derive(Asset, AsBindGroup, TypePath, Reflect, FromReflect, Default, Debug, Clone)]
 #[reflect(Default, Debug)]
-#[uuid = "a04064b6-dcdd-11ed-afa1-0242ac120002"]
 pub struct EnemyMaterial {
     #[uniform(0)]
     pub is_attacking: f32,

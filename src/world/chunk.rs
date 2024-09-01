@@ -44,16 +44,13 @@ impl Plugin for ChunkPlugin {
                     Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .runin_set(Update(GameState::Main)),
             )
             .add_system(
-                Self::despawn_outofrange_chunks
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                PostUpdate,
+                Self::despawn_outofrange_chunks.run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
-            )
+            .add_system(generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -68,22 +65,22 @@ pub struct TileSpriteData {
     pub tile_bit_index: u8,
     pub texture_offset: u8,
 }
-#[derive(Clone)]
+#[derive(Clone, Event)]
 pub struct SpawnChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Clone)]
+#[derive(Clone, Event)]
 pub struct DespawnChunkEvent {
     pub chunk_pos: IVec2,
 }
-#[derive(Clone)]
+#[derive(Clone, Event)]
 pub struct GenerateObjectsEvent {
     pub chunk_pos: IVec2,
 }
 
 #[derive(Component)]
 pub struct VisibleObject;
-#[derive(Clone)]
+#[derive(Clone, Event)]
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
 }
@@ -459,10 +456,7 @@ impl ChunkPlugin {
                                 );
                             }
                             if let Some(chest) = chest_option {
-                                debug!(
-                                    "chest: {:?}",
-                                    world_pos_to_tile_pos(t.translation().xy())
-                                );
+                                debug!("chest: {:?}", world_pos_to_tile_pos(t.translation().xy()));
 
                                 container_reg.containers.insert(
                                     world_pos_to_tile_pos(t.translation().xy()),

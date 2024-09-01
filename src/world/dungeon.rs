@@ -149,7 +149,7 @@ pub fn spawn_dungeon_text(
                         },
                     },
                 )
-                .with_alignment(TextAlignment::Center),
+                .with_justify(JustifyText::Center),
                 transform: Transform {
                     translation: Vec3::new(0., GAME_HEIGHT / 2. - 12., 1.),
                     scale: Vec3::new(1., 1., 1.),

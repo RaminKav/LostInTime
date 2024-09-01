@@ -56,6 +56,7 @@ pub struct SchematicToggle {
     chest_type: LootChestType,
 }
 
+#[derive(Event)]
 pub struct SchematicSpawnEvent(pub IVec2);
 pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
@@ -76,7 +77,7 @@ impl Plugin for SchematicPlugin {
                     give_chunks_schematic_spawners
                         .after(GenerationPlugin::generate_and_cache_objects),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }

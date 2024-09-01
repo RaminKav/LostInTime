@@ -1,4 +1,4 @@
-use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
+use bevy::{prelude::*, reflect::TypePath, utils::HashMap};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -32,7 +32,7 @@ impl Plugin for CraftingPlugin {
                     handle_inv_changed_update_crafting_tracker,
                     handle_furnace_slot_update.after(handle_hovering),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }
@@ -45,8 +45,7 @@ pub struct Recipes {
     pub upgradeable_items: Vec<WorldObject>,
 }
 
-#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq, TypeUuid)]
-#[uuid = "413bd529-bfeb-41b3-9db0-4b8b380a2c36"]
+#[derive(Default, Clone, Debug, Deserialize, PartialEq, Eq, TypePath)]
 pub struct RecipeItem {
     pub item: WorldObject,
     pub count: usize,
@@ -70,6 +69,7 @@ pub struct CraftingTracker {
     pub crafting_type_map: HashMap<CraftingContainerType, Vec<WorldObject>>,
 }
 
+#[derive(Event)]
 pub struct CraftedItemEvent {
     pub obj: WorldObject,
 }

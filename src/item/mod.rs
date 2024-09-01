@@ -30,7 +30,6 @@ use crate::world::world_helpers::{
 use crate::world::{TileMapPosition, TILE_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
 use bevy_proto::prelude::{ProtoCommands, Prototypes, ReflectSchematic, Schematic};
 use combat_shrine::{
@@ -228,10 +227,9 @@ pub struct Size(pub Vec2);
     Ord,
     PartialOrd,
     EnumIter,
-    TypeUuid,
+    TypePath,
 )]
 #[reflect(Component, Schematic)]
-#[uuid = "413be529-bfeb-41b3-9dc0-4b8b380a4c36"]
 pub enum WorldObject {
     #[default]
     None,
@@ -698,12 +696,14 @@ impl WorldObject {
     }
 }
 
+#[derive(Event)]
 pub struct PlaceItemEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
     pub placed_by_player: bool,
     pub override_existing_obj: bool,
 }
+#[derive(Event)]
 pub struct UpdateObjectEvent {
     pub obj: WorldObject,
     pub pos: Vec2,
@@ -726,12 +726,11 @@ impl Plugin for ItemsPlugin {
                 handle_break_object
                     .before(CustomFlush)
                     .after(spawn_obj_death_particles)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(
-                handle_placing_world_object
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                PostUpdate,
+                handle_placing_world_object.run_if(in_state(GameState::Main)),
             )
             .add_systems(
                 (
@@ -750,7 +749,7 @@ impl Plugin for ItemsPlugin {
                     handle_combat_shrine_activate_animation,
                     handle_on_hit_upgrades.after(handle_hits),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

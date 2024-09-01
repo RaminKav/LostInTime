@@ -23,17 +23,17 @@ impl Plugin for MinimapPlugin {
             .add_event::<UpdateMiniMapEvent>()
             .add_systems(
                 (update_minimap_cache, clear_cache_for_new_dimensions)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(
                 setup_mini_map
                     .after(CustomFlush)
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             );
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Event)]
 pub struct UpdateMiniMapEvent {
     pub pos: Option<TileMapPosition>,
     pub new_tile: Option<WorldObject>,
@@ -256,15 +256,10 @@ fn setup_mini_map(
         let map = commands
             .spawn((
                 MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new((num_tiles * 2) as f32, (num_tiles * 2) as f32),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
+                    mesh: meshes.add(Rectangle::new(
+                        (num_tiles * 2) as f32,
+                        (num_tiles * 2) as f32,
+                    )),
                     transform: Transform::from_translation(Vec3::new(0., 0., 2.)),
                     material: mat,
                     ..default()

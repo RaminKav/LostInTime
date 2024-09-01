@@ -29,6 +29,7 @@ pub struct GenerationSeed {
 
 #[derive(Component, Debug)]
 pub struct SpawnDimension;
+#[derive(Event)]
 pub struct DimensionSpawnEvent {
     pub swap_to_dim_now: bool,
     pub new_era: Option<Era>,
@@ -96,9 +97,8 @@ impl Plugin for DimensionPlugin {
         app.add_event::<DimensionSpawnEvent>()
             .add_system(Self::clear_entities_for_dim_swap.before(CustomFlush))
             .add_system(
-                Self::new_dim_with_params
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(in_state(GameState::Main)),
+                PreUpdate,
+                Self::new_dim_with_params.run_if(in_state(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

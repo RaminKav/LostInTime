@@ -134,7 +134,7 @@ impl Plugin for ClientPlugin {
                     tick_save_timer,
                     handle_append_run_data_after_death.run_if(resource_exists::<AnalyticsData>()),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
@@ -173,7 +173,7 @@ pub struct CurrentRunSaveData {
     pub analytics_data: AnalyticsData,
 }
 
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct GameOverEvent;
 
 #[derive(Resource, Default)]
@@ -500,5 +500,5 @@ pub fn load_state(
 }
 
 pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
-    state.0 == ClientState::Unpaused
+    state.get() == ClientState::Unpaused
 }

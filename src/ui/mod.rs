@@ -135,7 +135,7 @@ impl Plugin for UIPlugin {
                     handle_add_dodge_text,
                     tick_damage_numbers,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_systems(
                 (
@@ -151,16 +151,16 @@ impl Plugin for UIPlugin {
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_systems(
                 (
                     change_ui_state_to_chest_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<ChestContainer>()),
+                        .run_if(resource_added::<ChestContainer>),
                     change_ui_state_to_scrapper_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<ScrapperContainer>()),
+                        .run_if(resource_added::<ScrapperContainer>),
                     handle_scrap_items_in_scrapper.run_if(in_state(UIState::Scrapper)),
                     text_update_system,
                     add_inv_to_new_chest_objs,
@@ -170,18 +170,18 @@ impl Plugin for UIPlugin {
                     update_healthbar,
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<CraftingContainer>()),
+                        .run_if(resource_added::<CraftingContainer>),
                     change_ui_state_to_furnace_when_resource_added
                         .before(CustomFlush)
-                        .run_if(resource_added::<FurnaceContainer>()),
+                        .run_if(resource_added::<FurnaceContainer>),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
-            .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
+            .add_system(PostUpdate, handle_spawn_inv_player_stats)
             .add_system(
                 handle_enter_options_ui
                     .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+                    .run_if(state_changed::<UIState>.and_then(in_state(UIState::Options))),
             )
             .add_systems(
                 (
@@ -197,13 +197,13 @@ impl Plugin for UIPlugin {
                     update_furnace_bar,
                     setup_skill_choice_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                        .run_if(state_changed::<UIState>.and_then(in_state(UIState::Skills))),
                     handle_update_player_skills,
                     setup_essence_ui
                         .before(CustomFlush)
-                        .run_if(resource_added::<EssenceShopChoices>()),
+                        .run_if(resource_added::<EssenceShopChoices>),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_systems(
                 (
@@ -217,14 +217,15 @@ impl Plugin for UIPlugin {
                     spawn_tile_hover_on_cursor_move,
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(
-                handle_new_ui_state.in_base_set(CoreSet::PostUpdate), // .run_if(in_state(GameState::Main)),
+                PostUpdate,
+                handle_new_ui_state, // .run_if(in_state(GameState::Main)),
             )
             .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
-            .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
-            .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
+            .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>))
+            .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(apply_system_buffers.in_set(CustomFlush));
@@ -232,7 +233,7 @@ impl Plugin for UIPlugin {
 }
 
 fn ui_hover_interactions_condition(state: Res<State<GameState>>) -> bool {
-    state.0 == GameState::Main || state.0 == GameState::MainMenu
+    state.get() == GameState::Main || state.get() == GameState::MainMenu
 }
 
 pub fn handle_new_ui_state(
@@ -253,14 +254,15 @@ pub fn handle_new_ui_state(
 
     let mut should_close_self = false;
     let should_reset_crafting_container =
-        next_ui != curr_ui_state.0 && curr_ui_state.0.is_inv_open();
+        next_ui != curr_ui_state.get() && curr_ui_state.get().is_inv_open();
     if *DEBUG {
         debug!(
             "UI State Changed: {:?} -> {:?} | should reset: {should_reset_crafting_container:?}",
-            curr_ui_state.0, next_ui
+            curr_ui_state.get(),
+            next_ui
         );
     }
-    if next_ui == curr_ui_state.0 {
+    if next_ui == curr_ui_state.get() {
         next_ui_state.set(UIState::Closed);
         should_close_self = true;
     }

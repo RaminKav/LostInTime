@@ -104,6 +104,7 @@ pub struct ManaCost(pub i32);
 #[reflect(Component, Schematic)]
 pub struct ConsumableItem;
 
+#[derive(Event)]
 pub struct ActionSuccessEvent {
     pub obj: WorldObject,
     pub item_slot: usize,

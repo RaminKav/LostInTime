@@ -74,7 +74,7 @@ impl Plugin for InputsPlugin {
         app.insert_resource(CursorPos::default())
             .register_type::<CursorPos>()
             // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
-            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+            .with_default_schedule(FixedUpdate, |app| {
                 app.add_event::<AttackEvent>();
             })
             .add_systems(
@@ -89,7 +89,7 @@ impl Plugin for InputsPlugin {
                     handle_quick_hotbar_consume.before(handle_hotbar_key_input),
                     handle_interact_objects.run_if(is_not_paused),
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_systems((
                 toggle_inventory.run_if(in_state(GameState::Main)),
@@ -97,10 +97,10 @@ impl Plugin for InputsPlugin {
             ))
             .add_system(update_cursor_pos.after(move_player))
             .add_system(
+                PostUpdate,
                 move_camera_with_player
                     .after(PhysicsSet::SyncBackendFlush)
                     .before(TransformSystem::TransformPropagate)
-                    .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             );
     }
@@ -624,7 +624,7 @@ pub fn mouse_click_system(
     // mut meshes: ResMut<Assets<Mesh>>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    if ui_state.0 != UIState::Closed {
+    if ui_state.get() != UIState::Closed {
         return;
     }
 

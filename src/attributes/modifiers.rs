@@ -4,6 +4,7 @@ use super::{CurrentHealth, Healing, Mana};
 
 use bevy::prelude::*;
 
+#[derive(Event)]
 pub struct ModifyHealthEvent(pub i32);
 
 pub fn handle_modify_health_event(
@@ -15,6 +16,7 @@ pub fn handle_modify_health_event(
         health.0 += (event.0 as f32 * (1.0 + bonus_healing_rate.0 as f32 / 100.)) as i32;
     }
 }
+#[derive(Event)]
 pub struct ModifyManaEvent(pub i32);
 
 pub fn handle_modify_mana_event(

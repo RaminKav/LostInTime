@@ -22,6 +22,7 @@ pub struct BGMPicker {
     pub current_handle: Option<Handle<AudioSink>>,
 }
 
+#[derive(Event)]
 pub struct UpdateBGMTrackEvent {
     pub asset_path: String,
 }
@@ -41,7 +42,7 @@ impl Plugin for AudioPlugin {
                 break_item_audio,
                 hit_collision_audio,
             )
-                .in_set(OnUpdate(GameState::Main)),
+                .in_set(Update(GameState::Main)),
         );
     }
 }
@@ -53,7 +54,7 @@ pub fn sword_swing_sound(
     player_query: Query<Option<&AttackTimer>, With<Player>>,
     curr_ui_state: Res<State<UIState>>,
 ) {
-    if mouse_button_input.pressed(MouseButton::Left) && curr_ui_state.0 == UIState::Closed {
+    if mouse_button_input.pressed(MouseButton::Left) && curr_ui_state.get() == UIState::Closed {
         let attack_timer_option = player_query.single();
         if attack_timer_option.is_some() {
             return;

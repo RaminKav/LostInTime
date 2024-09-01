@@ -45,6 +45,7 @@ pub struct DebugPath;
 #[derive(Component)]
 pub struct DebugPathDelete;
 
+#[derive(Event)]
 pub struct DebugPathResetEvent {
     pub path: Vec<AIPos>,
 }
@@ -73,15 +74,7 @@ pub fn cache_ai_path_on_new_obj_spawn(
             if *DEBUG_AI {
                 commands
                     .spawn(MaterialMesh2dBundle {
-                        mesh: meshes
-                            .add(
-                                shape::Quad {
-                                    size: Vec2::new(7.0, 7.0),
-                                    ..Default::default()
-                                }
-                                .into(),
-                            )
-                            .into(),
+                        mesh: meshes.add(Rectangle::new(7.0, 7.0)),
                         transform: Transform::from_translation(Vec3::new(
                             offset_pos.x,
                             offset_pos.y,
@@ -117,15 +110,7 @@ pub fn spawn_new_debug_path(
 
             commands
                 .spawn(MaterialMesh2dBundle {
-                    mesh: meshes
-                        .add(
-                            shape::Quad {
-                                size: Vec2::new(7.0, 7.0),
-                                ..Default::default()
-                            }
-                            .into(),
-                        )
-                        .into(),
+                    mesh: meshes.add(Rectangle::new(7.0, 7.0)),
                     transform: Transform::from_translation(Vec3::new(pos.x + 4., pos.y - 4., 0.)),
                     material: materials.add(if is_last_pos {
                         Color::GREEN.into()

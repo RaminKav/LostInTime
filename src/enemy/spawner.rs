@@ -45,17 +45,15 @@ impl Plugin for SpawnerPlugin {
                     reduce_chunk_mob_count_on_mob_death,
                     despawn_out_of_range_mobs,
                 )
-                    .in_set(OnUpdate(GameState::Main)),
+                    .in_set(Update(GameState::Main)),
             )
             .add_system(
-                add_spawners_to_new_chunks
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(in_state(GameState::Main)),
+                PreUpdate,
+                add_spawners_to_new_chunks.run_if(in_state(GameState::Main)),
             )
             .add_system(
-                check_mob_count
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(resource_exists::<GlobalSpawnTimer>()),
+                PreUpdate,
+                check_mob_count.run_if(resource_exists::<GlobalSpawnTimer>()),
             );
     }
 }
@@ -91,7 +89,7 @@ pub struct ChunkSpawners {
     pub spawned_mobs: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Event)]
 pub struct MobSpawnEvent {
     chunk_pos: IVec2,
     bypass_timers: bool,

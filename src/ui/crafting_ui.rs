@@ -1,5 +1,4 @@
 pub use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
 use serde::{Deserialize, Serialize};
 
 use crate::{container::Container, item::CraftingTracker};
@@ -22,9 +21,8 @@ pub struct CraftingContainer {
     Deserialize,
     Reflect,
     FromReflect,
-    TypeUuid,
+    TypePath,
 )]
-#[uuid = "413be529-bfeb-41d3-9db0-4b8b380a2c36"]
 
 pub enum CraftingContainerType {
     #[default]

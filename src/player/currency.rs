@@ -14,6 +14,7 @@ impl TimeFragmentCurrency {
     }
 }
 
+#[derive(Event)]
 pub struct ModifyTimeFragmentsEvent {
     pub delta: i32,
 }

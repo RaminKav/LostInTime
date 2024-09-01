@@ -23,7 +23,7 @@ pub fn handle_game_over_fadeout(
             Entity,
             &FacingDirection,
             &mut Transform,
-            &mut TextureAtlasSprite,
+            &mut Sprite,
             &mut Handle<TextureAtlas>,
         ),
         With<Player>,

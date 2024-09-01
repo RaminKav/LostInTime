@@ -43,7 +43,7 @@ pub struct BarFlashTimer {
 }
 #[derive(Component)]
 pub struct CurrencyIcon;
-#[derive(Default)]
+#[derive(Default, Event)]
 pub struct FlashExpBarEvent;
 
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<ScreenResolution>) {

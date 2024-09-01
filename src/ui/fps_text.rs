@@ -30,7 +30,7 @@ pub fn spawn_fps_text(
                     },
                 },
             )
-            .with_alignment(TextAlignment::Right),
+            .with_justify(JustifyText::Right),
             transform: Transform {
                 translation: Vec3::new(
                     resolution.game_width / 2. - 28.5,

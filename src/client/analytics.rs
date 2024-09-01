@@ -59,6 +59,7 @@ impl Plugin for AnalyticsPlugin {
     }
 }
 
+#[derive(Event)]
 pub struct AnalyticsUpdateEvent {
     pub update_type: AnalyticsTrigger,
 }

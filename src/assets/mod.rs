@@ -1,7 +1,6 @@
 use std::fs;
 pub mod asset_helpers;
 use bevy::prelude::*;
-use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::utils::HashMap;
@@ -75,8 +74,7 @@ impl SpriteSize {
 pub struct SpriteAnchor(pub Vec2);
 
 /// Loaded from sprites_desc.ron and contains the description of every sprite in the game
-#[derive(Deserialize, TypeUuid)]
-#[uuid = "413be529-bfeb-41b3-9db0-4b8b380a2c36"]
+#[derive(Deserialize, TypePath)]
 pub struct GraphicsDesc {
     items: HashMap<WorldObject, WorldObjectData>,
     icons: HashMap<WorldObject, SpriteData>,
@@ -100,7 +98,7 @@ impl Plugin for GameAssetsPlugin {
                 combat_shrine_anim: None,
                 gamble_shrine_anim: None,
             })
-            .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
+            .add_system(Self::update_graphics.in_set(Update(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
     }
 }
@@ -114,8 +112,7 @@ impl Material2d for FoliageMaterial {
     // }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
-#[uuid = "9600d1e3-1911-4286-9810-e9bd9ff685e1"]
+#[derive(AsBindGroup, TypePath, Debug, Clone)]
 pub struct FoliageMaterial {
     #[uniform(0)]
     speed: f32,
