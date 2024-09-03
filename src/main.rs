@@ -70,7 +70,7 @@ mod sappling;
 mod schematic;
 mod ui;
 mod world;
-use animations::AnimationsPlugin;
+use animations::{player_sprite::PlayerDirectionalAnimation, AnimationsPlugin};
 use assets::{GameAssetsPlugin, Graphics, GraphicsDesc, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
@@ -333,6 +333,7 @@ pub struct GameParam<'w, 's> {
     pub game: ResMut<'w, Game>,
     pub graphics: Res<'w, Graphics>,
     pub resolution: Res<'w, ScreenResolution>,
+    pub player_anim_spec: Res<'w, PlayerDirectionalAnimation>,
     pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
     pub pathfinding_cache: ResMut<'w, PathfindingCache>,
@@ -562,8 +563,6 @@ impl<'w, 's> GameParam<'w, 's> {
     }
 }
 
-#[derive(Component, Default)]
-pub struct CameraDirty(bool, bool);
 #[derive(Component, Default)]
 pub struct MainCamera;
 #[derive(Component, Default)]

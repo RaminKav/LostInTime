@@ -2,7 +2,7 @@ use core::panic;
 use std::cmp::min;
 
 use crate::{
-    animations::{AnimationPosTracker, AnimationTimer, AttackAnimationTimer},
+    animations::{AnimationPosTracker, AnimationTimer},
     attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
     container::Container,
     inputs::FacingDirection,
@@ -141,13 +141,6 @@ impl InventoryItemStack {
         if item_map.is_none() {
             panic!("graphics not loaded");
         }
-        //TODO: extract this out to helper fn vvvv
-        let is_block = obj.is_wall();
-        let has_icon = if is_block {
-            game.graphics.icons.as_ref().unwrap().get(&obj)
-        } else {
-            None
-        };
 
         let player_state = game.player();
         let player_e = game.player_query.single().0;
@@ -193,11 +186,7 @@ impl InventoryItemStack {
             .insert(MainHand)
             .insert(Sensor)
             .insert(RigidBody::Fixed)
-            .insert(Collider::cuboid(16. / 1.5, 16. / 1.5))
-            .insert(AttackAnimationTimer(
-                Timer::from_seconds(0.18, TimerMode::Once),
-                0.,
-            ));
+            .insert(Collider::cuboid(16. / 1.5, 16. / 1.5));
         game.player_mut().main_hand_slot = Some(ActiveMainHandState {
             item_stack: self.item_stack.clone(),
             entity: item,

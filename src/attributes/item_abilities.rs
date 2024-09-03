@@ -1,14 +1,12 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     animations::AttackEvent,
     combat_helpers::spawn_temp_collider,
     inputs::MovementVector,
-    inventory::ItemStack,
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
         skills::{PlayerSkills, Skill},
@@ -38,22 +36,6 @@ impl Default for ItemAbility {
 // for now, it can be a fixed rate for all items, maybe 20%
 // perhapse a 3rd item upgrade can add or override abilities on items
 // when AttackEvent is fired, we match on enum and handle teh ability.
-const ITEM_ABILITY_CHANCE: u32 = 25;
-pub fn _add_ability_to_item_drops(stack: &mut ItemStack) {
-    let mut rng = rand::thread_rng();
-    let chance = rng.gen_range(0..100);
-    if chance <= ITEM_ABILITY_CHANCE {
-        let ability = match rng.gen_range(0..3) {
-            0 => Some(ItemAbility::Arc(rng.gen_range(2..5))),
-            1 => Some(ItemAbility::FireAttack(rng.gen_range(2..5))),
-            2 => Some(ItemAbility::Teleport(
-                rng.gen_range(2..5) as f32 * TILE_SIZE.x,
-            )),
-            _ => None,
-        };
-        stack.metadata.item_ability = ability;
-    }
-}
 
 pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
@@ -122,6 +104,7 @@ pub fn handle_item_abilitiy_on_attack(
                 mana_cost: None,
                 dmg_override: Some(dmg.0 / 5),
                 pos_override: None,
+                spawn_delay: 0.1,
             });
         }
         if skills.has(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
@@ -133,6 +116,7 @@ pub fn handle_item_abilitiy_on_attack(
                 mana_cost: None,
                 dmg_override: Some(dmg.0 / 3),
                 pos_override: None,
+                spawn_delay: 0.1,
             });
         }
     }

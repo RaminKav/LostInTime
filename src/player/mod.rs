@@ -2,6 +2,7 @@ use std::{fs::File, io::BufReader};
 
 use bevy::{prelude::*, transform::TransformSystem};
 
+use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     geometry::Sensor,
@@ -24,10 +25,7 @@ pub mod teleport;
 pub use currency::*;
 pub mod stats;
 use crate::{
-    animations::{
-        enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
-        AnimationTimer,
-    },
+    animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerAseprite},
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
@@ -68,9 +66,6 @@ pub struct PlayerState {
     pub direction: FacingDirection,
     pub is_moving: bool,
     pub is_dashing: bool,
-    pub is_attacking: bool,
-    pub is_sprinting: bool,
-    pub is_lunging: bool,
     pub main_hand_slot: Option<ActiveMainHandState>,
     pub position: Vec3,
     pub reach_distance: f32,
@@ -84,14 +79,11 @@ impl Default for PlayerState {
             direction: FacingDirection::Left,
             is_moving: true,
             is_dashing: false,
-            is_attacking: false,
-            is_sprinting: false,
-            is_lunging: false,
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 1.5,
-            player_dash_cooldown: Timer::from_seconds(1.0, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.15, TimerMode::Once),
+            player_dash_cooldown: Timer::from_seconds(1.5, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.3, TimerMode::Once),
         }
     }
 }
@@ -186,30 +178,20 @@ pub fn handle_player_raw_position(
 fn spawn_player(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut game: ResMut<Game>,
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
 ) {
     //spawn player entity with limb spritesheets as children
-    let player_texture_handle = asset_server.load("textures/player/player_down.png");
-    let player_texture_atlas = TextureAtlas::from_grid(
-        player_texture_handle,
-        Vec2::new(64., 64.),
-        10,
-        9,
-        None,
-        None,
-    );
-    let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
-
     let p = commands
         .spawn((
-            SpriteSheetBundle {
-                texture_atlas: player_texture_atlas_handle,
+            AsepriteBundle {
+                aseprite: asset_server.load(PlayerAseprite::PATH),
+                animation: AsepriteAnimation::from(PlayerAseprite::tags::IDLE_FRONT),
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..default()
             },
-            AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+            PlayerAnimation::Idle,
+            PlayerAnimationState::new(),
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
@@ -241,8 +223,8 @@ fn spawn_player(
                 filter_flags: QueryFilterFlags::EXCLUDE_SENSORS,
                 ..default()
             },
-            RawPosition::default(),
         ))
+        .insert(RawPosition::default())
         .insert(PlayerAttributeBundle {
             health: MaxHealth(100),
             mana: Mana::new(100),
@@ -254,13 +236,9 @@ fn spawn_player(
             attack_cooldown: AttackCooldown(0.4),
             ..default()
         })
-        .insert(CharacterAnimationSpriteSheetData {
-            animation_frames: vec![6, 6, 4, 6, 10, 7, 7, 7, 7],
-            anim_offset: 0,
-        })
+        .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(EnemyAnimationState::Idle)
         .insert(ManaRegenTimer(Timer::from_seconds(0.5, TimerMode::Once)))
         .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(RigidBody::KinematicPositionBased)

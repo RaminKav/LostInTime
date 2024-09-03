@@ -74,6 +74,7 @@ pub fn handle_delayed_ranged_attack(
                 mana_cost: None,
                 dmg_override: None,
                 pos_override: None,
+                spawn_delay: 0.36,
             });
 
             delayed_ranged_attack.0.reset();
@@ -105,22 +106,31 @@ pub fn handle_spread_arrows_attack(
         *count = 0;
     }
     if mouse_button_input.pressed(MouseButton::Left) && *count < spread_attack.0 {
+        let rotate = |val: Vec2, angle: f32| -> Vec2 {
+            let cos_angle = angle.cos();
+            let sin_angle = angle.sin();
+            Vec2::new(
+                val.x * cos_angle - val.y * sin_angle,
+                val.x * sin_angle + val.y * cos_angle,
+            )
+        };
+        let spread_factor = 0.2 * (f32::floor(*count as f32 / 2.0) + 1.);
         *count += 1;
+        let flip = *count % 2 == 0;
         let raw_dir = (cursor_pos.world_coords.truncate() - game.player().position.truncate())
             .normalize_or_zero();
+
+        let new_dir = rotate(raw_dir, spread_factor * if flip { -1. } else { 1. });
+
         ranged_attack_event.send(RangedAttackEvent {
             projectile: ranged_attack.0.clone(),
-            direction: (raw_dir
-                + Vec2::new(
-                    0.2 * raw_dir.y.abs() * *count as f32,
-                    0.2 * raw_dir.x.abs() * *count as f32,
-                ))
-            .normalize_or_zero(),
+            direction: new_dir,
             from_enemy: None,
             is_followup_proj: true,
             mana_cost: None,
             dmg_override: None,
             pos_override: None,
+            spawn_delay: 0.36,
         });
     }
 }
@@ -186,6 +196,7 @@ pub fn handle_on_hit_upgrades(
                 mana_cost: None,
                 dmg_override: Some(hit.damage / 2),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
+                spawn_delay: 0.1,
             });
         }
         let Some(main_hand) = game.player().main_hand_slot else {
@@ -201,6 +212,7 @@ pub fn handle_on_hit_upgrades(
                 mana_cost: None,
                 dmg_override: Some(hit.damage / 3),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
+                spawn_delay: 0.1,
             });
         }
         if skills.has(Skill::LethalBlow)

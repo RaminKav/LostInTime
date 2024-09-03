@@ -108,6 +108,10 @@ impl Skill {
             Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
             Skill::ChainLightning => "Chain Lightning".to_string(),
             Skill::FireStaffAoE => "Explosive Blast".to_string(),
+            Skill::Sprint => "Sprint".to_string(),
+            Skill::SprintFaster => "Faster Sprint".to_string(),
+            Skill::SprintLunge => "Lunge".to_string(),
+            Skill::SprintKillReset => "Kill Reset".to_string(),
             _ => "Unknown".to_string(),
         }
     }
@@ -254,9 +258,9 @@ impl Skill {
                     startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
                     sprint_duration_timer: Timer::from_seconds(3.5, TimerMode::Once),
                     sprint_cooldown_timer: Timer::from_seconds(0.1, TimerMode::Once),
-                    lunge_duration: Timer::from_seconds(1., TimerMode::Once),
+                    lunge_duration: Timer::from_seconds(0.7, TimerMode::Once),
                     speed_bonus: 1.6,
-                    lunge_speed: 2.5,
+                    lunge_speed: 2.9,
                 });
             }
 
@@ -312,6 +316,11 @@ impl Default for SkillChoiceQueue {
         Self {
             queue: Default::default(),
             pool: vec![
+                SkillChoiceState::new(Skill::Sprint).with_children(vec![
+                    SkillChoiceState::new(Skill::SprintFaster),
+                    SkillChoiceState::new(Skill::SprintLunge)
+                        .with_children(vec![SkillChoiceState::new(Skill::SprintKillReset)]),
+                ]),
                 SkillChoiceState::new(Skill::CritChance)
                     .set_repeatable()
                     .with_children(vec![

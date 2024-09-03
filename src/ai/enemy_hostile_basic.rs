@@ -213,7 +213,7 @@ pub fn follow(
         );
 
         let distance_from_target = (target_translation.truncate() - follow_translation).length();
-        let is_far_away = distance_from_target > 12. * TILE_SIZE.x;
+        let is_far_away = distance_from_target > 10.5 * TILE_SIZE.x;
         //convert follower txfm to AIPos too
         let target_txfm = if night_tracker.is_night() && is_far_away {
             target_translation.truncate()
@@ -239,7 +239,7 @@ pub fn follow(
         if night_tracker.is_night() && is_far_away {
             mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
         } else {
-            mover.filter_groups = Some(CollisionGroups::default());
+            mover.filter_groups = Some(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));
         }
 
         follow.curr_path = next_target_tile;
@@ -377,6 +377,7 @@ pub fn projectile_attack(
                 mana_cost: None,
                 dmg_override: None,
                 pos_override: None,
+                spawn_delay: 0.1,
             });
             commands
                 .entity(entity)

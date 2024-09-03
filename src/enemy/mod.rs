@@ -5,6 +5,7 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin},
 };
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
+use bevy_rapier2d::prelude::{CollisionGroups, Group};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
 use serde::Serialize;
@@ -16,7 +17,7 @@ use crate::{
         NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
-    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED, WHITE},
+    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
@@ -106,7 +107,6 @@ impl Mob {
             Mob::RedMushling => RED,
             Mob::RedMushking => RED,
             Mob::Hog => LIGHT_BROWN,
-            _ => WHITE,
         }
     }
     pub fn is_boss(&self) -> bool {
@@ -184,6 +184,9 @@ pub fn handle_new_mob_state_machine(
         spawn_events.iter()
     {
         let mut alignment = alignment.clone();
+        commands
+            .entity(e)
+            .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));
         if dungeon_check.get_single().is_ok() {
             alignment = CombatAlignment::Hostile;
         }

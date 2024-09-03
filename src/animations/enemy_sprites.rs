@@ -8,7 +8,7 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::Player, GameParam};
+use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection};
 
 use super::AnimationTimer;
 
@@ -51,34 +51,19 @@ impl CharacterAnimationSpriteSheetData {
         let current_animation_frames = self.animation_frames[current_animation as usize] as f32;
         current_frame >= current_animation_frames + max_frames * (current_animation) - 1.
     }
-    pub fn get_anim_state(&self) -> EnemyAnimationState {
-        match self.anim_offset {
-            0 => EnemyAnimationState::Idle,
-            1 => EnemyAnimationState::Walk,
-            2 => EnemyAnimationState::Hit,
-            3 => EnemyAnimationState::Death,
-            4 => EnemyAnimationState::Attack,
-            _ => EnemyAnimationState::Attack,
-        }
-    }
 }
 
 pub fn change_anim_offset_when_character_action_state_changes(
     mut query: Query<
         (
-            Entity,
             &mut CharacterAnimationSpriteSheetData,
             &EnemyAnimationState,
             &mut TextureAtlasSprite,
         ),
         Changed<EnemyAnimationState>,
     >,
-    game: GameParam,
 ) {
-    for (e, mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
-        let is_player = game.game.player == e;
-        let is_sprinting = game.player().is_sprinting;
-        let is_lunging = game.player().is_lunging;
+    for (mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
         let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
         match state {
             EnemyAnimationState::Idle => {
@@ -97,24 +82,8 @@ pub fn change_anim_offset_when_character_action_state_changes(
                 sprite.index = (max_frames * 3.) as usize;
             }
             EnemyAnimationState::Attack => {
-                if is_player {
-                    if is_lunging {
-                        sprite_sheet_data.anim_offset = 4;
-                        sprite.index = (max_frames * 4.) as usize;
-                        continue;
-                    }
-                    if let Some(main_hand) = game.player().main_hand_slot {
-                        if main_hand.item_stack.obj_type.is_weapon() {
-                            sprite_sheet_data.anim_offset =
-                                4 + main_hand.get_attack_anim_offset() as usize;
-                            sprite.index =
-                                (max_frames * (4. + main_hand.get_attack_anim_offset())) as usize;
-                        }
-                    }
-                } else {
-                    sprite_sheet_data.anim_offset = 4;
-                    sprite.index = (max_frames * 4.) as usize;
-                }
+                sprite_sheet_data.anim_offset = 4;
+                sprite.index = (max_frames * 4.) as usize;
             }
         }
     }
@@ -125,7 +94,7 @@ pub fn change_character_anim_direction(
             &FacingDirection,
             &mut TextureAtlasSprite,
             &mut Handle<TextureAtlas>,
-            Option<&Mob>,
+            &Mob,
             Option<&LeftFacingSideProfile>,
         ),
         Changed<FacingDirection>,
@@ -134,70 +103,49 @@ pub fn change_character_anim_direction(
     _asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
 ) {
-    for (
-        facing_direction,
-        mut sprite,
-        texture_atlas_handle,
-        mob_option,
-        left_side_profile_option,
-    ) in mob_query.iter_mut()
+    for (facing_direction, mut sprite, texture_atlas_handle, mob, left_side_profile_option) in
+        mob_query.iter_mut()
     {
         let texture_atlas = texture_atlases.get_mut(&texture_atlas_handle).unwrap();
 
         match facing_direction {
             FacingDirection::Left => {
-                texture_atlas.texture = if let Some(mob) = mob_option {
-                    graphics
-                        .mob_spritesheets
-                        .as_ref()
-                        .unwrap()
-                        .get(mob)
-                        .unwrap()[0]
-                        .clone()
-                } else {
-                    graphics.player_spritesheets.as_ref().unwrap()[0].clone()
-                };
+                texture_atlas.texture = graphics
+                    .mob_spritesheets
+                    .as_ref()
+                    .unwrap()
+                    .get(mob)
+                    .unwrap()[0]
+                    .clone();
                 sprite.flip_x = left_side_profile_option.is_none();
             }
             FacingDirection::Up => {
-                texture_atlas.texture = if let Some(mob) = mob_option {
-                    graphics
-                        .mob_spritesheets
-                        .as_ref()
-                        .unwrap()
-                        .get(mob)
-                        .unwrap()[1]
-                        .clone()
-                } else {
-                    graphics.player_spritesheets.as_ref().unwrap()[1].clone()
-                };
+                texture_atlas.texture = graphics
+                    .mob_spritesheets
+                    .as_ref()
+                    .unwrap()
+                    .get(mob)
+                    .unwrap()[1]
+                    .clone();
             }
             FacingDirection::Right => {
-                texture_atlas.texture = if let Some(mob) = mob_option {
-                    graphics
-                        .mob_spritesheets
-                        .as_ref()
-                        .unwrap()
-                        .get(mob)
-                        .unwrap()[0]
-                        .clone()
-                } else {
-                    graphics.player_spritesheets.as_ref().unwrap()[0].clone()
-                };
+                texture_atlas.texture = graphics
+                    .mob_spritesheets
+                    .as_ref()
+                    .unwrap()
+                    .get(mob)
+                    .unwrap()[0]
+                    .clone();
                 sprite.flip_x = left_side_profile_option.is_some();
             }
             FacingDirection::Down => {
-                texture_atlas.texture = if let Some(mob) = mob_option {
-                    graphics
-                        .mob_spritesheets
-                        .as_ref()
-                        .unwrap()
-                        .get(mob)
-                        .unwrap()[2]
-                        .clone()
-                } else {
-                    graphics.player_spritesheets.as_ref().unwrap()[2].clone()
-                };
+                texture_atlas.texture = graphics
+                    .mob_spritesheets
+                    .as_ref()
+                    .unwrap()
+                    .get(mob)
+                    .unwrap()[2]
+                    .clone();
             }
         }
     }
@@ -210,24 +158,10 @@ pub fn animate_character_spritesheet_animations(
         &mut AnimationTimer,
         &CharacterAnimationSpriteSheetData,
         &mut TextureAtlasSprite,
-        Option<&Player>,
     )>,
-    game: GameParam,
 ) {
-    for (_e, mut timer, sprite_sheet_data, mut sprite, is_player) in &mut query {
-        let mult = if is_player.is_some()
-            && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Attack
-            && !game.player().is_lunging
-        {
-            3.
-        } else if is_player.is_none()
-            && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Idle
-        {
-            0.5
-        } else {
-            1.
-        };
-        timer.tick(time.delta().mul_f32(mult));
+    for (_e, mut timer, sprite_sheet_data, mut sprite) in &mut query {
+        timer.tick(time.delta());
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
             let frames =

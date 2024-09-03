@@ -1,5 +1,5 @@
 use crate::{
-    animations::DoneAnimation,
+    animations::{player_sprite::PlayerAnimation, DoneAnimation},
     attributes::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
@@ -54,9 +54,11 @@ fn check_melee_hit_collisions(
     lifesteal: Query<&Lifesteal>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mobs: Query<(&GlobalTransform, Option<&Frail>), With<Mob>>,
+    anim: Query<&PlayerAnimation>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
-    if !game.game.player_state.is_attacking {
+    let anim = anim.single();
+    if !anim.is_an_attack() {
         hit_tracker.clear();
     }
     if let Ok((weapon_e, weapon_parent, weapon_t, weapon_obj)) = weapons.get_single() {
@@ -66,7 +68,7 @@ fn check_melee_hit_collisions(
         });
         for hit in hits_this_frame {
             let hit_entity = if hit.0 == weapon_e { hit.1 } else { hit.0 };
-            if (!game.game.player_state.is_attacking && !game.game.player_state.is_lunging)
+            if !anim.is_an_attack()
                 || world_obj.get(hit_entity).is_ok()
                 || hit_tracker.contains(&hit_entity)
             {

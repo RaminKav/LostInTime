@@ -69,7 +69,7 @@ pub fn setup_particles(
         gradient4.add_key(1.0, Vec4::new(170. / 255., 39. / 255., 44. / 255., 0.));
         let effect3 = effects.add(
             EffectAsset {
-                name: "emit:burst".to_string(),
+                name: "dust_particle_emit".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(10.0.into(), false),
                 ..Default::default()
@@ -98,7 +98,7 @@ pub fn setup_particles(
         );
         let obj_hit_particle = effects.add(
             EffectAsset {
-                name: "emit:hit".to_string(),
+                name: "emit:obj_hit_particle".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(Value::Uniform((10., 35.)), true),
                 ..Default::default()
@@ -131,7 +131,7 @@ pub fn setup_particles(
         );
         let enemy_death_particle = effects.add(
             EffectAsset {
-                name: "emit:hit".to_string(),
+                name: "emit:enemy_death_particles".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(Value::Uniform((10., 20.)), true),
                 ..Default::default()
@@ -161,7 +161,7 @@ pub fn setup_particles(
         );
         let use_item_particle = effects.add(
             EffectAsset {
-                name: "emit:hit".to_string(),
+                name: "emit:use_item".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(Value::Uniform((10., 35.)), true),
                 ..Default::default()
@@ -192,7 +192,7 @@ pub fn setup_particles(
         );
         let enemy_hit_particles = effects.add(
             EffectAsset {
-                name: "emit:hit".to_string(),
+                name: "emit:enemy_hit".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(Value::Uniform((20., 55.)), true),
                 ..Default::default()
@@ -225,7 +225,7 @@ pub fn setup_particles(
         );
         let xp_particles = effects.add(
             EffectAsset {
-                name: "emit:hit".to_string(),
+                name: "emit:xp".to_string(),
                 capacity: 32768,
                 spawner: Spawner::once(Value::Uniform((20., 55.)), true),
                 ..Default::default()
@@ -264,7 +264,7 @@ pub fn setup_particles(
         });
         commands
             .spawn((
-                Name::new("emit:burst"),
+                Name::new("dust_particles"),
                 ParticleEffectBundle {
                     effect: ParticleEffect::new(effect3).with_z_layer_2d(Some(2.)),
                     transform: Transform::from_translation(DUST_OFFSET.extend(1.)),
@@ -390,11 +390,7 @@ pub fn spawn_use_item_particles(
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.use_item_particle.clone())
                     .with_z_layer_2d(Some(999.)),
-                transform: Transform::from_translation(Vec3::new(
-                    hit_pos.x,
-                    hit_pos.y + 5.,
-                    2.,
-                )),
+                transform: Transform::from_translation(Vec3::new(hit_pos.x, hit_pos.y + 5., 2.)),
                 ..Default::default()
             },
             YSort(1.),
@@ -415,7 +411,7 @@ pub fn spawn_enemy_death_particles(
         let t = death_event.enemy_pos;
 
         commands.spawn((
-            Name::new("emit:burst"),
+            Name::new("spawn_enemy_death_particles"),
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.enemy_death_particle.clone())
                     .with_z_layer_2d(Some(999.)),
@@ -450,7 +446,7 @@ pub fn spawn_obj_death_particles(
         }
 
         commands.spawn((
-            Name::new("emit:burst"),
+            Name::new("spawn_obj_death_particles"),
             ParticleEffectBundle {
                 effect: ParticleEffect::new(particles.enemy_death_particle.clone())
                     .with_z_layer_2d(Some(999.)),

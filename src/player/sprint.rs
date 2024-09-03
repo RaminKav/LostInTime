@@ -1,12 +1,14 @@
 use std::time::Duration;
 
 use crate::{
-    animations::{enemy_sprites::EnemyAnimationState, AttackEvent},
+    animations::{player_sprite::PlayerAnimation, AttackEvent},
     inputs::{CursorPos, MovementVector},
     EnemyDeathEvent, GameParam,
 };
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::KinematicCharacterController;
+use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
+
+use super::{PlayerSkills, Skill};
 #[derive(Debug, Component)]
 pub struct SprintUpgrade {
     pub startup_timer: Timer,
@@ -24,11 +26,10 @@ pub fn handle_toggle_sprinting(
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
-    for (e, mut sprint_state) in sprint_query.iter_mut() {
+    for (e, sprint_state) in sprint_query.iter_mut() {
         if key_inputs.just_pressed(KeyCode::Space) && sprint_state.sprint_cooldown_timer.finished()
         {
             commands.entity(e).insert(Sprinting);
-            sprint_state.sprint_cooldown_timer.reset();
         } else if key_inputs.just_released(KeyCode::Space) {
             commands.entity(e).remove::<Sprinting>();
         }
@@ -42,34 +43,47 @@ pub fn handle_sprint_timer(
             &mut SprintUpgrade,
             &mut KinematicCharacterController,
             &mut MovementVector,
+            &PlayerAnimation,
+            &PlayerSkills,
         ),
         With<Sprinting>,
     >,
     mouse_inputs: Res<Input<MouseButton>>,
-    mut game: GameParam,
+    game: GameParam,
     mut attack_event: EventWriter<AttackEvent>,
     cursor_pos: Res<CursorPos>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
-    for (e, mut sprint, mut kcc, mut mv) in query.iter_mut() {
+    for (e, mut sprint, mut kcc, mut mv, anim, skills) in query.iter_mut() {
         if !sprint.startup_timer.finished() {
             sprint.startup_timer.tick(time.delta());
+            sprint.sprint_cooldown_timer.reset();
         } else {
-            let player_state = game.player_mut();
-            player_state.is_sprinting = true;
-            mv.0 = mv.0 * sprint.speed_bonus;
+            if anim != &PlayerAnimation::Run && !anim.is_one_time_anim() {
+                commands.entity(e).insert(PlayerAnimation::Run);
+            }
+            let speed_bonus_skill = skills.has(Skill::SprintFaster);
+            let lunge_skill = skills.has(Skill::SprintLunge);
+            mv.0 = mv.0 * (sprint.speed_bonus + if speed_bonus_skill { 0.2 } else { 0. });
+            let player_pos = game.player().position;
 
-            if (mouse_inputs.just_pressed(MouseButton::Right)
-                || key_inputs.just_pressed(KeyCode::Slash))
+            let direction =
+                (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
+            if mouse_inputs.just_pressed(MouseButton::Left) {
+                commands.entity(e).insert(PlayerAnimation::RunAttack2);
+                attack_event.send(AttackEvent {
+                    direction,
+                    ignore_cooldown: true,
+                });
+            }
+            if lunge_skill
+                && (mouse_inputs.just_pressed(MouseButton::Right)
+                    || key_inputs.just_pressed(KeyCode::Slash))
                 && sprint.sprint_cooldown_timer.percent() == 0.
             {
                 // LUNGE
-                let player_pos = game.player().position;
-
-                let direction = (cursor_pos.world_coords.truncate() - player_pos.truncate())
-                    .normalize_or_zero();
-                commands.entity(e).insert(EnemyAnimationState::Attack);
+                commands.entity(e).insert(PlayerAnimation::Lunge);
                 attack_event.send(AttackEvent {
                     direction,
                     ignore_cooldown: true,
@@ -78,14 +92,22 @@ pub fn handle_sprint_timer(
                 sprint.lunge_duration.tick(time.delta());
                 sprint.sprint_cooldown_timer.tick(time.delta());
                 mv.0 = mv.0 * 0.;
-                game.player_mut().is_lunging = true;
             } else if sprint.lunge_duration.percent() != 0. {
                 sprint.lunge_duration.tick(time.delta());
                 if sprint.lunge_duration.percent() >= 0.20
                     && sprint.lunge_duration.percent() <= 0.45
                 {
+                    commands
+                        .entity(e)
+                        .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+                    kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
                     mv.0 = mv.0 * sprint.lunge_speed;
                 } else {
+                    commands
+                        .entity(e)
+                        .insert(CollisionGroups::new(Group::ALL, Group::ALL));
+                    kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
+
                     mv.0 = mv.0 * 0.;
                 }
             }
@@ -93,7 +115,7 @@ pub fn handle_sprint_timer(
             if sprint.lunge_duration.finished() {
                 sprint.lunge_duration.reset();
                 commands.entity(e).remove::<Sprinting>();
-                game.player_mut().is_lunging = false;
+                commands.entity(e).insert(PlayerAnimation::Walk);
             }
 
             if sprint
@@ -111,27 +133,30 @@ pub fn handle_sprint_timer(
 
 pub fn handle_sprinting_cooldown(
     time: Res<Time>,
-    mut query: Query<&mut SprintUpgrade, Without<Sprinting>>,
-    mut game: GameParam,
+    mut query: Query<(Entity, &mut SprintUpgrade, &PlayerAnimation), Without<Sprinting>>,
+    mut commands: Commands,
 ) {
-    for mut sprint in query.iter_mut() {
+    for (e, mut sprint, anim) in query.iter_mut() {
         sprint.startup_timer.reset();
         sprint.sprint_duration_timer.reset();
         sprint.lunge_duration.reset();
         sprint.sprint_cooldown_timer.tick(time.delta());
-        let player_state = game.player_mut();
-        player_state.is_sprinting = false;
-        player_state.is_lunging = false;
+        if anim.is_sprinting() || anim.is_lunging() {
+            commands.entity(e).insert(PlayerAnimation::Walk);
+        }
     }
 }
 
 pub fn handle_enemy_death_sprint_reset(
     enemy_death_events: EventReader<EnemyDeathEvent>,
     mut sprint_query: Query<&mut SprintUpgrade>,
+    skills: Query<&PlayerSkills>,
 ) {
     if !enemy_death_events.is_empty() {
-        for mut sprint in sprint_query.iter_mut() {
-            sprint.sprint_cooldown_timer.tick(Duration::from_secs(99));
+        if skills.single().has(Skill::SprintKillReset) {
+            for mut sprint in sprint_query.iter_mut() {
+                sprint.sprint_cooldown_timer.tick(Duration::from_secs(99));
+            }
         }
     }
 }

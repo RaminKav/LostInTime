@@ -2,7 +2,8 @@ use std::f32::consts::PI;
 use std::time::Duration;
 
 use crate::ai::pathfinding::world_pos_to_AIPos;
-use crate::animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState};
+
+use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::AttackEvent;
 use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
@@ -122,6 +123,14 @@ pub enum FacingDirection {
     Down,
 }
 impl FacingDirection {
+    pub fn get_anim_dir_str(&self) -> &str {
+        match self {
+            Self::Left => "Side",
+            Self::Right => "Side",
+            Self::Up => "Back",
+            Self::Down => "Front",
+        }
+    }
     pub fn get_dir_vec(&self) -> Vec2 {
         match self {
             Self::Left => Vec2::new(-1., 0.),
@@ -213,9 +222,7 @@ pub fn move_player(
             Entity,
             &mut KinematicCharacterController,
             &mut MovementVector,
-            &EnemyAnimationState,
-            &CharacterAnimationSpriteSheetData,
-            &TextureAtlasSprite,
+            &PlayerAnimation,
             &Speed,
             &Hunger,
             &mut RunDustTimer,
@@ -240,20 +247,10 @@ pub fn move_player(
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
     }
-    let (
-        player_e,
-        mut player_kcc,
-        mut mv,
-        curr_anim,
-        anim_state,
-        sprite,
-        speed,
-        hunger,
-        mut run_dust_timer,
-        skills,
-    ) = player_query.single_mut();
+    let (player_e, mut player_kcc, mut mv, curr_anim, speed, hunger, mut run_dust_timer, skills) =
+        player_query.single_mut();
     let player = game.player_mut();
-    if player.is_attacking && !player.is_sprinting {
+    if curr_anim.is_movement_restricting() {
         mv.0 = Vec2::ZERO;
         return;
     }
@@ -298,14 +295,10 @@ pub fn move_player(
     if d.x != 0. || d.y != 0. {
         d = d.normalize() * s;
     }
-
+    let is_speeding_up = player.player_dash_duration.percent() < 0.5;
     if player.is_dashing {
-        let is_speeding_up = player.player_dash_duration.percent() < 0.5;
-        if curr_anim != &EnemyAnimationState::Dash
-            && (anim_state.is_done_current_animation(sprite.index)
-                || curr_anim != &EnemyAnimationState::Attack)
-        {
-            commands.entity(player_e).insert(EnemyAnimationState::Dash);
+        if curr_anim != &PlayerAnimation::Roll {
+            commands.entity(player_e).insert(PlayerAnimation::Roll);
         }
         d.x = if is_speeding_up {
             d.x.lerp(
@@ -333,12 +326,11 @@ pub fn move_player(
     mv.0 = d;
     if d.x != 0. || d.y != 0. {
         player_kcc.translation = Some(Vec2::new(d.x, d.y));
-        if curr_anim != &EnemyAnimationState::Walk
-            && !player.is_dashing
-            && anim_state.is_done_current_animation(sprite.index)
-        {
-            commands.entity(player_e).insert(EnemyAnimationState::Walk);
+
+        if curr_anim == &PlayerAnimation::Idle {
+            commands.entity(player_e).insert(PlayerAnimation::Walk);
         }
+
         minimap_event.send(UpdateMiniMapEvent {
             pos: None,
             new_tile: None,
@@ -366,19 +358,24 @@ pub fn move_player(
                 audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.35))
             });
         }
-    } else if curr_anim != &EnemyAnimationState::Idle
-        && anim_state.is_done_current_animation(sprite.index)
-    {
-        commands.entity(player_e).insert(EnemyAnimationState::Idle);
+    } else if curr_anim.is_walking() {
+        commands.entity(player_e).insert(PlayerAnimation::Idle);
     }
 }
-pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
+pub fn tick_dash_timer(
+    mut game: GameParam,
+    time: Res<Time>,
+    mut commands: Commands,
+    player_query: Query<Entity, With<Player>>,
+) {
     let player = game.player_mut();
     if player.is_dashing {
         player.player_dash_duration.tick(time.delta());
         if player.player_dash_duration.just_finished() {
             player.player_dash_duration.reset();
             player.is_dashing = false;
+            let player_e = player_query.single();
+            commands.entity(player_e).insert(PlayerAnimation::Walk);
         }
     }
 }
@@ -595,7 +592,7 @@ pub fn mouse_click_system(
     mut attack_event: EventWriter<AttackEvent>,
     mut hit_event: EventWriter<HitEvent>,
 
-    player_query: Query<(Entity, Option<&AttackTimer>), With<Player>>,
+    player_query: Query<(Entity, Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     ui_state: Res<State<UIState>>,
@@ -612,7 +609,7 @@ pub fn mouse_click_system(
 
     let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
     let player_pos = game.player().position;
-    let (player_e, attack_timer_option) = player_query.single();
+    let (player_e, attack_timer_option, player_anim) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
         // if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
@@ -648,11 +645,20 @@ pub fn mouse_click_system(
                 mana_cost: mana_cost_option.map(|m| -m.0),
                 dmg_override: None,
                 pos_override: None,
+                spawn_delay: 0.36,
             })
         }
-        commands
-            .entity(player_e)
-            .insert(EnemyAnimationState::Attack);
+        if !player_anim.is_one_time_anim() {
+            if let Some(main_hand) = main_hand_option {
+                if main_hand == WorldObject::WoodBow {
+                    commands.entity(player_e).insert(PlayerAnimation::Bow);
+                } else {
+                    commands.entity(player_e).insert(PlayerAnimation::Attack);
+                }
+            } else {
+                commands.entity(player_e).insert(PlayerAnimation::Attack);
+            }
+        }
         attack_event.send(AttackEvent {
             direction,
             ignore_cooldown: false,

@@ -11,7 +11,9 @@ use bevy_proto::{
     backend::schematics::FromSchematicInput,
     prelude::{Prototypes, PrototypesMut, ReflectSchematic, Schematic, SchematicContext},
 };
-use bevy_rapier2d::prelude::{Collider, KinematicCharacterController, QueryFilterFlags, Sensor};
+use bevy_rapier2d::prelude::{
+    Collider, CollisionGroups, Group, KinematicCharacterController, QueryFilterFlags, Sensor,
+};
 
 pub mod proto_param;
 use crate::{
@@ -206,6 +208,7 @@ impl From<KCC> for KinematicCharacterController {
     fn from(_: KCC) -> KinematicCharacterController {
         KinematicCharacterController {
             filter_flags: QueryFilterFlags::EXCLUDE_SENSORS | QueryFilterFlags::EXCLUDE_KINEMATIC,
+            filter_groups: Some(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1)),
             ..default()
         }
     }

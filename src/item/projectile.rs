@@ -91,6 +91,7 @@ pub struct RangedAttackEvent {
     pub is_followup_proj: bool,
     pub dmg_override: Option<i32>,
     pub pos_override: Option<Vec2>,
+    pub spawn_delay: f32,
 }
 
 #[derive(Clone, Component)]
@@ -102,16 +103,29 @@ pub struct EnemyProjectile {
 impl Plugin for RangedAttackPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<RangedAttackEvent>().add_systems(
-            (handle_ranged_attack_event, handle_translate_projectiles)
+            (
+                handle_ranged_attack_event,
+                handle_translate_projectiles,
+                handle_spawn_projectiles_after_delay,
+            )
                 .in_set(OnUpdate(GameState::Main)),
         );
     }
 }
 
+#[derive(Component)]
+pub struct ProjectileSpawnMarker {
+    pub timer: Timer,
+    pub proj: Projectile,
+    pub pos: Vec2,
+    pub direction: Vec2,
+    pub dmg_override: Option<i32>,
+    pub from_enemy: Option<Entity>,
+}
+
 fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
     player_query: Query<(Entity, &Mana, Option<&AttackTimer>), With<Player>>,
-    mut proto_commands: ProtoCommands,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     game: GameParam,
     proto: ProtoParam,
@@ -122,7 +136,10 @@ fn handle_ranged_attack_event(
     for proj_event in events.iter() {
         let (_player_e, mana, player_cooldown) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
-        if proj_event.from_enemy.is_none() && player_cooldown.is_some() && !proj_event.is_followup_proj {
+        if proj_event.from_enemy.is_none()
+            && player_cooldown.is_some()
+            && !proj_event.is_followup_proj
+        {
             continue;
         }
         if let Some(mana_cost) = proj_event.mana_cost {
@@ -157,25 +174,14 @@ fn handle_ranged_attack_event(
         } else {
             game.player().position.truncate()
         };
-        let p = proto_commands.spawn_projectile_from_proto(
-            proj_event.projectile.clone(),
-            &proto,
-            proj_event.pos_override.unwrap_or(t),
-            proj_event.direction,
-        );
-        if let Some(p) = p {
-            if let Some(e) = proj_event.from_enemy {
-                commands.entity(p).insert(EnemyProjectile {
-                    entity: e,
-                    mob: enemy_transforms.get(e).unwrap().1.clone(),
-                });
-            }
-            commands.entity(p).insert(Attack(
-                proj_event
-                    .dmg_override
-                    .unwrap_or(game.calculate_player_damage(0).0 as i32),
-            ));
-        }
+        commands.spawn(ProjectileSpawnMarker {
+            timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
+            proj: proj_event.projectile.clone(),
+            pos: proj_event.pos_override.unwrap_or(t),
+            direction: proj_event.direction,
+            dmg_override: proj_event.dmg_override,
+            from_enemy: proj_event.from_enemy,
+        });
     }
 }
 fn handle_translate_projectiles(
@@ -194,5 +200,40 @@ fn handle_translate_projectiles(
         };
         let delta = state.direction * (state.speed + arrow_speed_upgrade) * time.delta_seconds();
         transform.translation += delta.extend(0.0);
+    }
+}
+
+fn handle_spawn_projectiles_after_delay(
+    mut projectiles: Query<(Entity, &mut ProjectileSpawnMarker)>,
+    time: Res<Time>,
+    proto: ProtoParam,
+    mut proto_commands: ProtoCommands,
+    game: GameParam,
+    mut commands: Commands,
+    enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
+) {
+    for (e, mut proj) in projectiles.iter_mut() {
+        proj.timer.tick(time.delta());
+        if proj.timer.just_finished() {
+            let p = proto_commands.spawn_projectile_from_proto(
+                proj.proj.clone(),
+                &proto,
+                proj.pos,
+                proj.direction,
+            );
+            if let Some(p) = p {
+                if let Some(e) = proj.from_enemy {
+                    commands.entity(p).insert(EnemyProjectile {
+                        entity: e,
+                        mob: enemy_transforms.get(e).unwrap().1.clone(),
+                    });
+                }
+                commands.entity(p).insert(Attack(
+                    proj.dmg_override
+                        .unwrap_or(game.calculate_player_damage(0).0 as i32),
+                ));
+            }
+            commands.entity(e).despawn_recursive();
+        }
     }
 }

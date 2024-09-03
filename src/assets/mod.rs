@@ -1,4 +1,3 @@
-use std::fs;
 pub mod asset_helpers;
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -16,7 +15,7 @@ use crate::inventory::ItemStack;
 use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::{
-    Equipment, Foliage, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
+    Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
 };
 use crate::player::skills::Skill;
@@ -90,9 +89,7 @@ impl Plugin for GameAssetsPlugin {
                 wall_texture_atlas: None,
                 spritesheet_map: None,
                 icons: None,
-                foliage_material_map: None,
                 ui_image_handles: None,
-                player_spritesheets: None,
                 mob_spritesheets: None,
                 status_effect_icons: None,
                 skill_icons: None,
@@ -148,9 +145,7 @@ pub struct Graphics {
     pub wall_texture_atlas: Option<Handle<TextureAtlas>>,
     pub spritesheet_map: Option<HashMap<WorldObject, TextureAtlasSprite>>,
     pub icons: Option<HashMap<WorldObject, TextureAtlasSprite>>,
-    pub foliage_material_map: Option<HashMap<Foliage, FoliageMaterial>>,
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
-    pub player_spritesheets: Option<Vec<Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
     pub skill_icons: Option<HashMap<Skill, Handle<Image>>>,
@@ -283,15 +278,10 @@ impl GameAssetsPlugin {
         let mut spritesheet_map = HashMap::default();
         let mut icon_map = HashMap::default();
         let mut ui_image_handles = HashMap::default();
-        let foliage_material_map = HashMap::default();
         let mut status_effect_handles = HashMap::default();
         let mut skill_handles = HashMap::default();
         let mut item_glow_handles = HashMap::default();
-        let player_spritesheets = vec![
-            asset_server.load("textures/player/player_side.png"),
-            asset_server.load("textures/player/player_up.png"),
-            asset_server.load("textures/player/player_down.png"),
-        ];
+
         let mob_spritesheets = Mob::iter()
             .map(|mob| {
                 (
@@ -319,34 +309,7 @@ impl GameAssetsPlugin {
                 sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
                 spritesheet_map.insert(*item, sprite);
             }
-            //TODO: maybe we can clean up our spawning code with this vvv
-            //Position the sprite anchor if one is defined
-            // if let Some(anchor) = rect.anchor {
-            //     sprite.anchor = Anchor::Custom(Vec2::new(
-            //         anchor.0 / rect.size.0 - 0.5,
-            //         0.5 - anchor.1 / rect.size.1,
-            //     ));
-            // };
             world_obj_data.properties.insert(*item, *rect);
-        }
-        // load foliage mat
-        for f in Foliage::iter() {
-            // let handle = asset_server.load(format!("{}.png", f.to_string().to_lowercase()));
-            // let foliage_material = FoliageMaterial {
-            //     source_texture: Some(handle),
-            //     speed: 0.5,
-            //     minStrength: 0.001,
-            //     maxStrength: 0.003,
-            //     strengthScale: 20.,
-            //     interval: 3.5,
-            //     detail: 1.,
-            //     distortion: 1.,
-            //     heightOffset: 0.4,
-            //     offset: 0.,
-            //     opacity: 1.,
-            //     // alpha_mode: AlphaMode::Blend,
-            // };
-            // foliage_material_map.insert(f, foliage_material);
         }
 
         // load icons
@@ -409,10 +372,9 @@ impl GameAssetsPlugin {
             texture_atlas: Some(atlas_handle),
             wall_texture_atlas: Some(wall_atlas_handle),
             spritesheet_map: Some(spritesheet_map),
-            foliage_material_map: Some(foliage_material_map),
+
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
-            player_spritesheets: Some(player_spritesheets),
             mob_spritesheets: Some(mob_spritesheets),
             status_effect_icons: Some(status_effect_handles),
             skill_icons: Some(skill_handles),
