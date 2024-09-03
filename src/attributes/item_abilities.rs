@@ -7,7 +7,10 @@ use crate::{
     animations::AttackEvent,
     combat_helpers::spawn_temp_collider,
     inputs::MovementVector,
-    item::projectile::{Projectile, RangedAttackEvent},
+    item::{
+        projectile::{Projectile, RangedAttackEvent},
+        WorldObject,
+    },
     player::{
         skills::{PlayerSkills, Skill},
         MovePlayerEvent, Player,
@@ -61,6 +64,11 @@ pub fn handle_item_abilitiy_on_attack(
             let direction = move_direction.0.normalize();
             let distance = direction * 2. * TILE_SIZE.x;
             let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
+            if let Some(tile_data) = game.get_tile_data(pos) {
+                if tile_data.block_type.contains(&WorldObject::WaterTile) {
+                    return;
+                }
+            }
             if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
                 if obj.is_tree() || obj.is_wall() {
                     return;

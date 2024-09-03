@@ -258,7 +258,7 @@ impl Skill {
                     startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
                     sprint_duration_timer: Timer::from_seconds(3.5, TimerMode::Once),
                     sprint_cooldown_timer: Timer::from_seconds(0.1, TimerMode::Once),
-                    lunge_duration: Timer::from_seconds(0.7, TimerMode::Once),
+                    lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
                     speed_bonus: 1.6,
                     lunge_speed: 2.9,
                 });

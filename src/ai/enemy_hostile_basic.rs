@@ -12,10 +12,13 @@ use crate::{
     combat::HitEvent,
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
-    item::projectile::{Projectile, RangedAttackEvent},
+    item::{
+        projectile::{Projectile, RangedAttackEvent},
+        WorldObject,
+    },
     night::NightTracker,
     status_effects::Slow,
-    world::TILE_SIZE,
+    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     Game, GameParam, PLAYER_MOVE_SPEED,
 };
 
@@ -214,6 +217,11 @@ pub fn follow(
 
         let distance_from_target = (target_translation.truncate() - follow_translation).length();
         let is_far_away = distance_from_target > 10.5 * TILE_SIZE.x;
+        let is_on_water_tile = game
+            .get_tile_data(world_pos_to_tile_pos(follow_translation))
+            .expect("enemy is not on a tile?")
+            .block_type
+            .contains(&WorldObject::WaterTile);
         //convert follower txfm to AIPos too
         let target_txfm = if night_tracker.is_night() && is_far_away {
             target_translation.truncate()
@@ -236,7 +244,7 @@ pub fn follow(
         };
         let delta = delta_override.unwrap_or(direct_path_to_target);
         let mut mover = mover.get_mut(entity).unwrap();
-        if night_tracker.is_night() && is_far_away {
+        if (night_tracker.is_night() && is_far_away) || is_on_water_tile {
             mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
         } else {
             mover.filter_groups = Some(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));

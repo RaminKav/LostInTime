@@ -103,8 +103,8 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             let mut y_offset = 0.;
             let angle = proto_data.direction.y.atan2(proto_data.direction.x);
             if dir != Vec2::ZERO {
-                x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 3.;
-                y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 3.;
+                x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
+                y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
             }
             //TODO: make these prototype data
             spawned_entity_commands

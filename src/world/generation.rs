@@ -54,9 +54,9 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
     // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
 const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
-    (WorldObject::Pebble, 1),
-    (WorldObject::DeadSapling, 1),
     (WorldObject::BrownMushroom, 1),
+    (WorldObject::DeadSapling, 1),
+    (WorldObject::Pebble, 1),
 ];
 
 #[derive(Resource, Debug, Default, Clone)]
@@ -143,7 +143,7 @@ impl GenerationPlugin {
     fn generate_forest_for_chunk(
         world_generation_params: &WorldGeneration,
         chunk_pos: IVec2,
-        seed: u64,
+        _seed: u64,
     ) -> Vec<(TileMapPosition, WorldObject)> {
         let mut rng = rand::thread_rng();
 
@@ -461,39 +461,6 @@ impl GenerationPlugin {
                     objs_to_spawn = Box::new(objs_to_spawn.chain(validated_objs.into_iter()));
                 }
 
-                // generate starting area objs to ensure player has enough pebbles/sticks
-                if chunk_pos == IVec2::ZERO
-                    || chunk_pos == IVec2::new(-1, 0)
-                    || chunk_pos == IVec2::new(0, -1)
-                    || chunk_pos == IVec2::new(-1, -1)
-                {
-                    let mut starting_objs = vec![];
-                    for (obj_to_clear, num) in STARTING_ZONE_OBJS.iter() {
-                        let x_range = if chunk_pos.x == 0 {
-                            0..5
-                        } else {
-                            10..CHUNK_SIZE
-                        };
-                        let y_range = if chunk_pos.y == 0 {
-                            0..5
-                        } else {
-                            10..CHUNK_SIZE
-                        };
-                        for _ in 0..*num {
-                            starting_objs.push((
-                                TileMapPosition::new(
-                                    chunk_pos,
-                                    TilePos::new(
-                                        rand::thread_rng().gen_range(x_range.clone()),
-                                        rand::thread_rng().gen_range(y_range.clone()),
-                                    ),
-                                ),
-                                *obj_to_clear,
-                            ));
-                        }
-                    }
-                    objs_to_spawn = Box::new(objs_to_spawn.chain(starting_objs.into_iter()));
-                }
                 let mut objs_to_spawn =
                     objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
                 if dungeon_check.is_err() {
@@ -588,10 +555,43 @@ impl GenerationPlugin {
                     2,
                 );
                 for pos in clear_tiles {
-                    if let Some(_obj) = objs.get(&pos) {
-                        objs.remove(&pos);
+                    if let Some(obj) = objs.get(&pos) {
+                        if obj.is_tree() || obj.is_medium_size(&proto_param) {
+                            objs.remove(&pos);
+                        }
                     }
                 }
+
+                // generate starting area objs to ensure player has enough pebbles/sticks
+                if chunk_pos == IVec2::ZERO
+                    || chunk_pos == IVec2::new(-1, 0)
+                    || chunk_pos == IVec2::new(0, -1)
+                    || chunk_pos == IVec2::new(-1, -1)
+                {
+                    for (obj_to_spawn, num) in STARTING_ZONE_OBJS.iter() {
+                        let x_range = if chunk_pos.x == 0 {
+                            2..5
+                        } else {
+                            11..CHUNK_SIZE
+                        };
+                        let y_range = if chunk_pos.y == 0 {
+                            2..5
+                        } else {
+                            11..CHUNK_SIZE
+                        };
+                        for _ in 0..*num {
+                            let p = TileMapPosition::new(
+                                chunk_pos,
+                                TilePos::new(
+                                    rand::thread_rng().gen_range(x_range.clone()),
+                                    rand::thread_rng().gen_range(y_range.clone()),
+                                ),
+                            );
+                            objs.insert(p, *obj_to_spawn);
+                        }
+                    }
+                }
+
                 // UNIQUE OBJECTS
                 if dungeon_check.is_err() {
                     for (unique_obj, pos) in game.world_obj_cache.unique_objs.clone() {

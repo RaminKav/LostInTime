@@ -83,7 +83,7 @@ impl Default for PlayerState {
             position: Vec3::ZERO,
             reach_distance: 1.5,
             player_dash_cooldown: Timer::from_seconds(1.5, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.3, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.39, TimerMode::Once),
         }
     }
 }

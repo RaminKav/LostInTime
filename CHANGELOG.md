@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.2.0
+
+### Features
+
+- new player animations: Roll, bow attack, sprint, lunge, sprint attack
+- new sprint skill: overrides roll just like teleport, has skill upgrades that let you do a lunge attack while sprinting, reset the cooldown when getting a kill, and sprint faster.
+
+### Changes
+
+- shrines no longer spawn near/in the starting clearing
+- full internal player animation refactor
+
+### Bug Fixes
+
+- fixed spawns being bricked due to not enough stone
+- fixed bow arrow spread beign off-centred
+- fixed enemies getting stuck in water
+- fixed being able to teleport into the water
+
 ## 0.1.4
 
 ### Features
@@ -9,7 +28,7 @@
 
 ### Changes
 
-### Bugfixes
+### Bug fixes
 
 - Fix macos going crazy with the hotbar trackpad sensitivity
 
@@ -28,7 +47,7 @@
 - Allow placing some objects on water blocks
 - Pause during any Inventory/menus!
 
-### Bugfixes
+### Bug fixes
 
 - fix skill points carrying over to the next run
 - fix end of run crash
@@ -56,7 +75,7 @@
 - Nerfed drop rates of equipment and some weapons, small potions, and tomes/orbs
 - Buffed arrow/throwing star drop rate
 
-### Bugfixes
+### Bug fixes
 
 - Fixed a bug where player would teleport to the spawn portal with the teleport skill
 - Fixed a crash pertaining to status effects
@@ -76,7 +95,7 @@
 - Decreased autosave frequency
 - Game will now automatically save on pause
 
-### Bugfixes
+### Bug fixes
 
 - Menu buttons are now disabled when the info modal is open
 - Loot level now matches player level

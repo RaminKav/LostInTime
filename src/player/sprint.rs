@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     inputs::{CursorPos, MovementVector},
-    EnemyDeathEvent, GameParam,
+    AttackTimer, EnemyDeathEvent, GameParam,
 };
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
@@ -45,6 +45,7 @@ pub fn handle_sprint_timer(
             &mut MovementVector,
             &PlayerAnimation,
             &PlayerSkills,
+            Option<&AttackTimer>,
         ),
         With<Sprinting>,
     >,
@@ -55,7 +56,7 @@ pub fn handle_sprint_timer(
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
-    for (e, mut sprint, mut kcc, mut mv, anim, skills) in query.iter_mut() {
+    for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
         if !sprint.startup_timer.finished() {
             sprint.startup_timer.tick(time.delta());
             sprint.sprint_cooldown_timer.reset();
@@ -70,16 +71,18 @@ pub fn handle_sprint_timer(
 
             let direction =
                 (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
-            if mouse_inputs.just_pressed(MouseButton::Left) {
+            if mouse_inputs.pressed(MouseButton::Left)
+                && !anim.is_an_attack()
+                && attack_cooldown_option.is_none()
+            {
                 commands.entity(e).insert(PlayerAnimation::RunAttack2);
                 attack_event.send(AttackEvent {
                     direction,
-                    ignore_cooldown: true,
+                    ignore_cooldown: false,
                 });
             }
             if lunge_skill
-                && (mouse_inputs.just_pressed(MouseButton::Right)
-                    || key_inputs.just_pressed(KeyCode::Slash))
+                && (mouse_inputs.pressed(MouseButton::Right) || key_inputs.pressed(KeyCode::Slash))
                 && sprint.sprint_cooldown_timer.percent() == 0.
             {
                 // LUNGE

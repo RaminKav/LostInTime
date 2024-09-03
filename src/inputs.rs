@@ -362,20 +362,13 @@ pub fn move_player(
         commands.entity(player_e).insert(PlayerAnimation::Idle);
     }
 }
-pub fn tick_dash_timer(
-    mut game: GameParam,
-    time: Res<Time>,
-    mut commands: Commands,
-    player_query: Query<Entity, With<Player>>,
-) {
+pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
     let player = game.player_mut();
     if player.is_dashing {
         player.player_dash_duration.tick(time.delta());
         if player.player_dash_duration.just_finished() {
             player.player_dash_duration.reset();
             player.is_dashing = false;
-            let player_e = player_query.single();
-            commands.entity(player_e).insert(PlayerAnimation::Walk);
         }
     }
 }
@@ -596,7 +589,7 @@ pub fn mouse_click_system(
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     ui_state: Res<State<UIState>>,
-    ranged_query: Query<&RangedAttack, With<Equipment>>,
+    ranged_query: Query<(&WorldObject, &RangedAttack), With<Equipment>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     obj_actions: Query<&ObjectAction>,
@@ -634,7 +627,7 @@ pub fn mouse_click_system(
         }
         let direction =
             (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
-        if let Ok(ranged_tool) = ranged_query.get_single() {
+        if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
             let mana_cost_option =
                 proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
             ranged_attack_event.send(RangedAttackEvent {
@@ -645,24 +638,38 @@ pub fn mouse_click_system(
                 mana_cost: mana_cost_option.map(|m| -m.0),
                 dmg_override: None,
                 pos_override: None,
-                spawn_delay: 0.36,
+                spawn_delay: if obj == &WorldObject::WoodBow {
+                    0.36
+                } else {
+                    0.01
+                },
             })
         }
+        let mut did_attack = false;
         if !player_anim.is_one_time_anim() {
             if let Some(main_hand) = main_hand_option {
                 if main_hand == WorldObject::WoodBow {
                     commands.entity(player_e).insert(PlayerAnimation::Bow);
+                    attack_event.send(AttackEvent {
+                        direction,
+                        ignore_cooldown: false,
+                    });
                 } else {
-                    commands.entity(player_e).insert(PlayerAnimation::Attack);
+                    if !player_anim.is_sprinting() {
+                        did_attack = true;
+                    }
                 }
-            } else {
-                commands.entity(player_e).insert(PlayerAnimation::Attack);
+            } else if !player_anim.is_sprinting() {
+                did_attack = true;
             }
         }
-        attack_event.send(AttackEvent {
-            direction,
-            ignore_cooldown: false,
-        });
+        if did_attack {
+            commands.entity(player_e).insert(PlayerAnimation::Attack);
+            attack_event.send(AttackEvent {
+                direction,
+                ignore_cooldown: false,
+            });
+        }
         if player_pos
             .truncate()
             .distance(cursor_pos.world_coords.truncate())

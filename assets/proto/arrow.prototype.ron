@@ -5,7 +5,7 @@
         "survival_rogue_like::item::WorldObject": Arrow,
         "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
         "survival_rogue_like::item::projectile::Projectile": Arrow,
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 150., direction: (x: 0., y: 0.), hit_entities: []),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 150., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -4., y: -4.)),
         "survival_rogue_like::item::item_actions::ConsumableItem": (),
         "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
         "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
