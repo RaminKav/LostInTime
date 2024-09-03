@@ -69,7 +69,7 @@ pub fn handle_item_abilitiy_on_attack(
     let (player_pos, skills, move_direction, dmg) = player.single();
 
     let player = game.player_mut();
-    if skills.get(Skill::Teleport)
+    if skills.has(Skill::Teleport)
         && player.player_dash_cooldown.tick(time.delta()).finished()
         && key_input.just_pressed(KeyCode::Space)
     {
@@ -85,7 +85,7 @@ pub fn handle_item_abilitiy_on_attack(
                 }
             }
 
-            if skills.get(Skill::TeleportShock) {
+            if skills.has(Skill::TeleportShock) {
                 let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
                 spawn_temp_collider(
                     &mut commands,
@@ -113,7 +113,7 @@ pub fn handle_item_abilitiy_on_attack(
         return;
     };
     for attack in attacks.iter() {
-        if skills.get(Skill::WaveAttack) && Skill::WaveAttack.is_obj_valid(main_hand.get_obj()) {
+        if skills.has(Skill::WaveAttack) && Skill::WaveAttack.is_obj_valid(main_hand.get_obj()) {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,
                 direction: attack.direction,
@@ -124,7 +124,7 @@ pub fn handle_item_abilitiy_on_attack(
                 pos_override: None,
             });
         }
-        if skills.get(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
+        if skills.has(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::FireAttack,
                 direction: attack.direction,

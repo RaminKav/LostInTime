@@ -66,7 +66,7 @@ fn check_melee_hit_collisions(
         });
         for hit in hits_this_frame {
             let hit_entity = if hit.0 == weapon_e { hit.1 } else { hit.0 };
-            if !game.game.player_state.is_attacking
+            if (!game.game.player_state.is_attacking && !game.game.player_state.is_lunging)
                 || world_obj.get(hit_entity).is_ok()
                 || hit_tracker.contains(&hit_entity)
             {

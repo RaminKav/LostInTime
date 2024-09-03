@@ -115,15 +115,17 @@ pub fn handle_attack_cooldowns(
     mut commands: Commands,
     time: Res<Time>,
     tool_query: Query<Entity, With<MainHand>>,
-    attack_event: EventReader<AttackEvent>,
+    mut attack_event: EventReader<AttackEvent>,
     mut player: Query<(Entity, &AttackCooldown, Option<&mut AttackTimer>), With<Player>>,
 ) {
     let (player_e, cooldown, timer_option) = player.single_mut();
 
     if !attack_event.is_empty() && timer_option.is_none() {
-        let mut attack_cd_timer = AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
-        attack_cd_timer.0.tick(time.delta());
-        commands.entity(player_e).insert(attack_cd_timer);
+        if !attack_event.iter().next().unwrap().ignore_cooldown {
+            let mut attack_cd_timer = AttackTimer(Timer::from_seconds(cooldown.0, TimerMode::Once));
+            attack_cd_timer.0.tick(time.delta());
+            commands.entity(player_e).insert(attack_cd_timer);
+        }
         if let Ok(tool) = tool_query.get_single() {
             commands.entity(tool).remove::<HitMarker>();
         }
@@ -149,7 +151,7 @@ fn handle_enemy_death(
             continue;
         };
         let (mut player_level, skills) = player_xp.single_mut();
-        let is_crit_bonus = skills.get(Skill::CritLoot) && death_event.killed_by_crit;
+        let is_crit_bonus = skills.has(Skill::CritLoot) && death_event.killed_by_crit;
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(

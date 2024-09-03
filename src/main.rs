@@ -255,7 +255,7 @@ fn init_global_logger() {
                 .add_directive("bevy_render::renderer=warn".parse().unwrap())
                 .add_directive(
                     if *DEBUG {
-                        LevelFilter::DEBUG
+                        LevelFilter::INFO
                     } else {
                         LevelFilter::INFO
                     }

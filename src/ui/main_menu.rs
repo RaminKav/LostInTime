@@ -4,6 +4,7 @@ use std::{
 };
 
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy_rapier2d::prelude::Collider;
 
 use crate::{
     ai::pathfinding::PathfindingCache,
@@ -104,7 +105,7 @@ pub fn handle_menu_button_click_events(
     everything: Query<
         Entity,
         (
-            Or<(With<Visibility>, With<ActiveDimension>)>,
+            Or<(With<Visibility>, With<ActiveDimension>, With<Collider>)>,
             Without<DoNotDespawnOnGameOver>,
         ),
     >,

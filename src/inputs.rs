@@ -36,18 +36,13 @@ use crate::combat::{AttackTimer, HitEvent};
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
-use crate::item::item_upgrades::{
-    ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
-    FireStaffAOEUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade, VenomOnHitUpgrade,
-};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{
-    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventorySlotState, InventoryState,
-    UIState,
+    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
 };
 use crate::world::chunk::Chunk;
 
@@ -258,7 +253,7 @@ pub fn move_player(
         skills,
     ) = player_query.single_mut();
     let player = game.player_mut();
-    if player.is_attacking {
+    if player.is_attacking && !player.is_sprinting {
         mv.0 = Vec2::ZERO;
         return;
     }
@@ -285,7 +280,8 @@ pub fn move_player(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if !skills.get(Skill::Teleport)
+    if !skills.has(Skill::Teleport)
+        && !skills.has(Skill::Sprint)
         && player.player_dash_cooldown.tick(time.delta()).finished()
         && key_input.pressed(KeyCode::Space)
     {
@@ -440,21 +436,7 @@ pub fn toggle_inventory(
                 new_era: Some(Era::Main),
             });
         }
-        if key_input.just_pressed(KeyCode::U) {
-            commands
-                .entity(game.game.player)
-                .insert(FireStaffAOEUpgrade)
-                .insert(LightningStaffChainUpgrade)
-                .insert(BowUpgradeSpread(2))
-                .insert(ArrowSpeedUpgrade(1.))
-                .insert(BurnOnHitUpgrade)
-                .insert(VenomOnHitUpgrade)
-                .insert(LethalHitUpgrade)
-                .insert(ClawUpgradeMultiThrow(
-                    Timer::from_seconds(0.1, TimerMode::Once),
-                    2,
-                ));
-        }
+
         if key_input.just_pressed(KeyCode::L) {
             let pos = cursor.world_coords.truncate();
             if !can_spawn_mob_here(pos, &game, &proto, false) {
@@ -531,7 +513,7 @@ pub fn handle_quick_hotbar_consume(
     mut game: GameParam,
     proto_param: ProtoParam,
 
-    mut inv: Query<&mut Inventory>,
+    inv: Query<&mut Inventory>,
     mut item_action_param: ItemActionParam,
 ) {
     let shift_key_pressed =
@@ -671,7 +653,10 @@ pub fn mouse_click_system(
         commands
             .entity(player_e)
             .insert(EnemyAnimationState::Attack);
-        attack_event.send(AttackEvent { direction });
+        attack_event.send(AttackEvent {
+            direction,
+            ignore_cooldown: false,
+        });
         if player_pos
             .truncate()
             .distance(cursor_pos.world_coords.truncate())

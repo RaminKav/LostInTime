@@ -2,15 +2,14 @@ use crate::assets::{SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::colors::{
-    BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, PINK, RED,
-    UI_GRASS_GREEN, YELLOW,
+    BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, RED, YELLOW,
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 
 use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
-use crate::juice::{spawn_obj_death_particles, spawn_xp_particles, Particles};
+use crate::juice::{spawn_obj_death_particles, spawn_xp_particles};
 use crate::player::levels::{ExperienceReward, PlayerLevel};
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
@@ -27,7 +26,7 @@ use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
-use crate::world::{TileMapPosition, TILE_SIZE};
+use crate::world::TileMapPosition;
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -565,6 +564,7 @@ impl WorldObject {
             WorldObject::WoodSword => true,
             WorldObject::Sword => true,
             WorldObject::Dagger => true,
+            WorldObject::Claw => true,
             _ => false,
         }
     }

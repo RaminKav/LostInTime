@@ -470,12 +470,12 @@ impl GenerationPlugin {
                     let mut starting_objs = vec![];
                     for (obj_to_clear, num) in STARTING_ZONE_OBJS.iter() {
                         let x_range = if chunk_pos.x == 0 {
-                            0..CHUNK_SIZE / 2
+                            0..5
                         } else {
-                            CHUNK_SIZE / 2..CHUNK_SIZE
+                            10..CHUNK_SIZE
                         };
                         let y_range = if chunk_pos.y == 0 {
-                            0..CHUNK_SIZE / 2
+                            0..5
                         } else {
                             10..CHUNK_SIZE
                         };

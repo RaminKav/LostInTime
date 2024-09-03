@@ -7,15 +7,13 @@ use strum_macros::{Display, EnumIter};
 use crate::{
     custom_commands::CommandsExt,
     item::{
-        item_upgrades::{
-            ArrowSpeedUpgrade, BowUpgradeSpread, BurnOnHitUpgrade, ClawUpgradeMultiThrow,
-            FireStaffAOEUpgrade, FrailOnHitUpgrade, LethalHitUpgrade, LightningStaffChainUpgrade,
-            SlowOnHitUpgrade,
-        },
+        item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
         WorldObject,
     },
     proto::proto_param::ProtoParam,
 };
+
+use super::sprint::SprintUpgrade;
 
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
 pub enum Skill {
@@ -42,7 +40,34 @@ pub enum Skill {
     // Skills
     Teleport,
     TeleportShock,
-    TimeSlow,
+    TeleportCooldown,
+    TeleportCount,
+    TeleportManaSteal,
+
+    Sprint,
+    SprintFaster,
+    SprintStartupFaster,
+    SprintLunge,
+    SprintLungeDamage,
+    SprintLungePierce,
+    SprintKillReset,
+
+    DashDeflectProj,
+    DashInvulnerable,
+    DashFurther,
+    DashCount,
+    DashKnockback,
+    DaggerCombo,
+
+    RegenHPFaster,
+    RegenMPFaster,
+    OnHitAoEBurst,
+    SplitDamage,
+    Knockback,
+    DiscountMP,
+    MinusOneDamageOnHit,
+    ChanceToNotConsumeAmmo,
+
     // Weapon Upgrades
     ClawDoubleThrow,
     BowMultiShot,
@@ -54,37 +79,10 @@ pub enum Skill {
     //YELLOW: bonus dash
     //YELLOW: first hit after a dash is crit
     //RED: Your swords do bonus dmg
-    //
+    TimeSlow,
 }
 
 impl Skill {
-    pub fn get_icon(&self) -> WorldObject {
-        match self {
-            Skill::CritChance => WorldObject::Arrow,
-            Skill::CritDamage => WorldObject::Arrow,
-            Skill::Health => WorldObject::LargePotion,
-            Skill::Speed => WorldObject::Feather,
-            Skill::Thorns => WorldObject::BushlingScale,
-            Skill::Lifesteal => WorldObject::LargePotion,
-            Skill::AttackSpeed => WorldObject::Feather,
-            Skill::CritLoot => WorldObject::Chest,
-            Skill::DodgeChance => WorldObject::LeatherShoes,
-            Skill::FireDamage => WorldObject::Fireball,
-            Skill::WaveAttack => WorldObject::Tusk,
-            Skill::FrailStacks => WorldObject::Flint,
-            Skill::SlowStacks => WorldObject::String,
-            Skill::PoisonStacks => WorldObject::SlimeGoo,
-            Skill::LethalBlow => WorldObject::Sword,
-            Skill::Teleport => WorldObject::OrbOfTransformation,
-            Skill::TeleportShock => WorldObject::OrbOfTransformation,
-            Skill::TimeSlow => WorldObject::OrbOfTransformation,
-            Skill::ClawDoubleThrow => WorldObject::Claw,
-            Skill::BowMultiShot => WorldObject::WoodBow,
-            Skill::BowArrowSpeed => WorldObject::WoodBow,
-            Skill::ChainLightning => WorldObject::BasicStaff,
-            Skill::FireStaffAoE => WorldObject::FireStaff,
-        }
-    }
     pub fn get_title(&self) -> String {
         match self {
             Skill::CritChance => "Keen Eyes".to_string(),
@@ -110,6 +108,7 @@ impl Skill {
             Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
             Skill::ChainLightning => "Chain Lightning".to_string(),
             Skill::FireStaffAoE => "Explosive Blast".to_string(),
+            _ => "Unknown".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -221,6 +220,7 @@ impl Skill {
             Skill::BowArrowSpeed => {
                 vec!["Your Bow's Arrows".to_string(), "move faster.".to_string()]
             }
+            _ => vec!["Unknown".to_string()],
         }
     }
 
@@ -246,27 +246,20 @@ impl Skill {
             Skill::BowMultiShot => {
                 commands.entity(entity).insert(BowUpgradeSpread(2));
             }
-            Skill::ChainLightning => {
-                commands.entity(entity).insert(LightningStaffChainUpgrade);
-            }
-            Skill::FireStaffAoE => {
-                commands.entity(entity).insert(FireStaffAOEUpgrade);
-            }
-            Skill::PoisonStacks => {
-                commands.entity(entity).insert(BurnOnHitUpgrade);
-            }
-            Skill::LethalBlow => {
-                commands.entity(entity).insert(LethalHitUpgrade);
-            }
             Skill::BowArrowSpeed => {
                 commands.entity(entity).insert(ArrowSpeedUpgrade(1.));
             }
-            Skill::FrailStacks => {
-                commands.entity(entity).insert(FrailOnHitUpgrade);
+            Skill::Sprint => {
+                commands.entity(entity).insert(SprintUpgrade {
+                    startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
+                    sprint_duration_timer: Timer::from_seconds(3.5, TimerMode::Once),
+                    sprint_cooldown_timer: Timer::from_seconds(0.1, TimerMode::Once),
+                    lunge_duration: Timer::from_seconds(1., TimerMode::Once),
+                    speed_bonus: 1.6,
+                    lunge_speed: 2.5,
+                });
             }
-            Skill::SlowStacks => {
-                commands.entity(entity).insert(SlowOnHitUpgrade);
-            }
+
             _ => {}
         }
     }
@@ -421,7 +414,7 @@ pub struct PlayerSkills {
 }
 
 impl PlayerSkills {
-    pub fn get(&self, skill: Skill) -> bool {
+    pub fn has(&self, skill: Skill) -> bool {
         self.skills.contains(&skill)
     }
     pub fn get_count(&self, skill: Skill) -> i32 {

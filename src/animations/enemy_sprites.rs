@@ -77,6 +77,8 @@ pub fn change_anim_offset_when_character_action_state_changes(
 ) {
     for (e, mut sprite_sheet_data, state, mut sprite) in query.iter_mut() {
         let is_player = game.game.player == e;
+        let is_sprinting = game.player().is_sprinting;
+        let is_lunging = game.player().is_lunging;
         let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;
         match state {
             EnemyAnimationState::Idle => {
@@ -96,6 +98,11 @@ pub fn change_anim_offset_when_character_action_state_changes(
             }
             EnemyAnimationState::Attack => {
                 if is_player {
+                    if is_lunging {
+                        sprite_sheet_data.anim_offset = 4;
+                        sprite.index = (max_frames * 4.) as usize;
+                        continue;
+                    }
                     if let Some(main_hand) = game.player().main_hand_slot {
                         if main_hand.item_stack.obj_type.is_weapon() {
                             sprite_sheet_data.anim_offset =
@@ -205,10 +212,12 @@ pub fn animate_character_spritesheet_animations(
         &mut TextureAtlasSprite,
         Option<&Player>,
     )>,
+    game: GameParam,
 ) {
     for (_e, mut timer, sprite_sheet_data, mut sprite, is_player) in &mut query {
         let mult = if is_player.is_some()
             && sprite_sheet_data.get_anim_state() == EnemyAnimationState::Attack
+            && !game.player().is_lunging
         {
             3.
         } else if is_player.is_none()

@@ -61,6 +61,7 @@ pub struct DoneAnimation;
 #[derive(Debug, Clone, Default)]
 pub struct AttackEvent {
     pub direction: Vec2,
+    pub ignore_cooldown: bool,
 }
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
 #[uuid = "f690fdae-d598-45ab-8225-97e2a3f056f0"]

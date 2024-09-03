@@ -11,10 +11,16 @@ use bevy_rapier2d::{
     },
 };
 use serde::Deserialize;
+use sprint::{
+    handle_enemy_death_sprint_reset, handle_sprint_timer, handle_sprinting_cooldown,
+    handle_toggle_sprinting,
+};
 use strum_macros::{Display, EnumIter};
 pub mod currency;
 pub mod levels;
 pub mod skills;
+pub mod sprint;
+pub mod teleport;
 pub use currency::*;
 pub mod stats;
 use crate::{
@@ -33,7 +39,7 @@ use crate::{
     container::Container,
     custom_commands::CommandsExt,
     datafiles,
-    inputs::{move_camera_with_player, FacingDirection, MovementVector},
+    inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
     inventory::{Inventory, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
@@ -63,6 +69,8 @@ pub struct PlayerState {
     pub is_moving: bool,
     pub is_dashing: bool,
     pub is_attacking: bool,
+    pub is_sprinting: bool,
+    pub is_lunging: bool,
     pub main_hand_slot: Option<ActiveMainHandState>,
     pub position: Vec3,
     pub reach_distance: f32,
@@ -77,6 +85,8 @@ impl Default for PlayerState {
             is_moving: true,
             is_dashing: false,
             is_attacking: false,
+            is_sprinting: false,
+            is_lunging: false,
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 1.5,
@@ -112,8 +122,12 @@ impl Plugin for PlayerPlugin {
         .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
         .add_systems(
             (
+                handle_sprint_timer.after(move_player),
+                handle_sprinting_cooldown,
                 send_attribute_event_on_stats_update,
                 handle_level_up,
+                handle_enemy_death_sprint_reset,
+                handle_toggle_sprinting,
                 spawn_particles_when_leveling,
                 hide_particles_when_inv_open,
                 handle_modify_time_fragments,
@@ -178,8 +192,14 @@ fn spawn_player(
 ) {
     //spawn player entity with limb spritesheets as children
     let player_texture_handle = asset_server.load("textures/player/player_down.png");
-    let player_texture_atlas =
-        TextureAtlas::from_grid(player_texture_handle, Vec2::new(64., 64.), 7, 9, None, None);
+    let player_texture_atlas = TextureAtlas::from_grid(
+        player_texture_handle,
+        Vec2::new(64., 64.),
+        10,
+        9,
+        None,
+        None,
+    );
     let player_texture_atlas_handle = texture_atlases.add(player_texture_atlas);
 
     let p = commands
@@ -235,7 +255,7 @@ fn spawn_player(
             ..default()
         })
         .insert(CharacterAnimationSpriteSheetData {
-            animation_frames: vec![6, 6, 4, 6, 7, 7, 7, 7, 7],
+            animation_frames: vec![6, 6, 4, 6, 10, 7, 7, 7, 7],
             anim_offset: 0,
         })
         .insert(FacingDirection::Down)

@@ -4,7 +4,7 @@ use crate::attributes::{CurrentHealth, MaxHealth};
 use crate::combat::{EnemyDeathEvent, MarkedForDeath};
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
-use crate::player::skills::Skill;
+use crate::player::skills::{PlayerSkills, Skill};
 use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
 use crate::{
     combat::{AttackTimer, HitEvent},
@@ -32,27 +32,6 @@ pub struct BowUpgradeSpread(pub u8);
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
 pub struct ArrowSpeedUpgrade(pub f32);
-
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
-pub struct FireStaffAOEUpgrade;
-
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
-pub struct LightningStaffChainUpgrade;
-
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
-pub struct LethalHitUpgrade;
-
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
-pub struct BurnOnHitUpgrade;
-
-#[derive(Component, Default, Clone)]
-pub struct FrailOnHitUpgrade;
-#[derive(Component, Default, Clone)]
-pub struct SlowOnHitUpgrade;
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
@@ -148,17 +127,7 @@ pub fn handle_spread_arrows_attack(
 
 pub fn handle_on_hit_upgrades(
     mut hits: EventReader<HitEvent>,
-    upgrades: Query<
-        (
-            Option<&FireStaffAOEUpgrade>,
-            Option<&LightningStaffChainUpgrade>,
-            Option<&LethalHitUpgrade>,
-            Option<&BurnOnHitUpgrade>,
-            Option<&FrailOnHitUpgrade>,
-            Option<&SlowOnHitUpgrade>,
-        ),
-        With<Player>,
-    >,
+    upgrades: Query<&PlayerSkills, With<Player>>,
     proto: ProtoParam,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
@@ -186,16 +155,9 @@ pub fn handle_on_hit_upgrades(
         let Ok((hit_e, mob, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {
             continue;
         };
-        let (
-            fire_aoe_option,
-            lightning_chain_option,
-            lethal_option,
-            burn_option,
-            frail_option,
-            slow_option,
-        ) = upgrades.single();
+        let skills = upgrades.single();
 
-        if lightning_chain_option.is_some()
+        if skills.has(Skill::ChainLightning)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
             && *elec_count == 0
         {
@@ -206,7 +168,7 @@ pub fn handle_on_hit_upgrades(
                 continue;
             };
             *elec_count += 1;
-            let p = proto_commands.spawn_projectile_from_proto(
+            proto_commands.spawn_projectile_from_proto(
                 Projectile::Electricity,
                 &proto,
                 hit_entity_txfm.translation().truncate(),
@@ -229,7 +191,8 @@ pub fn handle_on_hit_upgrades(
         let Some(main_hand) = game.player().main_hand_slot else {
             continue;
         };
-        if fire_aoe_option.is_some() && hit.hit_with_projectile == Some(Projectile::Fireball) {
+        if skills.has(Skill::FireStaffAoE) && hit.hit_with_projectile == Some(Projectile::Fireball)
+        {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::FireExplosionAOE,
                 direction: Vec2::ZERO,
@@ -240,7 +203,7 @@ pub fn handle_on_hit_upgrades(
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
             });
         }
-        if lethal_option.is_some()
+        if skills.has(Skill::LethalBlow)
             && curr_hp.0 <= max_hp.0 / 4
             && !mob.is_boss()
             && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
@@ -257,7 +220,7 @@ pub fn handle_on_hit_upgrades(
         else {
             continue;
         };
-        if burn_option.is_some() {
+        if skills.has(Skill::PoisonStacks) {
             if let Some(mut burning) = burning_option {
                 burning.duration_timer.reset();
             } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
@@ -273,7 +236,7 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if frail_option.is_some() {
+        if skills.has(Skill::FrailStacks) {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
                     && Skill::FrailStacks.is_obj_valid(main_hand.get_obj())
@@ -298,7 +261,7 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if slow_option.is_some() {
+        if skills.has(Skill::SlowStacks) {
             if let Some(mut slow_stacks) = slowed_option {
                 if slow_stacks.num_stacks < 3 && Skill::SlowStacks.is_obj_valid(main_hand.get_obj())
                 {
