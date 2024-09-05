@@ -31,7 +31,7 @@ strum = "^0.15"
 strum_macros = "^0.15"
 interpolation = "0.2.0"
 lazy_static = "1.4.0"
-bevy_aseprite = "0.10"
+bevy_aseprite = { git = "https://github.com/RaminKav/bevy_aseprite.git", branch = "v0.10.0-fix" }
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
 tungstenite = { version = "0.23.0", features = ['native-tls-vendored'] }
