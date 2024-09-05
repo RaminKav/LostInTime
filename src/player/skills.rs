@@ -15,6 +15,12 @@ use crate::{
 
 use super::sprint::SprintUpgrade;
 
+pub enum SkillClass {
+    Melee,
+    Rogue,
+    Magic,
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
 pub enum Skill {
     // Passives
@@ -28,6 +34,8 @@ pub enum Skill {
     AttackSpeed,
     CritLoot,
     DodgeChance,
+    Defence,
+    AttackDamage,
 
     // On-Attack Triggers
     FireDamage,
@@ -83,6 +91,59 @@ pub enum Skill {
 }
 
 impl Skill {
+    pub fn get_class(&self) -> SkillClass {
+        match self {
+            Skill::CritChance => SkillClass::Rogue,
+            Skill::CritDamage => SkillClass::Rogue,
+            Skill::Health => SkillClass::Melee,
+            Skill::Thorns => SkillClass::Rogue,
+            Skill::Lifesteal => SkillClass::Melee,
+            Skill::Speed => SkillClass::Rogue,
+            Skill::AttackSpeed => SkillClass::Rogue,
+            Skill::CritLoot => SkillClass::Rogue,
+            Skill::DodgeChance => SkillClass::Rogue,
+            Skill::AttackDamage => SkillClass::Melee,
+            Skill::Defence => SkillClass::Melee,
+            Skill::FireDamage => SkillClass::Melee,
+            Skill::WaveAttack => SkillClass::Melee,
+            Skill::FrailStacks => SkillClass::Melee,
+            Skill::SlowStacks => SkillClass::Magic,
+            Skill::PoisonStacks => SkillClass::Rogue,
+            Skill::LethalBlow => SkillClass::Melee,
+            Skill::Teleport => SkillClass::Magic,
+            Skill::TeleportShock => SkillClass::Magic,
+            Skill::TeleportCooldown => SkillClass::Magic,
+            Skill::TeleportCount => SkillClass::Magic,
+            Skill::TeleportManaSteal => SkillClass::Magic,
+            Skill::Sprint => SkillClass::Rogue,
+            Skill::SprintFaster => SkillClass::Rogue,
+            Skill::SprintStartupFaster => SkillClass::Rogue,
+            Skill::SprintLunge => SkillClass::Rogue,
+            Skill::SprintLungeDamage => SkillClass::Rogue,
+            Skill::SprintLungePierce => SkillClass::Rogue,
+            Skill::SprintKillReset => SkillClass::Rogue,
+            Skill::DashDeflectProj => SkillClass::Melee,
+            Skill::DashInvulnerable => SkillClass::Melee,
+            Skill::DashFurther => SkillClass::Melee,
+            Skill::DashCount => SkillClass::Melee,
+            Skill::DashKnockback => SkillClass::Melee,
+            Skill::DaggerCombo => SkillClass::Rogue,
+            Skill::RegenHPFaster => SkillClass::Melee,
+            Skill::RegenMPFaster => SkillClass::Magic,
+            Skill::OnHitAoEBurst => SkillClass::Melee,
+            Skill::SplitDamage => SkillClass::Rogue,
+            Skill::Knockback => SkillClass::Melee,
+            Skill::DiscountMP => SkillClass::Magic,
+            Skill::MinusOneDamageOnHit => SkillClass::Melee,
+            Skill::ChanceToNotConsumeAmmo => SkillClass::Rogue,
+            Skill::ClawDoubleThrow => SkillClass::Rogue,
+            Skill::BowMultiShot => SkillClass::Rogue,
+            Skill::ChainLightning => SkillClass::Magic,
+            Skill::FireStaffAoE => SkillClass::Magic,
+            Skill::BowArrowSpeed => SkillClass::Rogue,
+            Skill::TimeSlow => SkillClass::Magic,
+        }
+    }
     pub fn get_title(&self) -> String {
         match self {
             Skill::CritChance => "Keen Eyes".to_string(),
@@ -285,6 +346,7 @@ impl Skill {
 pub struct SkillChoiceState {
     pub skill: Skill,
     pub child_skills: Vec<SkillChoiceState>,
+    pub clashing_skills: Vec<Skill>,
     pub is_one_time_skill: bool,
 }
 impl SkillChoiceState {
@@ -292,6 +354,7 @@ impl SkillChoiceState {
         Self {
             skill,
             child_skills: Default::default(),
+            clashing_skills: Default::default(),
             is_one_time_skill: true,
         }
     }
@@ -301,6 +364,10 @@ impl SkillChoiceState {
     }
     pub fn set_repeatable(mut self) -> Self {
         self.is_one_time_skill = false;
+        self
+    }
+    pub fn with_clashing(mut self, clashing: Vec<Skill>) -> Self {
+        self.clashing_skills = clashing;
         self
     }
 }
@@ -316,11 +383,13 @@ impl Default for SkillChoiceQueue {
         Self {
             queue: Default::default(),
             pool: vec![
-                SkillChoiceState::new(Skill::Sprint).with_children(vec![
-                    SkillChoiceState::new(Skill::SprintFaster),
-                    SkillChoiceState::new(Skill::SprintLunge)
-                        .with_children(vec![SkillChoiceState::new(Skill::SprintKillReset)]),
-                ]),
+                SkillChoiceState::new(Skill::Sprint)
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::SprintFaster),
+                        SkillChoiceState::new(Skill::SprintLunge)
+                            .with_children(vec![SkillChoiceState::new(Skill::SprintKillReset)]),
+                    ])
+                    .with_clashing(vec![Skill::Teleport]),
                 SkillChoiceState::new(Skill::CritChance)
                     .set_repeatable()
                     .with_children(vec![
@@ -345,10 +414,12 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::FireDamage),
                 SkillChoiceState::new(Skill::SlowStacks),
                 SkillChoiceState::new(Skill::PoisonStacks),
-                SkillChoiceState::new(Skill::Teleport).with_children(vec![
-                    SkillChoiceState::new(Skill::TeleportShock),
-                    // SkillChoiceState::new(Skill::TimeSlow),
-                ]),
+                SkillChoiceState::new(Skill::Teleport)
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::TeleportShock),
+                        // SkillChoiceState::new(Skill::TimeSlow),
+                    ])
+                    .with_clashing(vec![Skill::Sprint]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),
                 SkillChoiceState::new(Skill::BowMultiShot)
                     .with_children(vec![SkillChoiceState::new(Skill::BowArrowSpeed)]),
@@ -387,9 +458,12 @@ impl SkillChoiceQueue {
         proto_commands: &mut ProtoCommands,
         proto: &ProtoParam,
         player_pos: Vec2,
-        player_skills: PlayerSkills,
+        player_skills: &mut PlayerSkills,
         player_level: u8,
     ) {
+        player_skills.skills.push(skill.skill.clone());
+        player_skills.increment_class_count(skill.skill.clone());
+
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
         for choice in remaining_choices.iter() {
@@ -399,6 +473,9 @@ impl SkillChoiceQueue {
             if !player_skills.skills.contains(&child.skill) {
                 self.pool.push(child.clone());
             }
+        }
+        for clash in skill.clashing_skills.iter() {
+            self.pool.retain(|x| x.skill != *clash);
         }
         // handle drops
         if let Some((drop, count)) = skill.skill.get_instant_drop() {
@@ -420,6 +497,9 @@ impl SkillChoiceQueue {
 #[derive(Component, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub skills: Vec<Skill>,
+    pub melee_skill_count: usize,
+    pub rogue_skill_count: usize,
+    pub magic_skill_count: usize,
 }
 
 impl PlayerSkills {
@@ -428,5 +508,27 @@ impl PlayerSkills {
     }
     pub fn get_count(&self, skill: Skill) -> i32 {
         self.skills.iter().filter(|&s| *s == skill).count() as i32
+    }
+    pub fn get_class_affinity(&self) -> SkillClass {
+        //return the highest count class
+        let (melee, rogue, magic) = (
+            self.melee_skill_count,
+            self.rogue_skill_count,
+            self.magic_skill_count,
+        );
+        if melee >= rogue && melee >= magic {
+            SkillClass::Melee
+        } else if rogue >= melee && rogue >= magic {
+            SkillClass::Rogue
+        } else {
+            SkillClass::Magic
+        }
+    }
+    pub fn increment_class_count(&mut self, skill: Skill) {
+        match skill.get_class() {
+            SkillClass::Melee => self.melee_skill_count += 1,
+            SkillClass::Rogue => self.rogue_skill_count += 1,
+            SkillClass::Magic => self.magic_skill_count += 1,
+        }
     }
 }

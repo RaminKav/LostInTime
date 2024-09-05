@@ -775,13 +775,13 @@ pub fn handle_cursor_skills_buttons(
                     if left_mouse_pressed {
                         let (e, mut skills, t, level) = player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
-                        skills.skills.push(picked_skill.skill.clone());
+
                         skill_queue.handle_pick_skill(
                             picked_skill.clone(),
                             &mut proto_commands,
                             &proto,
                             t.translation().truncate(),
-                            skills.clone(),
+                            &mut skills,
                             level.level,
                         );
                         picked_skill.skill.add_skill_components(e, &mut commands);

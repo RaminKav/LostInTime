@@ -14,6 +14,7 @@ use crate::{
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     client::GameOverEvent,
     colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
+    inputs::move_player,
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType, WorldObject},
     player::{
@@ -1127,7 +1128,7 @@ impl Plugin for AttributesPlugin {
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_sprite_with_equipment_removed,
-                    handle_item_abilitiy_on_attack,
+                    handle_item_abilitiy_on_attack.after(move_player),
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )

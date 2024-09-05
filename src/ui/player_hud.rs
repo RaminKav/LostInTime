@@ -1,8 +1,8 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use super::{
-    interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon, InventorySlotType,
-    InventoryState, InventoryUI, UIElement, UIState,
+    damage_numbers::spawn_text, interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon,
+    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
@@ -399,12 +399,40 @@ pub fn update_foodbar(
 #[derive(Component, Eq, PartialEq)]
 pub struct SkillHudIcon(pub Skill);
 
+#[derive(Component)]
+pub struct SkillClassText;
+
+pub fn setup_skills_class_text(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
+) {
+    let text = spawn_text(
+        &mut commands,
+        &asset_server,
+        Vec3::new(
+            -res.game_width / 2. + 98.,
+            (GAME_HEIGHT - 15.) / 2. - 28.5,
+            6.,
+        ),
+        BLACK,
+        "R: , G: , B: ".to_string(),
+        Anchor::Center,
+        1.,
+        3,
+    );
+    commands
+        .entity(text)
+        .insert(Name::new("SKILLS CLASS TEXT"))
+        .insert(SkillClassText);
+}
 pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     mut prev_icons_tracker: Local<PlayerSkills>,
     res: Res<ScreenResolution>,
+    mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
 ) {
     if let Ok(new_skills) = player_skills.get_single() {
         for (i, skill) in new_skills.skills.clone().iter().enumerate() {
@@ -450,6 +478,14 @@ pub fn handle_update_player_skills(
                 })
                 .insert(RenderLayers::from_layers(&[3]))
                 .set_parent(icon);
+
+            let mut text = skill_class_text.single_mut();
+            text.sections[0].value = format!(
+                "R: {:} G: {:?} B: {:?}",
+                new_skills.melee_skill_count,
+                new_skills.rogue_skill_count,
+                new_skills.magic_skill_count
+            );
         }
     }
 }

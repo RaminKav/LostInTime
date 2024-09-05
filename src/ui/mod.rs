@@ -116,6 +116,7 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     setup_hotbar_hud,
+                    setup_skills_class_text,
                     setup_xp_bar_ui.after(load_state),
                     setup_bars_ui.after(load_state),
                     setup_currency_ui,
