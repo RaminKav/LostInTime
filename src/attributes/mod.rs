@@ -1,3 +1,4 @@
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use item_abilities::handle_item_abilitiy_on_attack;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -9,7 +10,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 pub mod health_regen;
 pub mod modifiers;
 use crate::{
-    animations::AnimatedTextureMaterial,
+    animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
     client::GameOverEvent,
@@ -40,6 +41,7 @@ pub mod item_abilities;
 use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
 
+aseprite!(pub RarityGlows, "textures/effects/RarityGlows.aseprite");
 #[derive(Resource, Reflect, Default, Bundle)]
 pub struct BlockAttributeBundle {
     pub health: CurrentHealth,
@@ -1334,8 +1336,10 @@ fn handle_new_items_raw_attributes(
         Or<(Added<RawItemBaseAttributes>, Added<RawItemBonusAttributes>)>,
     >,
     graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
+        println!("GOT NEW ITEM");
         let rarity = get_rarity_rng(rand::thread_rng());
         add_item_glows(&mut commands, &graphics, e, rarity.clone());
 
@@ -1348,6 +1352,29 @@ fn handle_new_items_raw_attributes(
             item_level.map(|l| l.0),
         );
 
+        if new_stack.rarity.clone() == ItemRarity::Rare {
+            commands
+                .spawn(AsepriteBundle {
+                    aseprite: asset_server.load(RarityGlows::PATH),
+                    animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    ..Default::default()
+                })
+                .insert(VisibilityBundle::default())
+                .insert(DoneAnimation)
+                .set_parent(e);
+        } else if new_stack.rarity.clone() == ItemRarity::Legendary {
+            commands
+                .spawn(AsepriteBundle {
+                    aseprite: asset_server.load(RarityGlows::PATH),
+                    animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    ..Default::default()
+                })
+                .insert(VisibilityBundle::default())
+                .insert(DoneAnimation)
+                .set_parent(e);
+        }
         commands.entity(e).insert(new_stack);
     }
 }

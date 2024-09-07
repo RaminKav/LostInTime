@@ -8,6 +8,7 @@ use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
+use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{handle_game_over_fadeout, tick_game_over_overlay};
@@ -112,6 +113,7 @@ impl Plugin for AnimationsPlugin {
                     handle_anim_change_when_player_dir_changes,
                     handle_player_animation_change,
                     cleanup_one_time_animations,
+                    handle_cleanup_one_time_aseprite_animations,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -395,6 +397,17 @@ fn animate_foliage_opacity(
                 asset_server.load::<Image, _>(format!("{}.png", obj.to_string().to_lowercase())),
             );
             // sprite.color = sprite.color.with_a(1.0);
+        }
+    }
+}
+
+pub fn handle_cleanup_one_time_aseprite_animations(
+    anims: Query<(Entity, &AsepriteAnimation), With<DoneAnimation>>,
+    mut commands: Commands,
+) {
+    for (e, anim) in anims.iter() {
+        if anim.just_finished() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }
