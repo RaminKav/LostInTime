@@ -15,14 +15,12 @@ use bevy_ecs_tilemap::{
 };
 use bevy_proto::prelude::ProtoCommands;
 use bevy_save::prelude::*;
-use itertools::Itertools;
 use rand::Rng;
 pub mod analytics;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    assets::SpriteAnchor,
     attributes::{hunger::Hunger, CurrentHealth},
     container::{Container, ContainerRegistry},
     datafiles,
@@ -265,7 +263,6 @@ pub fn save_state(
         (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
     >,
     mut save_data: ResMut<CurrentRunSaveData>,
-    proto_param: ProtoParam,
     player_data: Query<
         (
             &GlobalTransform,
@@ -314,45 +311,9 @@ pub fn save_state(
     save_data.player_skill_queue = skills_queue.clone();
     save_data.currency = currency.time_fragments;
 
-    save_data.placed_objs = game
-        .era
-        .era_generation_cache
-        .iter()
-        .map(|(_, c)| c.objects.clone())
-        .collect();
+    save_data.placed_objs = vec![game.world_obj_cache.objects.clone()];
 
-    let curr_era_objs = placed_objs
-        .iter()
-        .map(|(p, w, _, _)| {
-            let anchor = proto_param
-                .get_component::<SpriteAnchor, _>(*w)
-                .unwrap_or(&SpriteAnchor(Vec2::ZERO));
-            (
-                world_pos_to_tile_pos(p.translation().truncate() - anchor.0),
-                *w,
-            )
-        })
-        .map_into()
-        .collect();
-    if (save_data.placed_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
-        // we are in the newest era and have not saved it in EraManager yet
-        save_data.placed_objs.push(curr_era_objs);
-    } else {
-        save_data.placed_objs[game.era.current_era.index()] = curr_era_objs;
-    }
-
-    save_data.unique_objs = game
-        .era
-        .era_generation_cache
-        .iter()
-        .map(|(_e, c)| c.unique_objs.clone())
-        .collect();
-    let curr_era_unique_objs = game.world_obj_cache.unique_objs.clone();
-    if (save_data.unique_objs.len() as i32) - 1 < game.era.current_era.index() as i32 {
-        save_data.unique_objs.push(curr_era_unique_objs);
-    } else {
-        save_data.unique_objs[game.era.current_era.index()] = curr_era_unique_objs;
-    }
+    save_data.unique_objs = vec![game.world_obj_cache.unique_objs.clone()];
 
     // chain the current chests, and also the ones in registry,
     // since they will be despawned and missed by the query

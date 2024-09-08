@@ -279,7 +279,7 @@ pub fn move_player(
     //TODO: move this tick to animations.rs
     if !skills.has(Skill::Teleport)
         && !skills.has(Skill::Sprint)
-        && player.player_dash_cooldown.tick(time.delta()).finished()
+        && player.player_dash_cooldown.finished()
         && key_input.pressed(KeyCode::Space)
     {
         player.is_dashing = true;
@@ -362,14 +362,27 @@ pub fn move_player(
         commands.entity(player_e).insert(PlayerAnimation::Idle);
     }
 }
-pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
+pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>, skills: Query<&PlayerSkills>) {
     let player = game.player_mut();
+    let skills = skills.single();
     if player.is_dashing {
         player.player_dash_duration.tick(time.delta());
         if player.player_dash_duration.just_finished() {
             player.player_dash_duration.reset();
             player.is_dashing = false;
         }
+    } else {
+        let d = time.delta();
+        player
+            .player_dash_cooldown
+            .tick(if skills.has(Skill::TeleportCooldown) {
+                Duration::new(
+                    (d.as_secs() as f32 * 0.75) as u64,
+                    (d.subsec_nanos() as f32 * 0.75) as u32,
+                )
+            } else {
+                d
+            });
     }
 }
 pub fn close_container(
@@ -617,7 +630,7 @@ pub fn mouse_click_system(
                 cursor_pos.ui_coords
             );
         }
-        if attack_timer_option.is_some() {
+        if attack_timer_option.is_some() || player_anim.is_one_time_anim() {
             return;
         }
         let mut main_hand_option = None;
@@ -646,22 +659,20 @@ pub fn mouse_click_system(
             })
         }
         let mut did_attack = false;
-        if !player_anim.is_one_time_anim() {
-            if let Some(main_hand) = main_hand_option {
-                if main_hand == WorldObject::WoodBow {
-                    commands.entity(player_e).insert(PlayerAnimation::Bow);
-                    attack_event.send(AttackEvent {
-                        direction,
-                        ignore_cooldown: false,
-                    });
-                } else {
-                    if !player_anim.is_sprinting() {
-                        did_attack = true;
-                    }
+        if let Some(main_hand) = main_hand_option {
+            if main_hand == WorldObject::WoodBow {
+                commands.entity(player_e).insert(PlayerAnimation::Bow);
+                attack_event.send(AttackEvent {
+                    direction,
+                    ignore_cooldown: false,
+                });
+            } else {
+                if !player_anim.is_sprinting() {
+                    did_attack = true;
                 }
-            } else if !player_anim.is_sprinting() {
-                did_attack = true;
             }
+        } else if !player_anim.is_sprinting() {
+            did_attack = true;
         }
         if did_attack {
             commands.entity(player_e).insert(PlayerAnimation::Attack);

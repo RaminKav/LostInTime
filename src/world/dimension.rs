@@ -78,7 +78,7 @@ impl Era {
         match index {
             0 => Era::Main,
             1 => Era::Second,
-            _ => panic!("Invalid Era index"),
+            i => panic!("Invalid Era index:{}", i),
         }
     }
 }

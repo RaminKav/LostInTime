@@ -243,10 +243,10 @@ pub fn spawn_floating_text_with_shadow(
         let entity = spawn_text(
             commands,
             asset_server,
-            pos + if i == 0 {
+            if i == 0 {
                 Vec3::new(1., -1., -1.)
             } else {
-                Vec3::ZERO
+                pos + Vec3::ZERO
             },
             if i == 0 { BLACK } else { color },
             text.clone(),
@@ -256,11 +256,15 @@ pub fn spawn_floating_text_with_shadow(
         );
         if i == 0 {
             shadow_e = entity;
+        } else {
+            commands
+                .entity(entity)
+                .insert(DamageNumber {
+                    timer: Timer::from_seconds(0.85, TimerMode::Once),
+                    velocity: 0.,
+                })
+                .add_child(shadow_e);
         }
-        commands.entity(entity).insert(DamageNumber {
-            timer: Timer::from_seconds(0.85, TimerMode::Once),
-            velocity: 0.,
-        });
     }
     shadow_e
 }

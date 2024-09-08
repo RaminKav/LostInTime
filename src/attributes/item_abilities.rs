@@ -1,24 +1,13 @@
-use std::f32::consts::PI;
-
 use bevy::prelude::*;
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_rapier2d::prelude::KinematicCharacterController;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    animations::{player_sprite::PlayerAnimation, AttackEvent},
-    combat_helpers::spawn_temp_collider,
-    inputs::MovementVector,
-    item::{
-        projectile::{Projectile, RangedAttackEvent},
-        WorldObject,
-    },
+    animations::AttackEvent,
+    item::projectile::{Projectile, RangedAttackEvent},
     player::{
         skills::{PlayerSkills, Skill},
-        MovePlayerEvent, Player,
+        Player,
     },
-    proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     GameParam,
 };
 
@@ -45,83 +34,11 @@ impl Default for ItemAbility {
 pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut move_player: EventWriter<MovePlayerEvent>,
-    mut player: Query<
-        (
-            Entity,
-            &GlobalTransform,
-            &PlayerSkills,
-            &mut MovementVector,
-            &Attack,
-            &AsepriteAnimation,
-            &mut KinematicCharacterController,
-        ),
-        With<Player>,
-    >,
-    key_input: ResMut<Input<KeyCode>>,
-    mut game: GameParam,
-    proto_param: ProtoParam,
-    time: Res<Time>,
-    mut commands: Commands,
-    mut teleported: Local<bool>,
+    mut player: Query<(&PlayerSkills, &Attack), With<Player>>,
+    game: GameParam,
 ) {
-    let (e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc) = player.single_mut();
+    let (skills, dmg) = player.single_mut();
 
-    let player = game.player_mut();
-    if skills.has(Skill::Teleport)
-        && player.player_dash_cooldown.tick(time.delta()).finished()
-        && key_input.just_pressed(KeyCode::Space)
-    {
-        commands.entity(e).insert(PlayerAnimation::Teleport);
-        player.player_dash_cooldown.reset();
-    }
-
-    if move_direction.0.length() != 0. && aseprite.current_frame() == 136 && !*teleported {
-        *teleported = true;
-        let player_pos = player_pos.translation();
-        let direction = move_direction.0.normalize();
-        let distance = direction * 2.5 * TILE_SIZE.x;
-        let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
-        if let Some(tile_data) = game.get_tile_data(pos) {
-            if tile_data.block_type.contains(&WorldObject::WaterTile) {
-                return;
-            }
-        }
-        if let Some((_, obj)) = game.get_obj_entity_at_tile(pos, &proto_param) {
-            if obj.is_tree() || obj.is_wall() {
-                return;
-            }
-        }
-
-        if skills.has(Skill::TeleportShock) {
-            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-            spawn_temp_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::new(
-                    player_pos.x + (distance.x / 2.),
-                    player_pos.y + (distance.y / 2.),
-                    0.,
-                ))
-                .with_rotation(Quat::from_rotation_z(angle)),
-                Vec2::new(16., 3. * TILE_SIZE.x),
-                0.5,
-                dmg.0 / 5,
-            )
-        }
-        info!(
-            "Teleport {pos:?} {player_pos:?} | {:?} {:?}",
-            player_pos.truncate() + distance,
-            distance
-        );
-
-        move_player.send(MovePlayerEvent { pos });
-    }
-    if aseprite.current_frame() >= 129 && aseprite.current_frame() <= 135 {
-        move_direction.0 = Vec2::ZERO;
-        kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
-    } else if aseprite.current_frame() == 137 {
-        *teleported = false;
-    }
     let Some(main_hand) = game.player().main_hand_slot else {
         return;
     };

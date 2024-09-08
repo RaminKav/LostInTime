@@ -696,7 +696,9 @@ impl ItemAttributes {
             entity.remove::<AttackCooldown>();
         }
 
-        entity.insert(Attack(self.attack.value));
+        entity.insert(Attack(
+            self.attack.value + skills.get_count(Skill::Attack) * 5,
+        ));
         entity.insert(CritChance(
             self.crit_chance.value + skills.get_count(Skill::CritChance) * 10,
         ));
@@ -704,7 +706,9 @@ impl ItemAttributes {
             self.crit_damage.value + skills.get_count(Skill::CritDamage) * 15,
         ));
         entity.insert(BonusDamage(self.bonus_damage.value));
-        entity.insert(HealthRegen(self.health_regen.value));
+        entity.insert(HealthRegen(
+            self.health_regen.value + skills.get_count(Skill::HPRegen) * 5,
+        ));
         entity.insert(Healing(self.healing.value));
         entity.insert(Thorns(
             self.thorns.value + skills.get_count(Skill::Thorns) * 15,
@@ -719,7 +723,9 @@ impl ItemAttributes {
         entity.insert(Lifesteal(
             self.lifesteal.value + skills.get_count(Skill::Lifesteal) * 10,
         ));
-        entity.insert(Defence(self.defence.value));
+        entity.insert(Defence(
+            self.defence.value + skills.get_count(Skill::Defence) * 10,
+        ));
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(self.loot_rate.value));
     }

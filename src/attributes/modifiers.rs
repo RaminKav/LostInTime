@@ -1,4 +1,4 @@
-use crate::player::Player;
+use crate::{colors::BLUE, player::Player, ui::damage_numbers::spawn_floating_text_with_shadow};
 
 use super::{CurrentHealth, Healing, Mana};
 
@@ -19,13 +19,24 @@ pub struct ModifyManaEvent(pub i32);
 
 pub fn handle_modify_mana_event(
     mut event: EventReader<ModifyManaEvent>,
-    mut query: Query<&mut Mana, With<Player>>,
+    mut query: Query<(&mut Mana, &GlobalTransform), With<Player>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
 ) {
     for event in event.iter() {
-        let mut mana = query.single_mut();
+        let (mut mana, player_t) = query.single_mut();
         if mana.current == mana.max && event.0 > 0 {
             return;
         }
         mana.current += event.0;
+        if event.0 > 0 {
+            spawn_floating_text_with_shadow(
+                &mut commands,
+                &asset_server,
+                player_t.translation() + Vec3::new(0., 15., 0.),
+                BLUE,
+                format!("+{} MP", event.0),
+            );
+        }
     }
 }

@@ -35,7 +35,7 @@ pub enum Skill {
     CritLoot,
     DodgeChance,
     Defence,
-    AttackDamage,
+    Attack,
 
     // On-Attack Triggers
     FireDamage,
@@ -50,7 +50,7 @@ pub enum Skill {
     TeleportShock,
     TeleportCooldown,
     TeleportCount,
-    TeleportManaSteal,
+    TeleportManaRegen,
 
     Sprint,
     SprintFaster,
@@ -67,8 +67,9 @@ pub enum Skill {
     DashKnockback,
     DaggerCombo,
 
-    RegenHPFaster,
-    RegenMPFaster,
+    HPRegen,
+    MPRegen,
+    MPRegenCooldown,
     OnHitAoEBurst,
     SplitDamage,
     Knockback,
@@ -102,7 +103,7 @@ impl Skill {
             Skill::AttackSpeed => SkillClass::Rogue,
             Skill::CritLoot => SkillClass::Rogue,
             Skill::DodgeChance => SkillClass::Rogue,
-            Skill::AttackDamage => SkillClass::Melee,
+            Skill::Attack => SkillClass::Melee,
             Skill::Defence => SkillClass::Melee,
             Skill::FireDamage => SkillClass::Melee,
             Skill::WaveAttack => SkillClass::Melee,
@@ -114,7 +115,7 @@ impl Skill {
             Skill::TeleportShock => SkillClass::Magic,
             Skill::TeleportCooldown => SkillClass::Magic,
             Skill::TeleportCount => SkillClass::Magic,
-            Skill::TeleportManaSteal => SkillClass::Magic,
+            Skill::TeleportManaRegen => SkillClass::Magic,
             Skill::Sprint => SkillClass::Rogue,
             Skill::SprintFaster => SkillClass::Rogue,
             Skill::SprintStartupFaster => SkillClass::Rogue,
@@ -128,8 +129,8 @@ impl Skill {
             Skill::DashCount => SkillClass::Melee,
             Skill::DashKnockback => SkillClass::Melee,
             Skill::DaggerCombo => SkillClass::Rogue,
-            Skill::RegenHPFaster => SkillClass::Melee,
-            Skill::RegenMPFaster => SkillClass::Magic,
+            Skill::HPRegen => SkillClass::Melee,
+            Skill::MPRegen => SkillClass::Magic,
             Skill::OnHitAoEBurst => SkillClass::Melee,
             Skill::SplitDamage => SkillClass::Rogue,
             Skill::Knockback => SkillClass::Melee,
@@ -142,6 +143,7 @@ impl Skill {
             Skill::FireStaffAoE => SkillClass::Magic,
             Skill::BowArrowSpeed => SkillClass::Rogue,
             Skill::TimeSlow => SkillClass::Magic,
+            Skill::MPRegenCooldown => SkillClass::Magic,
         }
     }
     pub fn get_title(&self) -> String {

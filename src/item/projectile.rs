@@ -4,12 +4,16 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    attributes::{modifiers::ModifyManaEvent, Attack, Mana},
+    attributes::{modifiers::ModifyManaEvent, Attack, Mana, ManaRegen},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
     inventory::Inventory,
-    player::Player,
+    player::{
+        skills::{PlayerSkills, Skill},
+        teleport::JustTeleported,
+        Player,
+    },
     proto::proto_param::ProtoParam,
     GameParam, GameState,
 };
@@ -125,7 +129,17 @@ pub struct ProjectileSpawnMarker {
 
 fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
-    player_query: Query<(Entity, &Mana, Option<&AttackTimer>), With<Player>>,
+    player_query: Query<
+        (
+            Entity,
+            &Mana,
+            &ManaRegen,
+            &PlayerSkills,
+            Option<&AttackTimer>,
+            Option<&JustTeleported>,
+        ),
+        With<Player>,
+    >,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     game: GameParam,
     proto: ProtoParam,
@@ -134,7 +148,8 @@ fn handle_ranged_attack_event(
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
     for proj_event in events.iter() {
-        let (_player_e, mana, player_cooldown) = player_query.single();
+        let (_player_e, mana, mana_regen, skills, player_cooldown, teleported_option) =
+            player_query.single();
         // if proj is from the player, check if the player is on cooldown
         if proj_event.from_enemy.is_none()
             && player_cooldown.is_some()
@@ -182,6 +197,12 @@ fn handle_ranged_attack_event(
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
         });
+
+        if teleported_option.is_some() {
+            modify_mana_event.send(ModifyManaEvent(
+                mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
+            ));
+        }
     }
 }
 fn handle_translate_projectiles(

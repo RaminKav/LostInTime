@@ -698,7 +698,7 @@ impl GenerationPlugin {
                             }
                         }
                     }
-                    // only spawn if generated obj_to_clear is in our chunk or a previously genereated chunk,
+                    // only spawn if generated obj is in our chunk or a previously genereated chunk,
                     // otherwise cache it for the correct chunk to spawn
                     let obj_e = if pos.chunk_pos == chunk_pos
                         || game.is_chunk_generated(pos.chunk_pos)
