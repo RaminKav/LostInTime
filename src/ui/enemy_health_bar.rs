@@ -69,27 +69,7 @@ pub fn handle_enemy_health_bar_change(
         }
     }
 }
-pub fn handle_enemy_health_visibility(
-    changed_mobs: Query<
-        (&Children, &MaxHealth, &CurrentHealth),
-        (With<Mob>, Changed<CurrentHealth>),
-    >,
-    healthbars: Query<&mut Visibility, Without<Text>>,
-) {
-    return;
-    for (children, max_health, current_health) in changed_mobs.iter_mut() {
-        for child in children.iter() {
-            let Ok(mut v) = healthbars.get_mut(*child) else {
-                continue;
-            };
-            if current_health.0 == max_health.0 {
-                *v = Visibility::Hidden;
-            } else {
-                *v = Visibility::Inherited;
-            }
-        }
-    }
-}
+
 pub fn add_ui_icon_for_elite_mobs(
     elites: Query<Entity, Added<EliteMob>>,
     mut commands: Commands,

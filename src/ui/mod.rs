@@ -130,7 +130,6 @@ impl Plugin for UIPlugin {
                     handle_flash_bars,
                     update_xp_bar,
                     handle_enemy_health_bar_change,
-                    handle_enemy_health_visibility,
                     add_ui_icon_for_elite_mobs,
                     handle_add_dodge_text,
                     tick_damage_numbers,
