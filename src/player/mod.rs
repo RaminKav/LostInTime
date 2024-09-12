@@ -142,7 +142,7 @@ impl Plugin for PlayerPlugin {
         )
         .add_systems(
             (handle_echo_after_heal.before(handle_add_damage_numbers_after_hit),)
-                .in_set(OnUpdate(GameState::Main)),
+                .in_base_set(CoreSet::PostUpdate),
         )
         .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
         .add_system(handle_move_player.before(CustomFlush))
