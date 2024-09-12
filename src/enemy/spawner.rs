@@ -230,7 +230,7 @@ fn add_spawners_to_new_chunks(
     }
 }
 
-fn handle_add_fairy_spawners(
+fn _handle_add_fairy_spawners(
     mut chunk_query: Query<(&Chunk, &mut ChunkSpawners)>,
     new_day_event: EventReader<NewDayEvent>,
     player_pos: Query<&GlobalTransform, With<Player>>,

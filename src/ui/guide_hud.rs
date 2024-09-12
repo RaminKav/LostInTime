@@ -22,7 +22,7 @@ pub struct CurrentGoal {
     pub goal: WorldObject,
 }
 
-pub fn init_starting_goal(commands: Commands) {
+pub fn init_starting_goal(_commands: Commands) {
     // commands.insert_resource(CurrentGoal {
     //     goal: WorldObject::WoodAxe,
     // });
@@ -59,7 +59,7 @@ pub fn handle_display_new_goal(
         3,
     );
 
-    let slot_entity = commands
+    let _slot_entity = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
             transform: Transform::from_translation(Vec3::new(-170., -100., 0.)),
@@ -84,7 +84,7 @@ pub fn handle_display_new_goal(
             Vec2::new(0., 0.),
             3,
         );
-        let slot_entity = commands
+        let _slot_entity = commands
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
                 transform: Transform::from_translation(Vec3::new(
@@ -108,7 +108,7 @@ pub fn handle_display_new_goal(
 pub fn handle_update_goal_progress(
     inv: Query<&Inventory, Changed<Inventory>>,
     mut commands: Commands,
-    recipes: Res<Recipes>,
+    _recipes: Res<Recipes>,
     curr_goal: Res<CurrentGoal>,
     icons: Query<Entity, With<GoalIcons>>,
 ) {

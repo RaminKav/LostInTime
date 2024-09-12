@@ -7,7 +7,7 @@ use crate::{
         Dodge, Healing, HealthRegen, ItemAttributes, ItemRarity, Lifesteal, LootRateBonus,
         MaxHealth, RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
     },
-    colors::{BLACK, DARK_GREEN, GREY, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
+    colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED},
     inventory::ItemStack,
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -609,55 +609,6 @@ pub fn handle_spawn_inv_player_stats(
     }
 }
 
-fn get_color_from_stat_hover(i: usize, stat: &Option<StatType>) -> Color {
-    if let Some(stat) = stat {
-        match stat {
-            &StatType::STR => {
-                if i == 2 {
-                    return DARK_GREEN;
-                }
-                if i == 5 {
-                    return LIGHT_GREEN;
-                }
-            }
-            &StatType::DEX => {
-                if i == 2 {
-                    return LIGHT_GREEN;
-                }
-                if i == 4 {
-                    return DARK_GREEN;
-                }
-                if i == 5 {
-                    return DARK_GREEN;
-                }
-            }
-            &StatType::AGI => {
-                if i == 2 {
-                    return LIGHT_GREEN;
-                }
-                if i == 9 {
-                    return DARK_GREEN;
-                }
-                if i == 10 {
-                    return DARK_GREEN;
-                }
-            }
-            &StatType::VIT => {
-                if i == 2 {
-                    return LIGHT_GREEN;
-                }
-                if i == 1 {
-                    return DARK_GREEN;
-                }
-                if i == 6 {
-                    return DARK_GREEN;
-                }
-            }
-        }
-    }
-    LIGHT_RED
-}
-
 pub fn get_num_stars(
     score: f32,
     total_atts: f32,
@@ -670,11 +621,11 @@ pub fn get_num_stars(
     } else {
         3.
     };
-    if score >= 0.87 {
+    if score >= 0.85 {
         num_stars = 3.;
-    } else if score > 0.7 {
+    } else if score > 0.65 {
         num_stars = 2.;
-    } else if score > 0.45 {
+    } else if score > 0.42 {
         num_stars = 1.;
     }
     f32::min(f32::min(num_stars, max_possible_stars), 3.) as usize

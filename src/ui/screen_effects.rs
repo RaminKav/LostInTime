@@ -66,7 +66,7 @@ pub struct ScreenEffectMaterial {
     pub source_texture: Option<Handle<Image>>,
 }
 
-pub fn setup_screen_effects(
+pub fn _setup_screen_effects(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -114,7 +114,7 @@ pub fn setup_screen_effects(
     ));
 }
 
-pub fn handle_add_screen_effects(
+pub fn _handle_add_screen_effects(
     hp: Query<
         (&CurrentHealth, &MaxHealth, &Hunger),
         (With<Player>, Or<(Changed<CurrentHealth>, Changed<Hunger>)>),

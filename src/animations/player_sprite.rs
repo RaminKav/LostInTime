@@ -24,7 +24,6 @@ pub enum PlayerAnimation {
     Roll,
     Parry,
     Attack,
-    Sprint,
     Bow,
     Lunge,
     RunAttack,
@@ -42,7 +41,6 @@ impl PlayerAnimation {
             PlayerAnimation::Roll => format!("Roll{}", dir_str),
             PlayerAnimation::Parry => format!("Parry{}", dir_str),
             PlayerAnimation::Attack => format!("Attack2{}", dir_str),
-            PlayerAnimation::Sprint => format!("Sprint{}", dir_str),
             PlayerAnimation::Bow => format!("Bow{}", dir_str),
             PlayerAnimation::Lunge => format!("Lunge{}", dir_str),
             PlayerAnimation::RunAttack => format!("RunAttack{}", dir_str),
@@ -56,7 +54,6 @@ impl PlayerAnimation {
             PlayerAnimation::Roll => true,
             PlayerAnimation::Parry => true,
             PlayerAnimation::Attack => true,
-            PlayerAnimation::Sprint => true,
             PlayerAnimation::Lunge => true,
             PlayerAnimation::Bow => true,
             PlayerAnimation::RunAttack => true,
@@ -65,35 +62,22 @@ impl PlayerAnimation {
             _ => false,
         }
     }
-    pub fn is_attacking(&self) -> bool {
-        self == &PlayerAnimation::Attack
-    }
+
     pub fn is_movement_restricting(&self) -> bool {
         self == &PlayerAnimation::Attack || self == &PlayerAnimation::Bow
     }
-    pub fn is_run_attacking(&self) -> bool {
-        self == &PlayerAnimation::RunAttack
-            || self == &PlayerAnimation::RunAttack1
-            || self == &PlayerAnimation::RunAttack2
-    }
-    pub fn is_teleporting(&self) -> bool {
-        self == &PlayerAnimation::Teleport
-    }
+
     pub fn is_sprinting(&self) -> bool {
         self == &PlayerAnimation::Run
     }
     pub fn is_lunging(&self) -> bool {
         self == &PlayerAnimation::Lunge
     }
-    pub fn is_rolling(&self) -> bool {
-        self == &PlayerAnimation::Roll
-    }
+
     pub fn is_walking(&self) -> bool {
         self == &PlayerAnimation::Walk
     }
-    pub fn is_idling(&self) -> bool {
-        self == &PlayerAnimation::Idle
-    }
+
     pub fn is_one_time_anim(&self) -> bool {
         match self {
             PlayerAnimation::Roll => true,
@@ -193,15 +177,10 @@ pub fn handle_player_animation_change(
 }
 
 pub fn cleanup_one_time_animations(
-    mut query: Query<(
-        Entity,
-        &PlayerAnimation,
-        &AsepriteAnimation,
-        &PlayerAnimationState,
-    )>,
+    mut query: Query<(Entity, &PlayerAnimation, &AsepriteAnimation)>,
     mut commands: Commands,
 ) {
-    for (e, curr_anim, anim_state, dir) in query.iter_mut() {
+    for (e, curr_anim, anim_state) in query.iter_mut() {
         if curr_anim.is_one_time_anim() && anim_state.just_finished() {
             commands.entity(e).insert(PlayerAnimation::Idle);
         }

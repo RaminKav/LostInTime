@@ -41,7 +41,6 @@ pub fn handle_teleport(
             &mut MovementVector,
             &Attack,
             &AsepriteAnimation,
-            &PlayerAnimation,
             &mut KinematicCharacterController,
             &mut TeleportState,
         ),
@@ -55,17 +54,8 @@ pub fn handle_teleport(
     time: Res<Time>,
     asset_server: Res<AssetServer>,
 ) {
-    let Ok((
-        e,
-        player_pos,
-        skills,
-        mut move_direction,
-        dmg,
-        aseprite,
-        curr_anim,
-        mut kcc,
-        mut teleport_state,
-    )) = player.get_single_mut()
+    let Ok((e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc, mut teleport_state)) =
+        player.get_single_mut()
     else {
         return;
     };

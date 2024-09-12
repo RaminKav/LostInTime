@@ -44,7 +44,6 @@ pub use essence_ui::*;
 
 use crate::{
     client::{load_state, ClientState},
-    combat::handle_hits,
     item::item_actions::ActionSuccessEvent,
     CustomFlush, Game, GameState, DEBUG,
 };
@@ -60,7 +59,6 @@ use self::{
 };
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 145.);
-pub const STATS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
 pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);

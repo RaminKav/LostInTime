@@ -254,7 +254,7 @@ pub fn _AIPos_to_tile_pos(pos: AIPos) -> TileMapPosition {
     world_pos_to_tile_pos(w)
 }
 
-pub fn flood_fill(
+pub fn _flood_fill(
     pos: AIPos,
     game: &mut GameParam,
     visited: &mut Vec<AIPos>,
@@ -281,10 +281,10 @@ pub fn flood_fill(
         }
         if let Some(is_valid) = game.get_pos_validity_for_pathfinding(neighbour_tile) {
             if is_valid {
-                flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
+                _flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
             }
         } else {
-            flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
+            _flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
         }
     }
 }

@@ -56,7 +56,7 @@ impl ObjectAction {
     pub fn run_action(
         &self,
         e: Entity,
-        obj_pos: TileMapPosition,
+        _obj_pos: TileMapPosition,
         obj: WorldObject,
         game: &mut GameParam,
         item_action_param: &mut ItemActionParam,
