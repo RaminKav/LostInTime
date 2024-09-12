@@ -3,7 +3,7 @@ use item_abilities::handle_item_abilitiy_on_attack;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::{
-    cmp::min,
+    cmp::{max, min},
     ops::{Add, RangeInclusive},
 };
 use strum_macros::{Display, EnumIter};
@@ -182,9 +182,23 @@ impl ItemAttributes {
         rarity: ItemRarity,
         base_att: Option<&RawItemBaseAttributes>,
         bonus_att: Option<&RawItemBonusAttributes>,
+        level: i32,
+        obj: WorldObject,
+        equip_type: &EquipmentType,
     ) -> (Vec<(String, String, AttributeQuality)>, f32, f32) {
         let mut tooltips: Vec<(String, String, AttributeQuality)> = vec![];
         let is_positive = |val: i32| val > 0;
+        let base_att_lvl_bonus = if equip_type.is_weapon() || equip_type.is_tool() {
+            (level - 1) as f32 * obj.get_weapon_levelup_upgrade() as f32
+        } else {
+            0.
+        };
+        let (base_def_lvl_bonus, base_hp_lvl_bonus) =
+            if equip_type.is_equipment() && !equip_type.is_accessory() {
+                (max(0, (level * 2) - 1) as f32, max(0, level - 1) as f32)
+            } else {
+                (0., 0.)
+            };
         let r = rarity.get_rarity_attributes_bonus();
         let mut total_score = 0.;
         let mut total_atts = 0.;
@@ -202,8 +216,8 @@ impl ItemAttributes {
                 if let Some(health) = &base_att.unwrap().health {
                     format!(
                         "({}-{})",
-                        f32::round(*health.start() as f32 * r) as i32,
-                        f32::round(*health.end() as f32 * r) as i32
+                        f32::round(*health.start() as f32 * r + base_hp_lvl_bonus) as i32,
+                        f32::round(*health.end() as f32 * r + base_hp_lvl_bonus) as i32
                     )
                 } else {
                     format!(
@@ -233,8 +247,8 @@ impl ItemAttributes {
                 if let Some(defence) = &base_att.unwrap().defence {
                     format!(
                         "({}-{})",
-                        f32::round(*defence.start() as f32 * r) as i32,
-                        f32::round(*defence.end() as f32 * r) as i32
+                        f32::round(*defence.start() as f32 * r + base_def_lvl_bonus) as i32,
+                        f32::round(*defence.end() as f32 * r + base_def_lvl_bonus) as i32
                     )
                 } else {
                     format!(
@@ -253,7 +267,7 @@ impl ItemAttributes {
         if self.attack.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} Damage",
+                    "{}{} Attack",
                     if is_positive(self.attack.value) {
                         "+"
                     } else {
@@ -264,8 +278,8 @@ impl ItemAttributes {
                 if let Some(attack) = &base_att.unwrap().attack {
                     format!(
                         "({}-{})",
-                        f32::round(*attack.start() as f32 * r) as i32,
-                        f32::round(*attack.end() as f32 * r) as i32
+                        f32::round(*attack.start() as f32 * r + base_att_lvl_bonus) as i32,
+                        f32::round(*attack.end() as f32 * r + base_att_lvl_bonus) as i32
                     )
                 } else {
                     format!(

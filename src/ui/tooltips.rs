@@ -120,16 +120,19 @@ pub fn handle_spawn_inv_item_tooltip(
             proto.get_component::<RawItemBonusAttributes, _>(item.item_stack.obj_type);
         let equip_type = proto.get_component::<EquipmentType, _>(item.item_stack.obj_type);
         let item_rarity = item.item_stack.rarity.clone();
+        let level = item.item_stack.metadata.level;
         let (attributes, score, num_attributes) = item.item_stack.attributes.get_tooltips(
             item_rarity.clone(),
             raw_base_attributes,
             raw_bonus_attributes,
+            level.unwrap_or(0) as i32,
+            item.item_stack.obj_type,
+            equip_type.unwrap_or(&EquipmentType::None),
         );
 
         //subtract 2 for the base attributes, only want bonus attributes
-        let num_stars = get_num_stars(score, num_attributes - 2., item_rarity.clone(), equip_type);
+        let num_stars = get_num_stars(score, num_attributes, item_rarity.clone(), equip_type);
         // let durability = item.item_stack.attributes.get_durability_tooltip();
-        let level = item.item_stack.metadata.level;
         let item_actions = proto.get_component::<ItemActions, _>(item.item_stack.obj_type);
         let should_show_attributes = !attributes.is_empty() && !item.is_recipe;
         let size = Vec2::new(93., 120.5);
@@ -615,18 +618,26 @@ pub fn get_num_stars(
     rarity: ItemRarity,
     equip_type: Option<&EquipmentType>,
 ) -> usize {
-    let mut num_stars = 0.;
-    let max_possible_stars = if let Some(eqp_type) = equip_type {
-        3. + total_atts - *rarity.get_num_bonus_attributes(eqp_type).end() as f32
+    if let Some(equip_type) = equip_type {
+        let num_atts = if equip_type.is_weapon() || equip_type.is_tool() {
+            total_atts - 1.
+        } else if equip_type.is_armor() {
+            total_atts - 2.
+        } else {
+            total_atts
+        };
+        let mut num_stars = 0.;
+        let max_possible_stars =
+            3. + num_atts - dbg!(*rarity.get_num_bonus_attributes(equip_type).end() as f32);
+        if score >= 0.87 {
+            num_stars = 3.;
+        } else if score > 0.7 {
+            num_stars = 2.;
+        } else if score > 0.42 {
+            num_stars = 1.;
+        }
+        f32::min(f32::min(num_stars, max_possible_stars), 3.) as usize
     } else {
-        3.
-    };
-    if score >= 0.85 {
-        num_stars = 3.;
-    } else if score > 0.65 {
-        num_stars = 2.;
-    } else if score > 0.42 {
-        num_stars = 1.;
+        0
     }
-    f32::min(f32::min(num_stars, max_possible_stars), 3.) as usize
 }

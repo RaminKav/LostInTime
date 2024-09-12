@@ -137,6 +137,15 @@ impl EquipmentType {
             _ => false,
         }
     }
+    pub fn is_armor(&self) -> bool {
+        match self {
+            EquipmentType::Head => true,
+            EquipmentType::Chest => true,
+            EquipmentType::Legs => true,
+            EquipmentType::Feet => true,
+            _ => false,
+        }
+    }
     pub fn is_equipment(&self) -> bool {
         match self {
             EquipmentType::Head => true,

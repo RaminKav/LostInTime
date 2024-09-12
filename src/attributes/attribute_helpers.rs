@@ -102,7 +102,7 @@ pub fn build_item_stack_with_parsed_attributes(
     let mut level = 1;
     if let Some(item_level) = level_option {
         if item_level > 1 {
-            if equip_type.is_weapon() {
+            if equip_type.is_weapon() || equip_type.is_tool() {
                 let att_modifier = stack.obj_type.get_weapon_levelup_upgrade();
                 final_att.attack = final_att.attack + (item_level - 1) as i32 * att_modifier;
             } else if equip_type.is_equipment() && !equip_type.is_accessory() {
