@@ -708,7 +708,7 @@ impl ItemAttributes {
         }
 
         entity.insert(Attack(
-            self.attack.value + skills.get_count(Skill::Attack) * 5,
+            self.attack.value + skills.get_count(Skill::Attack) * 3,
         ));
         entity.insert(CritChance(
             self.crit_chance.value + skills.get_count(Skill::CritChance) * 10,

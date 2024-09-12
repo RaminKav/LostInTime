@@ -372,7 +372,7 @@ impl Skill {
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     count: 1,
                     max_count: 1,
-                    timer: Timer::from_seconds(1., TimerMode::Once),
+                    timer: Timer::from_seconds(0.45, TimerMode::Once),
                 });
             }
             &Skill::TeleportCount => {
@@ -381,7 +381,7 @@ impl Skill {
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     count: skills.get_count(Skill::TeleportCount) as u32,
                     max_count: 2,
-                    timer: Timer::from_seconds(1., TimerMode::Once),
+                    timer: Timer::from_seconds(0.45, TimerMode::Once),
                 });
             }
 

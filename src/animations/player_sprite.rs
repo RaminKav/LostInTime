@@ -59,6 +59,7 @@ impl PlayerAnimation {
             PlayerAnimation::RunAttack => true,
             PlayerAnimation::RunAttack1 => true,
             PlayerAnimation::RunAttack2 => true,
+            PlayerAnimation::Teleport => true,
             _ => false,
         }
     }

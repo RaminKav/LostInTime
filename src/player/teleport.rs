@@ -50,7 +50,6 @@ pub fn handle_teleport(
     game: GameParam,
     proto_param: ProtoParam,
     mut commands: Commands,
-    mut ice_aoe_check: Local<bool>,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
 ) {
@@ -63,17 +62,16 @@ pub fn handle_teleport(
     if skills.has(Skill::Teleport)
         && teleport_state.count > 0
         && key_input.just_pressed(KeyCode::Space)
+        && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)
     {
         commands.entity(e).insert(PlayerAnimation::Teleport);
         teleport_state.count -= 1;
+        teleport_state.timer.reset();
         teleport_state.timer.tick(time.delta());
     }
 
-    if move_direction.0.length() != 0.
-        && *ice_aoe_check == false
-        && teleport_state.timer.percent() >= 0.5
-    {
-        *ice_aoe_check = true;
+    if move_direction.0.length() != 0. && teleport_state.timer.percent() == 1. {
+        teleport_state.timer.reset();
         let player_pos = player_pos.translation();
         let direction = move_direction.0.normalize();
         let distance = direction * 2.5 * TILE_SIZE.x;
@@ -129,12 +127,11 @@ pub fn handle_teleport(
         teleport_state.timer.tick(time.delta());
     }
 
-    if aseprite.current_frame() >= 129 && aseprite.current_frame() <= 135 {
+    if teleport_state.timer.percent() != 0. && teleport_state.timer.percent() < 1. {
         move_direction.0 = Vec2::ZERO;
         kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
     } else if aseprite.just_finished() {
         teleport_state.timer.reset();
-        *ice_aoe_check = false;
     }
 }
 
@@ -156,17 +153,19 @@ pub fn tick_teleport_timer(
     mut player_q: Query<(&PlayerSkills, &mut TeleportState)>,
 ) {
     if let Ok((skills, mut teleport_state)) = player_q.get_single_mut() {
-        let d = time.delta();
-        teleport_state
-            .cooldown_timer
-            .tick(if skills.has(Skill::TeleportCooldown) {
-                Duration::new(
-                    (d.as_secs() as f32 * 0.75) as u64,
-                    (d.subsec_nanos() as f32 * 0.75) as u32,
-                )
-            } else {
-                d
-            });
+        if teleport_state.count < teleport_state.max_count {
+            let d = time.delta();
+            teleport_state
+                .cooldown_timer
+                .tick(if skills.has(Skill::TeleportCooldown) {
+                    Duration::new(
+                        (d.as_secs() as f32 * 0.75) as u64,
+                        (d.subsec_nanos() as f32 * 0.75) as u32,
+                    )
+                } else {
+                    d
+                });
+        }
 
         if teleport_state.cooldown_timer.finished()
             && teleport_state.count < teleport_state.max_count
