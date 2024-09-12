@@ -30,6 +30,7 @@ pub trait CommandsExt<'w, 's> {
         params: &ProtoParam,
         pos: Vec2,
         dir: Vec2,
+        mana_bar_full: bool,
     ) -> Option<Entity>;
     fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
@@ -84,6 +85,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         params: &ProtoParam,
         pos: Vec2,
         dir: Vec2,
+        mana_bar_full: bool,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
@@ -106,6 +108,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
                 y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
             }
+            proto_data.mana_bar_full = mana_bar_full;
             //TODO: make these prototype data
             spawned_entity_commands
                 .insert(proto_data)

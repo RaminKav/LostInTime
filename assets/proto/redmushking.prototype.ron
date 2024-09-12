@@ -11,7 +11,7 @@
     "survival_rogue_like::enemy::FollowSpeed": (0.65),
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 100., startup: 0.0, duration: 4.35, cooldown: 1.25, speed: 150.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: -17., y1: -15., x2: 17., y2: -15., r: 14.),
-    "survival_rogue_like::attributes::MaxHealth": (500),
+    "survival_rogue_like::attributes::MaxHealth": (1200),
     "survival_rogue_like::attributes::Attack": (20),
     "survival_rogue_like::player::levels::ExperienceReward": (500),
     "survival_rogue_like::item::loot_table::LootTable": (

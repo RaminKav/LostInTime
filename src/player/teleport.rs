@@ -1,13 +1,13 @@
-use std::f32::consts::PI;
+use std::{cmp::min, f32::consts::PI, time::Duration};
 
 use bevy::prelude::*;
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_rapier2d::prelude::KinematicCharacterController;
+use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
+use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::Attack,
-    combat_helpers::spawn_temp_collider,
+    combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     inputs::MovementVector,
     item::WorldObject,
     proto::proto_param::ProtoParam,
@@ -15,10 +15,21 @@ use crate::{
     GameParam,
 };
 
-use super::{MovePlayerEvent, Player, PlayerSkills, Skill};
+use super::{melee_skills::OnHitAoe, MovePlayerEvent, Player, PlayerSkills, Skill};
 
 #[derive(Component)]
-pub struct JustTeleported(pub Timer);
+pub struct JustTeleported;
+#[derive(Component)]
+pub struct TeleportState {
+    pub just_teleported_timer: Timer,
+    pub cooldown_timer: Timer,
+    pub count: u32,
+    pub max_count: u32,
+    pub timer: Timer,
+}
+
+#[derive(Component)]
+pub struct TeleportShockDmg;
 // TODO
 pub fn handle_teleport(
     mut move_player: EventWriter<MovePlayerEvent>,
@@ -30,29 +41,49 @@ pub fn handle_teleport(
             &mut MovementVector,
             &Attack,
             &AsepriteAnimation,
+            &PlayerAnimation,
             &mut KinematicCharacterController,
+            &mut TeleportState,
         ),
-        With<Player>,
+        (With<Player>, With<TeleportState>),
     >,
     key_input: ResMut<Input<KeyCode>>,
-    mut game: GameParam,
+    game: GameParam,
     proto_param: ProtoParam,
     mut commands: Commands,
-    mut teleported: Local<bool>,
+    mut ice_aoe_check: Local<bool>,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
 ) {
-    let (e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc) = player.single_mut();
+    let Ok((
+        e,
+        player_pos,
+        skills,
+        mut move_direction,
+        dmg,
+        aseprite,
+        curr_anim,
+        mut kcc,
+        mut teleport_state,
+    )) = player.get_single_mut()
+    else {
+        return;
+    };
 
-    let player = game.player_mut();
     if skills.has(Skill::Teleport)
-        && player.player_dash_cooldown.finished()
+        && teleport_state.count > 0
         && key_input.just_pressed(KeyCode::Space)
     {
         commands.entity(e).insert(PlayerAnimation::Teleport);
-        player.player_dash_cooldown.reset();
+        teleport_state.count -= 1;
+        teleport_state.timer.tick(time.delta());
     }
 
-    if move_direction.0.length() != 0. && aseprite.current_frame() == 136 && !*teleported {
-        *teleported = true;
+    if move_direction.0.length() != 0.
+        && *ice_aoe_check == false
+        && teleport_state.timer.percent() >= 0.5
+    {
+        *ice_aoe_check = true;
         let player_pos = player_pos.translation();
         let direction = move_direction.0.normalize();
         let distance = direction * 2.5 * TILE_SIZE.x;
@@ -70,7 +101,7 @@ pub fn handle_teleport(
 
         if skills.has(Skill::TeleportShock) {
             let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-            spawn_temp_collider(
+            let shock_e = spawn_temp_collider(
                 &mut commands,
                 Transform::from_translation(Vec3::new(
                     player_pos.x + (distance.x / 2.),
@@ -78,37 +109,79 @@ pub fn handle_teleport(
                     0.,
                 ))
                 .with_rotation(Quat::from_rotation_z(angle)),
-                Vec2::new(16., 3. * TILE_SIZE.x),
                 0.5,
                 dmg.0 / 5,
-            )
+                Collider::cuboid(8., 1.5 * TILE_SIZE.x),
+            );
+            commands.entity(shock_e).insert(TeleportShockDmg);
+        }
+        if skills.has(Skill::TeleportIceAoe) {
+            let hitbox_e = spawn_one_time_aseprite_collider(
+                &mut commands,
+                Transform::from_translation(Vec3::ZERO),
+                10.5,
+                dmg.0 / 4,
+                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
+                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
+                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+            );
+            commands.entity(hitbox_e).set_parent(e);
         }
 
         if skills.has(Skill::TeleportManaRegen) {
-            commands
-                .entity(e)
-                .insert(JustTeleported(Timer::from_seconds(0.7, TimerMode::Once)));
+            commands.entity(e).insert(JustTeleported);
         }
 
         move_player.send(MovePlayerEvent { pos });
     }
+    if teleport_state.timer.percent() != 0. {
+        teleport_state.timer.tick(time.delta());
+    }
+
     if aseprite.current_frame() >= 129 && aseprite.current_frame() <= 135 {
         move_direction.0 = Vec2::ZERO;
         kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
-    } else if aseprite.current_frame() == 137 {
-        *teleported = false;
+    } else if aseprite.just_finished() {
+        teleport_state.timer.reset();
+        *ice_aoe_check = false;
     }
 }
 
 pub fn tick_just_teleported(
-    mut teleported: Query<(Entity, &mut JustTeleported)>,
+    mut teleported: Query<(Entity, &mut TeleportState)>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
     for (e, mut timer) in teleported.iter_mut() {
-        timer.0.tick(time.delta());
-        if timer.0.finished() {
+        timer.just_teleported_timer.tick(time.delta());
+        if timer.just_teleported_timer.finished() {
             commands.entity(e).remove::<JustTeleported>();
+        }
+    }
+}
+
+pub fn tick_teleport_timer(
+    time: Res<Time>,
+    mut player_q: Query<(&PlayerSkills, &mut TeleportState)>,
+) {
+    if let Ok((skills, mut teleport_state)) = player_q.get_single_mut() {
+        let d = time.delta();
+        teleport_state
+            .cooldown_timer
+            .tick(if skills.has(Skill::TeleportCooldown) {
+                Duration::new(
+                    (d.as_secs() as f32 * 0.75) as u64,
+                    (d.subsec_nanos() as f32 * 0.75) as u32,
+                )
+            } else {
+                d
+            });
+
+        if teleport_state.cooldown_timer.finished()
+            && teleport_state.count < teleport_state.max_count
+        {
+            teleport_state.count = min(teleport_state.max_count, teleport_state.count + 1);
+            teleport_state.cooldown_timer.reset();
         }
     }
 }

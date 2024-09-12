@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
@@ -56,6 +57,7 @@ pub enum Projectile {
     Arc,
     FireAttack,
     TeleportShock,
+    OnHitAoE,
 }
 
 impl Projectile {
@@ -67,6 +69,14 @@ impl Projectile {
             _ => panic!("Projectile {:?} not implemented", self),
         }
     }
+    pub fn is_staff_proj(&self) -> bool {
+        match self {
+            Projectile::Fireball => true,
+            Projectile::GreenWhip => true,
+            Projectile::Electricity => true,
+            _ => false,
+        }
+    }
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
@@ -76,6 +86,7 @@ pub struct ProjectileState {
     pub hit_entities: Vec<Entity>,
     pub spawn_offset: Vec2,
     pub rotating: bool,
+    pub mana_bar_full: bool,
 }
 
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
@@ -125,6 +136,7 @@ pub struct ProjectileSpawnMarker {
     pub direction: Vec2,
     pub dmg_override: Option<i32>,
     pub from_enemy: Option<Entity>,
+    pub was_mana_bar_full: bool,
 }
 
 fn handle_ranged_attack_event(
@@ -161,22 +173,35 @@ fn handle_ranged_attack_event(
             if mana_cost.abs() > mana.current {
                 continue;
             }
-            modify_mana_event.send(ModifyManaEvent(mana_cost));
+            modify_mana_event.send(ModifyManaEvent(
+                mana_cost
+                    * if skills.has(Skill::DiscountMP) {
+                        0.75
+                    } else {
+                        1.
+                    } as i32,
+            ));
         }
         if proto
             .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
             .is_some()
         {
-            if let Some(proj_slot) = inv
-                .single()
-                .items
-                .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
+            let mut rng = rand::thread_rng();
+            // 1/3 chance to not consume ammo
+            if !skills.has(Skill::ChanceToNotConsumeAmmo)
+                || rng.gen_bool((1. * skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
             {
-                let held_item_option = inv.single().items.items[proj_slot].clone();
-                inv.single_mut().items.items[proj_slot] =
-                    held_item_option.unwrap().modify_count(-1);
-            } else {
-                continue;
+                if let Some(proj_slot) = inv
+                    .single()
+                    .items
+                    .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
+                {
+                    let held_item_option = inv.single().items.items[proj_slot].clone();
+                    inv.single_mut().items.items[proj_slot] =
+                        held_item_option.unwrap().modify_count(-1);
+                } else {
+                    continue;
+                }
             }
         }
         let t = if let Some(enemy) = proj_event.from_enemy {
@@ -196,6 +221,7 @@ fn handle_ranged_attack_event(
             direction: proj_event.direction,
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
+            was_mana_bar_full: mana.current == mana.max,
         });
 
         if teleported_option.is_some() {
@@ -241,6 +267,7 @@ fn handle_spawn_projectiles_after_delay(
                 &proto,
                 proj.pos,
                 proj.direction,
+                proj.was_mana_bar_full,
             );
             if let Some(p) = p {
                 if let Some(e) = proj.from_enemy {
@@ -249,10 +276,11 @@ fn handle_spawn_projectiles_after_delay(
                         mob: enemy_transforms.get(e).unwrap().1.clone(),
                     });
                 }
-                commands.entity(p).insert(Attack(
-                    proj.dmg_override
-                        .unwrap_or(game.calculate_player_damage(0).0 as i32),
-                ));
+                let player_att = game.player_stats.single().0;
+                let mana_full_bonus = if proj.was_mana_bar_full { 1.25 } else { 1. };
+                let computed_dmg =
+                    proj.dmg_override.unwrap_or(player_att.0 as i32) as f32 * mana_full_bonus;
+                commands.entity(p).insert(Attack(computed_dmg as i32));
             }
             commands.entity(e).despawn_recursive();
         }

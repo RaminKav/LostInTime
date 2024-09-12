@@ -784,7 +784,9 @@ pub fn handle_cursor_skills_buttons(
                             &mut skills,
                             level.level,
                         );
-                        picked_skill.skill.add_skill_components(e, &mut commands);
+                        picked_skill
+                            .skill
+                            .add_skill_components(e, &mut commands, skills.clone());
                         next_ui_state.set(UIState::Closed);
                         att_event.send(AttributeChangeEvent);
                     }

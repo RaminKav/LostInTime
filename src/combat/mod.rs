@@ -1,7 +1,10 @@
 use bevy::prelude::*;
 
+use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
 use bevy_proto::prelude::ProtoCommands;
-use combat_helpers::tick_despawn_timer;
+use bevy_rapier2d::prelude::Collider;
+use collisions::PlayerAttackCollider;
+use combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider, tick_despawn_timer};
 use rand::Rng;
 pub mod status_effects;
 use status_effects::*;
@@ -13,7 +16,10 @@ use crate::{
     ai::{FollowState, LeapAttackState},
     animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
     assets::SpriteAnchor,
-    attributes::{AttackCooldown, CurrentHealth, InvincibilityCooldown, LootRateBonus},
+    attributes::{
+        modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown,
+        LootRateBonus, ManaRegen,
+    },
     client::{
         analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
         is_not_paused,
@@ -31,7 +37,8 @@ use crate::{
     juice::bounce::BounceOnHit,
     player::{
         levels::{ExperienceReward, PlayerLevel},
-        skills::{PlayerSkills, Skill},
+        melee_skills::OnHitAoe,
+        skills::{self, PlayerSkills, Skill},
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
@@ -69,6 +76,9 @@ pub struct ObjBreakEvent {
     pub pos: TileMapPosition,
     pub give_drops_and_xp: bool,
 }
+
+#[derive(Component)]
+pub struct WasHitWithCrit;
 
 #[derive(Component, Debug, Clone)]
 pub struct AttackTimer(pub Timer);
@@ -255,6 +265,7 @@ pub fn handle_hits(
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
+    skills: Query<&PlayerSkills>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -316,20 +327,35 @@ pub fn handle_hits(
                     });
                 }
             } else {
+                let skills = skills.single();
                 let is_player = game.game.player == e;
-                hit_health.0 -= dmg;
+                hit_health.0 -= dmg
+                    - if skills.has(Skill::MinusOneDamageOnHit) {
+                        1
+                    } else {
+                        0
+                    };
                 if *DEBUG {
                     debug!("HP {:?}", hit_health.0);
                 }
 
-                // let has_i_frames = has_i_frames.get(hit.hit_entity);
+                let mob_kb = if let Some(mob) = mob_option {
+                    mob.get_base_kb()
+                        + if skills.has(Skill::Knockback) {
+                            100.
+                        } else {
+                            0.
+                        }
+                } else {
+                    0.
+                };
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                     timer: Timer::from_seconds(
                         //TODO: once we create builders for creatures, add this as a default to all creatures that can be hit
                         0.2,
                         TimerMode::Once,
                     ),
-                    knockback: if is_player { 400. } else { 0. },
+                    knockback: if is_player { 400. } else { mob_kb },
                     dir: hit.dir,
                 });
                 if let Some(i_frames) = i_frame_option {
@@ -373,10 +399,13 @@ pub fn handle_hits(
 }
 pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
-    dead_query: Query<(Entity, &Mob), With<MarkedForDeath>>,
+    dead_query: Query<(Entity, &Mob, Option<&Slow>, &GlobalTransform), With<MarkedForDeath>>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    player: Query<(&PlayerSkills, &Attack, &ManaRegen)>,
+    asset_server: Res<AssetServer>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
-    for (e, mob) in dead_query.iter() {
+    for (e, mob, slow_option, mob_pos) in dead_query.iter() {
         if mob.is_boss() {
             commands
                 .entity(e)
@@ -387,6 +416,25 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<ReturnToShrineState>()
                 .remove::<MarkedForDeath>();
         } else {
+            let (skills, attack, mana_regen) = player.single();
+            if let Some(_) = slow_option {
+                if skills.has(Skill::FrozenAoE) {
+                    spawn_one_time_aseprite_collider(
+                        &mut commands,
+                        Transform::from_translation(mob_pos.translation()),
+                        10.5,
+                        attack.0,
+                        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
+                        asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
+                        AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                    );
+                }
+                if skills.has(Skill::FrozenMPRegen) {
+                    modify_mana_event.send(ModifyManaEvent(
+                        mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
+                    ));
+                }
+            }
             commands.entity(e).despawn_recursive();
         }
         analytics.send(AnalyticsUpdateEvent {

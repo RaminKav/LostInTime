@@ -362,9 +362,9 @@ pub fn move_player(
         commands.entity(player_e).insert(PlayerAnimation::Idle);
     }
 }
-pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>, skills: Query<&PlayerSkills>) {
+pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
     let player = game.player_mut();
-    let skills = skills.single();
+
     if player.is_dashing {
         player.player_dash_duration.tick(time.delta());
         if player.player_dash_duration.just_finished() {
@@ -372,17 +372,7 @@ pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>, skills: Query<&Play
             player.is_dashing = false;
         }
     } else {
-        let d = time.delta();
-        player
-            .player_dash_cooldown
-            .tick(if skills.has(Skill::TeleportCooldown) {
-                Duration::new(
-                    (d.as_secs() as f32 * 0.75) as u64,
-                    (d.subsec_nanos() as f32 * 0.75) as u32,
-                )
-            } else {
-                d
-            });
+        player.player_dash_cooldown.tick(time.delta());
     }
 }
 pub fn close_container(
@@ -452,7 +442,12 @@ pub fn toggle_inventory(
             //     1,
             //     Some(1),
             // );
-            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(1));
+            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
@@ -695,7 +690,7 @@ pub fn mouse_click_system(
             }
             hit_event.send(HitEvent {
                 hit_entity: hit_obj,
-                damage: game.calculate_player_damage(0).0 as i32,
+                damage: game.calculate_player_damage(0, None, 0, None).0 as i32,
                 dir: Vec2::new(0., 0.),
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,

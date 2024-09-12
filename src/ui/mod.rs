@@ -46,7 +46,7 @@ use crate::{
     client::{load_state, ClientState},
     combat::handle_hits,
     item::item_actions::ActionSuccessEvent,
-    CustomFlush, GameState, DEBUG,
+    CustomFlush, Game, GameState, DEBUG,
 };
 
 use self::{
@@ -132,11 +132,15 @@ impl Plugin for UIPlugin {
                     handle_enemy_health_bar_change,
                     handle_enemy_health_visibility,
                     add_ui_icon_for_elite_mobs,
-                    handle_add_damage_numbers_after_hit.after(handle_hits),
                     handle_add_dodge_text,
                     tick_damage_numbers,
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_add_damage_numbers_after_hit
+                    .in_base_set(CoreSet::PostUpdate)
+                    .run_if(resource_exists::<Game>()),
             )
             .add_systems(
                 (

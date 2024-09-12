@@ -11,6 +11,7 @@ use bevy_rapier2d::{
         KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
     },
 };
+use melee_skills::{handle_on_hit_skills, handle_second_split_attack};
 use serde::Deserialize;
 use sprint::{
     handle_enemy_death_sprint_reset, handle_sprint_timer, handle_sprinting_cooldown,
@@ -19,11 +20,12 @@ use sprint::{
 use strum_macros::{Display, EnumIter};
 pub mod currency;
 pub mod levels;
+pub mod melee_skills;
 pub mod skills;
 pub mod sprint;
 pub mod teleport;
 pub use currency::*;
-use teleport::{handle_teleport, tick_just_teleported};
+use teleport::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub mod stats;
 use crate::{
     animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerAseprite},
@@ -37,7 +39,7 @@ use crate::{
     client::CurrentRunSaveData,
     container::Container,
     custom_commands::CommandsExt,
-    datafiles,
+    datafiles, handle_hits,
     inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
     inventory::{Inventory, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
@@ -126,6 +128,9 @@ impl Plugin for PlayerPlugin {
                 handle_modify_time_fragments,
                 tick_just_teleported,
                 handle_teleport,
+                tick_teleport_timer,
+                handle_second_split_attack,
+                handle_on_hit_skills.after(handle_hits),
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -275,8 +280,8 @@ fn spawn_player(
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),
                 ));
-                for skill in data.player_skills.skills {
-                    skill.add_skill_components(p, &mut commands);
+                for skill in data.player_skills.skills.clone() {
+                    skill.add_skill_components(p, &mut commands, data.player_skills.clone());
                 }
                 info!("LOADED PLAYER DATA FROM SAVE FILE");
             }
@@ -357,4 +362,5 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // );
     // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
+    proto_commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
 }

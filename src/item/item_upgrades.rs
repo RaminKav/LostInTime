@@ -185,6 +185,7 @@ pub fn handle_on_hit_upgrades(
                 (nearest_mob_t.2.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
                 .normalize_or_zero(),
+                false,
             );
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Electricity,
@@ -236,10 +237,16 @@ pub fn handle_on_hit_upgrades(
             if let Some(mut burning) = burning_option {
                 burning.duration_timer.reset();
             } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
+                let duration_bonus = if skills.has(Skill::PoisonDuration) {
+                    1.5
+                } else {
+                    1.
+                };
+                let damage_bonus = skills.get_count(Skill::PoisonStrength) as u8;
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
-                    duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
-                    damage: 1,
+                    duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
+                    damage: 1 + damage_bonus,
                 });
                 status_event.send(StatusEffectEvent {
                     entity: hit_e,

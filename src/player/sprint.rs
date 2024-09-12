@@ -10,7 +10,7 @@ use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterControlle
 
 use super::{PlayerSkills, Skill};
 #[derive(Debug, Component)]
-pub struct SprintUpgrade {
+pub struct SprintState {
     pub startup_timer: Timer,
     pub sprint_duration_timer: Timer,
     pub sprint_cooldown_timer: Timer,
@@ -22,7 +22,7 @@ pub struct SprintUpgrade {
 #[derive(Debug, Component)]
 pub struct Sprinting;
 pub fn handle_toggle_sprinting(
-    mut sprint_query: Query<(Entity, &mut SprintUpgrade), With<SprintUpgrade>>,
+    mut sprint_query: Query<(Entity, &mut SprintState), With<SprintState>>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
@@ -40,7 +40,7 @@ pub fn handle_sprint_timer(
     mut query: Query<
         (
             Entity,
-            &mut SprintUpgrade,
+            &mut SprintState,
             &mut KinematicCharacterController,
             &mut MovementVector,
             &PlayerAnimation,
@@ -136,7 +136,7 @@ pub fn handle_sprint_timer(
 
 pub fn handle_sprinting_cooldown(
     time: Res<Time>,
-    mut query: Query<(Entity, &mut SprintUpgrade, &PlayerAnimation), Without<Sprinting>>,
+    mut query: Query<(Entity, &mut SprintState, &PlayerAnimation), Without<Sprinting>>,
     mut commands: Commands,
 ) {
     for (e, mut sprint, anim) in query.iter_mut() {
@@ -152,7 +152,7 @@ pub fn handle_sprinting_cooldown(
 
 pub fn handle_enemy_death_sprint_reset(
     enemy_death_events: EventReader<EnemyDeathEvent>,
-    mut sprint_query: Query<&mut SprintUpgrade>,
+    mut sprint_query: Query<&mut SprintState>,
     skills: Query<&PlayerSkills>,
 ) {
     if !enemy_death_events.is_empty() {

@@ -76,6 +76,9 @@ impl PlayerAnimation {
             || self == &PlayerAnimation::RunAttack1
             || self == &PlayerAnimation::RunAttack2
     }
+    pub fn is_teleporting(&self) -> bool {
+        self == &PlayerAnimation::Teleport
+    }
     pub fn is_sprinting(&self) -> bool {
         self == &PlayerAnimation::Run
     }

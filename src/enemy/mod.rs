@@ -109,6 +109,20 @@ impl Mob {
             Mob::Hog => LIGHT_BROWN,
         }
     }
+    pub fn get_base_kb(&self) -> f32 {
+        match self {
+            Mob::None => 0.,
+            Mob::Slime => 0.,
+            Mob::SpikeSlime => 40.,
+            Mob::Bushling => 25.,
+            Mob::StingFly => 50.,
+            Mob::Fairy => 50.,
+            Mob::FurDevil => 50.,
+            Mob::RedMushling => 0.,
+            Mob::RedMushking => 0.,
+            Mob::Hog => 50.,
+        }
+    }
     pub fn is_boss(&self) -> bool {
         match self {
             Mob::RedMushking => true,

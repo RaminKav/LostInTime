@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Claw,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 4, end: 7)),
+        attack: Some((start: 7, end: 11)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 5, end: 10)),

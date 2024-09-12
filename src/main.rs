@@ -544,20 +544,31 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
 
-    pub fn calculate_player_damage(&self, bonus_crit: u32) -> (u32, bool) {
+    pub fn calculate_player_damage(
+        &self,
+        bonus_crit: u32,
+        dmg_mult: Option<f32>,
+        dmg_bonus: u32,
+        attack_override: Option<i32>,
+    ) -> (u32, bool) {
         let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, ..) = self.player_stats.single();
         let mut rng = rand::thread_rng();
-
+        let dmg_mult = dmg_mult.unwrap_or(1.);
+        let dmg = attack_override.unwrap_or(attack.0);
         if rng.gen_ratio(
             u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
             100,
         ) {
             (
-                ((attack.0 + bonus_dmg.0) as f32 * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
+                ((dmg_mult * (dmg + bonus_dmg.0 + dmg_bonus as i32) as f32)
+                    * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
                 true,
             )
         } else {
-            ((attack.0 + bonus_dmg.0) as u32, false)
+            (
+                (dmg_mult * (dmg + bonus_dmg.0) as f32) as u32 + dmg_bonus,
+                false,
+            )
         }
     }
 }

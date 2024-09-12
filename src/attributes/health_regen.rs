@@ -17,12 +17,24 @@ use super::{
 pub struct HealthRegenTimer(pub Timer);
 
 pub fn handle_health_regen(
-    mut player_regen: Query<(&HealthRegen, &mut HealthRegenTimer, &Hunger), With<Player>>,
+    mut player_regen: Query<
+        (&HealthRegen, &mut HealthRegenTimer, &Hunger, &PlayerSkills),
+        With<Player>,
+    >,
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
     time: Res<Time>,
 ) {
-    let (health_regen, mut timer, hunger) = player_regen.single_mut();
-    timer.0.tick(time.delta());
+    let (health_regen, mut timer, hunger, skills) = player_regen.single_mut();
+    let d = time.delta();
+
+    timer.0.tick(if skills.has(Skill::HPRegenCooldown) {
+        Duration::new(
+            (d.as_secs() as f32 * 0.75) as u64,
+            (d.subsec_nanos() as f32 * 0.75) as u32,
+        )
+    } else {
+        d
+    });
     if timer.0.just_finished() {
         if hunger.is_starving() {
             return;

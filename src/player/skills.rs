@@ -13,7 +13,7 @@ use crate::{
     proto::proto_param::ProtoParam,
 };
 
-use super::sprint::SprintUpgrade;
+use super::{sprint::SprintState, teleport::TeleportState};
 
 pub enum SkillClass {
     Melee,
@@ -54,20 +54,19 @@ pub enum Skill {
 
     Sprint,
     SprintFaster,
-    SprintStartupFaster,
     SprintLunge,
     SprintLungeDamage,
-    SprintLungePierce,
     SprintKillReset,
 
-    DashDeflectProj,
-    DashInvulnerable,
-    DashFurther,
-    DashCount,
-    DashKnockback,
-    DaggerCombo,
+    Parry,            //TODO
+    ParyyHPRegen,     //TODO
+    ParrySpear,       //TODO
+    ParryDeflectProj, //TODO
+    ParryKnockback,   //TODO
+    DaggerCombo,      //TODO
 
     HPRegen,
+    HPRegenCooldown,
     MPRegen,
     MPRegenCooldown,
     OnHitAoEBurst,
@@ -83,67 +82,95 @@ pub enum Skill {
     ChainLightning,
     FireStaffAoE,
     BowArrowSpeed,
-    //BLUE: ManaGain
-    //GREEN: chance to not consume arrows/throwing stars
-    //YELLOW: bonus dash
-    //YELLOW: first hit after a dash is crit
-    //RED: Your swords do bonus dmg
-    TimeSlow,
+
+    //magic
+    TeleportStatusDMG,
+    StaffDMG,
+    FrozenAoE,
+    FireStaffLava, //TODO
+    FrozenCrit,
+    TeleportIceAoe,
+    MPBarDMG,
+    MPBarCrit,
+    FrozenMPRegen,
+
+    //rogue
+    DodgeCrit, //TODO
+    PoisonDuration,
+    PoisonStrength,
+
+    //melee
+    HealAoE, //TODO
+    SwordDMG,
 }
 
 impl Skill {
     pub fn get_class(&self) -> SkillClass {
         match self {
-            Skill::CritChance => SkillClass::Rogue,
-            Skill::CritDamage => SkillClass::Rogue,
             Skill::Health => SkillClass::Melee,
-            Skill::Thorns => SkillClass::Rogue,
             Skill::Lifesteal => SkillClass::Melee,
-            Skill::Speed => SkillClass::Rogue,
-            Skill::AttackSpeed => SkillClass::Rogue,
-            Skill::CritLoot => SkillClass::Rogue,
-            Skill::DodgeChance => SkillClass::Rogue,
             Skill::Attack => SkillClass::Melee,
             Skill::Defence => SkillClass::Melee,
             Skill::FireDamage => SkillClass::Melee,
             Skill::WaveAttack => SkillClass::Melee,
             Skill::FrailStacks => SkillClass::Melee,
-            Skill::SlowStacks => SkillClass::Magic,
-            Skill::PoisonStacks => SkillClass::Rogue,
             Skill::LethalBlow => SkillClass::Melee,
+            Skill::Parry => SkillClass::Melee,
+            Skill::ParyyHPRegen => SkillClass::Melee,
+            Skill::ParrySpear => SkillClass::Melee,
+            Skill::ParryDeflectProj => SkillClass::Melee,
+            Skill::ParryKnockback => SkillClass::Melee,
+            Skill::HPRegen => SkillClass::Melee,
+            Skill::OnHitAoEBurst => SkillClass::Melee,
+            Skill::Knockback => SkillClass::Melee,
+            Skill::MinusOneDamageOnHit => SkillClass::Melee,
+            Skill::HPRegenCooldown => SkillClass::Melee,
+            Skill::HealAoE => SkillClass::Melee,
+            Skill::SwordDMG => SkillClass::Melee,
+
+            Skill::CritChance => SkillClass::Rogue,
+            Skill::CritDamage => SkillClass::Rogue,
+            Skill::Thorns => SkillClass::Rogue,
+            Skill::Speed => SkillClass::Rogue,
+            Skill::AttackSpeed => SkillClass::Rogue,
+            Skill::CritLoot => SkillClass::Rogue,
+            Skill::DodgeChance => SkillClass::Rogue,
+            Skill::PoisonStacks => SkillClass::Rogue,
+            Skill::DaggerCombo => SkillClass::Rogue,
+            Skill::Sprint => SkillClass::Rogue,
+            Skill::SprintFaster => SkillClass::Rogue,
+            Skill::SprintLunge => SkillClass::Rogue,
+            Skill::SprintLungeDamage => SkillClass::Rogue,
+            Skill::SprintKillReset => SkillClass::Rogue,
+            Skill::SplitDamage => SkillClass::Rogue,
+            Skill::ChanceToNotConsumeAmmo => SkillClass::Rogue,
+            Skill::ClawDoubleThrow => SkillClass::Rogue,
+            Skill::BowMultiShot => SkillClass::Rogue,
+            Skill::BowArrowSpeed => SkillClass::Rogue,
+            Skill::DodgeCrit => SkillClass::Rogue,
+            Skill::PoisonDuration => SkillClass::Rogue,
+            Skill::PoisonStrength => SkillClass::Rogue,
+
+            Skill::SlowStacks => SkillClass::Magic,
             Skill::Teleport => SkillClass::Magic,
             Skill::TeleportShock => SkillClass::Magic,
             Skill::TeleportCooldown => SkillClass::Magic,
             Skill::TeleportCount => SkillClass::Magic,
             Skill::TeleportManaRegen => SkillClass::Magic,
-            Skill::Sprint => SkillClass::Rogue,
-            Skill::SprintFaster => SkillClass::Rogue,
-            Skill::SprintStartupFaster => SkillClass::Rogue,
-            Skill::SprintLunge => SkillClass::Rogue,
-            Skill::SprintLungeDamage => SkillClass::Rogue,
-            Skill::SprintLungePierce => SkillClass::Rogue,
-            Skill::SprintKillReset => SkillClass::Rogue,
-            Skill::DashDeflectProj => SkillClass::Melee,
-            Skill::DashInvulnerable => SkillClass::Melee,
-            Skill::DashFurther => SkillClass::Melee,
-            Skill::DashCount => SkillClass::Melee,
-            Skill::DashKnockback => SkillClass::Melee,
-            Skill::DaggerCombo => SkillClass::Rogue,
-            Skill::HPRegen => SkillClass::Melee,
             Skill::MPRegen => SkillClass::Magic,
-            Skill::OnHitAoEBurst => SkillClass::Melee,
-            Skill::SplitDamage => SkillClass::Rogue,
-            Skill::Knockback => SkillClass::Melee,
             Skill::DiscountMP => SkillClass::Magic,
-            Skill::MinusOneDamageOnHit => SkillClass::Melee,
-            Skill::ChanceToNotConsumeAmmo => SkillClass::Rogue,
-            Skill::ClawDoubleThrow => SkillClass::Rogue,
-            Skill::BowMultiShot => SkillClass::Rogue,
             Skill::ChainLightning => SkillClass::Magic,
             Skill::FireStaffAoE => SkillClass::Magic,
-            Skill::BowArrowSpeed => SkillClass::Rogue,
-            Skill::TimeSlow => SkillClass::Magic,
             Skill::MPRegenCooldown => SkillClass::Magic,
+            Skill::TeleportStatusDMG => SkillClass::Magic,
+            Skill::StaffDMG => SkillClass::Magic,
+            Skill::FrozenAoE => SkillClass::Magic,
+            Skill::FireStaffLava => SkillClass::Magic,
+            Skill::FrozenCrit => SkillClass::Magic,
+            Skill::TeleportIceAoe => SkillClass::Magic,
+            Skill::MPBarDMG => SkillClass::Magic,
+            Skill::MPBarCrit => SkillClass::Magic,
+            Skill::FrozenMPRegen => SkillClass::Magic,
         }
     }
     pub fn get_title(&self) -> String {
@@ -165,7 +192,6 @@ impl Skill {
             Skill::LethalBlow => "Lethal Blow".to_string(),
             Skill::Teleport => "Teleport".to_string(),
             Skill::TeleportShock => "Shock Step".to_string(),
-            Skill::TimeSlow => "Time Slow".to_string(),
             Skill::ClawDoubleThrow => "Double Throw".to_string(),
             Skill::BowMultiShot => "Multi Shot".to_string(),
             Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
@@ -257,7 +283,6 @@ impl Skill {
                 "enemies damages".to_string(),
                 "them.".to_string(),
             ],
-            Skill::TimeSlow => vec!["Slow down".to_string(), "Time briefly".to_string()],
             Skill::ClawDoubleThrow => vec![
                 "Gain a Claw.".to_string(),
                 "Your Claws throw 2".to_string(),
@@ -302,7 +327,12 @@ impl Skill {
         }
     }
 
-    pub fn add_skill_components(&self, entity: Entity, commands: &mut Commands) {
+    pub fn add_skill_components(
+        &self,
+        entity: Entity,
+        commands: &mut Commands,
+        skills: PlayerSkills,
+    ) {
         match self {
             Skill::ClawDoubleThrow => {
                 commands.entity(entity).insert(ClawUpgradeMultiThrow(
@@ -317,13 +347,31 @@ impl Skill {
                 commands.entity(entity).insert(ArrowSpeedUpgrade(1.));
             }
             Skill::Sprint => {
-                commands.entity(entity).insert(SprintUpgrade {
+                commands.entity(entity).insert(SprintState {
                     startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
                     sprint_duration_timer: Timer::from_seconds(3.5, TimerMode::Once),
                     sprint_cooldown_timer: Timer::from_seconds(0.1, TimerMode::Once),
                     lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
                     speed_bonus: 1.6,
                     lunge_speed: 2.9,
+                });
+            }
+            Skill::Teleport => {
+                commands.entity(entity).insert(TeleportState {
+                    just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
+                    count: 1,
+                    max_count: 1,
+                    timer: Timer::from_seconds(1., TimerMode::Once),
+                });
+            }
+            &Skill::TeleportCount => {
+                commands.entity(entity).insert(TeleportState {
+                    just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
+                    count: skills.get_count(Skill::TeleportCount) as u32,
+                    max_count: 2,
+                    timer: Timer::from_seconds(1., TimerMode::Once),
                 });
             }
 
@@ -385,11 +433,25 @@ impl Default for SkillChoiceQueue {
         Self {
             queue: Default::default(),
             pool: vec![
+                SkillChoiceState::new(Skill::Defence),
+                SkillChoiceState::new(Skill::Attack),
+                SkillChoiceState::new(Skill::HPRegen),
+                SkillChoiceState::new(Skill::HPRegenCooldown),
+                SkillChoiceState::new(Skill::MPRegenCooldown),
+                SkillChoiceState::new(Skill::MPRegen),
+                SkillChoiceState::new(Skill::SplitDamage),
+                SkillChoiceState::new(Skill::Knockback),
+                SkillChoiceState::new(Skill::DiscountMP),
+                SkillChoiceState::new(Skill::ChanceToNotConsumeAmmo),
+                SkillChoiceState::new(Skill::MinusOneDamageOnHit),
+                SkillChoiceState::new(Skill::OnHitAoEBurst),
                 SkillChoiceState::new(Skill::Sprint)
                     .with_children(vec![
                         SkillChoiceState::new(Skill::SprintFaster),
-                        SkillChoiceState::new(Skill::SprintLunge)
-                            .with_children(vec![SkillChoiceState::new(Skill::SprintKillReset)]),
+                        SkillChoiceState::new(Skill::SprintLunge).with_children(vec![
+                            SkillChoiceState::new(Skill::SprintKillReset),
+                            SkillChoiceState::new(Skill::SprintLungeDamage),
+                        ]),
                     ])
                     .with_clashing(vec![Skill::Teleport]),
                 SkillChoiceState::new(Skill::CritChance)
@@ -419,7 +481,9 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::Teleport)
                     .with_children(vec![
                         SkillChoiceState::new(Skill::TeleportShock),
-                        // SkillChoiceState::new(Skill::TimeSlow),
+                        SkillChoiceState::new(Skill::TeleportCooldown),
+                        SkillChoiceState::new(Skill::TeleportCount),
+                        SkillChoiceState::new(Skill::TeleportManaRegen),
                     ])
                     .with_clashing(vec![Skill::Sprint]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),

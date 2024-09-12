@@ -11,15 +11,21 @@ use crate::{
         projectile::{EnemyProjectile, Projectile, ProjectileState},
         Equipment, MainHand, WorldObject,
     },
-    player::ModifyTimeFragmentsEvent,
+    player::{
+        melee_skills::SecondHitDelay,
+        skills::{PlayerSkills, Skill},
+        sprint::SprintState,
+        teleport::TeleportShockDmg,
+        ModifyTimeFragmentsEvent,
+    },
     ui::damage_numbers::DodgeEvent,
-    CustomFlush, GameParam, GameState, Player,
+    CustomFlush, Game, GameParam, GameState, Player,
 };
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
 
-use super::{Frail, HitEvent, HitMarker, InvincibilityTimer};
+use super::{Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow, WasHitWithCrit};
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -40,9 +46,11 @@ impl Plugin for CollisionPlugion {
 
 #[derive(Component)]
 pub struct DamagesWorldObjects;
+#[derive(Component)]
+pub struct PlayerAttackCollider;
 
 fn check_melee_hit_collisions(
-    _commands: Commands,
+    mut commands: Commands,
     context: ResMut<RapierContext>,
     weapons: Query<
         (Entity, &Parent, &GlobalTransform, &WorldObject),
@@ -52,6 +60,7 @@ fn check_melee_hit_collisions(
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     lifesteal: Query<&Lifesteal>,
+    skills: Query<(&PlayerSkills, Option<&SprintState>)>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mobs: Query<(&GlobalTransform, Option<&Frail>), With<Mob>>,
     anim: Query<&PlayerAnimation>,
@@ -79,8 +88,23 @@ fn check_melee_hit_collisions(
             let Ok((mob_txfm, frail_option)) = mobs.get(hit_entity) else {
                 continue;
             };
+            let (skills, maybe_sprint) = skills.single();
+            let sword_skill_bonus = if skills.has(Skill::SwordDMG) && weapon_obj.is_sword() {
+                3
+            } else {
+                0
+            };
             let (damage, was_crit) = game.calculate_player_damage(
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
+                if skills.has(Skill::SprintLungeDamage)
+                    && maybe_sprint.unwrap().lunge_duration.percent() != 0.
+                {
+                    Some(1.25)
+                } else {
+                    None
+                },
+                sword_skill_bonus,
+                None,
             );
             let delta = weapon_t.translation() - mob_txfm.translation();
             if let Ok(lifesteal) = lifesteal.get(game.game.player) {
@@ -88,16 +112,44 @@ fn check_melee_hit_collisions(
                     damage as f32 * lifesteal.0 as f32 / 100.,
                 ) as i32));
             }
-            hit_event.send(HitEvent {
-                hit_entity,
-                damage: damage as i32,
-                dir: delta.normalize_or_zero().truncate() * -1.,
-                hit_with_melee: Some(*weapon_obj),
-                hit_with_projectile: None,
-                was_crit,
-                hit_by_mob: None,
-                ignore_tool: false,
-            });
+            if true || skills.has(Skill::SplitDamage) {
+                let split_damage = f32::floor(damage as f32 / 2.) as i32;
+
+                if let Ok(lifesteal) = lifesteal.get(game.game.player) {
+                    modify_health_events.send(ModifyHealthEvent(f32::floor(
+                        split_damage as f32 * lifesteal.0 as f32 / 100.,
+                    ) as i32));
+                }
+                hit_event.send(HitEvent {
+                    hit_entity,
+                    damage: split_damage,
+                    dir: delta.normalize_or_zero().truncate() * -1.,
+                    hit_with_melee: Some(*weapon_obj),
+                    hit_with_projectile: None,
+                    was_crit,
+                    hit_by_mob: None,
+                    ignore_tool: false,
+                });
+                commands.entity(hit_entity).insert(SecondHitDelay {
+                    delay: Timer::from_seconds(0.15, TimerMode::Once),
+                    dir: delta.normalize_or_zero().truncate() * -1.,
+                    weapon_obj: *weapon_obj,
+                });
+            } else {
+                hit_event.send(HitEvent {
+                    hit_entity,
+                    damage: damage as i32,
+                    dir: delta.normalize_or_zero().truncate() * -1.,
+                    hit_with_melee: Some(*weapon_obj),
+                    hit_with_projectile: None,
+                    was_crit,
+                    hit_by_mob: None,
+                    ignore_tool: false,
+                });
+            }
+            if was_crit {
+                commands.entity(hit_entity).insert(WasHitWithCrit);
+            }
         }
     }
 }
@@ -114,31 +166,43 @@ fn check_projectile_hit_mob_collisions(
             &Projectile,
             &Attack,
             Option<&DoneAnimation>,
+            Option<&TeleportShockDmg>,
         ),
         Without<EnemyProjectile>,
     >,
     is_world_obj: Query<&WorldObject>,
     mut children: Query<&Parent>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    status_check: Query<(Option<&Burning>, Option<&Slow>, Option<&Frail>)>,
+    skills: Query<&PlayerSkills>,
+    game: GameParam,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
             continue;
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, proj, att, anim_option) =
-                if let Ok(e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, proj, att, anim_option)) =
-                        projectiles.get_mut(e.get())
+            //TODO: fr gotta refasctor this...
+            let (proj_entity, mut state, proj, att, anim_option, tp_shock) =
+                if let Ok(parent_e) = children.get_mut(*e1) {
+                    if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
+                        projectiles.get_mut(parent_e.get())
                     {
-                        (proj_entity, state, proj, att, anim_option)
+                        //collider is on the child, proj data on the parent
+                        (proj_entity, state, proj, att, anim_option, tp_shock)
+                    } else if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
+                        projectiles.get_mut(*e1)
+                    {
+                        //collider and proj data are on the same entity
+                        (proj_entity, state, proj, att, anim_option, tp_shock)
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, proj, att, anim_option)) =
+                } else if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
                     projectiles.get_mut(*e1)
                 {
-                    (proj_entity, state, proj, att, anim_option)
+                    //collider and proj data are on the same entity
+                    (proj_entity, state, proj, att, anim_option, tp_shock)
                 } else {
                     continue;
                 };
@@ -152,27 +216,53 @@ fn check_projectile_hit_mob_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
-            let damage = att.0;
+            let skills = skills.single();
+            let (burning, slow, frail) = status_check.get(*e2).unwrap();
+            let is_slowed = slow.is_some();
+            let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
+            let staff_skill_bonus = if skills.has(Skill::StaffDMG) && proj.is_staff_proj() {
+                3
+            } else {
+                0
+            };
+            let crit_bonus = if is_slowed && skills.has(Skill::FrozenCrit) {
+                10
+            } else {
+                0
+            } + if state.mana_bar_full && skills.has(Skill::MPBarCrit) {
+                10
+            } else {
+                0
+            };
+            let (mut damage, was_crit) =
+                game.calculate_player_damage(crit_bonus, None, staff_skill_bonus, Some(att.0));
             if let Some(lifesteal) = lifesteal {
-                if !is_world_obj.contains(*e2) {
+                if !is_world_obj.contains(*e2) && tp_shock.is_none() {
                     modify_health_events.send(ModifyHealthEvent(f32::floor(
                         damage as f32 * lifesteal.0 as f32 / 100.,
                     ) as i32));
                 }
             }
+
+            if is_status_effected && tp_shock.is_some() && skills.has(Skill::TeleportStatusDMG) {
+                damage = f32::ceil(damage as f32 * 2.) as u32;
+            }
             hit_event.send(HitEvent {
                 hit_entity: *e2,
-                damage,
+                damage: damage as i32,
                 dir: state.direction,
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
                 hit_by_mob: None,
-                was_crit: false,
+                was_crit,
             });
             //non-animating sprites are despawned immediately
             if anim_option.is_none() {
                 commands.entity(proj_entity).despawn_recursive();
+            }
+            if was_crit {
+                commands.entity(*e2).insert(WasHitWithCrit);
             }
         }
     }
@@ -334,7 +424,10 @@ fn check_mob_to_player_collisions(
         ),
         With<Player>,
     >,
-    dmg_source: Query<(&Transform, &Attack, Option<&MobIsAttacking>), Without<Player>>,
+    dmg_source: Query<
+        (&Transform, &Attack, Option<&MobIsAttacking>),
+        (Without<Player>, Without<PlayerAttackCollider>),
+    >,
     rapier_context: Res<RapierContext>,
     mut hit_event: EventWriter<HitEvent>,
     mut dodge_event: EventWriter<DodgeEvent>,

@@ -1345,7 +1345,6 @@ fn handle_new_items_raw_attributes(
     asset_server: Res<AssetServer>,
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
-        println!("GOT NEW ITEM");
         let rarity = get_rarity_rng(rand::thread_rng());
         add_item_glows(&mut commands, &graphics, e, rarity.clone());
 

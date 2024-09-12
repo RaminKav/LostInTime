@@ -8,7 +8,7 @@ use crate::{
     inventory::ItemStack,
     item::WorldObject,
     world::TILE_SIZE,
-    Game, TextureCamera,
+    Game, TextureCamera, WasHitWithCrit,
 };
 
 use super::{spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
@@ -59,7 +59,12 @@ pub fn add_previous_health(
 pub fn handle_add_damage_numbers_after_hit(
     mut commands: Commands,
     mut changed_health: Query<
-        (Entity, &CurrentHealth, &mut PreviousHealth),
+        (
+            Entity,
+            &CurrentHealth,
+            &mut PreviousHealth,
+            Option<&WasHitWithCrit>,
+        ),
         Changed<CurrentHealth>,
     >,
     txfms: Query<&GlobalTransform>,
@@ -67,7 +72,7 @@ pub fn handle_add_damage_numbers_after_hit(
     raw_dmg: Query<(&Attack, &BonusDamage)>,
     game: Res<Game>,
 ) {
-    for (e, changed_health, mut prev_health) in changed_health.iter_mut() {
+    for (e, changed_health, mut prev_health, crit_option) in changed_health.iter_mut() {
         let delta = changed_health.0 - prev_health.0;
         if delta == 0 {
             continue;
@@ -82,7 +87,8 @@ pub fn handle_add_damage_numbers_after_hit(
         prev_health.0 = changed_health.0;
         let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
-        let is_crit = !is_player && delta.abs() > dmg && dmg != 0;
+        let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
+
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -102,6 +108,9 @@ pub fn handle_add_damage_numbers_after_hit(
                 format!("+{}", delta)
             },
         );
+        if is_crit {
+            commands.entity(e).remove::<WasHitWithCrit>();
+        }
     }
 }
 pub fn handle_add_dodge_text(
