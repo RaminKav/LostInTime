@@ -37,6 +37,7 @@ use combat_shrine::{
     CombatShrineMobDeathEvent,
 };
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
+use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
 
 mod crafting;
@@ -769,6 +770,7 @@ impl Plugin for ItemsPlugin {
                     handle_slow_stack_ticks,
                     handle_combat_shrine_activate_animation,
                     handle_on_hit_upgrades.after(handle_hits),
+                    handle_reset_proj_hit_enemies_state,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

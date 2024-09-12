@@ -37,7 +37,7 @@ pub struct StatusEffectEvent {
     pub entity: Entity,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone)]
 pub struct Burning {
     pub tick_timer: Timer,
     pub duration_timer: Timer,

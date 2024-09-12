@@ -37,6 +37,7 @@ pub fn spawn_temp_collider(
             spawn_offset: Vec2::ZERO,
             rotating: false,
             mana_bar_full: false,
+            despawn_on_hit: false,
         })
         .insert(collider)
         .id()
@@ -50,12 +51,17 @@ pub fn spawn_one_time_aseprite_collider(
     collider: Collider,
     handle: Handle<Aseprite>,
     animation: AsepriteAnimation,
+    repeating_anim: bool,
 ) -> Entity {
     let hitbox_e = spawn_temp_collider(commands, transform, duration, attack, collider);
 
     commands
         .entity(hitbox_e)
-        .insert((handle, animation, DoneAnimation, PlayerAttackCollider));
+        .insert((handle, animation, PlayerAttackCollider));
+
+    if !repeating_anim {
+        commands.entity(hitbox_e).insert(DoneAnimation);
+    }
     hitbox_e
 }
 

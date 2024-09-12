@@ -1,22 +1,18 @@
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
+use bevy_rapier2d::prelude::Collider;
 
 use crate::{
-    animations::DoneAnimation,
-    attributes::{modifiers::ModifyHealthEvent, Attack, Lifesteal},
-    collisions::PlayerAttackCollider,
-    combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
+    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, Lifesteal},
+    combat_helpers::spawn_one_time_aseprite_collider,
     enemy::Mob,
-    item::{
-        projectile::{Projectile, ProjectileState},
-        WorldObject,
-    },
+    item::WorldObject,
     status_effects::Frail,
+    ui::damage_numbers::PreviousHealth,
     GameParam, HitEvent, InvincibilityTimer, WasHitWithCrit,
 };
 
-use super::{skills, sprint::SprintState, Player, PlayerSkills, Skill};
+use super::{sprint::SprintState, Player, PlayerSkills, Skill};
 aseprite!(pub OnHitAoe, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -51,6 +47,7 @@ pub fn handle_on_hit_skills(
                 Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
                 asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
                 AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                false,
             );
 
             commands.entity(hitbox_e).set_parent(player);
@@ -112,5 +109,41 @@ pub fn handle_second_split_attack(
             commands.entity(e).insert(WasHitWithCrit);
         }
         commands.entity(e).remove::<SecondHitDelay>();
+    }
+}
+
+pub fn handle_echo_after_heal(
+    mut commands: Commands,
+    mut changed_health: Query<
+        (
+            Entity,
+            &CurrentHealth,
+            &PreviousHealth,
+            &PlayerSkills,
+            &Attack,
+        ),
+        Changed<CurrentHealth>,
+    >,
+    asset_server: Res<AssetServer>,
+) {
+    for (e, changed_health, prev_health, skills, attack) in changed_health.iter_mut() {
+        let delta = changed_health.0 - prev_health.0;
+        if delta == 0 {
+            continue;
+        }
+
+        if skills.has(Skill::HealAoE) {
+            let hitbox_e = spawn_one_time_aseprite_collider(
+                &mut commands,
+                Transform::from_translation(Vec3::ZERO),
+                10.5,
+                attack.0,
+                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
+                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
+                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                false,
+            );
+            commands.entity(hitbox_e).set_parent(e);
+        }
     }
 }

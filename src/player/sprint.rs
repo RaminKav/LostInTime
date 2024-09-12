@@ -3,6 +3,7 @@ use std::time::Duration;
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     inputs::{CursorPos, MovementVector},
+    ui::damage_numbers::DodgeEvent,
     AttackTimer, EnemyDeathEvent, GameParam,
 };
 use bevy::prelude::*;
@@ -161,5 +162,18 @@ pub fn handle_enemy_death_sprint_reset(
                 sprint.sprint_cooldown_timer.tick(Duration::from_secs(99));
             }
         }
+    }
+}
+
+pub fn handle_dodge_crit(
+    dodges: EventReader<DodgeEvent>,
+    mut game: GameParam,
+    skills: Query<&PlayerSkills>,
+) {
+    if dodges.is_empty() {
+        return;
+    }
+    if skills.single().has(Skill::DodgeCrit) {
+        game.player_mut().next_hit_crit = true;
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    animations::{player_sprite::PlayerAnimation, DoneAnimation},
+    animations::player_sprite::PlayerAnimation,
     attributes::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
@@ -19,7 +19,7 @@ use crate::{
         ModifyTimeFragmentsEvent,
     },
     ui::damage_numbers::DodgeEvent,
-    CustomFlush, Game, GameParam, GameState, Player,
+    CustomFlush, GameParam, GameState, Player,
 };
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
@@ -112,7 +112,7 @@ fn check_melee_hit_collisions(
                     damage as f32 * lifesteal.0 as f32 / 100.,
                 ) as i32));
             }
-            if true || skills.has(Skill::SplitDamage) {
+            if skills.has(Skill::SplitDamage) {
                 let split_damage = f32::floor(damage as f32 / 2.) as i32;
 
                 if let Ok(lifesteal) = lifesteal.get(game.game.player) {
@@ -165,7 +165,6 @@ fn check_projectile_hit_mob_collisions(
             &mut ProjectileState,
             &Projectile,
             &Attack,
-            Option<&DoneAnimation>,
             Option<&TeleportShockDmg>,
         ),
         Without<EnemyProjectile>,
@@ -183,29 +182,28 @@ fn check_projectile_hit_mob_collisions(
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //TODO: fr gotta refasctor this...
-            let (proj_entity, mut state, proj, att, anim_option, tp_shock) =
-                if let Ok(parent_e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
-                        projectiles.get_mut(parent_e.get())
-                    {
-                        //collider is on the child, proj data on the parent
-                        (proj_entity, state, proj, att, anim_option, tp_shock)
-                    } else if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
-                        projectiles.get_mut(*e1)
-                    {
-                        //collider and proj data are on the same entity
-                        (proj_entity, state, proj, att, anim_option, tp_shock)
-                    } else {
-                        continue;
-                    }
-                } else if let Ok((proj_entity, state, proj, att, anim_option, tp_shock)) =
+            let (proj_entity, mut state, proj, att, tp_shock) = if let Ok(parent_e) =
+                children.get_mut(*e1)
+            {
+                if let Ok((proj_entity, state, proj, att, tp_shock)) =
+                    projectiles.get_mut(parent_e.get())
+                {
+                    //collider is on the child, proj data on the parent
+                    (proj_entity, state, proj, att, tp_shock)
+                } else if let Ok((proj_entity, state, proj, att, tp_shock)) =
                     projectiles.get_mut(*e1)
                 {
                     //collider and proj data are on the same entity
-                    (proj_entity, state, proj, att, anim_option, tp_shock)
+                    (proj_entity, state, proj, att, tp_shock)
                 } else {
                     continue;
-                };
+                }
+            } else if let Ok((proj_entity, state, proj, att, tp_shock)) = projectiles.get_mut(*e1) {
+                //collider and proj data are on the same entity
+                (proj_entity, state, proj, att, tp_shock)
+            } else {
+                continue;
+            };
             let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {
                 continue;
             };
@@ -258,7 +256,7 @@ fn check_projectile_hit_mob_collisions(
                 was_crit,
             });
             //non-animating sprites are despawned immediately
-            if anim_option.is_none() {
+            if state.despawn_on_hit {
                 commands.entity(proj_entity).despawn_recursive();
             }
             if was_crit {
@@ -283,7 +281,6 @@ fn check_projectile_hit_player_collisions(
         (
             Entity,
             &mut ProjectileState,
-            Option<&DoneAnimation>,
             &Projectile,
             &Attack,
             &EnemyProjectile,
@@ -297,22 +294,22 @@ fn check_projectile_hit_player_collisions(
             continue;
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
-            let (proj_entity, mut state, anim_option, proj, att, enemy_proj) =
-                if let Ok(e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, anim_option, proj, att, enemy_proj)) =
-                        projectiles.get_mut(e.get())
-                    {
-                        (proj_entity, state, anim_option, proj, att, enemy_proj)
-                    } else {
-                        continue;
-                    }
-                } else if let Ok((proj_entity, state, anim_option, proj, att, enemy_proj)) =
-                    projectiles.get_mut(*e1)
+            let (proj_entity, mut state, proj, att, enemy_proj) = if let Ok(e) =
+                children.get_mut(*e1)
+            {
+                if let Ok((proj_entity, state, proj, att, enemy_proj)) =
+                    projectiles.get_mut(e.get())
                 {
-                    (proj_entity, state, anim_option, proj, att, enemy_proj)
+                    (proj_entity, state, proj, att, enemy_proj)
                 } else {
                     continue;
-                };
+                }
+            } else if let Ok((proj_entity, state, proj, att, enemy_proj)) = projectiles.get_mut(*e1)
+            {
+                (proj_entity, state, proj, att, enemy_proj)
+            } else {
+                continue;
+            };
             let Ok((enemy_e, _attack)) = enemy_attack.get(enemy_proj.entity) else {
                 continue;
             };
@@ -351,7 +348,7 @@ fn check_projectile_hit_player_collisions(
                 hit_by_mob: Some(enemy_proj.mob.clone()),
                 was_crit: false,
             });
-            if anim_option.is_none() {
+            if state.despawn_on_hit {
                 commands.entity(proj_entity).despawn_recursive();
             }
         }

@@ -3,7 +3,7 @@
   templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": FireAttack,
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -20.)),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -20.), despawn_on_hit: false),
         "survival_rogue_like::proto::ColliderCapsulProto": (x1: 4., y1: 10., x2: 4., y2: -10., r: 7.),
         "survival_rogue_like::animations::DoneAnimation": (),
         "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/FireAttack.png", size: (x: 16., y: 26.), cols: 6, rows: 1),

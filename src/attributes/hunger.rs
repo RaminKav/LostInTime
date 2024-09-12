@@ -3,7 +3,13 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::{
-    animations::AttackEvent, item::item_actions::ActionSuccessEvent, player::Player, Game,
+    animations::AttackEvent,
+    item::item_actions::ActionSuccessEvent,
+    player::{
+        skills::{PlayerSkills, Skill},
+        Player,
+    },
+    Game,
 };
 
 use super::CurrentHealth;
@@ -52,13 +58,29 @@ impl Hunger {
 }
 
 pub fn tick_hunger(
-    mut hunger_query: Query<(&mut Hunger, &mut HungerTracker, &mut CurrentHealth), With<Player>>,
+    mut hunger_query: Query<
+        (
+            &mut Hunger,
+            &mut HungerTracker,
+            &mut CurrentHealth,
+            &PlayerSkills,
+        ),
+        With<Player>,
+    >,
     game: Res<Game>,
     time: Res<Time>,
 ) {
-    for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
+    for (mut hunger, mut tracker, mut health, skills) in hunger_query.iter_mut() {
         let is_moving = game.player_state.is_moving;
-        let d = time.delta();
+        let skill_mod = if skills.has(Skill::FullStomach) {
+            0.7
+        } else {
+            1.
+        };
+        let d = Duration::new(
+            (time.delta().as_secs() as f32 * skill_mod) as u64,
+            (time.delta().subsec_nanos() as f32 * skill_mod) as u32,
+        );
         tracker.timer.tick(if is_moving {
             Duration::new(
                 (d.as_secs() as f32 * 1.25) as u64,

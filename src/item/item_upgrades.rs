@@ -2,8 +2,10 @@ use std::time::Duration;
 
 use crate::attributes::{CurrentHealth, MaxHealth};
 use crate::combat::{EnemyDeathEvent, MarkedForDeath};
+use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::player::melee_skills::OnHitAoe;
 use crate::player::skills::{PlayerSkills, Skill};
 use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
 use crate::{
@@ -14,7 +16,10 @@ use crate::{
     GameParam,
 };
 use bevy::prelude::*;
+use bevy_aseprite::anim::AsepriteAnimation;
+use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
+use bevy_rapier2d::prelude::Collider;
 
 use super::{
     projectile::{Projectile, RangedAttack, RangedAttackEvent},
@@ -154,6 +159,7 @@ pub fn handle_on_hit_upgrades(
     mut enemy_death_events: EventWriter<EnemyDeathEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
+    asset_server: Res<AssetServer>,
 ) {
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
@@ -215,6 +221,19 @@ pub fn handle_on_hit_upgrades(
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
                 spawn_delay: 0.1,
             });
+        }
+        if skills.has(Skill::IceStaffFloor) && hit.hit_with_projectile == Some(Projectile::Fireball)
+        {
+            spawn_one_time_aseprite_collider(
+                &mut commands,
+                Transform::from_translation(hit_entity_txfm.translation()),
+                6.5,
+                hit.damage / 5,
+                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
+                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
+                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                true,
+            );
         }
         if skills.has(Skill::LethalBlow)
             && curr_hp.0 <= max_hp.0 / 4

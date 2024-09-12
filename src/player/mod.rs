@@ -11,11 +11,11 @@ use bevy_rapier2d::{
         KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
     },
 };
-use melee_skills::{handle_on_hit_skills, handle_second_split_attack};
+use melee_skills::{handle_echo_after_heal, handle_on_hit_skills, handle_second_split_attack};
 use serde::Deserialize;
 use sprint::{
-    handle_enemy_death_sprint_reset, handle_sprint_timer, handle_sprinting_cooldown,
-    handle_toggle_sprinting,
+    handle_dodge_crit, handle_enemy_death_sprint_reset, handle_sprint_timer,
+    handle_sprinting_cooldown, handle_toggle_sprinting,
 };
 use strum_macros::{Display, EnumIter};
 pub mod currency;
@@ -45,7 +45,10 @@ use crate::{
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
-    ui::{damage_numbers::PreviousHealth, FlashExpBarEvent},
+    ui::{
+        damage_numbers::{handle_add_damage_numbers_after_hit, PreviousHealth},
+        FlashExpBarEvent,
+    },
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
@@ -74,6 +77,7 @@ pub struct PlayerState {
     pub reach_distance: f32,
     pub player_dash_cooldown: Timer,
     pub player_dash_duration: Timer,
+    pub next_hit_crit: bool,
 }
 
 impl Default for PlayerState {
@@ -87,6 +91,7 @@ impl Default for PlayerState {
             reach_distance: 1.5,
             player_dash_cooldown: Timer::from_seconds(1.5, TimerMode::Once),
             player_dash_duration: Timer::from_seconds(0.39, TimerMode::Once),
+            next_hit_crit: false,
         }
     }
 }
@@ -131,7 +136,12 @@ impl Plugin for PlayerPlugin {
                 tick_teleport_timer,
                 handle_second_split_attack,
                 handle_on_hit_skills.after(handle_hits),
+                handle_dodge_crit,
             )
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_systems(
+            (handle_echo_after_heal.before(handle_add_damage_numbers_after_hit),)
                 .in_set(OnUpdate(GameState::Main)),
         )
         .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))

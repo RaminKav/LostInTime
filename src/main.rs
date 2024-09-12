@@ -558,7 +558,8 @@ impl<'w, 's> GameParam<'w, 's> {
         if rng.gen_ratio(
             u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
             100,
-        ) {
+        ) || self.player().next_hit_crit
+        {
             (
                 ((dmg_mult * (dmg + bonus_dmg.0 + dmg_bonus as i32) as f32)
                     * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,

@@ -2,7 +2,10 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use item_abilities::handle_item_abilitiy_on_attack;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, RangeInclusive};
+use std::{
+    cmp::min,
+    ops::{Add, RangeInclusive},
+};
 use strum_macros::{Display, EnumIter};
 
 use bevy::{ecs::system::EntityCommands, prelude::*};
@@ -685,6 +688,14 @@ impl ItemAttributes {
         skills: &PlayerSkills,
     ) {
         let computed_health = self.health + skills.get_count(Skill::Health) * 25;
+        let computed_speed = self.speed.value
+            - if skills.has(Skill::ReinforcedArmor) {
+                5
+            } else {
+                0
+            }
+            - if skills.has(Skill::SwordDMG) { 5 } else { 0 }
+            - if skills.has(Skill::WideSwing) { 5 } else { 0 };
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
         }
@@ -717,14 +728,18 @@ impl ItemAttributes {
             80,
             self.dodge.value + skills.get_count(Skill::DodgeChance) * 10,
         )));
-        entity.insert(Speed(
-            self.speed.value + skills.get_count(Skill::Speed) * 15,
-        ));
+        entity.insert(Speed(computed_speed + skills.get_count(Skill::Speed) * 15));
         entity.insert(Lifesteal(
             self.lifesteal.value + skills.get_count(Skill::Lifesteal) * 10,
         ));
         entity.insert(Defence(
-            self.defence.value + skills.get_count(Skill::Defence) * 10,
+            self.defence.value
+                + skills.get_count(Skill::Defence) * 10
+                + if skills.has(Skill::ReinforcedArmor) {
+                    2 * (min(0, computed_speed) / 5).abs()
+                } else {
+                    0
+                },
         ));
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(self.loot_rate.value));

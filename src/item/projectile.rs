@@ -87,6 +87,7 @@ pub struct ProjectileState {
     pub spawn_offset: Vec2,
     pub rotating: bool,
     pub mana_bar_full: bool,
+    pub despawn_on_hit: bool,
 }
 
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
@@ -283,6 +284,24 @@ fn handle_spawn_projectiles_after_delay(
                 commands.entity(p).insert(Attack(computed_dmg as i32));
             }
             commands.entity(e).despawn_recursive();
+        }
+    }
+}
+
+//TODO: make global timer resource for this
+pub fn handle_reset_proj_hit_enemies_state(
+    mut query: Query<&mut ProjectileState>,
+    mut timer: Local<Timer>,
+    time: Res<Time>,
+) {
+    if timer.duration().as_secs() == 0 {
+        *timer = Timer::from_seconds(1.0, TimerMode::Once);
+    }
+    timer.tick(time.delta());
+    if timer.just_finished() {
+        timer.reset();
+        for mut state in query.iter_mut() {
+            state.hit_entities.clear();
         }
     }
 }

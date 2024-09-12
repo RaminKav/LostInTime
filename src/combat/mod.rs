@@ -3,8 +3,7 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::Collider;
-use collisions::PlayerAttackCollider;
-use combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider, tick_despawn_timer};
+use combat_helpers::{spawn_one_time_aseprite_collider, tick_despawn_timer};
 use rand::Rng;
 pub mod status_effects;
 use status_effects::*;
@@ -38,10 +37,10 @@ use crate::{
     player::{
         levels::{ExperienceReward, PlayerLevel},
         melee_skills::OnHitAoe,
-        skills::{self, PlayerSkills, Skill},
+        skills::{PlayerSkills, Skill},
     },
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort, DEBUG,
 };
 
@@ -247,7 +246,7 @@ fn _spawn_hit_spark_effect(
 
 pub fn handle_hits(
     mut commands: Commands,
-    game: GameParam,
+    mut game: GameParam,
     mut health: Query<(
         Entity,
         &mut CurrentHealth,
@@ -385,6 +384,7 @@ pub fn handle_hits(
                         ),
                     });
                 } else if let Some(mob) = mob_option {
+                    game.player_mut().next_hit_crit = false;
                     analytics_events.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageDealt(mob.clone(), dmg as u32),
                     });
@@ -399,13 +399,24 @@ pub fn handle_hits(
 }
 pub fn cleanup_marked_for_death_entities(
     mut commands: Commands,
-    dead_query: Query<(Entity, &Mob, Option<&Slow>, &GlobalTransform), With<MarkedForDeath>>,
+    dead_query: Query<
+        (
+            Entity,
+            &Mob,
+            Option<&Slow>,
+            Option<&Burning>,
+            &GlobalTransform,
+        ),
+        With<MarkedForDeath>,
+    >,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
     player: Query<(&PlayerSkills, &Attack, &ManaRegen)>,
     asset_server: Res<AssetServer>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    neaby_mobs: Query<(Entity, &GlobalTransform), (With<Mob>, Without<MarkedForDeath>)>,
+    mut status_event: EventWriter<StatusEffectEvent>,
 ) {
-    for (e, mob, slow_option, mob_pos) in dead_query.iter() {
+    for (e, mob, slow_option, poison_option, mob_pos) in dead_query.iter() {
         if mob.is_boss() {
             commands
                 .entity(e)
@@ -427,12 +438,34 @@ pub fn cleanup_marked_for_death_entities(
                         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
                         asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
                         AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                        false,
                     );
                 }
                 if skills.has(Skill::FrozenMPRegen) {
                     modify_mana_event.send(ModifyManaEvent(
                         mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
                     ));
+                }
+            }
+            if let Some(p) = poison_option {
+                if skills.has(Skill::ViralVenum) {
+                    for (mob_e, txfm) in neaby_mobs.iter() {
+                        if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x {
+                            commands.entity(mob_e).insert(Burning {
+                                damage: p.damage,
+                                duration_timer: Timer::from_seconds(
+                                    p.duration_timer.duration().as_secs_f32(),
+                                    TimerMode::Once,
+                                ),
+                                tick_timer: p.tick_timer.clone(),
+                            });
+                            status_event.send(StatusEffectEvent {
+                                entity: mob_e,
+                                effect: StatusEffect::Poison,
+                                num_stacks: 1,
+                            });
+                        }
+                    }
                 }
             }
             commands.entity(e).despawn_recursive();

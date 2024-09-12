@@ -63,6 +63,7 @@ pub enum Skill {
     ParrySpear,       //TODO
     ParryDeflectProj, //TODO
     ParryKnockback,   //TODO
+    ParryEcho,        //TODO
     DaggerCombo,      //TODO
 
     HPRegen,
@@ -87,7 +88,7 @@ pub enum Skill {
     TeleportStatusDMG,
     StaffDMG,
     FrozenAoE,
-    FireStaffLava, //TODO
+    IceStaffFloor,
     FrozenCrit,
     TeleportIceAoe,
     MPBarDMG,
@@ -95,13 +96,17 @@ pub enum Skill {
     FrozenMPRegen,
 
     //rogue
-    DodgeCrit, //TODO
+    DodgeCrit,
     PoisonDuration,
     PoisonStrength,
+    ViralVenum,
 
     //melee
-    HealAoE, //TODO
+    HealAoE,
     SwordDMG,
+    FullStomach,
+    WideSwing, //TODO (wider sword swing hitbox, less speed)
+    ReinforcedArmor,
 }
 
 impl Skill {
@@ -120,6 +125,7 @@ impl Skill {
             Skill::ParrySpear => SkillClass::Melee,
             Skill::ParryDeflectProj => SkillClass::Melee,
             Skill::ParryKnockback => SkillClass::Melee,
+            Skill::ParryEcho => SkillClass::Melee,
             Skill::HPRegen => SkillClass::Melee,
             Skill::OnHitAoEBurst => SkillClass::Melee,
             Skill::Knockback => SkillClass::Melee,
@@ -127,6 +133,9 @@ impl Skill {
             Skill::HPRegenCooldown => SkillClass::Melee,
             Skill::HealAoE => SkillClass::Melee,
             Skill::SwordDMG => SkillClass::Melee,
+            Skill::FullStomach => SkillClass::Melee,
+            Skill::WideSwing => SkillClass::Melee,
+            Skill::ReinforcedArmor => SkillClass::Melee,
 
             Skill::CritChance => SkillClass::Rogue,
             Skill::CritDamage => SkillClass::Rogue,
@@ -150,6 +159,7 @@ impl Skill {
             Skill::DodgeCrit => SkillClass::Rogue,
             Skill::PoisonDuration => SkillClass::Rogue,
             Skill::PoisonStrength => SkillClass::Rogue,
+            Skill::ViralVenum => SkillClass::Rogue,
 
             Skill::SlowStacks => SkillClass::Magic,
             Skill::Teleport => SkillClass::Magic,
@@ -165,7 +175,7 @@ impl Skill {
             Skill::TeleportStatusDMG => SkillClass::Magic,
             Skill::StaffDMG => SkillClass::Magic,
             Skill::FrozenAoE => SkillClass::Magic,
-            Skill::FireStaffLava => SkillClass::Magic,
+            Skill::IceStaffFloor => SkillClass::Magic,
             Skill::FrozenCrit => SkillClass::Magic,
             Skill::TeleportIceAoe => SkillClass::Magic,
             Skill::MPBarDMG => SkillClass::Magic,

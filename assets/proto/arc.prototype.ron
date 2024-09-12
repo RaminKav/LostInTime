@@ -3,7 +3,7 @@
   templates: ["projectile.prototype.ron"],
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": Arc,
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 155., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -20., y: -20.)),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 155., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -20., y: -20.), despawn_on_hit: false),
         "survival_rogue_like::proto::ColliderCapsulProto": (x1: -1., y1: 10., x2: -1., y2: -10., r: 7.),
         "survival_rogue_like::animations::DoneAnimation": (),
         "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/arc.png", size: (x: 23., y: 40.), cols: 6, rows: 1),

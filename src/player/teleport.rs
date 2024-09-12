@@ -124,6 +124,7 @@ pub fn handle_teleport(
                 Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
                 asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
                 AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                false,
             );
             commands.entity(hitbox_e).set_parent(e);
         }

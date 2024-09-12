@@ -4,7 +4,7 @@
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": GreenWhip,
         // "survival_rogue_like::proto::ColliderProto": (x: 24., y: 8.),
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -10.)),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -10., y: -10.), despawn_on_hit: false),
         "survival_rogue_like::item::projectile::ArcProjectileData": (size: (x: 20., y: 16.), col_size: (x: 16., y: 2.), arc: (x: 1.0, y: 1.0), col_points: [1.5707, -0., -1.5, -2.2, -2.4]),
         "survival_rogue_like::animations::DoneAnimation": (),
         "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/greenwhip.png", size: (x: 48., y: 48.), cols: 5, rows: 1),
