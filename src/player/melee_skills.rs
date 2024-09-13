@@ -131,7 +131,7 @@ pub fn handle_echo_after_heal(
 ) {
     for (e, changed_health, prev_health, skills, attack) in changed_health.iter_mut() {
         let delta = changed_health.0 - prev_health.0;
-        if delta == 0 {
+        if delta <= 0 {
             continue;
         }
 

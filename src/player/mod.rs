@@ -32,6 +32,7 @@ use crate::{
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
+        modifiers::handle_modify_health_event,
         Attack, AttackCooldown, AttributeQuality, AttributeValue, CritChance, CritDamage,
         HealthRegen, InvincibilityCooldown, ItemAttributes, Mana, ManaRegen, MaxHealth,
         PlayerAttributeBundle,
@@ -141,7 +142,9 @@ impl Plugin for PlayerPlugin {
                 .in_set(OnUpdate(GameState::Main)),
         )
         .add_systems(
-            (handle_echo_after_heal.before(handle_add_damage_numbers_after_hit),)
+            (handle_echo_after_heal
+                .after(handle_modify_health_event)
+                .before(handle_add_damage_numbers_after_hit),)
                 .in_set(OnUpdate(GameState::Main)),
         )
         .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
@@ -372,5 +375,5 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
     // );
     // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
-    proto_commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
 }
