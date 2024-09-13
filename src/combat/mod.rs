@@ -264,7 +264,6 @@ pub fn handle_hits(
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
-    skills: Query<&PlayerSkills>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -326,10 +325,9 @@ pub fn handle_hits(
                     });
                 }
             } else {
-                let skills = skills.single();
                 let is_player = game.game.player == e;
                 hit_health.0 -= dmg
-                    - if skills.has(Skill::MinusOneDamageOnHit) {
+                    - if game.has_skill(Skill::MinusOneDamageOnHit) {
                         1
                     } else {
                         0
@@ -340,7 +338,7 @@ pub fn handle_hits(
 
                 let mob_kb = if let Some(mob) = mob_option {
                     mob.get_base_kb()
-                        + if skills.has(Skill::Knockback) {
+                        + if game.has_skill(Skill::Knockback) {
                             100.
                         } else {
                             0.

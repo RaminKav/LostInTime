@@ -628,7 +628,7 @@ pub fn get_num_stars(
         };
         let mut num_stars = 0.;
         let max_possible_stars =
-            3. + num_atts - dbg!(*rarity.get_num_bonus_attributes(equip_type).end() as f32);
+            3. + num_atts - *rarity.get_num_bonus_attributes(equip_type).end() as f32;
         if score >= 0.87 {
             num_stars = 3.;
         } else if score > 0.7 {

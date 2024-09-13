@@ -80,7 +80,10 @@ use enemy::EnemyPlugin;
 use inputs::InputsPlugin;
 use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectResource};
-use player::{Player, PlayerPlugin, PlayerState, TimeFragmentCurrency};
+use player::{
+    skills::{PlayerSkills, Skill},
+    Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
+};
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
@@ -341,7 +344,8 @@ pub struct GameParam<'w, 's> {
     pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
 
     //TODO: remove this to use Bevy_Save
-    pub player_query: Query<'w, 's, (Entity, &'static TimeFragmentCurrency), With<Player>>,
+    pub player_query:
+        Query<'w, 's, (Entity, &'static TimeFragmentCurrency, &'static PlayerSkills), With<Player>>,
     pub player_stats: Query<
         'w,
         's,
@@ -546,6 +550,8 @@ impl<'w, 's> GameParam<'w, 's> {
 
     pub fn calculate_player_damage(
         &self,
+        commands: &mut Commands,
+        hit_entity: Entity,
         bonus_crit: u32,
         dmg_mult: Option<f32>,
         dmg_bonus: u32,
@@ -560,6 +566,7 @@ impl<'w, 's> GameParam<'w, 's> {
             100,
         ) || self.player().next_hit_crit
         {
+            commands.entity(hit_entity).insert(WasHitWithCrit);
             (
                 ((dmg_mult * (dmg + bonus_dmg.0 + dmg_bonus as i32) as f32)
                     * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
@@ -571,6 +578,12 @@ impl<'w, 's> GameParam<'w, 's> {
                 false,
             )
         }
+    }
+    pub fn has_skill(&self, skill: Skill) -> bool {
+        self.player_query.single().2.has(skill)
+    }
+    pub fn skill_count(&self, skill: Skill) -> i32 {
+        self.player_query.single().2.get_count(skill)
     }
 }
 

@@ -690,7 +690,9 @@ pub fn mouse_click_system(
             }
             hit_event.send(HitEvent {
                 hit_entity: hit_obj,
-                damage: game.calculate_player_damage(0, None, 0, None).0 as i32,
+                damage: game
+                    .calculate_player_damage(&mut commands, hit_obj, 0, None, 0, None)
+                    .0 as i32,
                 dir: Vec2::new(0., 0.),
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,

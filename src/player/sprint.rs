@@ -165,15 +165,11 @@ pub fn handle_enemy_death_sprint_reset(
     }
 }
 
-pub fn handle_dodge_crit(
-    dodges: EventReader<DodgeEvent>,
-    mut game: GameParam,
-    skills: Query<&PlayerSkills>,
-) {
+pub fn handle_dodge_crit(dodges: EventReader<DodgeEvent>, mut game: GameParam) {
     if dodges.is_empty() {
         return;
     }
-    if skills.single().has(Skill::DodgeCrit) {
+    if game.has_skill(Skill::DodgeCrit) {
         game.player_mut().next_hit_crit = true;
     }
 }

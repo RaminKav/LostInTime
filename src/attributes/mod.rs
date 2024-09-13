@@ -195,7 +195,11 @@ impl ItemAttributes {
         };
         let (base_def_lvl_bonus, base_hp_lvl_bonus) =
             if equip_type.is_equipment() && !equip_type.is_accessory() {
-                (max(0, (level * 2) - 1) as f32, max(0, level - 1) as f32)
+                if level > 1 {
+                    (max(0, (level * 2) - 1) as f32, max(0, level - 1) as f32)
+                } else {
+                    (0., 0.)
+                }
             } else {
                 (0., 0.)
             };

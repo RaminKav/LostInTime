@@ -11,6 +11,7 @@ use crate::{
         WorldObject,
     },
     proto::proto_param::ProtoParam,
+    ui::UIElement,
 };
 
 use super::{sprint::SprintState, teleport::TeleportState};
@@ -59,13 +60,13 @@ pub enum Skill {
     SprintKillReset,
 
     Parry,            //TODO
-    ParyyHPRegen,     //TODO
+    ParryHPRegen,     //TODO
     ParrySpear,       //TODO
     ParryDeflectProj, //TODO
     ParryKnockback,   //TODO
     ParryEcho,        //TODO
-    DaggerCombo,      //TODO
 
+    DaggerCombo, //TODO
     HPRegen,
     HPRegenCooldown,
     MPRegen,
@@ -81,7 +82,7 @@ pub enum Skill {
     ClawDoubleThrow,
     BowMultiShot,
     ChainLightning,
-    FireStaffAoE,
+    IceStaffAoE,
     BowArrowSpeed,
 
     //magic
@@ -121,7 +122,7 @@ impl Skill {
             Skill::FrailStacks => SkillClass::Melee,
             Skill::LethalBlow => SkillClass::Melee,
             Skill::Parry => SkillClass::Melee,
-            Skill::ParyyHPRegen => SkillClass::Melee,
+            Skill::ParryHPRegen => SkillClass::Melee,
             Skill::ParrySpear => SkillClass::Melee,
             Skill::ParryDeflectProj => SkillClass::Melee,
             Skill::ParryKnockback => SkillClass::Melee,
@@ -170,7 +171,7 @@ impl Skill {
             Skill::MPRegen => SkillClass::Magic,
             Skill::DiscountMP => SkillClass::Magic,
             Skill::ChainLightning => SkillClass::Magic,
-            Skill::FireStaffAoE => SkillClass::Magic,
+            Skill::IceStaffAoE => SkillClass::Magic,
             Skill::MPRegenCooldown => SkillClass::Magic,
             Skill::TeleportStatusDMG => SkillClass::Magic,
             Skill::StaffDMG => SkillClass::Magic,
@@ -193,6 +194,8 @@ impl Skill {
             Skill::Lifesteal => "Drain Blood".to_string(),
             Skill::AttackSpeed => "Swift Blows".to_string(),
             Skill::CritLoot => "Eye on the Prize".to_string(),
+            Skill::Defence => "Defence!".to_string(),
+            Skill::Attack => "Strength! ".to_string(),
             Skill::DodgeChance => "Evasion".to_string(),
             Skill::FireDamage => "Fire Aspect".to_string(),
             Skill::WaveAttack => "Sonic Wave".to_string(),
@@ -202,42 +205,75 @@ impl Skill {
             Skill::LethalBlow => "Lethal Blow".to_string(),
             Skill::Teleport => "Teleport".to_string(),
             Skill::TeleportShock => "Shock Step".to_string(),
+            Skill::TeleportCooldown => "Teleport Faster!".to_string(),
+            Skill::TeleportCount => "Multi-port".to_string(),
+            Skill::TeleportManaRegen => "Infused Cast".to_string(),
+            Skill::TeleportStatusDMG => "Shock Mastery".to_string(),
             Skill::ClawDoubleThrow => "Double Throw".to_string(),
             Skill::BowMultiShot => "Multi Shot".to_string(),
             Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
             Skill::ChainLightning => "Chain Lightning".to_string(),
-            Skill::FireStaffAoE => "Explosive Blast".to_string(),
+            Skill::IceStaffAoE => "Explosive Blast".to_string(),
             Skill::Sprint => "Sprint".to_string(),
             Skill::SprintFaster => "Faster Sprint".to_string(),
             Skill::SprintLunge => "Lunge".to_string(),
+            Skill::SprintLungeDamage => "Lunge Mastery".to_string(),
             Skill::SprintKillReset => "Kill Reset".to_string(),
-            _ => "Unknown".to_string(),
+            Skill::Parry => "Parry".to_string(),
+            Skill::ParryHPRegen => "Rejuvenating Parry".to_string(),
+            Skill::ParrySpear => "Gravitational Spear".to_string(),
+            Skill::ParryDeflectProj => "Parry Deflect".to_string(),
+            Skill::ParryKnockback => "Shield Bash".to_string(),
+            Skill::ParryEcho => "Parry Echo".to_string(),
+            Skill::DaggerCombo => "Combo!".to_string(),
+            Skill::HPRegen => "Health Regeneration ".to_string(),
+            Skill::HPRegenCooldown => "HP Regen Cooldown".to_string(),
+            Skill::MPRegenCooldown => "MP Regen Cooldown".to_string(),
+            Skill::MPRegen => "Mana Regeneration".to_string(),
+            Skill::OnHitAoEBurst => "War Cry ".to_string(),
+            Skill::SplitDamage => "Double Stab ".to_string(),
+            Skill::Knockback => "Heavy Strike".to_string(),
+            Skill::DiscountMP => "Mana Discount".to_string(),
+            Skill::MinusOneDamageOnHit => "Polished Armor".to_string(),
+            Skill::ChanceToNotConsumeAmmo => "Ammo Mastery".to_string(),
+            Skill::StaffDMG => "Staff Mastery".to_string(),
+            Skill::FrozenAoE => "Ice Burst".to_string(),
+            Skill::IceStaffFloor => "Ice Trail ".to_string(),
+            Skill::FrozenCrit => "Frozen Wounds".to_string(),
+            Skill::TeleportIceAoe => "Ice Explosion".to_string(),
+            Skill::MPBarDMG => "Mana Infusion".to_string(),
+            Skill::MPBarCrit => "Empowered Spells ".to_string(),
+            Skill::FrozenMPRegen => "Mana Frost".to_string(),
+            Skill::DodgeCrit => "Vengeful Strike".to_string(),
+            Skill::PoisonDuration => "Venum Endurance".to_string(),
+            Skill::PoisonStrength => "Venumous Edge".to_string(),
+            Skill::ViralVenum => "Viral Venum".to_string(),
+            Skill::HealAoE => "Internal Echo".to_string(),
+            Skill::SwordDMG => "Powerful Strike".to_string(),
+            Skill::FullStomach => "Full Stomach".to_string(),
+            Skill::WideSwing => "Wide Swing ".to_string(),
+            Skill::ReinforcedArmor => "Reinforced Armor".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
             Skill::CritChance => vec![
-                "Grants +10% Critical".to_string(),
-                "Chance, permanantly. ".to_string(),
+                "Gain +10% Critical".to_string(),
+                "Chance, ".to_string(),
+                "permanantly.".to_string(),
             ],
             Skill::CritDamage => vec![
-                "Grants +15% Critical".to_string(),
+                "Gain +15% Critical".to_string(),
                 "Damage, permanently".to_string(),
             ],
-            Skill::Health => vec!["Grants +25 Health,".to_string(), "permanently.".to_string()],
-            Skill::Speed => vec!["Grants +15 Speed,".to_string(), "permanently.".to_string()],
-            Skill::Thorns => vec![
-                "Grants +15% Thorns, ".to_string(),
-                "permanently.".to_string(),
-            ],
-            Skill::Lifesteal => vec![
-                "Grants +1 Lifesteal,".to_string(),
-                "permanently.".to_string(),
-            ],
+            Skill::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
+            Skill::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
+            Skill::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
+            Skill::Lifesteal => vec!["Gain +1 Lifesteal,".to_string(), "permanently.".to_string()],
             Skill::AttackSpeed => vec![
-                "Grants +15% Attack".to_string(),
-                "Speed, permanently.".to_string(),
+                "Gain +15% Attack".to_string(),
+                "Speed, permanently. ".to_string(),
             ],
             Skill::CritLoot => vec![
                 "Enemies slayn with a".to_string(),
@@ -246,12 +282,13 @@ impl Skill {
                 "chance.".to_string(),
             ],
             Skill::DodgeChance => vec![
-                "Grants +10% Dodge".to_string(),
-                "Chance, permanently.".to_string(),
+                "Gain +10% Dodge".to_string(),
+                "Chance,".to_string(),
+                "permanently.".to_string(),
             ],
             Skill::FireDamage => vec![
                 "Your melee attacks".to_string(),
-                "deal a second fire".to_string(),
+                "deal a second fire ".to_string(),
                 "attack to enemies.".to_string(),
             ],
             Skill::WaveAttack => vec![
@@ -281,11 +318,11 @@ impl Skill {
             ],
             Skill::LethalBlow => vec![
                 "Melee attacks ".to_string(),
-                "execute enemies".to_string(),
+                "execute enemies ".to_string(),
                 "below 25% health.".to_string(),
             ],
             Skill::Teleport => vec![
-                "Your dodge action".to_string(),
+                "Your Roll ability".to_string(),
                 "becomes Teleport.".to_string(),
             ],
             Skill::TeleportShock => vec![
@@ -293,36 +330,267 @@ impl Skill {
                 "enemies damages".to_string(),
                 "them.".to_string(),
             ],
+            Skill::TeleportCooldown => vec![
+                "Your Teleport".to_string(),
+                "cooldown is".to_string(),
+                "reduced.".to_string(),
+            ],
+            Skill::TeleportCount => vec!["Gain +1 Teleport".to_string(), "count.".to_string()],
+            Skill::TeleportManaRegen => vec![
+                "Attacking right".to_string(),
+                "after a Teleport".to_string(),
+                "triggers mana".to_string(),
+                "regeneration.".to_string(),
+            ],
+            Skill::Sprint => vec![
+                "Your Roll ability".to_string(),
+                "becomes Sprint, ".to_string(),
+                "allowing you to".to_string(),
+                "move very fast.".to_string(),
+            ],
+            Skill::SprintFaster => {
+                vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
+            }
+            Skill::SprintLunge => vec![
+                "Right-click while".to_string(),
+                "sprinting to do".to_string(),
+                "a quick lunge".to_string(),
+                "attack.".to_string(),
+            ],
+            Skill::SprintLungeDamage => vec![
+                "Your Lunge attack".to_string(),
+                "does more damage.".to_string(),
+            ],
+            Skill::SprintKillReset => vec![
+                "Killing an enemy".to_string(),
+                "resets your Sprint".to_string(),
+                "and Lunge attack".to_string(),
+                "cooldown.".to_string(),
+            ],
             Skill::ClawDoubleThrow => vec![
                 "Gain a Claw.".to_string(),
                 "Your Claws throw 2".to_string(),
                 "stars in quick".to_string(),
-                "succession.".to_string(),
+                "succession. ".to_string(),
             ],
             Skill::BowMultiShot => vec![
                 "Gain a Bow.".to_string(),
                 "Your Bows shoot 3".to_string(),
-                "arrows in a spread".to_string(),
+                "arrows in a spread ".to_string(),
                 "pattern.".to_string(),
             ],
             Skill::ChainLightning => vec![
                 "Gain a Lightning ".to_string(),
                 "Staff.".to_string(),
-                "Lighting Staff".to_string(),
+                "Lighting Staff ".to_string(),
                 "bolts now chain to".to_string(),
-                "nearby enemies.".to_string(),
+                "nearby enemies. ".to_string(),
             ],
-            Skill::FireStaffAoE => vec![
-                "Gain a Fire Staff".to_string(),
-                "Fire Staff fireballs".to_string(),
-                "explode on contact,".to_string(),
-                "dealing dmg in an".to_string(),
-                "area.".to_string(),
+            Skill::IceStaffAoE => vec![
+                "Gain an Ice Staff".to_string(),
+                "Ice Staff attacks".to_string(),
+                "triggers an ice".to_string(),
+                "explosion that".to_string(),
+                "damages enemies. ".to_string(),
             ],
             Skill::BowArrowSpeed => {
                 vec!["Your Bow's Arrows".to_string(), "move faster.".to_string()]
             }
-            _ => vec!["Unknown".to_string()],
+            Skill::Attack => vec!["Gain +3 Attack,".to_string(), "permanently.".to_string()],
+            Skill::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
+            Skill::Parry => vec![
+                "Your Roll ability".to_string(),
+                "becomes Parry,".to_string(),
+                "allowing you to".to_string(),
+                "ignore damage and".to_string(),
+                "stun attackers if".to_string(),
+                "successful ".to_string(),
+            ],
+            Skill::ParryHPRegen => vec![
+                "A successful".to_string(),
+                "parry triggers".to_string(),
+                "health regeneration".to_string(),
+            ],
+            Skill::ParrySpear => vec![
+                "A successful".to_string(),
+                "parry allows you".to_string(),
+                "to Right-Click to".to_string(),
+                "do a Spear Attack".to_string(),
+                "that pulls enemies".to_string(),
+                "towards the impact.".to_string(),
+            ],
+            Skill::ParryDeflectProj => vec![
+                "A successful".to_string(),
+                "parry deflects".to_string(),
+                "projectiles.".to_string(),
+            ],
+            Skill::ParryKnockback => vec![
+                "A successful".to_string(),
+                "parry knocks ".to_string(),
+                "back enemies.".to_string(),
+            ],
+            Skill::ParryEcho => vec![
+                "A successful".to_string(),
+                "parry triggers".to_string(),
+                "an echo that".to_string(),
+                "damages enemies".to_string(),
+                "around you.".to_string(),
+            ],
+            Skill::DaggerCombo => vec![
+                "Attacks chained".to_string(),
+                "together build ".to_string(),
+                "Combo, increasing ".to_string(),
+                "your critical ".to_string(),
+                "damage.".to_string(),
+            ],
+            Skill::HPRegen => vec![
+                "Gain +5 Health".to_string(),
+                "regeneration, ".to_string(),
+                "permanently.".to_string(),
+            ],
+            Skill::MPRegen => vec![
+                "Gain +5 Mana ".to_string(),
+                "regeneration,".to_string(),
+                "permanently.".to_string(),
+            ],
+            Skill::HPRegenCooldown => vec![
+                "Your Health".to_string(),
+                "regeneration".to_string(),
+                "cooldown is.".to_string(),
+                "reduced.".to_string(),
+            ],
+            Skill::MPRegenCooldown => vec![
+                "Your Mana".to_string(),
+                "regeneration".to_string(),
+                "cooldown is.".to_string(),
+                "reduced.".to_string(),
+            ],
+            Skill::OnHitAoEBurst => vec![
+                "After taking ".to_string(),
+                "damage, trigger".to_string(),
+                "an echo that".to_string(),
+                "damages enemies".to_string(),
+                "around you. ".to_string(),
+            ],
+            Skill::SplitDamage => vec![
+                "Your melee".to_string(),
+                "attacks are split".to_string(),
+                "into two separate".to_string(),
+                "hits, each dealing".to_string(),
+                "half the damage. ".to_string(),
+            ],
+            Skill::Knockback => vec![
+                "Your attacks".to_string(),
+                "knockback enemies".to_string(),
+                "further. ".to_string(),
+            ],
+            Skill::DiscountMP => vec![
+                "Your staffs' attacks".to_string(),
+                "cost less mana.".to_string(),
+            ],
+            Skill::MinusOneDamageOnHit => vec![
+                "All incoming enemy ".to_string(),
+                "damage is reduced".to_string(),
+                "by one. ".to_string(),
+            ],
+            Skill::ChanceToNotConsumeAmmo => vec![
+                "You have a 33%".to_string(),
+                "chance to not".to_string(),
+                "consume ammo.".to_string(),
+            ],
+            Skill::TeleportStatusDMG => vec![
+                "Teleporting through".to_string(),
+                "an enemy with a".to_string(),
+                "status effect deals".to_string(),
+                "more damage.".to_string(),
+            ],
+            Skill::StaffDMG => vec!["Your Staffs deal".to_string(), "+3 damage.".to_string()],
+            Skill::FrozenAoE => vec![
+                "Killing a frozen".to_string(),
+                "enemy triggers an".to_string(),
+                "ice explosion that".to_string(),
+                "damages enemies.".to_string(),
+            ],
+            Skill::IceStaffFloor => vec![
+                "Your Ice Staff's".to_string(),
+                "attacks leave a".to_string(),
+                "trail of ice that".to_string(),
+                "damages enemies. ".to_string(),
+            ],
+            Skill::FrozenCrit => vec![
+                "Attacking frozen".to_string(),
+                "enemies gives you".to_string(),
+                "+10% critical hit".to_string(),
+                "chance.".to_string(),
+            ],
+            Skill::TeleportIceAoe => vec![
+                "Teleporting triggers".to_string(),
+                "an ice explosion".to_string(),
+                "that damages enemies.".to_string(),
+            ],
+            Skill::MPBarDMG => vec![
+                "Your staff's attacks".to_string(),
+                "gain +25% damage".to_string(),
+                "if your mana bar".to_string(),
+                "is full.".to_string(),
+            ],
+            Skill::MPBarCrit => vec![
+                "Your staff's attacks".to_string(),
+                "gain +10% critical".to_string(),
+                "hit chance if your".to_string(),
+                "mana bar is full.".to_string(),
+            ],
+            Skill::FrozenMPRegen => vec![
+                "Killing a frozen".to_string(),
+                "enemy triggers".to_string(),
+                "mana regeneration.".to_string(),
+            ],
+            Skill::DodgeCrit => vec![
+                "The next attack".to_string(),
+                "after dodging".to_string(),
+                "is a critical hit.".to_string(),
+            ],
+            Skill::PoisonDuration => vec![
+                "Your poison effect".to_string(),
+                "lasts longer.".to_string(),
+            ],
+            Skill::PoisonStrength => vec![
+                "Your poison effect".to_string(),
+                "does more damage.".to_string(),
+            ],
+            Skill::ViralVenum => vec![
+                "Killing a poisoned".to_string(),
+                "enemy spreads it's".to_string(),
+                "poison to nearby".to_string(),
+                "enemies.".to_string(),
+            ],
+            Skill::HealAoE => vec![
+                "Healing triggers".to_string(),
+                "an echo that".to_string(),
+                "damages enemies ".to_string(),
+                "around you.".to_string(),
+            ],
+            Skill::SwordDMG => vec![
+                "Your Swords deal".to_string(),
+                "+3 Damage but you".to_string(),
+                "lose 5 speed.".to_string(),
+            ],
+            Skill::FullStomach => vec![
+                "You get hungry".to_string(),
+                "at a slower rate.".to_string(),
+            ],
+            Skill::WideSwing => vec![
+                "Your Swords' attacks".to_string(),
+                "are wider and".to_string(),
+                "larger, but you".to_string(),
+                "lose 5 speed.".to_string(),
+            ],
+            Skill::ReinforcedArmor => vec![
+                "You gain Defence".to_string(),
+                "the more speed ".to_string(),
+                "you have lost. Lose".to_string(),
+                "5 speed. ".to_string(),
+            ],
         }
     }
 
@@ -331,7 +599,7 @@ impl Skill {
             Skill::ClawDoubleThrow => Some((WorldObject::Claw, 1)),
             Skill::BowMultiShot => Some((WorldObject::WoodBow, 1)),
             Skill::ChainLightning => Some((WorldObject::BasicStaff, 1)),
-            Skill::FireStaffAoE => Some((WorldObject::FireStaff, 1)),
+            Skill::IceStaffAoE => Some((WorldObject::FireStaff, 1)),
             Skill::BowArrowSpeed => Some((WorldObject::Arrow, 24)),
             _ => None,
         }
@@ -372,7 +640,7 @@ impl Skill {
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     count: 1,
                     max_count: 1,
-                    timer: Timer::from_seconds(0.45, TimerMode::Once),
+                    timer: Timer::from_seconds(0.27, TimerMode::Once),
                 });
             }
             &Skill::TeleportCount => {
@@ -381,11 +649,25 @@ impl Skill {
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     count: skills.get_count(Skill::TeleportCount) as u32,
                     max_count: 2,
-                    timer: Timer::from_seconds(0.45, TimerMode::Once),
+                    timer: Timer::from_seconds(0.27, TimerMode::Once),
                 });
             }
 
             _ => {}
+        }
+    }
+    pub fn get_ui_element(&self) -> UIElement {
+        match self.get_class() {
+            SkillClass::Melee => UIElement::SkillChoice,
+            SkillClass::Rogue => UIElement::SkillChoice,
+            SkillClass::Magic => UIElement::SkillChoice,
+        }
+    }
+    pub fn get_ui_element_hover(&self) -> UIElement {
+        match self.get_class() {
+            SkillClass::Melee => UIElement::SkillChoiceMeleeHover,
+            SkillClass::Rogue => UIElement::SkillChoiceRogueHover,
+            SkillClass::Magic => UIElement::SkillChoiceMagicHover,
         }
     }
 
@@ -450,11 +732,13 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::MPRegenCooldown),
                 SkillChoiceState::new(Skill::MPRegen),
                 SkillChoiceState::new(Skill::SplitDamage),
+                SkillChoiceState::new(Skill::DodgeCrit),
                 SkillChoiceState::new(Skill::Knockback),
                 SkillChoiceState::new(Skill::DiscountMP),
                 SkillChoiceState::new(Skill::ChanceToNotConsumeAmmo),
                 SkillChoiceState::new(Skill::MinusOneDamageOnHit),
                 SkillChoiceState::new(Skill::OnHitAoEBurst),
+                SkillChoiceState::new(Skill::HealAoE),
                 SkillChoiceState::new(Skill::Sprint)
                     .with_children(vec![
                         SkillChoiceState::new(Skill::SprintFaster),
@@ -463,7 +747,7 @@ impl Default for SkillChoiceQueue {
                             SkillChoiceState::new(Skill::SprintLungeDamage),
                         ]),
                     ])
-                    .with_clashing(vec![Skill::Teleport]),
+                    .with_clashing(vec![Skill::Teleport, Skill::Parry]),
                 SkillChoiceState::new(Skill::CritChance)
                     .set_repeatable()
                     .with_children(vec![
@@ -483,24 +767,52 @@ impl Default for SkillChoiceQueue {
                         SkillChoiceState::new(Skill::AttackSpeed).set_repeatable(),
                         SkillChoiceState::new(Skill::WaveAttack),
                     ]),
+                SkillChoiceState::new(Skill::MPBarDMG),
+                SkillChoiceState::new(Skill::MPBarCrit),
                 SkillChoiceState::new(Skill::LethalBlow),
                 SkillChoiceState::new(Skill::DodgeChance).set_repeatable(),
                 SkillChoiceState::new(Skill::FireDamage),
-                SkillChoiceState::new(Skill::SlowStacks),
-                SkillChoiceState::new(Skill::PoisonStacks),
+                SkillChoiceState::new(Skill::SlowStacks).with_children(vec![
+                    SkillChoiceState::new(Skill::FrozenAoE),
+                    SkillChoiceState::new(Skill::FrozenCrit),
+                    SkillChoiceState::new(Skill::FrozenMPRegen),
+                ]),
+                SkillChoiceState::new(Skill::IceStaffFloor),
+                SkillChoiceState::new(Skill::PoisonStacks).with_children(vec![
+                    SkillChoiceState::new(Skill::PoisonDuration),
+                    SkillChoiceState::new(Skill::PoisonStrength),
+                    SkillChoiceState::new(Skill::ViralVenum),
+                ]),
                 SkillChoiceState::new(Skill::Teleport)
                     .with_children(vec![
-                        SkillChoiceState::new(Skill::TeleportShock),
+                        SkillChoiceState::new(Skill::TeleportShock)
+                            .with_children(vec![SkillChoiceState::new(Skill::TeleportStatusDMG)]),
                         SkillChoiceState::new(Skill::TeleportCooldown),
                         SkillChoiceState::new(Skill::TeleportCount),
                         SkillChoiceState::new(Skill::TeleportManaRegen),
+                        SkillChoiceState::new(Skill::TeleportIceAoe),
                     ])
-                    .with_clashing(vec![Skill::Sprint]),
+                    .with_clashing(vec![Skill::Sprint, Skill::Parry]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),
                 SkillChoiceState::new(Skill::BowMultiShot)
                     .with_children(vec![SkillChoiceState::new(Skill::BowArrowSpeed)]),
                 SkillChoiceState::new(Skill::ChainLightning),
-                SkillChoiceState::new(Skill::FireStaffAoE),
+                SkillChoiceState::new(Skill::IceStaffAoE),
+                SkillChoiceState::new(Skill::StaffDMG),
+                SkillChoiceState::new(Skill::SwordDMG),
+                SkillChoiceState::new(Skill::FullStomach),
+                SkillChoiceState::new(Skill::WideSwing),
+                SkillChoiceState::new(Skill::ReinforcedArmor),
+                SkillChoiceState::new(Skill::DaggerCombo),
+                SkillChoiceState::new(Skill::Parry)
+                    .with_children(vec![
+                        SkillChoiceState::new(Skill::ParryHPRegen),
+                        SkillChoiceState::new(Skill::ParrySpear),
+                        SkillChoiceState::new(Skill::ParryDeflectProj),
+                        SkillChoiceState::new(Skill::ParryKnockback),
+                        SkillChoiceState::new(Skill::ParryEcho),
+                    ])
+                    .with_clashing(vec![Skill::Sprint, Skill::Teleport]),
             ],
         }
     }

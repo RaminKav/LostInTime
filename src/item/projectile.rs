@@ -190,7 +190,7 @@ fn handle_ranged_attack_event(
             let mut rng = rand::thread_rng();
             // 1/3 chance to not consume ammo
             if !skills.has(Skill::ChanceToNotConsumeAmmo)
-                || rng.gen_bool((1. * skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
+                || rng.gen_bool((3. - skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
             {
                 if let Some(proj_slot) = inv
                     .single()
@@ -278,7 +278,11 @@ fn handle_spawn_projectiles_after_delay(
                     });
                 }
                 let player_att = game.player_stats.single().0;
-                let mana_full_bonus = if proj.was_mana_bar_full { 1.25 } else { 1. };
+                let mana_full_bonus = if game.has_skill(Skill::MPBarDMG) && proj.was_mana_bar_full {
+                    1.25
+                } else {
+                    1.
+                };
                 let computed_dmg =
                     proj.dmg_override.unwrap_or(player_att.0 as i32) as f32 * mana_full_bonus;
                 commands.entity(p).insert(Attack(computed_dmg as i32));

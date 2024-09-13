@@ -134,7 +134,7 @@ impl Plugin for PlayerPlugin {
                 tick_just_teleported,
                 handle_teleport,
                 tick_teleport_timer,
-                handle_second_split_attack,
+                handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
                 handle_on_hit_skills.after(handle_hits),
                 handle_dodge_crit,
             )
@@ -142,7 +142,7 @@ impl Plugin for PlayerPlugin {
         )
         .add_systems(
             (handle_echo_after_heal.before(handle_add_damage_numbers_after_hit),)
-                .in_base_set(CoreSet::PostUpdate),
+                .in_set(OnUpdate(GameState::Main)),
         )
         .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
         .add_system(handle_move_player.before(CustomFlush))

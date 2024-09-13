@@ -9,7 +9,7 @@ use crate::{
     item::WorldObject,
     status_effects::Frail,
     ui::damage_numbers::PreviousHealth,
-    GameParam, HitEvent, InvincibilityTimer, WasHitWithCrit,
+    GameParam, HitEvent, InvincibilityTimer,
 };
 
 use super::{sprint::SprintState, Player, PlayerSkills, Skill};
@@ -74,8 +74,14 @@ pub fn handle_second_split_attack(
             continue;
         };
         let (skills, maybe_sprint) = player.single();
-
+        let sword_skill_bonus = if skills.has(Skill::SwordDMG) && second_hit.weapon_obj.is_sword() {
+            3
+        } else {
+            0
+        };
         let (damage, was_crit) = game.calculate_player_damage(
+            &mut commands,
+            e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
             if skills.has(Skill::SprintLungeDamage)
                 && maybe_sprint.unwrap().lunge_duration.percent() != 0.
@@ -84,16 +90,16 @@ pub fn handle_second_split_attack(
             } else {
                 None
             },
-            0,
+            sword_skill_bonus,
             None,
         );
+
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
         if let Ok(lifesteal) = lifesteal.get(game.game.player) {
             modify_health_events.send(ModifyHealthEvent(f32::floor(
                 split_damage as f32 * lifesteal.0 as f32 / 100.,
             ) as i32));
         }
-        info!("SPLIT 2 {} {:?}", split_damage, was_crit);
 
         hit_event.send(HitEvent {
             hit_entity: e,
@@ -105,9 +111,6 @@ pub fn handle_second_split_attack(
             hit_by_mob: None,
             ignore_tool: false,
         });
-        if was_crit {
-            commands.entity(e).insert(WasHitWithCrit);
-        }
         commands.entity(e).remove::<SecondHitDelay>();
     }
 }

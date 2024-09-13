@@ -28,7 +28,7 @@ use super::{
     SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
-#[derive(Component, Debug, EnumIter, Display, Hash, PartialEq, Eq)]
+#[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
 pub enum UIElement {
     Inventory,
     ChestInventory,
@@ -67,9 +67,16 @@ pub enum UIElement {
     ScreenIconSlot,
     Options,
     SkillChoice,
-    SkillChoiceHover,
+    SkillChoiceMelee,
+    SkillChoiceRogue,
+    SkillChoiceMagic,
+    SkillChoiceMeleeHover,
+    SkillChoiceRogueHover,
+    SkillChoiceMagicHover,
     StarIcon,
     InfoModal,
+    TitleBar,
+    SkillClassTracker,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -765,11 +772,12 @@ pub fn handle_cursor_skills_buttons(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    let ui_element = state.skill_choice.skill.get_ui_element_hover();
                     // swap to hover img
-                    commands.entity(e).insert(UIElement::SkillChoiceHover);
                     commands
                         .entity(e)
-                        .insert(graphics.get_ui_element_texture(UIElement::SkillChoiceHover));
+                        .insert(ui_element.clone())
+                        .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
@@ -798,12 +806,13 @@ pub fn handle_cursor_skills_buttons(
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
+                let ui_element = state.skill_choice.skill.get_ui_element();
 
                 interactable.change(Interaction::None);
-                commands.entity(e).insert(UIElement::SkillChoice);
                 commands
                     .entity(e)
-                    .insert(graphics.get_ui_element_texture(UIElement::SkillChoice));
+                    .insert(ui_element.clone())
+                    .insert(graphics.get_ui_element_texture(ui_element));
             }
         }
     }

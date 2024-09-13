@@ -209,8 +209,7 @@ pub fn handle_on_hit_upgrades(
         let Some(main_hand) = game.player().main_hand_slot else {
             continue;
         };
-        if skills.has(Skill::FireStaffAoE) && hit.hit_with_projectile == Some(Projectile::Fireball)
-        {
+        if skills.has(Skill::IceStaffAoE) && hit.hit_with_projectile == Some(Projectile::Fireball) {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::FireExplosionAOE,
                 direction: Vec2::ZERO,

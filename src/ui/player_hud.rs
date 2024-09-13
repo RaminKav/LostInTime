@@ -406,23 +406,42 @@ pub fn setup_skills_class_text(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
+    graphics: Res<Graphics>,
 ) {
+    let skill_class_hud_frame = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(UIElement::SkillClassTracker),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(63., 16.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    -res.game_width / 2. + 68.5,
+                    (GAME_HEIGHT - 15.) / 2. - 35.5,
+                    6.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Name::new("SKILL CLASS HUD"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
     let text = spawn_text(
         &mut commands,
         &asset_server,
-        Vec3::new(
-            -res.game_width / 2. + 98.,
-            (GAME_HEIGHT - 15.) / 2. - 28.5,
-            6.,
-        ),
+        Vec3::new(-23., -1., 1.),
         BLACK,
-        "R: , G: , B: ".to_string(),
-        Anchor::Center,
+        "  0     0     0".to_string(),
+        Anchor::CenterLeft,
         1.,
         3,
     );
     commands
         .entity(text)
+        .set_parent(skill_class_hud_frame)
         .insert(Name::new("SKILLS CLASS TEXT"))
         .insert(SkillClassText);
 }
@@ -481,7 +500,7 @@ pub fn handle_update_player_skills(
 
             let mut text = skill_class_text.single_mut();
             text.sections[0].value = format!(
-                "R: {:} G: {:?} B: {:?}",
+                "  {:}     {:?}     {:?}",
                 new_skills.melee_skill_count,
                 new_skills.rogue_skill_count,
                 new_skills.magic_skill_count

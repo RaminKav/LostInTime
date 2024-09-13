@@ -25,7 +25,7 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
 
-use super::{Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow, WasHitWithCrit};
+use super::{Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow};
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -95,6 +95,8 @@ fn check_melee_hit_collisions(
                 0
             };
             let (damage, was_crit) = game.calculate_player_damage(
+                &mut commands,
+                hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
                 if skills.has(Skill::SprintLungeDamage)
                     && maybe_sprint.unwrap().lunge_duration.percent() != 0.
@@ -147,9 +149,6 @@ fn check_melee_hit_collisions(
                     ignore_tool: false,
                 });
             }
-            if was_crit {
-                commands.entity(hit_entity).insert(WasHitWithCrit);
-            }
         }
     }
 }
@@ -173,7 +172,6 @@ fn check_projectile_hit_mob_collisions(
     mut children: Query<&Parent>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     status_check: Query<(Option<&Burning>, Option<&Slow>, Option<&Frail>)>,
-    skills: Query<&PlayerSkills>,
     game: GameParam,
 ) {
     for evt in collisions.iter() {
@@ -214,26 +212,31 @@ fn check_projectile_hit_mob_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
-            let skills = skills.single();
             let (burning, slow, frail) = status_check.get(*e2).unwrap();
             let is_slowed = slow.is_some();
             let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
-            let staff_skill_bonus = if skills.has(Skill::StaffDMG) && proj.is_staff_proj() {
+            let staff_skill_bonus = if game.has_skill(Skill::StaffDMG) && proj.is_staff_proj() {
                 3
             } else {
                 0
             };
-            let crit_bonus = if is_slowed && skills.has(Skill::FrozenCrit) {
+            let crit_bonus = if is_slowed && game.has_skill(Skill::FrozenCrit) {
                 10
             } else {
                 0
-            } + if state.mana_bar_full && skills.has(Skill::MPBarCrit) {
+            } + if state.mana_bar_full && game.has_skill(Skill::MPBarCrit) {
                 10
             } else {
                 0
             };
-            let (mut damage, was_crit) =
-                game.calculate_player_damage(crit_bonus, None, staff_skill_bonus, Some(att.0));
+            let (mut damage, was_crit) = game.calculate_player_damage(
+                &mut commands,
+                *e2,
+                crit_bonus,
+                None,
+                staff_skill_bonus,
+                Some(att.0),
+            );
             if let Some(lifesteal) = lifesteal {
                 if !is_world_obj.contains(*e2) && tp_shock.is_none() {
                     modify_health_events.send(ModifyHealthEvent(f32::floor(
@@ -242,7 +245,8 @@ fn check_projectile_hit_mob_collisions(
                 }
             }
 
-            if is_status_effected && tp_shock.is_some() && skills.has(Skill::TeleportStatusDMG) {
+            if is_status_effected && tp_shock.is_some() && game.has_skill(Skill::TeleportStatusDMG)
+            {
                 damage = f32::ceil(damage as f32 * 2.) as u32;
             }
             hit_event.send(HitEvent {
@@ -258,9 +262,6 @@ fn check_projectile_hit_mob_collisions(
             //non-animating sprites are despawned immediately
             if state.despawn_on_hit {
                 commands.entity(proj_entity).despawn_recursive();
-            }
-            if was_crit {
-                commands.entity(*e2).insert(WasHitWithCrit);
             }
         }
     }

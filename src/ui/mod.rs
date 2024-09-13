@@ -44,6 +44,7 @@ pub use essence_ui::*;
 
 use crate::{
     client::{load_state, ClientState},
+    handle_hits,
     item::item_actions::ActionSuccessEvent,
     CustomFlush, Game, GameState, DEBUG,
 };
@@ -136,7 +137,8 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 handle_add_damage_numbers_after_hit
-                    .in_base_set(CoreSet::PostUpdate)
+                    .before(handle_hits)
+                    .in_set(OnUpdate(GameState::Main))
                     .run_if(resource_exists::<Game>()),
             )
             .add_systems(
