@@ -107,7 +107,7 @@ pub fn handle_shrine_rewards(
                 WorldObject::WoodBow,
                 WorldObject::Claw,
                 // WorldObject::MiracleSeed,
-                WorldObject::FireStaff,
+                WorldObject::IceStaff,
                 WorldObject::BasicStaff,
                 WorldObject::MagicWhip,
                 WorldObject::LeatherPants,
@@ -122,10 +122,7 @@ pub fn handle_shrine_rewards(
             if shrine.num_mobs_left == 0 {
                 // give rewards
                 proto_commands.spawn_item_from_proto(
-                    *drop_list
-                        .iter()
-                        .choose(&mut rand::thread_rng())
-                        .unwrap(),
+                    *drop_list.iter().choose(&mut rand::thread_rng()).unwrap(),
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
                     1,

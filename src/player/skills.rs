@@ -599,7 +599,7 @@ impl Skill {
             Skill::ClawDoubleThrow => Some((WorldObject::Claw, 1)),
             Skill::BowMultiShot => Some((WorldObject::WoodBow, 1)),
             Skill::ChainLightning => Some((WorldObject::BasicStaff, 1)),
-            Skill::IceStaffAoE => Some((WorldObject::FireStaff, 1)),
+            Skill::IceStaffAoE => Some((WorldObject::IceStaff, 1)),
             Skill::BowArrowSpeed => Some((WorldObject::Arrow, 24)),
             _ => None,
         }

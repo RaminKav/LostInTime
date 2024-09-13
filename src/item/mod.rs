@@ -187,7 +187,7 @@ impl ActiveMainHandState {
             WorldObject::WoodAxe => 2.,
             WorldObject::WoodPickaxe => 2.,
             WorldObject::Dagger => 3.,
-            WorldObject::FireStaff => 4.,
+            WorldObject::IceStaff => 4.,
             WorldObject::BasicStaff => 0.,
             WorldObject::Claw => 1.,
             WorldObject::WoodBow => 1.,
@@ -258,7 +258,7 @@ pub enum WorldObject {
     Log,
     Sword,
     BasicStaff,
-    FireStaff,
+    IceStaff,
     Chestplate,
     MetalPants,
     MetalShoes,
@@ -563,7 +563,7 @@ impl WorldObject {
             WorldObject::Dagger => true,
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
-            WorldObject::FireStaff => true,
+            WorldObject::IceStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             _ => false,
@@ -582,7 +582,7 @@ impl WorldObject {
         match self {
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
-            WorldObject::FireStaff => true,
+            WorldObject::IceStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             _ => false,
@@ -590,7 +590,7 @@ impl WorldObject {
     }
     pub fn is_magic_weapon(&self) -> bool {
         match self {
-            WorldObject::FireStaff => true,
+            WorldObject::IceStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             _ => false,
@@ -639,7 +639,7 @@ impl WorldObject {
             WorldObject::Dagger => 1,
             WorldObject::Claw => 2,
             WorldObject::WoodBow => 2,
-            WorldObject::FireStaff => 2,
+            WorldObject::IceStaff => 2,
             WorldObject::BasicStaff => 2,
             WorldObject::MagicWhip => 2,
             _ => 0,

@@ -69,7 +69,7 @@
 ### Changes
 
 - Increased pickup distance for item drops
-- Nerfed fire staff (decreased explosion damage and hitbox size)
+- Nerfed Ice Staff (decreased explosion damage and hitbox size)
 - Wave attack, fire attack, and teleport shock damage now scales with attack (varying amounts)
 - Manual Save button moved to U instead of ESC so it doesnt lag when you close inventories
 - Nerfed drop rates of equipment and some weapons, small potions, and tomes/orbs

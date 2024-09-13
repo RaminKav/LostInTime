@@ -64,7 +64,7 @@
                 rate: 0.008
             ),
             (
-                item: FireStaff,
+                item: IceStaff,
                 min: 1,
                 max: 1,
                 rate: 0.008
@@ -181,5 +181,5 @@
         ),
   }
 )
-// sword, dagger, claw, WoodBow, basicstaff, firestaff, magicwhip, ring, pendant, chestplate, pants, boots
+// sword, dagger, claw, WoodBow, basicstaff, IceStaff, magicwhip, ring, pendant, chestplate, pants, boots
 // 9/

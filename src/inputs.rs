@@ -446,7 +446,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_item_from_proto(WorldObject::FireStaff, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);

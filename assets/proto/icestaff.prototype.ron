@@ -1,8 +1,8 @@
 (
-  name: "FireStaff",
+  name: "IceStaff",
   templates: ["item_drop.prototype.ron"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": FireStaff,
+  "survival_rogue_like::item::WorldObject": IceStaff,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
         attack: Some((start: 8, end: 12)),
@@ -22,13 +22,13 @@
   "survival_rogue_like::item::item_actions::ManaCost": (15),
   "survival_rogue_like::item::projectile::RangedAttack": (Fireball),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: FireStaff,
+        obj_type: IceStaff,
         attributes: (
             attack_cooldown: 0.85
         ),
         metadata: (
-            name: "Fire Staff", 
-            desc: ["A fire staff."]
+            name: "Ice Staff", 
+            desc: ["A Ice Staff."]
         ),
         count: 1
   ),

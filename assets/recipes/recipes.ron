@@ -46,5 +46,5 @@
     (MetalShard, MetalBar),
     (RawMeat, CookedMeat),
 ],
-[WoodSword, Sword, Chestplate, MetalPants, MetalShoes, LeatherTunic, LeatherPants, LeatherShoes, ForestShirt, ForestPants, ForestShoes, WoodAxe, WoodPickaxe, Dagger, Claw, WoodBow, FireStaff, BasicStaff, MagicWhip ]
+[WoodSword, Sword, Chestplate, MetalPants, MetalShoes, LeatherTunic, LeatherPants, LeatherShoes, ForestShirt, ForestPants, ForestShoes, WoodAxe, WoodPickaxe, Dagger, Claw, WoodBow, IceStaff, BasicStaff, MagicWhip ]
 )

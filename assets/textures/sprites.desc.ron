@@ -85,7 +85,7 @@
             size: (16., 16.),
             anchor: Some((0.2, 0.25)),
         ),
-        FireStaff: WorldObjectData(
+        IceStaff: WorldObjectData(
             texture_pos: (5., 4.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
@@ -768,7 +768,7 @@
             texture_pos: (4., 5.),
             size: (16., 16.),
         ),
-        FireStaff: SpriteData(
+        IceStaff: SpriteData(
             texture_pos: (5., 5.),
             size: (16., 16.),
         ),
