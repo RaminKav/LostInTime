@@ -12,9 +12,14 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::UIElement,
+    Game,
 };
 
-use super::{sprint::SprintState, teleport::TeleportState};
+use super::{
+    melee_skills::ParryState,
+    sprint::{ComboCounter, SprintState},
+    teleport::TeleportState,
+};
 
 pub enum SkillClass {
     Melee,
@@ -59,20 +64,20 @@ pub enum Skill {
     SprintLungeDamage,
     SprintKillReset,
 
-    Parry,            //TODO
-    ParryHPRegen,     //TODO
-    ParrySpear,       //TODO
-    ParryDeflectProj, //TODO
-    ParryKnockback,   //TODO
-    ParryEcho,        //TODO
+    Parry,
+    ParryHPRegen,
+    ParrySpear,
+    ParryDeflectProj,
+    ParryKnockback,
+    ParryEcho,
 
-    DaggerCombo, //TODO
+    DaggerCombo,
     HPRegen,
     HPRegenCooldown,
     MPRegen,
     MPRegenCooldown,
     OnHitAoEBurst,
-    SplitDamage,
+    SplitDamage, //TODO animation missing
     Knockback,
     DiscountMP,
     MinusOneDamageOnHit,
@@ -106,7 +111,7 @@ pub enum Skill {
     HealAoE,
     SwordDMG,
     FullStomach,
-    WideSwing, //TODO (wider sword swing hitbox, less speed)
+    WideSwing, //TODO animation missing
     ReinforcedArmor,
 }
 
@@ -610,6 +615,7 @@ impl Skill {
         entity: Entity,
         commands: &mut Commands,
         skills: PlayerSkills,
+        game: &mut Game,
     ) {
         match self {
             Skill::ClawDoubleThrow => {
@@ -650,6 +656,25 @@ impl Skill {
                     count: skills.get_count(Skill::TeleportCount) as u32,
                     max_count: 2,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
+                });
+            }
+            &Skill::DaggerCombo => {
+                commands.entity(entity).insert(ComboCounter {
+                    counter: 0,
+                    reset_timer: Timer::from_seconds(2., TimerMode::Once),
+                });
+            }
+            &Skill::WideSwing => {
+                //resets collider
+                game.player_state.main_hand_slot = None;
+            }
+            &Skill::Parry => {
+                commands.entity(entity).insert(ParryState {
+                    parry_timer: Timer::from_seconds(0.7, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once),
+                    spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
+                    success: false,
+                    active: false,
                 });
             }
 
@@ -735,7 +760,7 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::DodgeCrit),
                 SkillChoiceState::new(Skill::Knockback),
                 SkillChoiceState::new(Skill::DiscountMP),
-                SkillChoiceState::new(Skill::ChanceToNotConsumeAmmo),
+                SkillChoiceState::new(Skill::ChanceToNotConsumeAmmo).set_repeatable(),
                 SkillChoiceState::new(Skill::MinusOneDamageOnHit),
                 SkillChoiceState::new(Skill::OnHitAoEBurst),
                 SkillChoiceState::new(Skill::HealAoE),
@@ -748,25 +773,17 @@ impl Default for SkillChoiceQueue {
                         ]),
                     ])
                     .with_clashing(vec![Skill::Teleport, Skill::Parry]),
-                SkillChoiceState::new(Skill::CritChance)
-                    .set_repeatable()
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::CritDamage).set_repeatable(),
-                        SkillChoiceState::new(Skill::CritLoot),
-                        SkillChoiceState::new(Skill::FrailStacks),
-                    ]),
+                SkillChoiceState::new(Skill::CritChance).set_repeatable(),
+                SkillChoiceState::new(Skill::CritDamage).set_repeatable(),
+                SkillChoiceState::new(Skill::CritLoot),
+                SkillChoiceState::new(Skill::FrailStacks),
                 SkillChoiceState::new(Skill::Health)
                     .set_repeatable()
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::Lifesteal),
-                        SkillChoiceState::new(Skill::Thorns).set_repeatable(),
-                    ]),
-                SkillChoiceState::new(Skill::Speed)
-                    .set_repeatable()
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::AttackSpeed).set_repeatable(),
-                        SkillChoiceState::new(Skill::WaveAttack),
-                    ]),
+                    .with_children(vec![SkillChoiceState::new(Skill::Lifesteal)]),
+                SkillChoiceState::new(Skill::Thorns).set_repeatable(),
+                SkillChoiceState::new(Skill::Speed).set_repeatable(),
+                SkillChoiceState::new(Skill::AttackSpeed).set_repeatable(),
+                SkillChoiceState::new(Skill::WaveAttack),
                 SkillChoiceState::new(Skill::MPBarDMG),
                 SkillChoiceState::new(Skill::MPBarCrit),
                 SkillChoiceState::new(Skill::LethalBlow),
@@ -780,7 +797,7 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::IceStaffFloor),
                 SkillChoiceState::new(Skill::PoisonStacks).with_children(vec![
                     SkillChoiceState::new(Skill::PoisonDuration),
-                    SkillChoiceState::new(Skill::PoisonStrength),
+                    SkillChoiceState::new(Skill::PoisonStrength).set_repeatable(),
                     SkillChoiceState::new(Skill::ViralVenum),
                 ]),
                 SkillChoiceState::new(Skill::Teleport)
@@ -788,7 +805,7 @@ impl Default for SkillChoiceQueue {
                         SkillChoiceState::new(Skill::TeleportShock)
                             .with_children(vec![SkillChoiceState::new(Skill::TeleportStatusDMG)]),
                         SkillChoiceState::new(Skill::TeleportCooldown),
-                        SkillChoiceState::new(Skill::TeleportCount),
+                        SkillChoiceState::new(Skill::TeleportCount).set_repeatable(),
                         SkillChoiceState::new(Skill::TeleportManaRegen),
                         SkillChoiceState::new(Skill::TeleportIceAoe),
                     ])

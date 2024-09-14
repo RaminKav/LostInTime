@@ -18,7 +18,7 @@ use crate::{
         stats::StatType,
     },
     proto::proto_param::ProtoParam,
-    GameParam,
+    Game, GameParam,
 };
 
 use super::{
@@ -763,6 +763,7 @@ pub fn handle_cursor_skills_buttons(
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
+    mut game: ResMut<Game>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -792,9 +793,12 @@ pub fn handle_cursor_skills_buttons(
                             &mut skills,
                             level.level,
                         );
-                        picked_skill
-                            .skill
-                            .add_skill_components(e, &mut commands, skills.clone());
+                        picked_skill.skill.add_skill_components(
+                            e,
+                            &mut commands,
+                            skills.clone(),
+                            &mut game,
+                        );
                         next_ui_state.set(UIState::Closed);
                         att_event.send(AttributeChangeEvent);
                     }

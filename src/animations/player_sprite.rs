@@ -23,6 +23,8 @@ pub enum PlayerAnimation {
     Run,
     Roll,
     Parry,
+    ParryHit,
+    Spear,
     Attack,
     Bow,
     Lunge,
@@ -40,6 +42,8 @@ impl PlayerAnimation {
             PlayerAnimation::Run => format!("Run{}", dir_str),
             PlayerAnimation::Roll => format!("Roll{}", dir_str),
             PlayerAnimation::Parry => format!("Parry{}", dir_str),
+            PlayerAnimation::ParryHit => format!("ParryHit{}", dir_str),
+            PlayerAnimation::Spear => format!("Spear{}", dir_str),
             PlayerAnimation::Attack => format!("Attack2{}", dir_str),
             PlayerAnimation::Bow => format!("Bow{}", dir_str),
             PlayerAnimation::Lunge => format!("Lunge{}", dir_str),
@@ -53,6 +57,8 @@ impl PlayerAnimation {
         match self {
             PlayerAnimation::Roll => true,
             PlayerAnimation::Parry => true,
+            PlayerAnimation::ParryHit => true,
+            PlayerAnimation::Spear => true,
             PlayerAnimation::Attack => true,
             PlayerAnimation::Lunge => true,
             PlayerAnimation::Bow => true,
@@ -74,6 +80,9 @@ impl PlayerAnimation {
     pub fn is_lunging(&self) -> bool {
         self == &PlayerAnimation::Lunge
     }
+    pub fn is_parrying(&self) -> bool {
+        self == &PlayerAnimation::Parry || self == &PlayerAnimation::ParryHit
+    }
 
     pub fn is_walking(&self) -> bool {
         self == &PlayerAnimation::Walk
@@ -83,6 +92,8 @@ impl PlayerAnimation {
         match self {
             PlayerAnimation::Roll => true,
             PlayerAnimation::Parry => true,
+            PlayerAnimation::ParryHit => true,
+            PlayerAnimation::Spear => true,
             PlayerAnimation::Attack => true,
             PlayerAnimation::Bow => true,
             PlayerAnimation::Lunge => true,
@@ -126,13 +137,13 @@ pub fn handle_anim_change_when_player_dir_changes(
             &mut PlayerAnimationState,
             &mut TextureAtlasSprite,
         ),
-        Changed<FacingDirection>,
+        Or<(Changed<FacingDirection>, Changed<PlayerAnimation>)>,
     >,
 ) {
     for (new_dir, curr_anim, mut prev_anim_state, mut prev_dir, mut sprite) in
         new_dir_query.iter_mut()
     {
-        if curr_anim.is_dir_locked() {
+        if curr_anim.is_dir_locked() && !prev_anim_state.just_finished() {
             continue;
         }
 

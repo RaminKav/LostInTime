@@ -412,7 +412,7 @@ pub fn setup_skills_class_text(
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(UIElement::SkillClassTracker),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(63., 16.)),
+                custom_size: Some(Vec2::new(64., 16.)),
                 ..Default::default()
             },
             transform: Transform {

@@ -1,15 +1,21 @@
 use std::time::Duration;
 
 use crate::{
-    animations::{player_sprite::PlayerAnimation, AttackEvent},
+    animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
+    colors::BLACK,
+    enemy::Mob,
     inputs::{CursorPos, MovementVector},
-    ui::damage_numbers::DodgeEvent,
-    AttackTimer, EnemyDeathEvent, GameParam,
+    ui::damage_numbers::{spawn_text, DodgeEvent},
+    AttackTimer, EnemyDeathEvent, GameParam, HitEvent,
 };
-use bevy::prelude::*;
+use bevy::{prelude::*, sprite::Anchor};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
 
-use super::{PlayerSkills, Skill};
+use super::{Player, PlayerSkills, Skill};
+
+aseprite!(pub Combo, "textures/effects/Combo.aseprite");
+
 #[derive(Debug, Component)]
 pub struct SprintState {
     pub startup_timer: Timer,
@@ -171,5 +177,98 @@ pub fn handle_dodge_crit(dodges: EventReader<DodgeEvent>, mut game: GameParam) {
     }
     if game.has_skill(Skill::DodgeCrit) {
         game.player_mut().next_hit_crit = true;
+    }
+}
+
+#[derive(Debug, Component)]
+pub struct ComboCounter {
+    pub counter: u32,
+    pub reset_timer: Timer,
+}
+
+#[derive(Debug, Component)]
+pub struct ComboAnim;
+
+pub fn handle_add_combo_counter(
+    mut commands: Commands,
+    mut hits: EventReader<HitEvent>,
+    mobs: Query<&Mob>,
+    mut combo: Query<&mut ComboCounter>,
+    old_combo_anims: Query<(Entity, Option<&TextureAtlasSprite>), With<ComboAnim>>,
+    player: Query<(Entity, &PlayerSkills), With<Player>>,
+    asset_server: Res<AssetServer>,
+) {
+    let (player_e, skills) = player.single();
+    if !skills.has(Skill::DaggerCombo) {
+        return;
+    }
+
+    let mut combo_increment = 0;
+    for hit in hits.iter() {
+        if mobs.get(hit.hit_entity).is_ok() {
+            combo_increment += 1;
+        }
+    }
+    for mut c in combo.iter_mut() {
+        if combo_increment > 0 {
+            c.counter += combo_increment;
+            c.reset_timer.reset();
+            for (e, anim) in old_combo_anims.iter() {
+                if anim.is_some() {
+                    commands.entity(e).despawn_recursive();
+                } else {
+                    commands.entity(e).insert(DoneAnimation);
+                }
+            }
+            let text = spawn_text(
+                &mut commands,
+                &asset_server,
+                Vec3::new(0., -1., 1.),
+                BLACK,
+                format!("{}", c.counter),
+                Anchor::Center,
+                1.,
+                0,
+            );
+            let count = old_combo_anims.iter().count() as f32;
+            let e = commands
+                .spawn(AsepriteBundle {
+                    aseprite: asset_server.load(Combo::PATH),
+                    animation: AsepriteAnimation::from(Combo::tags::COMBO),
+                    transform: Transform::from_translation(Vec3::new(0., 20., count + 1.)),
+                    ..Default::default()
+                })
+                .insert(VisibilityBundle::default())
+                .insert(ComboAnim)
+                .add_child(text)
+                .set_parent(player_e)
+                .id();
+        }
+    }
+}
+
+pub fn tick_combo_counter(
+    time: Res<Time>,
+    mut combo: Query<&mut ComboCounter>,
+    old_combo_anims: Query<Entity, With<ComboAnim>>,
+    mut commands: Commands,
+) {
+    for mut c in combo.iter_mut() {
+        c.reset_timer.tick(time.delta());
+        if c.reset_timer.finished() {
+            c.counter = 0;
+            c.reset_timer.reset();
+            for c in old_combo_anims.iter() {
+                commands.entity(c).despawn_recursive();
+            }
+        }
+    }
+}
+
+pub fn pause_combo_anim_when_done(mut combo: Query<&mut AsepriteAnimation, With<ComboAnim>>) {
+    for mut anim in combo.iter_mut() {
+        if anim.just_finished() {
+            anim.pause();
+        }
     }
 }

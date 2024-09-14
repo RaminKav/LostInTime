@@ -11,11 +11,15 @@ use bevy_rapier2d::{
         KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
     },
 };
-use melee_skills::{handle_echo_after_heal, handle_on_hit_skills, handle_second_split_attack};
+use melee_skills::{
+    handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
+    handle_second_split_attack, handle_spear_gravity, tick_parried_timer, ParrySuccessEvent,
+};
 use serde::Deserialize;
 use sprint::{
-    handle_dodge_crit, handle_enemy_death_sprint_reset, handle_sprint_timer,
-    handle_sprinting_cooldown, handle_toggle_sprinting,
+    handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset,
+    handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
+    pause_combo_anim_when_done, tick_combo_counter,
 };
 use strum_macros::{Display, EnumIter};
 pub mod currency;
@@ -28,6 +32,7 @@ pub use currency::*;
 use teleport::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub mod stats;
 use crate::{
+    ai::{follow, idle, leap_attack},
     animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerAseprite},
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
@@ -118,7 +123,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
             app.add_event::<MovePlayerEvent>()
-                .add_event::<ModifyTimeFragmentsEvent>();
+                .add_event::<ModifyTimeFragmentsEvent>()
+                .add_event::<ParrySuccessEvent>();
         })
         .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
         .add_systems(
@@ -139,6 +145,24 @@ impl Plugin for PlayerPlugin {
                 handle_on_hit_skills.after(handle_hits),
                 handle_dodge_crit,
             )
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_systems(
+            (
+                tick_combo_counter,
+                handle_add_combo_counter,
+                pause_combo_anim_when_done,
+                handle_parry,
+                tick_parried_timer,
+                handle_parry_success,
+            )
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_system(
+            handle_spear_gravity
+                .after(idle)
+                .after(follow)
+                .after(leap_attack)
                 .in_set(OnUpdate(GameState::Main)),
         )
         .add_systems(
@@ -294,7 +318,12 @@ fn spawn_player(
                     RawPosition(data.player_transform),
                 ));
                 for skill in data.player_skills.skills.clone() {
-                    skill.add_skill_components(p, &mut commands, data.player_skills.clone());
+                    skill.add_skill_components(
+                        p,
+                        &mut commands,
+                        data.player_skills.clone(),
+                        &mut game,
+                    );
                 }
                 info!("LOADED PLAYER DATA FROM SAVE FILE");
             }

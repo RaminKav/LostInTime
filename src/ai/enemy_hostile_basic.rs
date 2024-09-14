@@ -17,9 +17,13 @@ use crate::{
         WorldObject,
     },
     night::NightTracker,
+    player::{
+        melee_skills::Parried,
+        skills::{PlayerSkills, Skill},
+    },
     status_effects::Slow,
     world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
-    Game, GameParam, PLAYER_MOVE_SPEED,
+    GameParam, PLAYER_MOVE_SPEED,
 };
 
 use super::pathfinding::get_next_tile_A_star;
@@ -188,17 +192,29 @@ pub fn follow(
         &EnemyAnimationState,
         Option<&EnemyAttackCooldown>,
         Option<&Slow>,
+        Option<&Parried>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
     mut game: GameParam,
     night_tracker: Res<NightTracker>,
 ) {
-    for (entity, mut follow, sprite, anim_data, anim_state, att_cooldown, slowed_option) in
-        follows.iter_mut()
+    for (
+        entity,
+        mut follow,
+        sprite,
+        anim_data,
+        anim_state,
+        att_cooldown,
+        slowed_option,
+        parried_option,
+    ) in follows.iter_mut()
     {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
-            return;
+            continue;
+        }
+        if let Some(_) = parried_option {
+            continue;
         }
         // Get the positions of the follower and target
         let target_translation = transforms.get(follow.target).unwrap().translation;
@@ -284,10 +300,11 @@ pub fn leap_attack(
         &CharacterAnimationSpriteSheetData,
         &EnemyAnimationState,
         Option<&Slow>,
+        Option<&mut Parried>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
-    _game: Res<Game>,
+    skills: Query<&PlayerSkills>,
 ) {
     for (
         entity,
@@ -299,6 +316,7 @@ pub fn leap_attack(
         anim_data,
         anim_state,
         slow_option,
+        mut parried_option,
     ) in attacks.iter_mut()
     {
         // Get the positions of the attacker and target
@@ -316,6 +334,17 @@ pub fn leap_attack(
                         * (1. - slow_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
                 );
             }
+            if let Some(ref mut parried) = parried_option {
+                if !parried.kb_applied {
+                    parried.kb_applied = true;
+                    let mult = if skills.single().has(Skill::ParryKnockback) {
+                        1.
+                    } else {
+                        0.5
+                    };
+                    attack.dir = Some(-attack.dir.unwrap() * mult);
+                }
+            }
 
             kcc.translation = Some(attack.dir.unwrap());
             attack.attack_duration_timer.tick(time.delta());
@@ -330,7 +359,7 @@ pub fn leap_attack(
         if attack.attack_duration_timer.finished() {
             //start attack cooldown timer
             attack.dir = None;
-            if anim_data.is_done_current_animation(sprite.index) {
+            if anim_data.is_done_current_animation(sprite.index) || parried_option.is_some() {
                 if follow_speed.0 > 0. {
                     commands.entity(entity).insert(FollowState {
                         target: attack.target,

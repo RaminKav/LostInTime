@@ -8,7 +8,7 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection};
+use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::melee_skills::Parried};
 
 use super::AnimationTimer;
 
@@ -158,9 +158,13 @@ pub fn animate_character_spritesheet_animations(
         &mut AnimationTimer,
         &CharacterAnimationSpriteSheetData,
         &mut TextureAtlasSprite,
+        Option<&Parried>,
     )>,
 ) {
-    for (_e, mut timer, sprite_sheet_data, mut sprite) in &mut query {
+    for (_e, mut timer, sprite_sheet_data, mut sprite, parried_option) in &mut query {
+        if parried_option.is_some() {
+            continue;
+        }
         timer.tick(time.delta());
         if timer.just_finished() {
             let max_frames = *sprite_sheet_data.animation_frames.iter().max().unwrap() as f32;

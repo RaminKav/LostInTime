@@ -82,6 +82,7 @@ use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectResource};
 use player::{
     skills::{PlayerSkills, Skill},
+    sprint::ComboCounter,
     Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -356,6 +357,7 @@ pub struct GameParam<'w, 's> {
             &'static CritChance,
             &'static CritDamage,
             &'static BonusDamage,
+            Option<&'static ComboCounter>,
             &'static HealthRegen,
             &'static Healing,
             &'static Thorns,
@@ -557,10 +559,16 @@ impl<'w, 's> GameParam<'w, 's> {
         dmg_bonus: u32,
         attack_override: Option<i32>,
     ) -> (u32, bool) {
-        let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, ..) = self.player_stats.single();
+        let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
+            self.player_stats.single();
         let mut rng = rand::thread_rng();
         let dmg_mult = dmg_mult.unwrap_or(1.);
         let dmg = attack_override.unwrap_or(attack.0);
+        let crit_dmb_bonus = if let Some(combo) = combo_option {
+            combo.counter as i32
+        } else {
+            0
+        };
         if rng.gen_ratio(
             u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
             100,
@@ -569,7 +577,8 @@ impl<'w, 's> GameParam<'w, 's> {
             commands.entity(hit_entity).insert(WasHitWithCrit);
             (
                 ((dmg_mult * (dmg + bonus_dmg.0 + dmg_bonus as i32) as f32)
-                    * (f32::abs(crit_dmg.0 as f32) / 100.)) as u32,
+                    * (f32::abs((crit_dmg.0 + crit_dmb_bonus) as f32) / 100.))
+                    as u32,
                 true,
             )
         } else {

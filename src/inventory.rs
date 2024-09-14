@@ -10,7 +10,7 @@ use crate::{
         ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
         PLAYER_EQUIPMENT_POSITIONS,
     },
-    player::Limb,
+    player::{skills::Skill, Limb},
     proto::proto_param::ProtoParam,
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::y_sort::YSort,
@@ -181,12 +181,19 @@ impl InventoryItemStack {
             .id();
 
         let mut item_entity = commands.entity(item);
-
+        let collider_size_bonus = if game.has_skill(Skill::WideSwing) && obj.is_sword() {
+            1.35
+        } else {
+            1.
+        };
         item_entity
             .insert(MainHand)
             .insert(Sensor)
             .insert(RigidBody::Fixed)
-            .insert(Collider::cuboid(16. / 1.5, 16. / 1.5));
+            .insert(Collider::cuboid(
+                collider_size_bonus * 16. / 1.5,
+                collider_size_bonus * 16. / 1.5,
+            ));
         game.player_mut().main_hand_slot = Some(ActiveMainHandState {
             item_stack: self.item_stack.clone(),
             entity: item,

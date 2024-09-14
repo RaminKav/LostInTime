@@ -1,14 +1,20 @@
+use std::f32::consts::PI;
+
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
-use bevy_rapier2d::prelude::Collider;
+use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
-    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, Lifesteal},
-    combat_helpers::spawn_one_time_aseprite_collider,
+    animations::player_sprite::PlayerAnimation,
+    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen, Lifesteal},
+    colors::LIGHT_RED,
+    combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     enemy::Mob,
+    inputs::CursorPos,
     item::WorldObject,
     status_effects::Frail,
-    ui::damage_numbers::PreviousHealth,
+    ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
+    world::TILE_SIZE,
     GameParam, HitEvent, InvincibilityTimer,
 };
 
@@ -39,18 +45,7 @@ pub fn handle_on_hit_skills(
             if in_i_frame.get(hit.hit_entity).is_ok() {
                 continue;
             }
-            let hitbox_e = spawn_one_time_aseprite_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::ZERO),
-                10.5,
-                attack.0,
-                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
-                false,
-            );
-
-            commands.entity(hitbox_e).set_parent(player);
+            spawn_echo_hitbox(&mut commands, &asset_server, player, attack.0);
         }
     }
 }
@@ -136,17 +131,202 @@ pub fn handle_echo_after_heal(
         }
 
         if skills.has(Skill::HealAoE) {
-            let hitbox_e = spawn_one_time_aseprite_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::ZERO),
-                10.5,
-                attack.0,
-                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
-                false,
-            );
-            commands.entity(hitbox_e).set_parent(e);
+            spawn_echo_hitbox(&mut commands, &asset_server, e, attack.0);
         }
+    }
+}
+#[derive(Component)]
+
+pub struct SpearGravity {
+    pub target: Vec2,
+    pub timer: Timer,
+}
+#[derive(Component)]
+pub struct ParryState {
+    pub parry_timer: Timer,
+    pub cooldown_timer: Timer,
+    pub spear_timer: Timer,
+    pub success: bool,
+    pub active: bool,
+}
+
+#[derive(Component)]
+
+pub struct Parried {
+    pub timer: Timer,
+    pub kb_applied: bool,
+}
+
+#[derive(Debug)]
+pub struct ParrySuccessEvent(pub Entity);
+
+#[derive(Component)]
+pub struct SpearAttack;
+
+pub fn handle_parry(
+    mut player: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &PlayerSkills,
+            &Attack,
+            &PlayerAnimation,
+            &mut ParryState,
+        ),
+        (With<Player>,),
+    >,
+    key_input: ResMut<Input<KeyCode>>,
+    mut commands: Commands,
+    time: Res<Time>,
+    cursor_pos: Res<CursorPos>,
+) {
+    let Ok((e, player_pos, skills, dmg, curr_anim, mut parry_state)) = player.get_single_mut()
+    else {
+        return;
+    };
+
+    if skills.has(Skill::Parry)
+        && key_input.just_pressed(KeyCode::Space)
+        && parry_state.cooldown_timer.finished()
+        && !curr_anim.is_parrying()
+    {
+        commands.entity(e).insert(PlayerAnimation::Parry);
+        parry_state.cooldown_timer.reset();
+        parry_state.parry_timer.reset();
+        parry_state.active = true;
+        parry_state.parry_timer.tick(time.delta());
+    }
+
+    if skills.has(Skill::ParrySpear)
+        && parry_state.active
+        && parry_state.success
+        && key_input.just_pressed(KeyCode::Slash)
+    {
+        parry_state.spear_timer.tick(time.delta());
+        commands.entity(e).insert(PlayerAnimation::Spear);
+        parry_state.active = false;
+    }
+    if parry_state.spear_timer.percent() != 0. {
+        parry_state.spear_timer.tick(time.delta());
+        if parry_state.spear_timer.just_finished() {
+            parry_state.spear_timer.reset();
+            let player_pos = player_pos.translation();
+            let direction =
+                (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
+            let distance = direction * 1.5 * TILE_SIZE.x;
+
+            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
+            let hit = spawn_temp_collider(
+                &mut commands,
+                Transform::from_translation(Vec3::new(distance.x / 2., distance.y / 2., 1.))
+                    .with_rotation(Quat::from_rotation_z(angle)),
+                0.5,
+                dmg.0,
+                Collider::cuboid(12., 1.5 * TILE_SIZE.x),
+            );
+            commands.entity(hit).insert(SpearAttack).set_parent(e);
+        }
+    }
+    parry_state.cooldown_timer.tick(time.delta());
+
+    if parry_state.parry_timer.percent() != 0. {
+        parry_state.parry_timer.tick(time.delta());
+        if parry_state.parry_timer.just_finished() {
+            parry_state.success = false;
+            parry_state.active = false;
+        }
+    }
+}
+
+pub fn handle_parry_success(
+    player: Query<
+        (
+            Entity,
+            &Attack,
+            &HealthRegen,
+            &GlobalTransform,
+            &PlayerSkills,
+        ),
+        With<Player>,
+    >,
+    mut parry_success_event: EventReader<ParrySuccessEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut modify_health_event: EventWriter<ModifyHealthEvent>,
+) {
+    for _ in parry_success_event.iter() {
+        let (player_e, attack, health_regen, player_txfm, skills) = player.single();
+        spawn_floating_text_with_shadow(
+            &mut commands,
+            &asset_server,
+            player_txfm.translation() + Vec3::new(0., 16., 0.),
+            LIGHT_RED,
+            "Parry!".to_string(),
+        );
+        if skills.has(Skill::ParryHPRegen) {
+            modify_health_event.send(ModifyHealthEvent(health_regen.0));
+        }
+        if skills.has(Skill::ParryEcho) {
+            spawn_echo_hitbox(&mut commands, &asset_server, player_e, attack.0);
+        }
+    }
+}
+
+pub fn tick_parried_timer(
+    mut parried_query: Query<(Entity, &mut Parried)>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (e, mut parried) in parried_query.iter_mut() {
+        parried.timer.tick(time.delta());
+        if parried.timer.just_finished() {
+            commands.entity(e).remove::<Parried>();
+        }
+    }
+}
+
+pub fn spawn_echo_hitbox(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    player: Entity,
+    dmg: i32,
+) {
+    let hitbox_e = spawn_one_time_aseprite_collider(
+        commands,
+        Transform::from_translation(Vec3::ZERO),
+        10.5,
+        dmg,
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
+        asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
+        AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+        false,
+    );
+    commands.entity(hitbox_e).set_parent(player);
+}
+
+pub fn handle_spear_gravity(
+    mut spear_query: Query<(
+        Entity,
+        &mut SpearGravity,
+        &mut GlobalTransform,
+        &mut KinematicCharacterController,
+    )>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (e, mut spear_gravity, txfm, mut kcc) in spear_query.iter_mut() {
+        spear_gravity.timer.tick(time.delta());
+        if spear_gravity.timer.just_finished() {
+            commands.entity(e).remove::<SpearGravity>();
+            continue;
+        }
+        let distance = spear_gravity.target - txfm.translation().truncate();
+        let delta = (distance).normalize_or_zero();
+        if distance.length() < 16. {
+            commands.entity(e).remove::<SpearGravity>();
+            continue;
+        }
+
+        kcc.translation = Some(delta * 300. * time.delta_seconds());
     }
 }

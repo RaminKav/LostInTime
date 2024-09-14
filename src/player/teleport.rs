@@ -30,7 +30,7 @@ pub struct TeleportState {
 
 #[derive(Component)]
 pub struct TeleportShockDmg;
-// TODO
+
 pub fn handle_teleport(
     mut move_player: EventWriter<MovePlayerEvent>,
     mut player: Query<

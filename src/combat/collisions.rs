@@ -8,11 +8,13 @@ use crate::{
     enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
     item::{
-        projectile::{EnemyProjectile, Projectile, ProjectileState},
+        projectile::{EnemyProjectile, Projectile, ProjectileState, RangedAttackEvent},
         Equipment, MainHand, WorldObject,
     },
     player::{
-        melee_skills::SecondHitDelay,
+        melee_skills::{
+            Parried, ParryState, ParrySuccessEvent, SecondHitDelay, SpearAttack, SpearGravity,
+        },
         skills::{PlayerSkills, Skill},
         sprint::SprintState,
         teleport::TeleportShockDmg,
@@ -155,7 +157,10 @@ fn check_melee_hit_collisions(
 fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
     player_attack: Query<(Entity, &Children, Option<&Lifesteal>), With<Player>>,
-    allowed_targets: Query<Entity, (Without<ItemStack>, Without<MainHand>, Without<Projectile>)>,
+    allowed_targets: Query<
+        (Entity, &GlobalTransform),
+        (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
+    >,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
@@ -165,6 +170,7 @@ fn check_projectile_hit_mob_collisions(
             &Projectile,
             &Attack,
             Option<&TeleportShockDmg>,
+            Option<&SpearAttack>,
         ),
         Without<EnemyProjectile>,
     >,
@@ -172,6 +178,7 @@ fn check_projectile_hit_mob_collisions(
     mut children: Query<&Parent>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     status_check: Query<(Option<&Burning>, Option<&Slow>, Option<&Frail>)>,
+    nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
 ) {
     for evt in collisions.iter() {
@@ -180,28 +187,29 @@ fn check_projectile_hit_mob_collisions(
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //TODO: fr gotta refasctor this...
-            let (proj_entity, mut state, proj, att, tp_shock) = if let Ok(parent_e) =
-                children.get_mut(*e1)
-            {
-                if let Ok((proj_entity, state, proj, att, tp_shock)) =
-                    projectiles.get_mut(parent_e.get())
-                {
-                    //collider is on the child, proj data on the parent
-                    (proj_entity, state, proj, att, tp_shock)
-                } else if let Ok((proj_entity, state, proj, att, tp_shock)) =
+            let (proj_entity, mut state, proj, att, tp_shock, spear_att) =
+                if let Ok(parent_e) = children.get_mut(*e1) {
+                    if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
+                        projectiles.get_mut(parent_e.get())
+                    {
+                        //collider is on the child, proj data on the parent
+                        (proj_entity, state, proj, att, tp_shock, spear_att)
+                    } else if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
+                        projectiles.get_mut(*e1)
+                    {
+                        //collider and proj data are on the same entity
+                        (proj_entity, state, proj, att, tp_shock, spear_att)
+                    } else {
+                        continue;
+                    }
+                } else if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
                     projectiles.get_mut(*e1)
                 {
                     //collider and proj data are on the same entity
-                    (proj_entity, state, proj, att, tp_shock)
+                    (proj_entity, state, proj, att, tp_shock, spear_att)
                 } else {
                     continue;
-                }
-            } else if let Ok((proj_entity, state, proj, att, tp_shock)) = projectiles.get_mut(*e1) {
-                //collider and proj data are on the same entity
-                (proj_entity, state, proj, att, tp_shock)
-            } else {
-                continue;
-            };
+                };
             let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {
                 continue;
             };
@@ -249,6 +257,19 @@ fn check_projectile_hit_mob_collisions(
             {
                 damage = f32::ceil(damage as f32 * 2.) as u32;
             }
+            let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();
+            if let Some(_) = spear_att {
+                for (mob_e, mob_txfm) in nearby_mobs.iter() {
+                    let delta =
+                        mob_txfm.translation().truncate() - hit_txfm.translation().truncate();
+                    if delta.length() <= 70. {
+                        commands.entity(mob_e).insert(SpearGravity {
+                            target: hit_txfm.translation().truncate(),
+                            timer: Timer::from_seconds(0.5, TimerMode::Once),
+                        });
+                    }
+                }
+            }
             hit_event.send(HitEvent {
                 hit_entity: *e2,
                 damage: damage as i32,
@@ -269,8 +290,14 @@ fn check_projectile_hit_mob_collisions(
 fn check_projectile_hit_player_collisions(
     mut commands: Commands,
     enemy_attack: Query<(Entity, &Attack), With<Mob>>,
-    allowed_targets: Query<
-        Option<&WorldObject>,
+    mut allowed_targets: Query<
+        (
+            Option<&WorldObject>,
+            Option<&mut ParryState>,
+            Option<&InvincibilityCooldown>,
+            Option<&Attack>,
+            Option<&PlayerSkills>,
+        ),
         (
             Or<(With<Player>, With<WorldObject>)>,
             (Without<Projectile>, Without<MainHand>),
@@ -288,6 +315,8 @@ fn check_projectile_hit_player_collisions(
         ),
         With<EnemyProjectile>,
     >,
+    mut parry_events: EventWriter<ParrySuccessEvent>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut children: Query<&Parent>,
 ) {
     for evt in collisions.iter() {
@@ -317,7 +346,7 @@ fn check_projectile_hit_player_collisions(
             if enemy_e == *e2 || !allowed_targets.contains(*e2) {
                 continue;
             }
-            if let Some(obj) = allowed_targets.get(*e2).unwrap() {
+            if let Some(obj) = allowed_targets.get(*e2).unwrap().0 {
                 if [
                     WorldObject::Grass,
                     WorldObject::Grass2,
@@ -338,17 +367,49 @@ fn check_projectile_hit_player_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
+            let mut hit_successful = true;
+            let (_, mut parry_option, i_frames, p_attack, skills) =
+                allowed_targets.get_mut(*e2).unwrap();
+            if let Some(ref mut parry) = parry_option {
+                if parry.active && !parry.success {
+                    parry_events.send(ParrySuccessEvent(*e1));
+                    hit_successful = false;
+                    parry.success = true;
 
-            hit_event.send(HitEvent {
-                hit_entity: *e2,
-                damage: att.0,
-                dir: state.direction,
-                hit_with_melee: None,
-                hit_with_projectile: Some(proj.clone()),
-                ignore_tool: false,
-                hit_by_mob: Some(enemy_proj.mob.clone()),
-                was_crit: false,
-            });
+                    commands
+                        .entity(*e2)
+                        .insert(InvincibilityTimer(Timer::from_seconds(
+                            i_frames.unwrap().0,
+                            TimerMode::Once,
+                        )))
+                        .insert(PlayerAnimation::ParryHit);
+                    if skills.unwrap().has(Skill::ParryDeflectProj) {
+                        //deflected proj
+                        ranged_attack_event.send(RangedAttackEvent {
+                            projectile: proj.clone(),
+                            direction: -state.direction,
+                            from_enemy: None,
+                            is_followup_proj: false,
+                            mana_cost: None,
+                            dmg_override: Some(p_attack.unwrap().0),
+                            pos_override: None,
+                            spawn_delay: 0.,
+                        })
+                    }
+                }
+            }
+            if hit_successful {
+                hit_event.send(HitEvent {
+                    hit_entity: *e2,
+                    damage: att.0,
+                    dir: state.direction,
+                    hit_with_melee: None,
+                    hit_with_projectile: Some(proj.clone()),
+                    ignore_tool: false,
+                    hit_by_mob: Some(enemy_proj.mob.clone()),
+                    was_crit: false,
+                });
+            }
             if state.despawn_on_hit {
                 commands.entity(proj_entity).despawn_recursive();
             }
@@ -411,7 +472,7 @@ pub fn check_item_drop_collisions(
 }
 fn check_mob_to_player_collisions(
     mut commands: Commands,
-    player: Query<
+    mut player: Query<
         (
             Entity,
             &Transform,
@@ -419,6 +480,7 @@ fn check_mob_to_player_collisions(
             &Defence,
             &Dodge,
             &InvincibilityCooldown,
+            Option<&mut ParryState>,
         ),
         With<Player>,
     >,
@@ -430,8 +492,10 @@ fn check_mob_to_player_collisions(
     mut hit_event: EventWriter<HitEvent>,
     mut dodge_event: EventWriter<DodgeEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
+    mut parry_events: EventWriter<ParrySuccessEvent>,
 ) {
-    let (player_e, player_txfm, thorns, defence, dodge, i_frames) = player.single();
+    let (player_e, player_txfm, thorns, defence, dodge, i_frames, mut parry_option) =
+        player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
@@ -439,7 +503,9 @@ fn check_mob_to_player_collisions(
                 continue;
             }
             //if the player is colliding with an entity...
-            let Ok(_) = player.get(e1) else { continue };
+            if e1 != player_e {
+                continue;
+            };
 
             if !dmg_source.contains(e2) {
                 continue;
@@ -465,16 +531,39 @@ fn check_mob_to_player_collisions(
                     )));
                 continue;
             }
-            hit_event.send(HitEvent {
-                hit_entity: e1,
-                damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
-                dir: delta.normalize_or_zero().truncate(),
-                hit_with_melee: None,
-                hit_with_projectile: None,
-                ignore_tool: false,
-                hit_by_mob: Some(is_attacking.unwrap().0.clone()),
-                was_crit: false,
-            });
+            let mut hit_successful = true;
+            if let Some(ref mut parry) = parry_option {
+                if parry.active && !parry.success {
+                    parry_events.send(ParrySuccessEvent(e2));
+                    hit_successful = false;
+                    parry.success = true;
+
+                    commands
+                        .entity(e1)
+                        .insert(InvincibilityTimer(Timer::from_seconds(
+                            i_frames.0,
+                            TimerMode::Once,
+                        )))
+                        .insert(PlayerAnimation::ParryHit);
+
+                    commands.entity(e2).insert(Parried {
+                        timer: Timer::from_seconds(0.75, TimerMode::Once),
+                        kb_applied: false,
+                    });
+                }
+            }
+            if hit_successful {
+                hit_event.send(HitEvent {
+                    hit_entity: e1,
+                    damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
+                    dir: delta.normalize_or_zero().truncate(),
+                    hit_with_melee: None,
+                    hit_with_projectile: None,
+                    ignore_tool: false,
+                    hit_by_mob: Some(is_attacking.unwrap().0.clone()),
+                    was_crit: false,
+                });
+            }
             // hit back to attacker if we have Thorns
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
                 hit_event.send(HitEvent {
