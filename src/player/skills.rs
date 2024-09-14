@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
+    attributes::{AttributeQuality, AttributeValue, ItemAttributes},
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
@@ -27,6 +28,54 @@ pub enum SkillClass {
     Melee,
     Rogue,
     Magic,
+}
+
+impl SkillClass {
+    pub fn get_cape(&self) -> WorldObject {
+        match self {
+            SkillClass::Melee => WorldObject::RedCape,
+            SkillClass::Rogue => WorldObject::GreenCape,
+            SkillClass::Magic => WorldObject::BlueCape,
+            _ => WorldObject::GreyCape,
+        }
+    }
+
+    pub fn compute_cape_stats(&self, level: i32) -> ItemAttributes {
+        let mut stats = ItemAttributes::default();
+        let quality = if level > 10 {
+            AttributeQuality::High
+        } else if level >= 5 {
+            AttributeQuality::Average
+        } else {
+            AttributeQuality::Low
+        };
+        match self {
+            SkillClass::Melee => {
+                stats.attack =
+                    AttributeValue::new(f32::floor(level as f32 * 1.5) as i32, quality, 1.);
+                stats.defence = AttributeValue::new(level, quality, 1.);
+                stats.health = AttributeValue::new(level * 10, quality, 1.);
+            }
+            SkillClass::Rogue => {
+                stats.attack =
+                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
+                stats.speed = AttributeValue::new(level * 5, quality, 1.);
+                stats.dodge = AttributeValue::new(level, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 2, quality, 1.);
+                stats.crit_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 3.5) as i32, quality, 1.);
+            }
+            SkillClass::Magic => {
+                stats.attack =
+                    AttributeValue::new(f32::floor(level as f32 * 1.5) as i32, quality, 1.);
+                stats.mana = AttributeValue::new(level * 5, quality, 1.);
+                stats.mana_regen =
+                    AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
+            }
+            _ => (),
+        }
+        stats
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]

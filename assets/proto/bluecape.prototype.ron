@@ -1,0 +1,18 @@
+(
+  name: "BlueCape",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": BlueCape,
+  "survival_rogue_like::item::EquipmentType": Cape,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: BlueCape,
+        metadata: (
+            name: "Mage's Cape", 
+            desc: ["A simple cape full", "of potential. For", "now, it's only", " purpose is to", "obscure your clothing."]
+        ),
+        count: 1
+  ),
+  }
+)

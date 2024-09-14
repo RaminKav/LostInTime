@@ -5,6 +5,26 @@
             size: (16., 16.),
             anchor: None,
         ),
+        GreyCape: WorldObjectData(
+            texture_pos: (0., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedCape: WorldObjectData(
+            texture_pos: (4., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GreenCape: WorldObjectData(
+            texture_pos: (2., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BlueCape: WorldObjectData(
+            texture_pos: (3., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Flint: WorldObjectData(
             texture_pos: (0., 4.),
             size: (16., 16.),

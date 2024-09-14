@@ -69,9 +69,7 @@ pub fn handle_mana_regen(
         if hunger.is_starving() {
             return;
         }
-        modify_mana_event.send(ModifyManaEvent(
-            mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
-        ));
+        modify_mana_event.send(ModifyManaEvent(mana_regen.0));
         timer.0.reset();
     }
 }

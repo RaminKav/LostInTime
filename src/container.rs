@@ -28,6 +28,13 @@ impl Container {
             items: vec![CONTAINER_UNIT; size],
         }
     }
+    pub fn with_item_in_slot(&mut self, slot: usize, item: ItemStack) -> &mut Self {
+        self.items[slot] = Some(InventoryItemStack {
+            item_stack: item,
+            slot,
+        });
+        self
+    }
     pub fn get_first_empty_slot(&self) -> Option<usize> {
         //TODO: maybe move the actual inv to a type in this file, and move this fn into that struct
         (0..self.items.len()).find(|&i| self.items[i].is_none())
@@ -155,13 +162,11 @@ impl Container {
                 }
             } else if !is_from_hotbar {
                 if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(self) {
-                    self.items[next_avail_slot] =
-                        Some(inv_item_stack.modify_slot(next_avail_slot));
+                    self.items[next_avail_slot] = Some(inv_item_stack.modify_slot(next_avail_slot));
                     self.items[slot] = None;
                 }
             } else if let Some(next_avail_slot) = Self::get_first_empty_non_hotbar_slot(self) {
-                self.items[next_avail_slot] =
-                    Some(inv_item_stack.modify_slot(next_avail_slot));
+                self.items[next_avail_slot] = Some(inv_item_stack.modify_slot(next_avail_slot));
                 self.items[slot] = None;
             }
         }

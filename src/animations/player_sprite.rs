@@ -13,8 +13,14 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
 use crate::{
+    attributes::AttributeChangeEvent,
     inputs::FacingDirection,
-    player::skills::{PlayerSkills, SkillClass},
+    inventory::Inventory,
+    player::{
+        levels::PlayerLevel,
+        skills::{PlayerSkills, SkillClass},
+    },
+    proto::proto_param::ProtoParam,
 };
 
 aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
@@ -206,11 +212,22 @@ pub fn cleanup_one_time_animations(
 }
 
 pub fn change_player_class_visuals(
-    player: Query<(Entity, &PlayerSkills, &SkillClass), Changed<PlayerSkills>>,
+    mut player: Query<
+        (
+            Entity,
+            &PlayerSkills,
+            &SkillClass,
+            &mut Inventory,
+            &PlayerLevel,
+        ),
+        Changed<PlayerSkills>,
+    >,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    proto: ProtoParam,
+    mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
-    for (e, skills, prev_class) in player.iter() {
+    for (e, skills, prev_class, mut inv, level) in player.iter_mut() {
         let class = skills.get_class_affinity(prev_class.clone());
         let (handle, anim) = match class {
             SkillClass::None => (
@@ -230,12 +247,17 @@ pub fn change_player_class_visuals(
                 PlayerGreenAseprite::tags::IDLE_FRONT,
             ),
         };
-
+        let mut cape_stack = proto.get_item_data(class.get_cape()).unwrap().clone();
+        cape_stack.attributes = class.compute_cape_stats(level.level as i32 - 1);
+        inv.equipment_items.with_item_in_slot(3, cape_stack);
+        //att update event
         commands
             .entity(e)
             .remove::<TextureAtlasSprite>()
             .insert(class)
             .insert(handle)
             .insert(AsepriteAnimation::from(anim));
+
+        att_event.send(AttributeChangeEvent);
     }
 }

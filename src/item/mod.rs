@@ -84,6 +84,7 @@ pub struct Equipment(pub Limb);
 pub enum EquipmentType {
     #[default]
     None,
+    Cape,
     Head,
     Chest,
     Legs,
@@ -127,6 +128,12 @@ impl EquipmentType {
     pub fn is_weapon(&self) -> bool {
         match self {
             EquipmentType::Weapon => true,
+            _ => false,
+        }
+    }
+    pub fn is_cape(&self) -> bool {
+        match self {
+            EquipmentType::Cape => true,
             _ => false,
         }
     }
@@ -429,6 +436,11 @@ pub enum WorldObject {
 
     Scrapper,
     ScrapperBlock,
+    // Capes
+    GreyCape,
+    RedCape,
+    GreenCape,
+    BlueCape,
 }
 
 #[derive(
@@ -566,6 +578,15 @@ impl WorldObject {
             WorldObject::IceStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
+    pub fn is_cape(&self) -> bool {
+        match self {
+            WorldObject::GreyCape => true,
+            WorldObject::RedCape => true,
+            WorldObject::GreenCape => true,
+            WorldObject::BlueCape => true,
             _ => false,
         }
     }

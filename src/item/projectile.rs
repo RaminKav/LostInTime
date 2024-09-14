@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    attributes::{modifiers::ModifyManaEvent, Attack, Mana, ManaRegen},
+    attributes::{modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -145,7 +145,8 @@ fn handle_ranged_attack_event(
     player_query: Query<
         (
             Entity,
-            &Mana,
+            &CurrentMana,
+            &MaxMana,
             &ManaRegen,
             &PlayerSkills,
             Option<&AttackTimer>,
@@ -161,8 +162,15 @@ fn handle_ranged_attack_event(
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
     for proj_event in events.iter() {
-        let (_player_e, mana, mana_regen, skills, player_cooldown, teleported_option) =
-            player_query.single();
+        let (
+            _player_e,
+            current_mana,
+            max_mana,
+            mana_regen,
+            skills,
+            player_cooldown,
+            teleported_option,
+        ) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
         if proj_event.from_enemy.is_none()
             && player_cooldown.is_some()
@@ -171,7 +179,7 @@ fn handle_ranged_attack_event(
             continue;
         }
         if let Some(mana_cost) = proj_event.mana_cost {
-            if mana_cost.abs() > mana.current {
+            if mana_cost.abs() > current_mana.0 {
                 continue;
             }
             modify_mana_event.send(ModifyManaEvent(
@@ -222,7 +230,7 @@ fn handle_ranged_attack_event(
             direction: proj_event.direction,
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
-            was_mana_bar_full: mana.current == mana.max,
+            was_mana_bar_full: current_mana.0 == max_mana.0,
         });
 
         if teleported_option.is_some() {

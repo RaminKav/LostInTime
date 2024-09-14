@@ -81,6 +81,8 @@ pub struct ItemAttributes {
     pub defence: AttributeValue,
     pub xp_rate: AttributeValue,
     pub loot_rate: AttributeValue,
+    pub mana: AttributeValue,
+    pub mana_regen: AttributeValue,
 }
 
 #[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
@@ -206,6 +208,8 @@ impl ItemAttributes {
         let r = rarity.get_rarity_attributes_bonus();
         let mut total_score = 0.;
         let mut total_atts = 0.;
+
+        let is_cape = equip_type.is_cape();
         if self.health.value != 0 {
             tooltips.push((
                 format!(
@@ -217,20 +221,25 @@ impl ItemAttributes {
                     },
                     self.health.value
                 ),
-                if let Some(health) = &base_att.unwrap().health {
-                    format!(
-                        "({}-{})",
-                        f32::round(*health.start() as f32 * r + base_hp_lvl_bonus) as i32,
-                        f32::round(*health.end() as f32 * r + base_hp_lvl_bonus) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().health.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().health.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(health) = &base_att.unwrap().health {
+                        format!(
+                            "({}-{})",
+                            f32::round(*health.start() as f32 * r + base_hp_lvl_bonus) as i32,
+                            f32::round(*health.end() as f32 * r + base_hp_lvl_bonus) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().health.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(*bonus_att.unwrap().health.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
                 },
                 self.health.quality,
             ));
@@ -248,20 +257,26 @@ impl ItemAttributes {
                     },
                     self.defence.value
                 ),
-                if let Some(defence) = &base_att.unwrap().defence {
-                    format!(
-                        "({}-{})",
-                        f32::round(*defence.start() as f32 * r + base_def_lvl_bonus) as i32,
-                        f32::round(*defence.end() as f32 * r + base_def_lvl_bonus) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().defence.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().defence.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(defence) = &base_att.unwrap().defence {
+                        format!(
+                            "({}-{})",
+                            f32::round(*defence.start() as f32 * r + base_def_lvl_bonus) as i32,
+                            f32::round(*defence.end() as f32 * r + base_def_lvl_bonus) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().defence.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().defence.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.defence.quality,
             ));
@@ -279,20 +294,25 @@ impl ItemAttributes {
                     },
                     self.attack.value
                 ),
-                if let Some(attack) = &base_att.unwrap().attack {
-                    format!(
-                        "({}-{})",
-                        f32::round(*attack.start() as f32 * r + base_att_lvl_bonus) as i32,
-                        f32::round(*attack.end() as f32 * r + base_att_lvl_bonus) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().attack.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().attack.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(attack) = &base_att.unwrap().attack {
+                        format!(
+                            "({}-{})",
+                            f32::round(*attack.start() as f32 * r + base_att_lvl_bonus) as i32,
+                            f32::round(*attack.end() as f32 * r + base_att_lvl_bonus) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().attack.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(*bonus_att.unwrap().attack.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
                 },
                 self.attack.quality,
             ));
@@ -317,20 +337,25 @@ impl ItemAttributes {
                     },
                     self.dodge.value
                 ),
-                if let Some(dodge) = &base_att.unwrap().dodge {
-                    format!(
-                        "({}-{})",
-                        f32::round(*dodge.start() as f32 * r) as i32,
-                        f32::round(*dodge.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(dodge) = &base_att.unwrap().dodge {
+                        format!(
+                            "({}-{})",
+                            f32::round(*dodge.start() as f32 * r) as i32,
+                            f32::round(*dodge.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
                 },
                 self.dodge.quality,
             ));
@@ -348,22 +373,26 @@ impl ItemAttributes {
                     },
                     self.crit_chance.value
                 ),
-                if let Some(crit_chance) = &base_att.unwrap().crit_chance {
-                    format!(
-                        "({}-{})",
-                        f32::round(*crit_chance.start() as f32 * r) as i32,
-                        f32::round(*crit_chance.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().crit_chance.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(
-                            *bonus_att.unwrap().crit_chance.clone().unwrap().end() as f32 * r
-                        ) as i32
-                    )
+                    if let Some(crit_chance) = &base_att.unwrap().crit_chance {
+                        format!(
+                            "({}-{})",
+                            f32::round(*crit_chance.start() as f32 * r) as i32,
+                            f32::round(*crit_chance.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().crit_chance.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().crit_chance.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.crit_chance.quality,
             ));
@@ -381,22 +410,26 @@ impl ItemAttributes {
                     },
                     self.crit_damage.value
                 ),
-                if let Some(crit_damage) = &base_att.unwrap().crit_damage {
-                    format!(
-                        "({}-{})",
-                        f32::round(*crit_damage.start() as f32 * r) as i32,
-                        f32::round(*crit_damage.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().crit_damage.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(
-                            *bonus_att.unwrap().crit_damage.clone().unwrap().end() as f32 * r
-                        ) as i32
-                    )
+                    if let Some(crit_damage) = &base_att.unwrap().crit_damage {
+                        format!(
+                            "({}-{})",
+                            f32::round(*crit_damage.start() as f32 * r) as i32,
+                            f32::round(*crit_damage.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().crit_damage.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().crit_damage.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.crit_damage.quality,
             ));
@@ -414,22 +447,27 @@ impl ItemAttributes {
                     },
                     self.bonus_damage.value
                 ),
-                if let Some(bonus_damage) = &base_att.unwrap().bonus_damage {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_damage.start() as f32 * r) as i32,
-                        f32::round(*bonus_damage.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().bonus_damage.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(
-                            *bonus_att.unwrap().bonus_damage.clone().unwrap().end() as f32 * r
-                        ) as i32
-                    )
+                    if let Some(bonus_damage) = &base_att.unwrap().bonus_damage {
+                        format!(
+                            "({}-{})",
+                            f32::round(*bonus_damage.start() as f32 * r) as i32,
+                            f32::round(*bonus_damage.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().bonus_damage.clone().unwrap().start() as f32
+                                    * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().bonus_damage.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.bonus_damage.quality,
             ));
@@ -447,22 +485,27 @@ impl ItemAttributes {
                     },
                     self.health_regen.value
                 ),
-                if let Some(health_regen) = &base_att.unwrap().health_regen {
-                    format!(
-                        "({}-{})",
-                        f32::round(*health_regen.start() as f32 * r) as i32,
-                        f32::round(*health_regen.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().health_regen.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(
-                            *bonus_att.unwrap().health_regen.clone().unwrap().end() as f32 * r
-                        ) as i32
-                    )
+                    if let Some(health_regen) = &base_att.unwrap().health_regen {
+                        format!(
+                            "({}-{})",
+                            f32::round(*health_regen.start() as f32 * r) as i32,
+                            f32::round(*health_regen.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().health_regen.clone().unwrap().start() as f32
+                                    * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().health_regen.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.health_regen.quality,
             ));
@@ -480,20 +523,26 @@ impl ItemAttributes {
                     },
                     self.healing.value
                 ),
-                if let Some(healing) = &base_att.unwrap().healing {
-                    format!(
-                        "({}-{})",
-                        f32::round(*healing.start() as f32 * r) as i32,
-                        f32::round(*healing.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().healing.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().healing.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(healing) = &base_att.unwrap().healing {
+                        format!(
+                            "({}-{})",
+                            f32::round(*healing.start() as f32 * r) as i32,
+                            f32::round(*healing.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().healing.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().healing.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.healing.quality,
             ));
@@ -511,20 +560,25 @@ impl ItemAttributes {
                     },
                     self.thorns.value
                 ),
-                if let Some(thorns) = &base_att.unwrap().thorns {
-                    format!(
-                        "({}-{})",
-                        f32::round(*thorns.start() as f32 * r) as i32,
-                        f32::round(*thorns.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().thorns.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().thorns.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(thorns) = &base_att.unwrap().thorns {
+                        format!(
+                            "({}-{})",
+                            f32::round(*thorns.start() as f32 * r) as i32,
+                            f32::round(*thorns.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().thorns.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(*bonus_att.unwrap().thorns.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
                 },
                 self.thorns.quality,
             ));
@@ -542,20 +596,25 @@ impl ItemAttributes {
                     },
                     self.speed.value
                 ),
-                if let Some(speed) = &base_att.unwrap().speed {
-                    format!(
-                        "({}-{})",
-                        f32::round(*speed.start() as f32 * r) as i32,
-                        f32::round(*speed.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().speed.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().speed.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(speed) = &base_att.unwrap().speed {
+                        format!(
+                            "({}-{})",
+                            f32::round(*speed.start() as f32 * r) as i32,
+                            f32::round(*speed.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().speed.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(*bonus_att.unwrap().speed.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
                 },
                 self.speed.quality,
             ));
@@ -573,21 +632,26 @@ impl ItemAttributes {
                     },
                     self.lifesteal.value
                 ),
-                if let Some(lifesteal) = &base_att.unwrap().lifesteal {
-                    format!(
-                        "({}-{})",
-                        f32::round(*lifesteal.start() as f32 * r) as i32,
-                        f32::round(*lifesteal.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().lifesteal.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(*bonus_att.unwrap().lifesteal.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(lifesteal) = &base_att.unwrap().lifesteal {
+                        format!(
+                            "({}-{})",
+                            f32::round(*lifesteal.start() as f32 * r) as i32,
+                            f32::round(*lifesteal.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().lifesteal.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().lifesteal.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.lifesteal.quality,
             ));
@@ -606,20 +670,26 @@ impl ItemAttributes {
                     },
                     self.xp_rate.value
                 ),
-                if let Some(xp_rate) = &base_att.unwrap().xp_rate {
-                    format!(
-                        "({}-{})",
-                        f32::round(*xp_rate.start() as f32 * r) as i32,
-                        f32::round(*xp_rate.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().xp_rate.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().xp_rate.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(xp_rate) = &base_att.unwrap().xp_rate {
+                        format!(
+                            "({}-{})",
+                            f32::round(*xp_rate.start() as f32 * r) as i32,
+                            f32::round(*xp_rate.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().xp_rate.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().xp_rate.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.xp_rate.quality,
             ));
@@ -637,26 +707,103 @@ impl ItemAttributes {
                     },
                     self.loot_rate.value
                 ),
-                if let Some(loot_rate) = &base_att.unwrap().loot_rate {
-                    format!(
-                        "({}-{})",
-                        f32::round(*loot_rate.start() as f32 * r) as i32,
-                        f32::round(*loot_rate.end() as f32 * r) as i32
-                    )
+                if is_cape {
+                    "".to_string()
                 } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().loot_rate.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(*bonus_att.unwrap().loot_rate.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
+                    if let Some(loot_rate) = &base_att.unwrap().loot_rate {
+                        format!(
+                            "({}-{})",
+                            f32::round(*loot_rate.start() as f32 * r) as i32,
+                            f32::round(*loot_rate.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().loot_rate.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().loot_rate.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
                 },
                 self.loot_rate.quality,
             ));
             total_atts += 1.;
             total_score += self.loot_rate.range_percentage;
+        }
+        if self.mana.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Mana",
+                    if is_positive(self.mana.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.mana.value
+                ),
+                if is_cape {
+                    "".to_string()
+                } else {
+                    if let Some(mana) = &base_att.unwrap().mana {
+                        format!(
+                            "({}-{})",
+                            f32::round(*mana.start() as f32 * r) as i32,
+                            f32::round(*mana.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(*bonus_att.unwrap().mana.clone().unwrap().start() as f32 * r)
+                                as i32,
+                            f32::round(*bonus_att.unwrap().mana.clone().unwrap().end() as f32 * r)
+                                as i32
+                        )
+                    }
+                },
+                self.mana.quality,
+            ));
+            total_atts += 1.;
+            total_score += self.mana.range_percentage;
+        }
+        if self.mana_regen.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Mana Regen",
+                    if is_positive(self.mana_regen.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.mana_regen.value
+                ),
+                if is_cape {
+                    "".to_string()
+                } else {
+                    if let Some(mana_regen) = &base_att.unwrap().mana_regen {
+                        format!(
+                            "({}-{})",
+                            f32::round(*mana_regen.start() as f32 * r) as i32,
+                            f32::round(*mana_regen.end() as f32 * r) as i32
+                        )
+                    } else {
+                        format!(
+                            "({}-{})",
+                            f32::round(
+                                *bonus_att.unwrap().mana_regen.clone().unwrap().start() as f32 * r
+                            ) as i32,
+                            f32::round(
+                                *bonus_att.unwrap().mana_regen.clone().unwrap().end() as f32 * r
+                            ) as i32
+                        )
+                    }
+                },
+                self.mana_regen.quality,
+            ));
+            total_atts += 1.;
+            total_score += self.mana_regen.range_percentage;
         }
         let ratio = if total_atts == 0. {
             0.
@@ -703,6 +850,7 @@ impl ItemAttributes {
         &self,
         entity: &mut EntityCommands,
         old_max_health: i32,
+        old_max_mana: i32,
         skills: &PlayerSkills,
     ) {
         let computed_health = self.health + skills.get_count(Skill::Health) * 25;
@@ -714,6 +862,9 @@ impl ItemAttributes {
             }
             - if skills.has(Skill::SwordDMG) { 5 } else { 0 }
             - if skills.has(Skill::WideSwing) { 5 } else { 0 };
+        if self.mana.value > 0 && self.mana.value != old_max_mana {
+            entity.insert(MaxMana(computed_health.value));
+        }
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
         }
@@ -761,6 +912,9 @@ impl ItemAttributes {
         ));
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(self.loot_rate.value));
+        entity.insert(ManaRegen(
+            self.mana_regen.value + skills.get_count(Skill::MPRegen) * 5,
+        ));
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {
@@ -794,6 +948,8 @@ impl ItemAttributes {
             defence: self.defence + other.defence,
             xp_rate: self.xp_rate + other.xp_rate,
             loot_rate: self.loot_rate + other.loot_rate,
+            mana: self.mana + other.mana,
+            mana_regen: self.mana_regen + other.mana_regen,
         }
     }
 }
@@ -934,6 +1090,8 @@ setup_raw_bonus_attributes! { struct RawItemBonusAttributes {
      lifesteal: Option<RangeInclusive<i32>>,
      xp_rate: Option<RangeInclusive<i32>>,
      loot_rate: Option<RangeInclusive<i32>>,
+     mana: Option<RangeInclusive<i32>>,
+     mana_regen: Option<RangeInclusive<i32>>,
 }}
 
 setup_raw_base_attributes! { struct RawItemBaseAttributes {
@@ -954,6 +1112,8 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      lifesteal: Option<RangeInclusive<i32>>,
      xp_rate: Option<RangeInclusive<i32>>,
      loot_rate: Option<RangeInclusive<i32>>,
+     mana: Option<RangeInclusive<i32>>,
+     mana_regen: Option<RangeInclusive<i32>>,
 }}
 
 #[derive(
@@ -1068,7 +1228,7 @@ pub struct AttributeChangeEvent;
 #[derive(Bundle, Clone, Debug, Copy, Default)]
 pub struct PlayerAttributeBundle {
     pub health: MaxHealth,
-    pub mana: Mana,
+    pub mana: MaxMana,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
     pub defence: Defence,
@@ -1094,15 +1254,10 @@ pub struct PlayerAttributeBundle {
 pub struct CurrentHealth(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
-pub struct Mana {
-    pub max: i32,
-    pub current: i32,
-}
-impl Mana {
-    pub fn new(max: i32) -> Self {
-        Self { max, current: max }
-    }
-}
+pub struct MaxMana(pub i32);
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct CurrentMana(pub i32);
 
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
@@ -1191,12 +1346,12 @@ fn clamp_health(
         }
     }
 }
-fn clamp_mana(mut health: Query<&mut Mana, With<Player>>) {
-    for mut m in health.iter_mut() {
-        if m.current < 0 {
-            m.current = 0;
-        } else if m.current > m.max {
-            m.current = m.max;
+fn clamp_mana(mut health: Query<(&mut CurrentMana, &MaxMana), With<Player>>) {
+    for (mut current_mana, max_mana) in health.iter_mut() {
+        if current_mana.0 < 0 {
+            current_mana.0 = 0;
+        } else if current_mana.0 > max_mana.0 {
+            current_mana.0 = max_mana.0;
         }
     }
 }
@@ -1206,12 +1361,12 @@ fn handle_player_item_attribute_change_events(
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
-    player_atts: Query<(&ItemAttributes, &PlayerSkills, &MaxHealth), With<Player>>,
+    player_atts: Query<(&ItemAttributes, &PlayerSkills, &MaxHealth, &MaxMana), With<Player>>,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
 ) {
     for _event in att_events.iter() {
-        let (att, skills, old_health) = player_atts.single();
+        let (att, skills, old_health, old_mana) = player_atts.single();
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -1229,7 +1384,12 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
-        new_att.add_attribute_components(&mut commands.entity(player), old_health.0, skills);
+        new_att.add_attribute_components(
+            &mut commands.entity(player),
+            old_health.0,
+            old_mana.0,
+            skills,
+        );
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)

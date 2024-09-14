@@ -615,6 +615,10 @@ pub fn handle_interaction_clicks(
                     interactable.change(Interaction::Hovering);
                 }
                 Interaction::Hovering => {
+                    // cape slot is not clickable
+                    if state.r#type.is_equipment() && state.slot_index == 3 {
+                        continue;
+                    }
                     if left_mouse_pressed && !currently_dragging && !shift_key_pressed {
                         //send drag event
                         if let Some(item) = state.item {

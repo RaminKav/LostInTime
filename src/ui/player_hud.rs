@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     assets::Graphics,
-    attributes::{hunger::Hunger, CurrentHealth, Mana, MaxHealth},
+    attributes::{hunger::Hunger, CurrentHealth, CurrentMana, MaxHealth, MaxMana},
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
@@ -538,15 +538,15 @@ pub fn setup_hotbar_hud(
 }
 
 pub fn update_mana_bar(
-    player_mana: Query<&Mana, (With<Player>, Changed<Mana>)>,
+    player_mana: Query<(&CurrentMana, &MaxMana), (With<Player>, Changed<CurrentMana>)>,
     mut mana_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ManaBar>>,
 ) {
-    let Ok(mana) = player_mana.get_single() else {
+    let Ok((current_mana, max_mana)) = player_mana.get_single() else {
         return;
     };
     let (mut sprite, mut flash) = mana_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
-        x: 60. * mana.current as f32 / mana.max as f32,
+        x: 60. * current_mana.0 as f32 / max_mana.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
     flash.timer.tick(Duration::from_nanos(1));

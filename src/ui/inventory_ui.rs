@@ -214,7 +214,7 @@ pub fn setup_inv_slots_ui(
         );
 
         // equipment slots
-        if slot_index < 3 && should_spawn_equipment {
+        if slot_index < 4 && should_spawn_equipment {
             spawn_inv_slot(
                 &mut commands,
                 &inv_state,
@@ -361,6 +361,7 @@ pub fn spawn_inv_slot(
     // Inv Slot Icon //
     let slot_icon = match slot_type {
         InventorySlotType::Equipment => match slot_index {
+            3 => Some("ui/icons/CapeSlotIcon.png"),
             2 => Some("ui/icons/ChestSlotIcon.png"),
             1 => Some("ui/icons/PantsSlotIcon.png"),
             0 => Some("ui/icons/ShoesSlotIcon.png"),

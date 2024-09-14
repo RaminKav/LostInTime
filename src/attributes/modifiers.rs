@@ -1,6 +1,6 @@
 use crate::{colors::BLUE, player::Player, ui::damage_numbers::spawn_floating_text_with_shadow};
 
-use super::{CurrentHealth, Healing, Mana};
+use super::{CurrentHealth, CurrentMana, Healing, MaxMana};
 
 use bevy::prelude::*;
 
@@ -19,16 +19,16 @@ pub struct ModifyManaEvent(pub i32);
 
 pub fn handle_modify_mana_event(
     mut event: EventReader<ModifyManaEvent>,
-    mut query: Query<(&mut Mana, &GlobalTransform), With<Player>>,
+    mut query: Query<(&mut CurrentMana, &MaxMana, &GlobalTransform), With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
     for event in event.iter() {
-        let (mut mana, player_t) = query.single_mut();
-        if mana.current == mana.max && event.0 > 0 {
+        let (mut mana, max_mana, player_t) = query.single_mut();
+        if mana.0 == max_mana.0 && event.0 > 0 {
             return;
         }
-        mana.current += event.0;
+        mana.0 += event.0;
         if event.0 > 0 {
             spawn_floating_text_with_shadow(
                 &mut commands,

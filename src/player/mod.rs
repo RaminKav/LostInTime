@@ -39,15 +39,15 @@ use crate::{
         hunger::{Hunger, HungerTracker},
         modifiers::handle_modify_health_event,
         Attack, AttackCooldown, AttributeQuality, AttributeValue, CritChance, CritDamage,
-        HealthRegen, InvincibilityCooldown, ItemAttributes, Mana, ManaRegen, MaxHealth,
-        PlayerAttributeBundle,
+        CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
+        MaxMana, PlayerAttributeBundle,
     },
     client::CurrentRunSaveData,
     container::Container,
     custom_commands::CommandsExt,
     datafiles, handle_hits,
     inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
-    inventory::{Inventory, INVENTORY_SIZE},
+    inventory::{Inventory, ItemStack, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
@@ -225,8 +225,10 @@ fn spawn_player(
     asset_server: Res<AssetServer>,
     mut game: ResMut<Game>,
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
+    proto: ProtoParam,
 ) {
     //spawn player entity with limb spritesheets as children
+    let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
     let p = commands
         .spawn((
             AsepriteBundle {
@@ -240,7 +242,9 @@ fn spawn_player(
             Player,
             Inventory {
                 items: Container::with_size(INVENTORY_SIZE),
-                equipment_items: Container::with_size(4),
+                equipment_items: Container::with_size(4)
+                    .with_item_in_slot(3, cape_stack.clone())
+                    .clone(),
                 accessory_items: Container::with_size(4),
                 crafting_items: Container::with_size(0),
                 ..default()
@@ -273,7 +277,7 @@ fn spawn_player(
         .insert(RawPosition::default())
         .insert(PlayerAttributeBundle {
             health: MaxHealth(100),
-            mana: Mana::new(100),
+            mana: MaxMana(100),
             attack: Attack(0),
             health_regen: HealthRegen(2),
             mana_regen: ManaRegen(5),
@@ -282,6 +286,7 @@ fn spawn_player(
             attack_cooldown: AttackCooldown(0.4),
             ..default()
         })
+        .insert(CurrentMana(100))
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
