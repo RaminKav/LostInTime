@@ -33,7 +33,7 @@ use teleport::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub mod stats;
 use crate::{
     ai::{follow, idle, leap_attack},
-    animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerAseprite},
+    animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerGreyAseprite},
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
@@ -230,8 +230,8 @@ fn spawn_player(
     let p = commands
         .spawn((
             AsepriteBundle {
-                aseprite: asset_server.load(PlayerAseprite::PATH),
-                animation: AsepriteAnimation::from(PlayerAseprite::tags::IDLE_FRONT),
+                aseprite: asset_server.load(PlayerGreyAseprite::PATH),
+                animation: AsepriteAnimation::from(PlayerGreyAseprite::tags::IDLE_FRONT),
                 transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..default()
             },
@@ -269,6 +269,7 @@ fn spawn_player(
                 ..default()
             },
         ))
+        .insert(SkillClass::None)
         .insert(RawPosition::default())
         .insert(PlayerAttributeBundle {
             health: MaxHealth(100),

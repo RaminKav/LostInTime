@@ -21,7 +21,9 @@ use super::{
     teleport::TeleportState,
 };
 
+#[derive(Component, Debug, Clone, Eq, PartialEq)]
 pub enum SkillClass {
+    None,
     Melee,
     Rogue,
     Magic,
@@ -683,6 +685,7 @@ impl Skill {
     }
     pub fn get_ui_element(&self) -> UIElement {
         match self.get_class() {
+            SkillClass::None => UIElement::SkillChoice,
             SkillClass::Melee => UIElement::SkillChoice,
             SkillClass::Rogue => UIElement::SkillChoice,
             SkillClass::Magic => UIElement::SkillChoice,
@@ -690,6 +693,7 @@ impl Skill {
     }
     pub fn get_ui_element_hover(&self) -> UIElement {
         match self.get_class() {
+            SkillClass::None => UIElement::SkillChoiceMeleeHover,
             SkillClass::Melee => UIElement::SkillChoiceMeleeHover,
             SkillClass::Rogue => UIElement::SkillChoiceRogueHover,
             SkillClass::Magic => UIElement::SkillChoiceMagicHover,
@@ -914,23 +918,36 @@ impl PlayerSkills {
     pub fn get_count(&self, skill: Skill) -> i32 {
         self.skills.iter().filter(|&s| *s == skill).count() as i32
     }
-    pub fn get_class_affinity(&self) -> SkillClass {
+    pub fn get_class_affinity(&self, prev_class: SkillClass) -> SkillClass {
         //return the highest count class
         let (melee, rogue, magic) = (
             self.melee_skill_count,
             self.rogue_skill_count,
             self.magic_skill_count,
         );
-        if melee >= rogue && melee >= magic {
+        if melee == 0 && rogue == 0 && magic == 0 {
+            return SkillClass::None;
+        }
+        //if there is a tie with the prev class, always return the prev class
+        if prev_class == SkillClass::Melee && melee >= rogue && melee >= magic {
             SkillClass::Melee
-        } else if rogue >= melee && rogue >= magic {
+        } else if prev_class == SkillClass::Rogue && rogue >= melee && rogue >= magic {
             SkillClass::Rogue
-        } else {
+        } else if prev_class == SkillClass::Magic && magic >= melee && magic >= rogue {
             SkillClass::Magic
+        } else {
+            if melee >= rogue && melee >= magic {
+                SkillClass::Melee
+            } else if rogue >= melee && rogue >= magic {
+                SkillClass::Rogue
+            } else {
+                SkillClass::Magic
+            }
         }
     }
     pub fn increment_class_count(&mut self, skill: Skill) {
         match skill.get_class() {
+            SkillClass::None => unreachable!(),
             SkillClass::Melee => self.melee_skill_count += 1,
             SkillClass::Rogue => self.rogue_skill_count += 1,
             SkillClass::Magic => self.magic_skill_count += 1,

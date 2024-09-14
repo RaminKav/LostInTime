@@ -200,7 +200,7 @@ pub fn handle_parry(
     if skills.has(Skill::ParrySpear)
         && parry_state.active
         && parry_state.success
-        && key_input.just_pressed(KeyCode::Slash)
+        && key_input.just_pressed(KeyCode::Space)
     {
         parry_state.spear_timer.tick(time.delta());
         commands.entity(e).insert(PlayerAnimation::Spear);

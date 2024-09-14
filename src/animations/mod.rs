@@ -13,8 +13,8 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{handle_game_over_fadeout, tick_game_over_overlay};
 use player_sprite::{
-    cleanup_one_time_animations, handle_anim_change_when_player_dir_changes,
-    handle_player_animation_change, PlayerAnimation,
+    change_player_class_visuals, cleanup_one_time_animations,
+    handle_anim_change_when_player_dir_changes, handle_player_animation_change, PlayerAnimation,
 };
 use serde::{Deserialize, Serialize};
 pub mod player_sprite;
@@ -117,6 +117,7 @@ impl Plugin for AnimationsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((change_player_class_visuals,).in_set(OnUpdate(GameState::Main)))
             .add_system(tick_game_over_overlay);
     }
 }

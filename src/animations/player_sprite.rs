@@ -10,11 +10,17 @@
 //when direction changes, we need to assign a new animation handle
 //
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
-use crate::inputs::FacingDirection;
+use crate::{
+    inputs::FacingDirection,
+    player::skills::{PlayerSkills, SkillClass},
+};
 
-aseprite!(pub PlayerAseprite, "textures/player/player.aseprite");
+aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
+aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
+aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
+aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
 
 #[derive(Component, Eq, PartialEq, Debug)]
 pub enum PlayerAnimation {
@@ -196,5 +202,40 @@ pub fn cleanup_one_time_animations(
         if curr_anim.is_one_time_anim() && anim_state.just_finished() {
             commands.entity(e).insert(PlayerAnimation::Idle);
         }
+    }
+}
+
+pub fn change_player_class_visuals(
+    player: Query<(Entity, &PlayerSkills, &SkillClass), Changed<PlayerSkills>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    for (e, skills, prev_class) in player.iter() {
+        let class = skills.get_class_affinity(prev_class.clone());
+        let (handle, anim) = match class {
+            SkillClass::None => (
+                asset_server.load::<Aseprite, _>(PlayerGreyAseprite::PATH),
+                PlayerGreyAseprite::tags::IDLE_FRONT,
+            ),
+            SkillClass::Melee => (
+                asset_server.load::<Aseprite, _>(PlayerRedAseprite::PATH),
+                PlayerRedAseprite::tags::IDLE_FRONT,
+            ),
+            SkillClass::Magic => (
+                asset_server.load::<Aseprite, _>(PlayerBlueAseprite::PATH),
+                PlayerBlueAseprite::tags::IDLE_FRONT,
+            ),
+            SkillClass::Rogue => (
+                asset_server.load::<Aseprite, _>(PlayerGreenAseprite::PATH),
+                PlayerGreenAseprite::tags::IDLE_FRONT,
+            ),
+        };
+
+        commands
+            .entity(e)
+            .remove::<TextureAtlasSprite>()
+            .insert(class)
+            .insert(handle)
+            .insert(AsepriteAnimation::from(anim));
     }
 }

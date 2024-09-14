@@ -4,6 +4,7 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": RedMushroom,
   "survival_rogue_like::attributes::MaxHealth": (1),
+  "survival_rogue_like::world::y_sort::YSort": (-0.01),
   "survival_rogue_like::player::levels::ExperienceReward": (5),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
