@@ -4,22 +4,20 @@
   schematics: {
   "survival_rogue_like::item::WorldObject": MetalPants,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        health: Some((start: 2, end: 12)),
-        defence: Some((start: 5, end: 12)),
-        speed: Some((start: -12, end: -8)),
-
+        health: Some((start: 8, end: 15)),
+        defence: Some((start: 8, end: 15)),
+        speed: Some((start: -14, end: -6)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 2, end: 5)),
         crit_chance: Some((start: 4, end: 5)),
         healing: Some((start: 4, end: 15)),
         bonus_damage: Some((start: 1, end: 3)),
-      //   speed: Some((start: 4, end: 10)),
         health_regen: Some((start: -2, end: 1)),
         thorns: Some((start: 4, end: 10)),
         dodge: Some((start: 1, end: 3)),
-        xp_rate: Some((start: 4, end: 10)),
-        loot_rate: Some((start: 4, end: 15)),
+        xp_rate: Some((start: 2, end: 5)),
+        loot_rate: Some((start: 2, end: 5)),
   ),
   "survival_rogue_like::item::EquipmentType": Legs,
   "survival_rogue_like::inventory::ItemStack": (

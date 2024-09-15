@@ -82,6 +82,7 @@ fn check_melee_hit_collisions(
             if !anim.is_an_attack()
                 || world_obj.get(hit_entity).is_ok()
                 || hit_tracker.contains(&hit_entity)
+                || weapon_obj.is_magic_weapon()
             {
                 continue;
             }

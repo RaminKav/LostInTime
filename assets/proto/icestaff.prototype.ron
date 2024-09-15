@@ -17,6 +17,8 @@
         thorns: Some((start: 3, end: 4)),
         dodge: Some((start: 1, end: 4)),
         loot_rate: Some((start: 3, end: 5)),
+        mana: Some((start: 4, end: 8)),
+        mana_regen: Some((start: 1, end: 5)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::item::item_actions::ManaCost": (15),
