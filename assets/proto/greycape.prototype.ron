@@ -10,7 +10,7 @@
         obj_type: GreyCape,
         metadata: (
             name: "Neutral Cape", 
-            desc: ["A simple cape full", "of potential. For", "now, it's only", " purpose is to", "obscure your clothing."]
+            desc: ["A simple cape full", "of potential. For", "now, it's only", "purpose is to", "obscure your", "clothing."]
         ),
         count: 1
   ),

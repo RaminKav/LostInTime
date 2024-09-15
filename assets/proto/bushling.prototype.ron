@@ -11,7 +11,7 @@
     "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/bushling/bushling_down.png", size: (x: 38., y: 38.), cols: 9, rows: 5),
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,9,6], anim_offset: 0),
-    "survival_rogue_like::attributes::MaxHealth": (55),
+    "survival_rogue_like::attributes::MaxHealth": (65),
     "survival_rogue_like::attributes::Attack": (15),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
@@ -121,19 +121,19 @@
                 item: LeatherTunic,
                 min: 1,
                 max: 1,
-                rate: 0.014
+                rate: 0.01
             ),
             (
                 item: LeatherPants,
                 min: 1,
                 max: 1,
-                rate: 0.014
+                rate: 0.01
             ),
             (
                 item: LeatherShoes,
                 min: 1,
                 max: 1,
-                rate: 0.014
+                rate: 0.01
             ),
             (
                 item: ForestShirt,
