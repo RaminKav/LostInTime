@@ -233,11 +233,13 @@ pub fn follow(
 
         let distance_from_target = (target_translation.truncate() - follow_translation).length();
         let is_far_away = distance_from_target > 10.5 * TILE_SIZE.x;
-        let is_on_water_tile = game
-            .get_tile_data(world_pos_to_tile_pos(follow_translation))
-            .expect("enemy is not on a tile?")
-            .block_type
-            .contains(&WorldObject::WaterTile);
+        let is_on_water_tile = if let Some(tile_data) =
+            game.get_tile_data(world_pos_to_tile_pos(follow_translation))
+        {
+            tile_data.block_type.contains(&WorldObject::WaterTile)
+        } else {
+            true
+        };
         //convert follower txfm to AIPos too
         let target_txfm = if night_tracker.is_night() && is_far_away {
             target_translation.truncate()

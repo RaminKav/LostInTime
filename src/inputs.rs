@@ -436,13 +436,7 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            // proto_commands.spawn_item_from_proto(
-            //     WorldObject::LeatherShoes,
-            //     &proto,
-            //     pos,
-            //     1,
-            //     Some(1),
-            // );
+            proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(4));
             // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));

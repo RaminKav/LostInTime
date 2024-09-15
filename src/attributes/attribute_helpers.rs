@@ -71,7 +71,7 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
 }
 
 pub fn get_rarity_rng(mut rng: ThreadRng) -> ItemRarity {
-    let rarity_rng = rng.gen_range(0..32);
+    let rarity_rng = rng.gen_range(0..35);
     if rarity_rng == 0 {
         ItemRarity::Legendary
     } else if rarity_rng < 5 {
