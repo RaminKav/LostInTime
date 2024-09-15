@@ -298,7 +298,7 @@ pub fn move_player(
     }
     let is_speeding_up = player.player_dash_duration.percent() < 0.5;
     if player.is_dashing {
-        if curr_anim != &PlayerAnimation::Roll {
+        if curr_anim != &PlayerAnimation::Roll && player.player_dash_duration.percent() == 0. {
             commands.entity(player_e).insert(PlayerAnimation::Roll);
         }
         d.x = if is_speeding_up {

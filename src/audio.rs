@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use rand::seq::IteratorRandom;
 
 use crate::{
+    animations::player_sprite::PlayerAnimation,
     combat::{AttackTimer, HitEvent, ObjBreakEvent},
     enemy::Mob,
     handle_attack_cooldowns,
@@ -50,11 +51,14 @@ pub fn sword_swing_sound(
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
     mouse_button_input: Res<Input<MouseButton>>,
-    player_query: Query<Option<&AttackTimer>, With<Player>>,
+    player_query: Query<(Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
     curr_ui_state: Res<State<UIState>>,
 ) {
-    if mouse_button_input.pressed(MouseButton::Left) && curr_ui_state.0 == UIState::Closed {
-        let attack_timer_option = player_query.single();
+    let (attack_timer_option, player_anim) = player_query.single();
+    if mouse_button_input.pressed(MouseButton::Left)
+        && curr_ui_state.0 == UIState::Closed
+        && player_anim.is_an_attack()
+    {
         if attack_timer_option.is_some() {
             return;
         }
