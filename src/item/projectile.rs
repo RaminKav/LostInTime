@@ -183,12 +183,12 @@ fn handle_ranged_attack_event(
                 continue;
             }
             modify_mana_event.send(ModifyManaEvent(
-                mana_cost
+                (mana_cost as f32
                     * if skills.has(Skill::DiscountMP) {
                         0.75
                     } else {
                         1.
-                    } as i32,
+                    }) as i32,
             ));
         }
         if proto
