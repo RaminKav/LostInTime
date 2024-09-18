@@ -5,9 +5,10 @@ use crate::combat::{EnemyDeathEvent, MarkedForDeath};
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
-use crate::player::melee_skills::OnHitAoe;
 use crate::player::skills::{PlayerSkills, Skill};
+use crate::player::teleport::IceFloor;
 use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
+use crate::world::y_sort::YSort;
 use crate::{
     combat::{AttackTimer, HitEvent},
     inputs::CursorPos,
@@ -201,7 +202,7 @@ pub fn handle_on_hit_upgrades(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(hit.damage / 2),
+                dmg_override: Some(hit.damage / 4),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
                 spawn_delay: 0.1,
             });
@@ -223,16 +224,17 @@ pub fn handle_on_hit_upgrades(
         }
         if skills.has(Skill::IceStaffFloor) && hit.hit_with_projectile == Some(Projectile::Fireball)
         {
-            spawn_one_time_aseprite_collider(
+            let ice = spawn_one_time_aseprite_collider(
                 &mut commands,
                 Transform::from_translation(hit_entity_txfm.translation()),
                 6.5,
                 hit.damage / 5,
-                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
+                asset_server.load::<Aseprite, _>(IceFloor::PATH),
+                AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                 true,
             );
+            commands.entity(ice).insert(YSort(-0.1));
         }
         if skills.has(Skill::LethalBlow)
             && curr_hp.0 <= max_hp.0 / 4

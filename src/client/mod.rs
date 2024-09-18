@@ -196,10 +196,10 @@ pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
     inv: Query<&Inventory>,
     proto_param: ProtoParam,
-    mut game_over: EventReader<GameOverEvent>,
+    game_over: EventReader<GameOverEvent>,
     mut analytics_data: ResMut<AnalyticsData>,
 ) {
-    for _event in game_over.iter() {
+    if !game_over.is_empty() {
         info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
         let save_file_path = datafiles::save_file();

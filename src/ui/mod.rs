@@ -43,9 +43,11 @@ mod essence_ui;
 pub use essence_ui::*;
 
 use crate::{
+    attributes::clamp_health,
     client::{load_state, ClientState},
     handle_hits,
     item::item_actions::ActionSuccessEvent,
+    night::NightTracker,
     CustomFlush, Game, GameState, DEBUG,
 };
 
@@ -119,6 +121,7 @@ impl Plugin for UIPlugin {
                     setup_xp_bar_ui.after(load_state),
                     setup_bars_ui.after(load_state),
                     setup_currency_ui,
+                    setup_clock_hud,
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -178,6 +181,10 @@ impl Plugin for UIPlugin {
                     change_ui_state_to_furnace_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<FurnaceContainer>()),
+                    handle_update_clock_hud.run_if(
+                        resource_exists::<NightTracker>()
+                            .and_then(resource_changed::<NightTracker>()),
+                    ),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -202,7 +209,7 @@ impl Plugin for UIPlugin {
                     setup_skill_choice_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
-                    handle_update_player_skills,
+                    handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),

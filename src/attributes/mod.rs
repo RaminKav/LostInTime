@@ -16,9 +16,9 @@ use crate::{
     animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
-    client::GameOverEvent,
+    client::{is_not_paused, GameOverEvent},
     colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
-    inputs::move_player,
+    inputs::player_move_inputs,
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType, WorldObject},
     player::{
@@ -33,7 +33,7 @@ use crate::{
         DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
         UIState,
     },
-    CustomFlush, GameParam, GameState, Player,
+    CustomFlush, Game, GameParam, GameState, Player,
 };
 use modifiers::*;
 pub mod attribute_helpers;
@@ -195,7 +195,7 @@ impl ItemAttributes {
         } else {
             0.
         };
-        let (base_def_lvl_bonus, base_hp_lvl_bonus) =
+        let (base_hp_lvl_bonus, base_def_lvl_bonus) =
             if equip_type.is_equipment() && !equip_type.is_accessory() {
                 if level > 1 {
                     (max(0, (level * 2) - 1) as f32, max(0, level - 1) as f32)
@@ -815,6 +815,7 @@ impl ItemAttributes {
     pub fn get_stats_summary(&self) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
         tooltips.push(("Health:          ".to_string(), format!("{}", self.health)));
+        tooltips.push(("Mana:          ".to_string(), format!("{}", self.mana)));
         tooltips.push((
             "Attack:             ".to_string(),
             format!("{}", self.attack + self.bonus_damage),
@@ -836,10 +837,6 @@ impl ItemAttributes {
         tooltips.push(("Thorns:           ".to_string(), format!("{}", self.thorns)));
         tooltips.push(("Dodge:            ".to_string(), format!("{}", self.dodge)));
         tooltips.push(("Speed:          ".to_string(), format!("{}", self.speed)));
-        tooltips.push((
-            "Lifesteal:      ".to_string(),
-            format!("{}", self.lifesteal),
-        ));
 
         tooltips.push(("XP: ".to_string(), format!("{}", self.xp_rate)));
         tooltips.push(("Loot: ".to_string(), format!("{}", self.loot_rate)));
@@ -863,7 +860,7 @@ impl ItemAttributes {
             - if skills.has(Skill::SwordDMG) { 5 } else { 0 }
             - if skills.has(Skill::WideSwing) { 5 } else { 0 };
         if self.mana.value > 0 && self.mana.value != old_max_mana {
-            entity.insert(MaxMana(computed_health.value));
+            entity.insert(MaxMana(self.mana.value));
         }
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
@@ -1315,16 +1312,16 @@ impl Plugin for AttributesPlugin {
                     clamp_health,
                     clamp_mana,
                     handle_actions_drain_hunger,
-                    tick_hunger,
+                    tick_hunger.run_if(is_not_paused),
                     handle_modify_health_event.before(clamp_health),
                     handle_modify_mana_event.before(clamp_mana),
                     add_current_health_with_max_health,
-                    handle_health_regen,
-                    handle_mana_regen,
+                    handle_health_regen.run_if(is_not_paused),
+                    handle_mana_regen.run_if(is_not_paused),
                     update_attributes_with_held_item_change,
                     update_attributes_and_sprite_with_equipment_change,
                     update_sprite_with_equipment_removed,
-                    handle_item_abilitiy_on_attack.after(move_player),
+                    handle_item_abilitiy_on_attack.after(player_move_inputs),
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
@@ -1333,7 +1330,7 @@ impl Plugin for AttributesPlugin {
     }
 }
 
-fn clamp_health(
+pub fn clamp_health(
     mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>>,
     mut game_over_event: EventWriter<GameOverEvent>,
 ) {
@@ -1364,6 +1361,7 @@ fn handle_player_item_attribute_change_events(
     player_atts: Query<(&ItemAttributes, &PlayerSkills, &MaxHealth, &MaxMana), With<Player>>,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
+    game: Res<Game>,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana) = player_atts.single();
@@ -1390,6 +1388,11 @@ fn handle_player_item_attribute_change_events(
             old_mana.0,
             skills,
         );
+        if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
+            if !main_hand.get_obj().is_weapon() {
+                new_att.attack = AttributeValue::new(1, AttributeQuality::Low, 0.);
+            }
+        }
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)

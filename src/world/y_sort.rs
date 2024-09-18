@@ -16,7 +16,7 @@ impl Plugin for YSortPlugin {
 pub struct YSort(pub f32);
 
 impl YSortPlugin {
-    fn y_sort(
+    pub fn y_sort(
         mut q: Query<(
             &mut Transform,
             &GlobalTransform,

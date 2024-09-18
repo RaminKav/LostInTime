@@ -1,9 +1,7 @@
 use bevy::prelude::*;
 
-use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
 use bevy_proto::prelude::ProtoCommands;
-use bevy_rapier2d::prelude::Collider;
-use combat_helpers::{spawn_one_time_aseprite_collider, tick_despawn_timer};
+use combat_helpers::tick_despawn_timer;
 use rand::Rng;
 pub mod status_effects;
 use status_effects::*;
@@ -36,8 +34,8 @@ use crate::{
     juice::bounce::BounceOnHit,
     player::{
         levels::{ExperienceReward, PlayerLevel},
-        melee_skills::OnHitAoe,
         skills::{PlayerSkills, Skill},
+        teleport::spawn_ice_explosion_hitbox,
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
@@ -428,15 +426,11 @@ pub fn cleanup_marked_for_death_entities(
             let (skills, attack, mana_regen) = player.single();
             if let Some(_) = slow_option {
                 if skills.has(Skill::FrozenAoE) {
-                    spawn_one_time_aseprite_collider(
+                    spawn_ice_explosion_hitbox(
                         &mut commands,
-                        Transform::from_translation(mob_pos.translation()),
-                        10.5,
+                        &asset_server,
+                        mob_pos.translation(),
                         attack.0,
-                        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-                        asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-                        AsepriteAnimation::from(OnHitAoe::tags::AO_E),
-                        false,
                     );
                 }
                 if skills.has(Skill::FrozenMPRegen) {

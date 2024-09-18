@@ -9,6 +9,7 @@ use rand::{
 };
 
 use crate::{
+    client::is_not_paused,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     item::WorldObject,
@@ -39,7 +40,7 @@ impl Plugin for SpawnerPlugin {
             .add_systems(
                 (
                     handle_spawn_mobs,
-                    tick_spawner_timers,
+                    tick_spawner_timers.run_if(is_not_paused),
                     // handle_add_fairy_spawners,
                     spawn_one_time_enemies_at_day,
                     reduce_chunk_mob_count_on_mob_death,

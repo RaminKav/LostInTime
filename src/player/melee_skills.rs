@@ -19,7 +19,7 @@ use crate::{
 };
 
 use super::{sprint::SprintState, Player, PlayerSkills, Skill};
-aseprite!(pub OnHitAoe, "textures/effects/OnHitAoe.aseprite");
+aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
 pub struct SecondHitDelay {
@@ -36,7 +36,7 @@ pub fn handle_on_hit_skills(
     in_i_frame: Query<&InvincibilityTimer>,
 ) {
     let (player, attack, skills) = player_q.single();
-    if !skills.has(Skill::OnHitAoEBurst) {
+    if !skills.has(Skill::OnHitEcho) {
         return;
     }
     for hit in hit_events.iter() {
@@ -130,7 +130,7 @@ pub fn handle_echo_after_heal(
             continue;
         }
 
-        if skills.has(Skill::HealAoE) {
+        if skills.has(Skill::HealEcho) {
             spawn_echo_hitbox(&mut commands, &asset_server, e, attack.0);
         }
     }
@@ -296,9 +296,9 @@ pub fn spawn_echo_hitbox(
         Transform::from_translation(Vec3::ZERO),
         10.5,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-        asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-        AsepriteAnimation::from(OnHitAoe::tags::AO_E),
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 26.),
+        asset_server.load::<Aseprite, _>(Echo::PATH),
+        AsepriteAnimation::from(Echo::tags::ECHO),
         false,
     );
     commands.entity(hitbox_e).set_parent(player);

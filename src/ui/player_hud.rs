@@ -1,4 +1,5 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
 
 use super::{
     damage_numbers::spawn_text, interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon,
@@ -7,10 +8,12 @@ use super::{
 use crate::{
     assets::Graphics,
     attributes::{hunger::Hunger, CurrentHealth, CurrentMana, MaxHealth, MaxMana},
+    client::GameOverEvent,
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
+    night::NightTracker,
     player::{
         levels::PlayerLevel,
         skills::{PlayerSkills, Skill},
@@ -19,6 +22,7 @@ use crate::{
     ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
+aseprite!(pub Clock, "ui/Clock.aseprite");
 
 #[derive(Component)]
 pub struct HealthBar;
@@ -32,6 +36,11 @@ pub struct XPBar;
 pub struct XPBarText;
 #[derive(Component)]
 pub struct CurrencyText;
+
+#[derive(Component)]
+pub struct ClockHUD;
+#[derive(Component)]
+pub struct ClockText;
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
@@ -452,7 +461,11 @@ pub fn handle_update_player_skills(
     mut prev_icons_tracker: Local<PlayerSkills>,
     res: Res<ScreenResolution>,
     mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
+    game_over: EventReader<GameOverEvent>,
 ) {
+    if !game_over.is_empty() {
+        prev_icons_tracker.skills.clear();
+    }
     if let Ok(new_skills) = player_skills.get_single() {
         for (i, skill) in new_skills.skills.clone().iter().enumerate() {
             if prev_icons_tracker.skills.get(i) == Some(skill) {
@@ -550,4 +563,74 @@ pub fn update_mana_bar(
         y: INNER_HUD_BAR_SIZE.y,
     });
     flash.timer.tick(Duration::from_nanos(1));
+}
+
+pub fn setup_clock_hud(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    night_tracker: Res<NightTracker>,
+    res: Res<ScreenResolution>,
+) {
+    let clock_hud_frame = commands
+        .spawn(AsepriteBundle {
+            animation: AsepriteAnimation::from(Clock::tags::ONE),
+            aseprite: asset_server.load::<Aseprite, _>(Clock::PATH),
+            transform: Transform {
+                translation: Vec3::new(
+                    -res.game_width / 2. + 28.5,
+                    (GAME_HEIGHT - 15.) / 2. - 65.5,
+                    6.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(Name::new("CLOCK HUD"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ClockHUD)
+        .id();
+    let text = spawn_text(
+        &mut commands,
+        &asset_server,
+        Vec3::new(10.5, -8., 1.),
+        BLACK,
+        format!("{}:00", night_tracker.get_hour()),
+        Anchor::CenterRight,
+        1.,
+        3,
+    );
+    commands
+        .entity(text)
+        .insert(ClockText)
+        .set_parent(clock_hud_frame);
+}
+
+pub fn handle_update_clock_hud(
+    night_tracker: Res<NightTracker>,
+    mut clock_text: Query<&mut Text, With<ClockText>>,
+    mut clock_anim: Query<Entity, With<ClockHUD>>,
+    mut commands: Commands,
+) {
+    let hour = night_tracker.get_hour();
+    let anim = match hour {
+        0 | 1 => Clock::tags::ONE,
+        2 | 3 => Clock::tags::TWO,
+        4 | 5 => Clock::tags::THREE,
+        6 | 7 => Clock::tags::FOUR,
+        8 | 9 => Clock::tags::FIVE,
+        10 | 11 => Clock::tags::SIX,
+        12 | 13 => Clock::tags::SEVEN,
+        14 | 15 => Clock::tags::EIGHT,
+        16 | 17 => Clock::tags::NINE,
+        18 | 19 => Clock::tags::TEN,
+        20 | 21 => Clock::tags::ELEVEN,
+        22 | 23 => Clock::tags::TWELVE,
+        i => unreachable!("Invalid hour: {}", i),
+    };
+    for e in clock_anim.iter_mut() {
+        commands.entity(e).insert(AsepriteAnimation::from(anim));
+    }
+    let mut text = clock_text.single_mut();
+    text.sections[0].value = format!("{}:00", if hour > 12 { hour - 12 } else { hour });
 }

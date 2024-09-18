@@ -310,7 +310,7 @@ impl GenerationPlugin {
                 game.world_obj_cache.unique_objs.insert(obj_to_clear, pos);
             }
         }
-        if dungeon_check.get_single().is_err() {
+        if dungeon_check.get_single().is_err() && !*NO_GEN {
             // summon portal
             commands
                 .spawn(VisibilityBundle::default())
@@ -556,7 +556,12 @@ impl GenerationPlugin {
                 );
                 for pos in clear_tiles {
                     if let Some(obj) = objs.get(&pos) {
-                        if obj.is_tree() || obj.is_medium_size(&proto_param) {
+                        if obj.is_tree()
+                            || obj.is_medium_size(&proto_param)
+                            || obj == &WorldObject::Grass
+                            || obj == &WorldObject::Grass2
+                            || obj == &WorldObject::Grass3
+                        {
                             objs.remove(&pos);
                         }
                     }

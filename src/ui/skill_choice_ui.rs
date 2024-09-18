@@ -33,7 +33,7 @@ pub fn setup_skill_choice_ui(
         return;
     }
     let choices = &choices_queue.queue[0];
-    let (size, t_offset) = (SKILLS_CHOICE_UI_SIZE, Vec2::new(4., 4.));
+    let t_offset = Vec2::new(4., 4.);
 
     // title bar
     let title_sprite = commands
@@ -44,7 +44,7 @@ pub fn setup_skill_choice_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 80., 7.),
+                translation: Vec3::new(0., 80., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -71,23 +71,43 @@ pub fn setup_skill_choice_ui(
         .insert(UIState::Skills)
         .set_parent(title_sprite);
 
-    commands
+    let overlay = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 10.)),
+                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.)),
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-t_offset.x, -t_offset.y, -1.),
+                translation: Vec3::new(-t_offset.x, -t_offset.y - GAME_HEIGHT / 2., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("overlay"));
+        .insert(Name::new("overlay"))
+        .id();
 
+    commands.entity(title_sprite).push_children(&[overlay]);
+
+    spawn_skill_choice_entities(
+        &graphics,
+        &mut commands,
+        &asset_server,
+        choices.clone(),
+        t_offset,
+    );
+}
+
+pub fn spawn_skill_choice_entities(
+    graphics: &Graphics,
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    choices: [SkillChoiceState; 3],
+    t_offset: Vec2,
+) {
+    let size = SKILLS_CHOICE_UI_SIZE;
     for i in -1..2 {
         let translation = Vec3::new(i as f32 * (size.x + 16.), 0., 1.);
         let choice = choices[(i + 1) as usize].clone();
@@ -192,14 +212,15 @@ pub fn setup_skill_choice_ui(
             text_desc.set_parent(skills_e);
         }
     }
-
-    // commands.entity(skills_e).push_children(&[overlay]);
 }
-
 pub fn toggle_skills_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
     key_input: ResMut<Input<KeyCode>>,
     mut queue: ResMut<SkillChoiceQueue>,
+    old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
 ) {
     if key_input.just_pressed(KeyCode::B) {
         next_inv_state.set(UIState::Skills);
@@ -210,7 +231,18 @@ pub fn toggle_skills_visibility(
         for choice in remaining_choices.iter() {
             queue.pool.push(choice.clone());
         }
+        for e in old_skill_entities.iter() {
+            commands.entity(e).despawn_recursive();
+        }
+
         let mut rng = rand::thread_rng();
         queue.add_new_skills_after_levelup(&mut rng);
+        spawn_skill_choice_entities(
+            &graphics,
+            &mut commands,
+            &asset_server,
+            queue.queue[0].clone(),
+            Vec2::new(4., 4.),
+        );
     }
 }

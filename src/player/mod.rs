@@ -42,12 +42,12 @@ use crate::{
         CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
         MaxMana, PlayerAttributeBundle,
     },
-    client::CurrentRunSaveData,
+    client::{is_not_paused, CurrentRunSaveData},
     container::Container,
     custom_commands::CommandsExt,
     datafiles, handle_hits,
-    inputs::{move_camera_with_player, move_player, FacingDirection, MovementVector},
-    inventory::{Inventory, ItemStack, INVENTORY_SIZE},
+    inputs::{move_camera_with_player, player_move_inputs, FacingDirection, MovementVector},
+    inventory::{Inventory, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
@@ -129,18 +129,20 @@ impl Plugin for PlayerPlugin {
         .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
         .add_systems(
             (
-                handle_sprint_timer.after(move_player),
-                handle_sprinting_cooldown,
+                handle_sprint_timer
+                    .after(player_move_inputs)
+                    .run_if(is_not_paused),
+                handle_sprinting_cooldown.run_if(is_not_paused),
                 send_attribute_event_on_stats_update,
                 handle_level_up,
                 handle_enemy_death_sprint_reset,
                 handle_toggle_sprinting,
                 spawn_particles_when_leveling,
+                handle_teleport.run_if(is_not_paused),
                 hide_particles_when_inv_open,
                 handle_modify_time_fragments,
-                tick_just_teleported,
-                handle_teleport,
-                tick_teleport_timer,
+                tick_just_teleported.run_if(is_not_paused),
+                tick_teleport_timer.run_if(is_not_paused),
                 handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
                 handle_on_hit_skills.after(handle_hits),
                 handle_dodge_crit,
@@ -149,11 +151,11 @@ impl Plugin for PlayerPlugin {
         )
         .add_systems(
             (
-                tick_combo_counter,
+                tick_combo_counter.run_if(is_not_paused),
                 handle_add_combo_counter,
                 pause_combo_anim_when_done,
                 handle_parry,
-                tick_parried_timer,
+                tick_parried_timer.run_if(is_not_paused),
                 handle_parry_success,
             )
                 .in_set(OnUpdate(GameState::Main)),
@@ -188,7 +190,6 @@ pub fn handle_move_player(
     mut move_events: EventReader<MovePlayerEvent>,
 ) {
     for m in move_events.iter() {
-        debug!("MOVING PLAYER TO {:?}", m.pos);
         //TODO: Add world helper to get chunk -> world pos, lots of copy code in item.rs
 
         let world_pos = tile_pos_to_world_pos(m.pos, false);
@@ -291,7 +292,7 @@ fn spawn_player(
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(ManaRegenTimer(Timer::from_seconds(2.5, TimerMode::Once)))
+        .insert(ManaRegenTimer(Timer::from_seconds(4., TimerMode::Once)))
         .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))

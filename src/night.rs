@@ -21,17 +21,21 @@ impl NightTracker {
     pub fn get_alpha(&self) -> f32 {
         if self.time < 6. {
             0.
-        } else if self.time >= 6. && self.time < 18. {
-            return (self.time - 6.) * 0.05833333;
+        } else if self.time >= 6. && self.time <= 14. {
+            return (self.time - 6.) * 0.09833333;
         } else {
-            return 0.7 - (self.time - 18.) * 0.11666666;
+            return 0.8 - (self.time - 14.) * 0.11666666;
         }
     }
     pub fn is_night(&self) -> bool {
-        self.time - 18. >= 0.
+        // 12am to 6am ->
+        self.time >= 12. && self.time <= 18.
     }
-    pub fn is_dawn(&self) -> bool {
+    pub fn is_start_of_new_day(&self) -> bool {
         self.time == 0.
+    }
+    pub fn get_hour(&self) -> u8 {
+        self.time as u8
     }
 }
 
@@ -78,7 +82,7 @@ pub fn spawn_night(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(17., TimerMode::Repeating)))
+        .insert(Night(Timer::from_seconds(15., TimerMode::Repeating)))
         .insert(Name::new("night"));
 }
 
@@ -99,7 +103,7 @@ pub fn tick_night_color(
                 night_tracker.days += 1;
                 night_tracker.time = 0.;
             }
-            if night_tracker.is_dawn() && night_tracker.days > 0 {
+            if night_tracker.is_start_of_new_day() && night_tracker.days > 0 {
                 new_day_event.send_default();
             }
             // change music

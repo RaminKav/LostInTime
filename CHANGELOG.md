@@ -6,11 +6,17 @@
 
 - new player animations: Roll, bow attack, sprint, lunge, sprint attack
 - new sprint skill: overrides roll just like teleport, has skill upgrades that let you do a lunge attack while sprinting, reset the cooldown when getting a kill, and sprint faster.
+- Day/Night Clock HUD widget
+- over 25 new skills
 
 ### Changes
 
 - shrines no longer spawn near/in the starting clearing
 - full internal player animation refactor
+- Fire staff is now Ice Staff
+- Mana and Mana Regen are new attributes that show up on some gear
+- Night is slightly darker, and day/night cycle is slightly shorter
+- non-weapons or empty hotbar slots always do 1 damage
 
 ### Bug Fixes
 
@@ -18,6 +24,7 @@
 - fixed bow arrow spread beign off-centred
 - fixed enemies getting stuck in water
 - fixed being able to teleport into the water
+- coal and metal boulders make correct sound now
 
 ## 0.1.4
 

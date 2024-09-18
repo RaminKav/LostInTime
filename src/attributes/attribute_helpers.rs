@@ -74,7 +74,7 @@ pub fn get_rarity_rng(mut rng: ThreadRng) -> ItemRarity {
     let rarity_rng = rng.gen_range(0..35);
     if rarity_rng == 0 {
         ItemRarity::Legendary
-    } else if rarity_rng < 5 {
+    } else if rarity_rng < 4 {
         ItemRarity::Rare
     } else if rarity_rng < 13 {
         ItemRarity::Uncommon

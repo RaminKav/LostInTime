@@ -1,7 +1,7 @@
 use std::{cmp::min, f32::consts::PI, time::Duration};
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
@@ -15,8 +15,10 @@ use crate::{
     GameParam,
 };
 
-use super::{melee_skills::OnHitAoe, MovePlayerEvent, Player, PlayerSkills, Skill};
+use super::{MovePlayerEvent, Player, PlayerSkills, Skill};
 
+aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
+aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
 #[derive(Component)]
 pub struct JustTeleported;
 #[derive(Component)]
@@ -26,6 +28,7 @@ pub struct TeleportState {
     pub count: u32,
     pub max_count: u32,
     pub timer: Timer,
+    pub second_explosion_timer: Timer,
 }
 
 #[derive(Component)]
@@ -68,11 +71,18 @@ pub fn handle_teleport(
         teleport_state.count -= 1;
         teleport_state.timer.reset();
         teleport_state.timer.tick(time.delta());
+        teleport_state.second_explosion_timer.reset();
+        teleport_state.second_explosion_timer.tick(time.delta());
     }
 
-    if move_direction.0.length() != 0. && teleport_state.timer.percent() == 1. {
+    let player_pos = player_pos.translation();
+    if skills.has(Skill::TeleportIceAoeEnd) && teleport_state.second_explosion_timer.just_finished()
+    {
+        teleport_state.second_explosion_timer.reset();
+        spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
+    }
+    if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
-        let player_pos = player_pos.translation();
         let direction = move_direction.0.normalize();
         let distance = direction * 2.5 * TILE_SIZE.x;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
@@ -104,17 +114,7 @@ pub fn handle_teleport(
             commands.entity(shock_e).insert(TeleportShockDmg);
         }
         if skills.has(Skill::TeleportIceAoe) {
-            let hitbox_e = spawn_one_time_aseprite_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::ZERO),
-                10.5,
-                dmg.0 / 4,
-                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 19.),
-                asset_server.load::<Aseprite, _>(OnHitAoe::PATH),
-                AsepriteAnimation::from(OnHitAoe::tags::AO_E),
-                false,
-            );
-            commands.entity(hitbox_e).set_parent(e);
+            spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
         }
 
         if skills.has(Skill::TeleportManaRegen) {
@@ -123,8 +123,12 @@ pub fn handle_teleport(
 
         move_player.send(MovePlayerEvent { pos });
     }
+
     if teleport_state.timer.percent() != 0. {
         teleport_state.timer.tick(time.delta());
+    }
+    if teleport_state.second_explosion_timer.percent() != 0. {
+        teleport_state.second_explosion_timer.tick(time.delta());
     }
 
     if teleport_state.timer.percent() != 0. && teleport_state.timer.percent() < 1. {
@@ -132,6 +136,7 @@ pub fn handle_teleport(
         kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
     } else if aseprite.just_finished() {
         teleport_state.timer.reset();
+        teleport_state.second_explosion_timer.reset();
     }
 }
 
@@ -174,4 +179,25 @@ pub fn tick_teleport_timer(
             teleport_state.cooldown_timer.reset();
         }
     }
+}
+
+pub fn spawn_ice_explosion_hitbox(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    dmg: i32,
+) {
+    let mut anim = AsepriteAnimation::from(IceExplosion::tags::ICE_EXPLOSION);
+    anim.current_frame = 0;
+    let c = spawn_one_time_aseprite_collider(
+        commands,
+        Transform::from_translation(pos),
+        10.5,
+        dmg,
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 28.),
+        asset_server.load::<Aseprite, _>(IceExplosion::PATH),
+        anim,
+        false,
+    );
+    commands.entity(c).insert(TeleportShockDmg);
 }

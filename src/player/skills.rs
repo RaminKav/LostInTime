@@ -119,7 +119,7 @@ pub enum Skill {
     ParryHPRegen,
     ParrySpear,
     ParryDeflectProj,
-    ParryKnockback,
+    ParryKnockback, // needs art prompt/art
     ParryEcho,
 
     DaggerCombo,
@@ -127,11 +127,11 @@ pub enum Skill {
     HPRegenCooldown,
     MPRegen,
     MPRegenCooldown,
-    OnHitAoEBurst,
+    OnHitEcho,
     SplitDamage, //TODO animation missing
-    Knockback,
+    Knockback,   // needs art prompt/art
     DiscountMP,
-    MinusOneDamageOnHit,
+    MinusOneDamageOnHit, // needs art prompt/art
     ChanceToNotConsumeAmmo,
 
     // Weapon Upgrades
@@ -148,6 +148,7 @@ pub enum Skill {
     IceStaffFloor,
     FrozenCrit,
     TeleportIceAoe,
+    TeleportIceAoeEnd,
     MPBarDMG,
     MPBarCrit,
     FrozenMPRegen,
@@ -159,11 +160,13 @@ pub enum Skill {
     ViralVenum,
 
     //melee
-    HealAoE,
+    HealEcho,
     SwordDMG,
     FullStomach,
     WideSwing, //TODO animation missing
     ReinforcedArmor,
+    //Your echos are stronger
+    // your echos are bigger
 }
 
 impl Skill {
@@ -184,11 +187,11 @@ impl Skill {
             Skill::ParryKnockback => SkillClass::Melee,
             Skill::ParryEcho => SkillClass::Melee,
             Skill::HPRegen => SkillClass::Melee,
-            Skill::OnHitAoEBurst => SkillClass::Melee,
+            Skill::OnHitEcho => SkillClass::Melee,
             Skill::Knockback => SkillClass::Melee,
             Skill::MinusOneDamageOnHit => SkillClass::Melee,
             Skill::HPRegenCooldown => SkillClass::Melee,
-            Skill::HealAoE => SkillClass::Melee,
+            Skill::HealEcho => SkillClass::Melee,
             Skill::SwordDMG => SkillClass::Melee,
             Skill::FullStomach => SkillClass::Melee,
             Skill::WideSwing => SkillClass::Melee,
@@ -235,6 +238,7 @@ impl Skill {
             Skill::IceStaffFloor => SkillClass::Magic,
             Skill::FrozenCrit => SkillClass::Magic,
             Skill::TeleportIceAoe => SkillClass::Magic,
+            Skill::TeleportIceAoeEnd => SkillClass::Magic,
             Skill::MPBarDMG => SkillClass::Magic,
             Skill::MPBarCrit => SkillClass::Magic,
             Skill::FrozenMPRegen => SkillClass::Magic,
@@ -286,7 +290,7 @@ impl Skill {
             Skill::HPRegenCooldown => "HP Regen Cooldown".to_string(),
             Skill::MPRegenCooldown => "MP Regen Cooldown".to_string(),
             Skill::MPRegen => "Mana Regeneration".to_string(),
-            Skill::OnHitAoEBurst => "War Cry ".to_string(),
+            Skill::OnHitEcho => "War Cry ".to_string(),
             Skill::SplitDamage => "Double Stab ".to_string(),
             Skill::Knockback => "Heavy Strike".to_string(),
             Skill::DiscountMP => "Mana Discount".to_string(),
@@ -297,6 +301,7 @@ impl Skill {
             Skill::IceStaffFloor => "Ice Trail ".to_string(),
             Skill::FrozenCrit => "Frozen Wounds".to_string(),
             Skill::TeleportIceAoe => "Ice Explosion".to_string(),
+            Skill::TeleportIceAoeEnd => "Dual Explosion".to_string(),
             Skill::MPBarDMG => "Mana Infusion".to_string(),
             Skill::MPBarCrit => "Empowered Spells ".to_string(),
             Skill::FrozenMPRegen => "Mana Frost".to_string(),
@@ -304,7 +309,7 @@ impl Skill {
             Skill::PoisonDuration => "Venum Endurance".to_string(),
             Skill::PoisonStrength => "Venumous Edge".to_string(),
             Skill::ViralVenum => "Viral Venum".to_string(),
-            Skill::HealAoE => "Internal Echo".to_string(),
+            Skill::HealEcho => "Internal Echo".to_string(),
             Skill::SwordDMG => "Powerful Strike".to_string(),
             Skill::FullStomach => "Full Stomach".to_string(),
             Skill::WideSwing => "Wide Swing ".to_string(),
@@ -350,7 +355,7 @@ impl Skill {
             Skill::WaveAttack => vec![
                 "Your melee Attacks".to_string(),
                 "send a sonic wave ".to_string(),
-                "attackt hat travels".to_string(),
+                "attack that travels".to_string(),
                 "a short distance.".to_string(),
             ],
             Skill::FrailStacks => vec![
@@ -521,7 +526,7 @@ impl Skill {
                 "cooldown is.".to_string(),
                 "reduced.".to_string(),
             ],
-            Skill::OnHitAoEBurst => vec![
+            Skill::OnHitEcho => vec![
                 "After taking ".to_string(),
                 "damage, trigger".to_string(),
                 "an echo that".to_string(),
@@ -582,7 +587,15 @@ impl Skill {
             Skill::TeleportIceAoe => vec![
                 "Teleporting triggers".to_string(),
                 "an ice explosion".to_string(),
-                "that damages enemies.".to_string(),
+                "that damages enemies".to_string(),
+                "where your teleport".to_string(),
+                "starts.".to_string(),
+            ],
+            Skill::TeleportIceAoeEnd => vec![
+                "Teleporting triggers".to_string(),
+                "a second ice".to_string(),
+                "explosion where".to_string(),
+                "your teleport ends.".to_string(),
             ],
             Skill::MPBarDMG => vec![
                 "Your staff's attacks".to_string(),
@@ -620,7 +633,7 @@ impl Skill {
                 "poison to nearby".to_string(),
                 "enemies.".to_string(),
             ],
-            Skill::HealAoE => vec![
+            Skill::HealEcho => vec![
                 "Healing triggers".to_string(),
                 "an echo that".to_string(),
                 "damages enemies ".to_string(),
@@ -698,6 +711,7 @@ impl Skill {
                     count: 1,
                     max_count: 1,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
+                    second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
             }
             &Skill::TeleportCount => {
@@ -707,6 +721,7 @@ impl Skill {
                     count: skills.get_count(Skill::TeleportCount) as u32,
                     max_count: 2,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
+                    second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
             }
             &Skill::DaggerCombo => {
@@ -815,8 +830,8 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::DiscountMP),
                 SkillChoiceState::new(Skill::ChanceToNotConsumeAmmo).set_repeatable(),
                 SkillChoiceState::new(Skill::MinusOneDamageOnHit),
-                SkillChoiceState::new(Skill::OnHitAoEBurst),
-                SkillChoiceState::new(Skill::HealAoE),
+                SkillChoiceState::new(Skill::OnHitEcho),
+                SkillChoiceState::new(Skill::HealEcho),
                 SkillChoiceState::new(Skill::Sprint)
                     .with_children(vec![
                         SkillChoiceState::new(Skill::SprintFaster),

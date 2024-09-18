@@ -4,8 +4,8 @@ use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
         Attack, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage, Defence,
-        Dodge, Healing, HealthRegen, ItemAttributes, ItemRarity, Lifesteal, LootRateBonus,
-        MaxHealth, RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
+        Dodge, Healing, HealthRegen, ItemAttributes, ItemRarity, LootRateBonus, MaxHealth, MaxMana,
+        RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
     },
     colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED},
     inventory::ItemStack,
@@ -414,6 +414,7 @@ pub fn handle_spawn_inv_player_stats(
         (
             &Attack,
             &MaxHealth,
+            &MaxMana,
             &Defence,
             &CritChance,
             &CritDamage,
@@ -423,7 +424,6 @@ pub fn handle_spawn_inv_player_stats(
             &Thorns,
             &Dodge,
             &Speed,
-            &Lifesteal,
             &XpRateBonus,
             &LootRateBonus,
         ),
@@ -460,6 +460,7 @@ pub fn handle_spawn_inv_player_stats(
         let (
             attack,
             max_health,
+            max_mana,
             defence,
             crit_chance,
             crit_damage,
@@ -469,7 +470,6 @@ pub fn handle_spawn_inv_player_stats(
             thorns,
             dodge,
             speed,
-            lifesteal,
             xp_rate_bonus,
             loot_rate_bonus,
         ) = player_stats.single();
@@ -477,6 +477,7 @@ pub fn handle_spawn_inv_player_stats(
         let attributes = ItemAttributes {
             attack: AttributeValue::new(attack.0, AttributeQuality::Low, 0.),
             health: AttributeValue::new(max_health.0, AttributeQuality::Low, 0.),
+            mana: AttributeValue::new(max_mana.0, AttributeQuality::Low, 0.),
             defence: AttributeValue::new(defence.0, AttributeQuality::Low, 0.),
             crit_chance: AttributeValue::new(crit_chance.0, AttributeQuality::Low, 0.),
             crit_damage: AttributeValue::new(crit_damage.0, AttributeQuality::Low, 0.),
@@ -486,7 +487,6 @@ pub fn handle_spawn_inv_player_stats(
             thorns: AttributeValue::new(thorns.0, AttributeQuality::Low, 0.),
             dodge: AttributeValue::new(dodge.0, AttributeQuality::Low, 0.),
             speed: AttributeValue::new(speed.0, AttributeQuality::Low, 0.),
-            lifesteal: AttributeValue::new(lifesteal.0, AttributeQuality::Low, 0.),
             xp_rate: AttributeValue::new(xp_rate_bonus.0, AttributeQuality::Low, 0.),
             loot_rate: AttributeValue::new(loot_rate_bonus.0, AttributeQuality::Low, 0.),
             ..default()

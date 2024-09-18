@@ -30,7 +30,7 @@
                 item: RawMeat,
                 min: 1,
                 max: 2,
-                rate: 0.65
+                rate: 0.85
             ),
             ]
         ),

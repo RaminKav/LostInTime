@@ -75,7 +75,7 @@ impl Plugin for InputsPlugin {
             })
             .add_systems(
                 (
-                    move_player.run_if(is_not_paused),
+                    player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
                     handle_hotbar_key_input,
@@ -91,7 +91,7 @@ impl Plugin for InputsPlugin {
                 toggle_inventory.run_if(in_state(GameState::Main)),
                 close_container.run_if(in_state(GameState::Main)),
             ))
-            .add_system(update_cursor_pos.after(move_player))
+            .add_system(update_cursor_pos.after(player_move_inputs))
             .add_system(
                 move_camera_with_player
                     .after(PhysicsSet::SyncBackendFlush)
@@ -215,7 +215,7 @@ fn turn_player(
         game.player_state.direction = dir.clone();
     }
 }
-pub fn move_player(
+pub fn player_move_inputs(
     mut game: GameParam,
     mut player_query: Query<
         (
