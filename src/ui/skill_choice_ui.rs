@@ -20,6 +20,9 @@ pub struct SkillDescText;
 #[derive(Component)]
 pub struct SkillTitleText;
 
+#[derive(Component)]
+pub struct RerollDice(pub usize);
+
 pub fn setup_skill_choice_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -98,6 +101,39 @@ pub fn setup_skill_choice_ui(
         choices.clone(),
         t_offset,
     );
+
+    for i in -1..2 {
+        if !choices_queue.rerolls[(i + 1) as usize] {
+            continue;
+        }
+        // reroll dice icon
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::RerollDice)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(21., 22.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(
+                        i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5,
+                        -70.,
+                        10.,
+                    ),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIElement::RerollDice)
+            .insert(Interactable::default())
+            .insert(UIState::Skills)
+            .insert(RerollDice((i + 1) as usize))
+            .insert(Name::new("DICE"));
+    }
 }
 
 pub fn spawn_skill_choice_entities(

@@ -8,6 +8,7 @@
 - new sprint skill: overrides roll just like teleport, has skill upgrades that let you do a lunge attack while sprinting, reset the cooldown when getting a kill, and sprint faster.
 - Day/Night Clock HUD widget
 - over 25 new skills
+- Skill Re-rolls: each skill choice slot can be re-rolled once per level-up!
 
 ### Changes
 

@@ -810,6 +810,7 @@ impl SkillChoiceState {
 #[derive(Resource, Clone, Serialize, Deserialize)]
 pub struct SkillChoiceQueue {
     pub queue: Vec<[SkillChoiceState; 3]>,
+    pub rerolls: [bool; 3],
     pub pool: Vec<SkillChoiceState>,
 }
 
@@ -817,6 +818,7 @@ impl Default for SkillChoiceQueue {
     fn default() -> Self {
         Self {
             queue: Default::default(),
+            rerolls: [true; 3],
             pool: vec![
                 SkillChoiceState::new(Skill::Defence),
                 SkillChoiceState::new(Skill::Attack),
@@ -906,6 +908,7 @@ impl SkillChoiceQueue {
     pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
         //only push if queue is empty
         if self.queue.is_empty() {
+            self.rerolls = [true; 3];
             let mut new_skills: [SkillChoiceState; 3] = Default::default();
             let mut add_back_to_pool: Vec<SkillChoiceState> = vec![];
             for i in 0..3 {
@@ -963,6 +966,20 @@ impl SkillChoiceQueue {
         //repopulate the queue after each skill selection, if there are skills missing
         if player_skills.skills.len() < player_level as usize - 1 {
             self.add_new_skills_after_levelup(&mut rand::thread_rng());
+        }
+    }
+    pub fn handle_reroll_slot(&mut self, slot: usize) {
+        if self.rerolls[slot] {
+            self.rerolls[slot] = false;
+            let old_skill = self.queue[0][slot].clone();
+            let new_skill = self
+                .pool
+                .iter()
+                .choose(&mut rand::thread_rng())
+                .unwrap()
+                .clone();
+            self.pool.push(old_skill);
+            self.queue[0][slot] = new_skill;
         }
     }
 }

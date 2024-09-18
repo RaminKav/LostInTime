@@ -23,9 +23,10 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
-    stats_ui::StatsButtonState, ui_helpers, ChestContainer, EssenceOption, FurnaceContainer,
-    InventorySlotState, MenuButton, MenuButtonClickEvent, ShowInvPlayerStatsEvent, SkillChoiceUI,
-    SubmitEssenceChoice, ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState,
+    spawn_skill_choice_entities, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
+    EssenceOption, FurnaceContainer, InventorySlotState, MenuButton, MenuButtonClickEvent,
+    RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
+    TooltipTeardownEvent, UIContainersParam, UIState,
 };
 
 #[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
@@ -77,6 +78,8 @@ pub enum UIElement {
     InfoModal,
     TitleBar,
     SkillClassTracker,
+    RerollDice,
+    RerollDiceHover,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -815,6 +818,64 @@ pub fn handle_cursor_skills_buttons(
                     continue;
                 };
                 let ui_element = state.skill_choice.skill.get_ui_element();
+
+                interactable.change(Interaction::None);
+                commands
+                    .entity(e)
+                    .insert(ui_element.clone())
+                    .insert(graphics.get_ui_element_texture(ui_element));
+            }
+        }
+    }
+}
+pub fn handle_cursor_reroll_dice_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut reroll_dice: Query<(Entity, &mut Interactable, &RerollDice), Without<InventorySlotState>>,
+    mut skill_queue: ResMut<SkillChoiceQueue>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, state) in reroll_dice.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    let ui_element = UIElement::RerollDiceHover;
+                    commands
+                        .entity(e)
+                        .insert(ui_element.clone())
+                        .insert(graphics.get_ui_element_texture(ui_element));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        commands.entity(e).despawn_recursive();
+                        skill_queue.handle_reroll_slot(state.0);
+                        for e in old_skill_entities.iter() {
+                            commands.entity(e).despawn_recursive();
+                        }
+                        spawn_skill_choice_entities(
+                            &graphics,
+                            &mut commands,
+                            &asset_server,
+                            skill_queue.queue[0].clone(),
+                            Vec2::new(4., 4.),
+                        );
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                let ui_element = UIElement::RerollDice;
 
                 interactable.change(Interaction::None);
                 commands

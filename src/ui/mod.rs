@@ -226,6 +226,7 @@ impl Plugin for UIPlugin {
                     update_currency_text,
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
+                    handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
