@@ -160,6 +160,7 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
         },
     ) {
         if result.0.len() < 3 {
+            warn!("Pathfinding too short {:?}", result);
             return None;
         }
         if max_iteration > 499 {

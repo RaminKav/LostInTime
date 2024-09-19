@@ -40,10 +40,14 @@ impl Plugin for AIPlugin {
                     sprout.run_if(is_not_paused),
                     projectile_attack.run_if(is_not_paused),
                     tick_enemy_attack_cooldowns.run_if(is_not_paused),
-                    cache_ai_path_on_new_obj_spawn.run_if(is_not_paused),
                     idle.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                cache_ai_path_on_new_obj_spawn
+                    .run_if(in_state(GameState::Main))
+                    .in_base_set(CoreSet::PostUpdate),
             );
     }
 }

@@ -615,8 +615,8 @@ pub fn mouse_click_system(
             let is_valid = game
                 .get_pos_validity_for_pathfinding(ai_pos)
                 .unwrap_or(true);
-            debug!(
-                "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?}",
+            info!(
+                "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?} || {ai_pos:?}",
                 cursor_pos.ui_coords
             );
         }

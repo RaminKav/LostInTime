@@ -270,9 +270,25 @@ pub fn follow(
 
         follow.curr_path = next_target_tile;
         follow.curr_delta = Some(delta);
-
+        // add directional offset so they dont get stuck on walls...
         mover.translation = Some(
-            delta
+            (delta
+                + Vec2::new(
+                    if delta.y == 1. {
+                        0.1
+                    } else if delta.y == -1. {
+                        -0.1
+                    } else {
+                        0.
+                    },
+                    if delta.x == 1. {
+                        0.1
+                    } else if delta.x == -1. {
+                        -0.1
+                    } else {
+                        0.
+                    },
+                ))
                 * follow.speed
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()

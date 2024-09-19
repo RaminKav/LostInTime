@@ -39,7 +39,7 @@ impl Plugin for SpawnerPlugin {
             .add_system(add_global_spawn_timer.in_schedule(OnEnter(GameState::Main)))
             .add_systems(
                 (
-                    handle_spawn_mobs,
+                    // handle_spawn_mobs,
                     tick_spawner_timers.run_if(is_not_paused),
                     // handle_add_fairy_spawners,
                     spawn_one_time_enemies_at_day,

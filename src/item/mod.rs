@@ -1,4 +1,5 @@
-use crate::assets::{SpriteSize, WorldObjectData};
+use crate::ai::pathfinding::world_pos_to_AIPos;
+use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::colors::{
@@ -898,17 +899,18 @@ pub fn handle_break_object(
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
+    anchor: Query<&SpriteAnchor>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
-
+        let world_pos = tile_pos_to_world_pos(broken.pos, false);
         // Chest
         if broken.obj == WorldObject::Chest {
             if let Ok(chest) = chest_containers.get(broken.entity) {
                 for item_option in chest.items.items.iter() {
                     if let Some(item) = item_option {
-                        let pos = tile_pos_to_world_pos(broken.pos, false);
-                        item.item_stack.spawn_as_drop(&mut commands, &mut game, pos);
+                        item.item_stack
+                            .spawn_as_drop(&mut commands, &mut game, world_pos);
                     }
                 }
             }
@@ -920,11 +922,7 @@ pub fn handle_break_object(
                 && broken.obj.is_water_placeable()
             {
                 for (e, _c, t) in water_colliders.iter() {
-                    if t.translation()
-                        .truncate()
-                        .distance(tile_pos_to_world_pos(broken.pos, false))
-                        <= 6.
-                    {
+                    if t.translation().truncate().distance(world_pos) <= 6. {
                         commands.entity(e).remove::<Sensor>();
                     }
                 }
@@ -955,7 +953,7 @@ pub fn handle_break_object(
                         true,
                     )
                 } else {
-                    tile_pos_to_world_pos(broken.pos, false)
+                    world_pos
                 };
                 let drop_spread = 10.;
 
@@ -986,5 +984,21 @@ pub fn handle_break_object(
         analytics_events.send(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::ObjectBroken(broken.obj),
         });
+
+        // AI Pos Cache
+        for quads in &[(-4., -4.), (-4., 4.), (4., 4.), (4., -4.)] {
+            let anchor_offset = if let Ok(anchor) = anchor.get(broken.entity) {
+                if broken.obj.is_tree() {
+                    anchor.0
+                } else {
+                    Vec2::new(0., 0.)
+                }
+            } else {
+                Vec2::new(0., 0.)
+            };
+            let offset_pos = world_pos + Vec2::new(quads.0, quads.1) - anchor_offset;
+            let ai_pos = world_pos_to_AIPos(offset_pos);
+            game.set_pos_validity_for_pathfinding(ai_pos, true);
+        }
     }
 }

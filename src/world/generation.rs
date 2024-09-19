@@ -7,6 +7,7 @@ use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, 
 use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
+use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::SpriteAnchor;
 use crate::container::ContainerRegistry;
 use crate::enemy::spawn_helpers::is_tile_water;
@@ -25,7 +26,7 @@ use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
-use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState};
+use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN};
 
 use bevy::prelude::*;
@@ -273,6 +274,8 @@ impl GenerationPlugin {
         mut commands: Commands,
         asset_server: Res<AssetServer>,
         dungeon_check: Query<&Dungeon>,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<ColorMaterial>>,
     ) {
         if new_dim.is_empty() {
             return;
@@ -336,6 +339,40 @@ impl GenerationPlugin {
                     ..Default::default()
                 })
                 .insert(Name::new("Time Portal"));
+            for y in 3..9 {
+                for x in 0..2 {
+                    for pos in vec![
+                        (8. * x as f32 + 4., y as f32 * 8. + 4.),
+                        (8. * x as f32 + 4., y as f32 * 8. - 4.),
+                        (8. * x as f32 + -4., y as f32 * 8. + 4.),
+                        (8. * x as f32 + -4., y as f32 * 8. + -4.),
+                        
+                    ] {
+                        let pos = Vec2::new(pos.0, pos.1);
+                        let ai_pos = world_pos_to_AIPos(pos);
+                        game.set_pos_validity_for_pathfinding(ai_pos, false);
+                        if *DEBUG_AI {
+                            commands
+                                .spawn(MaterialMesh2dBundle {
+                                    mesh: meshes
+                                        .add(
+                                            shape::Quad {
+                                                size: Vec2::new(7.0, 7.0),
+                                                ..Default::default()
+                                            }
+                                            .into(),
+                                        )
+                                        .into(),
+                                    transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 0.)),
+                                    material: materials.add(Color::RED.into()),
+                                    ..default()
+                                })
+                                .insert(YSort(-0.1))
+                                .insert(Name::new("debug chunk border x"));
+                        }
+                    }
+                }
+            }
         }
     }
     pub fn generate_and_cache_objects(
