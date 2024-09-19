@@ -10,9 +10,9 @@ use crate::{
 };
 
 use super::{
-    crafting_ui::CraftingContainer, interactions::Interaction, Interactable,
-    ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
-    FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
+    crafting_ui::CraftingContainer, interactions::Interaction, ui_helpers::spawn_ui_overlay,
+    Interactable, ShowInvPlayerStatsEvent, UIContainersParam, UIElement,
+    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -130,24 +130,14 @@ pub fn setup_inv_ui(
         _ => return,
     };
 
-    let overlay = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(resolution.game_width, GAME_HEIGHT)),
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-pos_offset.x, 0., -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("overlay"))
-        .id();
-    let inv_e = commands
+    spawn_ui_overlay(
+        &mut commands,
+        Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.),
+        0.8,
+        9.,
+    );
+
+    commands
         .spawn(SpriteBundle {
             texture,
             sprite: Sprite {
@@ -164,11 +154,9 @@ pub fn setup_inv_ui(
         .insert(InventoryUI)
         .insert(cur_inv_state.0.clone())
         .insert(Name::new("INVENTORY"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
+        .insert(RenderLayers::from_layers(&[3]));
 
     inv_state.inv_size = size;
-    commands.entity(inv_e).push_children(&[overlay]);
 
     stats_event.send(ShowInvPlayerStatsEvent {
         stat: None,

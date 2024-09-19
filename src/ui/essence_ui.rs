@@ -16,7 +16,10 @@ use crate::{
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
 
-use super::{spawn_item_stack_icon, Interactable, UIElement, UIState, ESSENCE_UI_SIZE};
+use super::{
+    spawn_item_stack_icon, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
+    ESSENCE_UI_SIZE,
+};
 
 #[derive(Component)]
 pub struct EssenceUI;
@@ -57,23 +60,12 @@ pub fn setup_essence_ui(
         Vec2::new(3.5, 3.5),
     );
 
-    let overlay = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 10.)),
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-t_offset.x, -t_offset.y, -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("overlay"))
-        .id();
+    let overlay = spawn_ui_overlay(
+        &mut commands,
+        Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.),
+        0.8,
+        9.,
+    );
 
     let essence_ui_e = commands
         .spawn(SpriteBundle {
@@ -186,7 +178,8 @@ pub fn handle_submit_essence_choice(
         let mut inv = inv.single_mut();
         if inv
             .items
-            .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence).is_ok()
+            .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence)
+            .is_ok()
         {
             choice.choice.item.spawn_as_drop(
                 &mut commands,

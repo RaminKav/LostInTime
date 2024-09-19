@@ -25,7 +25,10 @@ use crate::{
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
 };
 
-use super::{scrapper_ui::ScrapperEvent, Interactable, UIElement, UIState, OPTIONS_UI_SIZE};
+use super::{
+    scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
+    OPTIONS_UI_SIZE,
+};
 
 #[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
@@ -428,23 +431,13 @@ pub fn handle_enter_options_ui(
         Vec2::new(0., 0.),
     );
 
-    let overlay = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 10.)),
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-t_offset.x, -t_offset.y, -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("overlay"))
-        .id();
+    let overlay = spawn_ui_overlay(
+        &mut commands,
+        Vec2::new(res.game_width + 10., GAME_HEIGHT + 20.),
+        0.95,
+        9.,
+    );
+
     let stats_e = commands
         .spawn(SpriteBundle {
             texture,

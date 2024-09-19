@@ -528,10 +528,10 @@ impl Skill {
             ],
             Skill::OnHitEcho => vec![
                 "After taking ".to_string(),
-                "damage, trigger".to_string(),
+                "damage, trigger ".to_string(),
                 "an echo that".to_string(),
-                "damages enemies".to_string(),
-                "around you. ".to_string(),
+                "damages enemies ".to_string(),
+                "around you.".to_string(),
             ],
             Skill::SplitDamage => vec![
                 "Your melee".to_string(),
@@ -656,7 +656,7 @@ impl Skill {
             ],
             Skill::ReinforcedArmor => vec![
                 "You gain Defence".to_string(),
-                "the more speed ".to_string(),
+                "the more speed".to_string(),
                 "you have lost. Lose".to_string(),
                 "5 speed. ".to_string(),
             ],
@@ -978,6 +978,7 @@ impl SkillChoiceQueue {
                 .choose(&mut rand::thread_rng())
                 .unwrap()
                 .clone();
+            self.pool.retain(|x| x != &new_skill);
             self.pool.push(old_skill);
             self.queue[0][slot] = new_skill;
         }

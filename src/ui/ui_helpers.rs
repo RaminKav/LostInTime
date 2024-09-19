@@ -1,8 +1,8 @@
 use crate::{inputs::CursorPos, world, Game};
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 
-use super::Interactable;
+use super::{Interactable, UIState};
 
 pub fn pointcast_2d<'a>(
     cursor_pos: &Res<CursorPos>,
@@ -44,4 +44,25 @@ pub fn _get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
     let tile_pos =
         world::world_helpers::camera_pos_to_tile_pos(&Vec2::new(player_pos.x, player_pos.y));
     (chunk_pos, tile_pos)
+}
+
+pub fn spawn_ui_overlay(commands: &mut Commands, size: Vec2, alpha: f32, depth: f32) -> Entity {
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., alpha),
+                custom_size: Some(size),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., 0., depth),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(UIState::Inventory)
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("overlay"))
+        .id()
 }

@@ -28,7 +28,7 @@ mod skill_choice_ui;
 pub mod stats_ui;
 mod tile_hover;
 mod tooltips;
-mod ui_helpers;
+pub mod ui_helpers;
 pub use chest_ui::*;
 pub use enemy_health_bar::*;
 use fps_text::*;
@@ -226,6 +226,7 @@ impl Plugin for UIPlugin {
                     update_currency_text,
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
+                    handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )

@@ -23,10 +23,10 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
-    spawn_skill_choice_entities, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
+    spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
     EssenceOption, FurnaceContainer, InventorySlotState, MenuButton, MenuButtonClickEvent,
     RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam, UIState,
+    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
@@ -833,11 +833,9 @@ pub fn handle_cursor_reroll_dice_buttons(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut reroll_dice: Query<(Entity, &mut Interactable, &RerollDice), Without<InventorySlotState>>,
-    mut skill_queue: ResMut<SkillChoiceQueue>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -856,16 +854,16 @@ pub fn handle_cursor_reroll_dice_buttons(
                 Interaction::Hovering => {
                     if left_mouse_pressed {
                         commands.entity(e).despawn_recursive();
-                        skill_queue.handle_reroll_slot(state.0);
-                        for e in old_skill_entities.iter() {
-                            commands.entity(e).despawn_recursive();
-                        }
-                        spawn_skill_choice_entities(
-                            &graphics,
+
+                        spawn_skill_choice_flash(
                             &mut commands,
                             &asset_server,
-                            skill_queue.queue[0].clone(),
-                            Vec2::new(4., 4.),
+                            Vec3::new(
+                                (state.0 as f32 - 1.) * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
+                                4.,
+                                15.,
+                            ),
+                            state.0,
                         );
                     }
                 }

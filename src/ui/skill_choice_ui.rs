@@ -1,13 +1,18 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
+    animations::DoneAnimation,
     assets::Graphics,
     colors::{BLACK, WHITE},
     player::skills::{SkillChoiceQueue, SkillChoiceState},
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
-use super::{damage_numbers::spawn_text, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE};
+use super::{
+    damage_numbers::spawn_text, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
+    SKILLS_CHOICE_UI_SIZE,
+};
 
 #[derive(Component)]
 pub struct SkillChoiceUI {
@@ -22,6 +27,8 @@ pub struct SkillTitleText;
 
 #[derive(Component)]
 pub struct RerollDice(pub usize);
+
+aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
 
 pub fn setup_skill_choice_ui(
     mut commands: Commands,
@@ -74,25 +81,12 @@ pub fn setup_skill_choice_ui(
         .insert(UIState::Skills)
         .set_parent(title_sprite);
 
-    let overlay = commands
-        .spawn(SpriteBundle {
-            sprite: Sprite {
-                color: Color::rgba(146. / 255., 116. / 255., 65. / 255., 0.3),
-                custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.)),
-                ..default()
-            },
-            transform: Transform {
-                translation: Vec3::new(-t_offset.x, -t_offset.y - GAME_HEIGHT / 2., -1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("overlay"))
-        .id();
-
-    commands.entity(title_sprite).push_children(&[overlay]);
+    spawn_ui_overlay(
+        &mut commands,
+        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
+        0.8,
+        9.,
+    );
 
     spawn_skill_choice_entities(
         &graphics,
@@ -145,7 +139,7 @@ pub fn spawn_skill_choice_entities(
 ) {
     let size = SKILLS_CHOICE_UI_SIZE;
     for i in -1..2 {
-        let translation = Vec3::new(i as f32 * (size.x + 16.), 0., 1.);
+        let translation = Vec2::new(i as f32 * (size.x + 16.) + 0.1, 0.);
         let choice = choices[(i + 1) as usize].clone();
         let ui_element = choice.skill.get_ui_element();
         let skills_e = commands
@@ -232,7 +226,7 @@ pub fn spawn_skill_choice_entities(
                     text_anchor: Anchor::Center,
                     transform: Transform {
                         translation: Vec3::new(
-                            if i == 1 { 0.5 } else { 0. },
+                            if i == 0 { 0. } else { 0.5 },
                             -(j as f32 * 9.) + 0.5,
                             1.,
                         ),
@@ -249,6 +243,7 @@ pub fn spawn_skill_choice_entities(
         }
     }
 }
+
 pub fn toggle_skills_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
     key_input: ResMut<Input<KeyCode>>,
@@ -281,4 +276,50 @@ pub fn toggle_skills_visibility(
             Vec2::new(4., 4.),
         );
     }
+}
+pub fn handle_skill_reroll_after_flash(
+    flashes: Query<(Entity, &RerollDice, &AsepriteAnimation), With<DoneAnimation>>,
+    mut skill_queue: ResMut<SkillChoiceQueue>,
+    old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    for (e, slot, anim) in flashes.iter() {
+        if anim.current_frame() == 3 {
+            commands.entity(e).remove::<RerollDice>();
+            skill_queue.handle_reroll_slot(slot.0);
+            for e in old_skill_entities.iter() {
+                commands.entity(e).despawn_recursive();
+            }
+            spawn_skill_choice_entities(
+                &graphics,
+                &mut commands,
+                &asset_server,
+                skill_queue.queue[0].clone(),
+                Vec2::new(4., 4.),
+            );
+        }
+    }
+}
+pub fn spawn_skill_choice_flash(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    slot: usize,
+) {
+    commands
+        .spawn(AsepriteBundle {
+            animation: AsepriteAnimation::from(SkillChoiceFlash::tags::FLASH),
+            aseprite: asset_server.load(SkillChoiceFlash::PATH),
+            transform: Transform {
+                translation: pos,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(VisibilityBundle::default())
+        .insert(RerollDice(slot))
+        .insert(DoneAnimation);
 }
