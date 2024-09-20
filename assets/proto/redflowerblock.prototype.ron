@@ -8,7 +8,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: RedFlowerBlock,
         metadata: (
-            name: "Red Flower", 
+            name: "Red Flower ", 
             desc: ["A red flower.", "Might help in a","recipe."]
         ),
         count: 1

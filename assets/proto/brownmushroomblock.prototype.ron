@@ -8,7 +8,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: BrownMushroomBlock,
         metadata: (
-            name: "Brown Mushroom", 
+            name: "Brown Mushroom ", 
             desc: ["Mmm! A nice source", "of food. Must be", "better cooked", "though!"]
         ),
         count: 1
