@@ -6,7 +6,7 @@ use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::player::skills::{PlayerSkills, Skill};
-use crate::player::teleport::IceFloor;
+use crate::player::teleport::{spawn_ice_explosion_hitbox, IceFloor};
 use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
 use crate::world::y_sort::YSort;
 use crate::{
@@ -211,16 +211,12 @@ pub fn handle_on_hit_upgrades(
             continue;
         };
         if skills.has(Skill::IceStaffAoE) && hit.hit_with_projectile == Some(Projectile::Fireball) {
-            ranged_attack_event.send(RangedAttackEvent {
-                projectile: Projectile::FireExplosionAOE,
-                direction: Vec2::ZERO,
-                from_enemy: None,
-                is_followup_proj: true,
-                mana_cost: None,
-                dmg_override: Some(hit.damage / 3),
-                pos_override: Some(hit_entity_txfm.translation().truncate()),
-                spawn_delay: 0.1,
-            });
+            spawn_ice_explosion_hitbox(
+                &mut commands,
+                &asset_server,
+                hit_entity_txfm.translation(),
+                hit.damage / 3,
+            );
         }
         if skills.has(Skill::IceStaffFloor) && hit.hit_with_projectile == Some(Projectile::Fireball)
         {

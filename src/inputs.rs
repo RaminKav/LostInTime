@@ -608,8 +608,7 @@ pub fn mouse_click_system(
     let (player_e, attack_timer_option, player_anim) = player_query.single();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
-        // if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
-        if mouse_button_input.just_pressed(MouseButton::Left) {
+        if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
             let ai_pos = world_pos_to_AIPos(cursor_pos.world_coords.truncate());
             let is_valid = game

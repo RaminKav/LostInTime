@@ -94,6 +94,7 @@ pub fn tick_night_color(
     bgm_tracker: Res<BGMPicker>,
     mut new_day_event: EventWriter<NewDayEvent>,
 ) {
+    let mut music_changed = false;
     for (mut night_state, mut sprite) in query.iter_mut() {
         night_state.0.tick(time.delta());
         if night_state.0.finished() {
@@ -106,18 +107,20 @@ pub fn tick_night_color(
             if night_tracker.is_start_of_new_day() && night_tracker.days > 0 {
                 new_day_event.send_default();
             }
-            // change music
-            if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
-                bgm_track_event.send(UpdateBGMTrackEvent {
-                    asset_path: "sounds/bgm_night.ogg".to_owned(),
-                });
-            } else if !night_tracker.is_night()
-                && bgm_tracker.current_track != *"sounds/bgm_day.ogg"
-            {
-                bgm_track_event.send(UpdateBGMTrackEvent {
-                    asset_path: "sounds/bgm_day.ogg".to_owned(),
-                });
-            }
+            music_changed = true;
+        }
+    }
+
+    if music_changed || night_tracker.is_added() {
+        // change music
+        if night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_night.ogg" {
+            bgm_track_event.send(UpdateBGMTrackEvent {
+                asset_path: "sounds/bgm_night.ogg".to_owned(),
+            });
+        } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
+            bgm_track_event.send(UpdateBGMTrackEvent {
+                asset_path: "sounds/bgm_day.ogg".to_owned(),
+            });
         }
     }
 }

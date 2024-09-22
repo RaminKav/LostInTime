@@ -253,6 +253,7 @@ fn spawn_player(
             //TODO: remove itematt and construct from components?
             ItemAttributes {
                 health: AttributeValue::new(100, AttributeQuality::Low, 0.),
+                mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
                 attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
                 health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
                 mana_regen: AttributeValue::new(5, AttributeQuality::Low, 0.),
