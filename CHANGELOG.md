@@ -9,6 +9,8 @@
 - Day/Night Clock HUD widget
 - over 25 new skills
 - Skill Re-rolls: each skill choice slot can be re-rolled once per level-up!
+- New enemy attack warnings (! above their head)
+- Minimap!
 
 ### Changes
 
@@ -18,6 +20,9 @@
 - Mana and Mana Regen are new attributes that show up on some gear
 - Night is slightly darker, and day/night cycle is slightly shorter
 - non-weapons or empty hotbar slots always do 1 damage
+- icestaff costs less mana
+- default player sword/swing animations are white instead of blue
+- Lethal Blow skill nerfed to 20%
 
 ### Bug Fixes
 
@@ -26,6 +31,7 @@
 - fixed enemies getting stuck in water
 - fixed being able to teleport into the water
 - coal and metal boulders make correct sound now
+- fix various dungeon bugs
 
 ## 0.1.4
 

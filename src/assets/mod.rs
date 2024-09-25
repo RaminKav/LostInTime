@@ -21,6 +21,7 @@ use crate::item::{
 use crate::player::skills::Skill;
 use crate::status_effects::StatusEffect;
 use crate::ui::UIElement;
+use crate::world::portal::Portal;
 use crate::{GameState, ImageAssets};
 
 pub struct GameAssetsPlugin;
@@ -96,6 +97,7 @@ impl Plugin for GameAssetsPlugin {
                 item_glows: None,
                 combat_shrine_anim: None,
                 gamble_shrine_anim: None,
+                portal_ase: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -152,6 +154,7 @@ pub struct Graphics {
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
+    pub portal_ase: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -381,6 +384,7 @@ impl GameAssetsPlugin {
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
+            portal_ase: Some(asset_server.load(Portal::PATH)),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type

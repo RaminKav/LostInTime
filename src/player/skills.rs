@@ -380,7 +380,7 @@ impl Skill {
             Skill::LethalBlow => vec![
                 "Melee attacks ".to_string(),
                 "execute enemies ".to_string(),
-                "below 25% health.".to_string(),
+                "below 20% health.".to_string(),
             ],
             Skill::Teleport => vec![
                 "Your Roll ability".to_string(),
@@ -769,8 +769,6 @@ impl Skill {
             Skill::FireDamage => obj.is_melee_weapon(),
             Skill::WaveAttack => obj.is_melee_weapon(),
             Skill::FrailStacks => obj.is_melee_weapon(),
-            Skill::SlowStacks => obj.is_melee_weapon(),
-            Skill::PoisonStacks => obj.is_melee_weapon(),
             Skill::LethalBlow => obj.is_melee_weapon(),
             _ => true,
         }

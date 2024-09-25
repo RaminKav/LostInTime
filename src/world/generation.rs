@@ -8,7 +8,7 @@ use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
 use crate::ai::pathfinding::world_pos_to_AIPos;
-use crate::assets::SpriteAnchor;
+use crate::assets::{Graphics, SpriteAnchor};
 use crate::container::ContainerRegistry;
 use crate::enemy::spawn_helpers::is_tile_water;
 use crate::enemy::Mob;
@@ -122,24 +122,6 @@ impl GenerationPlugin {
             return Some(WorldObject::StoneWall);
         }
         None
-    }
-    fn generate_stone_for_chunk(
-        world_generation_params: &WorldGeneration,
-        chunk_pos: IVec2,
-        seed: u64,
-    ) -> Vec<(TileMapPosition, WorldObject)> {
-        let mut stone_blocks: Vec<(TileMapPosition, WorldObject)> = vec![];
-        for x in 0..CHUNK_SIZE {
-            for y in 0..CHUNK_SIZE {
-                let pos = TileMapPosition::new(chunk_pos, TilePos { x, y });
-                if let Some(block) =
-                    Self::get_perlin_block_at_tile(world_generation_params, pos, seed)
-                {
-                    stone_blocks.push((pos, block));
-                }
-            }
-        }
-        stone_blocks
     }
     fn generate_forest_for_chunk(
         world_generation_params: &WorldGeneration,
@@ -272,10 +254,10 @@ impl GenerationPlugin {
         mut game: GameParam,
         new_dim: Query<Entity, Added<ActiveDimension>>,
         mut commands: Commands,
-        asset_server: Res<AssetServer>,
         dungeon_check: Query<&Dungeon>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<ColorMaterial>>,
+        graphics: Res<Graphics>,
     ) {
         if new_dim.is_empty() {
             return;
@@ -314,6 +296,7 @@ impl GenerationPlugin {
             }
         }
         if dungeon_check.get_single().is_err() && !*NO_GEN {
+            info!("SPAWN PORTAL");
             // summon portal
             commands
                 .spawn(VisibilityBundle::default())
@@ -333,7 +316,7 @@ impl GenerationPlugin {
                     11.,
                 ))
                 .insert(AsepriteBundle {
-                    aseprite: asset_server.load(Portal::PATH),
+                    aseprite: graphics.portal_ase.as_ref().unwrap().clone(),
                     animation: AsepriteAnimation::from(Portal::tags::IDLE),
                     transform: Transform::from_translation(Vec3::new(0., 50., 0.)),
                     ..Default::default()
@@ -346,7 +329,6 @@ impl GenerationPlugin {
                         (8. * x as f32 + 4., y as f32 * 8. - 4.),
                         (8. * x as f32 + -4., y as f32 * 8. + 4.),
                         (8. * x as f32 + -4., y as f32 * 8. + -4.),
-                        
                     ] {
                         let pos = Vec2::new(pos.0, pos.1);
                         let ai_pos = world_pos_to_AIPos(pos);
@@ -363,7 +345,9 @@ impl GenerationPlugin {
                                             .into(),
                                         )
                                         .into(),
-                                    transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 0.)),
+                                    transform: Transform::from_translation(Vec3::new(
+                                        pos.x, pos.y, 0.,
+                                    )),
                                     material: materials.add(Color::RED.into()),
                                     ..default()
                                 })
@@ -401,20 +385,14 @@ impl GenerationPlugin {
             let chunk_pos = chunk.chunk_pos;
             let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
             let dungeon_check = dungeon_check.get_single();
-            let is_chunk_generated = if dungeon_check.is_ok() {
-                game.is_dungeon_chunk_generated(chunk_pos)
-            } else {
-                game.is_chunk_generated(chunk_pos)
-            };
+            let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
-                debug!("Generating new objects for {chunk_pos:?}");
-                // generate stone walls for dungeons
-                let stone = Self::generate_stone_for_chunk(
-                    &game.world_generation_params,
-                    chunk_pos,
-                    seed.seed,
+                info!(
+                    "Generating new objects for {chunk_pos:?} {:?}",
+                    dungeon_check.is_ok()
                 );
-                // generate forest walls trees for chunk
+
+                // generate forest trees for chunk
                 let mut trees = Self::generate_forest_for_chunk(
                     &game.world_generation_params,
                     chunk_pos,
@@ -438,11 +416,11 @@ impl GenerationPlugin {
 
                 // generate all objs
                 let mut objs_to_spawn: Box<dyn Iterator<Item = (TileMapPosition, WorldObject)>> =
-                    Box::new(stone.clone().into_iter().chain(trees.clone().into_iter()));
+                    Box::new(trees.clone().into_iter());
                 let mut occupied_tiles: HashMap<TileMapPosition, WorldObject> =
-                    stone.into_iter().chain(trees.into_iter()).collect();
+                    trees.into_iter().collect();
 
-                for (obj_to_clear, frequency) in game
+                for (obj_to_spawn, frequency) in game
                     .world_generation_params
                     .object_generation_frequencies
                     .iter()
@@ -458,12 +436,12 @@ impl GenerationPlugin {
                             );
 
                             let relative_tp = world_helpers::world_pos_to_tile_pos(tp_vec);
-                            (relative_tp, *obj_to_clear)
+                            (relative_tp, *obj_to_spawn)
                         })
                         .collect::<Vec<(TileMapPosition, WorldObject)>>();
-                    for (pos, obj_to_clear) in points.iter() {
+                    for (pos, obj) in points.iter() {
                         // check if tile(s) already occupied by another object waiting to spawn
-                        let is_medium = obj_to_clear.is_medium_size(&proto_param);
+                        let is_medium = obj.is_medium_size(&proto_param);
                         let tiles_obj_wants_to_take_up = if is_medium {
                             pos.get_neighbour_tiles_for_medium_objects()
                                 .into_iter()
@@ -477,12 +455,12 @@ impl GenerationPlugin {
                             .any(|p| occupied_tiles.contains_key(p))
                         {
                             // override chests and dungeon exits, skip anything else
-                            if obj_to_clear == &WorldObject::DungeonExit
-                                || obj_to_clear == &WorldObject::Chest
-                                || obj_to_clear == &WorldObject::DungeonEntrance
+                            if obj == &WorldObject::DungeonExit
+                                || obj == &WorldObject::Chest
+                                || obj == &WorldObject::DungeonEntrance
                             {
                                 occupied_tiles.remove(pos);
-                                occupied_tiles.insert(*pos, *obj_to_clear);
+                                occupied_tiles.insert(*pos, *obj);
                             } else {
                                 continue;
                             }
@@ -490,68 +468,57 @@ impl GenerationPlugin {
 
                         // mark tiles as occupied for future objects
                         tiles_obj_wants_to_take_up.iter().for_each(|p| {
-                            occupied_tiles.insert(*p, *obj_to_clear);
+                            occupied_tiles.insert(*p, *obj);
                         });
-                        validated_objs.push((*pos, *obj_to_clear));
+                        validated_objs.push((*pos, *obj));
                     }
-
                     objs_to_spawn = Box::new(objs_to_spawn.chain(validated_objs.into_iter()));
                 }
-
                 let mut objs_to_spawn =
                     objs_to_spawn.collect::<Vec<(TileMapPosition, WorldObject)>>();
-                if dungeon_check.is_err() {
-                    let cached_objs = game.get_objects_from_chunk_cache(chunk_pos);
-                    objs_to_spawn = objs_to_spawn
-                        .into_iter()
-                        .chain(cached_objs.to_owned().into_iter())
-                        .collect::<Vec<(TileMapPosition, WorldObject)>>();
-                } else {
-                    let cached_objs = game.get_objects_from_dungeon_cache(chunk_pos);
-                    objs_to_spawn = objs_to_spawn
-                        .into_iter()
-                        .chain(cached_objs.to_owned().into_iter())
-                        .collect::<Vec<(TileMapPosition, WorldObject)>>();
+                let cached_objs = game.get_objects_from_chunk_cache(chunk_pos);
+                objs_to_spawn = objs_to_spawn
+                    .into_iter()
+                    .chain(cached_objs.to_owned().into_iter())
+                    .collect::<Vec<(TileMapPosition, WorldObject)>>();
+
+                // Gen stone walls for dungeons
+                if let Ok(dungeon) = dungeon_check {
+                    let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
+                    for x in 0..CHUNK_SIZE {
+                        for y in 0..CHUNK_SIZE {
+                            let pos = TileMapPosition::new(chunk_pos, TilePos::new(x, y));
+                            if chunk_pos.x < -3
+                                || chunk_pos.x > 4
+                                || chunk_pos.y < -4
+                                || chunk_pos.y > 3
+                            {
+                                objs_to_spawn.push((pos, WorldObject::StoneWall));
+                                wall_cache.walls.insert(pos, true);
+                                continue;
+                            }
+
+                            if dungeon.grid
+                                [(CHUNK_SIZE as i32 * (4 - chunk_pos.y) - 1 - (y as i32)) as usize]
+                                [(3 * CHUNK_SIZE as i32
+                                    + (chunk_pos.x * CHUNK_SIZE as i32)
+                                    + x as i32) as usize]
+                                == 0
+                            {
+                                objs_to_spawn.push((pos, WorldObject::StoneWall));
+                                wall_cache.walls.insert(pos, true);
+                            }
+                        }
+                    }
                 }
+
                 let mut objs = objs_to_spawn
                     .iter()
                     .filter(|tp| {
                         if tp.1 == WorldObject::None {
                             return false;
                         }
-                        // spawn walls in dungeon according to the generated grid layout
-                        if let Ok(dungeon) = dungeon_check {
-                            let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                            if chunk_pos.x < -3
-                                || chunk_pos.x > 4
-                                || chunk_pos.y < -4
-                                || chunk_pos.y > 3
-                            {
-                                if tp.1.is_wall() {
-                                    wall_cache.walls.insert(tp.0, true);
-                                    return true;
-                                } else {
-                                    return false;
-                                }
-                            }
 
-                            if dungeon.grid[(CHUNK_SIZE as i32 * (4 - chunk_pos.y)
-                                - 1
-                                - (tp.0.tile_pos.y as i32))
-                                as usize][(3 * CHUNK_SIZE as i32
-                                + (chunk_pos.x * CHUNK_SIZE as i32)
-                                + tp.0.tile_pos.x as i32)
-                                as usize]
-                                == 1
-                            {
-                                if tp.1.is_wall() {
-                                    wall_cache.walls.insert(tp.0, false);
-                                    return false;
-                                }
-                            } else if !tp.1.is_wall() {
-                                return false;
-                            }
-                        }
                         let tile = if let Some(tile_data) = game.get_tile_data(tp.0) {
                             tile_data.block_type
                         } else {
@@ -574,68 +541,69 @@ impl GenerationPlugin {
                     })
                     .copied()
                     .collect::<HashMap<_, _>>();
-                // clear out spawn area
-                let clear_tiles = get_radial_tile_positions(
-                    TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
-                    10,
-                );
-                for pos in clear_tiles {
-                    if let Some(obj_to_clear) = objs.get(&pos) {
-                        if obj_to_clear.is_tree() {
-                            objs.remove(&pos);
-                        }
-                    }
-                }
-                // clear out portal area
-                let clear_tiles = get_radial_tile_positions(
-                    TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 2)),
-                    2,
-                );
-                for pos in clear_tiles {
-                    if let Some(obj) = objs.get(&pos) {
-                        if obj.is_tree()
-                            || obj.is_medium_size(&proto_param)
-                            || obj == &WorldObject::Grass
-                            || obj == &WorldObject::Grass2
-                            || obj == &WorldObject::Grass3
-                        {
-                            objs.remove(&pos);
-                        }
-                    }
-                }
 
-                // generate starting area objs to ensure player has enough pebbles/sticks
-                if chunk_pos == IVec2::ZERO
-                    || chunk_pos == IVec2::new(-1, 0)
-                    || chunk_pos == IVec2::new(0, -1)
-                    || chunk_pos == IVec2::new(-1, -1)
-                {
-                    for (obj_to_spawn, num) in STARTING_ZONE_OBJS.iter() {
-                        let x_range = if chunk_pos.x == 0 {
-                            2..5
-                        } else {
-                            11..CHUNK_SIZE
-                        };
-                        let y_range = if chunk_pos.y == 0 {
-                            2..5
-                        } else {
-                            11..CHUNK_SIZE
-                        };
-                        for _ in 0..*num {
-                            let p = TileMapPosition::new(
-                                chunk_pos,
-                                TilePos::new(
-                                    rand::thread_rng().gen_range(x_range.clone()),
-                                    rand::thread_rng().gen_range(y_range.clone()),
-                                ),
-                            );
-                            objs.insert(p, *obj_to_spawn);
-                        }
-                    }
-                }
-
-                // UNIQUE OBJECTS
                 if dungeon_check.is_err() {
+                    // clear out spawn area
+                    let clear_tiles = get_radial_tile_positions(
+                        TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
+                        10,
+                    );
+                    for pos in clear_tiles {
+                        if let Some(obj_to_clear) = objs.get(&pos) {
+                            if obj_to_clear.is_tree() {
+                                objs.remove(&pos);
+                            }
+                        }
+                    }
+                    // clear out portal area
+                    let clear_tiles = get_radial_tile_positions(
+                        TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 2)),
+                        2,
+                    );
+                    for pos in clear_tiles {
+                        if let Some(obj) = objs.get(&pos) {
+                            if obj.is_tree()
+                                || obj.is_medium_size(&proto_param)
+                                || obj == &WorldObject::Grass
+                                || obj == &WorldObject::Grass2
+                                || obj == &WorldObject::Grass3
+                            {
+                                objs.remove(&pos);
+                            }
+                        }
+                    }
+
+                    // generate starting area objs to ensure player has enough pebbles/sticks
+                    if chunk_pos == IVec2::ZERO
+                        || chunk_pos == IVec2::new(-1, 0)
+                        || chunk_pos == IVec2::new(0, -1)
+                        || chunk_pos == IVec2::new(-1, -1)
+                    {
+                        for (obj_to_spawn, num) in STARTING_ZONE_OBJS.iter() {
+                            let x_range = if chunk_pos.x == 0 {
+                                2..5
+                            } else {
+                                11..CHUNK_SIZE
+                            };
+                            let y_range = if chunk_pos.y == 0 {
+                                2..5
+                            } else {
+                                11..CHUNK_SIZE
+                            };
+                            for _ in 0..*num {
+                                let p = TileMapPosition::new(
+                                    chunk_pos,
+                                    TilePos::new(
+                                        rand::thread_rng().gen_range(x_range.clone()),
+                                        rand::thread_rng().gen_range(y_range.clone()),
+                                    ),
+                                );
+                                objs.insert(p, *obj_to_spawn);
+                            }
+                        }
+                    }
+
+                    // UNIQUE OBJECTS
                     for (unique_obj, pos) in game.world_obj_cache.unique_objs.clone() {
                         if pos.chunk_pos == chunk_pos {
                             //TODO: this will be funky if size is not even integers
@@ -731,8 +699,8 @@ impl GenerationPlugin {
                                     + (pos.chunk_pos.x * CHUNK_SIZE as i32)
                                     + pos.tile_pos.x as i32)
                                     as usize;
-                                if dungeon.grid[(original_y + y as usize).clamp(0, 127)]
-                                    [(original_x + x as usize).clamp(0, 127)]
+                                if dungeon.grid[(original_y as i32 + y).clamp(0, 127) as usize]
+                                    [(original_x as i32 + x).clamp(0, 127) as usize]
                                     == 1
                                 {
                                     is_touching_air = true
@@ -802,26 +770,17 @@ impl GenerationPlugin {
                             if obj_to_spawn.is_wall() {
                                 wall_cache.walls.insert(*pos, true);
                             }
-                            game.add_object_to_dungeon_cache(*pos, *obj_to_spawn);
-                        } else {
-                            game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
                         }
+                        game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
                     }
                 }
-                if dungeon_check.is_err() {
-                    game.set_chunk_generated(chunk_pos);
-                } else {
-                    game.set_dungeon_chunk_generated(chunk_pos);
-                }
+
+                game.set_chunk_generated(chunk_pos);
 
                 // send schematic event to spawn structures
                 schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
-                let objs = if dungeon_check.is_ok() {
-                    game.get_objects_from_dungeon_cache(chunk_pos)
-                } else {
-                    game.get_objects_from_chunk_cache(chunk_pos)
-                };
+                let objs = game.get_objects_from_chunk_cache(chunk_pos);
                 for (pos, obj_to_clear) in objs {
                     let spawned_obj = proto_commands.spawn_object_from_proto(
                         obj_to_clear,

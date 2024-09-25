@@ -126,7 +126,8 @@ lazy_static! {
     pub static ref NO_GEN: bool = env::var("NO_GEN").is_ok();
 }
 lazy_static! {
-    pub static ref MINIMAP: bool = env::var("MINIMAP").is_ok();
+    pub static ref MINIMAP: bool = true;
+    // pub static ref MINIMAP: bool = env::var("MINIMAP").is_ok();
 }
 lazy_static! {
     pub static ref COLLIDERS: bool = env::var("COLLIDERS").is_ok();

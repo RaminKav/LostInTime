@@ -6,8 +6,10 @@ use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::player::skills::{PlayerSkills, Skill};
-use crate::player::teleport::{spawn_ice_explosion_hitbox, IceFloor};
-use crate::status_effects::{Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent};
+use crate::player::teleport::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
+use crate::status_effects::{
+    try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
+};
 use crate::world::y_sort::YSort;
 use crate::{
     combat::{AttackTimer, HitEvent},
@@ -230,10 +232,13 @@ pub fn handle_on_hit_upgrades(
                 AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                 true,
             );
-            commands.entity(ice).insert(YSort(-0.1));
+            commands
+                .entity(ice)
+                .insert(YSort(-0.1))
+                .insert(IceExplosionDmg);
         }
         if skills.has(Skill::LethalBlow)
-            && curr_hp.0 <= max_hp.0 / 4
+            && curr_hp.0 <= max_hp.0 / 5
             && !mob.is_boss()
             && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
         {
@@ -244,7 +249,7 @@ pub fn handle_on_hit_upgrades(
                 killed_by_crit: false,
             });
         }
-        let Ok((burning_option, _poisoned_option, frailed_option, slowed_option)) =
+        let Ok((burning_option, _poisoned_option, frailed_option, mut slowed_option)) =
             burn_or_venom_mobs.get_mut(hit.hit_entity)
         else {
             continue;
@@ -297,28 +302,12 @@ pub fn handle_on_hit_upgrades(
             }
         }
         if skills.has(Skill::SlowStacks) {
-            if let Some(mut slow_stacks) = slowed_option {
-                if slow_stacks.num_stacks < 3 && Skill::SlowStacks.is_obj_valid(main_hand.get_obj())
-                {
-                    slow_stacks.num_stacks += 1;
-                    slow_stacks.timer.reset();
-                    status_event.send(StatusEffectEvent {
-                        entity: hit_e,
-                        effect: StatusEffect::Slow,
-                        num_stacks: slow_stacks.num_stacks as i32,
-                    });
-                }
-            } else {
-                commands.entity(hit_e).insert(Slow {
-                    num_stacks: 1,
-                    timer: Timer::from_seconds(1.7, TimerMode::Repeating),
-                });
-                status_event.send(StatusEffectEvent {
-                    entity: hit_e,
-                    effect: StatusEffect::Slow,
-                    num_stacks: 1,
-                });
-            }
+            try_add_slow_stacks(
+                hit_e,
+                &mut commands,
+                &mut status_event,
+                slowed_option.as_deref_mut(),
+            );
         }
     }
 }

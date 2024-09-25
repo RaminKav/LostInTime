@@ -13,10 +13,9 @@ use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::levels::PlayerLevel;
 use crate::player::skills::{PlayerSkills, Skill};
-use crate::player::MovePlayerEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
-use crate::world::dimension::{DimensionSpawnEvent, Era};
-use crate::world::dungeon::spawn_new_dungeon_dimension;
+use crate::world::dimension::{ActiveDimension, DimensionSpawnEvent, Era};
+use crate::world::dungeon::Dungeon;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
@@ -385,14 +384,12 @@ pub fn close_container(
     }
 }
 pub fn toggle_inventory(
-    mut game: GameParam,
+    game: GameParam,
     key_input: ResMut<Input<KeyCode>>,
-    mut commands: Commands,
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
-    mut move_player_event: EventWriter<MovePlayerEvent>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     cursor: Res<CursorPos>,
     mut player_xp: Query<&mut PlayerLevel>,
@@ -407,12 +404,10 @@ pub fn toggle_inventory(
 
     if *DEBUG {
         if key_input.just_pressed(KeyCode::P) {
-            spawn_new_dungeon_dimension(
-                &mut game,
-                &mut commands,
-                &mut proto_commands,
-                &mut move_player_event,
-            );
+            dim_event.send(DimensionSpawnEvent {
+                swap_to_dim_now: true,
+                new_era: Some(Era::DungeonMain),
+            });
         }
         if key_input.just_pressed(KeyCode::O) {
             dim_event.send(DimensionSpawnEvent {
@@ -436,20 +431,20 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(4));
+            // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(4));
             // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            // proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(f.unwrap()).insert(MobLevel(2));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }
@@ -616,7 +611,7 @@ pub fn mouse_click_system(
                 .unwrap_or(true);
             info!(
                 "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?} || {ai_pos:?}",
-                cursor_pos.ui_coords
+                cursor_pos.ui_coords,
             );
         }
         if attack_timer_option.is_some() || player_anim.is_one_time_anim() {
@@ -655,21 +650,19 @@ pub fn mouse_click_system(
                     direction,
                     ignore_cooldown: false,
                 });
-            } else {
+            } else if main_hand.is_melee_weapon() || main_hand.is_tool() {
                 if !player_anim.is_sprinting() {
                     did_attack = true;
                 }
             }
-        } else if !player_anim.is_sprinting() {
-            did_attack = true;
         }
         if did_attack {
             commands.entity(player_e).insert(PlayerAnimation::Attack);
-            attack_event.send(AttackEvent {
-                direction,
-                ignore_cooldown: false,
-            });
         }
+        attack_event.send(AttackEvent {
+            direction,
+            ignore_cooldown: false,
+        });
         if player_pos
             .truncate()
             .distance(cursor_pos.world_coords.truncate())

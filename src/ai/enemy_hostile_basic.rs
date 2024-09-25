@@ -8,7 +8,9 @@ use seldom_state::prelude::*;
 
 use crate::{
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
-    animations::enemy_sprites::{CharacterAnimationSpriteSheetData, EnemyAnimationState},
+    animations::enemy_sprites::{
+        spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
+    },
     combat::HitEvent,
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
@@ -307,7 +309,7 @@ pub fn follow(
 }
 
 pub fn leap_attack(
-    mut transforms: Query<&mut Transform>,
+    mut transforms: Query<&mut GlobalTransform>,
     mut attacks: Query<(
         Entity,
         &Mob,
@@ -323,6 +325,7 @@ pub fn leap_attack(
     mut commands: Commands,
     time: Res<Time>,
     skills: Query<&PlayerSkills>,
+    asset_server: Res<AssetServer>,
 ) {
     for (
         entity,
@@ -338,9 +341,9 @@ pub fn leap_attack(
     ) in attacks.iter_mut()
     {
         // Get the positions of the attacker and target
-        let target_translation = transforms.get(attack.target).unwrap().translation;
+        let target_translation = transforms.get(attack.target).unwrap().translation();
         let attack_transform = transforms.get_mut(entity).unwrap();
-        let attack_translation = attack_transform.translation;
+        let attack_translation = attack_transform.translation();
 
         if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
             let delta = target_translation - attack_translation;
@@ -394,6 +397,15 @@ pub fn leap_attack(
                     .insert(EnemyAttackCooldown(attack.attack_cooldown_timer.clone()));
             }
         } else {
+            if attack.attack_startup_timer.percent() == 0. {
+                spawn_attack_warning_aseprite(
+                    &mut commands,
+                    &asset_server,
+                    Vec3::new(0., 12., 10.),
+                    entity,
+                    attack.attack_startup_timer.duration().as_secs_f32() + 0.01,
+                );
+            }
             attack.attack_startup_timer.tick(time.delta());
         }
     }

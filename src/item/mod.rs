@@ -625,6 +625,13 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_tool(&self) -> bool {
+        match self {
+            WorldObject::WoodAxe => true,
+            WorldObject::WoodPickaxe => true,
+            _ => false,
+        }
+    }
     pub fn is_unique_object(&self) -> bool {
         match self {
             WorldObject::TimeGate => true,
@@ -875,11 +882,8 @@ pub fn handle_placing_world_object(
                 }
             }
         }
-        if dungeon_check.get_single().is_err() {
-            game.add_object_to_chunk_cache(tile_pos, place_event.obj);
-        } else {
-            game.add_object_to_dungeon_cache(tile_pos, place_event.obj);
-        }
+
+        game.add_object_to_chunk_cache(tile_pos, place_event.obj);
     }
 }
 pub fn handle_break_object(

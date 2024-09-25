@@ -10,8 +10,7 @@ use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
-use crate::world::dimension::DimensionSpawnEvent;
-use crate::world::dungeon::spawn_new_dungeon_dimension;
+use crate::world::dimension::{DimensionSpawnEvent, Era};
 
 use crate::world::TileMapPosition;
 use crate::GameParam;
@@ -105,17 +104,15 @@ impl ObjectAction {
                     .send(MovePlayerEvent { pos });
             }
             ObjectAction::DungeonTeleport => {
-                spawn_new_dungeon_dimension(
-                    game,
-                    commands,
-                    &mut proto_param.proto_commands,
-                    &mut item_action_param.move_player_event,
-                );
+                item_action_param.dim_event.send(DimensionSpawnEvent {
+                    swap_to_dim_now: true,
+                    new_era: Some(Era::DungeonMain),
+                });
             }
             ObjectAction::DungeonExit => {
                 item_action_param.dim_event.send(DimensionSpawnEvent {
                     swap_to_dim_now: true,
-                    new_era: Some(game.era.current_era.clone()),
+                    new_era: Some(game.era.current_era.get_assosiated_era_from_dungeon_era()),
                 });
             }
             ObjectAction::Chest => {

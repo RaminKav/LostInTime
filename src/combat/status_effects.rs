@@ -220,3 +220,32 @@ pub fn handle_slow_stack_ticks(
         }
     }
 }
+
+pub fn try_add_slow_stacks(
+    hit_e: Entity,
+    commands: &mut Commands,
+    status_event: &mut EventWriter<StatusEffectEvent>,
+    slowed_option: Option<&mut Slow>,
+) {
+    if let Some(slow_stacks) = slowed_option {
+        if slow_stacks.num_stacks < 3 {
+            slow_stacks.num_stacks += 1;
+            slow_stacks.timer.reset();
+            status_event.send(StatusEffectEvent {
+                entity: hit_e,
+                effect: StatusEffect::Slow,
+                num_stacks: slow_stacks.num_stacks as i32,
+            });
+        }
+    } else {
+        commands.entity(hit_e).insert(Slow {
+            num_stacks: 1,
+            timer: Timer::from_seconds(1.7, TimerMode::Repeating),
+        });
+        status_event.send(StatusEffectEvent {
+            entity: hit_e,
+            effect: StatusEffect::Slow,
+            num_stacks: 1,
+        });
+    }
+}

@@ -17,7 +17,7 @@ use crate::{
         },
         skills::{PlayerSkills, Skill},
         sprint::SprintState,
-        teleport::TeleportShockDmg,
+        teleport::{IceExplosionDmg, TeleportShockDmg},
         ModifyTimeFragmentsEvent,
     },
     ui::damage_numbers::DodgeEvent,
@@ -27,7 +27,10 @@ use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
 
-use super::{Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow};
+use super::{
+    try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
+    StatusEffectEvent,
+};
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -171,6 +174,7 @@ fn check_projectile_hit_mob_collisions(
             &Projectile,
             &Attack,
             Option<&TeleportShockDmg>,
+            Option<&IceExplosionDmg>,
             Option<&SpearAttack>,
         ),
         Without<EnemyProjectile>,
@@ -178,9 +182,10 @@ fn check_projectile_hit_mob_collisions(
     is_world_obj: Query<&WorldObject>,
     mut children: Query<&Parent>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
-    status_check: Query<(Option<&Burning>, Option<&Slow>, Option<&Frail>)>,
+    mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
+    mut status_event: EventWriter<StatusEffectEvent>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
@@ -188,26 +193,33 @@ fn check_projectile_hit_mob_collisions(
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //TODO: fr gotta refasctor this...
-            let (proj_entity, mut state, proj, att, tp_shock, spear_att) =
+            let (proj_entity, mut state, proj, att, tp_shock, ice_aoe, spear_att) =
                 if let Ok(parent_e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
+                    if let Ok((proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)) =
                         projectiles.get_mut(parent_e.get())
                     {
                         //collider is on the child, proj data on the parent
-                        (proj_entity, state, proj, att, tp_shock, spear_att)
-                    } else if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
-                        projectiles.get_mut(*e1)
+                        (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
+                    } else if let Ok((
+                        proj_entity,
+                        state,
+                        proj,
+                        att,
+                        tp_shock,
+                        ice_aoe,
+                        spear_att,
+                    )) = projectiles.get_mut(*e1)
                     {
                         //collider and proj data are on the same entity
-                        (proj_entity, state, proj, att, tp_shock, spear_att)
+                        (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, proj, att, tp_shock, spear_att)) =
+                } else if let Ok((proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)) =
                     projectiles.get_mut(*e1)
                 {
                     //collider and proj data are on the same entity
-                    (proj_entity, state, proj, att, tp_shock, spear_att)
+                    (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
                 } else {
                     continue;
                 };
@@ -221,7 +233,7 @@ fn check_projectile_hit_mob_collisions(
                 continue;
             }
             state.hit_entities.push(*e2);
-            let (burning, slow, frail) = status_check.get(*e2).unwrap();
+            let (burning, mut slow, frail) = status_check.get_mut(*e2).unwrap();
             let is_slowed = slow.is_some();
             let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
             let staff_skill_bonus = if game.has_skill(Skill::StaffDMG) && proj.is_staff_proj() {
@@ -247,7 +259,7 @@ fn check_projectile_hit_mob_collisions(
                 Some(att.0),
             );
             if let Some(lifesteal) = lifesteal {
-                if !is_world_obj.contains(*e2) && tp_shock.is_none() {
+                if !is_world_obj.contains(*e2) && tp_shock.is_none() && ice_aoe.is_none() {
                     modify_health_events.send(ModifyHealthEvent(f32::floor(
                         damage as f32 * lifesteal.0 as f32 / 100.,
                     ) as i32));
@@ -270,6 +282,9 @@ fn check_projectile_hit_mob_collisions(
                         });
                     }
                 }
+            }
+            if ice_aoe.is_some() {
+                try_add_slow_stacks(*e2, &mut commands, &mut status_event, slow.as_deref_mut());
             }
             hit_event.send(HitEvent {
                 hit_entity: *e2,

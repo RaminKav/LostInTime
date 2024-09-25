@@ -7,6 +7,12 @@ use crate::{
     enemy::Mob,
     item::Equipment,
     player::{MovePlayerEvent, Player},
+    world::{
+        dungeon::{Dungeon, Dungeontimer},
+        dungeon_generation::{gen_new_dungeon, get_player_spawn_tile, Bias},
+        world_helpers::world_pos_to_tile_pos,
+        CHUNK_SIZE,
+    },
     CustomFlush, GameParam, GameState,
 };
 
@@ -14,6 +20,8 @@ use super::{
     chunk::Chunk,
     dungeon::{CachedPlayerPos, DungeonText},
     generation::WorldObjectCache,
+    portal::TimePortal,
+    wall_auto_tile::ChunkWallCache,
 };
 
 #[derive(Component, Reflect, Default, Debug, Clone)]
@@ -59,12 +67,14 @@ pub enum Era {
     #[default]
     Main,
     Second,
+    DungeonMain,
 }
 
 impl Era {
     pub fn get_texture_index(&self) -> usize {
         match self {
             Era::Main => 0,
+            Era::DungeonMain => 1 * 16,
             Era::Second => 2 * 16,
         }
     }
@@ -72,13 +82,27 @@ impl Era {
         match self {
             Era::Main => 0,
             Era::Second => 1,
+            Era::DungeonMain => 2,
         }
     }
     pub fn from_index(index: usize) -> Self {
         match index {
             0 => Era::Main,
             1 => Era::Second,
+            2 => Era::DungeonMain,
             i => panic!("Invalid Era index:{}", i),
+        }
+    }
+    pub fn is_dungeon(&self) -> bool {
+        match self {
+            Era::DungeonMain => true,
+            _ => false,
+        }
+    }
+    pub fn get_assosiated_era_from_dungeon_era(&self) -> Self {
+        match self {
+            Era::DungeonMain => Era::Main,
+            _ => panic!("Invalid era for dungeon era"),
         }
     }
 }
@@ -110,12 +134,13 @@ impl DimensionPlugin {
         mut spawn_event: EventReader<DimensionSpawnEvent>,
         dungeon_text: Query<Entity, With<DungeonText>>,
         mut move_player_event: EventWriter<MovePlayerEvent>,
-        player_pos: Query<&CachedPlayerPos, With<Player>>,
+        player_cache_pos: Query<(Entity, &CachedPlayerPos), With<Player>>,
         mut game: GameParam,
         mut proto_commands: ProtoCommands,
+        mut chunk_wall_cache: Query<&mut ChunkWallCache>,
     ) {
         for new_dim in spawn_event.iter() {
-            debug!("SPAWNING NEW DIMENSION");
+            info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
 
             let dim_e = commands.spawn((Dimension,)).id();
             if new_dim.swap_to_dim_now {
@@ -127,10 +152,42 @@ impl DimensionPlugin {
 
             //swap era data
             if let Some(new_era) = &new_dim.new_era {
+                if new_era.is_dungeon() {
+                    let player = game.player_query.single().0;
+                    let player_pos = game.player().position;
+                    commands
+                        .entity(player)
+                        .insert(CachedPlayerPos(world_pos_to_tile_pos(
+                            player_pos.truncate(),
+                        )));
+                    let grid = gen_new_dungeon(
+                        3000,
+                        (CHUNK_SIZE * 4 * 2) as usize,
+                        Bias {
+                            bias: super::dungeon_generation::Direction::Left,
+                            strength: 0,
+                        },
+                    );
+                    commands
+                        .entity(dim_e)
+                        .insert(Dungeon { grid: grid.clone() })
+                        .insert(Dungeontimer(Timer::from_seconds(360., TimerMode::Once)));
+
+                    if let Some(pos) = get_player_spawn_tile(grid.clone()) {
+                        info!("MOVING PLAYER TO {:?}", pos);
+                        move_player_event.send(MovePlayerEvent { pos });
+                    }
+                }
+
                 let curr_era = game.era.current_era.clone();
-                game.era
-                    .era_generation_cache
-                    .insert(curr_era, game.world_obj_cache.clone());
+                if !curr_era.is_dungeon() {
+                    game.era
+                        .era_generation_cache
+                        .insert(curr_era.clone(), game.world_obj_cache.clone());
+                    for mut chunk_wall_cache in chunk_wall_cache.iter_mut() {
+                        chunk_wall_cache.walls.clear();
+                    }
+                }
                 game.era.current_era = new_era.clone();
 
                 commands.remove_resource::<WorldObjectCache>();
@@ -141,22 +198,22 @@ impl DimensionPlugin {
                     .cloned()
                     .unwrap_or(WorldObjectCache::default());
                 commands.insert_resource(new_world_cache);
-
                 proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
             } else {
-                debug!("USE CURR ERA: {:?}", game.era.current_era.index());
+                info!("USE CURR ERA: {:?}", game.era.current_era.index());
                 proto_commands.apply(format!(
                     "Era{}WorldGenerationParams",
                     game.era.current_era.index() + 1
                 ));
                 if let Some(era_cache) = game.era.era_generation_cache.get(&game.era.current_era) {
-                    debug!("APPLYING ERA CACHE");
+                    info!("APPLYING ERA CACHE");
                     commands.insert_resource(era_cache.clone());
                 }
             }
 
-            if let Ok(cached_pos) = player_pos.get_single() {
+            if let Ok((e, cached_pos)) = player_cache_pos.get_single() {
                 move_player_event.send(MovePlayerEvent { pos: cached_pos.0 });
+                commands.entity(e).remove::<CachedPlayerPos>();
             }
         }
     }
@@ -164,13 +221,19 @@ impl DimensionPlugin {
     pub fn clear_entities_for_dim_swap(
         new_dim: Query<Entity, Added<SpawnDimension>>,
         mut commands: Commands,
-        entity_query: Query<Entity, (Or<(With<Mob>, With<Chunk>)>, Without<Equipment>)>,
+        entity_query: Query<
+            Entity,
+            (
+                Or<(With<Mob>, With<Chunk>, With<TimePortal>)>,
+                Without<Equipment>,
+            ),
+        >,
         old_dim: Query<Entity, With<ActiveDimension>>,
     ) {
         // event sent out when we enter a new dimension
         for d in new_dim.iter() {
             //despawn all entities with positions, except the player
-            debug!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
+            info!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
             for e in entity_query.iter() {
                 commands.entity(e).despawn_recursive();
             }

@@ -34,6 +34,9 @@ pub struct TeleportState {
 #[derive(Component)]
 pub struct TeleportShockDmg;
 
+#[derive(Component)]
+pub struct IceExplosionDmg;
+
 pub fn handle_teleport(
     mut move_player: EventWriter<MovePlayerEvent>,
     mut player: Query<
@@ -199,5 +202,5 @@ pub fn spawn_ice_explosion_hitbox(
         anim,
         false,
     );
-    commands.entity(c).insert(TeleportShockDmg);
+    commands.entity(c).insert(IceExplosionDmg);
 }

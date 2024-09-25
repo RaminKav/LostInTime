@@ -3,7 +3,8 @@ use crate::assets::Graphics;
 use crate::colors::LIGHT_RED;
 use crate::enemy::Mob;
 use crate::item::WorldObject;
-use crate::world::dimension::SpawnDimension;
+use crate::world::dimension::{ActiveDimension, SpawnDimension};
+use crate::world::dungeon::Dungeon;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{CustomFlush, GameParam, GameState, Player, GAME_HEIGHT, MINIMAP};
@@ -92,8 +93,9 @@ fn setup_mini_map(
     minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<Minimap>>,
     p_t: Query<&Transform, With<Player>>,
-    mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
+    // mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
     mut meshes: ResMut<Assets<Mesh>>,
+    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
     // mut cache: ResMut<MinimapTileCache>,
 ) {
     //NOTES:
@@ -127,15 +129,6 @@ fn setup_mini_map(
         let pt = p_t.single();
         let p_cp = camera_pos_to_chunk_pos(&pt.translation.truncate());
         let p_tp: TilePos = camera_pos_to_tile_pos(&pt.translation.truncate());
-        let mobs: Vec<_> = mob_t
-            .iter()
-            .map(|t| {
-                (
-                    camera_pos_to_chunk_pos(&t.translation().truncate()),
-                    camera_pos_to_tile_pos(&t.translation().truncate()),
-                )
-            })
-            .collect();
 
         //Every pixel is 4 entries in image.data
         let mut data = Vec::with_capacity(16384);
@@ -145,6 +138,13 @@ fn setup_mini_map(
                 for x in -(num_tiles as i32 / 2)..num_tiles as i32 / 2 {
                     for q in 0..2 {
                         if x == 0 && y == 0 {
+                            data.push(0);
+                            data.push(0);
+                            data.push(0);
+                            data.push(255);
+                            continue;
+                        }
+                        if !dungeon_check.is_empty() {
                             data.push(0);
                             data.push(0);
                             data.push(0);
@@ -192,14 +192,6 @@ fn setup_mini_map(
                             game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos))
                         {
                             let tile = tile_data.block_type;
-                            if mobs.contains(&(chunk_pos, tile_pos)) {
-                                let c = LIGHT_RED;
-                                data.push((c.r() * 255.) as u8);
-                                data.push((c.g() * 255.) as u8);
-                                data.push((c.b() * 255.) as u8);
-                                data.push(255);
-                                continue;
-                            }
                             //Copy 1 pixel at index 0,1 2,3
                             let c = tile[(q + offset) as usize].get_obj_color();
 

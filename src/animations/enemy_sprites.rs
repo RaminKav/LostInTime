@@ -6,11 +6,17 @@
 // L, U, R, D -> 0, 1, 2, 3
 
 use bevy::prelude::*;
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use crate::{assets::Graphics, enemy::Mob, inputs::FacingDirection, player::melee_skills::Parried};
+use crate::{
+    assets::Graphics, combat_helpers::DespawnTimer, enemy::Mob, inputs::FacingDirection,
+    player::melee_skills::Parried,
+};
 
 use super::AnimationTimer;
+
+aseprite!(pub AttackWarning, "textures/effects/AttackWarning.aseprite");
 
 #[derive(Component, Schematic, Reflect, FromReflect, Eq, PartialEq, Debug, Default)]
 #[reflect(Schematic, Default)]
@@ -176,4 +182,24 @@ pub fn animate_character_spritesheet_animations(
             timer.reset();
         }
     }
+}
+
+pub fn spawn_attack_warning_aseprite(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+    parent: Entity,
+    duration: f32,
+) -> Entity {
+    let anim = AsepriteAnimation::from(AttackWarning::tags::WARNING);
+    commands
+        .spawn(AsepriteBundle {
+            aseprite: asset_server.load(AttackWarning::PATH),
+            animation: anim,
+            transform: Transform::from_translation(pos),
+            ..Default::default()
+        })
+        .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
+        .set_parent(parent)
+        .id()
 }
