@@ -4,6 +4,7 @@ mod game_over;
 use std::cmp::max;
 use std::f32::consts::PI;
 
+pub mod ui_animaitons;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
@@ -17,6 +18,7 @@ use player_sprite::{
     handle_anim_change_when_player_dir_changes, handle_player_animation_change, PlayerAnimation,
 };
 use serde::{Deserialize, Serialize};
+use ui_animaitons::{handle_move_animations, handle_ui_time_fragments};
 pub mod player_sprite;
 
 use crate::ai::LeapAttackState;
@@ -117,7 +119,14 @@ impl Plugin for AnimationsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems((change_player_class_visuals,).in_set(OnUpdate(GameState::Main)))
+            .add_systems(
+                (
+                    change_player_class_visuals,
+                    handle_move_animations,
+                    handle_ui_time_fragments,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(tick_game_over_overlay);
     }
 }

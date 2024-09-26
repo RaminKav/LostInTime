@@ -1,5 +1,5 @@
 use crate::{
-    animations::player_sprite::PlayerAnimation,
+    animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
     attributes::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
@@ -18,10 +18,9 @@ use crate::{
         skills::{PlayerSkills, Skill},
         sprint::SprintState,
         teleport::{IceExplosionDmg, TeleportShockDmg},
-        ModifyTimeFragmentsEvent,
     },
     ui::damage_numbers::DodgeEvent,
-    CustomFlush, GameParam, GameState, Player,
+    CustomFlush, GameParam, GameState, Player, ScreenResolution,
 };
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
@@ -441,7 +440,7 @@ pub fn check_item_drop_collisions(
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
-    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
+    resolution: Res<ScreenResolution>,
 ) {
     if !game.player().is_moving {
         return;
@@ -457,14 +456,41 @@ pub fn check_item_drop_collisions(
             let item_stack = items_query.get(e2).unwrap().clone();
             let obj = item_stack.obj_type;
             if obj == WorldObject::TimeFragment {
-                currency_event.send(ModifyTimeFragmentsEvent {
-                    delta: item_stack.count as i32,
-                });
+                commands.spawn(UIIconMover::new(
+                    Vec2::new(0., 0.),
+                    Vec2::new(
+                        -resolution.game_width / 2. + 15.,
+                        resolution.game_height / 2. - 50.,
+                    ),
+                    WorldObject::TimeFragment,
+                    0.,
+                    800.,
+                    None,
+                    false,
+                    item_stack,
+                ));
                 commands.entity(e2).despawn_recursive();
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
                 continue;
+            } else {
+                commands.spawn(UIIconMover::new(
+                    Vec2::new(
+                        -resolution.game_width / 2. + 65.,
+                        -resolution.game_height / 2. + 5.,
+                    ),
+                    Vec2::new(
+                        -resolution.game_width / 2. + 65.,
+                        -resolution.game_height / 2. + 40.,
+                    ),
+                    obj,
+                    00.,
+                    60.,
+                    Some(0.45),
+                    true,
+                    item_stack.clone(),
+                ));
             }
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
