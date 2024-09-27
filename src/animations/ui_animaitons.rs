@@ -58,7 +58,6 @@ pub fn handle_move_animations(
 
         if let Some(fade) = move_anim.fade_factor {
             let new_fade = sprite.color.a() - fade * time.delta_seconds();
-            info!("Fade {:?}", new_fade);
             sprite.color.set_a(new_fade);
             if sprite.color.a() <= 0.4 {
                 commands.entity(e).despawn_recursive();

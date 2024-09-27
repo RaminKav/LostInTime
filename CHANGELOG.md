@@ -11,6 +11,7 @@
 - Skill Re-rolls: each skill choice slot can be re-rolled once per level-up!
 - New enemy attack warnings (! above their head)
 - Minimap!
+- New UI improvments for item and currency pickup
 
 ### Changes
 
@@ -32,6 +33,7 @@
 - fixed being able to teleport into the water
 - coal and metal boulders make correct sound now
 - fix various dungeon bugs
+- No more lag spikes when game saves. As a result, game saves every 10s now.
 
 ## 0.1.4
 

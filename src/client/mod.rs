@@ -118,7 +118,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(AppMappingMode::new(MappingMode::Strict))
             .insert_resource(CurrentRunSaveData::default())
             .insert_resource(SaveTimer {
-                timer: Timer::from_seconds(200., TimerMode::Repeating),
+                timer: Timer::from_seconds(10., TimerMode::Repeating),
             })
             .add_plugin(AnalyticsPlugin)
             .add_system(
@@ -364,15 +364,22 @@ pub fn save_state(
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;
     save_data.analytics_data = analytics_data.clone();
+    let async_task_pool = bevy::tasks::IoTaskPool::get();
+    let data = save_data.clone();
+    info!("STARTING ASYNC SAVE");
+    let _ = async_task_pool
+        .spawn(async move {
+            let file = File::create(datafiles::save_file())
+                .expect("Could not open file for serialization");
 
-    let file = File::create(datafiles::save_file()).expect("Could not open file for serialization");
-
-    // let json_Data: String = serde_json::to_string(&save_data).unwrap();
-    if let Err(result) = serde_json::to_writer(file, &save_data.clone()) {
-        error!("Failed to save game state: {result:?}");
-    } else {
-        info!("SAVED GAME STATE!");
-    }
+            // let json_Data: String = serde_json::to_string(&save_data).unwrap();
+            if let Err(result) = serde_json::to_writer(file, &data) {
+                error!("Failed to save game state: {result:?}");
+            } else {
+                info!("SAVED GAME STATE!");
+            }
+        })
+        .detach();
 }
 
 pub fn load_state(

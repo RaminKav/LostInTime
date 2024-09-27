@@ -166,7 +166,7 @@ pub fn tick_game_over_overlay(
                 "Press Shift + Left Click to quickly move items\n\n     between your hotbar, inventory, and chests.",
                 "Exploring the dense forest can be dangerous, especially at night!\n\n     You have more room to fight in clearings.",
                 "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear have better base stats.",
-                "Press ESC to manually save your game! Otherwise it will save every 200s.",
+                "Press ESC to manually save your game! Otherwise it will save every 10.",
                 "Inventory, Crafting, and Chest menus pause the game."
               ];
 
