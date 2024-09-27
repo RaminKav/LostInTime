@@ -467,30 +467,29 @@ pub fn check_item_drop_collisions(
                     800.,
                     None,
                     false,
-                    item_stack,
+                    item_stack.clone(),
                 ));
                 commands.entity(e2).despawn_recursive();
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
-                continue;
-            } else {
                 commands.spawn(UIIconMover::new(
                     Vec2::new(
                         -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 5.,
+                        -resolution.game_height / 2. + 10.,
                     ),
                     Vec2::new(
                         -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 40.,
+                        -resolution.game_height / 2. + 10.,
                     ),
                     obj,
                     00.,
                     60.,
-                    Some(0.45),
+                    Some(0.15),
                     true,
                     item_stack.clone(),
                 ));
+                continue;
             }
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
@@ -500,6 +499,24 @@ pub fn check_item_drop_collisions(
                     .is_none()
             {
                 return;
+            }
+            if obj != WorldObject::TimeFragment {
+                commands.spawn(UIIconMover::new(
+                    Vec2::new(
+                        -resolution.game_width / 2. + 65.,
+                        -resolution.game_height / 2. + 10.,
+                    ),
+                    Vec2::new(
+                        -resolution.game_width / 2. + 65.,
+                        -resolution.game_height / 2. + 10.,
+                    ),
+                    obj,
+                    00.,
+                    60.,
+                    Some(0.15),
+                    true,
+                    item_stack.clone(),
+                ));
             }
             // ...and inventory has room, add it to the player's inventory
 

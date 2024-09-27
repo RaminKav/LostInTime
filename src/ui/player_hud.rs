@@ -281,7 +281,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(-res.game_width / 2. + 18.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(-res.game_width / 2. + 18.5, -GAME_HEIGHT / 2. + 10.),
         Vec2::new(0., 0.),
         3,
     );
@@ -304,7 +304,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::Dodge),
         &asset_server,
-        Vec2::new(-res.game_width / 2. + 42.5, -GAME_HEIGHT / 2. + 14.),
+        Vec2::new(-res.game_width / 2. + 42.5, -GAME_HEIGHT / 2. + 10.),
         Vec2::new(0., 0.),
         3,
     );

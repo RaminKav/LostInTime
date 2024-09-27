@@ -4,8 +4,13 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
-    assets::Graphics, attributes::add_item_glows, inventory::ItemStack, item::WorldObject,
-    player::ModifyTimeFragmentsEvent, proto::proto_param::ProtoParam,
+    assets::Graphics,
+    attributes::{add_item_glows, ItemRarity},
+    colors::WHITE,
+    inventory::ItemStack,
+    item::WorldObject,
+    player::ModifyTimeFragmentsEvent,
+    proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_text,
 };
 
@@ -53,8 +58,9 @@ pub fn handle_move_animations(
 
         if let Some(fade) = move_anim.fade_factor {
             let new_fade = sprite.color.a() - fade * time.delta_seconds();
+            info!("Fade {:?}", new_fade);
             sprite.color.set_a(new_fade);
-            if sprite.color.a() <= 0.0 {
+            if sprite.color.a() <= 0.4 {
                 commands.entity(e).despawn_recursive();
             }
 
@@ -108,12 +114,21 @@ impl UIIconMover {
 }
 pub fn handle_ui_time_fragments(
     mut query: Query<(Entity, &mut UIIconMover), Added<UIIconMover>>,
+    mut prev_movers: Query<&mut MoveUIAnimation>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     proto: ProtoParam,
 ) {
-    for (e, icon) in query.iter_mut() {
+    let mut non_text_movers_this_frame = 0.;
+    for (i, (e, icon)) in query.iter_mut().enumerate() {
+        if icon.show_name {
+            for mut mover in prev_movers.iter_mut() {
+                mover.end.y += 11.0;
+            }
+        } else {
+            non_text_movers_this_frame += 1.;
+        }
         let icon_e = commands
             .entity(e)
             .insert(SpriteSheetBundle {
@@ -131,7 +146,7 @@ pub fn handle_ui_time_fragments(
             })
             .insert(MoveUIAnimation {
                 start: icon.start,
-                end: icon.end,
+                end: icon.end + Vec2::new(0.0, (i as f32 - non_text_movers_this_frame) * 10.0),
                 velocity: icon.velocity,
                 acceleration: Some(icon.acceleration),
                 fade_factor: icon.fade_factor,
@@ -153,7 +168,11 @@ pub fn handle_ui_time_fragments(
                 &mut commands,
                 &asset_server,
                 Vec3::new(8., 0., 1.),
-                obj_rarity.get_color(),
+                if obj_rarity == ItemRarity::Common {
+                    WHITE
+                } else {
+                    obj_rarity.get_color()
+                },
                 format!("{}", obj_name),
                 Anchor::CenterLeft,
                 1.,
