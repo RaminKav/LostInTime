@@ -1,7 +1,7 @@
 (
     items: {
         None: WorldObjectData(
-            texture_pos: (13., 15.),
+            texture_pos: (15., 0.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -91,42 +91,42 @@
             anchor: None,
         ),
         Sword: WorldObjectData(
-            texture_pos: (3., 4.),
+            texture_pos: (3., 5.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
         ),
         WoodSword: WorldObjectData(
-            texture_pos: (3., 6.),
+            texture_pos: (3., 7.),
             size: (16., 16.),
             anchor: Some((0.25, 0.25)),
         ),
         Dagger: WorldObjectData(
-            texture_pos: (4., 4.),
+            texture_pos: (4., 5.),
             size: (16., 16.),
             anchor: Some((0.2, 0.25)),
         ),
         IceStaff: WorldObjectData(
-            texture_pos: (5., 4.),
+            texture_pos: (5., 5.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
         BasicStaff: WorldObjectData(
-            texture_pos: (6., 4.),
+            texture_pos: (6., 5.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
         DualStaff: WorldObjectData(
-            texture_pos: (7., 4.),
+            texture_pos: (7., 5.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
         WoodAxe: WorldObjectData(
-            texture_pos: (8., 3.),
+            texture_pos: (8., 4.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
         WoodPickaxe: WorldObjectData(
-            texture_pos: (6., 3.),
+            texture_pos: (7., 3.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
         ),
@@ -141,7 +141,7 @@
             anchor: Some((0.2,0.0)),
         ),
         Claw: WorldObjectData(
-            texture_pos: (5., 7.),
+            texture_pos: (4., 7.),
             size: (16., 16.),
             anchor: Some((0.25,-0.2)),
         ),
@@ -656,17 +656,17 @@
             anchor: None,
         ),
         RedSapplingBlock: WorldObjectData(
-            texture_pos: (15., 1.),
+            texture_pos: (1., 15.),
             size: (16., 16.),
             anchor: None,
         ),
         GreenSapplingBlock: WorldObjectData(
-            texture_pos: (14., 0.),
+            texture_pos: (0., 14.),
             size: (16., 16.),
             anchor: None,
         ),
         YellowSapplingBlock: WorldObjectData(
-            texture_pos: (15., 0.),
+            texture_pos: (0., 15.),
             size: (16., 16.),
             anchor: None,
         ),
