@@ -7,8 +7,8 @@ use crate::{
     container::Container,
     inputs::FacingDirection,
     item::{
-        ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, MainHand, WorldObject,
-        PLAYER_EQUIPMENT_POSITIONS,
+        ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, ItemDrop, MainHand,
+        WorldObject, PLAYER_EQUIPMENT_POSITIONS,
     },
     player::{skills::Skill, Limb},
     proto::proto_param::ProtoParam,
@@ -356,6 +356,7 @@ impl ItemStack {
                 transform,
                 ..Default::default()
             })
+            .insert(ItemDrop)
             .insert(Name::new("DropItem"))
             .insert(self.clone())
             //TODO: double colliders??

@@ -42,7 +42,7 @@ use crate::{
         CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
         MaxMana, PlayerAttributeBundle,
     },
-    client::{is_not_paused, CurrentRunSaveData},
+    client::{is_not_paused, CurrentRunSaveData, GameData},
     container::Container,
     custom_commands::CommandsExt,
     datafiles, handle_hits,
@@ -140,7 +140,6 @@ impl Plugin for PlayerPlugin {
                 spawn_particles_when_leveling,
                 handle_teleport.run_if(is_not_paused),
                 hide_particles_when_inv_open,
-                handle_modify_time_fragments,
                 tick_just_teleported.run_if(is_not_paused),
                 tick_teleport_timer.run_if(is_not_paused),
                 handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
@@ -167,6 +166,7 @@ impl Plugin for PlayerPlugin {
                 .after(leap_attack)
                 .in_set(OnUpdate(GameState::Main)),
         )
+        .add_systems((handle_modify_time_fragments,))
         .add_systems(
             (handle_echo_after_heal
                 .after(handle_modify_health_event)
@@ -228,6 +228,22 @@ fn spawn_player(
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
     proto: ProtoParam,
 ) {
+    // total currency counter
+    let game_data_file_path = datafiles::game_data();
+    let mut total_currency_all_time = 0;
+    if let Ok(file_file) = File::open(game_data_file_path) {
+        let reader = BufReader::new(file_file);
+
+        // Read the JSON contents of the file as an instance of `GameData`.
+        match serde_json::from_reader::<_, GameData>(reader) {
+            Ok(data) => total_currency_all_time = data.time_fragments,
+            Err(err) => {
+                error!("Failed to load data from game_data.json file to get currency {err:?}")
+            }
+        }
+    };
+    info!("total currency all time start: {total_currency_all_time}");
+
     //spawn player entity with limb spritesheets as children
     let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
     let p = commands
@@ -298,13 +314,14 @@ fn spawn_player(
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
-        .insert(TimeFragmentCurrency::default())
+        .insert(TimeFragmentCurrency::new(0, 0, total_currency_all_time))
         .insert(Sensor)
         .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
         .id();
 
     let mut hunger = Hunger::new(100);
+
     // Try to load inv from save
     if let Ok(save_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(save_file);
@@ -321,7 +338,11 @@ fn spawn_player(
                     data.current_health,
                     data.player_skills.clone(),
                     PreviousHealth(data.current_health.0),
-                    TimeFragmentCurrency::new(data.currency),
+                    TimeFragmentCurrency::new(
+                        data.currency.0,
+                        data.currency.1,
+                        total_currency_all_time,
+                    ),
                     hunger,
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),

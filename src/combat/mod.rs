@@ -430,7 +430,7 @@ pub fn cleanup_marked_for_death_entities(
                         &mut commands,
                         &asset_server,
                         mob_pos.translation(),
-                        attack.0,
+                        attack.0 / 4,
                     );
                 }
                 if skills.has(Skill::FrozenMPRegen) {

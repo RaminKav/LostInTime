@@ -217,7 +217,7 @@ pub fn handle_on_hit_upgrades(
                 &mut commands,
                 &asset_server,
                 hit_entity_txfm.translation(),
-                hit.damage / 3,
+                hit.damage / 4,
             );
         }
         if skills.has(Skill::IceStaffFloor) && hit.hit_with_projectile == Some(Projectile::Fireball)

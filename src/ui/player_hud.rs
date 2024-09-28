@@ -19,7 +19,7 @@ use crate::{
         skills::{PlayerSkills, Skill},
         Player, TimeFragmentCurrency,
     },
-    ScreenResolution, GAME_HEIGHT,
+    GameState, ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
 aseprite!(pub Clock, "ui/Clock.aseprite");
@@ -322,19 +322,29 @@ pub fn setup_currency_ui(
         .set_parent(dodge_icon);
 }
 pub fn update_currency_text(
-    mut currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
+    currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
     mut text_query: Query<&mut Text, With<CurrencyText>>,
     icon: Query<Entity, With<CurrencyIcon>>,
     mut commands: Commands,
+    game_state: Res<State<GameState>>,
 ) {
-    let Ok(time_fragments) = currency.get_single_mut() else {
-        return;
-    };
-    let icon_e = icon.single();
-    commands.entity(icon_e).insert(BounceOnHit::new());
-
-    let mut text = text_query.single_mut();
-    text.sections[0].value = format!("{:}", time_fragments.time_fragments);
+    for time_fragments in currency.iter() {
+        if game_state.0 != GameState::GameOver {
+            let icon_e = icon.single();
+            commands.entity(icon_e).insert(BounceOnHit::new());
+        }
+        // handles different text for two different UI elements, game end count and normal in-game
+        for mut text in text_query.iter_mut() {
+            text.sections[0].value = format!(
+                "{:}",
+                if game_state.0 == GameState::GameOver {
+                    time_fragments.total_collected_time_fragments_all_time
+                } else {
+                    time_fragments.time_fragments as u128
+                }
+            );
+        }
+    }
 }
 pub fn update_healthbar(
     player_health_query: Query<

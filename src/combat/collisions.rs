@@ -457,10 +457,11 @@ pub fn check_item_drop_collisions(
             let obj = item_stack.obj_type;
             if obj == WorldObject::TimeFragment {
                 commands.spawn(UIIconMover::new(
-                    Vec2::new(0., 0.),
-                    Vec2::new(
+                    Vec3::new(0., 0., 9.),
+                    Vec3::new(
                         -resolution.game_width / 2. + 15.,
                         resolution.game_height / 2. - 50.,
+                        9.,
                     ),
                     WorldObject::TimeFragment,
                     0.,
@@ -468,26 +469,30 @@ pub fn check_item_drop_collisions(
                     None,
                     false,
                     item_stack.clone(),
+                    true,
                 ));
                 commands.entity(e2).despawn_recursive();
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
                 commands.spawn(UIIconMover::new(
-                    Vec2::new(
+                    Vec3::new(
                         -resolution.game_width / 2. + 65.,
                         -resolution.game_height / 2. + 10.,
+                        9.,
                     ),
-                    Vec2::new(
+                    Vec3::new(
                         -resolution.game_width / 2. + 65.,
                         -resolution.game_height / 2. + 10.,
+                        9.,
                     ),
                     obj,
-                    00.,
-                    60.,
+                    100.,
+                    100.,
                     Some(0.15),
                     true,
                     item_stack.clone(),
+                    true,
                 ));
                 continue;
             }
@@ -502,20 +507,23 @@ pub fn check_item_drop_collisions(
             }
             if obj != WorldObject::TimeFragment {
                 commands.spawn(UIIconMover::new(
-                    Vec2::new(
+                    Vec3::new(
                         -resolution.game_width / 2. + 65.,
                         -resolution.game_height / 2. + 10.,
+                        9.,
                     ),
-                    Vec2::new(
+                    Vec3::new(
                         -resolution.game_width / 2. + 65.,
                         -resolution.game_height / 2. + 10.,
+                        9.,
                     ),
                     obj,
-                    00.,
-                    60.,
+                    100.,
+                    100.,
                     Some(0.15),
                     true,
                     item_stack.clone(),
+                    true,
                 ));
             }
             // ...and inventory has room, add it to the player's inventory

@@ -21,6 +21,7 @@ use analytics::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
     container::{Container, ContainerRegistry},
     datafiles,
@@ -163,7 +164,7 @@ pub struct CurrentRunSaveData {
     pub player_hunger: u8,
     pub player_skills: PlayerSkills,
     pub player_skill_queue: SkillChoiceQueue,
-    pub currency: i32,
+    pub currency: (i32, i32),
 
     // Era
     pub current_era: Era,
@@ -188,6 +189,10 @@ pub enum ClientState {
 #[derive(Resource, Clone, Serialize, Deserialize, Default)]
 pub struct GameData {
     pub num_runs: u128,
+    pub time_fragments: u128,
+    pub melee_points: u128,
+    pub rogue_points: u128,
+    pub magic_points: u128,
     pub longest_run: u8,
     pub seen_gear: Vec<ItemStack>,
     pub user_id: String,
@@ -196,17 +201,20 @@ pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
     inv: Query<&Inventory>,
     proto_param: ProtoParam,
-    game_over: EventReader<GameOverEvent>,
+    mut game_over: EventReader<GameOverEvent>,
     mut analytics_data: ResMut<AnalyticsData>,
+    all_time_fragments: Query<Entity, With<MoveUIAnimation>>,
+    mut commands: Commands,
+    time_fragments: Query<&TimeFragmentCurrency>,
 ) {
-    if !game_over.is_empty() {
+    for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
-        let save_file_path = datafiles::save_file();
-        if let Ok(file_file) = File::open(save_file_path) {
+        let game_data_file_path = datafiles::game_data();
+        if let Ok(file_file) = File::open(game_data_file_path) {
             let reader = BufReader::new(file_file);
 
-            // Read the JSON contents of the file as an instance of `User`.
+            // Read the JSON contents of the file as an instance of `GameData`.
             match serde_json::from_reader::<_, GameData>(reader) {
                 Ok(data) => game_data = data,
                 Err(err) => error!("Failed to load data from game_data.json file {err:?}"),
@@ -216,6 +224,8 @@ pub fn handle_append_run_data_after_death(
         if game_data.longest_run < night.days {
             game_data.longest_run = night.days;
         }
+        let time_fragments = time_fragments.single();
+        game_data.time_fragments += time_fragments.total_collected_time_fragments_this_run as u128;
         let inv = inv.single();
         for item in inv.items.items.clone().iter().flatten() {
             if item.slot < 6 {
@@ -245,6 +255,11 @@ pub fn handle_append_run_data_after_death(
             error!("Failed to save game data after death: {result:?}");
         } else {
             info!("UPDATED GAME DATA...");
+        }
+
+        //despawn ui animations
+        for e in all_time_fragments.iter() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }
@@ -309,7 +324,10 @@ pub fn save_state(
     save_data.visited_eras = game.era.visited_eras.clone();
     save_data.player_skills = skills.clone();
     save_data.player_skill_queue = skills_queue.clone();
-    save_data.currency = currency.time_fragments;
+    save_data.currency = (
+        currency.time_fragments,
+        currency.total_collected_time_fragments_this_run,
+    );
 
     save_data.placed_objs = vec![game.world_obj_cache.objects.clone()];
 

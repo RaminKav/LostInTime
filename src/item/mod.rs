@@ -21,8 +21,6 @@ use crate::status_effects::{
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
-use crate::world::dimension::ActiveDimension;
-use crate::world::dungeon::Dungeon;
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
@@ -769,6 +767,9 @@ pub struct UpdateObjectEvent {
     pub placed_by_player: bool,
 }
 
+#[derive(Component)]
+pub struct ItemDrop;
+
 pub struct ItemsPlugin;
 
 impl Plugin for ItemsPlugin {
@@ -828,7 +829,6 @@ pub fn handle_placing_world_object(
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
-    dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;

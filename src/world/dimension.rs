@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     enemy::Mob,
-    item::Equipment,
+    item::{Equipment, ItemDrop},
     player::{MovePlayerEvent, Player},
     world::{
         dungeon::{Dungeon, Dungeontimer},
@@ -224,7 +224,7 @@ impl DimensionPlugin {
         entity_query: Query<
             Entity,
             (
-                Or<(With<Mob>, With<Chunk>, With<TimePortal>)>,
+                Or<(With<Mob>, With<Chunk>, With<TimePortal>, With<ItemDrop>)>,
                 Without<Equipment>,
             ),
         >,
@@ -233,12 +233,12 @@ impl DimensionPlugin {
         // event sent out when we enter a new dimension
         for d in new_dim.iter() {
             //despawn all entities with positions, except the player
-            info!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
-            for e in entity_query.iter() {
-                commands.entity(e).despawn_recursive();
-            }
             // clean up old dimension,
             if let Ok(old_dim) = old_dim.get_single() {
+                info!("DESPAWNING EVERYTHING!!! {:?}", entity_query.iter().len());
+                for e in entity_query.iter() {
+                    commands.entity(e).despawn_recursive();
+                }
                 commands.entity(old_dim).despawn_recursive();
             }
             //give the new dimension active tag, and use its chunk manager as the game resource
