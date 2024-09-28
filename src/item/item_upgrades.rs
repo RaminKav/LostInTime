@@ -82,7 +82,7 @@ pub fn handle_delayed_ranged_attack(
                 mana_cost: None,
                 dmg_override: None,
                 pos_override: None,
-                spawn_delay: 0.36,
+                spawn_delay: 0.05,
             });
 
             delayed_ranged_attack.0.reset();
