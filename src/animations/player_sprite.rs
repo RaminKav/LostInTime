@@ -27,6 +27,7 @@ aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
 aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
 aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
 aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
+aseprite!(pub PlayerDeadAseprite, "textures/player/player_dead.aseprite");
 
 #[derive(Component, Eq, PartialEq, Debug)]
 pub enum PlayerAnimation {

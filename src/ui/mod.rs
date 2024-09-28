@@ -223,7 +223,6 @@ impl Plugin for UIPlugin {
                     spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,
-                    update_currency_text,
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
@@ -240,6 +239,7 @@ impl Plugin for UIPlugin {
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
+            .add_system(update_currency_text)
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

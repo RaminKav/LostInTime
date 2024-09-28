@@ -4,19 +4,26 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
 use crate::{
-    assets::Graphics, attributes::add_item_glows, inventory::ItemStack, item::WorldObject,
-    player::ModifyTimeFragmentsEvent, proto::proto_param::ProtoParam,
+    assets::Graphics,
+    attributes::{add_item_glows, ItemRarity},
+    colors::WHITE,
+    inventory::ItemStack,
+    item::WorldObject,
+    player::ModifyTimeFragmentsEvent,
+    proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_text,
 };
 
 #[derive(Component)]
 pub struct MoveUIAnimation {
-    pub start: Vec2,
-    pub end: Vec2,
+    pub start: Vec3,
+    pub end: Vec3,
     pub velocity: f32,
     pub acceleration: Option<f32>,
     pub fade_factor: Option<f32>,
-    pub stack_count: usize,
+    pub despawn_when_done: bool,
+    pub item_stack: ItemStack,
+    pub startup_delay: Timer,
 }
 
 pub fn handle_move_animations(
@@ -33,28 +40,40 @@ pub fn handle_move_animations(
     mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
 ) {
     for (e, mut transform, mut move_anim, mut sprite, child_option) in query.iter_mut() {
-        let direction = move_anim.end - move_anim.start;
-        let curr_distance = (transform.translation.truncate() - move_anim.start).length();
-        let distance = direction.length();
-        if curr_distance < distance {
-            let velocity = move_anim.velocity * time.delta_seconds();
-            let acceleration = move_anim.acceleration.unwrap_or(0.0);
-            let new_velocity = velocity + acceleration * time.delta_seconds();
+        if !move_anim.startup_delay.tick(time.delta()).finished() {
+            continue;
+        }
 
-            let delta = direction.normalize() * new_velocity;
-            transform.translation += delta.extend(0.0);
+        let direction = move_anim.end - move_anim.start;
+        let curr_distance = (transform.translation - move_anim.start).length();
+        let distance = direction.length();
+        let velocity = move_anim.velocity * time.delta_seconds();
+        let acceleration = move_anim.acceleration.unwrap_or(0.0);
+        let new_velocity = velocity + acceleration * time.delta_seconds();
+
+        let delta = direction.normalize() * new_velocity;
+
+        if curr_distance >= distance {
+            transform.translation = move_anim.end;
+        } else if curr_distance < distance {
+            transform.translation += delta;
             move_anim.velocity = new_velocity;
-        } else if move_anim.fade_factor.is_none() {
-            currency_event.send(ModifyTimeFragmentsEvent {
-                delta: move_anim.stack_count as i32,
-            });
-            commands.entity(e).despawn_recursive();
+        }
+        if move_anim.fade_factor.is_none() && curr_distance >= distance {
+            if move_anim.item_stack.obj_type == WorldObject::TimeFragment {
+                currency_event.send(ModifyTimeFragmentsEvent {
+                    delta: move_anim.item_stack.count as i32,
+                });
+            }
+            if move_anim.despawn_when_done {
+                commands.entity(e).despawn_recursive();
+            }
         }
 
         if let Some(fade) = move_anim.fade_factor {
             let new_fade = sprite.color.a() - fade * time.delta_seconds();
             sprite.color.set_a(new_fade);
-            if sprite.color.a() <= 0.0 {
+            if sprite.color.a() <= 0.4 && move_anim.despawn_when_done {
                 commands.entity(e).despawn_recursive();
             }
 
@@ -73,26 +92,28 @@ pub fn handle_move_animations(
 
 #[derive(Component)]
 pub struct UIIconMover {
-    pub start: Vec2,
-    pub end: Vec2,
+    pub start: Vec3,
+    pub end: Vec3,
     pub icon: WorldObject,
     pub velocity: f32,
     pub acceleration: f32,
     pub fade_factor: Option<f32>,
     pub show_name: bool,
     pub stack: ItemStack,
+    pub despawn_when_done: bool,
 }
 
 impl UIIconMover {
     pub fn new(
-        start: Vec2,
-        end: Vec2,
+        start: Vec3,
+        end: Vec3,
         icon: WorldObject,
         velocity: f32,
         acceleration: f32,
         fade_factor: Option<f32>,
         show_name: bool,
         stack: ItemStack,
+        despawn_when_done: bool,
     ) -> Self {
         UIIconMover {
             start,
@@ -103,17 +124,27 @@ impl UIIconMover {
             fade_factor,
             show_name,
             stack,
+            despawn_when_done,
         }
     }
 }
 pub fn handle_ui_time_fragments(
     mut query: Query<(Entity, &mut UIIconMover), Added<UIIconMover>>,
+    mut prev_movers: Query<&mut MoveUIAnimation>,
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     proto: ProtoParam,
 ) {
-    for (e, icon) in query.iter_mut() {
+    let mut non_text_movers_this_frame = 0.;
+    for (i, (e, icon)) in query.iter_mut().enumerate() {
+        if icon.show_name {
+            for mut mover in prev_movers.iter_mut() {
+                mover.end.y += 11.0;
+            }
+        } else {
+            non_text_movers_this_frame += 1.;
+        }
         let icon_e = commands
             .entity(e)
             .insert(SpriteSheetBundle {
@@ -126,16 +157,18 @@ pub fn handle_ui_time_fragments(
                     .clone(),
                 texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
 
-                transform: Transform::from_translation(icon.start.extend(12.0)),
+                transform: Transform::from_translation(icon.start),
                 ..Default::default()
             })
             .insert(MoveUIAnimation {
                 start: icon.start,
-                end: icon.end,
+                end: icon.end + Vec3::new(0.0, (i as f32 - non_text_movers_this_frame) * 10.0, 0.),
                 velocity: icon.velocity,
                 acceleration: Some(icon.acceleration),
                 fade_factor: icon.fade_factor,
-                stack_count: icon.stack.count,
+                item_stack: icon.stack.clone(),
+                despawn_when_done: icon.despawn_when_done,
+                startup_delay: Timer::from_seconds(0.0, TimerMode::Once),
             })
             .insert(RenderLayers::from_layers(&[3]))
             .id();
@@ -153,7 +186,11 @@ pub fn handle_ui_time_fragments(
                 &mut commands,
                 &asset_server,
                 Vec3::new(8., 0., 1.),
-                obj_rarity.get_color(),
+                if obj_rarity == ItemRarity::Common {
+                    WHITE
+                } else {
+                    obj_rarity.get_color()
+                },
                 format!("{}", obj_name),
                 Anchor::CenterLeft,
                 1.,

@@ -12,7 +12,9 @@ use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
-use game_over::{handle_game_over_fadeout, tick_game_over_overlay};
+use game_over::{
+    handle_game_over_fadeout, handle_spawn_collected_time_fragments, tick_game_over_overlay,
+};
 use player_sprite::{
     change_player_class_visuals, cleanup_one_time_animations,
     handle_anim_change_when_player_dir_changes, handle_player_animation_change, PlayerAnimation,
@@ -119,15 +121,13 @@ impl Plugin for AnimationsPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems(
-                (
-                    change_player_class_visuals,
-                    handle_move_animations,
-                    handle_ui_time_fragments,
-                )
-                    .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(tick_game_over_overlay);
+            .add_systems((change_player_class_visuals,).in_set(OnUpdate(GameState::Main)))
+            .add_systems((
+                tick_game_over_overlay,
+                handle_spawn_collected_time_fragments,
+                handle_move_animations,
+                handle_ui_time_fragments,
+            ));
     }
 }
 

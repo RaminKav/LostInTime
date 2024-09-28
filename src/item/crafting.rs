@@ -320,7 +320,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
         let shadow = spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
-            player_t.single().translation() + Vec3::new(0., 15., 0.),
+            player_t.single().translation() + Vec3::new(0., 15., 10.),
             YELLOW,
             "New Recipe!".to_string(),
         );

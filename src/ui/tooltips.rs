@@ -396,10 +396,8 @@ pub fn handle_spawn_inv_item_tooltip(
         //TODO: maybe we dont need to add as parent here and avoid this
         if let Ok(inv) = inv.get_single() {
             commands.entity(inv).add_child(tooltip);
-        } else {
-            commands
-                .entity(essence.get_single().unwrap())
-                .add_child(tooltip);
+        } else if let Ok(essence) = essence.get_single() {
+            commands.entity(essence).add_child(tooltip);
         }
     }
 }
