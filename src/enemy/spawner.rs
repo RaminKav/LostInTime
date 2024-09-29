@@ -219,15 +219,12 @@ fn add_spawners_to_new_chunks(
                 num_spawned: 0,
             });
         }
-        commands
-            .entity(
-                game.get_chunk_entity(new_chunk.chunk_pos)
-                    .expect("spawnner added to chunk that does not exist"),
-            )
-            .insert(ChunkSpawners {
+        if let Some(chunk_e) = game.get_chunk_entity(new_chunk.chunk_pos) {
+            commands.entity(chunk_e).insert(ChunkSpawners {
                 spawners,
                 spawned_mobs: 0,
             });
+        }
     }
 }
 

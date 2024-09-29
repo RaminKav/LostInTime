@@ -12,6 +12,7 @@
 - New enemy attack warnings (! above their head)
 - Minimap!
 - New UI improvments for item and currency pickup
+- New Item: Beacons. Place them down to always find your way back to them
 
 ### Changes
 
@@ -24,6 +25,8 @@
 - icestaff costs less mana
 - default player sword/swing animations are white instead of blue
 - Lethal Blow skill nerfed to 20%
+- Magic Tusk now teleports you to the portal, and the bed item is removed.
+- Increase spawn rate of pebbles and all stoen boulder types
 
 ### Bug Fixes
 

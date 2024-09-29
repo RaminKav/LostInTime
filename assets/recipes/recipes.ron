@@ -38,7 +38,9 @@
     (SmallPotion, ([(item: PinkFlowerBlock, count: 3),(item: RedFlowerBlock, count: 3),(item: SlimeGoo, count: 2)], AlchemyTable, 1)),
     (LargeManaPotion, ([(item: PinkFlowerBlock, count: 4),(item: YellowFlowerBlock, count: 4),(item: SlimeGoo, count: 4)], AlchemyTable, 1)),
     (SmallManaPotion, ([(item: PinkFlowerBlock, count: 3),(item: YellowFlowerBlock, count: 3),(item: SlimeGoo, count: 2)], AlchemyTable, 1)),
-    (BedBlock, ([(item: RedFlowerBlock, count: 3),(item: Feather, count: 4),(item: WoodPlank, count: 8)], CraftingTable, 1)),
+    (YellowBeaconBlock, ([(item: YellowFlowerBlock, count: 5),(item: StoneChunk, count: 2),(item: MagicGem, count: 1)], CraftingTable, 1)),
+    (RedBeaconBlock, ([(item: RedFlowerBlock, count: 5),(item: StoneChunk, count: 2),(item: MagicGem, count: 1)], CraftingTable, 1)),
+    (PinkBeaconBlock, ([(item: PinkFlowerBlock, count: 5),(item: StoneChunk, count: 2),(item: MagicGem, count: 1)], CraftingTable, 1)),
     (MagicTusk, ([(item: MagicGem, count: 1),(item: Feather, count: 2),(item: Tusk, count: 1)], Cauldron, 1)),
     
 ],

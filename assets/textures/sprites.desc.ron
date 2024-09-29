@@ -545,6 +545,36 @@
             size: (16., 16.),
             anchor: None,
         ),
+        YellowBeacon: WorldObjectData(
+            texture_pos: (12., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        YellowBeaconBlock: WorldObjectData(
+            texture_pos: (12., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedBeacon: WorldObjectData(
+            texture_pos: (13., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RedBeaconBlock: WorldObjectData(
+            texture_pos: (13., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PinkBeacon: WorldObjectData(
+            texture_pos: (14., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PinkBeaconBlock: WorldObjectData(
+            texture_pos: (14., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         MiracleSeed: WorldObjectData(
             texture_pos: (8., 6.),
             size: (16., 16.),

@@ -1,0 +1,18 @@
+(
+  name: "RedBeacon",
+  templates: ["world_object.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": RedBeacon,
+  "survival_rogue_like::item::object_actions::ObjectAction": ToggleBeacon(RedBeacon),
+  "survival_rogue_like::proto::ColliderProto": (x: 4., y: 6),
+  "survival_rogue_like::attributes::MaxHealth": (25),
+  "survival_rogue_like::item::loot_table::LootTable": (
+        drops: [(
+                item: RedBeaconBlock,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),]
+        ),
+  }
+)

@@ -7,6 +7,7 @@ use crate::colors::{
 };
 use crate::combat::{handle_hits, ObjBreakEvent};
 
+use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
@@ -19,6 +20,7 @@ use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::status_effects::{
     handle_burning_ticks, handle_frail_stack_ticks, handle_slow_stack_ticks,
 };
+use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::generation::WallBreakEvent;
@@ -440,6 +442,13 @@ pub enum WorldObject {
     RedCape,
     GreenCape,
     BlueCape,
+
+    YellowBeacon,
+    YellowBeaconBlock,
+    RedBeacon,
+    RedBeaconBlock,
+    PinkBeacon,
+    PinkBeaconBlock,
 }
 
 #[derive(
@@ -647,6 +656,17 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_beacon(&self) -> bool {
+        match self {
+            WorldObject::YellowBeacon => true,
+            WorldObject::YellowBeaconBlock => true,
+            WorldObject::RedBeacon => true,
+            WorldObject::RedBeaconBlock => true,
+            WorldObject::PinkBeacon => true,
+            WorldObject::PinkBeaconBlock => true,
+            _ => false,
+        }
+    }
     pub fn is_medium_size(&self, proto_param: &ProtoParam) -> bool {
         proto_param
             .get_component::<SpriteSize, _>(*self)
@@ -824,11 +844,13 @@ pub fn handle_placing_world_object(
     mut proto_param: ProtoParam,
     mut game: GameParam,
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut events: EventReader<PlaceItemEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
+    container_reg: Res<ContainerRegistry>,
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
@@ -855,19 +877,44 @@ pub fn handle_placing_world_object(
                 &mut proto_param,
                 true,
             );
-            if let Some(item) = item {
+            if let Some(item_e) = item {
                 //TODO: do what old game data did, add obj to registry
-                commands.entity(item).set_parent(chunk);
-                if !place_event.placed_by_player && place_event.obj == WorldObject::Chest {
+                commands.entity(item_e).set_parent(chunk);
+                if !place_event.placed_by_player
+                    && container_reg.containers.get(&tile_pos).is_none()
+                    && place_event.obj == WorldObject::Chest
+                {
                     commands
-                        .entity(item)
+                        .entity(item_e)
                         .insert(get_random_loot_chest_type(rand::thread_rng()));
                 }
+                if place_event.obj.is_beacon() {
+                    spawn_screen_locked_icon(
+                        item_e,
+                        &mut commands,
+                        &game.graphics,
+                        &asset_server,
+                        place_event.obj.clone(),
+                    );
+                }
 
-                minimap_event.send(UpdateMiniMapEvent {
-                    pos: Some(tile_pos),
-                    new_tile: Some(place_event.obj),
-                });
+                if place_event.obj.is_medium_size(&proto_param) {
+                    minimap_event.send(UpdateMiniMapEvent {
+                        pos: Some(tile_pos),
+                        new_tile: Some(place_event.obj),
+                    });
+                    for q in 0..3 {
+                        minimap_event.send(UpdateMiniMapEvent {
+                            pos: Some(tile_pos.get_neighbour_tiles_for_medium_objects()[q]),
+                            new_tile: Some(place_event.obj),
+                        });
+                    }
+                } else {
+                    minimap_event.send(UpdateMiniMapEvent {
+                        pos: Some(tile_pos),
+                        new_tile: Some(place_event.obj),
+                    });
+                }
 
                 if place_event.obj.is_water_placeable() {
                     for (e, _c, t) in water_colliders.iter() {
@@ -881,6 +928,8 @@ pub fn handle_placing_world_object(
                     }
                 }
             }
+        } else {
+            info!("no chunk when spawn");
         }
 
         game.add_object_to_chunk_cache(tile_pos, place_event.obj);
@@ -940,10 +989,23 @@ pub fn handle_break_object(
             wall_break_event.send(WallBreakEvent { pos: broken.pos })
         }
 
-        minimap_event.send(UpdateMiniMapEvent {
-            pos: Some(broken.pos),
-            new_tile: None,
-        });
+        if broken.obj.is_medium_size(&proto_param) {
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos),
+                new_tile: None,
+            });
+            for q in 0..3 {
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(broken.pos.get_neighbour_tiles_for_medium_objects()[q]),
+                    new_tile: None,
+                });
+            }
+        } else {
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(broken.pos),
+                new_tile: None,
+            });
+        }
 
         if !broken.give_drops_and_xp {
             continue;

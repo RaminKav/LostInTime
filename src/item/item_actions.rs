@@ -19,10 +19,12 @@ use crate::{
     world::{
         dimension::DimensionSpawnEvent,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
+        TileMapPosition,
     },
     GameParam, TextureCamera,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
+use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use super::{
@@ -131,6 +133,7 @@ pub struct ItemActionParam<'w, 's> {
     pub night_tracker: Res<'w, NightTracker>,
     pub skill_points_query: Query<'w, 's, &'static mut SkillPoints>,
     pub game_camera: Query<'w, 's, Entity, With<TextureCamera>>,
+    pub asset_server: Res<'w, AssetServer>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -160,12 +163,10 @@ impl ItemActions {
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::TeleportHome => {
-                    if let Some(pos) = game.game.home_pos {
-                        item_action_param
-                            .move_player_event
-                            .send(MovePlayerEvent { pos });
-                        item_action_param.use_item_event.send(UseItemEvent(obj));
-                    }
+                    item_action_param.move_player_event.send(MovePlayerEvent {
+                        pos: TileMapPosition::new(IVec2::new(0, 0), TilePos::new(0, 0)),
+                    });
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::PlacesInto(obj) => {
                     let pos = item_action_param.cursor_pos.world_coords.truncate();

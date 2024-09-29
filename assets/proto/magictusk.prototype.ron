@@ -9,7 +9,7 @@
         obj_type: MagicTusk,
         metadata: (
             name: "Magic Tusk ", 
-            desc: ["Guides you home."]
+            desc: ["Transports you back", "to the portal."]
         ),
         rarity: Rare,
         count: 1

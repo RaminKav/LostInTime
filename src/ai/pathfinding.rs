@@ -175,7 +175,7 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
         }
         Some(AIPos_to_world_pos(result.0[1]))
     } else {
-        warn!("No path found for ASTAR");
+        debug!("No path found for ASTAR");
         None
     }
 }

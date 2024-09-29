@@ -9,6 +9,7 @@ use crate::juice::ShakeEffect;
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
+use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 
@@ -40,6 +41,7 @@ pub enum ObjectAction {
     SetHome,
     CombatShrine,
     GambleShrine,
+    ToggleBeacon(WorldObject),
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -206,6 +208,15 @@ impl ObjectAction {
                 let pos =
                     world_pos_to_tile_pos(item_action_param.cursor_pos.world_coords.truncate());
                 game.game.home_pos = Some(pos);
+            }
+            ObjectAction::ToggleBeacon(obj) => {
+                spawn_screen_locked_icon(
+                    e,
+                    commands,
+                    &game.graphics,
+                    &item_action_param.asset_server,
+                    obj.clone(),
+                );
             }
             ObjectAction::CombatShrine => {
                 // Screen Shake

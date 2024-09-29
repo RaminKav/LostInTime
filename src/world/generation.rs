@@ -9,16 +9,11 @@ use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
 use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{Graphics, SpriteAnchor};
-use crate::container::ContainerRegistry;
 use crate::enemy::spawn_helpers::is_tile_water;
-use crate::enemy::Mob;
-use crate::item::{handle_break_object, WorldObject};
-use crate::player::Player;
+use crate::item::{handle_break_object, PlaceItemEvent, WorldObject};
 use crate::proto::proto_param::ProtoParam;
-use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
-use crate::ui::minimap::UpdateMiniMapEvent;
 
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_aseprite::AsepriteBundle;
@@ -26,14 +21,13 @@ use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
-use crate::{custom_commands::CommandsExt, CustomFlush, GameParam, GameState, DEBUG_AI};
+use crate::{CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN};
 
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
 use bevy::utils::HashMap;
 use bevy_ecs_tilemap::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
 
 use rand::{
@@ -365,31 +359,23 @@ impl GenerationPlugin {
         mut chunk_spawn_event: EventReader<GenerateObjectsEvent>,
         dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
         seed: Res<GenerationSeed>,
-        mut minimap_update: EventWriter<UpdateMiniMapEvent>,
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
-        mut proto_commands: ProtoCommands,
-        prototypes: Prototypes,
-        mut proto_param: ProtoParam,
-        container_reg: Res<ContainerRegistry>,
-        water_colliders: Query<
-            (Entity, &Collider, &GlobalTransform),
-            (Without<WorldObject>, Without<Mob>, Without<Player>),
-        >,
+        proto_param: ProtoParam,
         mut done_event: EventWriter<DoneGeneratingEvent>,
         mut schematic_spawn_event: EventWriter<SchematicSpawnEvent>,
+        mut place_item_event: EventWriter<PlaceItemEvent>,
     ) {
         if *NO_GEN {
             return;
         }
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
             let dungeon_check = dungeon_check.get_single();
             let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
                 info!(
                     "Generating new objects for {chunk_pos:?} {:?}",
-                    dungeon_check.is_ok()
+                    game.get_chunk_entity(chunk_pos).is_some()
                 );
 
                 // generate forest trees for chunk
@@ -484,6 +470,7 @@ impl GenerationPlugin {
 
                 // Gen stone walls for dungeons
                 if let Ok(dungeon) = dungeon_check {
+                    let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
                     let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
                     for x in 0..CHUNK_SIZE {
                         for y in 0..CHUNK_SIZE {
@@ -685,94 +672,25 @@ impl GenerationPlugin {
                         }
                     }
                 }
-
                 for (pos, obj_to_spawn) in objs.iter() {
-                    let mut is_touching_air = false;
-                    if let Ok(dungeon) = dungeon_check {
-                        for x in -1_i32..2 {
-                            for y in -1_i32..2 {
-                                let original_y = ((CHUNK_SIZE) as i32 * (4 - pos.chunk_pos.y)
-                                    - 1
-                                    - (pos.tile_pos.y as i32))
-                                    as usize;
-                                let original_x = ((3 * CHUNK_SIZE) as i32
-                                    + (pos.chunk_pos.x * CHUNK_SIZE as i32)
-                                    + pos.tile_pos.x as i32)
-                                    as usize;
-                                if dungeon.grid[(original_y as i32 + y).clamp(0, 127) as usize]
-                                    [(original_x as i32 + x).clamp(0, 127) as usize]
-                                    == 1
-                                {
-                                    is_touching_air = true
-                                }
-                            }
-                        }
-                    }
                     // only spawn if generated obj is in our chunk or a previously genereated chunk,
                     // otherwise cache it for the correct chunk to spawn
-                    let obj_e = if pos.chunk_pos == chunk_pos
-                        || game.is_chunk_generated(pos.chunk_pos)
+
+                    if game.get_chunk_entity(chunk_pos).is_some()
+                        && (pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos))
                     {
-                        proto_commands.spawn_object_from_proto(
-                            *obj_to_spawn,
-                            tile_pos_to_world_pos(*pos, obj_to_spawn.is_medium_size(&proto_param)),
-                            &prototypes,
-                            &mut proto_param,
-                            is_touching_air,
-                        )
+                        place_item_event.send(PlaceItemEvent {
+                            obj: *obj_to_spawn,
+                            pos: tile_pos_to_world_pos(
+                                *pos,
+                                obj_to_spawn.is_medium_size(&proto_param),
+                            ),
+                            placed_by_player: false,
+                            override_existing_obj: false,
+                        });
                     } else {
                         game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
-                        None
                     };
-
-                    if let Some(spawned_obj) = obj_e {
-                        if obj_to_spawn.is_medium_size(&proto_param) {
-                            minimap_update.send(UpdateMiniMapEvent {
-                                pos: Some(*pos),
-                                new_tile: Some(*obj_to_spawn),
-                            });
-                            for q in 0..3 {
-                                minimap_update.send(UpdateMiniMapEvent {
-                                    pos: Some(pos.get_neighbour_tiles_for_medium_objects()[q]),
-                                    new_tile: Some(*obj_to_spawn),
-                                });
-                            }
-                        } else {
-                            minimap_update.send(UpdateMiniMapEvent {
-                                pos: Some(*pos),
-                                new_tile: Some(*obj_to_spawn),
-                            });
-                        }
-
-                        if obj_to_spawn == &WorldObject::Chest
-                            && container_reg.containers.get(pos).is_none()
-                        {
-                            commands
-                                .entity(spawned_obj)
-                                .insert(get_random_loot_chest_type(rand::thread_rng()));
-                        } else if obj_to_spawn == &WorldObject::Bridge {
-                            for (e, _c, t) in water_colliders.iter() {
-                                if t.translation()
-                                    .truncate()
-                                    .distance(tile_pos_to_world_pos(*pos, false))
-                                    <= 6.
-                                {
-                                    commands.entity(e).despawn();
-                                }
-                            }
-                        }
-                        commands
-                            .entity(spawned_obj)
-                            .set_parent(game.get_chunk_entity(pos.chunk_pos).unwrap());
-
-                        if dungeon_check.is_ok() {
-                            let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                            if obj_to_spawn.is_wall() {
-                                wall_cache.walls.insert(*pos, true);
-                            }
-                        }
-                        game.add_object_to_chunk_cache(*pos, *obj_to_spawn);
-                    }
                 }
 
                 game.set_chunk_generated(chunk_pos);
@@ -781,45 +699,13 @@ impl GenerationPlugin {
                 schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
-                for (pos, obj_to_clear) in objs {
-                    let spawned_obj = proto_commands.spawn_object_from_proto(
-                        obj_to_clear,
-                        tile_pos_to_world_pos(pos, obj_to_clear.is_medium_size(&proto_param)),
-                        &prototypes,
-                        &mut proto_param,
-                        true,
-                    );
-
-                    if let Some(spawned_obj) = spawned_obj {
-                        let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
-                        if obj_to_clear.is_wall() {
-                            wall_cache.walls.insert(pos, true);
-                        } else if obj_to_clear == WorldObject::Chest
-                            && container_reg.containers.get(&pos).is_none()
-                        {
-                            commands
-                                .entity(spawned_obj)
-                                .insert(get_random_loot_chest_type(rand::thread_rng()));
-                        } else if obj_to_clear == WorldObject::Bridge {
-                            for (e, _c, t) in water_colliders.iter() {
-                                if t.translation()
-                                    .truncate()
-                                    .distance(tile_pos_to_world_pos(pos, false))
-                                    <= 6.
-                                {
-                                    commands.entity(e).despawn();
-                                }
-                            }
-                        }
-                        minimap_update.send(UpdateMiniMapEvent {
-                            pos: Some(pos),
-                            new_tile: Some(obj_to_clear),
-                        });
-
-                        commands
-                            .entity(spawned_obj)
-                            .set_parent(game.get_chunk_entity(chunk_pos).unwrap());
-                    }
+                for (pos, obj_to_spawn) in objs {
+                    place_item_event.send(PlaceItemEvent {
+                        obj: obj_to_spawn,
+                        pos: tile_pos_to_world_pos(pos, obj_to_spawn.is_medium_size(&proto_param)),
+                        placed_by_player: false,
+                        override_existing_obj: false,
+                    });
                 }
             }
 

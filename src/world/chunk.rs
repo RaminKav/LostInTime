@@ -6,7 +6,7 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_rapier2d::prelude::Collider;
 
-use super::dimension::{dim_spawned, GenerationSeed};
+use super::dimension::{dim_spawned, ActiveDimension, GenerationSeed};
 
 use super::dungeon::Dungeon;
 use super::generation::WorldObjectCache;
@@ -40,7 +40,9 @@ impl Plugin for ChunkPlugin {
                     Self::spawn_chunks_around_camera
                         .after(handle_move_player)
                         .run_if(dim_spawned),
-                    Self::handle_new_chunk_event.after(Self::spawn_chunks_around_camera),
+                    Self::handle_new_chunk_event
+                        .after(Self::spawn_chunks_around_camera)
+                        .after(Self::startup_chunk_generation),
                     Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
                 )
@@ -51,6 +53,7 @@ impl Plugin for ChunkPlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             )
+            .add_system(Self::startup_chunk_generation.in_schedule(OnEnter(GameState::Main)))
             .add_system(
                 generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
             )
@@ -416,6 +419,23 @@ impl ChunkPlugin {
             }
         }
     }
+    pub fn startup_chunk_generation(
+        game: GameParam,
+        mut create_chunk_event: EventWriter<CreateChunkEvent>,
+        new_dim_query: Query<Entity, Added<ActiveDimension>>,
+    ) {
+        if new_dim_query.iter().next().is_none() {
+            return;
+        }
+        for y in -6..=6 {
+            for x in -6..=6 {
+                let chunk_pos = IVec2::new(x, y);
+                if game.get_chunk_entity(chunk_pos).is_none() {
+                    create_chunk_event.send(CreateChunkEvent { chunk_pos });
+                }
+            }
+        }
+    }
     //TODO: change despawning systems to use playe rpos instead??
     fn despawn_outofrange_chunks(
         game: GameParam,
@@ -459,10 +479,7 @@ impl ChunkPlugin {
                                 );
                             }
                             if let Some(chest) = chest_option {
-                                debug!(
-                                    "chest: {:?}",
-                                    world_pos_to_tile_pos(t.translation().xy())
-                                );
+                                debug!("chest: {:?}", world_pos_to_tile_pos(t.translation().xy()));
 
                                 container_reg.containers.insert(
                                     world_pos_to_tile_pos(t.translation().xy()),

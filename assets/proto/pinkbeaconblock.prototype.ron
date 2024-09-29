@@ -1,0 +1,17 @@
+(
+  name: "PinkBeaconBlock",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PinkBeaconBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(PinkBeacon)]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PinkBeaconBlock,
+        metadata: (
+            name: "Pink Beacon ", 
+            desc: ["Place this down to","mark this location."]
+        ),
+        count: 1
+  ),
+  }
+)
