@@ -1,7 +1,7 @@
 use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    item::{PlaceItemEvent, Wall},
+    item::{PlaceItemEvent, Wall, WorldObject},
     proto::proto_param::ProtoParam,
     GameParam,
 };
@@ -21,7 +21,7 @@ pub struct AutoTileComplete;
 pub struct ChunkWallCache {
     pub walls: HashMap<TileMapPosition, bool>,
 }
-
+//TODO: Cache obj entities so we do not need to call get_obj_entity_at_tile, its very slow
 pub fn update_wall(
     mut commands: Commands,
     proto_param: ProtoParam,
@@ -154,16 +154,12 @@ pub fn update_wall(
                 }
             }
         }
-        if let Some(mut new_wall_data) =
-            game.get_wall_data_at_tile_mut(new_wall_pos, &proto_param)
+        if let Some(mut new_wall_data) = game.get_wall_data_at_tile_mut(new_wall_pos, &proto_param)
         {
             commands.entity(wall_entity).remove::<Dirty>();
 
             new_wall_data.obj_bit_index = final_sprite_index;
-            wall_sprite.index =
-                (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
-        } else {
-            warn!("missing {:?}", new_wall_pos);
+            wall_sprite.index = (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
         }
     }
 }
@@ -204,10 +200,13 @@ pub fn handle_wall_placed(
     for PlaceItemEvent {
         obj,
         pos,
-        placed_by_player: _,
+        placed_by_player,
         override_existing_obj: _,
     } in events.iter()
     {
+        if !placed_by_player {
+            continue;
+        }
         if proto_param.get_component::<Wall, _>(*obj).is_none() {
             continue;
         }

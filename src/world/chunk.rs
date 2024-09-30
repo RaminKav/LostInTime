@@ -41,8 +41,9 @@ impl Plugin for ChunkPlugin {
                         .after(handle_move_player)
                         .run_if(dim_spawned),
                     Self::handle_new_chunk_event
-                        .after(Self::spawn_chunks_around_camera)
-                        .after(Self::startup_chunk_generation),
+                        .after(Self::startup_chunk_generation)
+                        .after(Self::spawn_chunks_around_camera),
+                    Self::startup_chunk_generation,
                     Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
                     Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
                 )
@@ -53,7 +54,6 @@ impl Plugin for ChunkPlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(Self::startup_chunk_generation.in_schedule(OnEnter(GameState::Main)))
             .add_system(
                 generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
             )
@@ -134,17 +134,10 @@ pub struct Chunk {
     pub chunk_pos: IVec2,
 }
 
-pub fn generate_and_cache_island_chunks(
-    mut game: GameParam,
-    seed: Res<GenerationSeed>,
-    dungeon_check: Query<&Dungeon>,
-) {
-    if dungeon_check.iter().next().is_some() {
-        return;
-    }
+pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
-    debug!(
+    info!(
         "Caching ALL chunks {:?}",
         game.world_generation_params.water_frequency,
     );
@@ -217,7 +210,7 @@ impl ChunkPlugin {
             let map_type = TilemapType::default();
             let mut water_colliders = vec![];
 
-            debug!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
+            info!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
@@ -228,7 +221,7 @@ impl ChunkPlugin {
                     {
                         tile_data.clone()
                     } else {
-                        // warn!("Tile data not found for {chunk_pos:?} {tile_pos:?}");
+                        warn!("Tile data not found for {chunk_pos:?} {tile_pos:?}");
                         let (bits, mut index_shift, blocks) =
                             TilePlugin::get_tile_from_perlin_noise(
                                 &game.world_generation_params,
@@ -402,7 +395,12 @@ impl ChunkPlugin {
         mut camera_query: Query<&Transform, With<Player>>,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         _load_chunk_event: EventWriter<SpawnChunkEvent>,
+        dungeon_check: Query<&Dungeon>,
     ) {
+        // only spawn chunks around camera after initial full world generation
+        if !game.is_chunk_generated(IVec2::new(0, 0)) && !dungeon_check.get_single().is_ok() {
+            return;
+        }
         let transform = camera_query.single_mut();
         let camera_chunk_pos = world_helpers::camera_pos_to_chunk_pos(&transform.translation.xy());
         for y in (camera_chunk_pos.y - NUM_CHUNKS_AROUND_CAMERA)
@@ -423,21 +421,28 @@ impl ChunkPlugin {
         game: GameParam,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
         new_dim_query: Query<Entity, Added<ActiveDimension>>,
+        dungeon_check: Query<&Dungeon>,
     ) {
         if new_dim_query.iter().next().is_none() {
             return;
         }
-        for y in -6..=6 {
-            for x in -6..=6 {
+        if dungeon_check.get_single().is_ok() {
+            return;
+        }
+        info!("BEGIN STARTUP CHUNK GENERATION!!");
+        let num_chunks = 6;
+        for y in -num_chunks..=num_chunks {
+            for x in -num_chunks..=num_chunks {
                 let chunk_pos = IVec2::new(x, y);
-                if game.get_chunk_entity(chunk_pos).is_none() {
+                if game.get_chunk_entity(chunk_pos).is_none() && !game.is_chunk_generated(chunk_pos)
+                {
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
                 }
             }
         }
     }
     //TODO: change despawning systems to use playe rpos instead??
-    fn despawn_outofrange_chunks(
+    pub fn despawn_outofrange_chunks(
         game: GameParam,
         player_query: Query<&Transform, (With<Player>, With<YSort>)>,
         mut commands: Commands,
@@ -448,7 +453,11 @@ impl ChunkPlugin {
             Option<&ChestContainer>,
         )>,
         mut container_reg: ResMut<ContainerRegistry>,
+        dungeon_check: Query<&Dungeon>,
     ) {
+        if dungeon_check.iter().next().is_some() {
+            return;
+        }
         for player_transform in player_query.iter() {
             let max_distance = f32::hypot(
                 CHUNK_SIZE as f32 * TILE_SIZE.x,
@@ -460,10 +469,12 @@ impl ChunkPlugin {
                 //TODO: calculate maximum possible distance for 2x2 chunksa
                 let x = (chunk_pos.x / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
                 let y = (chunk_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;
+                let chunk_pos = IVec2::new(x, y);
                 if distance > max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
-                    && game.get_chunk_entity(IVec2::new(x, y)).is_some()
+                    && game.get_chunk_entity(chunk_pos).is_some()
+                    && game.is_chunk_generated(chunk_pos)
                 {
-                    debug!("            despawning chunk {x:?},{y:?}");
+                    info!("            despawning chunk {x:?},{y:?}");
 
                     // add all containers in this chunk into the registry so their contents are safe
                     for child in children.iter() {
@@ -489,7 +500,7 @@ impl ChunkPlugin {
                         }
                     }
                     commands
-                        .entity(game.get_chunk_entity(IVec2::new(x, y)).unwrap())
+                        .entity(game.get_chunk_entity(chunk_pos).unwrap())
                         .despawn_recursive();
                 }
             }

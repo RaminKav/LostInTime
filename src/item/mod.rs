@@ -23,11 +23,12 @@ use crate::status_effects::{
 use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
+use crate::world::dungeon::Dungeon;
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
 };
-use crate::world::TileMapPosition;
+use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -851,18 +852,21 @@ pub fn handle_placing_world_object(
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
     container_reg: Res<ContainerRegistry>,
+    dungeon_check: Query<&Dungeon>,
 ) {
     for place_event in events.iter() {
         let pos = place_event.pos;
         let tile_pos = world_pos_to_tile_pos(pos);
-        if !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param)
-            && !place_event.override_existing_obj
+        if !place_event.override_existing_obj
+            && place_event.placed_by_player
+            && !can_object_be_placed_here(tile_pos, &mut game, place_event.obj, &proto_param)
         {
             continue;
         }
 
         // Delete old object
         if place_event.override_existing_obj {
+            //TODO: this fn is slow, optimize get_obj_entity_at_tile
             if let Some((old_obj, _)) = game.get_obj_entity_at_tile(tile_pos, &proto_param) {
                 commands.entity(old_obj).despawn_recursive();
             }
@@ -870,12 +874,34 @@ pub fn handle_placing_world_object(
 
         // Place New Object
         if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
+            let mut is_touching_air = true;
+            if let Ok(dungeon) = dungeon_check.get_single() {
+                is_touching_air = false;
+                for x in -1_i32..2 {
+                    for y in -1_i32..2 {
+                        let original_y = ((CHUNK_SIZE) as i32 * (4 - tile_pos.chunk_pos.y)
+                            - 1
+                            - (tile_pos.tile_pos.y as i32))
+                            as usize;
+                        let original_x = ((3 * CHUNK_SIZE) as i32
+                            + (tile_pos.chunk_pos.x * CHUNK_SIZE as i32)
+                            + tile_pos.tile_pos.x as i32)
+                            as usize;
+                        if dungeon.grid[(original_y as i32 + y).clamp(0, 127) as usize]
+                            [(original_x as i32 + x).clamp(0, 127) as usize]
+                            == 1
+                        {
+                            is_touching_air = true
+                        }
+                    }
+                }
+            }
             let item = proto_commands.spawn_object_from_proto(
                 place_event.obj,
                 pos,
                 &prototypes,
                 &mut proto_param,
-                true,
+                is_touching_air,
             );
             if let Some(item_e) = item {
                 //TODO: do what old game data did, add obj to registry
@@ -929,7 +955,7 @@ pub fn handle_placing_world_object(
                 }
             }
         } else {
-            info!("no chunk when spawn");
+            info!("no chunk when spawn {:?} {:?}", tile_pos, place_event.obj);
         }
 
         game.add_object_to_chunk_cache(tile_pos, place_event.obj);

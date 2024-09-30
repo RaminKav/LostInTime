@@ -1,4 +1,4 @@
-use super::chunk::{GenerateObjectsEvent, TileSpriteData};
+use super::chunk::{ChunkPlugin, GenerateObjectsEvent, TileSpriteData};
 use super::dimension::{ActiveDimension, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
@@ -14,7 +14,6 @@ use crate::item::{handle_break_object, PlaceItemEvent, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
-
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_aseprite::AsepriteBundle;
 use itertools::Itertools;
@@ -82,9 +81,12 @@ impl Plugin for GenerationPlugin {
                 Self::generate_unique_objects_for_new_world.in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
-                Self::generate_and_cache_objects.before(CustomFlush).run_if(
-                    resource_exists::<GenerationSeed>().and_then(in_state(GameState::Main)),
-                ),
+                Self::generate_and_cache_objects
+                    .before(ChunkPlugin::despawn_outofrange_chunks)
+                    .before(CustomFlush)
+                    .run_if(
+                        resource_exists::<GenerationSeed>().and_then(in_state(GameState::Main)),
+                    ),
             )
             .add_system(
                 update_wall
@@ -97,7 +99,7 @@ impl Plugin for GenerationPlugin {
 }
 
 impl GenerationPlugin {
-    fn get_perlin_block_at_tile(
+    fn _get_perlin_block_at_tile(
         world_generation_params: &WorldGeneration,
         pos: TileMapPosition,
         seed: u64,
@@ -353,6 +355,7 @@ impl GenerationPlugin {
             }
         }
     }
+
     pub fn generate_and_cache_objects(
         mut commands: Commands,
         mut game: GameParam,
@@ -699,6 +702,7 @@ impl GenerationPlugin {
                 schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
+                info!("Chunk already generated: {chunk_pos:?} {:?}", objs.len());
                 for (pos, obj_to_spawn) in objs {
                     place_item_event.send(PlaceItemEvent {
                         obj: obj_to_spawn,
