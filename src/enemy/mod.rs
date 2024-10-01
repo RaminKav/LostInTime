@@ -403,12 +403,24 @@ fn juice_up_spawned_elite_mobs(
 }
 
 fn juice_up_spawned_mobs_per_day(
-    mut elites: Query<(Entity, &mut MaxHealth, &mut Attack, &mut ExperienceReward), Added<Mob>>,
+    mut elites: Query<
+        (
+            Entity,
+            &mut MaxHealth,
+            &mut Attack,
+            &mut ExperienceReward,
+            &Mob,
+        ),
+        Added<Mob>,
+    >,
     night_tracker: Res<NightTracker>,
     player_level: Query<&PlayerLevel>,
     mut commands: Commands,
 ) {
-    for (e, mut hp, mut att, mut exp) in elites.iter_mut() {
+    for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
+        if mob.is_boss() {
+            continue;
+        }
         let chaos_factor =
             night_tracker.days as f32 * 0.1 + (player_level.single().level as f32 * 0.05);
         hp.0 = (hp.0 as f32 * (1. + chaos_factor * 1.15)) as i32;

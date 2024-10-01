@@ -140,7 +140,7 @@ pub fn handle_ui_time_fragments(
     for (i, (e, icon)) in query.iter_mut().enumerate() {
         if icon.show_name {
             for mut mover in prev_movers.iter_mut() {
-                mover.end.y += 11.0;
+                mover.end.y += 11.5;
             }
         } else {
             non_text_movers_this_frame += 1.;
@@ -191,7 +191,15 @@ pub fn handle_ui_time_fragments(
                 } else {
                     obj_rarity.get_color()
                 },
-                format!("{}", obj_name),
+                format!(
+                    "{}{}",
+                    obj_name,
+                    if icon.stack.count > 1 {
+                        format!(" x{}", icon.stack.count)
+                    } else {
+                        "".to_string()
+                    }
+                ),
                 Anchor::CenterLeft,
                 1.,
                 3,
