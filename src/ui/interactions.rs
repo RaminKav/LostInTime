@@ -66,6 +66,7 @@ pub enum UIElement {
     HungerDebuff2,
     HungerDebuff3,
     ScreenIconSlot,
+    ScreenIconSlotLarge,
     Options,
     SkillChoice,
     SkillChoiceMelee,

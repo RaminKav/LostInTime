@@ -1059,7 +1059,7 @@ pub fn handle_break_object(
                     &proto_param,
                     pos.truncate(),
                     drop.count,
-                    None,
+                    Some(player_xp.single().level),
                 );
             }
         }

@@ -1,16 +1,19 @@
-use std::time::Duration;
+use std::{f32::consts::PI, time::Duration};
 
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
+    attributes::Attack,
     colors::BLACK,
+    combat_helpers::spawn_temp_collider,
     enemy::Mob,
-    inputs::{CursorPos, MovementVector},
+    inputs::{CursorPos, FacingDirection, MovementVector},
     ui::damage_numbers::{spawn_text, DodgeEvent},
+    world::TILE_SIZE,
     AttackTimer, EnemyDeathEvent, GameParam, HitEvent,
 };
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController};
+use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
 use super::{Player, PlayerSkills, Skill};
 
@@ -52,6 +55,8 @@ pub fn handle_sprint_timer(
             &mut MovementVector,
             &PlayerAnimation,
             &PlayerSkills,
+            &FacingDirection,
+            &Attack,
             Option<&AttackTimer>,
         ),
         With<Sprinting>,
@@ -63,7 +68,9 @@ pub fn handle_sprint_timer(
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
 ) {
-    for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
+    for (e, mut sprint, mut kcc, mut mv, anim, skills, dir, dmg, attack_cooldown_option) in
+        query.iter_mut()
+    {
         if !sprint.startup_timer.finished() {
             sprint.startup_timer.tick(time.delta());
             sprint.sprint_cooldown_timer.reset();
@@ -98,6 +105,21 @@ pub fn handle_sprint_timer(
                     direction,
                     ignore_cooldown: true,
                 });
+                let angle = match dir {
+                    FacingDirection::Up => 0.,
+                    FacingDirection::Down => 0.,
+                    FacingDirection::Left => PI / 2.,
+                    FacingDirection::Right => PI / 2.,
+                };
+                let lunge_e = spawn_temp_collider(
+                    &mut commands,
+                    Transform::from_translation(Vec3::new(0., 0., 0.))
+                        .with_rotation(Quat::from_rotation_z(angle)),
+                    0.5,
+                    dmg.0,
+                    Collider::cuboid(9., 1.5 * TILE_SIZE.x),
+                );
+                commands.entity(lunge_e).set_parent(e);
 
                 sprint.lunge_duration.tick(time.delta());
                 sprint.sprint_cooldown_timer.tick(time.delta());
@@ -231,7 +253,7 @@ pub fn handle_add_combo_counter(
                 0,
             );
             let count = old_combo_anims.iter().count() as f32;
-            let e = commands
+            commands
                 .spawn(AsepriteBundle {
                     aseprite: asset_server.load(Combo::PATH),
                     animation: AsepriteAnimation::from(Combo::tags::COMBO),
@@ -241,8 +263,7 @@ pub fn handle_add_combo_counter(
                 .insert(VisibilityBundle::default())
                 .insert(ComboAnim)
                 .add_child(text)
-                .set_parent(player_e)
-                .id();
+                .set_parent(player_e);
         }
     }
 }

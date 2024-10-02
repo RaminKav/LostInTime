@@ -30,7 +30,7 @@
             attack_cooldown: 0.85
         ),
         metadata: (
-            name: "Magic Whip", 
+            name: "Magic Whip ", 
             desc: ["A magic whip."]
         ),
         count: 1

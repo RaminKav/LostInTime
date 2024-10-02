@@ -31,6 +31,7 @@ use crate::{
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const MAX_MOB_PER_CHUNK: i32 = 4;
+pub const BASE_MAX_MOBS_TOTAL: i32 = 6;
 pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
@@ -372,10 +373,17 @@ fn check_mob_count(
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mut timer: ResMut<GlobalSpawnTimer>,
     time: Res<Time>,
+    mobs: Query<&Mob>,
+    night_tracker: Res<NightTracker>,
 ) {
     // for each spawned chunk, check if mob count is < max
     // and if so, send event to spawn more
     timer.timer.tick(time.delta());
+    let mob_count = mobs.iter().filter(|m| m != &&Mob::RedMushling).count() as i32;
+    let max_mobs = BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 2;
+    if mob_count >= max_mobs {
+        return;
+    }
     if timer.timer.just_finished() {
         timer.timer.reset();
         let mut rng = rand::thread_rng();

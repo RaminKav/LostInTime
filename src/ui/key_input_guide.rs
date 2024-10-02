@@ -68,13 +68,18 @@ pub fn spawn_shrine_interact_key_guide(
     player_query: Query<(Entity, &GlobalTransform), With<Player>>,
     game: GameParam,
     already_exists: Query<Entity, With<InteractGuide>>,
-    guides: Query<(&GlobalTransform, &InteractionGuideTrigger, &SpriteAnchor)>,
+    guides: Query<(
+        &GlobalTransform,
+        &InteractionGuideTrigger,
+        Option<&SpriteAnchor>,
+    )>,
 ) {
     let (player_e, player_t) = player_query.single();
 
     if already_exists.iter().count() == 0 {
-        for (txfm, guide, anchor) in guides.iter() {
-            let guide_pos = txfm.translation().truncate() - anchor.0;
+        for (txfm, guide, anchor_option) in guides.iter() {
+            let guide_pos =
+                txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
                 let parent_entity = commands
                     .spawn(SpatialBundle::from_transform(Transform::from_translation(
@@ -159,8 +164,9 @@ pub fn spawn_shrine_interact_key_guide(
             }
         }
     } else {
-        for (txfm, guide, anchor) in guides.iter() {
-            let guide_pos = txfm.translation().truncate() - anchor.0;
+        for (txfm, guide, anchor_option) in guides.iter() {
+            let guide_pos =
+                txfm.translation().truncate() - anchor_option.unwrap_or(&SpriteAnchor::default()).0;
             if guide_pos.distance(player_t.translation().truncate()) < guide.activation_distance {
                 return;
             }

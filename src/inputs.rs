@@ -14,8 +14,7 @@ use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::levels::PlayerLevel;
 use crate::player::skills::{PlayerSkills, Skill};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
-use crate::world::dimension::{ActiveDimension, DimensionSpawnEvent, Era};
-use crate::world::dungeon::Dungeon;
+use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
@@ -431,21 +430,22 @@ pub fn toggle_inventory(
             if !can_spawn_mob_here(pos, &game, &proto, false) {
                 return;
             }
-            // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(4));
+            // proto_commands.spawn_item_from_proto(WorldObject::Crate, &proto, pos, 1, None);
             // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::IceStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
-            proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::RedMushling, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
-            // commands.entity(f.unwrap()).insert(MobLevel(2));
+            // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
+            // commands.entity(f.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::Slime, &proto.prototypes, pos);
         }
     }
