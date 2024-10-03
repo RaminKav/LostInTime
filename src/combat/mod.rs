@@ -34,8 +34,8 @@ use crate::{
     juice::bounce::BounceOnHit,
     player::{
         levels::{ExperienceReward, PlayerLevel},
+        mage_skills::spawn_ice_explosion_hitbox,
         skills::{PlayerSkills, Skill},
-        teleport::spawn_ice_explosion_hitbox,
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},

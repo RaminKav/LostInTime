@@ -13,7 +13,7 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
 use crate::{
-    attributes::AttributeChangeEvent,
+    attributes::{AttributeChangeEvent, ItemRarity},
     inputs::FacingDirection,
     inventory::Inventory,
     player::{
@@ -214,13 +214,7 @@ pub fn cleanup_one_time_animations(
 
 pub fn change_player_class_visuals(
     mut player: Query<
-        (
-            Entity,
-            &PlayerSkills,
-            &SkillClass,
-            &mut Inventory,
-            &PlayerLevel,
-        ),
+        (Entity, &mut PlayerSkills, &mut Inventory, &PlayerLevel),
         Changed<PlayerSkills>,
     >,
     mut commands: Commands,
@@ -228,7 +222,8 @@ pub fn change_player_class_visuals(
     proto: ProtoParam,
     mut att_event: EventWriter<AttributeChangeEvent>,
 ) {
-    for (e, skills, prev_class, mut inv, level) in player.iter_mut() {
+    for (e, mut skills, mut inv, level) in player.iter_mut() {
+        let prev_class = skills.class.clone();
         let class = skills.get_class_affinity(prev_class.clone());
         let (handle, anim) = match class {
             SkillClass::None => (
@@ -249,8 +244,20 @@ pub fn change_player_class_visuals(
             ),
         };
         let mut cape_stack = proto.get_item_data(class.get_cape()).unwrap().clone();
-        cape_stack.attributes = class.compute_cape_stats(level.level as i32 - 1);
+        let level = level.level as i32 - 1;
+        cape_stack.attributes = class.compute_cape_stats(level);
+        if level >= 11 {
+            cape_stack.rarity = ItemRarity::Legendary;
+        } else if level >= 7 {
+            cape_stack.rarity = ItemRarity::Rare;
+        } else if level >= 3 {
+            cape_stack.rarity = ItemRarity::Uncommon;
+        } else {
+            cape_stack.rarity = ItemRarity::Common;
+        }
+        cape_stack.metadata.level = Some(level as u8);
         inv.equipment_items.with_item_in_slot(3, cape_stack);
+        skills.class = class.clone();
         //att update event
         commands
             .entity(e)

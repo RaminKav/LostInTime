@@ -13,23 +13,24 @@ use bevy_rapier2d::{
 };
 use melee_skills::{
     handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
-    handle_second_split_attack, handle_spear_gravity, tick_parried_timer, ParrySuccessEvent,
+    handle_second_split_attack, handle_spear, handle_spear_gravity, tick_parried_timer,
+    ParrySuccessEvent,
 };
-use serde::Deserialize;
-use sprint::{
-    handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset,
-    handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
+use rogue_skills::{
+    handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset, handle_lunge,
+    handle_lunge_cooldown, handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
     pause_combo_anim_when_done, tick_combo_counter,
 };
+use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 pub mod currency;
 pub mod levels;
+pub mod mage_skills;
 pub mod melee_skills;
+pub mod rogue_skills;
 pub mod skills;
-pub mod sprint;
-pub mod teleport;
 pub use currency::*;
-use teleport::{handle_teleport, tick_just_teleported, tick_teleport_timer};
+use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub mod stats;
 use crate::{
     ai::{follow, idle, leap_attack},
@@ -124,6 +125,7 @@ impl Plugin for PlayerPlugin {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
             app.add_event::<MovePlayerEvent>()
                 .add_event::<ModifyTimeFragmentsEvent>()
+                .add_event::<ActiveSkillUsedEvent>()
                 .add_event::<ParrySuccessEvent>();
         })
         .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
@@ -133,9 +135,10 @@ impl Plugin for PlayerPlugin {
                     .after(player_move_inputs)
                     .run_if(is_not_paused),
                 handle_sprinting_cooldown.run_if(is_not_paused),
+                handle_enemy_death_sprint_reset.after(handle_lunge),
+                handle_lunge_cooldown.run_if(is_not_paused),
                 send_attribute_event_on_stats_update,
                 handle_level_up,
-                handle_enemy_death_sprint_reset,
                 handle_toggle_sprinting,
                 spawn_particles_when_leveling,
                 handle_teleport.run_if(is_not_paused),
@@ -150,10 +153,12 @@ impl Plugin for PlayerPlugin {
         )
         .add_systems(
             (
+                handle_lunge.after(player_move_inputs).run_if(is_not_paused),
                 tick_combo_counter.run_if(is_not_paused),
                 handle_add_combo_counter,
                 pause_combo_anim_when_done,
-                handle_parry,
+                handle_parry.run_if(is_not_paused),
+                handle_spear.after(player_move_inputs).run_if(is_not_paused),
                 tick_parried_timer.run_if(is_not_paused),
                 handle_parry_success,
             )

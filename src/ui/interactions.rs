@@ -66,6 +66,7 @@ pub enum UIElement {
     HungerDebuff2,
     HungerDebuff3,
     ScreenIconSlot,
+    ScreenIconSlotLarge,
     Options,
     SkillChoice,
     SkillChoiceMelee,
@@ -765,6 +766,7 @@ pub fn handle_cursor_skills_buttons(
     mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform, &PlayerLevel)>,
     mut skill_queue: ResMut<SkillChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    curr_ui_state: Res<State<UIState>>,
     proto: ProtoParam,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
@@ -774,6 +776,7 @@ pub fn handle_cursor_skills_buttons(
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let ui_state = &curr_ui_state.0;
 
     for (e, mut interactable, state) in skill_choices.iter_mut() {
         match hit_test {
@@ -791,23 +794,53 @@ pub fn handle_cursor_skills_buttons(
                     if left_mouse_pressed {
                         let (e, mut skills, t, level) = player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
+                        if ui_state == &UIState::Skills {
+                            skill_queue.handle_pick_skill(
+                                picked_skill.clone(),
+                                &mut proto_commands,
+                                &proto,
+                                t.translation().truncate(),
+                                &mut skills,
+                                level.level,
+                            );
+                            picked_skill.skill.add_skill_components(
+                                e,
+                                &mut commands,
+                                skills.clone(),
+                                &mut game,
+                            );
+                            if skill_queue.active_skill_limbo.is_some() {
+                                next_ui_state.set(UIState::ActiveSkills);
+                            } else {
+                                next_ui_state.set(UIState::Closed);
+                            }
+                            att_event.send(AttributeChangeEvent);
+                        } else if ui_state == &UIState::ActiveSkills {
+                            match state.index {
+                                0 => {
+                                    let prev_active_skill =
+                                        skills.active_skill_slot_1.clone().unwrap();
+                                    for skill_to_remove in prev_active_skill.child_skills {
+                                        skill_queue.pool.retain(|s| s != &skill_to_remove);
+                                    }
 
-                        skill_queue.handle_pick_skill(
-                            picked_skill.clone(),
-                            &mut proto_commands,
-                            &proto,
-                            t.translation().truncate(),
-                            &mut skills,
-                            level.level,
-                        );
-                        picked_skill.skill.add_skill_components(
-                            e,
-                            &mut commands,
-                            skills.clone(),
-                            &mut game,
-                        );
-                        next_ui_state.set(UIState::Closed);
-                        att_event.send(AttributeChangeEvent);
+                                    skills.active_skill_slot_1 =
+                                        skill_queue.active_skill_limbo.clone();
+                                }
+                                1 => {
+                                    let prev_active_skill =
+                                        skills.active_skill_slot_2.clone().unwrap();
+                                    for skill_to_remove in prev_active_skill.child_skills {
+                                        skill_queue.pool.retain(|s| s != &skill_to_remove);
+                                    }
+                                    skills.active_skill_slot_2 =
+                                        skill_queue.active_skill_limbo.clone();
+                                }
+                                _ => (),
+                            }
+                            skill_queue.active_skill_limbo = None;
+                            next_ui_state.set(UIState::Closed);
+                        }
                     }
                 }
                 _ => (),

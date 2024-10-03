@@ -119,7 +119,7 @@ impl Plugin for ClientPlugin {
             .insert_resource(AppMappingMode::new(MappingMode::Strict))
             .insert_resource(CurrentRunSaveData::default())
             .insert_resource(SaveTimer {
-                timer: Timer::from_seconds(10., TimerMode::Repeating),
+                timer: Timer::from_seconds(100., TimerMode::Repeating),
             })
             .add_plugin(AnalyticsPlugin)
             .add_system(
@@ -231,7 +231,10 @@ pub fn handle_append_run_data_after_death(
             if item.slot < 6 {
                 //hotbar item
                 if let Some(eqp_type) = item.get_obj().get_equip_type(&proto_param) {
-                    if eqp_type != EquipmentType::Axe && eqp_type != EquipmentType::Pickaxe {
+                    if eqp_type != EquipmentType::Axe
+                        && eqp_type != EquipmentType::Pickaxe
+                        && !item.get_obj().is_cape()
+                    {
                         game_data.seen_gear.push(item.item_stack.clone());
                     }
                 }
@@ -307,7 +310,7 @@ pub fn save_state(
     if dungeon_check.get_single().is_ok() {
         return;
     }
-    if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::U) {
+    if !timer.timer.just_finished() && !key_input.just_pressed(KeyCode::Escape) {
         return;
     }
     timer.timer.reset();

@@ -616,6 +616,9 @@ pub fn get_num_stars(
     rarity: ItemRarity,
     equip_type: Option<&EquipmentType>,
 ) -> usize {
+    if equip_type == Some(&EquipmentType::Cape) {
+        return 3;
+    }
     if let Some(equip_type) = equip_type {
         let num_atts = if equip_type.is_weapon() || equip_type.is_tool() {
             total_atts - 1.

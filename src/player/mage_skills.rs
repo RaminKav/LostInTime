@@ -8,6 +8,7 @@ use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::Attack,
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
+    get_active_skill_keybind,
     inputs::MovementVector,
     item::WorldObject,
     proto::proto_param::ProtoParam,
@@ -15,7 +16,7 @@ use crate::{
     GameParam,
 };
 
-use super::{MovePlayerEvent, Player, PlayerSkills, Skill};
+use super::{ActiveSkillUsedEvent, MovePlayerEvent, Player, PlayerSkills, Skill};
 
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
 aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
@@ -58,24 +59,29 @@ pub fn handle_teleport(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     let Ok((e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc, mut teleport_state)) =
         player.get_single_mut()
     else {
         return;
     };
-
-    if skills.has(Skill::Teleport)
-        && teleport_state.count > 0
-        && key_input.just_pressed(KeyCode::Space)
-        && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)
-    {
-        commands.entity(e).insert(PlayerAnimation::Teleport);
-        teleport_state.count -= 1;
-        teleport_state.timer.reset();
-        teleport_state.timer.tick(time.delta());
-        teleport_state.second_explosion_timer.reset();
-        teleport_state.second_explosion_timer.tick(time.delta());
+    if let Some(teleport_slot) = skills.has_active_skill(Skill::Teleport) {
+        if teleport_state.count > 0
+            && key_input.just_pressed(get_active_skill_keybind(teleport_slot))
+            && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)
+        {
+            active_skill_event.send(ActiveSkillUsedEvent {
+                slot: teleport_slot,
+                cooldown: teleport_state.cooldown_timer.duration().as_secs_f32(),
+            });
+            commands.entity(e).insert(PlayerAnimation::Teleport);
+            teleport_state.count -= 1;
+            teleport_state.timer.reset();
+            teleport_state.timer.tick(time.delta());
+            teleport_state.second_explosion_timer.reset();
+            teleport_state.second_explosion_timer.tick(time.delta());
+        }
     }
 
     let player_pos = player_pos.translation();

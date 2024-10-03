@@ -2,10 +2,11 @@ use crate::{
     ai::HurtByPlayer,
     custom_commands::CommandsExt,
     enemy::spawn_helpers::can_spawn_mob_here,
+    inventory::ItemStack,
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
     player::levels::ExperienceReward,
-    ui::damage_numbers::spawn_screen_locked_icon,
+    ui::{damage_numbers::spawn_screen_locked_icon, key_input_guide::InteractionGuideTrigger},
     world::{world_helpers::tile_pos_to_world_pos, TILE_SIZE},
     GameParam, TextureCamera,
 };
@@ -377,6 +378,14 @@ pub fn handle_death(
                     &asset_server,
                     WorldObject::TimeFragment,
                 );
+                commands
+                    .entity(spawned_mob)
+                    .insert(InteractionGuideTrigger {
+                        key: Some("F".to_string()),
+                        text: Some(" Shop".to_string()),
+                        activation_distance: 32.,
+                        icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    });
             }
         }
     }

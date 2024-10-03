@@ -11,7 +11,7 @@ use crate::{
     Game, TextureCamera, WasHitWithCrit,
 };
 
-use super::{spawn_item_stack_icon, UIElement, UI_SLOT_SIZE};
+use super::{spawn_item_stack_icon, UIElement};
 
 #[derive(Component)]
 pub struct DamageNumber {
@@ -182,10 +182,10 @@ pub fn spawn_screen_locked_icon(
         .insert(Name::new("SCREEN ICON ITEM"));
 
     let mut slot_entity = commands.spawn(SpriteBundle {
-        texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlot),
+        texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
         transform: Transform::default(),
         sprite: Sprite {
-            custom_size: Some(Vec2::new(UI_SLOT_SIZE, UI_SLOT_SIZE)),
+            custom_size: Some(Vec2::new(20., 20.)),
             ..Default::default()
         },
         ..Default::default()
@@ -203,7 +203,8 @@ pub fn handle_clamp_screen_locked_icons(
     txfms: Query<&GlobalTransform>,
     game_camera: Query<&GlobalTransform, With<TextureCamera>>,
 ) {
-    let MAX_DIST: Vec2 = Vec2::new(11.5, 7.) * TILE_SIZE.x - Vec2::new(2., 1.);
+    let MAX_DIST: Vec2 = Vec2::new(11.5, 7.) * TILE_SIZE.x - Vec2::new(0., 0.);
+    let offset = Vec2::new(6., 5.);
 
     for (e, screen_locked_icon, mut icon_txfm, mut v) in query.iter_mut() {
         if let Ok(parent_txfm) = txfms.get(screen_locked_icon.parent) {
@@ -213,22 +214,22 @@ pub fn handle_clamp_screen_locked_icons(
             let cx = camera_txfm.translation().x;
             let cy = camera_txfm.translation().y;
 
-            if icon_txfm.translation.x > cx + MAX_DIST.x {
-                icon_txfm.translation.x = cx + MAX_DIST.x;
-            } else if icon_txfm.translation.x < cx - MAX_DIST.x {
-                icon_txfm.translation.x = cx - MAX_DIST.x;
+            if icon_txfm.translation.x > cx + MAX_DIST.x - offset.x {
+                icon_txfm.translation.x = cx + MAX_DIST.x - offset.x;
+            } else if icon_txfm.translation.x < cx - MAX_DIST.x + offset.x {
+                icon_txfm.translation.x = cx - MAX_DIST.x + offset.x;
             }
-            if icon_txfm.translation.y > cy + MAX_DIST.y {
-                icon_txfm.translation.y = cy + MAX_DIST.y;
-            } else if icon_txfm.translation.y < cy - MAX_DIST.y {
-                icon_txfm.translation.y = cy - MAX_DIST.y;
+            if icon_txfm.translation.y > cy + MAX_DIST.y - offset.y {
+                icon_txfm.translation.y = cy + MAX_DIST.y - offset.y;
+            } else if icon_txfm.translation.y < cy - MAX_DIST.y + offset.y {
+                icon_txfm.translation.y = cy - MAX_DIST.y + offset.y;
             }
 
             // TOGGLE VISIBILITY WHEN PARENT IN VIEW
-            if icon_txfm.translation.x < cx + MAX_DIST.x
-                && icon_txfm.translation.x > cx - MAX_DIST.x
-                && icon_txfm.translation.y < cy + MAX_DIST.y
-                && icon_txfm.translation.y > cy - MAX_DIST.y
+            if icon_txfm.translation.x < cx + MAX_DIST.x - offset.x
+                && icon_txfm.translation.x > cx - MAX_DIST.x + offset.x
+                && icon_txfm.translation.y < cy + MAX_DIST.y - offset.y
+                && icon_txfm.translation.y > cy - MAX_DIST.y + offset.y
             {
                 *v = Visibility::Hidden;
             } else {

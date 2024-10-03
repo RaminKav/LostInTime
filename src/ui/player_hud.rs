@@ -16,7 +16,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{PlayerSkills, Skill},
+        skills::{ActiveSkillUsedEvent, PlayerSkills, Skill},
         Player, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -41,6 +41,9 @@ pub struct CurrencyText;
 pub struct ClockHUD;
 #[derive(Component)]
 pub struct ClockText;
+
+#[derive(Component)]
+pub struct ActiveSkillIcon;
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
@@ -281,7 +284,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::InventoryBag),
         &asset_server,
-        Vec2::new(-res.game_width / 2. + 18.5, -GAME_HEIGHT / 2. + 10.),
+        Vec2::new(86.5, -GAME_HEIGHT / 2. + 10.),
         Vec2::new(0., 0.),
         3,
     );
@@ -297,30 +300,8 @@ pub fn setup_currency_ui(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(bag_icon);
-
-    // DODGE ICON
-    let dodge_icon = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::Dodge),
-        &asset_server,
-        Vec2::new(-res.game_width / 2. + 42.5, -GAME_HEIGHT / 2. + 10.),
-        Vec2::new(0., 0.),
-        3,
-    );
-    commands
-        .spawn(SpriteBundle {
-            texture: asset_server.load("textures/SpaceKey.png"),
-            transform: Transform::from_translation(Vec3::new(-0.5, 13.0, 1.)),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(30., 10.)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(dodge_icon);
 }
+
 pub fn update_currency_text(
     currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
     mut text_query: Query<&mut Text, With<CurrencyText>>,
@@ -472,6 +453,8 @@ pub fn handle_update_player_skills(
     res: Res<ScreenResolution>,
     mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
     game_over: EventReader<GameOverEvent>,
+    asset_server: Res<AssetServer>,
+    prev_active_skill_icons: Query<Entity, With<ActiveSkillIcon>>,
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.skills.clear();
@@ -528,6 +511,78 @@ pub fn handle_update_player_skills(
                 new_skills.rogue_skill_count,
                 new_skills.magic_skill_count
             );
+        }
+
+        // Active Skill Icons
+        prev_active_skill_icons.for_each(|e| {
+            commands.entity(e).despawn_recursive();
+        });
+
+        for (i, active_skill_option) in vec![
+            new_skills.active_skill_slot_1.clone(),
+            new_skills.active_skill_slot_2.clone(),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let icon_bg = commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(20., 20.)),
+                        ..default()
+                    },
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -res.game_width / 2. + 18. + i as f32 * 30.,
+                            -GAME_HEIGHT / 2. + 14.,
+                            1.,
+                        ),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(ActiveSkillIcon)
+                .id();
+            commands
+                .spawn(SpriteBundle {
+                    texture: asset_server.load(if i == 0 {
+                        "textures/SpaceKey.png"
+                    } else {
+                        "textures/ShiftKey.png"
+                    }),
+                    transform: Transform::from_translation(Vec3::new(0., 13., 2. + i as f32)),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(if i == 0 { 30. } else { 26. }, 10.)),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(icon_bg);
+            if let Some(active_skill) = active_skill_option.clone() {
+                commands
+                    .spawn(SpriteBundle {
+                        texture: graphics.get_skill_icon(active_skill.skill.clone()),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(16., 16.)),
+                            ..Default::default()
+                        },
+                        transform: Transform {
+                            translation: Vec3::new(0., 0., 1.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .insert(SkillHudIcon(active_skill.skill))
+                    .insert(Name::new("HUD ICON!!"))
+                    .set_parent(icon_bg);
+            }
+            spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
         }
     }
 }
@@ -643,4 +698,67 @@ pub fn handle_update_clock_hud(
     }
     let mut text = clock_text.single_mut();
     text.sections[0].value = format!("{}:00", if hour > 12 { hour - 12 } else { hour });
+}
+
+#[derive(Component)]
+pub struct SkillCooldownOverlay {
+    pub timer: Timer,
+    pub index: usize,
+}
+
+pub fn spawn_skill_cooldown_overlay(
+    parent: Entity,
+    commands: &mut Commands,
+    duration: f32,
+    index: usize,
+) -> Entity {
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(1., 1., 1., 0.45),
+                custom_size: Some(Vec2::new(16., 0.)),
+                anchor: Anchor::BottomCenter,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., -8., 3.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(SkillCooldownOverlay {
+            timer: Timer::from_seconds(duration, TimerMode::Once),
+            index,
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("overlay"))
+        .set_parent(parent)
+        .id()
+}
+
+pub fn tick_skill_cooldown_overlays(
+    mut overlays: Query<(&mut Sprite, &mut SkillCooldownOverlay), With<SkillCooldownOverlay>>,
+    time: Res<Time>,
+) {
+    for (mut overlay, mut timer) in overlays.iter_mut() {
+        timer.timer.tick(time.delta());
+        overlay.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
+    }
+}
+
+pub fn handle_active_skill_event(
+    mut active_skill_used: EventReader<ActiveSkillUsedEvent>,
+    mut overlays: Query<&mut SkillCooldownOverlay>,
+) {
+    for e in active_skill_used.iter() {
+        for mut overlay in overlays.iter_mut() {
+            if overlay.index == e.slot {
+                overlay.timer.reset();
+                overlay
+                    .timer
+                    .set_duration(Duration::from_secs_f32(e.cooldown));
+            }
+        }
+    }
 }

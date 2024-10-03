@@ -10,7 +10,8 @@ use crate::{
     colors::LIGHT_RED,
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     enemy::Mob,
-    inputs::CursorPos,
+    get_active_skill_keybind,
+    inputs::{CursorPos, MovementVector},
     item::WorldObject,
     status_effects::Frail,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
@@ -18,7 +19,7 @@ use crate::{
     GameParam, HitEvent, InvincibilityTimer,
 };
 
-use super::{sprint::SprintState, Player, PlayerSkills, Skill};
+use super::{rogue_skills::LungeState, ActiveSkillUsedEvent, Player, PlayerSkills, Skill};
 aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -59,7 +60,7 @@ pub fn handle_second_split_attack(
     mut hit_event: EventWriter<HitEvent>,
     time: Res<Time>,
     mut commands: Commands,
-    player: Query<(&PlayerSkills, Option<&SprintState>)>,
+    player: Query<(&PlayerSkills, Option<&LungeState>)>,
 ) {
     for (e, mut second_hit) in second_hit_query.iter_mut() {
         if !second_hit.delay.tick(time.delta()).just_finished() {
@@ -68,7 +69,7 @@ pub fn handle_second_split_attack(
         let Ok(frail_option) = mobs.get(e) else {
             continue;
         };
-        let (skills, maybe_sprint) = player.single();
+        let (skills, maybe_lunge) = player.single();
         let sword_skill_bonus = if skills.has(Skill::SwordDMG) && second_hit.weapon_obj.is_sword() {
             3
         } else {
@@ -79,7 +80,7 @@ pub fn handle_second_split_attack(
             e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
             if skills.has(Skill::SprintLungeDamage)
-                && maybe_sprint.unwrap().lunge_duration.percent() != 0.
+                && maybe_lunge.unwrap().lunge_duration.percent() != 0.
             {
                 Some(1.25)
             } else {
@@ -145,9 +146,13 @@ pub struct SpearGravity {
 pub struct ParryState {
     pub parry_timer: Timer,
     pub cooldown_timer: Timer,
-    pub spear_timer: Timer,
     pub success: bool,
     pub active: bool,
+}
+#[derive(Component)]
+pub struct SpearState {
+    pub cooldown_timer: Timer,
+    pub spear_timer: Timer,
 }
 
 #[derive(Component)]
@@ -164,14 +169,52 @@ pub struct ParrySuccessEvent(pub Entity);
 pub struct SpearAttack;
 
 pub fn handle_parry(
+    mut player: Query<(Entity, &PlayerSkills, &PlayerAnimation, &mut ParryState), (With<Player>,)>,
+    key_input: ResMut<Input<KeyCode>>,
+    mut commands: Commands,
+    time: Res<Time>,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+) {
+    let Ok((e, skills, curr_anim, mut parry_state)) = player.get_single_mut() else {
+        return;
+    };
+
+    if let Some(parry_slot) = skills.has_active_skill(Skill::Parry) {
+        if key_input.just_pressed(get_active_skill_keybind(parry_slot))
+            && parry_state.cooldown_timer.finished()
+            && !curr_anim.is_parrying()
+        {
+            commands.entity(e).insert(PlayerAnimation::Parry);
+            parry_state.cooldown_timer.reset();
+            parry_state.parry_timer.reset();
+            parry_state.active = true;
+            parry_state.parry_timer.tick(time.delta());
+            active_skill_event.send(ActiveSkillUsedEvent {
+                slot: parry_slot,
+                cooldown: parry_state.cooldown_timer.duration().as_secs_f32(),
+            });
+        }
+    }
+    parry_state.cooldown_timer.tick(time.delta());
+
+    if parry_state.parry_timer.percent() != 0. {
+        parry_state.parry_timer.tick(time.delta());
+        if parry_state.parry_timer.just_finished() {
+            parry_state.success = false;
+            parry_state.active = false;
+        }
+    }
+}
+pub fn handle_spear(
     mut player: Query<
         (
             Entity,
             &GlobalTransform,
             &PlayerSkills,
             &Attack,
-            &PlayerAnimation,
-            &mut ParryState,
+            &mut SpearState,
+            &mut KinematicCharacterController,
+            &mut MovementVector,
         ),
         (With<Player>,),
     >,
@@ -179,37 +222,31 @@ pub fn handle_parry(
     mut commands: Commands,
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
-    let Ok((e, player_pos, skills, dmg, curr_anim, mut parry_state)) = player.get_single_mut()
+    let Ok((e, player_pos, skills, dmg, mut spear_state, mut kcc, mut mv)) =
+        player.get_single_mut()
     else {
         return;
     };
 
-    if skills.has(Skill::Parry)
-        && key_input.just_pressed(KeyCode::Space)
-        && parry_state.cooldown_timer.finished()
-        && !curr_anim.is_parrying()
-    {
-        commands.entity(e).insert(PlayerAnimation::Parry);
-        parry_state.cooldown_timer.reset();
-        parry_state.parry_timer.reset();
-        parry_state.active = true;
-        parry_state.parry_timer.tick(time.delta());
+    if let Some(spear_slot) = skills.has_active_skill(Skill::ParrySpear) {
+        if key_input.just_pressed(get_active_skill_keybind(spear_slot))
+            && spear_state.cooldown_timer.finished()
+        {
+            spear_state.cooldown_timer.reset();
+            spear_state.spear_timer.tick(time.delta());
+            commands.entity(e).insert(PlayerAnimation::Spear);
+            active_skill_event.send(ActiveSkillUsedEvent {
+                slot: spear_slot,
+                cooldown: spear_state.cooldown_timer.duration().as_secs_f32(),
+            });
+        }
     }
-
-    if skills.has(Skill::ParrySpear)
-        && parry_state.active
-        && parry_state.success
-        && key_input.just_pressed(KeyCode::Space)
-    {
-        parry_state.spear_timer.tick(time.delta());
-        commands.entity(e).insert(PlayerAnimation::Spear);
-        parry_state.active = false;
-    }
-    if parry_state.spear_timer.percent() != 0. {
-        parry_state.spear_timer.tick(time.delta());
-        if parry_state.spear_timer.just_finished() {
-            parry_state.spear_timer.reset();
+    if spear_state.spear_timer.percent() != 0. {
+        spear_state.spear_timer.tick(time.delta());
+        if spear_state.spear_timer.just_finished() {
+            spear_state.spear_timer.reset();
             let player_pos = player_pos.translation();
             let direction =
                 (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
@@ -226,16 +263,11 @@ pub fn handle_parry(
             );
             commands.entity(hit).insert(SpearAttack).set_parent(e);
         }
-    }
-    parry_state.cooldown_timer.tick(time.delta());
 
-    if parry_state.parry_timer.percent() != 0. {
-        parry_state.parry_timer.tick(time.delta());
-        if parry_state.parry_timer.just_finished() {
-            parry_state.success = false;
-            parry_state.active = false;
-        }
+        mv.0 = mv.0 * 0.;
+        kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
     }
+    spear_state.cooldown_timer.tick(time.delta());
 }
 
 pub fn handle_parry_success(

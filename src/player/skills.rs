@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
 use rand::seq::IteratorRandom;
@@ -17,12 +19,12 @@ use crate::{
 };
 
 use super::{
-    melee_skills::ParryState,
-    sprint::{ComboCounter, SprintState},
-    teleport::TeleportState,
+    mage_skills::TeleportState,
+    melee_skills::{ParryState, SpearState},
+    rogue_skills::{ComboCounter, LungeState, SprintState},
 };
 
-#[derive(Component, Debug, Clone, Eq, PartialEq)]
+#[derive(Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SkillClass {
     None,
     Melee,
@@ -80,6 +82,7 @@ impl SkillClass {
 
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
 pub enum Skill {
+    Roll,
     // Passives
     #[default]
     CritChance,
@@ -242,6 +245,8 @@ impl Skill {
             Skill::MPBarDMG => SkillClass::Magic,
             Skill::MPBarCrit => SkillClass::Magic,
             Skill::FrozenMPRegen => SkillClass::Magic,
+
+            Skill::Roll => SkillClass::None,
         }
     }
     pub fn get_title(&self) -> String {
@@ -314,11 +319,13 @@ impl Skill {
             Skill::FullStomach => "Full Stomach".to_string(),
             Skill::WideSwing => "Wide Swing ".to_string(),
             Skill::ReinforcedArmor => "Reinforced Armor".to_string(),
+            Skill::Roll => "Roll".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
+            Skill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
             Skill::CritChance => vec![
                 "Gain +10% Critical".to_string(),
                 "Chance, ".to_string(),
@@ -383,8 +390,10 @@ impl Skill {
                 "below 20% health.".to_string(),
             ],
             Skill::Teleport => vec![
-                "Your Roll ability".to_string(),
-                "becomes Teleport.".to_string(),
+                "Teleport a short".to_string(),
+                "distance to dodge".to_string(),
+                "attacks or move".to_string(),
+                "around quickly.".to_string(),
             ],
             Skill::TeleportShock => vec![
                 "Teleporting through".to_string(),
@@ -404,10 +413,10 @@ impl Skill {
                 "regeneration.".to_string(),
             ],
             Skill::Sprint => vec![
-                "Your Roll ability".to_string(),
-                "becomes Sprint, ".to_string(),
-                "allowing you to".to_string(),
-                "move very fast.".to_string(),
+                "Hold Sprint to move".to_string(),
+                "60% faster. Allows".to_string(),
+                "you to attack while".to_string(),
+                "sprinting.".to_string(),
             ],
             Skill::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
@@ -460,12 +469,11 @@ impl Skill {
             Skill::Attack => vec!["Gain +3 Attack,".to_string(), "permanently.".to_string()],
             Skill::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
             Skill::Parry => vec![
-                "Your Roll ability".to_string(),
-                "becomes Parry,".to_string(),
-                "allowing you to".to_string(),
-                "ignore damage and".to_string(),
+                "Allows you to Parry".to_string(),
+                "enemy attacks,".to_string(),
+                "ignore damage, and".to_string(),
                 "stun attackers if".to_string(),
-                "successful ".to_string(),
+                "timed successfully.".to_string(),
             ],
             Skill::ParryHPRegen => vec![
                 "A successful".to_string(),
@@ -662,7 +670,17 @@ impl Skill {
             ],
         }
     }
-
+    pub fn is_active_skill(&self) -> bool {
+        match self {
+            Skill::Roll => true,
+            Skill::Parry => true,
+            Skill::ParrySpear => true,
+            Skill::Sprint => true,
+            Skill::SprintLunge => true,
+            Skill::Teleport => true,
+            _ => false,
+        }
+    }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
             Skill::ClawDoubleThrow => Some((WorldObject::Claw, 1)),
@@ -697,17 +715,28 @@ impl Skill {
             Skill::Sprint => {
                 commands.entity(entity).insert(SprintState {
                     startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
-                    sprint_duration_timer: Timer::from_seconds(3.5, TimerMode::Once),
-                    sprint_cooldown_timer: Timer::from_seconds(0.1, TimerMode::Once),
-                    lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
+                    sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
+                    sprint_cooldown_timer: Timer::from_seconds(6., TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
                     speed_bonus: 1.6,
-                    lunge_speed: 2.9,
+                });
+            }
+            Skill::SprintLunge => {
+                commands.entity(entity).insert(LungeState {
+                    lunge_cooldown_timer: Timer::from_seconds(4., TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                    lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
+                    lunge_speed: 3.9,
                 });
             }
             Skill::Teleport => {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
                     count: 1,
                     max_count: 1,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
@@ -717,7 +746,9 @@ impl Skill {
             &Skill::TeleportCount => {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
                     count: skills.get_count(Skill::TeleportCount) as u32,
                     max_count: 2,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
@@ -737,10 +768,19 @@ impl Skill {
             &Skill::Parry => {
                 commands.entity(entity).insert(ParryState {
                     parry_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once),
-                    spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
                     success: false,
                     active: false,
+                });
+            }
+            &Skill::ParrySpear => {
+                commands.entity(entity).insert(SpearState {
+                    cooldown_timer: Timer::from_seconds(5.2, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                    spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
                 });
             }
 
@@ -775,6 +815,11 @@ impl Skill {
     }
 }
 
+pub struct ActiveSkillUsedEvent {
+    pub slot: usize,
+    pub cooldown: f32,
+}
+
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
 pub struct SkillChoiceState {
     pub skill: Skill,
@@ -799,7 +844,7 @@ impl SkillChoiceState {
         self.is_one_time_skill = false;
         self
     }
-    pub fn with_clashing(mut self, clashing: Vec<Skill>) -> Self {
+    pub fn _with_clashing(mut self, clashing: Vec<Skill>) -> Self {
         self.clashing_skills = clashing;
         self
     }
@@ -810,6 +855,7 @@ pub struct SkillChoiceQueue {
     pub queue: Vec<[SkillChoiceState; 3]>,
     pub rerolls: [bool; 3],
     pub pool: Vec<SkillChoiceState>,
+    pub active_skill_limbo: Option<SkillChoiceState>,
 }
 
 impl Default for SkillChoiceQueue {
@@ -817,6 +863,7 @@ impl Default for SkillChoiceQueue {
         Self {
             queue: Default::default(),
             rerolls: [true; 3],
+            active_skill_limbo: None,
             pool: vec![
                 SkillChoiceState::new(Skill::Defence),
                 SkillChoiceState::new(Skill::Attack),
@@ -833,14 +880,11 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::OnHitEcho),
                 SkillChoiceState::new(Skill::HealEcho),
                 SkillChoiceState::new(Skill::Sprint)
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::SprintFaster),
-                        SkillChoiceState::new(Skill::SprintLunge).with_children(vec![
-                            SkillChoiceState::new(Skill::SprintKillReset),
-                            SkillChoiceState::new(Skill::SprintLungeDamage),
-                        ]),
-                    ])
-                    .with_clashing(vec![Skill::Teleport, Skill::Parry]),
+                    .with_children(vec![SkillChoiceState::new(Skill::SprintFaster)]),
+                SkillChoiceState::new(Skill::SprintLunge).with_children(vec![
+                    SkillChoiceState::new(Skill::SprintKillReset),
+                    SkillChoiceState::new(Skill::SprintLungeDamage),
+                ]),
                 SkillChoiceState::new(Skill::CritChance).set_repeatable(),
                 SkillChoiceState::new(Skill::CritDamage).set_repeatable(),
                 SkillChoiceState::new(Skill::CritLoot),
@@ -868,16 +912,14 @@ impl Default for SkillChoiceQueue {
                     SkillChoiceState::new(Skill::PoisonStrength).set_repeatable(),
                     SkillChoiceState::new(Skill::ViralVenum),
                 ]),
-                SkillChoiceState::new(Skill::Teleport)
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::TeleportShock)
-                            .with_children(vec![SkillChoiceState::new(Skill::TeleportStatusDMG)]),
-                        SkillChoiceState::new(Skill::TeleportCooldown),
-                        SkillChoiceState::new(Skill::TeleportCount).set_repeatable(),
-                        SkillChoiceState::new(Skill::TeleportManaRegen),
-                        SkillChoiceState::new(Skill::TeleportIceAoe),
-                    ])
-                    .with_clashing(vec![Skill::Sprint, Skill::Parry]),
+                SkillChoiceState::new(Skill::Teleport).with_children(vec![
+                    SkillChoiceState::new(Skill::TeleportShock)
+                        .with_children(vec![SkillChoiceState::new(Skill::TeleportStatusDMG)]),
+                    SkillChoiceState::new(Skill::TeleportCooldown),
+                    SkillChoiceState::new(Skill::TeleportCount).set_repeatable(),
+                    SkillChoiceState::new(Skill::TeleportManaRegen),
+                    SkillChoiceState::new(Skill::TeleportIceAoe),
+                ]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),
                 SkillChoiceState::new(Skill::BowMultiShot)
                     .with_children(vec![SkillChoiceState::new(Skill::BowArrowSpeed)]),
@@ -889,15 +931,13 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::WideSwing),
                 SkillChoiceState::new(Skill::ReinforcedArmor),
                 SkillChoiceState::new(Skill::DaggerCombo),
-                SkillChoiceState::new(Skill::Parry)
-                    .with_children(vec![
-                        SkillChoiceState::new(Skill::ParryHPRegen),
-                        SkillChoiceState::new(Skill::ParrySpear),
-                        SkillChoiceState::new(Skill::ParryDeflectProj),
-                        SkillChoiceState::new(Skill::ParryKnockback),
-                        SkillChoiceState::new(Skill::ParryEcho),
-                    ])
-                    .with_clashing(vec![Skill::Sprint, Skill::Teleport]),
+                SkillChoiceState::new(Skill::ParrySpear),
+                SkillChoiceState::new(Skill::Parry).with_children(vec![
+                    SkillChoiceState::new(Skill::ParryHPRegen),
+                    SkillChoiceState::new(Skill::ParryDeflectProj),
+                    SkillChoiceState::new(Skill::ParryKnockback),
+                    SkillChoiceState::new(Skill::ParryEcho),
+                ]),
             ],
         }
     }
@@ -965,6 +1005,17 @@ impl SkillChoiceQueue {
         if player_skills.skills.len() < player_level as usize - 1 {
             self.add_new_skills_after_levelup(&mut rand::thread_rng());
         }
+
+        // handle active skills
+        if skill.skill.is_active_skill() {
+            if player_skills.active_skill_slot_1.is_none() {
+                player_skills.insert_active_skill(skill.clone(), 1);
+            } else if player_skills.active_skill_slot_2.is_none() {
+                player_skills.insert_active_skill(skill.clone(), 2);
+            } else {
+                self.active_skill_limbo = Some(skill);
+            }
+        }
     }
     pub fn handle_reroll_slot(&mut self, slot: usize) {
         if self.rerolls[slot] {
@@ -983,17 +1034,51 @@ impl SkillChoiceQueue {
     }
 }
 
-#[derive(Component, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub skills: Vec<Skill>,
+    pub class: SkillClass,
     pub melee_skill_count: usize,
     pub rogue_skill_count: usize,
     pub magic_skill_count: usize,
+    pub active_skill_slot_1: Option<SkillChoiceState>,
+    pub active_skill_slot_2: Option<SkillChoiceState>,
+}
+
+impl Default for PlayerSkills {
+    fn default() -> Self {
+        Self {
+            skills: vec![],
+            class: SkillClass::None,
+            melee_skill_count: 0,
+            rogue_skill_count: 0,
+            magic_skill_count: 0,
+            active_skill_slot_1: Some(SkillChoiceState::new(Skill::Roll)),
+            active_skill_slot_2: None,
+        }
+    }
 }
 
 impl PlayerSkills {
     pub fn has(&self, skill: Skill) -> bool {
         self.skills.contains(&skill)
+    }
+    pub fn has_active_skill(&self, skill: Skill) -> Option<usize> {
+        if self
+            .active_skill_slot_1
+            .as_ref()
+            .is_some_and(|s| s.skill == skill)
+        {
+            return Some(0);
+        }
+        if self
+            .active_skill_slot_2
+            .as_ref()
+            .is_some_and(|s| s.skill == skill)
+        {
+            return Some(1);
+        }
+        None
     }
     pub fn get_count(&self, skill: Skill) -> i32 {
         self.skills.iter().filter(|&s| *s == skill).count() as i32
@@ -1031,6 +1116,13 @@ impl PlayerSkills {
             SkillClass::Melee => self.melee_skill_count += 1,
             SkillClass::Rogue => self.rogue_skill_count += 1,
             SkillClass::Magic => self.magic_skill_count += 1,
+        }
+    }
+    pub fn insert_active_skill(&mut self, skill: SkillChoiceState, slot: usize) {
+        match slot {
+            1 => self.active_skill_slot_1 = Some(skill),
+            2 => self.active_skill_slot_2 = Some(skill),
+            _ => {}
         }
     }
 }

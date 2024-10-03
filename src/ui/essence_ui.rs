@@ -9,9 +9,9 @@ use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     client::GameData,
     datafiles,
-    inventory::{Inventory, ItemStack},
+    inventory::ItemStack,
     item::WorldObject,
-    player::Player,
+    player::{levels::PlayerLevel, ModifyTimeFragmentsEvent, Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
@@ -64,7 +64,7 @@ pub fn setup_essence_ui(
         &mut commands,
         Vec2::new(resolution.game_width + 10., GAME_HEIGHT + 20.),
         0.8,
-        9.,
+        -1.,
     );
 
     let essence_ui_e = commands
@@ -152,7 +152,7 @@ pub fn setup_essence_ui(
         let cost_icon = spawn_item_stack_icon(
             &mut commands,
             &graphics,
-            &ItemStack::crate_icon_stack(WorldObject::Essence)
+            &ItemStack::crate_icon_stack(WorldObject::TimeFragment)
                 .copy_with_count(essence_option.cost as usize),
             &asset_server,
             Vec2::ZERO,
@@ -170,17 +170,18 @@ pub fn handle_submit_essence_choice(
     mut ev: EventReader<SubmitEssenceChoice>,
     mut next_inv_state: ResMut<NextState<UIState>>,
     essence_ui: Query<Entity, With<EssenceUI>>,
-    mut inv: Query<&mut Inventory>,
+    currency: Query<&TimeFragmentCurrency>,
+    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
     mut game_param: GameParam,
     player_t: Query<&GlobalTransform, With<Player>>,
 ) {
     for choice in ev.iter() {
-        let mut inv = inv.single_mut();
-        if inv
-            .items
-            .remove_from_inventory(choice.choice.cost as usize, WorldObject::Essence)
-            .is_ok()
-        {
+        let cur = currency.single();
+        if cur.time_fragments >= choice.choice.cost as i32 {
+            currency_event.send(ModifyTimeFragmentsEvent {
+                delta: -(choice.choice.cost as i32),
+            });
+
             choice.choice.item.spawn_as_drop(
                 &mut commands,
                 &mut game_param,
@@ -198,6 +199,7 @@ pub fn handle_submit_essence_choice(
 
 pub fn handle_populate_essence_shop_on_new_spawn(
     mut new_spawns: Query<&mut EssenceShopChoices, Added<EssenceShopChoices>>,
+    player_level: Query<&PlayerLevel>,
     proto_param: ProtoParam,
 ) {
     for mut shop in new_spawns.iter_mut() {
@@ -207,11 +209,12 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                     &ItemStack::crate_icon_stack(WorldObject::LargePotion).copy_with_count(3),
                     &proto_param,
                 ),
-                cost: 3,
+                cost: 5,
             },
             EssenceOption {
                 item: create_new_random_item_stack_with_attributes(
-                    &ItemStack::crate_icon_stack(WorldObject::MiracleSeed).copy_with_count(1),
+                    &ItemStack::crate_icon_stack(WorldObject::OrbOfTransformation)
+                        .copy_with_count(1),
                     &proto_param,
                 ),
                 cost: 5,
@@ -221,7 +224,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                     &ItemStack::crate_icon_stack(WorldObject::UpgradeTome).copy_with_count(1),
                     &proto_param,
                 ),
-                cost: 4,
+                cost: 3,
             },
             EssenceOption {
                 item: create_new_random_item_stack_with_attributes(
@@ -233,16 +236,22 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         ];
 
         let mut shop_choices = vec![];
+        let player_level = player_level.single().level;
         if let Ok(file_file) = File::open(datafiles::game_data()) {
             let reader = BufReader::new(file_file);
             let mut rng = rand::thread_rng();
             // Read the JSON contents of the file as an instance of `User`.
             match serde_json::from_reader::<_, GameData>(reader) {
                 Ok(data) => {
-                    if let Some(seen_item) = data.seen_gear.iter().choose(&mut rng) {
+                    if let Some(seen_item) = data
+                        .seen_gear
+                        .iter()
+                        .filter(|i| i.metadata.level.unwrap_or(1) <= player_level)
+                        .choose(&mut rng)
+                    {
                         shop_choices.push(EssenceOption {
                             item: seen_item.clone(),
-                            cost: 5,
+                            cost: seen_item.metadata.level.unwrap_or(1) as u32 + 2,
                         });
                         while shop_choices.len() < 4 {
                             let pick = GENERIC_SHOP_OPTIONS
