@@ -85,7 +85,7 @@ pub fn handle_teleport(
     }
 
     let player_pos = player_pos.translation();
-    if skills.has(Skill::TeleportIceAoeEnd) && teleport_state.second_explosion_timer.just_finished()
+    if skills.has(Skill::TeleportIceAoEEnd) && teleport_state.second_explosion_timer.just_finished()
     {
         teleport_state.second_explosion_timer.reset();
         spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
@@ -122,7 +122,7 @@ pub fn handle_teleport(
             );
             commands.entity(shock_e).insert(TeleportShockDmg);
         }
-        if skills.has(Skill::TeleportIceAoe) {
+        if skills.has(Skill::TeleportIceAoE) {
             spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
         }
 

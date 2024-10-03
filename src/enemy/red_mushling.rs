@@ -54,7 +54,10 @@ pub fn handle_new_red_mushling_state_machine(
                     target: game.player,
                     range: 30.,
                 },
-                GasAttackState { hitbox: None },
+                GasAttackState {
+                    hitbox: None,
+                    cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                },
             );
 
         e_cmds.insert(state_machine);
@@ -69,6 +72,7 @@ pub struct SproutingState;
 #[component(storage = "SparseSet")]
 pub struct GasAttackState {
     hitbox: Option<Entity>,
+    cooldown: Timer,
 }
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
@@ -87,7 +91,10 @@ pub fn sprout(
             commands
                 .entity(entity)
                 .remove::<SproutingState>()
-                .insert(GasAttackState { hitbox: None });
+                .insert(GasAttackState {
+                    hitbox: None,
+                    cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                });
             *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
         }
     }
@@ -96,15 +103,20 @@ pub fn sprout(
 pub fn gas_attack(
     mut sprouts: Query<(Entity, &mut AsepriteAnimation, &Attack, &mut GasAttackState)>,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
     for (entity, mut anim, attack, mut gas_state) in sprouts.iter_mut() {
+        gas_state.cooldown.tick(time.delta());
+        if !gas_state.cooldown.finished() {
+            continue;
+        }
         if anim.current_frame() < 18 || anim.current_frame() > 46 {
             *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
         }
         if anim.is_paused() {
             anim.play();
         }
-        if anim.current_frame() >= 33 && anim.current_frame() <= 40 {
+        if anim.current_frame() >= 33 && anim.current_frame() < 39 {
             if let Some(hitbox) = gas_state.hitbox {
                 if let Some(mut hit_e) = commands.get_entity(hitbox) {
                     hit_e.insert(Collider::capsule(Vec2::ZERO, Vec2::ZERO, 24.));
@@ -123,7 +135,7 @@ pub fn gas_attack(
                 gas_state.hitbox = Some(hitbox);
             }
         }
-        if anim.current_frame() == 46 {
+        if anim.just_finished() {
             commands
                 .entity(entity)
                 .remove::<GasAttackState>()
@@ -134,7 +146,7 @@ pub fn gas_attack(
                     is_stopped: true,
                 });
             *anim = AsepriteAnimation::from(RedMushling::tags::IDLE_FRONT);
-        } else if anim.current_frame() == 41 {
+        } else if anim.current_frame() == 39 {
             if let Some(hitbox) = gas_state.hitbox {
                 if let Some(hitbox) = commands.get_entity(hitbox) {
                     hitbox.despawn_recursive();
