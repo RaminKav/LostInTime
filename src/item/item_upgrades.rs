@@ -5,8 +5,8 @@ use crate::combat::{EnemyDeathEvent, MarkedForDeath};
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
 use crate::player::skills::{PlayerSkills, Skill};
-use crate::player::teleport::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
 use crate::status_effects::{
     try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
 };

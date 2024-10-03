@@ -6,6 +6,7 @@ use crate::{
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     enemy::Mob,
+    get_active_skill_keybind,
     inputs::{CursorPos, FacingDirection, MovementVector},
     ui::damage_numbers::{spawn_text, DodgeEvent},
     world::TILE_SIZE,
@@ -15,7 +16,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{Player, PlayerSkills, Skill};
+use super::{ActiveSkillUsedEvent, Player, PlayerSkills, Skill};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -24,24 +25,41 @@ pub struct SprintState {
     pub startup_timer: Timer,
     pub sprint_duration_timer: Timer,
     pub sprint_cooldown_timer: Timer,
-    pub lunge_duration: Timer,
     pub speed_bonus: f32,
+}
+#[derive(Debug, Component)]
+pub struct LungeState {
+    pub lunge_cooldown_timer: Timer,
+    pub lunge_duration: Timer,
     pub lunge_speed: f32,
 }
 
 #[derive(Debug, Component)]
 pub struct Sprinting;
 pub fn handle_toggle_sprinting(
-    mut sprint_query: Query<(Entity, &mut SprintState), With<SprintState>>,
+    mut sprint_query: Query<
+        (Entity, &mut SprintState, &PlayerSkills, Option<&Sprinting>),
+        With<SprintState>,
+    >,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
-    for (e, sprint_state) in sprint_query.iter_mut() {
-        if key_inputs.just_pressed(KeyCode::Space) && sprint_state.sprint_cooldown_timer.finished()
-        {
-            commands.entity(e).insert(Sprinting);
-        } else if key_inputs.just_released(KeyCode::Space) {
-            commands.entity(e).remove::<Sprinting>();
+    for (e, sprint_state, skills, was_sprinting) in sprint_query.iter_mut() {
+        if let Some(sprint_slot) = skills.has_active_skill(Skill::Sprint) {
+            if key_inputs.just_pressed(get_active_skill_keybind(sprint_slot))
+                && sprint_state.sprint_cooldown_timer.finished()
+            {
+                commands.entity(e).insert(Sprinting);
+            } else if key_inputs.just_released(get_active_skill_keybind(sprint_slot)) {
+                if was_sprinting.is_some() {
+                    active_skill_event.send(ActiveSkillUsedEvent {
+                        slot: sprint_slot,
+                        cooldown: sprint_state.sprint_cooldown_timer.duration().as_secs_f32(),
+                    });
+                    commands.entity(e).remove::<Sprinting>();
+                }
+            }
         }
     }
 }
@@ -55,8 +73,6 @@ pub fn handle_sprint_timer(
             &mut MovementVector,
             &PlayerAnimation,
             &PlayerSkills,
-            &FacingDirection,
-            &Attack,
             Option<&AttackTimer>,
         ),
         With<Sprinting>,
@@ -65,12 +81,10 @@ pub fn handle_sprint_timer(
     game: GameParam,
     mut attack_event: EventWriter<AttackEvent>,
     cursor_pos: Res<CursorPos>,
-    key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
-    for (e, mut sprint, mut kcc, mut mv, anim, skills, dir, dmg, attack_cooldown_option) in
-        query.iter_mut()
-    {
+    for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
         if !sprint.startup_timer.finished() {
             sprint.startup_timer.tick(time.delta());
             sprint.sprint_cooldown_timer.reset();
@@ -79,7 +93,6 @@ pub fn handle_sprint_timer(
                 commands.entity(e).insert(PlayerAnimation::Run);
             }
             let speed_bonus_skill = skills.has(Skill::SprintFaster);
-            let lunge_skill = skills.has(Skill::SprintLunge);
             mv.0 = mv.0 * (sprint.speed_bonus + if speed_bonus_skill { 0.2 } else { 0. });
             let player_pos = game.player().position;
 
@@ -95,16 +108,51 @@ pub fn handle_sprint_timer(
                     ignore_cooldown: false,
                 });
             }
-            if lunge_skill
-                && (mouse_inputs.pressed(MouseButton::Right) || key_inputs.pressed(KeyCode::Slash))
-                && sprint.sprint_cooldown_timer.percent() == 0.
+
+            if sprint
+                .sprint_duration_timer
+                .tick(time.delta())
+                .just_finished()
             {
+                active_skill_event.send(ActiveSkillUsedEvent {
+                    slot: skills.has_active_skill(Skill::Sprint).unwrap(),
+                    cooldown: sprint.sprint_cooldown_timer.duration().as_secs_f32(),
+                });
+                commands.entity(e).remove::<Sprinting>();
+            }
+
+            kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
+        }
+    }
+}
+pub fn handle_lunge(
+    time: Res<Time>,
+    mut query: Query<(
+        Entity,
+        &mut LungeState,
+        &mut KinematicCharacterController,
+        &mut MovementVector,
+        &PlayerSkills,
+        &FacingDirection,
+        &Attack,
+    )>,
+    key_inputs: Res<Input<KeyCode>>,
+    mut commands: Commands,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+) {
+    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
+        if let Some(lunge_slot) = skills.has_active_skill(Skill::SprintLunge) {
+            if key_inputs.just_pressed(get_active_skill_keybind(lunge_slot))
+                && lunge_state.lunge_cooldown_timer.finished()
+            {
+                lunge_state.lunge_cooldown_timer.reset();
+                active_skill_event.send(ActiveSkillUsedEvent {
+                    slot: lunge_slot,
+                    cooldown: lunge_state.lunge_cooldown_timer.duration().as_secs_f32(),
+                });
+
                 // LUNGE
                 commands.entity(e).insert(PlayerAnimation::Lunge);
-                attack_event.send(AttackEvent {
-                    direction,
-                    ignore_cooldown: true,
-                });
                 let angle = match dir {
                     FacingDirection::Up => 0.,
                     FacingDirection::Down => 0.,
@@ -121,19 +169,19 @@ pub fn handle_sprint_timer(
                 );
                 commands.entity(lunge_e).set_parent(e);
 
-                sprint.lunge_duration.tick(time.delta());
-                sprint.sprint_cooldown_timer.tick(time.delta());
+                lunge_state.lunge_duration.tick(time.delta());
+                lunge_state.lunge_cooldown_timer.tick(time.delta());
                 mv.0 = mv.0 * 0.;
-            } else if sprint.lunge_duration.percent() != 0. {
-                sprint.lunge_duration.tick(time.delta());
-                if sprint.lunge_duration.percent() >= 0.20
-                    && sprint.lunge_duration.percent() <= 0.45
+            } else if lunge_state.lunge_duration.percent() != 0. {
+                lunge_state.lunge_duration.tick(time.delta());
+                if lunge_state.lunge_duration.percent() >= 0.20
+                    && lunge_state.lunge_duration.percent() <= 0.45
                 {
                     commands
                         .entity(e)
                         .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
                     kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-                    mv.0 = mv.0 * sprint.lunge_speed;
+                    mv.0 = mv.0 * lunge_state.lunge_speed;
                 } else {
                     commands
                         .entity(e)
@@ -142,23 +190,14 @@ pub fn handle_sprint_timer(
 
                     mv.0 = mv.0 * 0.;
                 }
-            }
 
-            if sprint.lunge_duration.finished() {
-                sprint.lunge_duration.reset();
-                commands.entity(e).remove::<Sprinting>();
-                commands.entity(e).insert(PlayerAnimation::Walk);
-            }
+                if lunge_state.lunge_duration.finished() {
+                    lunge_state.lunge_duration.reset();
+                    commands.entity(e).insert(PlayerAnimation::Walk);
+                }
 
-            if sprint
-                .sprint_duration_timer
-                .tick(time.delta())
-                .just_finished()
-            {
-                commands.entity(e).remove::<Sprinting>();
+                kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
             }
-
-            kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
         }
     }
 }
@@ -171,23 +210,48 @@ pub fn handle_sprinting_cooldown(
     for (e, mut sprint, anim) in query.iter_mut() {
         sprint.startup_timer.reset();
         sprint.sprint_duration_timer.reset();
-        sprint.lunge_duration.reset();
         sprint.sprint_cooldown_timer.tick(time.delta());
-        if anim.is_sprinting() || anim.is_lunging() {
+        if anim.is_sprinting() {
+            commands.entity(e).insert(PlayerAnimation::Walk);
+        }
+    }
+}
+
+pub fn handle_lunge_cooldown(
+    time: Res<Time>,
+    mut query: Query<(
+        Entity,
+        &mut LungeState,
+        &PlayerAnimation,
+        &AsepriteAnimation,
+    )>,
+    mut commands: Commands,
+) {
+    for (e, mut lunge_state, anim, aseprite_anim) in query.iter_mut() {
+        lunge_state.lunge_cooldown_timer.tick(time.delta());
+        if anim.is_lunging() && aseprite_anim.just_finished() {
+            lunge_state.lunge_duration.reset();
             commands.entity(e).insert(PlayerAnimation::Walk);
         }
     }
 }
 
 pub fn handle_enemy_death_sprint_reset(
-    enemy_death_events: EventReader<EnemyDeathEvent>,
-    mut sprint_query: Query<&mut SprintState>,
+    mut enemy_death_events: EventReader<EnemyDeathEvent>,
+    mut lunge_query: Query<&mut LungeState>,
     skills: Query<&PlayerSkills>,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
-    if !enemy_death_events.is_empty() {
+    for _ in enemy_death_events.iter() {
         if skills.single().has(Skill::SprintKillReset) {
-            for mut sprint in sprint_query.iter_mut() {
-                sprint.sprint_cooldown_timer.tick(Duration::from_secs(99));
+            if let Some(lunge_slot) = skills.single().has_active_skill(Skill::SprintLunge) {
+                for mut sprint in lunge_query.iter_mut() {
+                    active_skill_event.send(ActiveSkillUsedEvent {
+                        slot: lunge_slot,
+                        cooldown: 0.,
+                    });
+                    sprint.lunge_cooldown_timer.tick(Duration::from_secs(99));
+                }
             }
         }
     }

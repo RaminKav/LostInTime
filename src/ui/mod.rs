@@ -44,7 +44,7 @@ pub use essence_ui::*;
 
 use crate::{
     attributes::clamp_health,
-    client::{load_state, ClientState},
+    client::{is_not_paused, load_state, ClientState},
     handle_hits,
     item::item_actions::ActionSuccessEvent,
     night::NightTracker,
@@ -204,11 +204,17 @@ impl Plugin for UIPlugin {
                     handle_submit_essence_choice,
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
-                    handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
+                    handle_cursor_skills_buttons
+                        .run_if(in_state(UIState::Skills).or_else(in_state(UIState::ActiveSkills))),
                     update_furnace_bar,
                     setup_skill_choice_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                    setup_active_skill_slot_choice_ui
+                        .before(CustomFlush)
+                        .run_if(
+                            state_changed::<UIState>().and_then(in_state(UIState::ActiveSkills)),
+                        ),
                     handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
                         .before(CustomFlush)
@@ -218,6 +224,8 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
+                    tick_skill_cooldown_overlays.run_if(is_not_paused),
+                    handle_active_skill_event.run_if(is_not_paused),
                     tick_game_start_overlay,
                     handle_clamp_screen_locked_icons,
                     spawn_shrine_interact_key_guide,

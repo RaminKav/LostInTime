@@ -12,7 +12,7 @@ use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::levels::PlayerLevel;
-use crate::player::skills::{PlayerSkills, Skill};
+use crate::player::skills::{ActiveSkillUsedEvent, PlayerSkills, Skill};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::input::mouse::MouseWheel;
@@ -51,7 +51,9 @@ use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
     RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
-use crate::{Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP};
+use crate::{
+    get_active_skill_keybind, Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+};
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
     KeyCode::Key1,
@@ -241,6 +243,7 @@ pub fn player_move_inputs(
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
     mut audio_timer: Local<Timer>,
+    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -275,15 +278,17 @@ pub fn player_move_inputs(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if !skills.has(Skill::Teleport)
-        && !skills.has(Skill::Sprint)
-        && !skills.has(Skill::Parry)
-        && player.player_dash_cooldown.finished()
-        && key_input.pressed(KeyCode::Space)
-    {
-        player.is_dashing = true;
-
-        player.player_dash_cooldown.reset();
+    if let Some(roll_slot) = skills.has_active_skill(Skill::Roll) {
+        if player.player_dash_cooldown.finished()
+            && key_input.pressed(get_active_skill_keybind(roll_slot))
+        {
+            player.is_dashing = true;
+            active_skill_event.send(ActiveSkillUsedEvent {
+                slot: roll_slot,
+                cooldown: player.player_dash_cooldown.duration().as_secs_f32(),
+            });
+            player.player_dash_cooldown.reset();
+        }
     }
     if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
         && !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]))

@@ -17,8 +17,10 @@ use attributes::{
 mod audio;
 mod container;
 mod datafiles;
+mod keybinds;
 mod panic_handler;
 mod vectorize;
+pub use keybinds::*;
 
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
@@ -82,7 +84,7 @@ use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectResource};
 use player::{
     skills::{PlayerSkills, Skill},
-    sprint::ComboCounter,
+    rogue_skills::ComboCounter,
     Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};

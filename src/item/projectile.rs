@@ -11,8 +11,8 @@ use crate::{
     enemy::Mob,
     inventory::Inventory,
     player::{
+        mage_skills::JustTeleported,
         skills::{PlayerSkills, Skill},
-        teleport::JustTeleported,
         Player,
     },
     proto::proto_param::ProtoParam,

@@ -12,12 +12,12 @@ use crate::{
         Equipment, MainHand, WorldObject,
     },
     player::{
+        mage_skills::{IceExplosionDmg, TeleportShockDmg},
         melee_skills::{
             Parried, ParryState, ParrySuccessEvent, SecondHitDelay, SpearAttack, SpearGravity,
         },
+        rogue_skills::LungeState,
         skills::{PlayerSkills, Skill},
-        sprint::SprintState,
-        teleport::{IceExplosionDmg, TeleportShockDmg},
     },
     ui::damage_numbers::DodgeEvent,
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
@@ -64,7 +64,7 @@ fn check_melee_hit_collisions(
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
     lifesteal: Query<&Lifesteal>,
-    skills: Query<(&PlayerSkills, Option<&SprintState>)>,
+    skills: Query<(&PlayerSkills, Option<&LungeState>)>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mobs: Query<(&GlobalTransform, Option<&Frail>), With<Mob>>,
     anim: Query<&PlayerAnimation>,
@@ -93,7 +93,7 @@ fn check_melee_hit_collisions(
             let Ok((mob_txfm, frail_option)) = mobs.get(hit_entity) else {
                 continue;
             };
-            let (skills, maybe_sprint) = skills.single();
+            let (skills, maybe_lunge) = skills.single();
             let sword_skill_bonus = if skills.has(Skill::SwordDMG) && weapon_obj.is_sword() {
                 3
             } else {
@@ -104,7 +104,7 @@ fn check_melee_hit_collisions(
                 hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
                 if skills.has(Skill::SprintLungeDamage)
-                    && maybe_sprint.unwrap().lunge_duration.percent() != 0.
+                    && maybe_lunge.unwrap().lunge_duration.percent() != 0.
                 {
                     Some(1.25)
                 } else {
