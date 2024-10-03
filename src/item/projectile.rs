@@ -280,10 +280,12 @@ fn handle_spawn_projectiles_after_delay(
             );
             if let Some(p) = p {
                 if let Some(e) = proj.from_enemy {
-                    commands.entity(p).insert(EnemyProjectile {
-                        entity: e,
-                        mob: enemy_transforms.get(e).unwrap().1.clone(),
-                    });
+                    if let Ok(enemy_txfm) = enemy_transforms.get(e) {
+                        commands.entity(p).insert(EnemyProjectile {
+                            entity: e,
+                            mob: enemy_txfm.1.clone(),
+                        });
+                    }
                 }
                 let player_att = game.player_stats.single().0;
                 let mana_full_bonus = if game.has_skill(Skill::MPBarDMG) && proj.was_mana_bar_full {
