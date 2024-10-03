@@ -19,7 +19,9 @@ use bevy_aseprite::AsepriteBundle;
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
-use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
+use crate::world::{
+    noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
+};
 use crate::{CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN};
 
@@ -258,10 +260,10 @@ impl GenerationPlugin {
         if new_dim.is_empty() {
             return;
         }
-        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 2.) as i32;
-        for (obj_to_clear, _size, _) in UNIQUE_OBJECTS_DATA {
-            if !game.world_obj_cache.unique_objs.contains_key(&obj_to_clear) {
-                debug!("NEW UNIQUE OBJ: {obj_to_clear:?}");
+        let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
+        for (obj_to_spawn, _size, _) in UNIQUE_OBJECTS_DATA {
+            if !game.world_obj_cache.unique_objs.contains_key(&obj_to_spawn) {
+                debug!("NEW UNIQUE OBJ: {obj_to_spawn:?}");
 
                 let mut rng = rand::thread_rng();
 
@@ -287,8 +289,8 @@ impl GenerationPlugin {
                 if pos.chunk_pos.y == -1 {
                     pos.chunk_pos.y = -2;
                 }
-                debug!("set up a {obj_to_clear:?} at {pos:?}");
-                game.world_obj_cache.unique_objs.insert(obj_to_clear, pos);
+                debug!("set up a {obj_to_spawn:?} at {pos:?}");
+                game.world_obj_cache.unique_objs.insert(obj_to_spawn, pos);
             }
         }
         if dungeon_check.get_single().is_err() && !*NO_GEN {
@@ -631,7 +633,7 @@ impl GenerationPlugin {
                                                     rng.gen_range(0..15),
                                                 ),
                                             );
-                                            debug!("relocating {unique_obj:?} to {pos:?}");
+                                            info!("relocating {unique_obj:?} to {pos:?}");
                                             continue 'repeat;
                                         }
                                     }
@@ -675,11 +677,22 @@ impl GenerationPlugin {
                         }
                     }
                 }
+                let max_distance = f32::hypot(
+                    CHUNK_SIZE as f32 * TILE_SIZE.x,
+                    CHUNK_SIZE as f32 * TILE_SIZE.y,
+                );
+                let chunk_dist = Vec2::new(chunk.chunk_pos.x as f32, chunk.chunk_pos.y as f32)
+                    * CHUNK_SIZE as f32
+                    * TILE_SIZE.x as f32;
+                let distance = Vec2::new(0., 0.).distance(chunk_dist);
+
                 for (pos, obj_to_spawn) in objs.iter() {
                     // only spawn if generated obj is in our chunk or a previously genereated chunk,
                     // otherwise cache it for the correct chunk to spawn
 
-                    if game.get_chunk_entity(chunk_pos).is_some()
+                    if (distance <= max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
+                        || dungeon_check.is_ok())
+                        && game.get_chunk_entity(chunk_pos).is_some()
                         && (pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos))
                     {
                         place_item_event.send(PlaceItemEvent {
