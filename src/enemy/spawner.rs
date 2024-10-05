@@ -54,11 +54,9 @@ impl Plugin for SpawnerPlugin {
                     .in_base_set(CoreSet::PreUpdate)
                     .run_if(in_state(GameState::Main)),
             )
-            .add_system(
-                check_mob_count
-                    .in_base_set(CoreSet::PreUpdate)
-                    .run_if(resource_exists::<GlobalSpawnTimer>()),
-            );
+            .add_system(check_mob_count.in_base_set(CoreSet::PreUpdate).run_if(
+                resource_exists::<GlobalSpawnTimer>().and_then(resource_exists::<NightTracker>()),
+            ));
     }
 }
 
