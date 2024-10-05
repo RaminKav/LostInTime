@@ -290,6 +290,9 @@ pub fn handle_hits(
                 hit.damage
             };
             if let Some(obj) = obj_option {
+                if hit.hit_with_projectile.is_some() && hit.hit_by_mob.is_none() {
+                    continue;
+                }
                 let anchor = proto_param
                     .get_component::<SpriteAnchor, _>(*obj)
                     .unwrap_or(&SpriteAnchor(Vec2::ZERO));

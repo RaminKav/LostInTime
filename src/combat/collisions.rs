@@ -315,7 +315,7 @@ fn check_projectile_hit_player_collisions(
         ),
         (
             Or<(With<Player>, With<WorldObject>)>,
-            (Without<Projectile>, Without<MainHand>),
+            (Without<Projectile>, Without<MainHand>, Without<ItemStack>),
         ),
     >,
     mut hit_event: EventWriter<HitEvent>,

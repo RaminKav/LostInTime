@@ -1,13 +1,14 @@
 use bevy::{prelude::*, utils::HashMap};
 
 use crate::{
-    item::{PlaceItemEvent, Wall, WorldObject},
+    item::{PlaceItemEvent, Wall},
     proto::proto_param::ProtoParam,
     GameParam,
 };
 
 use super::{
     chunk::GenerateObjectsEvent,
+    dungeon::Dungeon,
     generation::WallBreakEvent,
     world_helpers::{get_neighbour_tile, get_neighbour_wall_data, world_pos_to_tile_pos},
     TileMapPosition,
@@ -55,7 +56,6 @@ pub fn update_wall(
                 }
                 let neighbour_pos = get_neighbour_tile(new_wall_pos, (dx, dy));
                 let Some(neighbour_chunk_e) = game.get_chunk_entity(neighbour_pos.chunk_pos) else {
-                    // println!("NEIGHBOUR CHUNK MISSING {:?}", neighbour_pos.chunk_pos);
                     continue 'outer;
                 };
                 if let Ok(cache) = chunk_wall_cache.get(neighbour_chunk_e) {
@@ -67,7 +67,6 @@ pub fn update_wall(
                 }
             }
         }
-
         for dy in -1i8..=1 {
             for dx in -1i8..=1 {
                 //skip corner block updates for walls
@@ -95,7 +94,6 @@ pub fn update_wall(
                 }
                 let updated_bit_index =
                     compute_wall_index(final_sprite_index, (dx, dy), !neighbour_is_wall);
-
                 final_sprite_index = updated_bit_index;
             }
         }
@@ -157,7 +155,6 @@ pub fn update_wall(
         if let Some(mut new_wall_data) = game.get_wall_data_at_tile_mut(new_wall_pos, &proto_param)
         {
             commands.entity(wall_entity).remove::<Dirty>();
-
             new_wall_data.obj_bit_index = final_sprite_index;
             wall_sprite.index = (final_sprite_index + new_wall_data.texture_offset * 32) as usize;
         }
@@ -195,6 +192,7 @@ pub fn handle_wall_placed(
     mut events: EventReader<PlaceItemEvent>,
 
     mut chunk_wall_cache: Query<&mut ChunkWallCache>,
+    dungeon_check: Query<&Dungeon>,
 ) {
     let mut new_walls_pos = Vec::new();
     for PlaceItemEvent {
@@ -204,7 +202,7 @@ pub fn handle_wall_placed(
         override_existing_obj: _,
     } in events.iter()
     {
-        if !placed_by_player {
+        if !placed_by_player && dungeon_check.get_single().is_ok() {
             continue;
         }
         if proto_param.get_component::<Wall, _>(*obj).is_none() {

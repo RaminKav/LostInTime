@@ -377,9 +377,18 @@ fn check_mob_count(
     // for each spawned chunk, check if mob count is < max
     // and if so, send event to spawn more
     timer.timer.tick(time.delta());
-    let mob_count = mobs.iter().filter(|m| m != &&Mob::RedMushling).count() as i32;
+    let mob_count = mobs
+        .iter()
+        .filter(|m| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
+        .count() as i32;
     let max_mobs = BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 2;
     if mob_count >= max_mobs {
+        info!(
+            "MAX MOBS {:?} {:?} {:?}",
+            mob_count,
+            max_mobs,
+            mobs.iter().count()
+        );
         return;
     }
     if timer.timer.just_finished() {
