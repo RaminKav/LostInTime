@@ -710,7 +710,7 @@ impl Skill {
                 commands.entity(entity).insert(BowUpgradeSpread(2));
             }
             Skill::BowArrowSpeed => {
-                commands.entity(entity).insert(ArrowSpeedUpgrade(1.));
+                commands.entity(entity).insert(ArrowSpeedUpgrade(1.4));
             }
             Skill::Sprint => {
                 commands.entity(entity).insert(SprintState {
@@ -921,8 +921,8 @@ impl Default for SkillChoiceQueue {
                     SkillChoiceState::new(Skill::TeleportIceAoE),
                 ]),
                 SkillChoiceState::new(Skill::ClawDoubleThrow),
-                SkillChoiceState::new(Skill::BowMultiShot)
-                    .with_children(vec![SkillChoiceState::new(Skill::BowArrowSpeed)]),
+                SkillChoiceState::new(Skill::BowMultiShot),
+                SkillChoiceState::new(Skill::BowArrowSpeed),
                 SkillChoiceState::new(Skill::ChainLightning),
                 SkillChoiceState::new(Skill::IceStaffAoE),
                 SkillChoiceState::new(Skill::StaffDMG),

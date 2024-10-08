@@ -83,8 +83,9 @@ use inputs::InputsPlugin;
 use inventory::ItemStack;
 use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectResource};
 use player::{
-    skills::{PlayerSkills, Skill},
+    levels::PlayerLevel,
     rogue_skills::ComboCounter,
+    skills::{PlayerSkills, Skill},
     Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -348,8 +349,17 @@ pub struct GameParam<'w, 's> {
     pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
 
     //TODO: remove this to use Bevy_Save
-    pub player_query:
-        Query<'w, 's, (Entity, &'static TimeFragmentCurrency, &'static PlayerSkills), With<Player>>,
+    pub player_query: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static TimeFragmentCurrency,
+            &'static PlayerSkills,
+            &'static mut PlayerLevel,
+        ),
+        With<Player>,
+    >,
     pub player_stats: Query<
         'w,
         's,
@@ -396,6 +406,15 @@ pub struct GameParam<'w, 's> {
 impl<'w, 's> GameParam<'w, 's> {
     pub fn player(&self) -> PlayerState {
         self.game.player_state.clone()
+    }
+    pub fn get_player_level(&self) -> u8 {
+        self.player_query.single().3.level
+    }
+    pub fn get_player_level_mut(&mut self) -> Mut<PlayerLevel> {
+        self.player_query.single_mut().3
+    }
+    pub fn get_player_skills(&self) -> PlayerSkills {
+        self.player_query.single().2.clone()
     }
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state

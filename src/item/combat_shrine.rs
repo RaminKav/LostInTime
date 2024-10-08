@@ -8,7 +8,6 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
     item::{object_actions::ObjectAction, LootTable},
-    player::levels::PlayerLevel,
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     GameParam,
@@ -94,7 +93,6 @@ pub fn handle_shrine_rewards(
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
-    level: Query<&PlayerLevel>,
 ) {
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
@@ -126,7 +124,7 @@ pub fn handle_shrine_rewards(
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
                     1,
-                    Some(level.single().level),
+                    Some(game.get_player_level()),
                 );
                 commands
                     .entity(e)

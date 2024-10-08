@@ -1,4 +1,5 @@
 use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -9,7 +10,7 @@ use crate::{
     container::Container,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
-    player::Player,
+    player::{levels::PlayerLevel, Player},
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::CraftingContainerType,
@@ -19,6 +20,8 @@ use crate::{
     },
     GameState,
 };
+
+use super::EquipmentType;
 
 pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
@@ -150,11 +153,13 @@ pub fn get_crafting_inventory_item_stacks(
     objs: Vec<WorldObject>,
     rec: &Recipes,
     proto: &ProtoParam,
+    player_level: u8,
 ) -> Vec<Option<InventoryItemStack>> {
     let mut list = vec![];
     for (slot, obj) in objs.iter().enumerate() {
         let recipe = rec.crafting_list.get(obj).expect("no recipe for item?");
         let mut default_stack = proto.get_item_data(*obj).unwrap().clone();
+
         let stack_count = recipe.2;
         let desc = recipe
             .0
@@ -162,6 +167,9 @@ pub fn get_crafting_inventory_item_stacks(
             .map(|ingredient| format!("{}x", ingredient.count,))
             .collect();
         default_stack.metadata.desc = desc;
+        if proto.get_component::<EquipmentType, _>(*obj).is_some() {
+            default_stack.metadata.level = Some(player_level);
+        }
         list.push(Some(InventoryItemStack::new(
             default_stack.copy_with_count(stack_count),
             slot,
@@ -306,13 +314,14 @@ pub fn handle_inv_changed_update_crafting_tracker(
     mut craft_tracker: ResMut<CraftingTracker>,
     recipes: Res<Recipes>,
     proto: ProtoParam,
-    player_t: Query<&GlobalTransform, With<Player>>,
+    player: Query<(&GlobalTransform, &PlayerLevel), With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     mut text_timer: ResMut<NewRecipeTextTimer>,
     time: Res<Time>,
 ) {
+    let (player_t, player_level) = player.single();
     // queue processing
     if !text_timer.timer.finished() {
         text_timer.timer.tick(time.delta());
@@ -320,7 +329,7 @@ pub fn handle_inv_changed_update_crafting_tracker(
         let shadow = spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
-            player_t.single().translation() + Vec3::new(0., 15., 10.),
+            player_t.translation() + Vec3::new(0., 15., 10.),
             YELLOW,
             "New Recipe!".to_string(),
         );
@@ -378,7 +387,16 @@ pub fn handle_inv_changed_update_crafting_tracker(
         .get(&CraftingContainerType::Inventory)
     {
         inv.crafting_items = Container {
-            items: get_crafting_inventory_item_stacks(inv_recipes.clone(), &recipes, &proto),
+            items: get_crafting_inventory_item_stacks(
+                inv_recipes
+                    .into_iter()
+                    .sorted_by_key(|i| i.to_string())
+                    .cloned()
+                    .collect_vec(),
+                &recipes,
+                &proto,
+                player_level.level,
+            ),
             ..default()
         };
     }

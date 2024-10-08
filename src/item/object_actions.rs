@@ -186,6 +186,7 @@ impl ObjectAction {
                         crafting_items.to_vec(),
                         &item_action_param.recipes,
                         proto_param,
+                        game.get_player_level() as u8,
                     )
                 } else {
                     vec![]

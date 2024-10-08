@@ -388,7 +388,7 @@ pub fn close_container(
     }
 }
 pub fn toggle_inventory(
-    game: GameParam,
+    mut game: GameParam,
     key_input: ResMut<Input<KeyCode>>,
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
@@ -396,7 +396,6 @@ pub fn toggle_inventory(
     _inv: Query<&mut Inventory>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     cursor: Res<CursorPos>,
-    mut player_xp: Query<&mut PlayerLevel>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
     if key_input.just_pressed(KeyCode::I)
@@ -420,7 +419,8 @@ pub fn toggle_inventory(
             });
         }
         if key_input.just_pressed(KeyCode::C) {
-            player_xp.single_mut().add_xp(100);
+            game.get_player_level_mut().add_xp(100);
+
             flash_event.send_default();
         }
         if key_input.just_pressed(KeyCode::K) {
@@ -614,7 +614,7 @@ pub fn mouse_click_system(
             let is_valid = game
                 .get_pos_validity_for_pathfinding(ai_pos)
                 .unwrap_or(true);
-            info!(
+            debug!(
                 "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?} || {ai_pos:?}",
                 cursor_pos.ui_coords,
             );

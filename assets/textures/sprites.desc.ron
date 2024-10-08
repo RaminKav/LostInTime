@@ -156,7 +156,7 @@
             anchor: Some((0.2,0.0)),
         ),
         MagicWhip: WorldObjectData(
-            texture_pos: (11., 5.),
+            texture_pos: (10., 5.),
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
@@ -231,12 +231,12 @@
             anchor: None,
         ),
         Scrapper: WorldObjectData(
-            texture_pos: (1., 9.),
+            texture_pos: (9., 2.),
             size: (16., 16.),
             anchor: None,
         ),
         ScrapperBlock: WorldObjectData(
-            texture_pos: (1., 9.),
+            texture_pos: (9., 2.),
             size: (16., 16.),
             anchor: None,
         ),

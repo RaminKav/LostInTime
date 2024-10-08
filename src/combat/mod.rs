@@ -15,7 +15,7 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{
         modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown,
-        LootRateBonus, ManaRegen,
+        LootRateBonus, ManaRegen, MaxHealth,
     },
     client::{
         analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
@@ -248,6 +248,7 @@ pub fn handle_hits(
     mut health: Query<(
         Entity,
         &mut CurrentHealth,
+        &MaxHealth,
         &GlobalTransform,
         Option<&WorldObject>,
         Option<&Mob>,
@@ -272,6 +273,7 @@ pub fn handle_hits(
         if let Ok((
             e,
             mut hit_health,
+            max_health,
             t,
             obj_option,
             mob_option,
@@ -327,14 +329,24 @@ pub fn handle_hits(
                 }
             } else {
                 let is_player = game.game.player == e;
+                if let Some(mob) = mob_option {
+                    if game.get_player_skills().has(Skill::LethalBlow)
+                        && hit_health.0 <= max_health.0 / 5
+                        && !mob.is_boss()
+                        && Skill::LethalBlow
+                            .is_obj_valid(hit.hit_with_melee.unwrap_or(WorldObject::None))
+                    {
+                        hit_health.0 = 0;
+                    }
+                }
                 hit_health.0 -= dmg
-                    - if game.has_skill(Skill::MinusOneDamageOnHit) {
+                    - if game.has_skill(Skill::MinusOneDamageOnHit) && is_player {
                         1
                     } else {
                         0
                     };
                 if *DEBUG {
-                    debug!("HP {:?}", hit_health.0);
+                    info!("HP {:?}", hit_health.0);
                 }
 
                 let mob_kb = if let Some(mob) = mob_option {

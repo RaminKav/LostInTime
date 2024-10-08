@@ -249,12 +249,12 @@ fn handle_translate_projectiles(
         let arrow_speed_upgrade = if proj == &Projectile::Arrow {
             speed_modifiers
                 .get_single()
-                .unwrap_or(&ArrowSpeedUpgrade(0.))
+                .unwrap_or(&ArrowSpeedUpgrade(1.))
                 .0
         } else {
-            0.
+            1.
         };
-        let delta = state.direction * (state.speed + arrow_speed_upgrade) * time.delta_seconds();
+        let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
         transform.translation += delta.extend(0.0);
     }
 }

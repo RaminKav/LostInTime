@@ -8,7 +8,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: ChestBlock,
         metadata: (
-            name: "Chest", 
+            name: "Chest ", 
             desc: ["Stores items."]
         ),
         count: 1

@@ -2,6 +2,7 @@ use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
+use crate::client::is_not_paused;
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, RED, YELLOW,
 };
@@ -12,7 +13,7 @@ use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
 use crate::juice::{spawn_obj_death_particles, spawn_xp_particles};
-use crate::player::levels::{ExperienceReward, PlayerLevel};
+use crate::player::levels::ExperienceReward;
 use crate::player::Player;
 use crate::proto::proto_param::ProtoParam;
 
@@ -818,19 +819,23 @@ impl Plugin for ItemsPlugin {
                 (
                     handle_pay_shrine_cost,
                     handle_delayed_spawns.run_if(resource_exists::<DelayedSpawn>()),
-                    handle_item_action_success,
-                    handle_delayed_ranged_attack,
-                    handle_spread_arrows_attack.after(CustomFlush),
-                    handle_burning_ticks,
+                    handle_item_action_success.run_if(is_not_paused),
+                    handle_delayed_ranged_attack.run_if(is_not_paused),
+                    handle_spread_arrows_attack
+                        .after(CustomFlush)
+                        .run_if(is_not_paused),
+                    handle_burning_ticks.run_if(is_not_paused),
                     handle_shrine_rewards,
                     add_shrine_visuals_on_spawn,
                     handle_gamble_shrine_rewards,
                     add_gamble_visuals_on_spawn,
-                    handle_frail_stack_ticks,
-                    handle_slow_stack_ticks,
+                    handle_frail_stack_ticks.run_if(is_not_paused),
+                    handle_slow_stack_ticks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
-                    handle_on_hit_upgrades.after(handle_hits),
-                    handle_reset_proj_hit_enemies_state,
+                    handle_on_hit_upgrades
+                        .after(handle_hits)
+                        .run_if(is_not_paused),
+                    handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -972,7 +977,6 @@ pub fn handle_break_object(
     loot_tables: Query<&LootTable>,
     chest_containers: Query<&ChestContainer>,
     xp: Query<&ExperienceReward>,
-    mut player_xp: Query<&mut PlayerLevel>,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
@@ -1059,15 +1063,15 @@ pub fn handle_break_object(
                     &proto_param,
                     pos.truncate(),
                     drop.count,
-                    Some(player_xp.single().level),
+                    Some(game.get_player_level()),
                 );
             }
         }
 
         // EXP Reward
         if let Ok(exp) = xp.get(broken.entity) {
-            let mut player = player_xp.single_mut();
-            player.add_xp(exp.0);
+            let mut player_xp = game.get_player_level_mut();
+            player_xp.add_xp(exp.0);
             let t = tile_pos_to_world_pos(broken.pos, true);
             spawn_xp_particles(t, &mut commands, exp.0 as f32);
         }

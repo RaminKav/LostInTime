@@ -101,6 +101,9 @@ impl PlayerAnimation {
         self == &PlayerAnimation::Walk
     }
 
+    pub fn is_shooting_bow(&self) -> bool {
+        self == &PlayerAnimation::Bow
+    }
     pub fn is_one_time_anim(&self) -> bool {
         match self {
             PlayerAnimation::Roll => true,
@@ -120,7 +123,7 @@ impl PlayerAnimation {
     pub fn is_an_attack(&self) -> bool {
         match self {
             PlayerAnimation::Attack => true,
-            PlayerAnimation::Lunge => true,
+            // PlayerAnimation::Lunge => true,
             PlayerAnimation::RunAttack => true,
             PlayerAnimation::RunAttack1 => true,
             PlayerAnimation::RunAttack2 => true,

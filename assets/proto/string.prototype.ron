@@ -6,8 +6,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: String,
         metadata: (
-            name: "String", 
-            desc: ["Some string. Helps", "to craft various tools."]
+            name: "String ", 
+            desc: ["Some string. Helps", "to craft various", "tools."]
         ),
         count: 1
   ),

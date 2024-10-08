@@ -285,7 +285,6 @@ pub fn save_state(
         (
             &GlobalTransform,
             &PlayerStats,
-            &PlayerLevel,
             &CurrentHealth,
             &Hunger,
             &Inventory,
@@ -315,10 +314,10 @@ pub fn save_state(
     }
     timer.timer.reset();
     //PlayerData
-    let (player_txfm, stats, level, hp, hunger, inv, skills, currency) = player_data.single();
+    let (player_txfm, stats, hp, hunger, inv, skills, currency) = player_data.single();
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
-    save_data.player_level = level.clone();
+    save_data.player_level = game.player_query.single().3.clone();
     save_data.current_health = *hp;
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();

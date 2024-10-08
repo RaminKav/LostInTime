@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-use crate::attributes::{CurrentHealth, MaxHealth};
-use crate::combat::{EnemyDeathEvent, MarkedForDeath};
+use crate::animations::player_sprite::PlayerAnimation;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
@@ -98,7 +97,10 @@ pub fn handle_spread_arrows_attack(
     game: GameParam,
     mouse_button_input: Res<Input<MouseButton>>,
     cursor_pos: Res<CursorPos>,
-    att_cooldown_query: Query<(&BowUpgradeSpread, Option<&AttackTimer>), With<Player>>,
+    att_cooldown_query: Query<
+        (&BowUpgradeSpread, &PlayerAnimation, Option<&AttackTimer>),
+        With<Player>,
+    >,
     mut count: Local<u8>,
 ) {
     let Ok(ranged_attack) = wep_query.get_single() else {
@@ -107,13 +109,16 @@ pub fn handle_spread_arrows_attack(
     if ranged_attack.0 != Projectile::Arrow {
         return;
     }
-    let Ok((spread_attack, cooldown_option)) = att_cooldown_query.get_single() else {
+    let Ok((spread_attack, anim, cooldown_option)) = att_cooldown_query.get_single() else {
         return;
     };
-    if cooldown_option.is_none() {
+    if cooldown_option.is_none() && !anim.is_shooting_bow() {
         *count = 0;
     }
-    if mouse_button_input.pressed(MouseButton::Left) && *count < spread_attack.0 {
+    if anim.is_shooting_bow()
+        && mouse_button_input.pressed(MouseButton::Left)
+        && *count < spread_attack.0
+    {
         let rotate = |val: Vec2, angle: f32| -> Vec2 {
             let cos_angle = angle.cos();
             let sin_angle = angle.sin();
@@ -150,7 +155,7 @@ pub fn handle_on_hit_upgrades(
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
     game: GameParam,
-    mobs: Query<(Entity, &Mob, &GlobalTransform, &CurrentHealth, &MaxHealth), With<Mob>>,
+    mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut burn_or_venom_mobs: Query<(
         Option<&mut Burning>,
         Option<&mut Poisoned>,
@@ -159,7 +164,6 @@ pub fn handle_on_hit_upgrades(
     )>,
     mut elec_count: Local<u8>,
     att_cooldown_query: Query<Option<&AttackTimer>, With<Player>>,
-    mut enemy_death_events: EventWriter<EnemyDeathEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
     asset_server: Res<AssetServer>,
@@ -171,7 +175,7 @@ pub fn handle_on_hit_upgrades(
         if hit.hit_entity == game.game.player {
             continue;
         }
-        let Ok((hit_e, mob, hit_entity_txfm, curr_hp, max_hp)) = mobs.get(hit.hit_entity) else {
+        let Ok((hit_e, hit_entity_txfm)) = mobs.get(hit.hit_entity) else {
             continue;
         };
         let skills = upgrades.single();
@@ -181,7 +185,7 @@ pub fn handle_on_hit_upgrades(
             && *elec_count == 0
         {
             let Some(nearest_mob_t) = mobs.iter().find(|t| {
-                t.2.translation().distance(hit_entity_txfm.translation()) < 70.
+                t.1.translation().distance(hit_entity_txfm.translation()) < 70.
                     && t.0 != hit.hit_entity
             }) else {
                 continue;
@@ -191,14 +195,14 @@ pub fn handle_on_hit_upgrades(
                 Projectile::Electricity,
                 &proto,
                 hit_entity_txfm.translation().truncate(),
-                (nearest_mob_t.2.translation().truncate()
+                (nearest_mob_t.1.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
                 .normalize_or_zero(),
                 false,
             );
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Electricity,
-                direction: (nearest_mob_t.2.translation().truncate()
+                direction: (nearest_mob_t.1.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
                 .normalize_or_zero(),
                 from_enemy: None,
@@ -236,18 +240,6 @@ pub fn handle_on_hit_upgrades(
                 .entity(ice)
                 .insert(YSort(-0.1))
                 .insert(IceExplosionDmg);
-        }
-        if skills.has(Skill::LethalBlow)
-            && curr_hp.0 <= max_hp.0 / 5
-            && !mob.is_boss()
-            && Skill::LethalBlow.is_obj_valid(main_hand.get_obj())
-        {
-            commands.entity(hit_e).insert(MarkedForDeath);
-            enemy_death_events.send(EnemyDeathEvent {
-                entity: hit_e,
-                enemy_pos: hit_entity_txfm.translation().truncate(),
-                killed_by_crit: false,
-            });
         }
         let Ok((burning_option, _poisoned_option, frailed_option, mut slowed_option)) =
             burn_or_venom_mobs.get_mut(hit.hit_entity)

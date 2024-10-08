@@ -8,7 +8,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: UpgradeStationBlock,
         metadata: (
-            name: "Upgrade Station", 
+            name: "Upgrade Station ", 
             desc: ["Allows you to", "upgrade and", "improve your","equipment. "]
         ),
         count: 1

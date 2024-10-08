@@ -6,7 +6,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: StoneChunk,
         metadata: (
-            name: "Stone", 
+            name: "Stone ", 
             desc: ["A big chunk of", "stone. Can be used", "to craft various", "tools."]
         ),
         count: 1

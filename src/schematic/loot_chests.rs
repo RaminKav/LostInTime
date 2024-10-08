@@ -6,7 +6,7 @@ use crate::{
     attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
     inventory::InventoryItemStack,
     item::{Loot, LootTable, LootTablePlugin, WorldObject},
-    night::NightTracker,
+    player::levels::PlayerLevel,
     proto::proto_param::ProtoParam,
     ui::ChestContainer,
 };
@@ -25,7 +25,7 @@ pub fn handle_new_loot_chest_spawn(
     mut loot_chests: Query<(Entity, &LootChestType, &mut ChestContainer), With<LootChestType>>,
     proto_param: ProtoParam,
     mut commands: Commands,
-    night_tracker: ResMut<NightTracker>,
+    player_level: Query<&PlayerLevel>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -144,9 +144,13 @@ pub fn handle_new_loot_chest_spawn(
                 ],
             },
         };
-        for loot in
-            LootTablePlugin::get_drops(&loot_table, &proto_param, 0, Some(night_tracker.days + 1))
-                .iter()
+        for loot in LootTablePlugin::get_drops(
+            &loot_table,
+            &proto_param,
+            0,
+            Some(player_level.single().level),
+        )
+        .iter()
         {
             let mut found_slot = false;
             while !found_slot {

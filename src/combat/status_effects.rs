@@ -3,9 +3,9 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
-use crate::{assets::Graphics, attributes::CurrentHealth};
+use crate::assets::Graphics;
 
-use super::{EnemyDeathEvent, MarkedForDeath};
+use super::HitEvent;
 
 #[derive(
     Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, FromReflect, Eq, PartialEq,
@@ -143,29 +143,27 @@ pub fn update_status_effect_icons(
 }
 
 pub fn handle_burning_ticks(
-    mut burning: Query<(Entity, &mut Burning, &mut CurrentHealth, &GlobalTransform)>,
+    mut burning: Query<(Entity, &mut Burning)>,
     time: Res<Time>,
     mut commands: Commands,
-    mut enemy_death_events: EventWriter<EnemyDeathEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
+    mut hit_event: EventWriter<HitEvent>,
 ) {
-    for (e, mut burning, mut curr_hp, t) in burning.iter_mut() {
+    for (e, mut burning) in burning.iter_mut() {
         burning.duration_timer.tick(time.delta());
         if !burning.duration_timer.just_finished() {
             burning.tick_timer.tick(time.delta());
             if burning.tick_timer.just_finished() {
-                curr_hp.0 -= burning.damage as i32;
-                if curr_hp.0 <= 0 {
-                    commands
-                        .entity(e)
-                        .insert(MarkedForDeath)
-                        .remove::<Burning>();
-                    enemy_death_events.send(EnemyDeathEvent {
-                        entity: e,
-                        enemy_pos: t.translation().truncate(),
-                        killed_by_crit: false,
-                    });
-                }
+                hit_event.send(HitEvent {
+                    hit_entity: e,
+                    damage: burning.damage as i32,
+                    dir: Vec2::new(0.5, 0.5),
+                    hit_with_melee: None,
+                    hit_with_projectile: None,
+                    was_crit: false,
+                    hit_by_mob: None,
+                    ignore_tool: false,
+                });
                 burning.tick_timer.reset();
             }
         } else {

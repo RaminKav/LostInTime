@@ -383,7 +383,7 @@ fn check_mob_count(
         .count() as i32;
     let max_mobs = BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 2;
     if mob_count >= max_mobs {
-        info!(
+        debug!(
             "MAX MOBS {:?} {:?} {:?}",
             mob_count,
             max_mobs,
