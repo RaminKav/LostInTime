@@ -1,8 +1,9 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, transform::commands};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     animations::AttackEvent,
+    audio::{AudioSoundEffect, SoundSpawner},
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
         skills::{PlayerSkills, Skill},
@@ -36,6 +37,7 @@ pub fn handle_item_abilitiy_on_attack(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut player: Query<(&PlayerSkills, &Attack), With<Player>>,
     game: GameParam,
+    mut commands: Commands,
 ) {
     let (skills, dmg) = player.single_mut();
 
@@ -54,6 +56,7 @@ pub fn handle_item_abilitiy_on_attack(
                 pos_override: None,
                 spawn_delay: 0.1,
             });
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.4));
         }
         if skills.has(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
             ranged_attack_event.send(RangedAttackEvent {

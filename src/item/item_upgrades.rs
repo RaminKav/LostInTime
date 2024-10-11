@@ -199,6 +199,7 @@ pub fn handle_on_hit_upgrades(
                     - hit_entity_txfm.translation().truncate())
                 .normalize_or_zero(),
                 false,
+                &asset_server,
             );
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Electricity,
@@ -235,6 +236,7 @@ pub fn handle_on_hit_upgrades(
                 asset_server.load::<Aseprite, _>(IceFloor::PATH),
                 AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                 true,
+                Projectile::Fireball,
             );
             commands
                 .entity(ice)

@@ -3,11 +3,13 @@ use std::{f32::consts::PI, time::Duration};
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
     attributes::Attack,
+    audio::{AudioSoundEffect, SoundSpawner},
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     enemy::Mob,
     get_active_skill_keybind,
     inputs::{CursorPos, FacingDirection, MovementVector},
+    item::projectile::Projectile,
     ui::damage_numbers::{spawn_text, DodgeEvent},
     world::TILE_SIZE,
     AttackTimer, EnemyDeathEvent, GameParam, HitEvent,
@@ -153,6 +155,8 @@ pub fn handle_lunge(
 
                 // LUNGE
                 commands.entity(e).insert(PlayerAnimation::Lunge);
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.5));
+
                 let angle = match dir {
                     FacingDirection::Up => 0.,
                     FacingDirection::Down => 0.,
@@ -166,6 +170,7 @@ pub fn handle_lunge(
                     0.5,
                     dmg.0,
                     Collider::cuboid(9., 1.5 * TILE_SIZE.x),
+                    Projectile::None,
                 );
                 commands.entity(lunge_e).set_parent(e);
 

@@ -21,6 +21,7 @@ use crate::{
     inputs::player_move_inputs,
     inventory::{Inventory, ItemStack},
     item::{Equipment, EquipmentType, WorldObject},
+    juice::ShakeEffect,
     player::{
         skills::{PlayerSkills, Skill},
         stats::StatType,
@@ -33,7 +34,7 @@ use crate::{
         DropOnSlotEvent, InventoryState, RemoveFromSlotEvent, ShowInvPlayerStatsEvent, UIElement,
         UIState,
     },
-    CustomFlush, Game, GameParam, GameState, Player,
+    CustomFlush, Game, GameParam, GameState, Player, TextureCamera,
 };
 use modifiers::*;
 pub mod attribute_helpers;
@@ -1539,6 +1540,7 @@ fn handle_new_items_raw_attributes(
     >,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    mut game_camera: Query<Entity, With<TextureCamera>>,
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
         let rarity = get_rarity_rng(rand::thread_rng());
@@ -1551,6 +1553,7 @@ fn handle_new_items_raw_attributes(
             rarity,
             eqp_type,
             item_level.map(|l| l.0),
+            &mut commands,
         );
 
         if new_stack.rarity.clone() == ItemRarity::Rare {
@@ -1575,6 +1578,22 @@ fn handle_new_items_raw_attributes(
                 .insert(VisibilityBundle::default())
                 .insert(DoneAnimation)
                 .set_parent(e);
+            let mut rng = rand::thread_rng();
+            let seed = rng.gen_range(0..100000);
+            let speed = 10.;
+            let max_mag = 90.;
+            let noise = 0.5;
+            let dir = Vec2::new(1., 1.);
+            for e in game_camera.iter_mut() {
+                commands.entity(e).insert(ShakeEffect {
+                    timer: Timer::from_seconds(2., TimerMode::Once),
+                    speed,
+                    seed,
+                    max_mag,
+                    noise,
+                    dir,
+                });
+            }
         }
         commands.entity(e).insert(new_stack);
     }

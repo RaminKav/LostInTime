@@ -7,12 +7,13 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen, Lifesteal},
+    audio::{AudioSoundEffect, SoundSpawner},
     colors::LIGHT_RED,
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     enemy::Mob,
     get_active_skill_keybind,
     inputs::{CursorPos, MovementVector},
-    item::WorldObject,
+    item::{projectile::Projectile, WorldObject},
     status_effects::Frail,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
@@ -237,6 +238,9 @@ pub fn handle_spear(
             spear_state.cooldown_timer.reset();
             spear_state.spear_timer.tick(time.delta());
             commands.entity(e).insert(PlayerAnimation::Spear);
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.5));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.5).with_delay(0.32));
+
             active_skill_event.send(ActiveSkillUsedEvent {
                 slot: spear_slot,
                 cooldown: spear_state.cooldown_timer.duration().as_secs_f32(),
@@ -260,6 +264,7 @@ pub fn handle_spear(
                 0.5,
                 dmg.0,
                 Collider::cuboid(12., 1.5 * TILE_SIZE.x),
+                Projectile::Echo,
             );
             commands.entity(hit).insert(SpearAttack).set_parent(e);
         }
@@ -332,6 +337,7 @@ pub fn spawn_echo_hitbox(
         asset_server.load::<Aseprite, _>(Echo::PATH),
         AsepriteAnimation::from(Echo::tags::ECHO),
         false,
+        Projectile::Echo,
     );
     commands.entity(hitbox_e).set_parent(player);
 }

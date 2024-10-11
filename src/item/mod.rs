@@ -605,7 +605,7 @@ impl WorldObject {
             WorldObject::WoodSword => true,
             WorldObject::Sword => true,
             WorldObject::Dagger => true,
-            WorldObject::Claw => true,
+            WorldObject::Claw => false,
             _ => false,
         }
     }
@@ -1071,9 +1071,9 @@ pub fn handle_break_object(
         // EXP Reward
         if let Ok(exp) = xp.get(broken.entity) {
             let mut player_xp = game.get_player_level_mut();
-            player_xp.add_xp(exp.0);
+            let did_level = player_xp.add_xp(exp.0);
             let t = tile_pos_to_world_pos(broken.pos, true);
-            spawn_xp_particles(t, &mut commands, exp.0 as f32);
+            spawn_xp_particles(t, &mut commands, exp.0, did_level);
         }
 
         // Analytics

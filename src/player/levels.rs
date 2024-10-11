@@ -38,14 +38,17 @@ impl PlayerLevel {
         }
     }
 
-    pub fn add_xp(&mut self, xp: u32) {
+    pub fn add_xp(&mut self, xp: u32) -> bool {
+        let mut did_level_up = false;
         self.xp += xp;
+
         if self.xp >= self.next_level_xp {
             self.level += 1;
             self.xp -= self.next_level_xp;
             self.next_level_xp = f32::floor(
                 BASE_LEVEL_EXP_REQ * f32::powf(1. + (0.2 * (self.level as f32 - 1.)), 2.),
             ) as u32;
+            did_level_up = true;
         }
         if *DEBUG {
             debug!(
@@ -53,6 +56,7 @@ impl PlayerLevel {
                 self.xp, self.level, self.next_level_xp
             );
         }
+        did_level_up
     }
 }
 

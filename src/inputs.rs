@@ -7,11 +7,11 @@ use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::AttackEvent;
 use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
+use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::ChunkSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::levels::PlayerLevel;
 use crate::player::skills::{ActiveSkillUsedEvent, PlayerSkills, Skill};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -288,6 +288,7 @@ pub fn player_move_inputs(
                 cooldown: player.player_dash_cooldown.duration().as_secs_f32(),
             });
             player.player_dash_cooldown.reset();
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
         }
     }
     if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
@@ -419,9 +420,12 @@ pub fn toggle_inventory(
             });
         }
         if key_input.just_pressed(KeyCode::C) {
-            game.get_player_level_mut().add_xp(100);
+            let did_level = game.get_player_level_mut().add_xp(100);
 
-            flash_event.send_default();
+            flash_event.send(FlashExpBarEvent {
+                amount: 100,
+                did_level,
+            });
         }
         if key_input.just_pressed(KeyCode::K) {
             dim_event.send(DimensionSpawnEvent {

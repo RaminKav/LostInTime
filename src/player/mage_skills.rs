@@ -7,10 +7,11 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::Attack,
+    audio::{AudioSoundEffect, SoundSpawner},
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     get_active_skill_keybind,
     inputs::MovementVector,
-    item::WorldObject,
+    item::{projectile::Projectile, WorldObject},
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
     GameParam,
@@ -19,6 +20,7 @@ use crate::{
 use super::{ActiveSkillUsedEvent, MovePlayerEvent, Player, PlayerSkills, Skill};
 
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
+aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
 aseprite!(pub IceFloor, "textures/effects/IceFloor.aseprite");
 #[derive(Component)]
 pub struct JustTeleported;
@@ -76,6 +78,7 @@ pub fn handle_teleport(
                 cooldown: teleport_state.cooldown_timer.duration().as_secs_f32(),
             });
             commands.entity(e).insert(PlayerAnimation::Teleport);
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.25));
             teleport_state.count -= 1;
             teleport_state.timer.reset();
             teleport_state.timer.tick(time.delta());
@@ -119,8 +122,10 @@ pub fn handle_teleport(
                 0.5,
                 dmg.0 / 5,
                 Collider::cuboid(8., 1.5 * TILE_SIZE.x),
+                Projectile::TeleportShock,
             );
             commands.entity(shock_e).insert(TeleportShockDmg);
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.3));
         }
         if skills.has(Skill::TeleportIceAoE) {
             spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
@@ -207,6 +212,9 @@ pub fn spawn_ice_explosion_hitbox(
         asset_server.load::<Aseprite, _>(IceExplosion::PATH),
         anim,
         false,
+        Projectile::FireExplosionAOE,
     );
+
     commands.entity(c).insert(IceExplosionDmg);
+    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
 }

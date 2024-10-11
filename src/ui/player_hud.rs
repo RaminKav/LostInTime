@@ -8,6 +8,7 @@ use super::{
 use crate::{
     assets::Graphics,
     attributes::{hunger::Hunger, CurrentHealth, CurrentMana, MaxHealth, MaxMana},
+    audio::{AudioSoundEffect, SoundSpawner},
     client::GameOverEvent,
     colors::{BLACK, BLUE, RED, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
@@ -56,7 +57,10 @@ pub struct BarFlashTimer {
 #[derive(Component)]
 pub struct CurrencyIcon;
 #[derive(Default)]
-pub struct FlashExpBarEvent;
+pub struct FlashExpBarEvent {
+    pub amount: u32,
+    pub did_level: bool,
+}
 
 pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<ScreenResolution>) {
     let hud_bar_frame = commands
@@ -352,8 +356,9 @@ pub fn update_xp_bar(
     mut xp_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<XPBar>>,
     mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
     mut flash_event: EventReader<FlashExpBarEvent>,
+    mut commands: Commands,
 ) {
-    for _e in flash_event.iter() {
+    for event in flash_event.iter() {
         let level = player_xp_query.single();
 
         let (mut sprite, mut flash) = xp_bar_query.single_mut();
@@ -367,6 +372,19 @@ pub fn update_xp_bar(
             txfm.translation.x = -5.5;
         }
         flash.timer.tick(Duration::from_nanos(1));
+        if event.did_level {
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::LevelUp, 0.35));
+        }
+        if event.amount >= 50 {
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.15));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.22));
+        } else if event.amount >= 10 {
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.15));
+        } else {
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
+        }
     }
 }
 
@@ -744,6 +762,9 @@ pub fn tick_skill_cooldown_overlays(
     for (mut overlay, mut timer) in overlays.iter_mut() {
         timer.timer.tick(time.delta());
         overlay.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
+        if timer.timer.just_finished() {
+            // commands.spawn(SoundSpawner::new(AudioSoundEffect::SkillCooldown, 0.03));
+        }
     }
 }
 

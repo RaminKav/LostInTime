@@ -11,12 +11,13 @@ pub mod collisions;
 pub mod combat_helpers;
 use crate::{
     ai::{FollowState, LeapAttackState},
-    animations::{AnimationTimer, AttackEvent, DoneAnimation, HitAnimationTracker},
+    animations::{AttackEvent, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{
         modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown,
         LootRateBonus, ManaRegen, MaxHealth,
     },
+    audio::{AudioSoundEffect, SoundSpawner},
     client::{
         analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
         is_not_paused,
@@ -31,7 +32,7 @@ use crate::{
         projectile::Projectile,
         EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
-    juice::bounce::BounceOnHit,
+    juice::{bounce::BounceOnHit, spawn_xp_particles},
     player::{
         levels::{ExperienceReward, PlayerLevel},
         mage_skills::spawn_ice_explosion_hitbox,
@@ -39,7 +40,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
-    AppExt, CustomFlush, Game, GameParam, GameState, Player, YSort, DEBUG,
+    AppExt, CustomFlush, GameParam, GameState, Player, DEBUG,
 };
 
 use self::collisions::CollisionPlugion;
@@ -152,6 +153,7 @@ fn handle_enemy_death(
     mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills)>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
+    mut commands: Commands,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
@@ -180,7 +182,8 @@ fn handle_enemy_death(
             }
         }
         //give player xp
-        player_level.add_xp(mob_xp.0);
+        let did_level = player_level.add_xp(mob_xp.0);
+        spawn_xp_particles(death_event.enemy_pos, &mut commands, mob_xp.0, did_level);
     }
 }
 fn handle_invincibility_frames(
@@ -193,52 +196,6 @@ fn handle_invincibility_frames(
         if i_frame.1 .0.just_finished() {
             commands.entity(i_frame.0).remove::<InvincibilityTimer>();
         }
-    }
-}
-fn _spawn_hit_spark_effect(
-    mut commands: Commands,
-    mut hit_events: EventReader<HitEvent>,
-    game: Res<Game>,
-    transforms: Query<&GlobalTransform>,
-    asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
-    is_mob: Query<&Mob>,
-) {
-    // add spark animation entity as child, will animate once and remove itself.
-    for hit in hit_events.iter() {
-        if hit.hit_entity == game.player {
-            continue;
-        }
-        if is_mob.get(hit.hit_entity).is_ok() {
-            continue;
-        }
-        let texture_handle = asset_server.load("textures/effects/hit-particles.png");
-        let texture_atlas =
-            TextureAtlas::from_grid(texture_handle, Vec2::new(32.0, 32.0), 7, 1, None, None);
-        let texture_atlas_handle = texture_atlases.add(texture_atlas);
-        let mut rng = rand::thread_rng();
-        let s = 5;
-        let x_rng = rng.gen_range(-s..s);
-        let y_rng = rng.gen_range(-s..s);
-        let hit_pos = transforms.get(hit.hit_entity).unwrap().translation();
-
-        commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas_handle,
-                transform: Transform::from_translation(Vec3::new(
-                    hit_pos.x + x_rng as f32,
-                    hit_pos.y - 5. + y_rng as f32,
-                    1.,
-                )),
-                ..default()
-            },
-            AnimationTimer(Timer::from_seconds(0.075, TimerMode::Repeating)),
-            YSort(1.),
-            DoneAnimation,
-            Name::new("Hit Spark"),
-        ));
-
-        commands.entity(hit.hit_entity).remove::<JustGotHit>();
     }
 }
 
@@ -394,6 +351,7 @@ pub fn handle_hits(
                             dmg as u32,
                         ),
                     });
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::PlayerHit, 0.35));
                 } else if let Some(mob) = mob_option {
                     game.player_mut().next_hit_crit = false;
                     analytics_events.send(AnalyticsUpdateEvent {

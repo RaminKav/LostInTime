@@ -1,9 +1,11 @@
 use std::cmp::max;
 
+use bevy::prelude::Commands;
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     attributes::{ItemAttributes, ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes},
+    audio::{AudioSoundEffect, SoundSpawner},
     inventory::ItemStack,
     item::EquipmentType,
     proto::proto_param::ProtoParam,
@@ -11,6 +13,7 @@ use crate::{
 pub fn create_new_random_item_stack_with_attributes(
     stack: &ItemStack,
     proto: &ProtoParam,
+    commands: &mut Commands,
 ) -> ItemStack {
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
         let mut stack = stack.clone();
@@ -36,6 +39,7 @@ pub fn create_new_random_item_stack_with_attributes(
         rarity,
         eqp_type,
         stack.metadata.level,
+        commands,
     )
 }
 
@@ -90,6 +94,7 @@ pub fn build_item_stack_with_parsed_attributes(
     rarity: ItemRarity,
     equip_type: &EquipmentType,
     level_option: Option<u8>,
+    commands: &mut Commands,
 ) -> ItemStack {
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
         raw_bonus_att.into_item_attributes(rarity.clone(), equip_type)
@@ -115,6 +120,17 @@ pub fn build_item_stack_with_parsed_attributes(
     let mut new_stack = stack.copy_with_attributes(&final_att);
     new_stack.metadata.level = Some(level);
     new_stack.rarity = rarity.clone();
+    if rarity == ItemRarity::Legendary {
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5).with_delay(0.55));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2).with_delay(2.3));
+    }
+    if rarity == ItemRarity::Rare {
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4));
+    }
 
     new_stack
 }

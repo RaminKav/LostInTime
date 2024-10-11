@@ -8,6 +8,7 @@ use crate::{
     attributes::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
     },
+    audio::{AudioSoundEffect, SoundSpawner},
     colors::{DARK_GREEN, RED, WHITE, YELLOW_2},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
@@ -24,9 +25,9 @@ use crate::{
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
     spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
-    EssenceOption, FurnaceContainer, InventorySlotState, MenuButton, MenuButtonClickEvent,
-    RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
-    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
+    EssenceOption, FurnaceContainer, InfoModal, InventorySlotState, MenuButton,
+    MenuButtonClickEvent, RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
+    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
@@ -360,6 +361,9 @@ pub fn handle_hovering(
                 let state = state_option.unwrap();
                 // swap to hover img
                 commands.entity(e).insert(UIElement::InventorySlotHover);
+
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::UISlotHover, 0.2));
+
                 commands
                     .entity(e)
                     .insert(graphics.get_ui_element_texture(UIElement::InventorySlotHover));
@@ -661,12 +665,12 @@ pub fn handle_interaction_clicks(
                                 };
 
                                 if state.r#type.is_crafting() {
-                                    commands.entity(item_icon.0).insert(
-                                        create_new_random_item_stack_with_attributes(
-                                            item_icon.2,
-                                            &proto,
-                                        ),
+                                    let new_stack = create_new_random_item_stack_with_attributes(
+                                        item_icon.2,
+                                        &proto,
+                                        &mut commands,
                                     );
+                                    commands.entity(item_icon.0).insert(new_stack);
                                     container_param.crafted_event.send(CraftedItemEvent {
                                         obj: state.obj_type.unwrap(),
                                     });
@@ -783,6 +787,8 @@ pub fn handle_cursor_skills_buttons(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
+
                     let ui_element = state.skill_choice.skill.get_ui_element_hover();
                     // swap to hover img
                     commands
@@ -887,6 +893,7 @@ pub fn handle_cursor_reroll_dice_buttons(
                 Interaction::Hovering => {
                     if left_mouse_pressed {
                         commands.entity(e).despawn_recursive();
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
 
                         spawn_skill_choice_flash(
                             &mut commands,
@@ -925,15 +932,22 @@ pub fn handle_cursor_main_menu_buttons(
     mut menu_buttons: Query<(Entity, &mut Interactable, &MenuButton), Without<InventorySlotState>>,
     mut text: Query<&mut Text, With<MenuButton>>,
     mut send_menu_button_event: EventWriter<MenuButtonClickEvent>,
+    mut commands: Commands,
+    info_check: Query<&InfoModal>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
     for (e, mut interactable, menu_button) in menu_buttons.iter_mut() {
+        if !info_check.is_empty() && menu_button != &MenuButton::InfoOK {
+            continue;
+        }
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.25));
+
                     let color = if menu_button == &MenuButton::GameOverOK
                         || menu_button == &MenuButton::InfoOK
                         || menu_button == &MenuButton::Scrapper
@@ -949,6 +963,7 @@ pub fn handle_cursor_main_menu_buttons(
                         send_menu_button_event.send(MenuButtonClickEvent {
                             button: menu_button.clone(),
                         });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }
                 _ => (),

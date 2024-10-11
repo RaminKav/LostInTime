@@ -9,7 +9,7 @@ use crate::{
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
-    player::{levels::ExperienceReward, Player},
+    player::Player,
     proto::proto_param::ProtoParam,
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort},
     Game, GameParam,
@@ -404,7 +404,6 @@ pub fn spawn_use_item_particles(
 pub fn spawn_enemy_death_particles(
     mut commands: Commands,
     mut death_events: EventReader<EnemyDeathEvent>,
-    xp: Query<&ExperienceReward>,
     particles: Res<Particles>,
 ) {
     for death_event in death_events.iter() {
@@ -424,9 +423,6 @@ pub fn spawn_enemy_death_particles(
                 velocity: Vec3::new(0., 8000., 0.),
             },
         ));
-        if let Ok(xp) = xp.get(death_event.entity) {
-            spawn_xp_particles(t, &mut commands, xp.0 as f32);
-        }
     }
 }
 
@@ -520,20 +516,20 @@ pub fn handle_exp_particles(
     }
 }
 
-pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, amount: f32) {
+pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, amount: u32, did_level_up: bool) {
     commands.spawn((
         TransformBundle::from_transform(Transform::from_translation(t.extend(0.))),
         CpuParticleGenerator {
-            min_particle_size: 1. + f32::floor(amount / 10.),
-            max_particle_size: 2. + f32::floor(amount / 10.),
-            min_particle_count: 1 + f32::floor(amount / 5.) as usize,
-            max_particle_count: 3 + f32::floor(amount / 5.) as usize,
+            min_particle_size: 1. + f32::floor(amount as f32 / 10.),
+            max_particle_size: 2. + f32::floor(amount as f32 / 10.),
+            min_particle_count: 1 + f32::floor(amount as f32 / 5.) as usize,
+            max_particle_count: 3 + f32::floor(amount as f32 / 5.) as usize,
             pos_offset: Vec2::ZERO,
             min_spawn_radius: 6.,
             max_spawn_radius: 12.,
             color: YELLOW,
             lifetime: 100.,
-            particle_type: CpuParticleType::Exp,
+            particle_type: CpuParticleType::Exp(amount, did_level_up),
         },
     ));
 }

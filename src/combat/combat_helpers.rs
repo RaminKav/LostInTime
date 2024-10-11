@@ -18,6 +18,7 @@ pub fn spawn_temp_collider(
     duration: f32,
     attack: i32,
     collider: Collider,
+    projectile: Projectile,
 ) -> Entity {
     commands
         .spawn(TransformBundle {
@@ -26,7 +27,7 @@ pub fn spawn_temp_collider(
         })
         .insert(DespawnTimer(Timer::from_seconds(duration, TimerMode::Once)))
         .insert(Attack(attack))
-        .insert(Projectile::TeleportShock)
+        .insert(projectile)
         .insert(Sensor)
         .insert(ActiveEvents::COLLISION_EVENTS)
         .insert(ActiveCollisionTypes::all())
@@ -52,8 +53,9 @@ pub fn spawn_one_time_aseprite_collider(
     handle: Handle<Aseprite>,
     animation: AsepriteAnimation,
     repeating_anim: bool,
+    projectile: Projectile,
 ) -> Entity {
-    let hitbox_e = spawn_temp_collider(commands, transform, duration, attack, collider);
+    let hitbox_e = spawn_temp_collider(commands, transform, duration, attack, collider, projectile);
 
     commands
         .entity(hitbox_e)

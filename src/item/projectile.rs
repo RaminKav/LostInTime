@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{asset, prelude::*};
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -6,6 +6,7 @@ use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
     attributes::{modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana},
+    audio::{AudioSoundEffect, SoundSpawner},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -57,7 +58,7 @@ pub enum Projectile {
     Arc,
     FireAttack,
     TeleportShock,
-    OnHitAoE,
+    Echo,
 }
 
 impl Projectile {
@@ -267,6 +268,7 @@ fn handle_spawn_projectiles_after_delay(
     game: GameParam,
     mut commands: Commands,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
+    asset_server: Res<AssetServer>,
 ) {
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
@@ -277,7 +279,18 @@ fn handle_spawn_projectiles_after_delay(
                 proj.pos,
                 proj.direction,
                 proj.was_mana_bar_full,
+                &asset_server,
             );
+            if proj.proj == Projectile::Fireball {
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
+            } else if proj.proj == Projectile::Arrow {
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
+            } else if proj.proj == Projectile::ThrowingStar {
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
+            } else if proj.proj == Projectile::Electricity {
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
+            }
+
             if let Some(p) = p {
                 if let Some(e) = proj.from_enemy {
                     if let Ok(enemy_txfm) = enemy_transforms.get(e) {

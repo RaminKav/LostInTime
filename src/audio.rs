@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use rand::seq::IteratorRandom;
+use strum_macros::Display;
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
@@ -10,7 +11,7 @@ use crate::{
     juice::UseItemEvent,
     player::Player,
     ui::UIState,
-    GameState,
+    GameParam, GameState,
 };
 
 #[derive(Component)]
@@ -27,6 +28,74 @@ pub struct UpdateBGMTrackEvent {
     pub asset_path: String,
 }
 
+#[derive(Component, Display)]
+pub enum AudioSoundEffect {
+    IceStaffCast,
+    IceStaffHit,
+    LightningStaffCast,
+    LightningStaffHit,
+    IceExplosion,
+    DefaultEnemyHit,
+    Teleport,
+    TeleportShock,
+    AirWaveAttack,
+    Parry,
+    CombatStatueActivate,
+    GambleStatueActivate,
+    GambleStatueFail,
+    GambleStatueSuccess,
+    CurrencyPickup,
+    RareDrop1,
+    RareDrop2,
+    LegendaryDrop1,
+    LegendaryDrop2,
+    Roll,
+    UISlotHover,
+    UIEquipSlotClick,
+    UISkillSelection,
+    UISkillHover,
+    UISkillReRoll,
+    ItemPickup,
+    SkillCooldown,
+    IncorrectAction,
+    PortalAura,
+    PortalActivate,
+    Spear,
+    SpearPull,
+    Lunge,
+    Claw,
+    Bow,
+    DungeonEntranceLoading,
+    ButtonClick,
+    ButtonHover,
+    Anvil,
+    CaveAmbience,
+    GainExp,
+    LevelUp,
+    PlayerHit,
+}
+#[derive(Component)]
+
+pub struct SoundSpawner {
+    pub sound: AudioSoundEffect,
+    pub volume: f32,
+    pub delay: Option<Timer>,
+}
+
+impl SoundSpawner {
+    pub fn new(sound: AudioSoundEffect, volume: f32) -> Self {
+        SoundSpawner {
+            sound,
+            volume,
+            delay: None,
+        }
+    }
+    pub fn with_delay(mut self, delay: f32) -> Self {
+        self.delay = Some(Timer::from_seconds(delay, TimerMode::Once));
+        self
+    }
+}
+
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(BGMPicker {
@@ -35,6 +104,7 @@ impl Plugin for AudioPlugin {
         })
         .add_event::<UpdateBGMTrackEvent>()
         .add_system(bgm_audio)
+        .add_system(handle_sound_spawners)
         .add_systems(
             (
                 sword_swing_sound.after(handle_attack_cooldowns),
@@ -46,28 +116,66 @@ impl Plugin for AudioPlugin {
         );
     }
 }
-
+pub fn handle_sound_spawners(
+    mut sounds: Query<(Entity, &mut SoundSpawner)>,
+    asset_server: Res<AssetServer>,
+    audio: Res<Audio>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (e, mut sound) in sounds.iter_mut() {
+        let mut play_sound = false;
+        if let Some(delay) = sound.delay.as_mut() {
+            delay.tick(time.delta());
+            if delay.finished() {
+                play_sound = true;
+            }
+        } else {
+            play_sound = true;
+        }
+        if play_sound {
+            let sound_handle = asset_server.load(format!("sounds/{}.ogg", sound.sound));
+            audio.play_with_settings(
+                sound_handle.clone(),
+                PlaybackSettings::ONCE.with_volume(sound.volume),
+            );
+            commands.entity(e).despawn();
+        }
+    }
+}
 pub fn sword_swing_sound(
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
     mouse_button_input: Res<Input<MouseButton>>,
     player_query: Query<(Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
     curr_ui_state: Res<State<UIState>>,
+    game: GameParam,
 ) {
     let (attack_timer_option, player_anim) = player_query.single();
     if mouse_button_input.pressed(MouseButton::Left)
         && curr_ui_state.0 == UIState::Closed
-        && player_anim.is_an_attack()
+        && player_anim == &PlayerAnimation::Attack
     {
         if attack_timer_option.is_some() {
             return;
         }
         trace!("AUDIO!!");
-
+        let is_dagger = if let Some(main_hand_state) = game.game.player_state.main_hand_slot.clone()
+        {
+            main_hand_state.get_obj() == WorldObject::Dagger
+        } else {
+            false
+        };
         let swing1 = asset_server.load("sounds/swing.ogg");
         let swing2 = asset_server.load("sounds/swing2.ogg");
         let swing3 = asset_server.load("sounds/swing3.ogg");
-        let swings = [swing1, swing2, swing3];
+        let dagger1 = asset_server.load("sounds/Dagger1.ogg");
+        let dagger2 = asset_server.load("sounds/Dagger2.ogg");
+        let swings = if is_dagger {
+            vec![dagger1, dagger2]
+        } else {
+            vec![swing1, swing2, swing3]
+        };
         swings.iter().choose(&mut rand::thread_rng()).map(|sound| {
             audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.5))
         });

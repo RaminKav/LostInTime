@@ -4,6 +4,7 @@ use crate::{
         modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
         Thorns,
     },
+    audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
@@ -154,6 +155,7 @@ fn check_melee_hit_collisions(
                     ignore_tool: false,
                 });
             }
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
         }
     }
 }
@@ -295,6 +297,18 @@ fn check_projectile_hit_mob_collisions(
                 hit_by_mob: None,
                 was_crit,
             });
+            if nearby_mobs.get(*e2).is_ok() {
+                if proj.clone() == Projectile::Fireball
+                    || proj.clone() == Projectile::FireExplosionAOE
+                {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
+                } else if proj.clone() == Projectile::Electricity {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffHit, 0.4));
+                } else {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
+                }
+            }
+
             //non-animating sprites are despawned immediately
             if state.despawn_on_hit {
                 commands.entity(proj_entity).despawn_recursive();
@@ -534,6 +548,7 @@ pub fn check_item_drop_collisions(
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
         }
     }
 }

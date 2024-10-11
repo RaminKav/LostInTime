@@ -1,8 +1,13 @@
 use crate::{
+    animations::AnimationTimer,
     assets::{SpriteAnchor, SpriteSize},
     attributes::ItemLevel,
     inventory::ItemStack,
-    item::{projectile::ArcProjectileData, EquipmentType, ItemDrop, Wall},
+    item::{
+        projectile::{ArcProjectileData, Projectile},
+        EquipmentType, ItemDrop, Wall,
+    },
+    player::mage_skills::Electricity,
     proto::proto_param::ProtoParam,
     world::{
         wall_auto_tile::Dirty,
@@ -11,6 +16,7 @@ use crate::{
     },
 };
 use bevy::prelude::*;
+use bevy_aseprite::{anim::AsepriteAnimation, Aseprite};
 use bevy_proto::prelude::{ProtoCommands, Prototypes, Schematic};
 use bevy_rapier2d::prelude::{ActiveCollisionTypes, ActiveEvents, Collider, Sensor};
 use core::fmt::Display;
@@ -31,6 +37,7 @@ pub trait CommandsExt<'w, 's> {
         pos: Vec2,
         dir: Vec2,
         mana_bar_full: bool,
+        asset_server: &AssetServer,
     ) -> Option<Entity>;
     fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
@@ -86,6 +93,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         pos: Vec2,
         dir: Vec2,
         mana_bar_full: bool,
+        asset_server: &AssetServer,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
@@ -147,6 +155,16 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                         ActiveCollisionTypes::all(),
                     ));
                 });
+            }
+            if let Some(proj) = params.get_component::<Projectile, _>(obj.clone()) {
+                if proj == &Projectile::Electricity {
+                    spawned_entity_commands
+                        .insert(AsepriteAnimation::from(Electricity::tags::ELECTRICITY))
+                        .insert(asset_server.load::<Aseprite, _>(Electricity::PATH))
+                        .remove::<TextureAtlasSprite>()
+                        .remove::<Handle<TextureAtlas>>()
+                        .remove::<AnimationTimer>();
+                }
             }
 
             return Some(spawned_entity);

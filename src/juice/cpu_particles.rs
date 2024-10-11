@@ -26,12 +26,14 @@ pub struct CpuParticleGenerator {
 }
 
 pub enum CpuParticleType {
-    Exp,
+    Exp(u32, bool),
 }
 
 #[derive(Component)]
 pub struct ExpParticle {
     pub delay: Timer,
+    pub amount: u32,
+    pub did_level_up_as_result: bool,
 }
 
 pub fn handle_generate_cpu_particles(
@@ -79,9 +81,11 @@ pub fn handle_generate_cpu_particles(
                 .id();
 
             match gen.particle_type {
-                CpuParticleType::Exp => {
+                CpuParticleType::Exp(amount, did_level_up_as_result) => {
                     commands.entity(p).insert(ExpParticle {
                         delay: Timer::from_seconds(0.25, TimerMode::Once),
+                        amount,
+                        did_level_up_as_result,
                     });
                 }
             }
@@ -118,7 +122,10 @@ pub fn handle_move_exp_particles(
         txfm.translation += p.velocity.extend(0.);
         if g_txfm.translation().truncate().distance(target_pos) <= 3. {
             commands.entity(e).despawn();
-            flash_event.send_default();
+            flash_event.send(FlashExpBarEvent {
+                amount: exp_state.amount,
+                did_level: exp_state.did_level_up_as_result,
+            });
         }
     }
 }

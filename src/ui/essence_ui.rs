@@ -1,6 +1,6 @@
 use std::{fs::File, io::BufReader};
 
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, transform::commands};
 use bevy_proto::backend::schematics::{ReflectSchematic, Schematic};
 use rand::seq::IteratorRandom;
 
@@ -201,6 +201,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
     mut new_spawns: Query<&mut EssenceShopChoices, Added<EssenceShopChoices>>,
     player_level: Query<&PlayerLevel>,
     proto_param: ProtoParam,
+    mut commands: Commands,
 ) {
     for mut shop in new_spawns.iter_mut() {
         let mut GENERIC_SHOP_OPTIONS = vec![
@@ -208,6 +209,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 item: create_new_random_item_stack_with_attributes(
                     &ItemStack::crate_icon_stack(WorldObject::LargePotion).copy_with_count(3),
                     &proto_param,
+                    &mut commands,
                 ),
                 cost: 5,
             },
@@ -216,6 +218,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                     &ItemStack::crate_icon_stack(WorldObject::OrbOfTransformation)
                         .copy_with_count(1),
                     &proto_param,
+                    &mut commands,
                 ),
                 cost: 5,
             },
@@ -223,6 +226,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 item: create_new_random_item_stack_with_attributes(
                     &ItemStack::crate_icon_stack(WorldObject::UpgradeTome).copy_with_count(1),
                     &proto_param,
+                    &mut commands,
                 ),
                 cost: 3,
             },
@@ -230,6 +234,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 item: create_new_random_item_stack_with_attributes(
                     &ItemStack::crate_icon_stack(WorldObject::Key).copy_with_count(1),
                     &proto_param,
+                    &mut commands,
                 ),
                 cost: 10,
             },

@@ -157,7 +157,11 @@ pub fn handle_new_loot_chest_spawn(
                 let picked_slot = rng.gen_range(0..inventory.items.items.len());
                 if inventory.items.items[picked_slot].is_none() {
                     inventory.items.items[picked_slot] = Some(InventoryItemStack::new(
-                        create_new_random_item_stack_with_attributes(loot, &proto_param),
+                        create_new_random_item_stack_with_attributes(
+                            loot,
+                            &proto_param,
+                            &mut commands,
+                        ),
                         picked_slot,
                     ));
                     found_slot = true;

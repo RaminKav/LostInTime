@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::GameState;
+use crate::{    
+    audio::{AudioSoundEffect, SoundSpawner},
+    GameState
+};
 
 #[derive(Component, Default, Debug)]
 pub struct TimeFragmentCurrency {
@@ -28,6 +31,7 @@ pub fn handle_modify_time_fragments(
     mut time_fragments: Query<&mut TimeFragmentCurrency>,
     mut events: EventReader<ModifyTimeFragmentsEvent>,
     state: Res<State<GameState>>,
+    mut commands: Commands,
 ) {
     let Ok(mut time_fragments) = time_fragments.get_single_mut() else {
         return;
@@ -41,6 +45,7 @@ pub fn handle_modify_time_fragments(
             } else if state.0 == GameState::GameOver {
                 time_fragments.total_collected_time_fragments_all_time += event.delta as u128;
             }
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::CurrencyPickup, 0.75));
         }
     }
 }
