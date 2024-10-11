@@ -13,6 +13,7 @@
 - Minimap!
 - New UI improvments for item and currency pickup
 - New Item: Beacons. Place them down to always find your way back to them
+- Lots of new Audio/SFX
 
 ### Changes
 
