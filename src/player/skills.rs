@@ -390,10 +390,10 @@ impl Skill {
                 "below 20% health.".to_string(),
             ],
             Skill::Teleport => vec![
-                "Teleport a short".to_string(),
-                "distance to dodge".to_string(),
-                "attacks or move".to_string(),
-                "around quickly.".to_string(),
+                "Active: Teleport a".to_string(),
+                "short distance to".to_string(),
+                "dodge attacks or".to_string(),
+                "move around quickly.".to_string(),
             ],
             Skill::TeleportShock => vec![
                 "Teleporting through".to_string(),
@@ -413,19 +413,18 @@ impl Skill {
                 "regeneration.".to_string(),
             ],
             Skill::Sprint => vec![
-                "Hold Sprint to move".to_string(),
-                "60% faster. Allows".to_string(),
-                "you to attack while".to_string(),
-                "sprinting.".to_string(),
+                "Active: Hold Sprint".to_string(),
+                "to move 60% faster.".to_string(),
+                "Allows you to attack".to_string(),
+                "while sprinting.".to_string(),
             ],
             Skill::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
             }
             Skill::SprintLunge => vec![
-                "Right-click while".to_string(),
-                "sprinting to do".to_string(),
-                "a quick lunge".to_string(),
-                "attack.".to_string(),
+                "Active: dash through".to_string(),
+                "enemies with a quick".to_string(),
+                "lunge attack.".to_string(),
             ],
             Skill::SprintLungeDamage => vec![
                 "Your Lunge attack".to_string(),
@@ -469,7 +468,7 @@ impl Skill {
             Skill::Attack => vec!["Gain +3 Attack,".to_string(), "permanently.".to_string()],
             Skill::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
             Skill::Parry => vec![
-                "Allows you to Parry".to_string(),
+                "Active: Parry".to_string(),
                 "enemy attacks,".to_string(),
                 "ignore damage, and".to_string(),
                 "stun attackers if".to_string(),
@@ -481,10 +480,7 @@ impl Skill {
                 "health regeneration".to_string(),
             ],
             Skill::ParrySpear => vec![
-                "A successful".to_string(),
-                "parry allows you".to_string(),
-                "to Right-Click to".to_string(),
-                "do a Spear Attack".to_string(),
+                "Active: Spear Attack".to_string(),
                 "that pulls enemies".to_string(),
                 "towards the impact.".to_string(),
             ],
