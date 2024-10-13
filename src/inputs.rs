@@ -36,7 +36,7 @@ use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
-use crate::item::projectile::{RangedAttack, RangedAttackEvent};
+use crate::item::projectile::{Projectile, RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -643,7 +643,11 @@ pub fn mouse_click_system(
                 is_followup_proj: false,
                 mana_cost: mana_cost_option.map(|m| -m.0),
                 dmg_override: None,
-                pos_override: None,
+                pos_override: if ranged_tool.0 == Projectile::Electricity {
+                    Some(Vec2::ZERO)
+                } else {
+                    None
+                },
                 spawn_delay: if obj == &WorldObject::WoodBow {
                     0.36
                 } else {

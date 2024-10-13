@@ -1,4 +1,4 @@
-use bevy::{asset, prelude::*};
+use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -139,6 +139,7 @@ pub struct ProjectileSpawnMarker {
     pub dmg_override: Option<i32>,
     pub from_enemy: Option<Entity>,
     pub was_mana_bar_full: bool,
+    pub is_followup_proj: bool,
 }
 
 fn handle_ranged_attack_event(
@@ -232,6 +233,7 @@ fn handle_ranged_attack_event(
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
             was_mana_bar_full: current_mana.0 == max_mana.0,
+            is_followup_proj: proj_event.is_followup_proj,
         });
 
         if teleported_option.is_some() {
@@ -267,6 +269,7 @@ fn handle_spawn_projectiles_after_delay(
     mut proto_commands: ProtoCommands,
     game: GameParam,
     mut commands: Commands,
+    player: Query<Entity, With<Player>>,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     asset_server: Res<AssetServer>,
 ) {
@@ -281,17 +284,21 @@ fn handle_spawn_projectiles_after_delay(
                 proj.was_mana_bar_full,
                 &asset_server,
             );
-            if proj.proj == Projectile::Fireball {
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
-            } else if proj.proj == Projectile::Arrow {
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
-            } else if proj.proj == Projectile::ThrowingStar {
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
-            } else if proj.proj == Projectile::Electricity {
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
-            }
 
             if let Some(p) = p {
+                if proj.proj == Projectile::Fireball {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
+                } else if proj.proj == Projectile::Arrow {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
+                } else if proj.proj == Projectile::ThrowingStar {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
+                } else if proj.proj == Projectile::Electricity {
+                    if !proj.is_followup_proj {
+                        let player_e = player.single();
+                        commands.entity(player_e).add_child(p);
+                    }
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
+                }
                 if let Some(e) = proj.from_enemy {
                     if let Ok(enemy_txfm) = enemy_transforms.get(e) {
                         commands.entity(p).insert(EnemyProjectile {
