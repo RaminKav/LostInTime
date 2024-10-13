@@ -200,7 +200,7 @@ pub fn bgm_audio(
         let bgm1 = asset_server.load(path);
 
         let new_handle = audio_handles.get_handle(
-            audio.play_with_settings(bgm1.clone(), PlaybackSettings::LOOP.with_volume(1.0)),
+            audio.play_with_settings(bgm1.clone(), PlaybackSettings::LOOP.with_volume(0.75)),
         );
         bgm_tracker.current_handle = Some(new_handle);
     }

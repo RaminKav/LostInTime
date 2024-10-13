@@ -25,7 +25,7 @@ use crate::{
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
         TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
-    GameParam, GameState,
+    GameParam, GameState, DEBUG,
 };
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
@@ -43,6 +43,7 @@ impl Plugin for SpawnerPlugin {
                     handle_spawn_mobs,
                     tick_spawner_timers.run_if(is_not_paused),
                     // handle_add_fairy_spawners,
+                    test_mob_count,
                     spawn_one_time_enemies_at_day,
                     reduce_chunk_mob_count_on_mob_death,
                     despawn_out_of_range_mobs,
@@ -101,6 +102,30 @@ fn add_global_spawn_timer(mut commands: Commands) {
     commands.insert_resource(GlobalSpawnTimer {
         timer: Timer::from_seconds(5., TimerMode::Once),
     });
+}
+fn test_mob_count(q: Query<&Mob>, key_input: Res<Input<KeyCode>>) {
+    if *DEBUG && key_input.just_pressed(KeyCode::G) {
+        info!(
+            "Fur Devils: {:?}",
+            q.iter().filter(|m| m == &&Mob::FurDevil).count()
+        );
+        info!(
+            "Bushlings: {:?}",
+            q.iter().filter(|m| m == &&Mob::Bushling).count()
+        );
+        info!(
+            "Stingflys: {:?}",
+            q.iter().filter(|m| m == &&Mob::StingFly).count()
+        );
+        info!(
+            "SpikeSlimes: {:?}",
+            q.iter().filter(|m| m == &&Mob::SpikeSlime).count()
+        );
+        info!(
+            "Mushlings: {:?}",
+            q.iter().filter(|m| m == &&Mob::RedMushling).count()
+        );
+    }
 }
 
 fn add_spawners_to_new_chunks(
@@ -383,7 +408,7 @@ fn check_mob_count(
         .count() as i32;
     let max_mobs = BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 2;
     if mob_count >= max_mobs {
-        debug!(
+        info!(
             "MAX MOBS {:?} {:?} {:?}",
             mob_count,
             max_mobs,
@@ -397,6 +422,7 @@ fn check_mob_count(
         if let Some((_e, chunk, spawners)) = chunk_query.iter().choose(&mut rng) {
             let chunk_pos = chunk.chunk_pos;
             if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
+                info!("Max MOBS PER CHUNK REACHED");
                 return;
             }
             spawn_event.send(MobSpawnEvent {

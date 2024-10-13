@@ -373,6 +373,8 @@ impl GenerationPlugin {
         if *NO_GEN {
             return;
         }
+        let mut total_coal = 0;
+        let mut total_metal = 0;
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
             let dungeon_check = dungeon_check.get_single();
@@ -685,11 +687,22 @@ impl GenerationPlugin {
                     * CHUNK_SIZE as f32
                     * TILE_SIZE.x as f32;
                 let distance = Vec2::new(0., 0.).distance(chunk_dist);
-
-                for (pos, obj_to_spawn) in objs.iter() {
+                for (pos, mut obj_to_spawn) in objs.iter() {
                     // only spawn if generated obj is in our chunk or a previously genereated chunk,
                     // otherwise cache it for the correct chunk to spawn
 
+                    if total_metal > total_coal + 5 && obj_to_spawn == &WorldObject::MetalBoulder {
+                        obj_to_spawn = &WorldObject::CoalBoulder;
+                    }
+                    if total_coal > total_metal + 5 && obj_to_spawn == &WorldObject::CoalBoulder {
+                        obj_to_spawn = &WorldObject::MetalBoulder;
+                    }
+                    if obj_to_spawn == &WorldObject::CoalBoulder {
+                        total_coal += 1;
+                    }
+                    if obj_to_spawn == &WorldObject::MetalBoulder {
+                        total_metal += 1;
+                    }
                     if (distance <= max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
                         || dungeon_check.is_ok())
                         && game.get_chunk_entity(chunk_pos).is_some()

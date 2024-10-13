@@ -376,14 +376,14 @@ pub fn update_xp_bar(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::LevelUp, 0.35));
         }
         if event.amount >= 50 {
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.15));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.22));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08).with_delay(0.15));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08).with_delay(0.22));
         } else if event.amount >= 10 {
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12).with_delay(0.15));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08).with_delay(0.15));
         } else {
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08));
         }
     }
 }
