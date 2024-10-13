@@ -414,7 +414,7 @@ pub fn load_state(
 ) {
     let mut rng = rand::thread_rng();
     let mut seed = rng.gen_range(0..100000);
-
+    let mut save_data_exists = false;
     // Load data if it exists
     if let Ok(file_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(file_file);
@@ -422,6 +422,7 @@ pub fn load_state(
         // Read the JSON contents of the file as an instance of `User`.
         match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
             Ok(data) => {
+                save_data_exists = true;
                 let mut cache = WorldObjectCache::default();
                 for (tp, _) in data.placed_objs[data.current_era.index()].iter() {
                     if !cache.generated_chunks.contains(&tp.chunk_pos) {
@@ -471,9 +472,19 @@ pub fn load_state(
                 game_camera_transform.translation.x = data.player_transform.x;
                 game_camera_transform.translation.y = data.player_transform.y;
             }
-            Err(err) => println!("Failed to load data from file {err:?}"),
+            Err(err) => {
+                let new_file = File::create(datafiles::save_file())
+                    .expect("Could not create save data file for serialization");
+                if let Err(result) = serde_json::to_writer(new_file, "") {
+                    error!("Failed to save game data after death: {result:?}");
+                } else {
+                    info!("UPDATED SAVE DATA...");
+                }
+                println!("Failed to load data from file {err:?}")
+            }
         }
-    } else {
+    }
+    if !save_data_exists {
         proto_commands.apply("Era1WorldGenerationParams");
         commands.init_resource::<WorldObjectCache>();
     }

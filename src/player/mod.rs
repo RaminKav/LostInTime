@@ -236,13 +236,20 @@ fn spawn_player(
     // total currency counter
     let game_data_file_path = datafiles::game_data();
     let mut total_currency_all_time = 0;
-    if let Ok(file_file) = File::open(game_data_file_path) {
-        let reader = BufReader::new(file_file);
+    if let Ok(game_file) = File::open(game_data_file_path.clone()) {
+        let reader = BufReader::new(game_file);
 
         // Read the JSON contents of the file as an instance of `GameData`.
         match serde_json::from_reader::<_, GameData>(reader) {
             Ok(data) => total_currency_all_time = data.time_fragments,
             Err(err) => {
+                let new_file = File::create(game_data_file_path)
+                    .expect("Could not create game data file for serialization");
+                if let Err(result) = serde_json::to_writer(new_file, "") {
+                    error!("Failed to save game data after death: {result:?}");
+                } else {
+                    info!("UPDATED GAME DATA...");
+                }
                 error!("Failed to load data from game_data.json file to get currency {err:?}")
             }
         }
@@ -370,8 +377,12 @@ fn spawn_player(
 }
 
 fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
-    if let Ok(_) = File::open(datafiles::save_file()) {
-        return;
+    if let Ok(save_file) = File::open(datafiles::save_file()) {
+        let reader = BufReader::new(save_file);
+
+        if serde_json::from_reader::<_, CurrentRunSaveData>(reader).is_ok() {
+            return;
+        }
     }
     proto_commands.spawn_item_from_proto(WorldObject::WoodSword, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Essence, &proto, Vec2::ZERO, 10, None);
