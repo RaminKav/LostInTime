@@ -30,7 +30,6 @@ use crate::{
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
-pub const MAX_MOB_PER_CHUNK: i32 = 4;
 pub const BASE_MAX_MOBS_TOTAL: i32 = 6;
 pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
@@ -332,11 +331,16 @@ fn handle_spawn_mobs(
                             can_spawn_mob_here(pos, &game, &proto_param, false);
                         fallback_attempts -= 1;
                         if fallback_attempts <= 0 {
-                            warn!(
+                            info!(
                                 "Could not find a valid spawn location for mob {:?}",
                                 e.chunk_pos
                             );
                             picked_spawner.spawn_timer.tick(Duration::from_nanos(1));
+                            info!(
+                                "skip spawn: cant find a valid spawn location {:?}",
+                                e.chunk_pos
+                            );
+
                             continue 'outer;
                         }
                     }
@@ -416,15 +420,16 @@ fn check_mob_count(
         );
         return;
     }
-    if timer.timer.just_finished() {
+    if timer.timer.finished() {
         timer.timer.reset();
         let mut rng = rand::thread_rng();
-        if let Some((_e, chunk, spawners)) = chunk_query.iter().choose(&mut rng) {
+        if let Some((_e, chunk, _)) = chunk_query.iter().choose(&mut rng) {
             let chunk_pos = chunk.chunk_pos;
-            if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
-                info!("Max MOBS PER CHUNK REACHED");
-                return;
-            }
+            // if spawners.spawned_mobs >= MAX_MOB_PER_CHUNK {
+            //     info!("Max MOBS PER CHUNK REACHED");
+            //     return;
+            // }
+            info!("send spawn event! {:?}", chunk_pos);
             spawn_event.send(MobSpawnEvent {
                 chunk_pos,
                 bypass_timers: false,
