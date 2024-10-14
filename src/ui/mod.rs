@@ -170,7 +170,6 @@ impl Plugin for UIPlugin {
                         .run_if(resource_added::<ScrapperContainer>()),
                     handle_scrap_items_in_scrapper.run_if(in_state(UIState::Scrapper)),
                     text_update_system,
-                    add_inv_to_new_chest_objs,
                     add_inv_to_new_scrapper_objs,
                     add_container_to_new_furnace_objs,
                     update_foodbar,
@@ -187,6 +186,11 @@ impl Plugin for UIPlugin {
                     ),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                add_inv_to_new_chest_objs
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
             )
             .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
             .add_system(
