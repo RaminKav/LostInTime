@@ -1,14 +1,14 @@
 (
-  name: "YellowSapplingBlock",
+  name: "YellowSaplingBlock",
   templates: ["item_drop.prototype.ron"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": YellowSapplingBlock,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(YellowSapplingStage1)]),
+  "survival_rogue_like::item::WorldObject": YellowSaplingBlock,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [PlacesInto(YellowSaplingStage1)]),
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: YellowSapplingBlock,
+        obj_type: YellowSaplingBlock,
         metadata: (
-            name: "Yellow Sappling",
+            name: "Yellow Sapling",
             desc: ["Grows into a tree", "when placed on", "the ground."],
         ),
         count: 1

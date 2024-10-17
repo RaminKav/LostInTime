@@ -10,31 +10,31 @@ use crate::{
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
-pub struct Sappling(pub Timer);
+pub struct Sapling(pub Timer);
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
 #[reflect(Component, Schematic)]
 pub struct GrowsInto(WorldObject);
 
-pub struct SapplingPlugin;
+pub struct SaplingPlugin;
 
-impl Plugin for SapplingPlugin {
+impl Plugin for SaplingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(tick_sappling_color.in_set(OnUpdate(GameState::Main)));
+        app.add_system(tick_sapling_color.in_set(OnUpdate(GameState::Main)));
     }
 }
 
-pub fn tick_sappling_color(
+pub fn tick_sapling_color(
     time: Res<Time>,
-    mut query: Query<(&WorldObject, &mut Sappling, &GrowsInto, &GlobalTransform)>,
+    mut query: Query<(&WorldObject, &mut Sapling, &GrowsInto, &GlobalTransform)>,
     mut events: EventWriter<PlaceItemEvent>,
     proto_param: ProtoParam,
 ) {
-    for (obj, mut sappling_state, growth, tfxm) in query.iter_mut() {
-        sappling_state.0.tick(time.delta());
+    for (obj, mut sapling_state, growth, tfxm) in query.iter_mut() {
+        sapling_state.0.tick(time.delta());
 
-        if sappling_state.0.finished() {
-            //swap sappling to next stage, or a tree
+        if sapling_state.0.finished() {
+            //swap sapling to next stage, or a tree
             //TODO: make it pick between 2 tree types
             let anchor = proto_param
                 .get_component::<SpriteAnchor, _>(*obj)

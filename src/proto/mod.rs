@@ -44,7 +44,7 @@ use crate::{
         PlacesInto, RequiredEquipmentType, Wall, WorldObject,
     },
     player::levels::ExperienceReward,
-    sappling::{GrowsInto, Sappling},
+    sapling::{GrowsInto, Sapling},
     schematic::{loot_chests::LootChestType, SchematicType},
     status_effects::{StatusEffectState, StatusEffectTracker},
     ui::{
@@ -88,7 +88,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<RawItemBonusAttributes>()
             .register_type::<ExperienceReward>()
             .register_type::<GrowsInto>()
-            .register_type::<SapplingProto>()
+            .register_type::<SaplingProto>()
             .register_type::<ItemDisplayMetaData>()
             .register_type::<YSort>()
             .register_type::<IdleStateProto>()
@@ -278,12 +278,12 @@ impl From<ColliderCapsulProto> for Collider {
 
 #[derive(Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
-#[schematic(into = Sappling)]
-pub struct SapplingProto(f32);
+#[schematic(into = Sapling)]
+pub struct SaplingProto(f32);
 
-impl From<SapplingProto> for Sappling {
-    fn from(c: SapplingProto) -> Sappling {
-        Sappling(Timer::from_seconds(c.0, TimerMode::Once))
+impl From<SaplingProto> for Sapling {
+    fn from(c: SaplingProto) -> Sapling {
+        Sapling(Timer::from_seconds(c.0, TimerMode::Once))
     }
 }
 

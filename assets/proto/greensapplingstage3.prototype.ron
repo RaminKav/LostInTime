@@ -1,14 +1,14 @@
 (
-  name: "GreenSapplingStage3",
+  name: "GreenSaplingStage3",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": GreenSapplingStage3,
+  "survival_rogue_like::item::WorldObject": GreenSaplingStage3,
   "survival_rogue_like::animations::FadeOpacity": (),
   "bevy_proto::custom::SpriteBundle": (
-      texture: AssetPath("GreenSapplingStage3.png")
+      texture: AssetPath("GreenSaplingStage3.png")
    ),
-  "survival_rogue_like::sappling::GrowsInto": (SmallGreenTree),
-  "survival_rogue_like::proto::SapplingProto": (100.),
+  "survival_rogue_like::sapling::GrowsInto": (SmallGreenTree),
+  "survival_rogue_like::proto::SaplingProto": (100.),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 16., y: 32.)),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 8.)),
@@ -19,7 +19,7 @@
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: GreenSapplingBlock,
+                item: GreenSaplingBlock,
                 min: 1,
                 max: 1,
                 rate: 1.

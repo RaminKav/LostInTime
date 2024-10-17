@@ -29,7 +29,7 @@ use crate::inputs::{mouse_click_system, FacingDirection, MovementVector};
 use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
-use crate::sappling::Sappling;
+use crate::sapling::Sapling;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player};
 use crate::{GameParam, GameState};
@@ -387,7 +387,7 @@ fn animate_foliage_opacity(
     mut commands: Commands,
     mut tree_query: Query<
         (Entity, &GlobalTransform, &WorldObject),
-        (With<FadeOpacity>, Without<Sappling>),
+        (With<FadeOpacity>, Without<Sapling>),
     >,
     player: Query<&GlobalTransform, With<Player>>,
     asset_server: Res<AssetServer>,

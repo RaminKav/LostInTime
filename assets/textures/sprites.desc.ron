@@ -685,17 +685,17 @@
             size: (16., 16.),
             anchor: None,
         ),
-        RedSapplingBlock: WorldObjectData(
+        RedSaplingBlock: WorldObjectData(
             texture_pos: (1., 15.),
             size: (16., 16.),
             anchor: None,
         ),
-        GreenSapplingBlock: WorldObjectData(
+        GreenSaplingBlock: WorldObjectData(
             texture_pos: (0., 14.),
             size: (16., 16.),
             anchor: None,
         ),
-        YellowSapplingBlock: WorldObjectData(
+        YellowSaplingBlock: WorldObjectData(
             texture_pos: (0., 15.),
             size: (16., 16.),
             anchor: None,
@@ -850,15 +850,15 @@
             texture_pos: (4., 7.),
             size: (16., 16.),
         ),
-        RedSapplingBlock: SpriteData(
+        RedSaplingBlock: SpriteData(
             texture_pos: (1., 15.),
             size: (16., 16.),
         ),
-        GreenSapplingBlock: SpriteData(
+        GreenSaplingBlock: SpriteData(
             texture_pos: (0., 14.),
             size: (16., 16.),
         ),
-        YellowSapplingBlock: SpriteData(
+        YellowSaplingBlock: SpriteData(
             texture_pos: (0., 15.),
             size: (16., 16.),
         ),

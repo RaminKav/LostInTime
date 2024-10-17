@@ -1,14 +1,14 @@
 (
-  name: "YellowSapplingStage1",
+  name: "YellowSaplingStage1",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": YellowSapplingStage1,
+  "survival_rogue_like::item::WorldObject": YellowSaplingStage1,
   "survival_rogue_like::animations::FadeOpacity": (),
   "bevy_proto::custom::SpriteBundle": (
-      texture: AssetPath("YellowSapplingStage1.png")
+      texture: AssetPath("YellowSaplingStage1.png")
    ),
-  "survival_rogue_like::sappling::GrowsInto": (YellowSapplingStage2),
-  "survival_rogue_like::proto::SapplingProto": (60.),
+  "survival_rogue_like::sapling::GrowsInto": (YellowSaplingStage2),
+  "survival_rogue_like::proto::SaplingProto": (60.),
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::item::FoliageSize": ((x: 16., y: 16.)),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 0.)),
@@ -18,7 +18,7 @@
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: YellowSapplingBlock,
+                item: YellowSaplingBlock,
                 min: 1,
                 max: 1,
                 rate: 1.

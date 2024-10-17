@@ -389,19 +389,19 @@ pub enum WorldObject {
     Key,
     MiracleSeed,
 
-    // Sapplings
-    RedSapplingBlock,
-    YellowSapplingBlock,
-    GreenSapplingBlock,
-    RedSapplingStage1,
-    RedSapplingStage2,
-    RedSapplingStage3,
-    YellowSapplingStage1,
-    YellowSapplingStage2,
-    YellowSapplingStage3,
-    GreenSapplingStage1,
-    GreenSapplingStage2,
-    GreenSapplingStage3,
+    // Saplings
+    RedSaplingBlock,
+    YellowSaplingBlock,
+    GreenSaplingBlock,
+    RedSaplingStage1,
+    RedSaplingStage2,
+    RedSaplingStage3,
+    YellowSaplingStage1,
+    YellowSaplingStage2,
+    YellowSaplingStage3,
+    GreenSaplingStage1,
+    GreenSaplingStage2,
+    GreenSaplingStage3,
 
     // Era 2
     Era2SmallTree,
@@ -478,16 +478,16 @@ pub enum Foliage {
     MediumYellowTree,
     RedTree,
 
-    // Sapplings
-    RedSapplingStage1,
-    RedSapplingStage2,
-    RedSapplingStage3,
-    YellowSapplingStage1,
-    YellowSapplingStage2,
-    YellowSapplingStage3,
-    GreenSapplingStage1,
-    GreenSapplingStage2,
-    GreenSapplingStage3,
+    // Saplings
+    RedSaplingStage1,
+    RedSaplingStage2,
+    RedSaplingStage3,
+    YellowSaplingStage1,
+    YellowSaplingStage2,
+    YellowSaplingStage3,
+    GreenSaplingStage1,
+    GreenSaplingStage2,
+    GreenSaplingStage3,
 
     // Era 2
     Era2SmallTree,

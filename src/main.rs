@@ -48,7 +48,7 @@ use bevy_embedded_assets::EmbeddedAssetPlugin;
 use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
-use sappling::SapplingPlugin;
+use sapling::SaplingPlugin;
 
 mod juice;
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
@@ -68,7 +68,7 @@ mod item;
 mod night;
 mod player;
 mod proto;
-mod sappling;
+mod sapling;
 mod schematic;
 mod ui;
 mod world;
@@ -209,7 +209,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
-        .add_plugin(SapplingPlugin)
+        .add_plugin(SaplingPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
         .add_plugin(CombatPlugin)
