@@ -3,7 +3,7 @@
   templates: ["mob_basic.prototype.ron"],
   schematics: {
     "survival_rogue_like::enemy::Mob": StingFly,
-    "survival_rogue_like::enemy::CombatAlignment": Neutral,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
     "survival_rogue_like::enemy::FollowSpeed": (0.4),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::animations::enemy_sprites::LeftFacingSideProfile": (),

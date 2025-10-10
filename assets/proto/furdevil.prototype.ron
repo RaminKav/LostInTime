@@ -3,7 +3,7 @@
   templates: ["mob_basic.prototype.ron"],
   schematics: {
     "survival_rogue_like::enemy::Mob": FurDevil,
-    "survival_rogue_like::enemy::CombatAlignment": Neutral,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
     "survival_rogue_like::enemy::FollowSpeed": (0.45),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 24., startup: 0.45, duration: 0.42, cooldown: 0.7, speed: 95.),

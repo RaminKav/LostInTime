@@ -80,11 +80,11 @@ impl Trigger for NightTimeAggro {
 
     // Return `Ok` to trigger and `Err` to not trigger
     fn trigger(&self, _entity: Entity, night_tracker: Self::Param<'_, '_>) -> Result<f32, f32> {
-        if night_tracker.is_night() {
-            Ok(1.)
-        } else {
-            Err(0.)
-        }
+        Ok(1.)
+        // if night_tracker.is_night() {
+        // } else {
+        //     Err(0.)
+        // }
     }
 }
 // This trigger checks if the enemy is within the the given range of the target
@@ -227,11 +227,11 @@ pub fn follow(
             follow_transform.translation.truncate() + follow_collider_offset,
         ));
 
-        let next_target_tile = get_next_tile_A_star(
-            &target_translation.truncate(),
-            &follow_translation,
-            &mut game,
-        );
+        // let next_target_tile = get_next_tile_A_star(
+        //     &target_translation.truncate(),
+        //     &follow_translation,
+        //     &mut game,
+        // );
 
         let distance_from_target = (target_translation.truncate() - follow_translation).length();
         let is_far_away = distance_from_target > 10.5 * TILE_SIZE.x;
@@ -243,34 +243,30 @@ pub fn follow(
             true
         };
         //convert follower txfm to AIPos too
-        let target_txfm = if night_tracker.is_night() && is_far_away {
-            target_translation.truncate()
-        } else {
-            next_target_tile.unwrap_or(target_translation.truncate())
-        };
+        let target_txfm = target_translation.truncate();
         let direct_path_to_target = (target_txfm - follow_translation).normalize_or_zero();
-        let delta_override: Option<Vec2> = if let Some(curr_path) = follow.curr_path {
-            if curr_path == target_txfm {
-                Some(
-                    follow
-                        .curr_delta
-                        .expect("delta should exist if curr_path exists"),
-                )
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        let delta = delta_override.unwrap_or(direct_path_to_target);
+        // let delta_override: Option<Vec2> = if let Some(curr_path) = follow.curr_path {
+        //     if curr_path == target_txfm {
+        //         Some(
+        //             follow
+        //                 .curr_delta
+        //                 .expect("delta should exist if curr_path exists"),
+        //         )
+        //     } else {
+        //         None
+        //     }
+        // } else {
+        //     None
+        // };
+        let delta = direct_path_to_target;
         let mut mover = mover.get_mut(entity).unwrap();
-        if (night_tracker.is_night() && is_far_away) || is_on_water_tile {
-            mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
-        } else {
-            mover.filter_groups = Some(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));
-        }
+        mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
+        // if (night_tracker.is_night() && is_far_away) || is_on_water_tile {
+        // } else {
+        //     mover.filter_groups = Some(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1));
+        // }
 
-        follow.curr_path = next_target_tile;
+        follow.curr_path = Some(direct_path_to_target);
         follow.curr_delta = Some(delta);
         // add directional offset so they dont get stuck on walls...
         mover.translation = Some(

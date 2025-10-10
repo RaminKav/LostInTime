@@ -440,7 +440,7 @@ pub fn toggle_inventory(
                 return;
             }
             // proto_commands.spawn_item_from_proto(WorldObject::Crate, &proto, pos, 1, None);
-            // proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, pos, 1, Some(5));
+            // proto_commands.spawn_item_from_proto(WorldObject::TimeFragment, &proto, pos, 1, None);
             // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::WoodBow, &proto, pos, 1, Some(5));
             // proto_commands.spawn_item_from_proto(WorldObject::Claw, &proto, pos, 1, Some(5));
@@ -448,9 +448,9 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
