@@ -5,7 +5,7 @@ use bevy::{
     sprite::{Material2d, Material2dPlugin},
 };
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
-use bevy_rapier2d::prelude::{CollisionGroups, Group};
+use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
 use seldom_state::prelude::{StateMachine, Trigger};
 use serde::Deserialize;
 use serde::Serialize;
@@ -22,6 +22,7 @@ use crate::{
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
     player::levels::{ExperienceReward, PlayerLevel},
+    proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
     world::{dungeon::Dungeon, TileMapPosition},
     AppExt, GameParam, GameState,
@@ -377,15 +378,19 @@ fn juice_up_spawned_elite_mobs(
     mut elites: Query<
         (
             Entity,
+            &Mob,
             &mut MaxHealth,
             &mut Attack,
             &mut ExperienceReward,
             &mut LootTable,
+            &mut TextureAtlasSprite,
         ),
         Added<EliteMob>,
     >,
+    mut commands: Commands,
+    proto: ProtoParam,
 ) {
-    for (_e, mut hp, mut att, mut exp, mut loot) in elites.iter_mut() {
+    for (e, mob, mut hp, mut att, mut exp, mut loot, mut sprite) in elites.iter_mut() {
         hp.0 = (hp.0 as f32 * 3.) as i32;
         att.0 = (att.0 as f32 * 2.) as i32;
         exp.0 = (exp.0 as f32 * 2.5) as u32;
@@ -399,6 +404,15 @@ fn juice_up_spawned_elite_mobs(
                 rate: l.rate * 2.5,
             })
             .collect();
+        let collider_scale_up = 1.5;
+        let mut collider_proto = proto
+            .get_component::<ColliderCapsulProto, _>(mob.clone())
+            .expect("mob should have collider")
+            .clone();
+        collider_proto.scale(collider_scale_up);
+        let collider: Collider = collider_proto.clone().into();
+        commands.entity(e).insert(collider);
+        sprite.custom_size = Some(Vec2::new(48., 48.));
     }
 }
 
@@ -421,10 +435,9 @@ fn juice_up_spawned_mobs_per_day(
         if mob.is_boss() {
             continue;
         }
-        let chaos_factor =
-            night_tracker.days as f32 * 0.1 + (player_level.single().level as f32 * 0.05);
-        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 1.15)) as i32;
-        att.0 = (att.0 as f32 * (1. + chaos_factor * 0.85)) as i32;
+        let chaos_factor = night_tracker.days as f32;
+        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.20)) as i32;
+        att.0 = (att.0 as f32 * (1. + chaos_factor * 0.15)) as i32;
         exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }

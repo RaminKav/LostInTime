@@ -80,7 +80,7 @@ pub fn add_ui_icon_for_elite_mobs(
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::EliteStar),
                 transform: Transform {
-                    translation: Vec3::new(0., 6., 1.),
+                    translation: Vec3::new(0., 10., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },

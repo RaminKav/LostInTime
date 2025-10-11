@@ -259,7 +259,7 @@ impl From<ColliderProto> for Collider {
         Collider::cuboid(col_state.x, col_state.y)
     }
 }
-#[derive(Schematic, Reflect, FromReflect)]
+#[derive(Component, Clone, Schematic, Reflect, FromReflect)]
 #[reflect(Schematic)]
 #[schematic(into = Collider)]
 pub struct ColliderCapsulProto {
@@ -273,6 +273,16 @@ pub struct ColliderCapsulProto {
 impl From<ColliderCapsulProto> for Collider {
     fn from(c: ColliderCapsulProto) -> Collider {
         Collider::capsule(Vec2::new(c.x1, c.y1), Vec2::new(c.x2, c.y2), c.r)
+    }
+}
+impl ColliderCapsulProto {
+    pub fn scale(&mut self, scale: f32) -> Self {
+        self.x1 *= scale;
+        self.y1 *= scale;
+        self.x2 *= scale;
+        self.y2 *= scale;
+        self.r *= scale;
+        self.clone()
     }
 }
 

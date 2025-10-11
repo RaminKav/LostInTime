@@ -93,7 +93,7 @@ fn setup_mini_map(
     minimap_cache: Res<MinimapTileCache>,
     old_map: Query<Entity, With<Minimap>>,
     p_t: Query<&Transform, With<Player>>,
-    // mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
+    mob_t: Query<&GlobalTransform, (With<Mob>, Changed<GlobalTransform>)>,
     mut meshes: ResMut<Assets<Mesh>>,
     dungeon_check: Query<&Dungeon, With<ActiveDimension>>,
     // mut cache: ResMut<MinimapTileCache>,
@@ -130,6 +130,15 @@ fn setup_mini_map(
         let p_cp = camera_pos_to_chunk_pos(&pt.translation.truncate());
         let p_tp: TilePos = camera_pos_to_tile_pos(&pt.translation.truncate());
 
+        let mobs: Vec<_> = mob_t
+            .iter()
+            .map(|t| {
+                (
+                    camera_pos_to_chunk_pos(&t.translation().truncate()),
+                    camera_pos_to_tile_pos(&t.translation().truncate()),
+                )
+            })
+            .collect();
         //Every pixel is 4 entries in image.data
         let mut data = Vec::with_capacity(16384);
 
@@ -192,6 +201,14 @@ fn setup_mini_map(
                             game.get_tile_data(TileMapPosition::new(chunk_pos, tile_pos))
                         {
                             let tile = tile_data.block_type;
+                            if mobs.contains(&(chunk_pos, tile_pos)) {
+                                let c = LIGHT_RED;
+                                data.push((c.r() * 255.) as u8);
+                                data.push((c.g() * 255.) as u8);
+                                data.push((c.b() * 255.) as u8);
+                                data.push(255);
+                                continue;
+                            }
                             //Copy 1 pixel at index 0,1 2,3
                             let c = tile[(q + offset) as usize].get_obj_color();
 
