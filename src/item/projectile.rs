@@ -193,28 +193,28 @@ fn handle_ranged_attack_event(
                     }) as i32,
             ));
         }
-        if proto
-            .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
-            .is_some()
-        {
-            let mut rng = rand::thread_rng();
-            // 1/3 chance to not consume ammo
-            if !skills.has(Skill::ChanceToNotConsumeAmmo)
-                || rng.gen_bool((3. - skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
-            {
-                if let Some(proj_slot) = inv
-                    .single()
-                    .items
-                    .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
-                {
-                    let held_item_option = inv.single().items.items[proj_slot].clone();
-                    inv.single_mut().items.items[proj_slot] =
-                        held_item_option.unwrap().modify_count(-1);
-                } else {
-                    continue;
-                }
-            }
-        }
+        // if proto
+        //     .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
+        //     .is_some()
+        // {
+        //     let mut rng = rand::thread_rng();
+        //     // 1/3 chance to not consume ammo
+        //     if !skills.has(Skill::ChanceToNotConsumeAmmo)
+        //         || rng.gen_bool((3. - skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
+        //     {
+        //         if let Some(proj_slot) = inv
+        //             .single()
+        //             .items
+        //             .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
+        //         {
+        //             let held_item_option = inv.single().items.items[proj_slot].clone();
+        //             inv.single_mut().items.items[proj_slot] =
+        //                 held_item_option.unwrap().modify_count(-1);
+        //         } else {
+        //             continue;
+        //         }
+        //     }
+        // }
         let t = if let Some(enemy) = proj_event.from_enemy {
             enemy_transforms
                 .get(enemy)
