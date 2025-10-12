@@ -6,7 +6,7 @@
     // (CraftingTableBlock, ([(item: WoodPlank, count: 1),(item: Log, count: 1),(item: Stick, count: 1),], Inventory, 1)),
     // (Log, ([(item: WoodPlank, count: 4)], Inventory, 1)),
     // (WoodPlank, ([(item: Log, count: 1)], Inventory, 4)),
-    (ChestBlock, ([,(item: Log, count: 8)], Inventory, 1)),
+    (ChestBlock, ([(item: Log, count: 8)], Inventory, 1)),
     (WoodWallBlock, ([(item: Log, count: 4)], Inventory, 4)),
     (WoodDoorBlock, ([(item: Log, count: 6)], Inventory, 1)),
     (StoneWallBlock, ([(item: StoneChunk, count: 4)], Inventory, 4)),
