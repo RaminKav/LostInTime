@@ -391,9 +391,9 @@ fn juice_up_spawned_elite_mobs(
     proto: ProtoParam,
 ) {
     for (e, mob, mut hp, mut att, mut exp, mut loot, mut sprite) in elites.iter_mut() {
-        hp.0 = (hp.0 as f32 * 3.) as i32;
-        att.0 = (att.0 as f32 * 2.) as i32;
-        exp.0 = (exp.0 as f32 * 2.5) as u32;
+        hp.0 = (hp.0 as f32 * 5.) as i32;
+        att.0 = (att.0 as f32 * 1.5) as i32;
+        exp.0 = (exp.0 as f32 * 3.) as u32;
         loot.drops = loot
             .drops
             .iter()
@@ -401,7 +401,7 @@ fn juice_up_spawned_elite_mobs(
                 item: l.item,
                 min: l.min,
                 max: l.max,
-                rate: l.rate * 2.5,
+                rate: l.rate * 3.,
             })
             .collect();
         let collider_scale_up = 1.5;
@@ -436,7 +436,7 @@ fn juice_up_spawned_mobs_per_day(
             continue;
         }
         let chaos_factor = night_tracker.days as f32;
-        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.20)) as i32;
+        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.30)) as i32;
         att.0 = (att.0 as f32 * (1. + chaos_factor * 0.15)) as i32;
         exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));

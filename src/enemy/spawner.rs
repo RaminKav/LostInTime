@@ -31,7 +31,7 @@ use crate::{
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
-pub const BASE_MAX_MOBS_TOTAL: i32 = 16;
+pub const BASE_MAX_MOBS_TOTAL: i32 = 120;
 pub const ELITE_SPAWN_RATE: f32 = 0.07;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
@@ -78,8 +78,9 @@ impl PartialEq for Spawner {
     }
 }
 #[derive(Component, Debug)]
-pub struct ChunkSpawners {
+pub struct GlobalSpawners {
     pub spawners: Vec<Spawner>,
+    pub initial_spawn_delay: Timer,
     pub spawned_mobs: i32,
 }
 
@@ -129,7 +130,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(5., TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(3),
             num_spawned: 0,
@@ -137,7 +138,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(5., TimerMode::Once),
             min_days_to_spawn: 0,
             num_to_spawn: Some(3),
             num_spawned: 0,
@@ -153,7 +154,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::Hog,
             weight: 20.,
-            spawn_timer: Timer::from_seconds(60., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(120., TimerMode::Once),
             min_days_to_spawn: 0,
             num_to_spawn: None,
             num_spawned: 0,
@@ -169,7 +170,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::Bushling,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(5., TimerMode::Once),
             min_days_to_spawn: 1,
             num_to_spawn: Some(3),
             num_spawned: 0,
@@ -200,14 +201,15 @@ fn add_spawners_to_new_chunks(
             num_spawned: 0,
         });
     }
-    commands.spawn(ChunkSpawners {
+    commands.spawn(GlobalSpawners {
         spawners,
         spawned_mobs: 0,
+        initial_spawn_delay: Timer::from_seconds(5., TimerMode::Once),
     });
 }
 
 fn _handle_add_fairy_spawners(
-    mut chunk_query: Query<(&Chunk, &mut ChunkSpawners)>,
+    mut chunk_query: Query<(&Chunk, &mut GlobalSpawners)>,
     new_day_event: EventReader<NewDayEvent>,
     player_pos: Query<&GlobalTransform, With<Player>>,
 ) {
@@ -236,7 +238,7 @@ fn handle_spawn_mobs(
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
     player_t: Query<&GlobalTransform, With<Player>>,
-    mut spawners: Query<&mut ChunkSpawners>,
+    mut spawners: Query<&mut GlobalSpawners>,
     asset_server: Res<AssetServer>,
 ) {
     'outer: for e in spawner_trigger_event.iter() {
@@ -313,7 +315,7 @@ fn handle_spawn_mobs(
 fn reduce_chunk_mob_count_on_mob_death(
     mut death_events: EventReader<EnemyDeathEvent>,
     game: GameParam,
-    mut spawners: Query<&mut ChunkSpawners>,
+    mut spawners: Query<&mut GlobalSpawners>,
 ) {
     for death in death_events.iter() {
         let chunk = camera_pos_to_chunk_pos(&death.enemy_pos);
@@ -371,12 +373,16 @@ fn spawn_one_time_enemies_at_day(
 }
 fn tick_spawner_timers(
     time: Res<Time>,
-    mut spawners: Query<(Entity, &mut ChunkSpawners)>,
+    mut spawners: Query<(Entity, &mut GlobalSpawners)>,
     night_tracker: Res<NightTracker>,
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
 ) {
     for (spawner_e, mut spawners) in spawners.iter_mut() {
+        if !spawners.initial_spawn_delay.finished() {
+            spawners.initial_spawn_delay.tick(time.delta());
+            continue;
+        }
         // for each spawned chunk, check if mob count is < max
         // and if so, send event to spawn more
         let mob_count = mobs
@@ -405,7 +411,7 @@ fn tick_spawner_timers(
                 // double spawn rate at night
                 spawner.spawn_timer.tick(time.delta());
             }
-            if spawner.spawn_timer.just_finished() {
+            if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();
                 for _ in 0..spawner.num_to_spawn.unwrap_or(1) {
                     info!("send spawn event! {:?}", spawner.enemy);

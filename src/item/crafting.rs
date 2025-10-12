@@ -259,9 +259,25 @@ pub fn handle_furnace_slot_update(
                         if let Some(eqp_type) = furnace_item.get_obj().get_equip_type(&proto) {
                             if eqp_type.is_weapon() || eqp_type.is_tool() {
                                 modifiers.push(("attack".to_owned(), 1));
+                                if let Some(bonus_mod) = furnace_item
+                                    .item_stack
+                                    .attributes
+                                    .get_random_existing_bonus_attribute_string(vec!["attack"])
+                                {
+                                    modifiers.push((bonus_mod, 1));
+                                }
                             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
                                 modifiers.push(("health".to_owned(), 2));
                                 modifiers.push(("armor".to_owned(), 1));
+                                if let Some(bonus_mod) = furnace_item
+                                    .item_stack
+                                    .attributes
+                                    .get_random_existing_bonus_attribute_string(vec![
+                                        "health", "armor",
+                                    ])
+                                {
+                                    modifiers.push((bonus_mod, 1));
+                                }
                             }
                         }
                         for (modifier, delta) in modifiers {

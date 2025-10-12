@@ -369,17 +369,17 @@ pub fn save_state(
             .containers
             .insert(world_pos_to_tile_pos(pos), chest.items.clone());
     }
-    if let Some(furnace) = check_open_furnace {
-        let pos = placed_objs
-            .get(furnace.parent)
-            .unwrap()
-            .0
-            .translation()
-            .truncate();
-        save_data
-            .containers
-            .insert(world_pos_to_tile_pos(pos), furnace.items.clone());
-    }
+    // if let Some(furnace) = check_open_furnace {
+    //     let pos = placed_objs
+    //         .get(furnace.parent)
+    //         .unwrap()
+    //         .0
+    //         .translation()
+    //         .truncate();
+    //     save_data
+    //         .containers
+    //         .insert(world_pos_to_tile_pos(pos), furnace.items.clone());
+    // }
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
     save_data.seed = seed.seed;

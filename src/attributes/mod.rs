@@ -914,10 +914,63 @@ impl ItemAttributes {
             self.mana_regen.value + skills.get_count(Skill::MPRegen) * 5,
         ));
     }
+    pub fn get_random_existing_bonus_attribute_string(&self, filter: Vec<&str>) -> Option<String> {
+        debug!("Getting random existing attribute from: {:?}", self);
+        let existing_attributes = vec![
+            ("health", self.health.value),
+            ("attack", self.attack.value),
+            ("crit_chance", self.crit_chance.value),
+            ("crit_damage", self.crit_damage.value),
+            ("bonus_damage", self.bonus_damage.value),
+            ("health_regen", self.health_regen.value),
+            ("healing", self.healing.value),
+            ("thorns", self.thorns.value),
+            ("dodge", self.dodge.value),
+            ("speed", self.speed.value),
+            ("lifesteal", self.lifesteal.value),
+            ("defence", self.defence.value),
+            ("xp_rate", self.xp_rate.value),
+            ("loot_rate", self.loot_rate.value),
+            ("mana", self.mana.value),
+            ("mana_regen", self.mana_regen.value),
+            ("durability", self.durability.value),
+            ("max_durability", self.max_durability.value),
+        ]
+        .iter()
+        .filter(|(name, val)| *val != 0 && !filter.contains(name))
+        .map(|(name, _)| name.to_string())
+        .collect::<Vec<String>>();
+        if existing_attributes.is_empty() {
+            debug!("No existing attributes found");
+            None
+        } else {
+            let mut rng = rand::thread_rng();
+            let index = rng.gen_range(0..existing_attributes.len());
+            debug!(
+                "Randomly selected attribute: {}",
+                existing_attributes[index]
+            );
+            Some(existing_attributes[index].clone())
+        }
+    }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {
             "health" => self.health.value += modifier.delta,
             "attack" => self.attack.value += modifier.delta,
+            "crit_chance" => self.crit_chance.value += modifier.delta,
+            "crit_damage" => self.crit_damage.value += modifier.delta,
+            "bonus_damage" => self.bonus_damage.value += modifier.delta,
+            "health_regen" => self.health_regen.value += modifier.delta,
+            "healing" => self.healing.value += modifier.delta,
+            "thorns" => self.thorns.value += modifier.delta,
+            "dodge" => self.dodge.value += modifier.delta,
+            "speed" => self.speed.value += modifier.delta,
+            "lifesteal" => self.lifesteal.value += modifier.delta,
+            "defence" => self.defence.value += modifier.delta,
+            "xp_rate" => self.xp_rate.value += modifier.delta,
+            "loot_rate" => self.loot_rate.value += modifier.delta,
+            "mana" => self.mana.value += modifier.delta,
+            "mana_regen" => self.mana_regen.value += modifier.delta,
             "durability" => self.durability.value += modifier.delta,
             "max_durability" => self.max_durability.value += modifier.delta,
             "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,

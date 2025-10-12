@@ -6,6 +6,7 @@ use crate::{
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
     },
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
+    container::Container,
     inputs::CursorPos,
     inventory::Inventory,
     juice::UseItemEvent,
@@ -13,8 +14,8 @@ use crate::{
     player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
-        scrapper_ui::ScrapperContainer, ChestContainer, FurnaceContainer, InventorySlotState,
-        InventorySlotType, UIState,
+        scrapper_ui::ScrapperContainer, ChestContainer, FurnaceContainer, FurnaceState,
+        InventorySlotState, InventorySlotType, UIState,
     },
     world::{
         dimension::DimensionSpawnEvent,
@@ -44,6 +45,8 @@ pub enum ItemAction {
     Essence,
     DungeonKey,
     GrantSkillPoint(u8),
+    UpgradeTome,
+    OrbOfTransformation,
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -147,6 +150,7 @@ impl ItemActions {
         item_action_param: &mut ItemActionParam,
         game: &mut GameParam,
         proto_param: &ProtoParam,
+        commands: &mut Commands,
     ) {
         for action in &self.actions {
             match action {
@@ -217,6 +221,38 @@ impl ItemActions {
                     sp.count += *amount;
 
                     item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::UpgradeTome => {
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    commands.insert_resource(FurnaceContainer {
+                        items: Container::with_size(2),
+                        parent: Entity::from_raw(69), //TODO: FIX
+                        slot_map: vec![
+                            vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
+                            item_action_param.recipes.upgradeable_items.clone(),
+                        ],
+                        timer: Timer::from_seconds(0.5, TimerMode::Once),
+                        state: Some(FurnaceState {
+                            current_fuel_left: Timer::from_seconds(0.5, TimerMode::Once),
+                            current_fuel_type: WorldObject::UpgradeTome,
+                        }),
+                    });
+                }
+                ItemAction::OrbOfTransformation => {
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                    commands.insert_resource(FurnaceContainer {
+                        items: Container::with_size(2),
+                        parent: Entity::from_raw(69), //TODO: FIX
+                        slot_map: vec![
+                            vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
+                            item_action_param.recipes.upgradeable_items.clone(),
+                        ],
+                        timer: Timer::from_seconds(0.5, TimerMode::Once),
+                        state: Some(FurnaceState {
+                            current_fuel_left: Timer::from_seconds(0.5, TimerMode::Once),
+                            current_fuel_type: WorldObject::OrbOfTransformation,
+                        }),
+                    });
                 }
                 _ => {}
             }
