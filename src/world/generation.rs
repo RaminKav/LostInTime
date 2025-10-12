@@ -130,16 +130,16 @@ impl GenerationPlugin {
 
         //TODO: make these come from proto, use frequencies?
         let TREES = world_generation_params.forest_params.tree_weights.clone();
-        let spawn_ring_offset = if chunk_pos == IVec2::new(0, 0)
-            || chunk_pos == IVec2::new(0, -1)
-            || chunk_pos == IVec2::new(-1, 0)
-            || chunk_pos == IVec2::new(-1, -1)
-        {
-            6
-        } else {
-            0
-        };
-        let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 } + spawn_ring_offset;
+        // let spawn_ring_offset = if chunk_pos == IVec2::new(0, 0)
+        //     || chunk_pos == IVec2::new(0, -1)
+        //     || chunk_pos == IVec2::new(-1, 0)
+        //     || chunk_pos == IVec2::new(-1, -1)
+        // {
+        //     6
+        // } else {
+        //     0
+        // };
+        let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 };
         let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
         for _ in 0..num_clusters {
             let mut picked_trees = TREES
@@ -160,8 +160,7 @@ impl GenerationPlugin {
                 world_generation_params.forest_params.tree_spacing_radius,
                 30,
                 f32::min(
-                    world_generation_params.forest_params.tree_density * 100.
-                        + spawn_ring_offset as f32,
+                    world_generation_params.forest_params.tree_density * 100.,
                     1.,
                 ),
                 world_generation_params.forest_params.forest_radius * TILE_SIZE.x,

@@ -82,7 +82,7 @@ pub fn spawn_night(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(15., TimerMode::Repeating)))
+        .insert(Night(Timer::from_seconds(6., TimerMode::Repeating)))
         .insert(Name::new("night"));
 }
 

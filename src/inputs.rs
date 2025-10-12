@@ -10,7 +10,7 @@ use crate::attributes::hunger::Hunger;
 use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
-use crate::enemy::spawner::ChunkSpawners;
+use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{ActiveSkillUsedEvent, PlayerSkills, Skill};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
@@ -509,7 +509,7 @@ pub fn handle_quick_hotbar_consume(
     mut key_input: ResMut<Input<KeyCode>>,
     mut game: GameParam,
     proto_param: ProtoParam,
-
+    mut commands: Commands,
     inv: Query<&mut Inventory>,
     mut item_action_param: ItemActionParam,
 ) {
@@ -532,6 +532,7 @@ pub fn handle_quick_hotbar_consume(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
+                    &mut commands,
                 );
             }
         }
@@ -575,7 +576,7 @@ pub fn diagnostics(
     mouse_button_input: Res<Input<MouseButton>>,
     entities: Query<Entity>,
     mobs: Query<&Mob>,
-    spawners: Query<&ChunkSpawners>,
+    spawners: Query<&GlobalSpawners>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Right) {
         debug!("Entity Count: {:?}", entities.iter().count());
@@ -715,6 +716,7 @@ pub fn mouse_click_system(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
+                    &mut commands,
                 );
             }
         }
