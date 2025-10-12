@@ -644,7 +644,7 @@ pub fn mouse_click_system(
                 is_followup_proj: false,
                 mana_cost: mana_cost_option.map(|m| -m.0),
                 dmg_override: None,
-                pos_override: if ranged_tool.0 == Projectile::Electricity {
+                pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
                     Some(Vec2::ZERO)
                 } else {
                     None
@@ -657,6 +657,7 @@ pub fn mouse_click_system(
             })
         }
         let mut did_attack = false;
+        let mut is_melee_wep_or_tool = false;
         if let Some(main_hand) = main_hand_option {
             if main_hand == WorldObject::WoodBow {
                 commands.entity(player_e).insert(PlayerAnimation::Bow);
@@ -664,11 +665,16 @@ pub fn mouse_click_system(
                     direction,
                     ignore_cooldown: false,
                 });
-            } else if main_hand.is_melee_weapon() || main_hand.is_tool() {
+            } else if main_hand.is_melee_weapon()
+                || main_hand.is_ranged_weapon()
+                || main_hand.is_tool()
+            {
                 if !player_anim.is_sprinting() {
                     did_attack = true;
                 }
             }
+
+            is_melee_wep_or_tool = main_hand.is_tool() || main_hand.is_melee_weapon();
         }
         if did_attack {
             commands.entity(player_e).insert(PlayerAnimation::Attack);
@@ -681,7 +687,7 @@ pub fn mouse_click_system(
             .truncate()
             .distance(cursor_pos.world_coords.truncate())
             > game.player().reach_distance * 32.
-            || ranged_query.get_single().is_ok()
+            || (ranged_query.get_single().is_ok() && !is_melee_wep_or_tool)
         {
             return;
         }

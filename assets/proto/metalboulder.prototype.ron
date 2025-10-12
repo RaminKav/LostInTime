@@ -13,13 +13,13 @@
   "survival_rogue_like::world::y_sort::YSort": (-0.015),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: MetalShard,
+                item: MetalBar,
                 min: 2,
                 max: 5,
                 rate: 1.
             ),
             (
-                item: PebbleBlock,
+                item: StoneChunk,
                 min: 1,
                 max: 4,
                 rate: 0.6

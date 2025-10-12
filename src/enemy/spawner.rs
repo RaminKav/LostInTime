@@ -410,6 +410,8 @@ fn tick_spawner_timers(
             if night_tracker.is_night() {
                 // double spawn rate at night
                 spawner.spawn_timer.tick(time.delta());
+                spawner.spawn_timer.tick(time.delta());
+                spawner.spawn_timer.tick(time.delta());
             }
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();

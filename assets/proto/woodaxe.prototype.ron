@@ -30,6 +30,6 @@
         ),
         count: 1
   ),
-   "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: PebbleBlock, chance: 1.),(obj: PebbleBlock, chance: 1.), (obj: PebbleBlock, chance: 0.5)]),
+   "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)]),
   }
 )

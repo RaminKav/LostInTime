@@ -17,7 +17,7 @@
                 rate: 1.
             ),
             (
-            item: PebbleBlock,
+            item: StoneChunk,
                 min: 1,
                 max: 4,
                 rate: 0.75

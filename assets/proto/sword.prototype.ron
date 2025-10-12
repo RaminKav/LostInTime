@@ -19,6 +19,7 @@
         loot_rate: Some((start: 3, end: 7)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::item::projectile::RangedAttack": (SwordProjectile),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Sword,
         attributes: (
@@ -30,6 +31,6 @@
         ),
         count: 1
   ),
-  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: PebbleBlock, chance: 1.),(obj: PebbleBlock, chance: 1.), (obj: PebbleBlock, chance: 0.5)]),
+  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: StoneChunk, chance: 1.),(obj: StoneChunk, chance: 1.), (obj: StoneChunk, chance: 0.5)]),
   }
 )

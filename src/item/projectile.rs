@@ -59,6 +59,7 @@ pub enum Projectile {
     FireAttack,
     TeleportShock,
     Echo,
+    SwordProjectile,
 }
 
 impl Projectile {
@@ -75,6 +76,13 @@ impl Projectile {
             Projectile::Fireball => true,
             Projectile::GreenWhip => true,
             Projectile::Electricity => true,
+            _ => false,
+        }
+    }
+    pub fn is_anchored_to_player_pos(&self) -> bool {
+        match self {
+            Projectile::Electricity => true,
+            Projectile::SwordProjectile => true,
             _ => false,
         }
     }
@@ -225,6 +233,7 @@ fn handle_ranged_attack_event(
         } else {
             game.player().position.truncate()
         };
+        info!("PROJ {:?}", proj_event.pos_override.unwrap_or(t));
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
@@ -276,6 +285,7 @@ fn handle_spawn_projectiles_after_delay(
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
+            info!("SPAWNED PROJ");
             let p = proto_commands.spawn_projectile_from_proto(
                 proj.proj.clone(),
                 &proto,
@@ -286,6 +296,11 @@ fn handle_spawn_projectiles_after_delay(
             );
 
             if let Some(p) = p {
+                if proj.proj.is_anchored_to_player_pos() && !proj.is_followup_proj {
+                    let player_e = player.single();
+                    commands.entity(player_e).add_child(p);
+                }
+                // AUDIO
                 if proj.proj == Projectile::Fireball {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
                 } else if proj.proj == Projectile::Arrow {
@@ -293,10 +308,6 @@ fn handle_spawn_projectiles_after_delay(
                 } else if proj.proj == Projectile::ThrowingStar {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
                 } else if proj.proj == Projectile::Electricity {
-                    if !proj.is_followup_proj {
-                        let player_e = player.single();
-                        commands.entity(player_e).add_child(p);
-                    }
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
                 }
                 if let Some(e) = proj.from_enemy {

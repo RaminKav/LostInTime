@@ -13,15 +13,10 @@
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [
             (
-                item: PebbleBlock,
+                item: StoneChunk,
                 min: 2,
                 max: 5,
                 rate: 1.
-            ),(
-                item: StoneChunk,
-                min: 1,
-                max: 1,
-                rate: 0.25
             ),
             (
                 item: Flint,

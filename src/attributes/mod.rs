@@ -1248,17 +1248,34 @@ impl ItemRarity {
     }
     pub fn get_scrap(&self) -> ScrapsInto {
         match self {
-            ItemRarity::Common => ScrapsInto(vec![]),
-            ItemRarity::Uncommon => ScrapsInto(vec![Scrap::new(WorldObject::UpgradeTome, 0.06)]),
+            ItemRarity::Common => ScrapsInto(vec![Scrap::new(WorldObject::UpgradeTome, 1.)]),
+            ItemRarity::Uncommon => ScrapsInto(vec![
+                Scrap::new(WorldObject::OrbOfTransformation, 0.2),
+                Scrap::new(WorldObject::UpgradeTome, 1.0),
+                Scrap::new(WorldObject::UpgradeTome, 0.5),
+            ]),
             ItemRarity::Rare => ScrapsInto(vec![
                 Scrap::new(WorldObject::OrbOfTransformation, 1.),
-                Scrap::new(WorldObject::UpgradeTome, 0.17),
+                Scrap::new(WorldObject::OrbOfTransformation, 0.2),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 1.0),
+                Scrap::new(WorldObject::UpgradeTome, 0.2),
             ]),
             ItemRarity::Legendary => ScrapsInto(vec![
                 Scrap::new(WorldObject::OrbOfTransformation, 1.),
                 Scrap::new(WorldObject::OrbOfTransformation, 1.),
-                Scrap::new(WorldObject::OrbOfTransformation, 0.5),
-                Scrap::new(WorldObject::UpgradeTome, 0.4),
+                Scrap::new(WorldObject::OrbOfTransformation, 1.),
+                Scrap::new(WorldObject::OrbOfTransformation, 0.2),
+                Scrap::new(WorldObject::OrbOfTransformation, 0.2),
+                Scrap::new(WorldObject::OrbOfTransformation, 0.2),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 1.),
+                Scrap::new(WorldObject::UpgradeTome, 0.5),
+                Scrap::new(WorldObject::UpgradeTome, 0.5),
+                Scrap::new(WorldObject::UpgradeTome, 0.5),
             ]),
         }
     }
