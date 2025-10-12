@@ -18,12 +18,7 @@
   "survival_rogue_like::player::levels::ExperienceReward": (15),
   "bevy_proto::custom::VisibilityBundle": (),
   "survival_rogue_like::item::loot_table::LootTable": (
-        drops: [(
-                item: WoodPlank,
-                min: 2,
-                max: 4,
-                rate: 1.
-            ),
+        drops: [
             (
                 item: Stick,
                 min: 1,
@@ -32,8 +27,8 @@
             ),(
                 item: Log,
                 min: 1,
-                max: 1,
-                rate: 0.35
+                max: 4,
+                rate: 1.
             ),
             (
                 item: YellowSaplingBlock,

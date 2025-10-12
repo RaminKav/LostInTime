@@ -3,6 +3,8 @@
   templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": UpgradeTome,
+  "survival_rogue_like::item::item_actions::ItemActions": (actions: [UpgradeTome]),
+  "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: UpgradeTome,
         metadata: (
