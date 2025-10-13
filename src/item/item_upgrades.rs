@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
+use crate::attributes::ItemAttributes;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
@@ -167,10 +168,12 @@ pub fn handle_on_hit_upgrades(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
     asset_server: Res<AssetServer>,
+    player_att: Query<&ItemAttributes, With<Player>>,
 ) {
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
     }
+    let player_attributes = player_att.single();
     for hit in hits.iter() {
         if hit.hit_entity == game.game.player {
             continue;
@@ -200,6 +203,7 @@ pub fn handle_on_hit_upgrades(
                 .normalize_or_zero(),
                 false,
                 &asset_server,
+                1. + player_attributes.size.value as f32 / 100.,
             );
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Electricity,

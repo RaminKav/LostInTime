@@ -83,6 +83,7 @@ pub struct ItemAttributes {
     pub xp_rate: AttributeValue,
     pub loot_rate: AttributeValue,
     pub mana: AttributeValue,
+    pub size: AttributeValue,
     pub mana_regen: AttributeValue,
 }
 
@@ -1001,6 +1002,7 @@ impl ItemAttributes {
             loot_rate: self.loot_rate + other.loot_rate,
             mana: self.mana + other.mana,
             mana_regen: self.mana_regen + other.mana_regen,
+            size: self.size + other.size,
         }
     }
 }

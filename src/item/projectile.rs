@@ -5,7 +5,9 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
-    attributes::{modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana},
+    attributes::{
+        modifiers::ModifyManaEvent, Attack, CurrentMana, ItemAttributes, ManaRegen, MaxMana,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::AttackTimer,
     custom_commands::CommandsExt,
@@ -165,6 +167,7 @@ fn handle_ranged_attack_event(
             &MaxMana,
             &ManaRegen,
             &PlayerSkills,
+            &ItemAttributes,
             Option<&AttackTimer>,
             Option<&JustTeleported>,
         ),
@@ -184,6 +187,7 @@ fn handle_ranged_attack_event(
             max_mana,
             mana_regen,
             skills,
+            attributes,
             player_cooldown,
             teleported_option,
         ) = player_query.single();
@@ -207,6 +211,7 @@ fn handle_ranged_attack_event(
                     }) as i32,
             ));
         }
+
         // if proto
         //     .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
         //     .is_some()
@@ -239,11 +244,16 @@ fn handle_ranged_attack_event(
         } else {
             game.player().position.truncate()
         };
-        info!("PROJ {:?}", proj_event.pos_override.unwrap_or(t));
+        info!(
+            "PROJ {:?}",
+            proj_event.pos_override.map(|v| v * 2.).unwrap_or(t)
+        );
+
+        let size = 1. + attributes.size.value as f32 / 100.;
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
-            pos: proj_event.pos_override.unwrap_or(t),
+            pos: proj_event.pos_override.map(|v| v * size).unwrap_or(t),
             direction: proj_event.direction,
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
@@ -255,7 +265,7 @@ fn handle_ranged_attack_event(
             commands.spawn(ProjectileSpawnMarker {
                 timer: Timer::from_seconds(proj_event.spawn_delay + 0.3, TimerMode::Once),
                 proj: Projectile::DaggerProjectile2,
-                pos: proj_event.pos_override.unwrap_or(t),
+                pos: proj_event.pos_override.map(|v| v * size).unwrap_or(t),
                 direction: proj_event.direction,
                 dmg_override: proj_event.dmg_override,
                 from_enemy: proj_event.from_enemy,
@@ -300,7 +310,9 @@ fn handle_spawn_projectiles_after_delay(
     player: Query<Entity, With<Player>>,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     asset_server: Res<AssetServer>,
+    player_att: Query<&ItemAttributes, With<Player>>,
 ) {
+    let player_att = player_att.single();
     for (e, mut proj) in projectiles.iter_mut() {
         proj.timer.tick(time.delta());
         if proj.timer.just_finished() {
@@ -312,6 +324,7 @@ fn handle_spawn_projectiles_after_delay(
                 proj.direction,
                 proj.was_mana_bar_full,
                 &asset_server,
+                1. + player_att.size.value as f32 / 100.,
             );
 
             if let Some(p) = p {

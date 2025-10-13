@@ -38,6 +38,7 @@ pub trait CommandsExt<'w, 's> {
         dir: Vec2,
         mana_bar_full: bool,
         asset_server: &AssetServer,
+        scale_up: f32,
     ) -> Option<Entity>;
     fn spawn_from_proto<'a, T: Display + Schematic + Clone + Into<&'a str>>(
         &mut self,
@@ -94,6 +95,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         dir: Vec2,
         mana_bar_full: bool,
         asset_server: &AssetServer,
+        scale_up: f32,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
             let mut spawned_entity_commands = self.commands().entity(spawned_entity);
@@ -108,7 +110,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 sprite_data.size
             } else {
                 Vec2::new(16., 16.)
-            };
+            } * scale_up;
             let mut x_offset = 0.;
             let mut y_offset = 0.;
             let angle = proto_data.direction.y.atan2(proto_data.direction.x);
@@ -123,11 +125,12 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 .insert(Transform {
                     translation: pos.extend(0.)
                         + Vec3::new(
-                            x_offset + (angle.cos() * proj_state.spawn_offset.x),
-                            y_offset + (angle.sin() * proj_state.spawn_offset.y),
+                            x_offset + (angle.cos() * proj_state.spawn_offset.x * scale_up),
+                            y_offset + (angle.sin() * proj_state.spawn_offset.y * scale_up),
                             0.,
                         ),
                     rotation: Quat::from_rotation_z(angle),
+                    scale: Vec3::splat(scale_up),
                     ..default()
                 })
                 .insert(ActiveEvents::COLLISION_EVENTS)
@@ -150,7 +153,10 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                             ..default()
                         }),
                         Sensor,
-                        Collider::cuboid(arc_data.col_size.x, arc_data.col_size.y),
+                        Collider::cuboid(
+                            arc_data.col_size.x * scale_up,
+                            arc_data.col_size.y * scale_up,
+                        ),
                         ActiveEvents::COLLISION_EVENTS,
                         ActiveCollisionTypes::all(),
                     ));
