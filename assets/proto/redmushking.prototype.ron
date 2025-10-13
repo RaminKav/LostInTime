@@ -34,12 +34,6 @@
                 max: 9,
                 rate: 1.
             ),
-            (
-                item: Arrow,
-                min: 10,
-                max: 20,
-                rate: 0.85
-            ),
             // (
             //     item: ThrowingStar,
             //     min: 1,

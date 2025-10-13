@@ -6,7 +6,7 @@ use seldom_state::{
 };
 
 use crate::{
-    ai::{HurtByPlayer, IdleState, LineOfSight},
+    ai::{FollowState, HurtByPlayer, IdleState, LineOfSight, NightTimeAggro},
     attributes::Attack,
     inputs::FacingDirection,
     Game,
@@ -43,10 +43,10 @@ pub fn handle_new_red_mushling_state_machine(
             .set_trans_logging(false)
             .trans::<WaitingToSproutState>(HurtByPlayer, SproutingState)
             .trans::<WaitingToSproutState>(
-                MushkingSummoned.and(LineOfSight {
+                LineOfSight {
                     target: game.player,
                     range: 40.,
-                }),
+                },
                 SproutingState,
             )
             .trans::<IdleState>(
@@ -57,6 +57,25 @@ pub fn handle_new_red_mushling_state_machine(
                 GasAttackState {
                     hitbox: None,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                },
+            )
+            .trans::<FollowState>(
+                LineOfSight {
+                    target: game.player,
+                    range: 20.,
+                },
+                GasAttackState {
+                    hitbox: None,
+                    cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                },
+            )
+            .trans::<IdleState>(
+                NightTimeAggro,
+                FollowState {
+                    target: game.player,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: 0.4,
                 },
             );
 

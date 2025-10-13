@@ -50,8 +50,8 @@ pub fn handle_gamble_shrine_rewards(
                 commands.entity(e).remove::<GambleShrine>();
 
                 let drop_list = [
-                    WorldObject::WoodSword,
-                    WorldObject::WoodSword,
+                    // WorldObject::WoodSword,
+                    // WorldObject::WoodSword,
                     WorldObject::Sword,
                     WorldObject::Dagger,
                     WorldObject::WoodBow,

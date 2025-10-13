@@ -684,7 +684,7 @@ impl WorldObject {
     pub fn get_weapon_levelup_upgrade(&self) -> i32 {
         match self {
             WorldObject::WoodSword => 2,
-            WorldObject::Sword => 3,
+            WorldObject::Sword => 2,
             WorldObject::Dagger => 1,
             WorldObject::Claw => 2,
             WorldObject::WoodBow => 2,

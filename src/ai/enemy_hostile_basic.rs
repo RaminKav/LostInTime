@@ -54,9 +54,6 @@ impl Trigger for LineOfSight {
         entity: Entity,
         (transforms, _time, night_tracker): Self::Param<'_, '_>,
     ) -> Result<f32, f32> {
-        if night_tracker.is_night() {
-            return Ok(0.);
-        }
         if let Ok(tfxm) = transforms.get(entity) {
             let delta = transforms.get(self.target).unwrap().translation.truncate()
                 - tfxm.translation.truncate();
@@ -235,13 +232,13 @@ pub fn follow(
 
         let distance_from_target = (target_translation.truncate() - follow_translation).length();
         let is_far_away = distance_from_target > 10.5 * TILE_SIZE.x;
-        let is_on_water_tile = if let Some(tile_data) =
-            game.get_tile_data(world_pos_to_tile_pos(follow_translation))
-        {
-            tile_data.block_type.contains(&WorldObject::WaterTile)
-        } else {
-            true
-        };
+        // let is_on_water_tile = if let Some(tile_data) =
+        //     game.get_tile_data(world_pos_to_tile_pos(follow_translation))
+        // {
+        //     tile_data.block_type.contains(&WorldObject::WaterTile)
+        // } else {
+        //     true
+        // };
         //convert follower txfm to AIPos too
         let target_txfm = target_translation.truncate();
         let direct_path_to_target = (target_txfm - follow_translation).normalize_or_zero();

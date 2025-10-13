@@ -98,8 +98,8 @@ pub fn handle_shrine_rewards(
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
             shrine.num_mobs_left -= 1;
             let drop_list = [
-                WorldObject::WoodSword,
-                WorldObject::WoodSword,
+                // WorldObject::WoodSword,
+                // WorldObject::WoodSword,
                 WorldObject::Sword,
                 WorldObject::Dagger,
                 WorldObject::WoodBow,

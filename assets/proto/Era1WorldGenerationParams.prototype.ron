@@ -11,9 +11,9 @@
       dirt_frequency: 0.0,
       forest_params: (
         tree_spacing_radius: 30.,
-        tree_density: 0.2,
+        tree_density: 0.1,
         forest_radius: 10.,
-        max_trees_per_forest: 22,
+        max_trees_per_forest: 18,
         tree_weights: {
           SmallGreenTree: 10.0,
           SmallYellowTree: 2.5,

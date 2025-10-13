@@ -1199,10 +1199,10 @@ impl ItemRarity {
     pub fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
         let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
         match self {
-            ItemRarity::Common => acc_offset..=(1 + acc_offset),
-            ItemRarity::Uncommon => (1 + acc_offset)..=(2 + acc_offset),
-            ItemRarity::Rare => (2 + acc_offset)..=(3 + acc_offset),
-            ItemRarity::Legendary => (4 + acc_offset)..=(5 + acc_offset),
+            ItemRarity::Common => (1 + acc_offset)..=(2 + acc_offset),
+            ItemRarity::Uncommon => (2 + acc_offset)..=(3 + acc_offset),
+            ItemRarity::Rare => (3 + acc_offset)..=(4 + acc_offset),
+            ItemRarity::Legendary => (5 + acc_offset)..=(6 + acc_offset),
         }
     }
     fn get_rarity_attributes_bonus(&self) -> f32 {

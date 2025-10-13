@@ -400,6 +400,7 @@ pub fn new_follow(
         &mut AsepriteAnimation,
         &mut KinematicCharacterController,
     )>,
+    added: Query<Entity, Added<FollowState>>,
     time: Res<Time>,
 ) {
     for (entity, follow, att_cooldown, mut anim, mut mover) in follows.iter_mut() {
@@ -416,7 +417,7 @@ pub fn new_follow(
         // Find the direction from the follower to the target and go that way
         mover.translation = Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
 
-        if anim.current_frame() < 6 || anim.current_frame() > 13 {
+        if added.get(entity).is_ok() {
             *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
         }
     }

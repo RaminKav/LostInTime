@@ -435,10 +435,10 @@ fn juice_up_spawned_mobs_per_day(
         if mob.is_boss() {
             continue;
         }
-        let chaos_factor = night_tracker.days as f32;
+        let chaos_factor = night_tracker.days as f32 + (player_level.single().level as f32 * 0.2);
         hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.30)) as i32;
         att.0 = (att.0 as f32 * (1. + chaos_factor * 0.15)) as i32;
-        exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.1)) as u32;
+        exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.08)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }
