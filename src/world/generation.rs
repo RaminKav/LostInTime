@@ -14,6 +14,7 @@ use crate::item::{handle_break_object, PlaceItemEvent, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
+use crate::world::chunk::DoneCreateChunkEvent;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_aseprite::AsepriteBundle;
 use itertools::Itertools;
@@ -249,44 +250,79 @@ impl GenerationPlugin {
     //TODO: do the same shit w graphcis resource loading, but w GameData and pkvStore
     pub fn generate_unique_objects_for_new_world(
         mut game: GameParam,
-        new_dim: Query<Entity, Added<ActiveDimension>>,
+        done_chunks_event: EventReader<DoneCreateChunkEvent>,
         mut commands: Commands,
         dungeon_check: Query<&Dungeon>,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<ColorMaterial>>,
         graphics: Res<Graphics>,
     ) {
-        if new_dim.is_empty() {
+        if done_chunks_event.len() == 0 {
             return;
         }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
-        for (obj_to_spawn, _size, _) in UNIQUE_OBJECTS_DATA {
+        for (obj_to_spawn, size, _) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj_to_spawn) {
-                debug!("NEW UNIQUE OBJ: {obj_to_spawn:?}");
-
                 let mut rng = rand::thread_rng();
+                let gen_new_pos = |rng: &mut rand::rngs::ThreadRng| {
+                    let mut pos = TileMapPosition::new(
+                        IVec2::new(
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                            rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        ),
+                        TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                    );
+                    if pos.chunk_pos == IVec2::ZERO {
+                        pos.chunk_pos = IVec2::new(2, 2);
+                    }
+                    if pos.chunk_pos.x == 1 {
+                        pos.chunk_pos.x = 2;
+                    }
+                    if pos.chunk_pos.y == 1 {
+                        pos.chunk_pos.y = 2;
+                    }
+                    if pos.chunk_pos.x == -1 {
+                        pos.chunk_pos.x = -2;
+                    }
+                    if pos.chunk_pos.y == -1 {
+                        pos.chunk_pos.y = -2;
+                    }
+                    pos
+                };
+                let mut pos = gen_new_pos(&mut rng);
+                info!("NEW UNIQUE OBJ: {obj_to_spawn:?} {pos:?}");
 
-                let mut pos = TileMapPosition::new(
-                    IVec2::new(
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
-                    ),
-                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
-                );
-                if pos.chunk_pos == IVec2::ZERO {
-                    pos.chunk_pos = IVec2::new(2, 2);
-                }
-                if pos.chunk_pos.x == 1 {
-                    pos.chunk_pos.x = 2;
-                }
-                if pos.chunk_pos.y == 1 {
-                    pos.chunk_pos.y = 2;
-                }
-                if pos.chunk_pos.x == -1 {
-                    pos.chunk_pos.x = -2;
-                }
-                if pos.chunk_pos.y == -1 {
-                    pos.chunk_pos.y = -2;
+                //TODO: this will be funky if size is not even integers
+                let x_halfsize = (size.x / 2.) as i32;
+                let y_halfsize = (size.y / 2.) as i32;
+
+                let mut found_non_water_location = false;
+                let mut max_chunk_retries = 16;
+                'repeat: while !found_non_water_location {
+                    for x in (-x_halfsize)..=x_halfsize {
+                        for y in (-y_halfsize)..=y_halfsize {
+                            let n_pos = tile_pos_to_world_pos(
+                                get_neighbour_tile(pos, (x as i8, y as i8)),
+                                false,
+                            );
+                            if is_tile_water(n_pos, &game).is_ok_and(|x| x) {
+                                let mut rng = rand::thread_rng();
+
+                                pos = TileMapPosition::new(
+                                    pos.chunk_pos,
+                                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                                );
+
+                                max_chunk_retries -= 1;
+                                if max_chunk_retries == 0 {
+                                    max_chunk_retries = 16;
+                                    pos = gen_new_pos(&mut rng);
+                                }
+                                continue 'repeat;
+                            }
+                        }
+                    }
+                    found_non_water_location = true;
                 }
                 debug!("set up a {obj_to_spawn:?} at {pos:?}");
                 game.world_obj_cache.unique_objs.insert(obj_to_spawn, pos);
@@ -599,53 +635,8 @@ impl GenerationPlugin {
                     // UNIQUE OBJECTS
                     for (unique_obj, pos) in game.world_obj_cache.unique_objs.clone() {
                         if pos.chunk_pos == chunk_pos {
-                            //TODO: this will be funky if size is not even integers
-                            let x_halfsize = (UNIQUE_OBJECTS_DATA
-                                .iter()
-                                .find(|(o, _, _)| o == &unique_obj)
-                                .map(|(_, s, _)| s)
-                                .unwrap()
-                                .x
-                                / 2.) as i32;
-                            let y_halfsize = (UNIQUE_OBJECTS_DATA
-                                .iter()
-                                .find(|(o, _, _)| o == &unique_obj)
-                                .map(|(_, s, _)| s)
-                                .unwrap()
-                                .y
-                                / 2.) as i32;
-
-                            let mut pos = pos;
-                            let mut found_non_water_location = false;
-                            'repeat: while !found_non_water_location {
-                                for x in (-x_halfsize)..=x_halfsize {
-                                    for y in (-y_halfsize)..=y_halfsize {
-                                        let n_pos = tile_pos_to_world_pos(
-                                            get_neighbour_tile(pos, (x as i8, y as i8)),
-                                            false,
-                                        );
-                                        if is_tile_water(n_pos, &game).is_ok_and(|x| x) {
-                                            let mut rng = rand::thread_rng();
-
-                                            pos = TileMapPosition::new(
-                                                chunk_pos,
-                                                TilePos::new(
-                                                    rng.gen_range(0..15),
-                                                    rng.gen_range(0..15),
-                                                ),
-                                            );
-                                            info!("relocating {unique_obj:?} to {pos:?}");
-                                            continue 'repeat;
-                                        }
-                                    }
-                                }
-                                found_non_water_location = true;
-                            }
-                            game.world_obj_cache.unique_objs.insert(unique_obj, pos);
-
                             objs.insert(pos, unique_obj);
-                            debug!("SPAWNING UNIQUE {unique_obj:?} at {pos:?} {x_halfsize:?}");
-                        }
+                        };
                         // clear out area
                         let clear_tiles = get_radial_tile_positions(
                             pos,

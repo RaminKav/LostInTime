@@ -193,7 +193,7 @@ impl ActiveMainHandState {
     pub fn get_attack_anim_offset(&self) -> f32 {
         match self.item_stack.obj_type {
             WorldObject::WoodSword => 1.,
-            WorldObject::Sword => 2.,
+            WorldObject::Spear => 2.,
             WorldObject::WoodAxe => 2.,
             WorldObject::WoodPickaxe => 2.,
             WorldObject::Dagger => 3.,
@@ -278,7 +278,7 @@ pub enum WorldObject {
     ForestShirt,
     ForestPants,
     ForestShoes,
-    DualStaff,
+    Spear,
     Dagger,
     Fireball,
     Ring,
@@ -582,6 +582,7 @@ impl WorldObject {
         match self {
             WorldObject::WoodSword => true,
             WorldObject::Sword => true,
+            WorldObject::Spear => true,
             WorldObject::Dagger => true,
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
@@ -604,6 +605,7 @@ impl WorldObject {
         match self {
             WorldObject::WoodSword => true,
             WorldObject::Sword => true,
+            WorldObject::Spear => true,
             WorldObject::Dagger => true,
             WorldObject::Claw => false,
             _ => false,
@@ -685,6 +687,7 @@ impl WorldObject {
         match self {
             WorldObject::WoodSword => 2,
             WorldObject::Sword => 2,
+            WorldObject::Spear => 2,
             WorldObject::Dagger => 1,
             WorldObject::Claw => 2,
             WorldObject::WoodBow => 2,

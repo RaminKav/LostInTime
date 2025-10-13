@@ -1,0 +1,12 @@
+(
+  name: "SpearProjectile",
+  templates: ["projectile.prototype.ron"],
+  schematics: {
+        "survival_rogue_like::item::projectile::Projectile": SpearProjectile,
+        "survival_rogue_like::proto::ColliderProto": (x: 43., y: 5.),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -4., y: -4.), hit_entities: [], despawn_on_hit: false),
+        "survival_rogue_like::animations::DoneAnimation": (),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/SpearProjectile.png", size: (x: 86., y: 10.), cols: 3, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+  }
+)

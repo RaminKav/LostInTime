@@ -143,7 +143,7 @@ impl<'w, 's> ProtoParam<'w, 's> {
             }
             None
         } else {
-            warn!("Could not get projectile data for: {}", id);
+            warn!("Could not get sprite sheet data for: {}", id);
             None
         }
     }

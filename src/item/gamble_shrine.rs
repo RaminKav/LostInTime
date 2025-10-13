@@ -53,6 +53,7 @@ pub fn handle_gamble_shrine_rewards(
                     // WorldObject::WoodSword,
                     // WorldObject::WoodSword,
                     WorldObject::Sword,
+                    WorldObject::Spear,
                     WorldObject::Dagger,
                     WorldObject::WoodBow,
                     WorldObject::Claw,

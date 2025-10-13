@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     assets::Graphics,
-    attributes::{attribute_helpers::reroll_item_bonus_attributes, AttributeModifier},
+    attributes::attribute_helpers::{levelup_item_stats, reroll_item_bonus_attributes},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     colors::YELLOW,
     container::Container,
@@ -254,47 +254,23 @@ pub fn handle_furnace_slot_update(
                     .current_fuel_type
                 {
                     WorldObject::UpgradeTome => {
-                        let mut modifiers: Vec<(String, i32)> = vec![];
-                        let furnace_item = furnace.items.items[1].as_ref().unwrap();
-                        if let Some(eqp_type) = furnace_item.get_obj().get_equip_type(&proto) {
-                            if eqp_type.is_weapon() || eqp_type.is_tool() {
-                                modifiers.push(("attack".to_owned(), 1));
-                                if let Some(bonus_mod) = furnace_item
-                                    .item_stack
-                                    .attributes
-                                    .get_random_existing_bonus_attribute_string(vec!["attack"])
-                                {
-                                    modifiers.push((bonus_mod, 1));
-                                }
-                            } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
-                                modifiers.push(("health".to_owned(), 2));
-                                modifiers.push(("armor".to_owned(), 1));
-                                if let Some(bonus_mod) = furnace_item
-                                    .item_stack
-                                    .attributes
-                                    .get_random_existing_bonus_attribute_string(vec![
-                                        "health", "armor",
-                                    ])
-                                {
-                                    modifiers.push((bonus_mod, 1));
-                                }
-                            }
-                        }
-                        for (modifier, delta) in modifiers {
-                            furnace.items.items[1]
-                                .as_ref()
-                                .unwrap()
-                                .clone()
-                                .modify_attributes(
-                                    AttributeModifier { modifier, delta },
-                                    &mut furnace.items,
-                                );
-                            furnace.items.items[1]
-                                .as_ref()
-                                .unwrap()
-                                .clone()
-                                .modify_level(1, &mut furnace.items);
-                        }
+                        let upgraded_stack = levelup_item_stats(
+                            &furnace.items.items[1].as_ref().unwrap().clone().item_stack,
+                            1,
+                            &proto,
+                            false,
+                        );
+                        furnace.items.items[1].as_ref().unwrap().clone().item_stack =
+                            upgraded_stack.clone();
+                        furnace.items.items[1] = Some(InventoryItemStack {
+                            item_stack: upgraded_stack.clone(),
+                            slot: 1,
+                        });
+                        furnace.items.items[1]
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                            .modify_level(1, &mut furnace.items);
                     }
                     WorldObject::OrbOfTransformation => {
                         let old_item = furnace.items.items[1].as_ref().unwrap();

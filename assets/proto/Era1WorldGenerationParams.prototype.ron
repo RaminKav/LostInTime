@@ -5,13 +5,13 @@
   entity: false,
   schematics: {
     "survival_rogue_like::world::WorldGeneration": (
-      water_frequency: 0.29,
+      water_frequency: 0.33,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       forest_params: (
-        tree_spacing_radius: 30.,
-        tree_density: 0.1,
+        tree_spacing_radius: 36.,
+        tree_density: 0.02,
         forest_radius: 10.,
         max_trees_per_forest: 18,
         tree_weights: {
@@ -59,8 +59,8 @@
         WaterBoulder2: 0.02,
       },
       schematic_frequencies: {
-        CombatShrine: 0.065,
-        GambleShrine: 0.065,
+        CombatShrine: 0.1,
+        GambleShrine: 0.1,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

@@ -10,7 +10,7 @@ use crate::{
         ActiveMainHandState, Equipment, EquipmentType, ItemDisplayMetaData, ItemDrop, MainHand,
         WorldObject, PLAYER_EQUIPMENT_POSITIONS,
     },
-    player::{skills::Skill, Limb},
+    player::Limb,
     proto::proto_param::ProtoParam,
     ui::{mark_slot_dirty, InventorySlotState, InventorySlotType, UIContainersParam},
     world::y_sort::YSort,
@@ -21,7 +21,7 @@ use rand::Rng;
 use bevy::prelude::*;
 
 use bevy_proto::prelude::*;
-use bevy_rapier2d::prelude::{Collider, RigidBody, Sensor};
+use bevy_rapier2d::prelude::{Collider, Sensor};
 use serde::{Deserialize, Serialize};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
@@ -463,9 +463,9 @@ impl ItemStack {
         let split_count = self.count / 2;
         (self.count - split_count, split_count)
     }
-    pub fn get_copy_with_modified_attributes(&mut self, modifier: AttributeModifier) -> Self {
+    pub fn get_copy_with_modified_attributes(&self, modifier: AttributeModifier) -> Self {
         self.clone()
-            .copy_with_attributes(self.attributes.change_attribute(modifier))
+            .copy_with_attributes(self.attributes.clone().change_attribute(modifier))
     }
     pub fn modify_count(&mut self, amount: i8) -> Self {
         if (self.count as i8) + amount <= 0 {

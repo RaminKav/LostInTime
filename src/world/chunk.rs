@@ -34,6 +34,7 @@ impl Plugin for ChunkPlugin {
         app.add_event::<SpawnChunkEvent>()
             .add_event::<DespawnChunkEvent>()
             .add_event::<CreateChunkEvent>()
+            .add_event::<DoneCreateChunkEvent>()
             .add_event::<GenerateObjectsEvent>()
             .add_systems(
                 (
@@ -90,6 +91,8 @@ pub struct VisibleObject;
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
 }
+#[derive(Clone)]
+pub struct DoneCreateChunkEvent;
 #[derive(Component, Reflect, FromReflect, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct TileEntityCollection {
@@ -420,6 +423,7 @@ impl ChunkPlugin {
     pub fn startup_chunk_generation(
         game: GameParam,
         mut create_chunk_event: EventWriter<CreateChunkEvent>,
+        mut done_create_chunk_event: EventWriter<DoneCreateChunkEvent>,
         new_dim_query: Query<Entity, Added<ActiveDimension>>,
         dungeon_check: Query<&Dungeon>,
     ) {
@@ -440,6 +444,8 @@ impl ChunkPlugin {
                 }
             }
         }
+        done_create_chunk_event.send(DoneCreateChunkEvent);
+        info!("END STARTUP CHUNK GENERATION!!");
     }
     //TODO: change despawning systems to use playe rpos instead??
     pub fn despawn_outofrange_chunks(

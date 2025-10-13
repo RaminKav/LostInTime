@@ -1,10 +1,15 @@
 use std::cmp::max;
 
 use bevy::prelude::Commands;
+use bevy_proto::prelude::ProtoCommands;
 use rand::{rngs::ThreadRng, Rng};
+use tracing::info;
 
 use crate::{
-    attributes::{ItemAttributes, ItemRarity, RawItemBaseAttributes, RawItemBonusAttributes},
+    attributes::{
+        AttributeModifier, ItemAttributes, ItemRarity, RawItemBaseAttributes,
+        RawItemBonusAttributes,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     inventory::ItemStack,
     item::EquipmentType,
@@ -44,13 +49,14 @@ pub fn create_new_random_item_stack_with_attributes(
 }
 
 pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> ItemStack {
+    let level = stack.metadata.level.unwrap_or(1);
     let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
         return stack.clone();
     };
 
     let mut rng = rand::thread_rng();
-    let rarity_rng = rng.gen_range(0..=10);
+    let rarity_rng = rng.gen_range(0..=8);
     let rarity = if rarity_rng <= 0 {
         stack.rarity.get_next_rarity()
     } else {
@@ -71,6 +77,8 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
 
     let mut new_stack = stack.copy_with_attributes(&final_att);
     new_stack.rarity = rarity;
+
+    new_stack = levelup_item_stats(&new_stack, level, proto, true);
     new_stack
 }
 
@@ -133,4 +141,55 @@ pub fn build_item_stack_with_parsed_attributes(
     }
 
     new_stack
+}
+
+pub fn levelup_item_stats(
+    stack: &ItemStack,
+    level: u8,
+    proto: &ProtoParam,
+    skip_main_attributes: bool,
+) -> ItemStack {
+    let mut stack = stack.clone();
+    for _ in 0..level {
+        let mut modifiers: Vec<(String, i32)> = vec![];
+
+        let rarity = stack.rarity.clone();
+        let num_upgrades = if rarity == ItemRarity::Legendary {
+            2
+        } else {
+            1
+        };
+        if let Some(eqp_type) = stack.obj_type.get_equip_type(proto) {
+            if eqp_type.is_weapon() || eqp_type.is_tool() {
+                if (!skip_main_attributes) {
+                    modifiers.push(("attack".to_owned(), 1));
+                }
+                for _ in 0..num_upgrades {
+                    if let Some(bonus_mod) = stack
+                        .attributes
+                        .get_random_existing_bonus_attribute_string(vec!["attack"])
+                    {
+                        modifiers.push((bonus_mod, 1));
+                    }
+                }
+            } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
+                if (!skip_main_attributes) {
+                    modifiers.push(("health".to_owned(), 2));
+                    modifiers.push(("armor".to_owned(), 1));
+                }
+                for _ in 0..num_upgrades {
+                    if let Some(bonus_mod) = stack
+                        .attributes
+                        .get_random_existing_bonus_attribute_string(vec!["health", "armor"])
+                    {
+                        modifiers.push((bonus_mod, 1));
+                    }
+                }
+            }
+        }
+        for (modifier, delta) in modifiers {
+            stack = stack.get_copy_with_modified_attributes(AttributeModifier { modifier, delta });
+        }
+    }
+    stack.clone()
 }

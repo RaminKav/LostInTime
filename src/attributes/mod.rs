@@ -937,7 +937,7 @@ impl ItemAttributes {
             ("max_durability", self.max_durability.value),
         ]
         .iter()
-        .filter(|(name, val)| *val != 0 && !filter.contains(name))
+        .filter(|(name, val)| *val > 0 && !filter.contains(name))
         .map(|(name, _)| name.to_string())
         .collect::<Vec<String>>();
         if existing_attributes.is_empty() {

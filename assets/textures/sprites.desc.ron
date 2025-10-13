@@ -115,7 +115,7 @@
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
-        DualStaff: WorldObjectData(
+        Spear: WorldObjectData(
             texture_pos: (7., 5.),
             size: (16., 16.),
             anchor: Some((0.2,0.0)),
@@ -826,7 +826,7 @@
             texture_pos: (6., 5.),
             size: (16., 16.),
         ),
-        DualStaff: SpriteData(
+        Spear: SpriteData(
             texture_pos: (7., 5.),
             size: (16., 16.),
         ),

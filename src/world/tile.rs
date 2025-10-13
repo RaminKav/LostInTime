@@ -95,15 +95,9 @@ impl TilePlugin {
     }
     pub fn apply_distance_function_to_tile(x: f32, y: f32, e: f64) -> f64 {
         let d = (Vec2::new(x, y).distance(Vec2::ZERO)) / ISLAND_SIZE;
-        let mix = 0.5;
+        let mix = 0.3;
         let ne = lerp(&e, &(1. - d as f64), &mix);
-        if ne >= 0.25 {
-            // land
-            0.3
-        } else {
-            // water
-            0.1
-        }
+        ne
     }
     pub fn _update_neighbour_tiles(
         new_tile_pos: TilePos,

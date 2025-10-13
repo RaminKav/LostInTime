@@ -60,6 +60,9 @@ pub enum Projectile {
     TeleportShock,
     Echo,
     SwordProjectile,
+    DaggerProjectile1,
+    DaggerProjectile2,
+    SpearProjectile,
 }
 
 impl Projectile {
@@ -83,6 +86,9 @@ impl Projectile {
         match self {
             Projectile::Electricity => true,
             Projectile::SwordProjectile => true,
+            Projectile::DaggerProjectile1 => true,
+            Projectile::DaggerProjectile2 => true,
+            Projectile::SpearProjectile => true,
             _ => false,
         }
     }
@@ -244,6 +250,19 @@ fn handle_ranged_attack_event(
             was_mana_bar_full: current_mana.0 == max_mana.0,
             is_followup_proj: proj_event.is_followup_proj,
         });
+
+        if proj_event.projectile == Projectile::DaggerProjectile1 {
+            commands.spawn(ProjectileSpawnMarker {
+                timer: Timer::from_seconds(proj_event.spawn_delay + 0.3, TimerMode::Once),
+                proj: Projectile::DaggerProjectile2,
+                pos: proj_event.pos_override.unwrap_or(t),
+                direction: proj_event.direction,
+                dmg_override: proj_event.dmg_override,
+                from_enemy: proj_event.from_enemy,
+                was_mana_bar_full: current_mana.0 == max_mana.0,
+                is_followup_proj: false,
+            });
+        }
 
         if teleported_option.is_some() {
             modify_mana_event.send(ModifyManaEvent(

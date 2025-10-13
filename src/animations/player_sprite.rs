@@ -16,6 +16,7 @@ use crate::{
     attributes::{AttributeChangeEvent, ItemRarity},
     inputs::FacingDirection,
     inventory::Inventory,
+    item::WorldObject,
     player::{
         levels::PlayerLevel,
         skills::{PlayerSkills, SkillClass},
@@ -83,8 +84,25 @@ impl PlayerAnimation {
         }
     }
 
-    pub fn is_movement_restricting(&self) -> bool {
-        self == &PlayerAnimation::Attack || self == &PlayerAnimation::Bow
+    pub fn action_movement_restriction(&self, main_hand: Option<WorldObject>) -> f32 {
+        if self == &PlayerAnimation::Attack || self == &PlayerAnimation::Bow {
+            if let Some(wep) = main_hand {
+                match wep {
+                    WorldObject::BasicStaff | WorldObject::IceStaff | WorldObject::MagicWhip => {
+                        return 0.5
+                    }
+                    WorldObject::Sword => return 0.4,
+                    WorldObject::Dagger => return 0.85,
+                    WorldObject::WoodBow => return 0.2,
+                    WorldObject::Claw => return 0.8,
+                    WorldObject::Spear => return 0.15,
+                    _ => return 1.,
+                }
+            }
+            0.5
+        } else {
+            1.0
+        }
     }
 
     pub fn is_sprinting(&self) -> bool {

@@ -36,7 +36,7 @@ use crate::enemy::Mob;
 use crate::inventory::Inventory;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
-use crate::item::projectile::{Projectile, RangedAttack, RangedAttackEvent};
+use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::minimap::UpdateMiniMapEvent;
@@ -251,15 +251,12 @@ pub fn player_move_inputs(
     let (player_e, mut player_kcc, mut mv, curr_anim, speed, hunger, mut run_dust_timer, skills) =
         player_query.single_mut();
     let player = game.player_mut();
-    if curr_anim.is_movement_restricting() {
-        mv.0 = Vec2::ZERO;
-        return;
-    }
     let mut d = Vec2::ZERO;
     let s = PLAYER_MOVE_SPEED
         * time.delta_seconds()
         * (1. + speed.0 as f32 / 100.)
-        * (if hunger.is_starving() { 0.7 } else { 1. });
+        * (if hunger.is_starving() { 0.7 } else { 1. })
+        * curr_anim.action_movement_restriction(player.main_hand_slot.clone().map(|s| s.get_obj()));
 
     if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
         d.x -= 1.;

@@ -11,7 +11,6 @@
         crit_damage: Some((start: 2, end: 6)),
         crit_chance: Some((start: 1, end: 4)),
         healing: Some((start: 2, end: 5)),
-        bonus_damage: Some((start: 1, end: 1)),
         speed: Some((start: 4, end: 20)),
         health_regen: Some((start: 1, end: 2)),
         thorns: Some((start: 4, end: 8)),

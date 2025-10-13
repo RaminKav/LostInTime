@@ -11,7 +11,6 @@
         crit_damage: Some((start: 7, end: 15)),
         crit_chance: Some((start: 7, end: 18)),
         healing: Some((start: 2, end: 8)),
-        bonus_damage: Some((start: 1, end: 2)),
         speed: Some((start: 4, end: 10)),
         health_regen: Some((start: 1, end: 2)),
         thorns: Some((start: 3, end: 5)),
@@ -19,11 +18,11 @@
         loot_rate: Some((start: 3, end: 12)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
-  "survival_rogue_like::item::projectile::RangedAttack": (SwordProjectile),
+  "survival_rogue_like::item::projectile::RangedAttack": (DaggerProjectile1),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Dagger,
         attributes: (
-            attack_cooldown: 0.3
+            attack_cooldown: 0.6
         ),
         metadata: (
             name: "Dagger", 
