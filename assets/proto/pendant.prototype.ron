@@ -5,11 +5,12 @@
   "survival_rogue_like::item::WorldObject": Pendant,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        size: Some((start: 100, end: 110)),
-      //   xp_rate: Some((start: 6, end: 20)),
-      //   loot_rate: Some((start: 6, end: 20)),
+        size: Some((start: 40, end: 80)),
+        xp_rate: Some((start: 6, end: 20)),
+        loot_rate: Some((start: 6, end: 20)),
       //   mana: Some((start: 8, end: 18)),
-      //   mana_regen: Some((start: 2, end: 4)),
+        mana_regen: Some((start: 2, end: 4)),
+        attack_speed: Some((start: 90, end: 130)),
   ),
   "survival_rogue_like::item::EquipmentType": Pendant,
   "survival_rogue_like::inventory::ItemStack": (

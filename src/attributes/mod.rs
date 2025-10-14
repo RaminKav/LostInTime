@@ -84,6 +84,7 @@ pub struct ItemAttributes {
     pub loot_rate: AttributeValue,
     pub mana: AttributeValue,
     pub size: AttributeValue,
+    pub attack_speed: AttributeValue,
     pub mana_regen: AttributeValue,
 }
 
@@ -807,6 +808,70 @@ impl ItemAttributes {
             total_atts += 1.;
             total_score += self.mana_regen.range_percentage;
         }
+        if self.size.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Proj. Size",
+                    if is_positive(self.size.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.size.value
+                ),
+                if let Some(size) = &base_att.unwrap().size {
+                    format!(
+                        "({}-{})",
+                        f32::round(*size.start() as f32 * r) as i32,
+                        f32::round(*size.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(*bonus_att.unwrap().size.clone().unwrap().start() as f32 * r)
+                            as i32,
+                        f32::round(*bonus_att.unwrap().size.clone().unwrap().end() as f32 * r)
+                            as i32
+                    )
+                },
+                self.size.quality,
+            ));
+            total_atts += 1.;
+            total_score += self.size.range_percentage;
+        }
+        if self.attack_speed.value != 0 {
+            tooltips.push((
+                format!(
+                    "{}{} Attack Speed",
+                    if is_positive(self.attack_speed.value) {
+                        "+"
+                    } else {
+                        ""
+                    },
+                    self.attack_speed.value
+                ),
+                if let Some(attack_speed) = &base_att.unwrap().attack_speed {
+                    format!(
+                        "({}-{})",
+                        f32::round(*attack_speed.start() as f32 * r) as i32,
+                        f32::round(*attack_speed.end() as f32 * r) as i32
+                    )
+                } else {
+                    format!(
+                        "({}-{})",
+                        f32::round(
+                            *bonus_att.unwrap().attack_speed.clone().unwrap().start() as f32 * r
+                        ) as i32,
+                        f32::round(
+                            *bonus_att.unwrap().attack_speed.clone().unwrap().end() as f32 * r
+                        ) as i32
+                    )
+                },
+                self.attack_speed.quality,
+            ));
+            total_atts += 1.;
+            total_score += self.size.range_percentage;
+        }
         let ratio = if total_atts == 0. {
             0.
         } else {
@@ -868,8 +933,10 @@ impl ItemAttributes {
             entity.insert(MaxHealth(computed_health.value));
         }
         if self.attack_cooldown > 0. {
+            let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             entity.insert(AttackCooldown(
-                self.attack_cooldown * (1.0 - skills.get_count(Skill::AttackSpeed) as f32 * 0.15),
+                self.attack_cooldown * (1.0 - skills.get_count(Skill::AttackSpeed) as f32 * 0.15)
+                    / attack_speed_mod,
             ));
         } else {
             entity.remove::<AttackCooldown>();
@@ -914,6 +981,7 @@ impl ItemAttributes {
         entity.insert(ManaRegen(
             self.mana_regen.value + skills.get_count(Skill::MPRegen) * 5,
         ));
+        entity.insert(ProjectileSize(self.size.value));
     }
     pub fn get_random_existing_bonus_attribute_string(&self, filter: Vec<&str>) -> Option<String> {
         debug!("Getting random existing attribute from: {:?}", self);
@@ -931,6 +999,7 @@ impl ItemAttributes {
             ("lifesteal", self.lifesteal.value),
             ("defence", self.defence.value),
             ("xp_rate", self.xp_rate.value),
+            ("attack_speed", self.attack_speed.value),
             ("loot_rate", self.loot_rate.value),
             ("mana", self.mana.value),
             ("mana_regen", self.mana_regen.value),
@@ -968,7 +1037,7 @@ impl ItemAttributes {
             "speed" => self.speed.value += modifier.delta,
             "lifesteal" => self.lifesteal.value += modifier.delta,
             "defence" => self.defence.value += modifier.delta,
-            "xp_rate" => self.xp_rate.value += modifier.delta,
+            "attack_speed" => self.attack_speed.value += modifier.delta,
             "loot_rate" => self.loot_rate.value += modifier.delta,
             "mana" => self.mana.value += modifier.delta,
             "mana_regen" => self.mana_regen.value += modifier.delta,
@@ -976,6 +1045,7 @@ impl ItemAttributes {
             "max_durability" => self.max_durability.value += modifier.delta,
             "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,
             "invincibility_cooldown" => self.invincibility_cooldown += modifier.delta as f32,
+            "size" => self.size.value += modifier.delta,
             _ => warn!("Got an unexpected attribute: {:?}", modifier.modifier),
         }
         self
@@ -999,6 +1069,7 @@ impl ItemAttributes {
             lifesteal: self.lifesteal + other.lifesteal,
             defence: self.defence + other.defence,
             xp_rate: self.xp_rate + other.xp_rate,
+            attack_speed: self.attack_speed + other.attack_speed,
             loot_rate: self.loot_rate + other.loot_rate,
             mana: self.mana + other.mana,
             mana_regen: self.mana_regen + other.mana_regen,
@@ -1145,6 +1216,8 @@ setup_raw_bonus_attributes! { struct RawItemBonusAttributes {
      loot_rate: Option<RangeInclusive<i32>>,
      mana: Option<RangeInclusive<i32>>,
      mana_regen: Option<RangeInclusive<i32>>,
+     size: Option<RangeInclusive<i32>>,
+     attack_speed: Option<RangeInclusive<i32>>,
 }}
 
 setup_raw_base_attributes! { struct RawItemBaseAttributes {
@@ -1167,6 +1240,8 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      loot_rate: Option<RangeInclusive<i32>>,
      mana: Option<RangeInclusive<i32>>,
      mana_regen: Option<RangeInclusive<i32>>,
+     size: Option<RangeInclusive<i32>>,
+     attack_speed: Option<RangeInclusive<i32>>,
 }}
 
 #[derive(
@@ -1199,12 +1274,22 @@ pub enum ItemGlow {
 
 impl ItemRarity {
     pub fn get_num_bonus_attributes(&self, eqp_type: &EquipmentType) -> RangeInclusive<i32> {
-        let acc_offset = if eqp_type.is_accessory() { 1 } else { 0 };
-        match self {
-            ItemRarity::Common => (1 + acc_offset)..=(2 + acc_offset),
-            ItemRarity::Uncommon => (2 + acc_offset)..=(3 + acc_offset),
-            ItemRarity::Rare => (3 + acc_offset)..=(4 + acc_offset),
+        let acc_offset = if eqp_type.is_accessory() { -1 } else { 0 };
+        let acc_max = 2;
+        let count = match self {
+            ItemRarity::Common => (2 + acc_offset)..=(2 + acc_offset),
+            ItemRarity::Uncommon => (3 + acc_offset)..=(3 + acc_offset),
+            ItemRarity::Rare => (4 + acc_offset)..=(4 + acc_offset),
             ItemRarity::Legendary => (5 + acc_offset)..=(6 + acc_offset),
+        };
+        if eqp_type.is_accessory() {
+            // max of 2
+            RangeInclusive::new(
+                i32::min(*count.start(), acc_max),
+                i32::min(*count.end(), acc_max),
+            )
+        } else {
+            count
         }
     }
     fn get_rarity_attributes_bonus(&self) -> f32 {
@@ -1314,6 +1399,7 @@ pub struct PlayerAttributeBundle {
     pub xp_rate: XpRateBonus,
     pub mana_regen: ManaRegen,
     pub loot_rate: LootRateBonus,
+    pub size: ProjectileSize,
 }
 
 //TODO: Add max health vs curr health
@@ -1366,6 +1452,13 @@ pub struct Speed(pub i32);
 pub struct Lifesteal(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct Defence(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct ProjectileSize(pub i32);
+impl ProjectileSize {
+    pub fn get_multiplier(&self) -> f32 {
+        1. + self.0 as f32 / 100.
+    }
+}
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct XpRateBonus(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
