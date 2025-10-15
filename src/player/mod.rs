@@ -276,6 +276,7 @@ fn spawn_player(
                     .clone(),
                 accessory_items: Container::with_size(4),
                 crafting_items: Container::with_size(0),
+                furnace_items: Container::with_size(2),
                 ..default()
             },
             //TODO: remove itematt and construct from components?

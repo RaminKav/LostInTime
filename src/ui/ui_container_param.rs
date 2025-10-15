@@ -8,6 +8,7 @@ use bevy::{
 use crate::{
     container::Container,
     item::{CraftedItemEvent, CraftingTracker, Recipes},
+    ui::InventoryState,
 };
 
 use super::{
@@ -22,6 +23,7 @@ pub struct UIContainersParam<'w, 's> {
     pub furnace_option: Option<ResMut<'w, FurnaceContainer>>,
     pub crafting_option: Option<ResMut<'w, CraftingContainer>>,
 
+    pub inv_state: ResMut<'w, InventoryState>,
     pub crafted_event: EventWriter<'w, CraftedItemEvent>,
     pub crafting_tracker: Res<'w, CraftingTracker>,
     pub recipes: Res<'w, Recipes>,

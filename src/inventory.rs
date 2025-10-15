@@ -33,6 +33,7 @@ pub struct Inventory {
     pub equipment_items: Container,
     pub accessory_items: Container,
     pub crafting_items: Container,
+    pub furnace_items: Container,
     // pub crafting_result_item: Container,
 }
 impl Inventory {
@@ -41,6 +42,7 @@ impl Inventory {
             InventorySlotType::Equipment => &self.equipment_items,
             InventorySlotType::Accessory => &self.accessory_items,
             InventorySlotType::Crafting => &self.crafting_items,
+            InventorySlotType::Furnace => &self.furnace_items,
             _ => &self.items,
         }
     }
@@ -49,6 +51,7 @@ impl Inventory {
             InventorySlotType::Equipment => &mut self.equipment_items,
             InventorySlotType::Accessory => &mut self.accessory_items,
             InventorySlotType::Crafting => &mut self.crafting_items,
+            InventorySlotType::Furnace => &mut self.furnace_items,
             _ => &mut self.items,
         }
     }
@@ -273,7 +276,7 @@ impl InventoryItemStack {
         ui_cont_param: &UIContainersParam,
     ) -> bool {
         if slot_type.is_furnace() {
-            return ui_cont_param.furnace_option.as_ref().unwrap().slot_map[self.slot]
+            return ui_cont_param.inv_state.furnace_state.slot_map[self.slot]
                 .contains(&self.item_stack.obj_type);
         }
         if !(slot_type.is_accessory() || slot_type.is_equipment()) {

@@ -8,7 +8,7 @@ use crate::{
         RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
     },
     colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED},
-    inventory::ItemStack,
+    inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
     player::{stats::StatType, Player},
@@ -80,15 +80,26 @@ pub fn handle_tooltip_teardown(
     mut updates: EventReader<TooltipTeardownEvent>,
     tooltip: Query<Entity, With<ItemOrRecipeTooltip>>,
     mut tooltip_manager: ResMut<TooltipsManager>,
+    inv: Query<&Inventory>,
+
+    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
 ) {
     if updates.iter().count() > 0 {
-        for t in tooltip.iter() {
-            commands.entity(t).despawn_recursive();
-        }
-
-        // begin delay for next tooltip
-        if tooltip.iter().count() > 0 {
-            tooltip_manager.timer.reset();
+        let inv = inv.single();
+        if let Some(item) = &inv.furnace_items.items[1] {
+            tooltip_update_events.send(ToolTipUpdateEvent {
+                item_stack: item.item_stack.clone(),
+                is_recipe: false,
+                show_range: false,
+            });
+        } else {
+            for t in tooltip.iter() {
+                commands.entity(t).despawn_recursive();
+            }
+            // begin delay for next tooltip
+            if tooltip.iter().count() > 0 {
+                tooltip_manager.timer.reset();
+            }
         }
     }
 }
@@ -104,8 +115,12 @@ pub fn handle_spawn_inv_item_tooltip(
     recipes: Res<Recipes>,
     item_stacks: Query<(Entity, &ItemStack)>,
     proto: ProtoParam,
+    old_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
 ) {
     for item in updates.iter() {
+        for t in old_tooltips.iter() {
+            commands.entity(t).despawn_recursive();
+        }
         let parent_inv_size = match cur_inv_state.0 {
             UIState::Inventory => INVENTORY_UI_SIZE,
             UIState::Chest => CHEST_INVENTORY_UI_SIZE,

@@ -5,7 +5,7 @@ use crate::{
     attributes::{add_item_glows, AttributeChangeEvent},
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
-    ui::{CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
+    ui::{crafting_ui::UpgradeButton, FurnaceState, CHEST_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE},
     ScreenResolution, GAME_HEIGHT,
 };
 
@@ -55,6 +55,7 @@ pub struct InventorySlotState {
 pub struct InventoryState {
     pub active_hotbar_slot: usize,
     pub inv_size: Vec2,
+    pub furnace_state: FurnaceState,
     pub hotbar_dirty: bool,
 }
 #[derive(FromReflect, PartialEq, Reflect, Debug, Clone, Copy)]
@@ -138,7 +139,7 @@ pub fn setup_inv_ui(
         9.,
     );
 
-    commands
+    let inv = commands
         .spawn(SpriteBundle {
             texture,
             sprite: Sprite {
@@ -155,10 +156,35 @@ pub fn setup_inv_ui(
         .insert(InventoryUI)
         .insert(cur_inv_state.0.clone())
         .insert(Name::new("INVENTORY"))
-        .insert(RenderLayers::from_layers(&[3]));
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
 
     inv_state.inv_size = size;
 
+    let upgrade_button = commands
+        .spawn(SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::UpgradeButton)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(13., 13.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(95., 44., 10.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIElement::UpgradeButton)
+        .insert(Interactable::default())
+        .insert(UIState::Inventory)
+        .insert(UpgradeButton)
+        .insert(Name::new("UPGRADE BUTTON"))
+        .id();
+    commands.entity(inv).push_children(&[upgrade_button]);
     stats_event.send(ShowInvPlayerStatsEvent {
         stat: None,
         ignore_timer: true,
@@ -249,6 +275,22 @@ pub fn setup_inv_slots_ui(
             );
         }
     }
+    if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
+        for (slot_index, item) in furnace_items.items.iter().enumerate() {
+            spawn_inv_slot(
+                &mut commands,
+                &inv_state,
+                &graphics,
+                slot_index,
+                Interaction::None,
+                &inv_state_res,
+                &inv_query,
+                &asset_server,
+                InventorySlotType::Furnace,
+                item.to_owned(),
+            );
+        }
+    }
 }
 
 pub fn spawn_inv_slot(
@@ -286,9 +328,9 @@ pub fn spawn_inv_slot(
             + UI_SLOT_SIZE / 2.
             + 6.;
 
-        y = -((slot_index / 8) as f32).trunc() * UI_SLOT_SIZE - (inv_state.inv_size.y) / 2.
+        y = -((slot_index / 8) as f32).trunc() * (UI_SLOT_SIZE + 1.) - (inv_state.inv_size.y) / 2.
             + 7. * UI_SLOT_SIZE
-            + 15.;
+            + 16.;
         if inv_ui_state.0 == UIState::Inventory {
             x -= 2.;
             y -= 29.;
@@ -309,14 +351,11 @@ pub fn spawn_inv_slot(
         y += 4. * UI_SLOT_SIZE + 11.;
     } else if slot_type.is_furnace() {
         if slot_index == 0 {
-            x = -20.5;
-            y = 26.;
+            x = 76.;
+            y = 33.5;
         } else if slot_index == 1 {
-            x = -20.5;
-            y = 68.;
-        } else if slot_index == 2 {
-            x = 21.5;
-            y = 47.;
+            x = 76.;
+            y = 54.5;
         }
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
@@ -525,7 +564,6 @@ pub fn update_inventory_ui(
     graphics: Res<Graphics>,
     mut ui_elements: Query<(Entity, &InventorySlotState)>,
     interactables: Query<&Interactable>,
-    inv_state: Res<InventoryState>,
     inv_ui_state: Res<State<UIState>>,
     inv_query: Query<Entity, With<InventoryUI>>,
     asset_server: Res<AssetServer>,
@@ -548,7 +586,10 @@ pub fn update_inventory_ui(
         } else if slot_state.r#type.is_scrapper() {
             cont_param.scrapper_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else if slot_state.r#type.is_furnace() {
-            cont_param.furnace_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
+            inv.single()
+                .get_items_from_slot_type(slot_state.r#type)
+                .items[slot_state.slot_index]
+                .clone()
         } else if slot_state.r#type.is_crafting() && cont_param.crafting_option.is_some() {
             cont_param.crafting_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else {
@@ -575,7 +616,7 @@ pub fn update_inventory_ui(
                 } else {
                     Interaction::None
                 },
-                &inv_state,
+                &cont_param.inv_state,
                 &inv_query,
                 &asset_server,
                 slot_state.r#type,

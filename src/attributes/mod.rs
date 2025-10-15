@@ -983,7 +983,7 @@ impl ItemAttributes {
         ));
         entity.insert(ProjectileSize(self.size.value));
     }
-    pub fn get_random_existing_bonus_attribute_string(&self, filter: Vec<&str>) -> Option<String> {
+    pub fn get_random_existing_bonus_attribute_string(&self, filter: &Vec<&str>) -> Option<String> {
         debug!("Getting random existing attribute from: {:?}", self);
         let existing_attributes = vec![
             ("health", self.health.value),
@@ -1002,6 +1002,7 @@ impl ItemAttributes {
             ("attack_speed", self.attack_speed.value),
             ("loot_rate", self.loot_rate.value),
             ("mana", self.mana.value),
+            ("projectile_size", self.size.value),
             ("mana_regen", self.mana_regen.value),
             ("durability", self.durability.value),
             ("max_durability", self.max_durability.value),
@@ -1038,6 +1039,7 @@ impl ItemAttributes {
             "lifesteal" => self.lifesteal.value += modifier.delta,
             "defence" => self.defence.value += modifier.delta,
             "attack_speed" => self.attack_speed.value += modifier.delta,
+            "projectile_size" => self.size.value += modifier.delta,
             "loot_rate" => self.loot_rate.value += modifier.delta,
             "mana" => self.mana.value += modifier.delta,
             "mana_regen" => self.mana_regen.value += modifier.delta,
@@ -1045,7 +1047,6 @@ impl ItemAttributes {
             "max_durability" => self.max_durability.value += modifier.delta,
             "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,
             "invincibility_cooldown" => self.invincibility_cooldown += modifier.delta as f32,
-            "size" => self.size.value += modifier.delta,
             _ => warn!("Got an unexpected attribute: {:?}", modifier.modifier),
         }
         self

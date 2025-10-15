@@ -35,6 +35,9 @@ pub enum CraftingContainerType {
     AlchemyTable,
 }
 
+#[derive(Component)]
+pub struct UpgradeButton;
+
 pub fn change_ui_state_to_crafting_when_resource_added(
     mut inv_ui_state: ResMut<NextState<UIState>>,
     mut tracker: ResMut<CraftingTracker>,

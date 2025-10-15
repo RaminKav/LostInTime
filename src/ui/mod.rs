@@ -61,7 +61,7 @@ use self::{
     tile_hover::spawn_tile_hover_on_cursor_move,
 };
 
-pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(172., 145.);
+pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(218., 145.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
 pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);
@@ -198,13 +198,17 @@ impl Plugin for UIPlugin {
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
             )
+            .add_system(
+                handle_tooltip_teardown
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
             .add_systems(
                 (
                     setup_inv_slots_ui,
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     setup_scrapper_slots_ui.run_if(in_state(UIState::Scrapper)),
                     tick_tooltip_timer,
-                    handle_tooltip_teardown,
                     handle_submit_essence_choice,
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
@@ -239,6 +243,7 @@ impl Plugin for UIPlugin {
                     spawn_tile_hover_on_cursor_move,
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
+                    handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )
                     .in_set(OnUpdate(GameState::Main)),

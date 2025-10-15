@@ -19,6 +19,7 @@ use crate::{
         stats::StatType,
     },
     proto::proto_param::ProtoParam,
+    ui::{crafting_ui::UpgradeButton, InventoryState},
     Game, GameParam,
 };
 
@@ -82,6 +83,8 @@ pub enum UIElement {
     SkillClassTracker,
     RerollDice,
     RerollDiceHover,
+    UpgradeButton,
+    UpgradeButtonHover,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -252,8 +255,6 @@ pub fn handle_drop_on_slot_events(
                 &mut cont_param.chest_option.as_mut().unwrap().items
             } else if slot_type.is_scrapper() {
                 &mut cont_param.scrapper_option.as_mut().unwrap().items
-            } else if slot_type.is_furnace() {
-                &mut cont_param.furnace_option.as_mut().unwrap().items
             } else {
                 inv.get_mut_items_from_slot_type(slot_type)
             };
@@ -342,7 +343,6 @@ pub fn handle_hovering(
     chest_option: Option<Res<ChestContainer>>,
     scrapper_option: Option<Res<ScrapperContainer>>,
     crafting_option: Option<Res<CraftingContainer>>,
-    furnace_option: Option<Res<FurnaceContainer>>,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
     mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
     mut stats_update_events: EventWriter<ShowInvPlayerStatsEvent>,
@@ -353,6 +353,8 @@ pub fn handle_hovering(
     let shift_key_pressed = key_input.pressed(KeyCode::LShift);
     let shift_key_just_pressed = key_input.just_pressed(KeyCode::LShift);
     let shift_key_just_released = key_input.just_released(KeyCode::LShift);
+    let mut spawning_new_tooltips_this_frame = false;
+    let mut tearing_down_tooltips_this_frame = false;
     for (e, ui, interactable, state_option, essence_option, stats_option) in
         interactables.iter_mut()
     {
@@ -373,8 +375,6 @@ pub fn handle_hovering(
                         chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_scrapper() {
                         scrapper_option.as_ref().unwrap().items.items[state.slot_index].clone()
-                    } else if state.r#type.is_furnace() {
-                        furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_crafting() && crafting_option.is_some() {
                         crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
@@ -382,6 +382,7 @@ pub fn handle_hovering(
                             .clone()
                     };
                     if let Some(item) = item {
+                        spawning_new_tooltips_this_frame = true;
                         tooltip_update_events.send(ToolTipUpdateEvent {
                             item_stack: item.item_stack,
                             is_recipe: state.r#type.is_crafting(),
@@ -401,8 +402,6 @@ pub fn handle_hovering(
                         chest_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_scrapper() {
                         scrapper_option.as_ref().unwrap().items.items[state.slot_index].clone()
-                    } else if state.r#type.is_furnace() {
-                        furnace_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else if state.r#type.is_crafting() && crafting_option.is_some() {
                         crafting_option.as_ref().unwrap().items.items[state.slot_index].clone()
                     } else {
@@ -454,8 +453,9 @@ pub fn handle_hovering(
                     .entity(e)
                     .insert(UIElement::InventorySlot)
                     .insert(graphics.get_ui_element_texture(UIElement::InventorySlot));
-
-                tooltip_teardown_events.send_default();
+                if let Some(InventorySlotState { item: Some(_), .. }) = state_option {
+                    tearing_down_tooltips_this_frame = true;
+                }
             }
             if ui == &UIElement::StatsButtonHover {
                 // swap to base img
@@ -475,6 +475,9 @@ pub fn handle_hovering(
                 tooltip_teardown_events.send_default();
             }
         }
+    }
+    if tearing_down_tooltips_this_frame && !spawning_new_tooltips_this_frame {
+        tooltip_teardown_events.send_default();
     }
 }
 
@@ -658,8 +661,6 @@ pub fn handle_interaction_clicks(
                                     &mut container_param.chest_option.as_mut().unwrap().items
                                 } else if state.r#type.is_scrapper() {
                                     &mut container_param.scrapper_option.as_mut().unwrap().items
-                                } else if state.r#type.is_furnace() {
-                                    &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
                                     inv.get_mut_items_from_slot_type(state.r#type)
                                 };
@@ -693,8 +694,6 @@ pub fn handle_interaction_clicks(
                                     &mut container_param.chest_option.as_mut().unwrap().items
                                 } else if state.r#type.is_scrapper() {
                                     &mut container_param.scrapper_option.as_mut().unwrap().items
-                                } else if state.r#type.is_furnace() {
-                                    &mut container_param.furnace_option.as_mut().unwrap().items
                                 } else {
                                     inv.get_mut_items_from_slot_type(state.r#type)
                                 };
@@ -725,12 +724,12 @@ pub fn handle_interaction_clicks(
                         if state.r#type.is_crafting() {
                             continue;
                         }
-                        let is_furnace = container_param.furnace_option.is_some();
+
                         let mut inv = inv.single_mut();
                         if let Some(active_container) =
                             container_param.get_active_ui_container_mut()
                         {
-                            if state.r#type.is_inventory() && !is_furnace {
+                            if state.r#type.is_inventory() {
                                 inv.items.move_item_to_target_container(
                                     active_container,
                                     state.slot_index,
@@ -914,6 +913,65 @@ pub fn handle_cursor_reroll_dice_buttons(
                     continue;
                 };
                 let ui_element = UIElement::RerollDice;
+
+                interactable.change(Interaction::None);
+                commands
+                    .entity(e)
+                    .insert(ui_element.clone())
+                    .insert(graphics.get_ui_element_texture(ui_element));
+            }
+        }
+    }
+}
+pub fn handle_cursor_inventory_upgrade_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut upgrade_button: Query<
+        (Entity, &mut Interactable, &UpgradeButton),
+        Without<InventorySlotState>,
+    >,
+    mut commands: Commands,
+    mut inv_state: ResMut<InventoryState>,
+    mut inv: Query<&mut Inventory>,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, _) in upgrade_button.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    let ui_element = UIElement::UpgradeButtonHover;
+                    commands
+                        .entity(e)
+                        .insert(ui_element.clone())
+                        .insert(graphics.get_ui_element_texture(ui_element));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        let mut inv = inv.single_mut();
+
+                        if !inv_state.furnace_state.ready_to_upgrade {
+                            if let Some(fuel) = inv.furnace_items.items[0].as_mut() {
+                                inv_state.furnace_state.ready_to_upgrade = true;
+                                inv_state.furnace_state.current_fuel_type =
+                                    fuel.item_stack.obj_type;
+                                let updated_fuel = fuel.modify_count(-1);
+                                inv.furnace_items.items[0] = updated_fuel;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                let ui_element = UIElement::UpgradeButton;
 
                 interactable.change(Interaction::None);
                 commands

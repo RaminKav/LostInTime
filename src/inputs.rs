@@ -529,7 +529,6 @@ pub fn handle_quick_hotbar_consume(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
-                    &mut commands,
                 );
             }
         }
@@ -719,7 +718,6 @@ pub fn mouse_click_system(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
-                    &mut commands,
                 );
             }
         }

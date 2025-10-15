@@ -1,27 +1,34 @@
-use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
+use bevy::{prelude::*, reflect::TypeUuid, render::view::RenderLayers, utils::HashMap};
+use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use itertools::Itertools;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
+use super::EquipmentType;
 use crate::{
+    animations::DoneAnimation,
     assets::Graphics,
-    attributes::attribute_helpers::{levelup_item_stats, reroll_item_bonus_attributes},
+    attributes::{
+        attribute_helpers::{levelup_item_stats, reroll_item_bonus_attributes},
+        ItemRarity, RarityGlows,
+    },
+    audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     colors::YELLOW,
     container::Container,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::WorldObject,
+    juice::ShakeEffect,
     player::{levels::PlayerLevel, Player},
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::CraftingContainerType,
         damage_numbers::{spawn_floating_text_with_shadow, NewRecipeTextTimer},
-        handle_hovering, mark_slot_dirty, spawn_item_stack_icon, FurnaceContainer, FurnaceState,
-        InventorySlotState, InventorySlotType,
+        handle_hovering, spawn_item_stack_icon, InventorySlotState, InventoryState,
+        ToolTipUpdateEvent,
     },
-    GameState,
+    GameState, TextureCamera,
 };
-
-use super::EquipmentType;
 
 pub struct CraftingPlugin;
 impl Plugin for CraftingPlugin {
@@ -179,125 +186,140 @@ pub fn get_crafting_inventory_item_stacks(
 }
 
 pub fn handle_furnace_slot_update(
-    furnace_option: Option<ResMut<FurnaceContainer>>,
-    mut furnace_objects: Query<&mut FurnaceContainer>,
+    mut commands: Commands,
     proto: ProtoParam,
     time: Res<Time>,
-    recipes: Res<Recipes>,
-    mut inv_slots: Query<&mut InventorySlotState>,
+    mut inv: Query<&mut Inventory>,
+    mut inv_state: ResMut<InventoryState>,
+    mut inv_slots: Query<(Entity, &mut InventorySlotState)>,
+    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    asset_server: Res<AssetServer>,
+    mut game_camera: Query<Entity, With<TextureCamera>>,
 ) {
-    let mut process_furnace = |furnace: &mut FurnaceContainer| {
-        let is_upgrade_furnace = furnace.items.items.len() == 2;
-        let mut needs_fuel = false;
-        if let Some(fuel_state) = furnace.state.as_mut() {
-            fuel_state.current_fuel_left.tick(time.delta());
-        } else {
-            needs_fuel = true;
-        }
-        if furnace.items.items[1].is_none() || (furnace.items.items[0].is_none() && needs_fuel) {
-            furnace.timer.reset();
-            return;
-        }
-        let ingredient = furnace.items.items[1].as_ref().unwrap();
-        let curr_result_obj = if is_upgrade_furnace {
-            None
-        } else {
-            furnace.items.items[2].clone()
-        };
+    let mut inv = inv.single_mut();
 
-        let expected_result = if is_upgrade_furnace {
-            &WorldObject::None
-        } else {
-            recipes
-                .furnace_list
-                .get(&ingredient.item_stack.obj_type)
-                .expect("incorrect furnace recipe?")
-        };
-        if let Some(curr_result) = curr_result_obj {
-            if curr_result.item_stack.obj_type != *expected_result {
-                // the ingredient in slot 1 does not match the current output in slot 2
-                furnace.timer.reset();
-                return;
-            }
-        }
+    if inv_state.furnace_state.ready_to_upgrade {
+        inv_state.furnace_state.upgrade_timer.tick(time.delta());
 
-        if needs_fuel {
-            let fuel = furnace.items.items[0].as_mut().unwrap();
-            let mut fuel_state = FurnaceState::from_fuel(*fuel.get_obj());
-            fuel_state.current_fuel_left.tick(time.delta());
-            furnace.state = Some(fuel_state);
-            let updated_fuel = fuel.modify_count(-1);
-            furnace.items.items[0] = updated_fuel;
-        }
-
-        furnace.timer.tick(time.delta());
-
-        if furnace.timer.just_finished() {
-            if !is_upgrade_furnace {
-                let updated_result =
-                    if let Some(mut existing_result) = furnace.items.items[2].clone() {
-                        existing_result.modify_count(1).unwrap()
-                    } else {
-                        InventoryItemStack::new(
-                            proto.get_item_data(*expected_result).unwrap().clone(),
-                            0,
-                        )
-                    };
-                furnace.items.items[2] = Some(updated_result);
-                let updated_resource = furnace.items.items[1].as_mut().unwrap().modify_count(-1);
-                furnace.items.items[1] = updated_resource;
-            } else {
-                match furnace
-                    .state
-                    .as_ref()
-                    .expect("no furnace state")
-                    .current_fuel_type
-                {
-                    WorldObject::UpgradeTome => {
-                        let upgraded_stack = levelup_item_stats(
-                            &furnace.items.items[1].as_ref().unwrap().clone().item_stack,
-                            1,
-                            &proto,
-                            false,
-                        );
-                        furnace.items.items[1].as_ref().unwrap().clone().item_stack =
-                            upgraded_stack.clone();
-                        furnace.items.items[1] = Some(InventoryItemStack {
-                            item_stack: upgraded_stack.clone(),
-                            slot: 1,
-                        });
-                        furnace.items.items[1]
+        if inv_state.furnace_state.upgrade_timer.just_finished() {
+            match inv_state.furnace_state.current_fuel_type {
+                WorldObject::UpgradeTome => {
+                    // Upgrade Stats
+                    let upgraded_stack = levelup_item_stats(
+                        &inv.furnace_items.items[1]
                             .as_ref()
                             .unwrap()
                             .clone()
-                            .modify_level(1, &mut furnace.items);
-                    }
-                    WorldObject::OrbOfTransformation => {
-                        let old_item = furnace.items.items[1].as_ref().unwrap();
-                        furnace.items.items[1] = Some(InventoryItemStack::new(
-                            reroll_item_bonus_attributes(&old_item.item_stack, &proto),
-                            old_item.slot,
-                        ));
-                    }
-                    _ => {}
-                }
-                mark_slot_dirty(1, InventorySlotType::Furnace, &mut inv_slots);
-            }
+                            .item_stack,
+                        1,
+                        &proto,
+                        false,
+                    );
 
-            if let Some(state) = furnace.state.as_ref() {
-                if state.current_fuel_left.finished() {
-                    furnace.state = None;
+                    inv.furnace_items.items[1] = Some(InventoryItemStack {
+                        item_stack: upgraded_stack.clone(),
+                        slot: 1,
+                    });
+
+                    // Increase Level
+                    inv.furnace_items.items[1]
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .modify_level(1, &mut inv.furnace_items);
+                }
+                WorldObject::OrbOfTransformation => {
+                    // Reroll Attributes
+                    let old_item = inv.furnace_items.items[1].as_ref().unwrap().clone();
+                    let new_item = reroll_item_bonus_attributes(&old_item.item_stack, &proto);
+                    inv.furnace_items.items[1] =
+                        Some(InventoryItemStack::new(new_item.clone(), old_item.slot));
+
+                    let new_rarity = new_item.rarity.clone();
+                    let rarity_changed = new_rarity != old_item.clone().item_stack.rarity;
+
+                    if rarity_changed {
+                        if new_rarity == ItemRarity::Legendary {
+                            // Sound effect
+                            commands
+                                .spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
+                            commands.spawn(
+                                SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5)
+                                    .with_delay(0.55),
+                            );
+                            commands.spawn(
+                                SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2)
+                                    .with_delay(2.3),
+                            );
+
+                            // glow/shake effects
+                            commands
+                                .spawn(AsepriteBundle {
+                                    aseprite: asset_server.load(RarityGlows::PATH),
+                                    animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
+                                    transform: Transform::from_translation(Vec3::new(
+                                        99., 55., 20.,
+                                    )),
+                                    ..Default::default()
+                                })
+                                .insert(VisibilityBundle::default())
+                                .insert(DoneAnimation)
+                                .insert(RenderLayers::from_layers(&[3]));
+
+                            let mut rng = rand::thread_rng();
+                            let seed = rng.gen_range(0..100000);
+                            let speed = 10.;
+                            let max_mag = 90.;
+                            let noise = 0.5;
+                            let dir = Vec2::new(1., 1.);
+                            for e in game_camera.iter_mut() {
+                                commands.entity(e).insert(ShakeEffect {
+                                    timer: Timer::from_seconds(2., TimerMode::Once),
+                                    speed,
+                                    seed,
+                                    max_mag,
+                                    noise,
+                                    dir,
+                                });
+                            }
+                        } else if new_rarity == ItemRarity::Rare {
+                            commands
+                                .spawn(AsepriteBundle {
+                                    aseprite: asset_server.load(RarityGlows::PATH),
+                                    animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
+                                    transform: Transform::from_translation(Vec3::new(
+                                        99., 55., 20.,
+                                    )),
+                                    ..Default::default()
+                                })
+                                .insert(VisibilityBundle::default())
+                                .insert(DoneAnimation)
+                                .insert(RenderLayers::from_layers(&[3]));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
+                            commands.spawn(
+                                SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4),
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            }
+            for (_, mut state) in inv_slots.iter_mut() {
+                if state.slot_index == 1 && (state.r#type.is_furnace() || state.r#type.is_hotbar())
+                {
+                    state.dirty = true;
                 }
             }
-            furnace.timer.reset();
+            inv_state.furnace_state.upgrade_timer.reset();
+            inv_state.furnace_state.ready_to_upgrade = false;
+            tooltip_update_events.send(ToolTipUpdateEvent {
+                item_stack: inv.furnace_items.items[1].clone().unwrap().item_stack,
+                is_recipe: false,
+                show_range: false,
+            });
         }
-    };
-
-    if let Some(mut furnace) = furnace_option {
-        process_furnace(&mut furnace);
-    }
-    for mut furnace in furnace_objects.iter_mut() {
-        process_furnace(&mut furnace);
     }
 }
 

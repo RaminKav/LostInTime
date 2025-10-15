@@ -1,9 +1,7 @@
 use std::cmp::max;
 
 use bevy::prelude::Commands;
-use bevy_proto::prelude::ProtoCommands;
 use rand::{rngs::ThreadRng, Rng};
-use tracing::info;
 
 use crate::{
     attributes::{
@@ -56,7 +54,7 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     };
 
     let mut rng = rand::thread_rng();
-    let rarity_rng = rng.gen_range(0..=8);
+    let rarity_rng = rng.gen_range(0..=6);
     let rarity = if rarity_rng <= 0 {
         stack.rarity.get_next_rarity()
     } else {
@@ -154,36 +152,33 @@ pub fn levelup_item_stats(
         let mut modifiers: Vec<(String, i32)> = vec![];
 
         let rarity = stack.rarity.clone();
-        let num_upgrades = if rarity == ItemRarity::Legendary {
-            2
-        } else {
-            1
+        let num_upgrades = match rarity {
+            ItemRarity::Legendary => 4,
+            ItemRarity::Rare => 3,
+            ItemRarity::Uncommon => 2,
+            _ => 1,
         };
         if let Some(eqp_type) = stack.obj_type.get_equip_type(proto) {
+            let mut filter: Vec<&str> = vec![];
             if eqp_type.is_weapon() || eqp_type.is_tool() {
-                if (!skip_main_attributes) {
+                if !skip_main_attributes {
                     modifiers.push(("attack".to_owned(), 1));
-                }
-                for _ in 0..num_upgrades {
-                    if let Some(bonus_mod) = stack
-                        .attributes
-                        .get_random_existing_bonus_attribute_string(vec!["attack"])
-                    {
-                        modifiers.push((bonus_mod, 1));
-                    }
+                    filter.push("attack");
                 }
             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
-                if (!skip_main_attributes) {
+                if !skip_main_attributes {
                     modifiers.push(("health".to_owned(), 2));
                     modifiers.push(("armor".to_owned(), 1));
+                    filter.push("health");
+                    filter.push("armor");
                 }
-                for _ in 0..num_upgrades {
-                    if let Some(bonus_mod) = stack
-                        .attributes
-                        .get_random_existing_bonus_attribute_string(vec!["health", "armor"])
-                    {
-                        modifiers.push((bonus_mod, 1));
-                    }
+            }
+            for _ in 0..num_upgrades {
+                if let Some(bonus_mod) = stack
+                    .attributes
+                    .get_random_existing_bonus_attribute_string(&filter)
+                {
+                    modifiers.push((bonus_mod, 1));
                 }
             }
         }

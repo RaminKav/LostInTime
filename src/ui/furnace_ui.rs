@@ -25,18 +25,53 @@ pub struct FurnaceContainer {
 #[derive(Debug, Clone)]
 pub struct FurnaceState {
     pub current_fuel_type: WorldObject,
-    pub current_fuel_left: Timer,
+    pub upgrade_timer: Timer,
+    pub slot_map: Vec<Vec<WorldObject>>,
+    pub ready_to_upgrade: bool,
 }
-impl FurnaceState {
-    pub fn from_fuel(fuel: WorldObject) -> Self {
+impl Default for FurnaceState {
+    fn default() -> Self {
         Self {
-            current_fuel_type: fuel,
-            current_fuel_left: Timer::from_seconds(
-                if fuel == WorldObject::Coal { 9. } else { 3. },
-                TimerMode::Once,
-            ),
+            current_fuel_type: WorldObject::UpgradeTome,
+            ready_to_upgrade: false,
+            slot_map: vec![
+                vec![WorldObject::UpgradeTome, WorldObject::OrbOfTransformation],
+                vec![
+                    WorldObject::Sword,
+                    WorldObject::Dagger,
+                    WorldObject::WoodBow,
+                    WorldObject::IceStaff,
+                    WorldObject::BasicStaff,
+                    WorldObject::MagicWhip,
+                    WorldObject::Claw,
+                    WorldObject::Spear,
+                    WorldObject::Chestplate,
+                    WorldObject::MetalPants,
+                    WorldObject::MetalShoes,
+                    WorldObject::LeatherTunic,
+                    WorldObject::LeatherPants,
+                    WorldObject::LeatherShoes,
+                    WorldObject::ForestShirt,
+                    WorldObject::ForestPants,
+                    WorldObject::ForestShoes,
+                    WorldObject::Ring,
+                    WorldObject::Pendant,
+                ],
+            ],
+            upgrade_timer: Timer::from_seconds(0.3, TimerMode::Once),
         }
     }
+}
+impl FurnaceState {
+    // pub fn from_fuel(fuel: WorldObject) -> Self {
+    //     Self {
+    //         current_fuel_type: fuel,
+    //         current_fuel_left: Timer::from_seconds(
+    //             if fuel == WorldObject::Coal { 9. } else { 3. },
+    //             TimerMode::Once,
+    //         ),
+    //     }
+    // }
 }
 #[derive(Component)]
 pub struct FurnaceProgBar;
@@ -125,16 +160,8 @@ pub fn add_container_to_new_furnace_objs(
             .get(&world_pos_to_tile_pos(t.translation().truncate()));
         match obj {
             WorldObject::Furnace => {
-                let ing: Vec<_> = recipes
-                    .furnace_list
-                    .iter()
-                    .map(|(k, _)| *k)
-                    .collect();
-                let results: Vec<_> = recipes
-                    .furnace_list
-                    .iter()
-                    .map(|(_, v)| *v)
-                    .collect();
+                let ing: Vec<_> = recipes.furnace_list.iter().map(|(k, _)| *k).collect();
+                let results: Vec<_> = recipes.furnace_list.iter().map(|(_, v)| *v).collect();
                 commands.entity(e).insert(FurnaceContainer {
                     items: existing_cont_option
                         .unwrap_or(&Container::with_size(3))
