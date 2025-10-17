@@ -237,7 +237,7 @@ pub fn spawn_skill_choice_entities(
             0.,
         );
         let choice = choices[(i + 1) as usize].clone();
-        let ui_element = choice.skill.get_ui_element();
+        let ui_element = choice.skill.get_ui_element(choice.rarity.clone());
         let skills_e = commands
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(ui_element.clone()),
@@ -388,7 +388,7 @@ pub fn handle_skill_reroll_after_flash(
     for (e, slot, anim) in flashes.iter() {
         if anim.current_frame() == 3 {
             commands.entity(e).remove::<RerollDice>();
-            skill_queue.handle_reroll_slot(slot.0);
+            skill_queue.handle_reroll_slot(slot.0, &mut rand::thread_rng());
             for e in old_skill_entities.iter() {
                 commands.entity(e).despawn_recursive();
             }

@@ -788,7 +788,10 @@ pub fn handle_cursor_skills_buttons(
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillHover, 0.2));
 
-                    let ui_element = state.skill_choice.skill.get_ui_element_hover();
+                    let ui_element = state
+                        .skill_choice
+                        .skill
+                        .get_ui_element_hover(state.skill_choice.rarity.clone());
                     // swap to hover img
                     commands
                         .entity(e)
@@ -855,7 +858,10 @@ pub fn handle_cursor_skills_buttons(
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
-                let ui_element = state.skill_choice.skill.get_ui_element();
+                let ui_element = state
+                    .skill_choice
+                    .skill
+                    .get_ui_element(state.skill_choice.rarity.clone());
 
                 interactable.change(Interaction::None);
                 commands

@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
-use rand::seq::IteratorRandom;
+use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    attributes::{AttributeQuality, AttributeValue, ItemAttributes},
+    attributes::{AttributeQuality, AttributeValue, ItemAttributes, RarityGlows},
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
@@ -329,25 +329,29 @@ impl Skill {
             ],
 
             Skill::WaveAttack => vec![
-                "Your melee Attacks".to_string(),
-                "send a sonic wave ".to_string(),
-                "attack that travels".to_string(),
-                "a short distance.".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to send a".to_string(),
+                "sonic wave attack".to_string(),
+                "that travels a".to_string(),
+                "short distance.".to_string(),
             ],
             Skill::FrailStacks => vec![
-                "Melee attacks apply".to_string(),
-                "a Frail stack that ".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to apply".to_string(),
+                "a Frail stack that".to_string(),
                 "gives +3% critical".to_string(),
                 "chance on hits".to_string(),
             ],
             Skill::SlowStacks => vec![
-                "Melee attacks apply".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to apply".to_string(),
                 "a Slow stack to".to_string(),
                 "enemies, reducing".to_string(),
                 "speed by 15%.".to_string(),
             ],
             Skill::PoisonStacks => vec![
-                "Melee attacks apply".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to apply".to_string(),
                 "Poison to enemies.".to_string(),
                 "Poisoned enemies".to_string(),
                 "lose health over".to_string(),
@@ -384,8 +388,8 @@ impl Skill {
             Skill::Sprint => vec![
                 "Active: Hold Sprint".to_string(),
                 "to move 60% faster.".to_string(),
-                "Allows you to attack".to_string(),
-                "while sprinting.".to_string(),
+                // "Allows you to attack".to_string(),
+                // "while sprinting.".to_string(),
             ],
             Skill::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
@@ -413,20 +417,20 @@ impl Skill {
             Skill::IncreaseProjectilCount => vec![
                 "Increase all weapon".to_string(),
                 "projectile count".to_string(),
-                "by 1".to_string(),
+                "by 1.".to_string(),
             ],
 
             Skill::IceStaffAoE => vec![
-                "Gain an Ice Staff".to_string(),
-                "Ice Staff attacks".to_string(),
-                "triggers an ice".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to ".to_string(),
+                "trigger an ice".to_string(),
                 "explosion that".to_string(),
                 "damages enemies. ".to_string(),
             ],
             Skill::BowArrowSpeed => {
-                vec!["Your Bow's Arrows".to_string(), "move faster.".to_string()]
+                vec!["Your Projectiles".to_string(), "move faster.".to_string()]
             }
-            Skill::Attack => vec!["Gain +3 Attack,".to_string(), "permanently.".to_string()],
+            Skill::Attack => vec!["Gain +10% Damage,".to_string(), "permanently.".to_string()],
             Skill::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
             Skill::Parry => vec![
                 "Active: Parry".to_string(),
@@ -527,9 +531,9 @@ impl Skill {
                 "damages enemies.".to_string(),
             ],
             Skill::IceStaffFloor => vec![
-                "Your Ice Staff's".to_string(),
-                "attacks leave a".to_string(),
-                "trail of ice that".to_string(),
+                "Your Attacks have".to_string(),
+                "a chance to leave".to_string(),
+                "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
             ],
             Skill::FrozenCrit => vec![
@@ -698,20 +702,20 @@ impl Skill {
             _ => {}
         }
     }
-    pub fn get_ui_element(&self) -> UIElement {
-        match self.get_class() {
-            SkillClass::None => UIElement::SkillChoice,
-            SkillClass::Melee => UIElement::SkillChoice,
-            SkillClass::Rogue => UIElement::SkillChoice,
-            SkillClass::Magic => UIElement::SkillChoice,
+    pub fn get_ui_element(&self, rarity: SkillRarity) -> UIElement {
+        match rarity {
+            SkillRarity::Common => UIElement::SkillChoice,
+            SkillRarity::Uncommon => UIElement::SkillChoiceRogue,
+            SkillRarity::Rare => UIElement::SkillChoiceMagic,
+            SkillRarity::Legendary => UIElement::SkillChoiceMelee,
         }
     }
-    pub fn get_ui_element_hover(&self) -> UIElement {
-        match self.get_class() {
-            SkillClass::None => UIElement::SkillChoiceMeleeHover,
-            SkillClass::Melee => UIElement::SkillChoiceMeleeHover,
-            SkillClass::Rogue => UIElement::SkillChoiceRogueHover,
-            SkillClass::Magic => UIElement::SkillChoiceMagicHover,
+    pub fn get_ui_element_hover(&self, rarity: SkillRarity) -> UIElement {
+        match rarity {
+            SkillRarity::Common => UIElement::SkillChoice,
+            SkillRarity::Uncommon => UIElement::SkillChoiceRogueHover,
+            SkillRarity::Rare => UIElement::SkillChoiceMagicHover,
+            SkillRarity::Legendary => UIElement::SkillChoiceMeleeHover,
         }
     }
 
@@ -731,19 +735,29 @@ pub struct ActiveSkillUsedEvent {
 }
 
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
+pub enum SkillRarity {
+    #[default]
+    Common,
+    Uncommon,
+    Rare,
+    Legendary,
+}
+#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
 pub struct SkillChoiceState {
     pub skill: Skill,
     pub child_skills: Vec<SkillChoiceState>,
     pub clashing_skills: Vec<Skill>,
     pub is_one_time_skill: bool,
+    pub rarity: SkillRarity,
 }
 impl SkillChoiceState {
-    pub fn new(skill: Skill) -> Self {
+    pub fn new(skill: Skill, rarity: SkillRarity) -> Self {
         Self {
             skill,
             child_skills: Default::default(),
             clashing_skills: Default::default(),
             is_one_time_skill: true,
+            rarity,
         }
     }
     pub fn with_children(mut self, children: Vec<SkillChoiceState>) -> Self {
@@ -775,50 +789,55 @@ impl Default for SkillChoiceQueue {
             rerolls: [true; 3],
             active_skill_limbo: None,
             pool: vec![
-                SkillChoiceState::new(Skill::Defence).set_repeatable(),
-                SkillChoiceState::new(Skill::Attack).set_repeatable(),
-                SkillChoiceState::new(Skill::HPRegen).set_repeatable(),
-                SkillChoiceState::new(Skill::HPRegenCooldown).set_repeatable(),
-                SkillChoiceState::new(Skill::MPRegenCooldown).set_repeatable(),
-                SkillChoiceState::new(Skill::MPRegen).set_repeatable(),
-                SkillChoiceState::new(Skill::DodgeCrit).set_repeatable(),
-                SkillChoiceState::new(Skill::Knockback).set_repeatable(),
-                SkillChoiceState::new(Skill::DiscountMP).set_repeatable(),
-                SkillChoiceState::new(Skill::OnHitEcho).set_repeatable(),
-                SkillChoiceState::new(Skill::HealEcho).set_repeatable(),
-                SkillChoiceState::new(Skill::Sprint),
-                SkillChoiceState::new(Skill::CritChance).set_repeatable(),
-                SkillChoiceState::new(Skill::CritDamage).set_repeatable(),
-                SkillChoiceState::new(Skill::FrailStacks).set_repeatable(),
-                SkillChoiceState::new(Skill::Health).set_repeatable(),
-                SkillChoiceState::new(Skill::Lifesteal).set_repeatable(),
-                SkillChoiceState::new(Skill::Thorns).set_repeatable(),
-                SkillChoiceState::new(Skill::Speed).set_repeatable(),
-                SkillChoiceState::new(Skill::AttackSpeed).set_repeatable(),
-                SkillChoiceState::new(Skill::WaveAttack).set_repeatable(),
-                SkillChoiceState::new(Skill::MPBarDMG).set_repeatable(),
-                SkillChoiceState::new(Skill::MPBarCrit).set_repeatable(),
-                SkillChoiceState::new(Skill::LethalBlow).set_repeatable(),
-                SkillChoiceState::new(Skill::DodgeChance).set_repeatable(),
-                SkillChoiceState::new(Skill::SlowStacks).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenAoE).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenCrit).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenMPRegen).set_repeatable(),
-                SkillChoiceState::new(Skill::IceStaffFloor).set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonStacks).set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonDuration).set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonStrength).set_repeatable(),
-                SkillChoiceState::new(Skill::ViralVenum).set_repeatable(),
-                SkillChoiceState::new(Skill::Teleport),
-                SkillChoiceState::new(Skill::ChanceToProcExtraAttack).set_repeatable(),
-                SkillChoiceState::new(Skill::IncreaseProjectilCount).set_repeatable(),
-                SkillChoiceState::new(Skill::BowArrowSpeed).set_repeatable(),
-                SkillChoiceState::new(Skill::IceStaffAoE).set_repeatable(),
-                SkillChoiceState::new(Skill::FullStomach).set_repeatable(),
-                SkillChoiceState::new(Skill::ReinforcedArmor).set_repeatable(),
-                SkillChoiceState::new(Skill::DaggerCombo).set_repeatable(),
-                SkillChoiceState::new(Skill::ParrySpear),
-                SkillChoiceState::new(Skill::Parry),
+                SkillChoiceState::new(Skill::Defence, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::Attack, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::HPRegen, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::HPRegenCooldown, SkillRarity::Uncommon)
+                    .set_repeatable(),
+                SkillChoiceState::new(Skill::MPRegenCooldown, SkillRarity::Uncommon)
+                    .set_repeatable(),
+                SkillChoiceState::new(Skill::MPRegen, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::DodgeCrit, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::Knockback, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::DiscountMP, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::OnHitEcho, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::HealEcho, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::Sprint, SkillRarity::Common),
+                SkillChoiceState::new(Skill::CritChance, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::CritDamage, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::FrailStacks, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::Health, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::Lifesteal, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::Thorns, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::Speed, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::AttackSpeed, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::WaveAttack, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::MPBarDMG, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::MPBarCrit, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::LethalBlow, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::DodgeChance, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::SlowStacks, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::FrozenAoE, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::FrozenCrit, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::FrozenMPRegen, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::IceStaffFloor, SkillRarity::Legendary)
+                    .set_repeatable(),
+                SkillChoiceState::new(Skill::PoisonStacks, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::PoisonDuration, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::PoisonStrength, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::ViralVenum, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::Teleport, SkillRarity::Common),
+                SkillChoiceState::new(Skill::ChanceToProcExtraAttack, SkillRarity::Rare)
+                    .set_repeatable(),
+                SkillChoiceState::new(Skill::IncreaseProjectilCount, SkillRarity::Legendary)
+                    .set_repeatable(),
+                SkillChoiceState::new(Skill::BowArrowSpeed, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::IceStaffAoE, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::FullStomach, SkillRarity::Uncommon).set_repeatable(),
+                SkillChoiceState::new(Skill::ReinforcedArmor, SkillRarity::Rare).set_repeatable(),
+                SkillChoiceState::new(Skill::DaggerCombo, SkillRarity::Legendary).set_repeatable(),
+                SkillChoiceState::new(Skill::ParrySpear, SkillRarity::Common),
+                SkillChoiceState::new(Skill::Parry, SkillRarity::Common),
             ],
         }
     }
@@ -831,7 +850,8 @@ impl SkillChoiceQueue {
             let mut new_skills: [SkillChoiceState; 3] = Default::default();
             let mut add_back_to_pool: Vec<SkillChoiceState> = vec![];
             for i in 0..3 {
-                if let Some(picked_skill) = self.pool.iter().choose(rng) {
+                let rarity = SkillChoiceQueue::gen_rarity(rng);
+                if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng) {
                     if !picked_skill.is_one_time_skill {
                         add_back_to_pool.push(picked_skill.clone());
                     }
@@ -844,6 +864,25 @@ impl SkillChoiceQueue {
             }
 
             self.queue.push(new_skills.clone());
+        }
+    }
+    pub fn get_skill_of_rarity(
+        &self,
+        rarity: SkillRarity,
+        rng: &mut rand::rngs::ThreadRng,
+    ) -> Option<SkillChoiceState> {
+        self.pool
+            .iter()
+            .filter(|x| x.rarity == rarity)
+            .choose(rng)
+            .cloned()
+    }
+    pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng) -> SkillRarity {
+        match rng.gen_range(0..100) {
+            0..=60 => SkillRarity::Common,
+            61..=83 => SkillRarity::Uncommon,
+            84..=96 => SkillRarity::Rare,
+            _ => SkillRarity::Legendary,
         }
     }
 
@@ -898,19 +937,19 @@ impl SkillChoiceQueue {
             }
         }
     }
-    pub fn handle_reroll_slot(&mut self, slot: usize) {
+    pub fn handle_reroll_slot(&mut self, slot: usize, rng: &mut rand::rngs::ThreadRng) {
         if self.rerolls[slot] {
             self.rerolls[slot] = false;
             let old_skill = self.queue[0][slot].clone();
-            let new_skill = self
-                .pool
-                .iter()
-                .choose(&mut rand::thread_rng())
-                .unwrap()
-                .clone();
-            self.pool.retain(|x| x != &new_skill);
-            self.pool.push(old_skill);
-            self.queue[0][slot] = new_skill;
+            let rarity = SkillChoiceQueue::gen_rarity(rng);
+            //TODO: consolidate this code with the main skill picking area?
+            if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng) {
+                if picked_skill.is_one_time_skill {
+                    self.pool.retain(|x| x != &picked_skill);
+                }
+                self.pool.push(old_skill);
+                self.queue[0][slot] = picked_skill;
+            }
         }
     }
 }
@@ -934,7 +973,7 @@ impl Default for PlayerSkills {
             melee_skill_count: 0,
             rogue_skill_count: 0,
             magic_skill_count: 0,
-            active_skill_slot_1: Some(SkillChoiceState::new(Skill::Roll)),
+            active_skill_slot_1: Some(SkillChoiceState::new(Skill::Roll, SkillRarity::Common)),
             active_skill_slot_2: None,
         }
     }
