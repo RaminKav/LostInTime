@@ -56,7 +56,7 @@ pub enum Projectile {
     GreenWhip,
     Arrow,
     ThrowingStar,
-    FireExplosionAOE,
+    IceExplosionAOE,
     SlimeGooProjectile,
     Arc,
     FireAttack,
@@ -117,6 +117,7 @@ pub struct ArcProjectileData {
     pub col_points: Vec<f32>,
 }
 
+#[derive(Clone)]
 pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
@@ -213,28 +214,6 @@ fn handle_ranged_attack_event(
             ));
         }
 
-        // if proto
-        //     .get_component::<ConsumableItem, _>(proj_event.projectile.clone())
-        //     .is_some()
-        // {
-        //     let mut rng = rand::thread_rng();
-        //     // 1/3 chance to not consume ammo
-        //     if !skills.has(Skill::ChanceToNotConsumeAmmo)
-        //         || rng.gen_bool((3. - skills.get_count(Skill::ChanceToNotConsumeAmmo) as f64) / 3.)
-        //     {
-        //         if let Some(proj_slot) = inv
-        //             .single()
-        //             .items
-        //             .get_slot_for_item_in_container(&proj_event.projectile.get_world_object())
-        //         {
-        //             let held_item_option = inv.single().items.items[proj_slot].clone();
-        //             inv.single_mut().items.items[proj_slot] =
-        //                 held_item_option.unwrap().modify_count(-1);
-        //         } else {
-        //             continue;
-        //         }
-        //     }
-        // }
         let t = if let Some(enemy) = proj_event.from_enemy {
             enemy_transforms
                 .get(enemy)
@@ -284,14 +263,10 @@ fn handle_translate_projectiles(
     time: Res<Time>,
 ) {
     for (mut transform, state, proj) in query.iter_mut() {
-        let arrow_speed_upgrade = if proj == &Projectile::Arrow {
-            speed_modifiers
-                .get_single()
-                .unwrap_or(&ArrowSpeedUpgrade(1.))
-                .0
-        } else {
-            1.
-        };
+        let arrow_speed_upgrade = speed_modifiers
+            .get_single()
+            .unwrap_or(&ArrowSpeedUpgrade(1.))
+            .0;
         let delta = state.direction * (state.speed * arrow_speed_upgrade) * time.delta_seconds();
         transform.translation += delta.extend(0.0);
     }

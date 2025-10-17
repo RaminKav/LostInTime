@@ -6,7 +6,7 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
-    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen, Lifesteal},
+    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen},
     audio::{AudioSoundEffect, SoundSpawner},
     colors::LIGHT_RED,
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
@@ -55,9 +55,7 @@ pub fn handle_on_hit_skills(
 pub fn handle_second_split_attack(
     mobs: Query<Option<&Frail>, With<Mob>>,
     game: GameParam,
-    lifesteal: Query<&Lifesteal>,
     mut second_hit_query: Query<(Entity, &mut SecondHitDelay)>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mut hit_event: EventWriter<HitEvent>,
     time: Res<Time>,
     mut commands: Commands,
@@ -71,32 +69,21 @@ pub fn handle_second_split_attack(
             continue;
         };
         let (skills, maybe_lunge) = player.single();
-        let sword_skill_bonus = if skills.has(Skill::SwordDMG) && second_hit.weapon_obj.is_sword() {
-            3
-        } else {
-            0
-        };
+
         let (damage, was_crit) = game.calculate_player_damage(
             &mut commands,
             e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-            if skills.has(Skill::SprintLungeDamage)
-                && maybe_lunge.unwrap().lunge_duration.percent() != 0.
-            {
-                Some(1.25)
+            if skills.has(Skill::Attack) {
+                Some(1. + skills.get_count(Skill::Attack) as f32 * 0.1)
             } else {
                 None
             },
-            sword_skill_bonus,
+            0,
             None,
         );
 
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
-        if let Ok(lifesteal) = lifesteal.get(game.game.player) {
-            modify_health_events.send(ModifyHealthEvent(f32::floor(
-                split_damage as f32 * lifesteal.0 as f32 / 100.,
-            ) as i32));
-        }
 
         hit_event.send(HitEvent {
             hit_entity: e,

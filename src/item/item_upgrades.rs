@@ -1,6 +1,8 @@
+use rand::Rng;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
+use crate::attributes::modifiers::ModifyHealthEvent;
 use crate::attributes::ItemAttributes;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
@@ -58,9 +60,7 @@ pub fn handle_delayed_ranged_attack(
     let Ok(ranged_attack) = wep_query.get_single() else {
         return;
     };
-    if ranged_attack.0 != Projectile::ThrowingStar {
-        return;
-    }
+
     let Ok((mut delayed_ranged_attack, cooldown_option)) = att_cooldown_query.get_single_mut()
     else {
         return;
@@ -69,6 +69,10 @@ pub fn handle_delayed_ranged_attack(
         *count = 0;
         return;
     }
+    if ranged_attack.0 == Projectile::Arrow || ranged_attack.0 == Projectile::Electricity {
+        return;
+    }
+    // TODO: add custom delays per proj type
     if mouse_button_input.pressed(MouseButton::Left) || delayed_ranged_attack.0.percent() != 0. {
         delayed_ranged_attack.0.tick(time.delta());
         if delayed_ranged_attack.0.just_finished() {
@@ -169,12 +173,15 @@ pub fn handle_on_hit_upgrades(
     mut status_event: EventWriter<StatusEffectEvent>,
     asset_server: Res<AssetServer>,
     player_att: Query<&ItemAttributes, With<Player>>,
+    mut modify_health_events: EventWriter<ModifyHealthEvent>,
 ) {
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
     }
     let player_attributes = player_att.single();
     for hit in hits.iter() {
+        let mut rng = rand::thread_rng();
+
         if hit.hit_entity == game.game.player {
             continue;
         }
@@ -183,7 +190,7 @@ pub fn handle_on_hit_upgrades(
         };
         let skills = upgrades.single();
 
-        if skills.has(Skill::ChainLightning)
+        if skills.has(Skill::IncreaseProjectilCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
             && *elec_count == 0
         {
@@ -221,7 +228,10 @@ pub fn handle_on_hit_upgrades(
         let Some(main_hand) = game.player().main_hand_slot else {
             continue;
         };
-        if skills.has(Skill::IceStaffAoE) && hit.hit_with_projectile == Some(Projectile::Fireball) {
+        if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
+            && skills.has(Skill::IceStaffAoE)
+            && rng.gen_bool(skills.get_count(Skill::IceStaffAoE) as f64 * 0.1)
+        {
             spawn_ice_explosion_hitbox(
                 &mut commands,
                 &asset_server,
@@ -229,7 +239,8 @@ pub fn handle_on_hit_upgrades(
                 hit.damage / 4,
             );
         }
-        if skills.has(Skill::IceStaffFloor) && hit.hit_with_projectile == Some(Projectile::Fireball)
+        if skills.has(Skill::IceStaffFloor)
+            && rng.gen_bool(skills.get_count(Skill::IceStaffFloor) as f64 * 0.1)
         {
             let ice = spawn_one_time_aseprite_collider(
                 &mut commands,
@@ -240,7 +251,7 @@ pub fn handle_on_hit_upgrades(
                 asset_server.load::<Aseprite, _>(IceFloor::PATH),
                 AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                 true,
-                Projectile::Fireball,
+                Projectile::Echo,
             );
             commands
                 .entity(ice)
@@ -252,7 +263,9 @@ pub fn handle_on_hit_upgrades(
         else {
             continue;
         };
-        if skills.has(Skill::PoisonStacks) {
+        if skills.has(Skill::PoisonStacks)
+            && rng.gen_bool(skills.get_count(Skill::PoisonStacks) as f64 * 0.25)
+        {
             if let Some(mut burning) = burning_option {
                 burning.duration_timer.reset();
             } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
@@ -274,7 +287,9 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if skills.has(Skill::FrailStacks) {
+        if skills.has(Skill::FrailStacks)
+            && rng.gen_bool(skills.get_count(Skill::FrailStacks) as f64 * 0.25)
+        {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
                     && Skill::FrailStacks.is_obj_valid(main_hand.get_obj())
@@ -299,13 +314,21 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if skills.has(Skill::SlowStacks) {
+        if skills.has(Skill::SlowStacks)
+            && rng.gen_bool(skills.get_count(Skill::SlowStacks) as f64 * 0.25)
+        {
             try_add_slow_stacks(
                 hit_e,
                 &mut commands,
                 &mut status_event,
                 slowed_option.as_deref_mut(),
             );
+        }
+
+        if skills.has(Skill::Lifesteal)
+            && rng.gen_bool(skills.get_count(Skill::Lifesteal) as f64 * 0.1)
+        {
+            modify_health_events.send(ModifyHealthEvent(1));
         }
     }
 }

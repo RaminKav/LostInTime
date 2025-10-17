@@ -923,9 +923,7 @@ impl ItemAttributes {
                 5
             } else {
                 0
-            }
-            - if skills.has(Skill::SwordDMG) { 5 } else { 0 }
-            - if skills.has(Skill::WideSwing) { 5 } else { 0 };
+            };
         if self.mana.value > 0 && self.mana.value != old_max_mana {
             entity.insert(MaxMana(self.mana.value));
         }
@@ -942,9 +940,7 @@ impl ItemAttributes {
             entity.remove::<AttackCooldown>();
         }
 
-        entity.insert(Attack(
-            self.attack.value + skills.get_count(Skill::Attack) * 3,
-        ));
+        entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
             self.crit_chance.value + skills.get_count(Skill::CritChance) * 10,
         ));
@@ -964,9 +960,7 @@ impl ItemAttributes {
             self.dodge.value + skills.get_count(Skill::DodgeChance) * 10,
         )));
         entity.insert(Speed(computed_speed + skills.get_count(Skill::Speed) * 15));
-        entity.insert(Lifesteal(
-            self.lifesteal.value + skills.get_count(Skill::Lifesteal) * 10,
-        ));
+        entity.insert(Lifesteal(self.lifesteal.value));
         entity.insert(Defence(
             self.defence.value
                 + skills.get_count(Skill::Defence) * 10

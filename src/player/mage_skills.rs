@@ -88,11 +88,6 @@ pub fn handle_teleport(
     }
 
     let player_pos = player_pos.translation();
-    if skills.has(Skill::TeleportIceAoEEnd) && teleport_state.second_explosion_timer.just_finished()
-    {
-        teleport_state.second_explosion_timer.reset();
-        spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
-    }
     if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
@@ -126,9 +121,6 @@ pub fn handle_teleport(
             );
             commands.entity(shock_e).insert(TeleportShockDmg);
             commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.3));
-        }
-        if skills.has(Skill::TeleportIceAoE) {
-            spawn_ice_explosion_hitbox(&mut commands, &asset_server, player_pos, dmg.0 / 4);
         }
 
         if skills.has(Skill::TeleportManaRegen) {
@@ -212,7 +204,7 @@ pub fn spawn_ice_explosion_hitbox(
         asset_server.load::<Aseprite, _>(IceExplosion::PATH),
         anim,
         false,
-        Projectile::FireExplosionAOE,
+        Projectile::IceExplosionAOE,
     );
 
     commands.entity(c).insert(IceExplosionDmg);

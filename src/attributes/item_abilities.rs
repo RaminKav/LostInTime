@@ -1,4 +1,5 @@
-use bevy::{prelude::*, transform::commands};
+use bevy::prelude::*;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -41,11 +42,14 @@ pub fn handle_item_abilitiy_on_attack(
 ) {
     let (skills, dmg) = player.single_mut();
 
-    let Some(main_hand) = game.player().main_hand_slot else {
+    let Some(_) = game.player().main_hand_slot else {
         return;
     };
     for attack in attacks.iter() {
-        if skills.has(Skill::WaveAttack) && Skill::WaveAttack.is_obj_valid(main_hand.get_obj()) {
+        let mut rng = rand::thread_rng();
+        if skills.has(Skill::WaveAttack)
+            && rng.gen_bool(skills.get_count(Skill::WaveAttack) as f64 * 0.1)
+        {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,
                 direction: attack.direction,
@@ -57,18 +61,6 @@ pub fn handle_item_abilitiy_on_attack(
                 spawn_delay: 0.1,
             });
             commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.4));
-        }
-        if skills.has(Skill::FireDamage) && Skill::FireDamage.is_obj_valid(main_hand.get_obj()) {
-            ranged_attack_event.send(RangedAttackEvent {
-                projectile: Projectile::FireAttack,
-                direction: attack.direction,
-                from_enemy: None,
-                is_followup_proj: true,
-                mana_cost: None,
-                dmg_override: Some(dmg.0 / 3),
-                pos_override: None,
-                spawn_delay: 0.1,
-            });
         }
     }
 }

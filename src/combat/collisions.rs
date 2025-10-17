@@ -1,8 +1,7 @@
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
     attributes::{
-        modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Lifesteal,
-        Thorns,
+        modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Thorns,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
@@ -13,11 +12,8 @@ use crate::{
         Equipment, MainHand, WorldObject,
     },
     player::{
-        mage_skills::{IceExplosionDmg, TeleportShockDmg},
-        melee_skills::{
-            Parried, ParryState, ParrySuccessEvent, SecondHitDelay, SpearAttack, SpearGravity,
-        },
-        rogue_skills::LungeState,
+        mage_skills::IceExplosionDmg,
+        melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
         skills::{PlayerSkills, Skill},
     },
     ui::damage_numbers::DodgeEvent,
@@ -64,10 +60,16 @@ fn check_melee_hit_collisions(
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
-    lifesteal: Query<&Lifesteal>,
-    skills: Query<(&PlayerSkills, Option<&LungeState>)>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
-    mobs: Query<(&GlobalTransform, Option<&Frail>), With<Mob>>,
+    skills: Query<&PlayerSkills>,
+    mobs: Query<
+        (
+            &GlobalTransform,
+            Option<&Burning>,
+            Option<&mut Slow>,
+            Option<&Frail>,
+        ),
+        With<Mob>,
+    >,
     anim: Query<&PlayerAnimation>,
     mut hit_tracker: Local<Vec<Entity>>,
 ) {
@@ -91,77 +93,51 @@ fn check_melee_hit_collisions(
             }
 
             hit_tracker.push(hit_entity);
-            let Ok((mob_txfm, frail_option)) = mobs.get(hit_entity) else {
+            let Ok((mob_txfm, burning_option, slow_option, frail_option)) = mobs.get(hit_entity)
+            else {
                 continue;
             };
-            let (skills, maybe_lunge) = skills.single();
-            let sword_skill_bonus = if skills.has(Skill::SwordDMG) && weapon_obj.is_sword() {
-                3
-            } else {
-                0
-            };
-            let (damage, was_crit) = game.calculate_player_damage(
+            let skills = skills.single();
+
+            let (mut damage, was_crit) = game.calculate_player_damage(
                 &mut commands,
                 hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-                if skills.has(Skill::SprintLungeDamage)
-                    && maybe_lunge.unwrap().lunge_duration.percent() != 0.
-                {
-                    Some(1.25)
+                if skills.has(Skill::Attack) {
+                    Some(1. + skills.get_count(Skill::Attack) as f32 * 0.1)
                 } else {
                     None
                 },
-                sword_skill_bonus,
+                0,
                 None,
             );
-            let delta = weapon_t.translation() - mob_txfm.translation();
-            if let Ok(lifesteal) = lifesteal.get(game.game.player) {
-                modify_health_events.send(ModifyHealthEvent(f32::floor(
-                    damage as f32 * lifesteal.0 as f32 / 100.,
-                ) as i32));
-            }
-            if skills.has(Skill::SplitDamage) {
-                let split_damage = f32::floor(damage as f32 / 2.) as i32;
 
-                if let Ok(lifesteal) = lifesteal.get(game.game.player) {
-                    modify_health_events.send(ModifyHealthEvent(f32::floor(
-                        split_damage as f32 * lifesteal.0 as f32 / 100.,
-                    ) as i32));
-                }
-                hit_event.send(HitEvent {
-                    hit_entity,
-                    damage: split_damage,
-                    dir: delta.normalize_or_zero().truncate() * -1.,
-                    hit_with_melee: Some(*weapon_obj),
-                    hit_with_projectile: None,
-                    was_crit,
-                    hit_by_mob: None,
-                    ignore_tool: false,
-                });
-                commands.entity(hit_entity).insert(SecondHitDelay {
-                    delay: Timer::from_seconds(0.15, TimerMode::Once),
-                    dir: delta.normalize_or_zero().truncate() * -1.,
-                    weapon_obj: *weapon_obj,
-                });
-            } else {
-                hit_event.send(HitEvent {
-                    hit_entity,
-                    damage: damage as i32,
-                    dir: delta.normalize_or_zero().truncate() * -1.,
-                    hit_with_melee: Some(*weapon_obj),
-                    hit_with_projectile: None,
-                    was_crit,
-                    hit_by_mob: None,
-                    ignore_tool: false,
-                });
+            let is_status_effected =
+                burning_option.is_some() || slow_option.is_some() || frail_option.is_some();
+
+            if is_status_effected && game.has_skill(Skill::TeleportStatusDMG) {
+                damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
+            let delta = weapon_t.translation() - mob_txfm.translation();
+
+            hit_event.send(HitEvent {
+                hit_entity,
+                damage: damage as i32,
+                dir: delta.normalize_or_zero().truncate() * -1.,
+                hit_with_melee: Some(*weapon_obj),
+                hit_with_projectile: None,
+                was_crit,
+                hit_by_mob: None,
+                ignore_tool: false,
+            });
+
             commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
         }
     }
 }
 fn check_projectile_hit_mob_collisions(
     mut commands: Commands,
-    player_attack: Query<(Entity, &Children, Option<&Lifesteal>), With<Player>>,
+    player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
         (Entity, &GlobalTransform),
         (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
@@ -174,15 +150,12 @@ fn check_projectile_hit_mob_collisions(
             &mut ProjectileState,
             &Projectile,
             &Attack,
-            Option<&TeleportShockDmg>,
             Option<&IceExplosionDmg>,
             Option<&SpearAttack>,
         ),
         Without<EnemyProjectile>,
     >,
-    is_world_obj: Query<&WorldObject>,
     mut children: Query<&Parent>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
@@ -194,37 +167,30 @@ fn check_projectile_hit_mob_collisions(
         };
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //TODO: fr gotta refasctor this...
-            let (proj_entity, mut state, proj, att, tp_shock, ice_aoe, spear_att) =
+            let (proj_entity, mut state, proj, att, ice_aoe, spear_att) =
                 if let Ok(parent_e) = children.get_mut(*e1) {
-                    if let Ok((proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)) =
+                    if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
                         projectiles.get_mut(parent_e.get())
                     {
                         //collider is on the child, proj data on the parent
-                        (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
-                    } else if let Ok((
-                        proj_entity,
-                        state,
-                        proj,
-                        att,
-                        tp_shock,
-                        ice_aoe,
-                        spear_att,
-                    )) = projectiles.get_mut(*e1)
+                        (proj_entity, state, proj, att, ice_aoe, spear_att)
+                    } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
+                        projectiles.get_mut(*e1)
                     {
                         //collider and proj data are on the same entity
-                        (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
+                        (proj_entity, state, proj, att, ice_aoe, spear_att)
                     } else {
                         continue;
                     }
-                } else if let Ok((proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)) =
+                } else if let Ok((proj_entity, state, proj, att, ice_aoe, spear_att)) =
                     projectiles.get_mut(*e1)
                 {
                     //collider and proj data are on the same entity
-                    (proj_entity, state, proj, att, tp_shock, ice_aoe, spear_att)
+                    (proj_entity, state, proj, att, ice_aoe, spear_att)
                 } else {
                     continue;
                 };
-            let Ok((player_e, children, lifesteal)) = player_attack.get_single() else {
+            let Ok((player_e, children)) = player_attack.get_single() else {
                 continue;
             };
             if player_e == *e2 || children.contains(e2) || !allowed_targets.contains(*e2) {
@@ -237,11 +203,7 @@ fn check_projectile_hit_mob_collisions(
             let (burning, mut slow, frail) = status_check.get_mut(*e2).unwrap();
             let is_slowed = slow.is_some();
             let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
-            let staff_skill_bonus = if game.has_skill(Skill::StaffDMG) && proj.is_staff_proj() {
-                3
-            } else {
-                0
-            };
+
             let crit_bonus = if is_slowed && game.has_skill(Skill::FrozenCrit) {
                 10
             } else {
@@ -255,21 +217,16 @@ fn check_projectile_hit_mob_collisions(
                 &mut commands,
                 *e2,
                 crit_bonus,
-                None,
-                staff_skill_bonus,
+                if game.has_skill(Skill::Attack) {
+                    Some(1. + game.skill_count(Skill::Attack) as f32 * 0.1)
+                } else {
+                    None
+                },
+                0,
                 Some(att.0),
             );
-            if let Some(lifesteal) = lifesteal {
-                if !is_world_obj.contains(*e2) && tp_shock.is_none() && ice_aoe.is_none() {
-                    modify_health_events.send(ModifyHealthEvent(f32::floor(
-                        damage as f32 * lifesteal.0 as f32 / 100.,
-                    ) as i32));
-                }
-            }
-
-            if is_status_effected && tp_shock.is_some() && game.has_skill(Skill::TeleportStatusDMG)
-            {
-                damage = f32::ceil(damage as f32 * 2.) as u32;
+            if is_status_effected && game.has_skill(Skill::TeleportStatusDMG) {
+                damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
             let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();
             if let Some(_) = spear_att {
@@ -299,7 +256,7 @@ fn check_projectile_hit_mob_collisions(
             });
             if nearby_mobs.get(*e2).is_ok() {
                 if proj.clone() == Projectile::Fireball
-                    || proj.clone() == Projectile::FireExplosionAOE
+                    || proj.clone() == Projectile::IceExplosionAOE
                 {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
                 } else if proj.clone() == Projectile::Electricity {
@@ -325,7 +282,6 @@ fn check_projectile_hit_player_collisions(
             Option<&mut ParryState>,
             Option<&InvincibilityCooldown>,
             Option<&Attack>,
-            Option<&PlayerSkills>,
         ),
         (
             Or<(With<Player>, With<WorldObject>)>,
@@ -397,8 +353,7 @@ fn check_projectile_hit_player_collisions(
             }
             state.hit_entities.push(*e2);
             let mut hit_successful = true;
-            let (_, mut parry_option, i_frames, p_attack, skills) =
-                allowed_targets.get_mut(*e2).unwrap();
+            let (_, mut parry_option, i_frames, p_attack) = allowed_targets.get_mut(*e2).unwrap();
             if let Some(ref mut parry) = parry_option {
                 if parry.active && !parry.success {
                     parry_events.send(ParrySuccessEvent(*e1));
@@ -412,19 +367,18 @@ fn check_projectile_hit_player_collisions(
                             TimerMode::Once,
                         )))
                         .insert(PlayerAnimation::ParryHit);
-                    if skills.unwrap().has(Skill::ParryDeflectProj) {
-                        //deflected proj
-                        ranged_attack_event.send(RangedAttackEvent {
-                            projectile: proj.clone(),
-                            direction: -state.direction,
-                            from_enemy: None,
-                            is_followup_proj: false,
-                            mana_cost: None,
-                            dmg_override: Some(p_attack.unwrap().0),
-                            pos_override: None,
-                            spawn_delay: 0.,
-                        })
-                    }
+
+                    //deflected proj
+                    ranged_attack_event.send(RangedAttackEvent {
+                        projectile: proj.clone(),
+                        direction: -state.direction,
+                        from_enemy: None,
+                        is_followup_proj: false,
+                        mana_cost: None,
+                        dmg_override: Some(p_attack.unwrap().0),
+                        pos_override: None,
+                        spawn_delay: 0.,
+                    })
                 }
             }
             if hit_successful {

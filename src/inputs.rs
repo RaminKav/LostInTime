@@ -633,24 +633,42 @@ pub fn mouse_click_system(
         if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
             let mana_cost_option =
                 proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
-            ranged_attack_event.send(RangedAttackEvent {
-                projectile: ranged_tool.0.clone(),
-                direction,
-                from_enemy: None,
-                is_followup_proj: false,
-                mana_cost: mana_cost_option.map(|m| -m.0),
-                dmg_override: None,
-                pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
-                    Some(Vec2::ZERO)
-                } else {
-                    None
-                },
-                spawn_delay: if obj == &WorldObject::WoodBow {
-                    0.36
-                } else {
-                    0.01
-                },
-            })
+            let mut rng = rand::thread_rng();
+            let trigger_count = if game.has_skill(Skill::ChanceToProcExtraAttack)
+                && rng.gen_bool(game.skill_count(Skill::ChanceToProcExtraAttack) as f64 * 0.25)
+            {
+                2
+            } else {
+                1
+            };
+            for i in 0..trigger_count {
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: ranged_tool.0.clone(),
+                    direction,
+                    from_enemy: None,
+                    is_followup_proj: false,
+                    mana_cost: mana_cost_option.map(|m| -m.0),
+                    dmg_override: None,
+                    pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
+                        Some(Vec2::ZERO)
+                    } else {
+                        None
+                    },
+                    spawn_delay: if obj == &WorldObject::WoodBow {
+                        if i == 0 {
+                            0.36
+                        } else {
+                            0.2
+                        }
+                    } else {
+                        if i == 0 {
+                            0.01
+                        } else {
+                            0.2
+                        }
+                    },
+                })
+            }
         }
         let mut did_attack = false;
         let mut is_melee_wep_or_tool = false;
