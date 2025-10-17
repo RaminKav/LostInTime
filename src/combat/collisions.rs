@@ -255,7 +255,7 @@ fn check_projectile_hit_mob_collisions(
                 was_crit,
             });
             if nearby_mobs.get(*e2).is_ok() {
-                if proj.clone() == Projectile::Fireball
+                if proj.clone() == Projectile::IceShard
                     || proj.clone() == Projectile::IceExplosionAOE
                 {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));

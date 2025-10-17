@@ -1,11 +1,11 @@
 (
-  name: "IceStaff",
+  name: "Gun",
   templates: ["item_drop.prototype.ron"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": IceStaff,
+  "survival_rogue_like::item::WorldObject": Gun,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 10, end: 16)),
+        attack: Some((start: 10, end: 14)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 2, end: 4)),
@@ -20,15 +20,14 @@
         mana_regen: Some((start: 1, end: 5)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
-  "survival_rogue_like::item::item_actions::ManaCost": (5),
-  "survival_rogue_like::item::projectile::RangedAttack": (IceShard),
+  "survival_rogue_like::item::projectile::RangedAttack": (Bullet),
   "survival_rogue_like::inventory::ItemStack": (
-        obj_type: IceStaff,
+        obj_type: Gun,
         attributes: (
             attack_cooldown: 0.85
         ),
         metadata: (
-            name: "Ice Staff", 
+            name: "Gun", 
             desc: ["A Ice Staff."]
         ),
         count: 1

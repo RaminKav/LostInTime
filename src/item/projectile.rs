@@ -1,19 +1,16 @@
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, IntoStaticStr};
 
 use crate::{
     attributes::{
-        modifiers::ModifyManaEvent, Attack, CurrentMana, ItemAttributes, ManaRegen, MaxMana,
-        ProjectileSize,
+        modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
-    inventory::Inventory,
     player::{
         mage_skills::JustTeleported,
         skills::{PlayerSkills, Skill},
@@ -23,7 +20,7 @@ use crate::{
     GameParam, GameState,
 };
 
-use super::{item_actions::ConsumableItem, item_upgrades::ArrowSpeedUpgrade, WorldObject};
+use super::item_upgrades::ArrowSpeedUpgrade;
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
@@ -52,6 +49,7 @@ pub enum Projectile {
     None,
     Rock,
     Fireball,
+    IceShard,
     Electricity,
     GreenWhip,
     Arrow,
@@ -66,17 +64,12 @@ pub enum Projectile {
     DaggerProjectile1,
     DaggerProjectile2,
     SpearProjectile,
+    Bullet,
+    HammerProjectile,
+    Dart,
 }
 
 impl Projectile {
-    fn get_world_object(&self) -> WorldObject {
-        match self {
-            Projectile::Fireball => WorldObject::Fireball,
-            Projectile::Arrow => WorldObject::Arrow,
-            Projectile::ThrowingStar => WorldObject::ThrowingStar,
-            _ => panic!("Projectile {:?} not implemented", self),
-        }
-    }
     pub fn is_staff_proj(&self) -> bool {
         match self {
             Projectile::Fireball => true,
@@ -89,6 +82,7 @@ impl Projectile {
         match self {
             Projectile::Electricity => true,
             Projectile::SwordProjectile => true,
+            Projectile::HammerProjectile => true,
             Projectile::DaggerProjectile1 => true,
             Projectile::DaggerProjectile2 => true,
             Projectile::SpearProjectile => true,
@@ -177,9 +171,7 @@ fn handle_ranged_attack_event(
     >,
     enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
     game: GameParam,
-    proto: ProtoParam,
     mut commands: Commands,
-    mut inv: Query<&mut Inventory>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
     for proj_event in events.iter() {
@@ -258,11 +250,11 @@ fn handle_ranged_attack_event(
     }
 }
 fn handle_translate_projectiles(
-    mut query: Query<(&mut Transform, &ProjectileState, &Projectile), With<Projectile>>,
+    mut query: Query<(&mut Transform, &ProjectileState), With<Projectile>>,
     speed_modifiers: Query<&ArrowSpeedUpgrade>,
     time: Res<Time>,
 ) {
-    for (mut transform, state, proj) in query.iter_mut() {
+    for (mut transform, state) in query.iter_mut() {
         let arrow_speed_upgrade = speed_modifiers
             .get_single()
             .unwrap_or(&ArrowSpeedUpgrade(1.))

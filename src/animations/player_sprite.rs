@@ -88,11 +88,15 @@ impl PlayerAnimation {
         if self == &PlayerAnimation::Attack || self == &PlayerAnimation::Bow {
             if let Some(wep) = main_hand {
                 match wep {
-                    WorldObject::BasicStaff | WorldObject::IceStaff | WorldObject::MagicWhip => {
-                        return 0.5
-                    }
+                    WorldObject::BasicStaff
+                    | WorldObject::FireStaff
+                    | WorldObject::IceStaff
+                    | WorldObject::MagicWhip => return 0.5,
                     WorldObject::Sword => return 0.4,
                     WorldObject::Dagger => return 0.85,
+                    WorldObject::Hammer => return 0.1,
+                    WorldObject::Blowdart => return 0.6,
+                    WorldObject::Gun => return 0.45,
                     WorldObject::WoodBow => return 0.2,
                     WorldObject::Claw => return 0.8,
                     WorldObject::Spear => return 0.15,

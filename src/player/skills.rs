@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    attributes::{AttributeQuality, AttributeValue, ItemAttributes, RarityGlows},
+    attributes::{AttributeQuality, AttributeValue, ItemAttributes},
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
@@ -95,6 +95,7 @@ pub enum Skill {
     DodgeChance,
     Defence,
     Attack,
+    Gigantify,
 
     // On-Attack Triggers
     WaveAttack,
@@ -123,8 +124,8 @@ pub enum Skill {
     ParryKnockback, // needs art prompt/art
     ParryEcho,
 
-    DaggerCombo, // TODO: Rarity Legendary
-    HPRegen,     //
+    DaggerCombo,
+    HPRegen,
     HPRegenCooldown,
     MPRegen,
     MPRegenCooldown,
@@ -187,6 +188,7 @@ impl Skill {
             Skill::HPRegenCooldown => SkillClass::Melee,
             Skill::HealEcho => SkillClass::Melee,
             Skill::FullStomach => SkillClass::Melee,
+            Skill::Gigantify => SkillClass::Melee,
 
             Skill::ReinforcedArmor => SkillClass::Melee,
 
@@ -260,6 +262,7 @@ impl Skill {
             Skill::ChanceToProcExtraAttack => "Double Throw".to_string(),
             Skill::IncreaseProjectilCount => "Multi Shot".to_string(),
             Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
+            Skill::Gigantify => "Gigantify".to_string(),
 
             Skill::IceStaffAoE => "Explosive Blast".to_string(),
             Skill::Sprint => "Sprint".to_string(),
@@ -325,6 +328,11 @@ impl Skill {
             Skill::DodgeChance => vec![
                 "Gain +10% Dodge".to_string(),
                 "Chance,".to_string(),
+                "permanently.".to_string(),
+            ],
+            Skill::Gigantify => vec![
+                "Your Attacks gain".to_string(),
+                "+15% Size".to_string(),
                 "permanently.".to_string(),
             ],
 
@@ -529,18 +537,21 @@ impl Skill {
                 "enemy triggers an".to_string(),
                 "ice explosion that".to_string(),
                 "damages enemies.".to_string(),
+                "+25% freeze chance.".to_string(),
             ],
             Skill::IceStaffFloor => vec![
                 "Your Attacks have".to_string(),
                 "a chance to leave".to_string(),
                 "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
+                "+25% freeze chance.".to_string(),
             ],
             Skill::FrozenCrit => vec![
                 "Attacking frozen".to_string(),
                 "enemies gives you".to_string(),
                 "+10% critical hit".to_string(),
                 "chance.".to_string(),
+                "+25% freeze chance.".to_string(),
             ],
             Skill::MPBarDMG => vec![
                 "Your staff's attacks".to_string(),
@@ -558,31 +569,37 @@ impl Skill {
                 "Killing a frozen".to_string(),
                 "enemy triggers".to_string(),
                 "mana regeneration.".to_string(),
+                "+25% freeze chance.".to_string(),
             ],
             Skill::DodgeCrit => vec![
                 "The next attack".to_string(),
                 "after dodging".to_string(),
                 "is a critical hit.".to_string(),
+                "+10% dodge chance.".to_string(),
             ],
             Skill::PoisonDuration => vec![
                 "Your poison effect".to_string(),
                 "lasts longer.".to_string(),
+                "+25% poison chance.".to_string(),
             ],
             Skill::PoisonStrength => vec![
                 "Your poison effect".to_string(),
                 "does more damage.".to_string(),
+                "+25% poison chance.".to_string(),
             ],
             Skill::ViralVenum => vec![
                 "Killing a poisoned".to_string(),
                 "enemy spreads it's".to_string(),
                 "poison to nearby".to_string(),
                 "enemies.".to_string(),
+                "+25% poison chance.".to_string(),
             ],
             Skill::HealEcho => vec![
                 "Healing triggers".to_string(),
                 "an echo that".to_string(),
                 "damages enemies ".to_string(),
                 "around you.".to_string(),
+                "+20 Health regen.".to_string(),
             ],
             Skill::FullStomach => vec![
                 "You get hungry".to_string(),
@@ -791,6 +808,7 @@ impl Default for SkillChoiceQueue {
             pool: vec![
                 SkillChoiceState::new(Skill::Defence, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::Attack, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::Gigantify, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::HPRegen, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::HPRegenCooldown, SkillRarity::Uncommon)
                     .set_repeatable(),
@@ -982,6 +1000,33 @@ impl Default for PlayerSkills {
 impl PlayerSkills {
     pub fn has(&self, skill: Skill) -> bool {
         self.skills.contains(&skill)
+    }
+    pub fn calculate_freeze_chance(&self) -> f64 {
+        let mut chance = 0.0;
+        let freeze_skills = vec![
+            Skill::FrozenAoE,
+            Skill::IceStaffFloor,
+            Skill::FrozenCrit,
+            Skill::FrozenMPRegen,
+            Skill::SlowStacks,
+        ];
+        for skill in freeze_skills.iter() {
+            chance += self.get_count(skill.clone()) as f64 * 0.25;
+        }
+        chance
+    }
+    pub fn calculate_poison_chance(&self) -> f64 {
+        let mut chance = 0.0;
+        let poison_skills = vec![
+            Skill::PoisonDuration,
+            Skill::PoisonStrength,
+            Skill::ViralVenum,
+            Skill::PoisonStacks,
+        ];
+        for skill in poison_skills.iter() {
+            chance += self.get_count(skill.clone()) as f64 * 0.25;
+        }
+        chance
     }
     pub fn has_active_skill(&self, skill: Skill) -> Option<usize> {
         if self

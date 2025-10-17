@@ -190,20 +190,6 @@ impl ActiveMainHandState {
     pub fn get_obj(&self) -> WorldObject {
         self.item_stack.obj_type
     }
-    pub fn get_attack_anim_offset(&self) -> f32 {
-        match self.item_stack.obj_type {
-            WorldObject::WoodSword => 1.,
-            WorldObject::Spear => 2.,
-            WorldObject::WoodAxe => 2.,
-            WorldObject::WoodPickaxe => 2.,
-            WorldObject::Dagger => 3.,
-            WorldObject::IceStaff => 4.,
-            WorldObject::BasicStaff => 0.,
-            WorldObject::Claw => 1.,
-            WorldObject::WoodBow => 1.,
-            _ => 0.,
-        }
-    }
 }
 
 #[derive(
@@ -225,8 +211,6 @@ pub struct ItemDisplayMetaData {
     pub level: Option<u8>,
     pub item_ability: Option<ItemAbility>,
 }
-#[derive(Component)]
-pub struct Size(pub Vec2);
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(
     Debug,
@@ -279,6 +263,13 @@ pub enum WorldObject {
     ForestPants,
     ForestShoes,
     Spear,
+    Hammer,
+    FireStaff,
+    Blowdart,
+    Gun,
+    IceShard,
+    Dart,
+    Bullet,
     Dagger,
     Fireball,
     Ring,
@@ -584,6 +575,10 @@ impl WorldObject {
             WorldObject::Sword => true,
             WorldObject::Spear => true,
             WorldObject::Dagger => true,
+            WorldObject::Gun => true,
+            WorldObject::Blowdart => true,
+            WorldObject::FireStaff => true,
+            WorldObject::Hammer => true,
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
             WorldObject::IceStaff => true,
@@ -607,6 +602,7 @@ impl WorldObject {
             WorldObject::Sword => true,
             WorldObject::Spear => true,
             WorldObject::Dagger => true,
+            WorldObject::Hammer => true,
             WorldObject::Claw => false,
             _ => false,
         }
@@ -689,6 +685,10 @@ impl WorldObject {
             WorldObject::Sword => 2,
             WorldObject::Spear => 2,
             WorldObject::Dagger => 1,
+            WorldObject::Hammer => 2,
+            WorldObject::Gun => 2,
+            WorldObject::Blowdart => 2,
+            WorldObject::FireStaff => 2,
             WorldObject::Claw => 2,
             WorldObject::WoodBow => 2,
             WorldObject::IceStaff => 2,

@@ -76,7 +76,42 @@
             anchor: None,
         ),
         Fireball: WorldObjectData(
+            texture_pos: (5., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        IceShard: WorldObjectData(
             texture_pos: (1., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Blowdart: WorldObjectData(
+            texture_pos: (3., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Dart: WorldObjectData(
+            texture_pos: (3., 3.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Hammer: WorldObjectData(
+            texture_pos: (4., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FireStaff: WorldObjectData(
+            texture_pos: (5., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Gun: WorldObjectData(
+            texture_pos: (6., 4.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Bullet: WorldObjectData(
+            texture_pos: (6., 3.),
             size: (16., 16.),
             anchor: None,
         ),

@@ -949,7 +949,9 @@ impl ItemAttributes {
         ));
         entity.insert(BonusDamage(self.bonus_damage.value));
         entity.insert(HealthRegen(
-            self.health_regen.value + skills.get_count(Skill::HPRegen) * 5,
+            self.health_regen.value
+                + skills.get_count(Skill::HPRegen) * 5
+                + skills.get_count(Skill::HealEcho) * 20,
         ));
         entity.insert(Healing(self.healing.value));
         entity.insert(Thorns(
@@ -957,7 +959,9 @@ impl ItemAttributes {
         ));
         entity.insert(Dodge(i32::min(
             80,
-            self.dodge.value + skills.get_count(Skill::DodgeChance) * 10,
+            self.dodge.value
+                + skills.get_count(Skill::DodgeChance) * 10
+                + skills.get_count(Skill::DodgeCrit) * 10,
         )));
         entity.insert(Speed(computed_speed + skills.get_count(Skill::Speed) * 15));
         entity.insert(Lifesteal(self.lifesteal.value));
@@ -975,7 +979,9 @@ impl ItemAttributes {
         entity.insert(ManaRegen(
             self.mana_regen.value + skills.get_count(Skill::MPRegen) * 5,
         ));
-        entity.insert(ProjectileSize(self.size.value));
+        entity.insert(ProjectileSize(
+            self.size.value + skills.get_count(Skill::Gigantify) * 15,
+        ));
     }
     pub fn get_random_existing_bonus_attribute_string(&self, filter: &Vec<&str>) -> Option<String> {
         debug!("Getting random existing attribute from: {:?}", self);

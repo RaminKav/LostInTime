@@ -39,6 +39,10 @@ impl Default for FurnaceState {
                 vec![
                     WorldObject::Sword,
                     WorldObject::Dagger,
+                    WorldObject::Gun,
+                    WorldObject::Hammer,
+                    WorldObject::Blowdart,
+                    WorldObject::FireStaff,
                     WorldObject::WoodBow,
                     WorldObject::IceStaff,
                     WorldObject::BasicStaff,

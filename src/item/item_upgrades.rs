@@ -7,6 +7,7 @@ use crate::attributes::ItemAttributes;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::item::WorldObject;
 use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
 use crate::player::skills::{PlayerSkills, Skill};
 use crate::status_effects::{
@@ -263,8 +264,8 @@ pub fn handle_on_hit_upgrades(
         else {
             continue;
         };
-        if skills.has(Skill::PoisonStacks)
-            && rng.gen_bool(skills.get_count(Skill::PoisonStacks) as f64 * 0.25)
+        if main_hand.get_obj() == WorldObject::Blowdart
+            || rng.gen_bool(skills.calculate_poison_chance())
         {
             if let Some(mut burning) = burning_option {
                 burning.duration_timer.reset();
@@ -287,8 +288,9 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if skills.has(Skill::FrailStacks)
-            && rng.gen_bool(skills.get_count(Skill::FrailStacks) as f64 * 0.25)
+        if main_hand.get_obj() == WorldObject::Hammer
+            || (skills.has(Skill::FrailStacks)
+                && rng.gen_bool(skills.get_count(Skill::FrailStacks) as f64 * 0.25))
         {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
@@ -314,9 +316,7 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if skills.has(Skill::SlowStacks)
-            && rng.gen_bool(skills.get_count(Skill::SlowStacks) as f64 * 0.25)
-        {
+        if rng.gen_bool(skills.calculate_freeze_chance()) {
             try_add_slow_stacks(
                 hit_e,
                 &mut commands,
