@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::prelude::*;
 
 use bevy_proto::prelude::ProtoCommands;
@@ -19,16 +21,22 @@ use crate::{
         stats::StatType,
     },
     proto::proto_param::ProtoParam,
-    ui::{crafting_ui::UpgradeButton, InventoryState},
+    ui::{
+        crafting_ui::UpgradeButton,
+        item_chest::{
+            ItemChestAnimChangeEvent, ItemChestAnimState, ItemChestButton, ItemChestState,
+        },
+        InventoryState,
+    },
     Game, GameParam,
 };
 
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
     spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
-    EssenceOption, FurnaceContainer, InfoModal, InventorySlotState, MenuButton,
-    MenuButtonClickEvent, RerollDice, ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice,
-    ToolTipUpdateEvent, TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
+    EssenceOption, InfoModal, InventorySlotState, MenuButton, MenuButtonClickEvent, RerollDice,
+    ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
+    TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
@@ -85,6 +93,10 @@ pub enum UIElement {
     RerollDiceHover,
     UpgradeButton,
     UpgradeButtonHover,
+    ItemChestOpeningCommon,
+    ItemChestOpeningUncommon,
+    ItemChestOpeningRare,
+    ItemChestOpeningLegendary,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -967,6 +979,113 @@ pub fn handle_cursor_inventory_upgrade_button(
                                     fuel.item_stack.obj_type;
                                 let updated_fuel = fuel.modify_count(-1);
                                 inv.furnace_items.items[0] = updated_fuel;
+                            }
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                let ui_element = UIElement::UpgradeButton;
+
+                interactable.change(Interaction::None);
+                commands
+                    .entity(e)
+                    .insert(ui_element.clone())
+                    .insert(graphics.get_ui_element_texture(ui_element));
+            }
+        }
+    }
+}
+
+pub fn handle_cursor_item_chest_button(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut item_chest_button: Query<
+        (Entity, &mut Interactable, &ItemChestButton),
+        Without<InventorySlotState>,
+    >,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut item_chest_state: ResMut<ItemChestState>,
+    mut chest_event: EventWriter<ItemChestAnimChangeEvent>,
+    mut game: GameParam,
+    mut next_ui_state: ResMut<NextState<UIState>>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, _) in item_chest_button.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                    let ui_element = UIElement::UpgradeButtonHover;
+                    commands
+                        .entity(e)
+                        .insert(ui_element.clone())
+                        .insert(graphics.get_ui_element_texture(ui_element));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed {
+                        let state = item_chest_state.state.clone();
+                        match state {
+                            ItemChestAnimState::Closed => {
+                                chest_event.send(ItemChestAnimChangeEvent {
+                                    state: ItemChestAnimState::Opening,
+                                    set_ui_rarity: None,
+                                });
+                            }
+                            ItemChestAnimState::Opening => {
+                                // do nothing
+                                let elapsed = item_chest_state
+                                    .shuffle_duration_timer
+                                    .elapsed()
+                                    .as_secs_f32();
+                                let duration = item_chest_state
+                                    .shuffle_duration_timer
+                                    .duration()
+                                    .as_secs_f32();
+                                match item_chest_state.shuffle_duration_timer.percent() {
+                                    0.0..=0.25 => {
+                                        item_chest_state.shuffle_duration_timer.tick(
+                                            Duration::from_secs_f32(duration * 0.25 - elapsed),
+                                        );
+                                    }
+                                    0.25..=0.48 => {
+                                        item_chest_state.shuffle_duration_timer.tick(
+                                            Duration::from_secs_f32(duration * 0.48 - elapsed),
+                                        );
+                                    }
+                                    0.5..=0.7 => {
+                                        item_chest_state.shuffle_duration_timer.tick(
+                                            Duration::from_secs_f32(duration * 0.70 - elapsed),
+                                        );
+                                    }
+                                    _ => {
+                                        chest_event.send(ItemChestAnimChangeEvent {
+                                            state: ItemChestAnimState::Done,
+                                            set_ui_rarity: None,
+                                        });
+                                    }
+                                }
+                            }
+                            ItemChestAnimState::Done => {
+                                let pos = game.player().position.truncate();
+                                item_chest_state.picked_item.clone().unwrap().spawn_as_drop(
+                                    &mut commands,
+                                    &mut game,
+                                    pos,
+                                );
+                                next_ui_state.set(UIState::Closed);
+                                commands.remove_resource::<ItemChestState>();
+                                // commands
+                                //     .entity(item_chest_state.owner_chest_entity)
+                                //     .despawn();
                             }
                         }
                     }

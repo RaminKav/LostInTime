@@ -675,7 +675,7 @@ impl Skill {
                         .clone(),
                     count: 1,
                     max_count: 1,
-                    timer: Timer::from_seconds(0.27, TimerMode::Once),
+                    timer: Timer::from_seconds(0.17, TimerMode::Once),
                     second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
             }
@@ -869,7 +869,9 @@ impl SkillChoiceQueue {
             let mut add_back_to_pool: Vec<SkillChoiceState> = vec![];
             for i in 0..3 {
                 let rarity = SkillChoiceQueue::gen_rarity(rng);
-                if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng) {
+                if let Some(picked_skill) = self
+                    .get_skill_of_rarity(rarity.clone(), rng, &|s| new_skills.clone().contains(s))
+                {
                     if !picked_skill.is_one_time_skill {
                         add_back_to_pool.push(picked_skill.clone());
                     }
@@ -888,10 +890,11 @@ impl SkillChoiceQueue {
         &self,
         rarity: SkillRarity,
         rng: &mut rand::rngs::ThreadRng,
+        filter: &dyn Fn(&SkillChoiceState) -> bool,
     ) -> Option<SkillChoiceState> {
         self.pool
             .iter()
-            .filter(|x| x.rarity == rarity)
+            .filter(|x| x.rarity == rarity && filter(x))
             .choose(rng)
             .cloned()
     }
@@ -961,7 +964,9 @@ impl SkillChoiceQueue {
             let old_skill = self.queue[0][slot].clone();
             let rarity = SkillChoiceQueue::gen_rarity(rng);
             //TODO: consolidate this code with the main skill picking area?
-            if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng) {
+            if let Some(picked_skill) =
+                self.get_skill_of_rarity(rarity.clone(), rng, &|s| self.queue[0].contains(s))
+            {
                 if picked_skill.is_one_time_skill {
                     self.pool.retain(|x| x != &picked_skill);
                 }

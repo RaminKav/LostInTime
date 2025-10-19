@@ -1,11 +1,17 @@
 use std::cmp::max;
 
-use bevy::prelude::Commands;
+use bevy::{
+    asset::AssetServer, math::Vec3, prelude::Commands, render::view::RenderLayers,
+    transform::components::Transform,
+};
+use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
+use bevy_proto::custom::VisibilityBundle;
 use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
+    animations::DoneAnimation,
     attributes::{
-        AttributeModifier, ItemAttributes, ItemRarity, RawItemBaseAttributes,
+        AttributeModifier, ItemAttributes, ItemRarity, RarityGlows, RawItemBaseAttributes,
         RawItemBonusAttributes,
     },
     audio::{AudioSoundEffect, SoundSpawner},
@@ -81,7 +87,7 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
 }
 
 pub fn get_rarity_rng(mut rng: ThreadRng) -> ItemRarity {
-    let rarity_rng = rng.gen_range(0..35);
+    let rarity_rng = rng.gen_range(0..25);
     if rarity_rng == 0 {
         ItemRarity::Legendary
     } else if rarity_rng < 4 {
@@ -187,4 +193,45 @@ pub fn levelup_item_stats(
         }
     }
     stack.clone()
+}
+
+pub fn spawn_rarity_animation(
+    new_rarity: ItemRarity,
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    pos: Vec3,
+) {
+    if new_rarity == ItemRarity::Legendary {
+        // Sound effect
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5).with_delay(0.55));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2).with_delay(2.3));
+
+        // glow/shake effects
+        commands
+            .spawn(AsepriteBundle {
+                aseprite: asset_server.load(RarityGlows::PATH),
+                animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
+                transform: Transform::from_translation(pos),
+                ..Default::default()
+            })
+            .insert(VisibilityBundle::default())
+            .insert(DoneAnimation)
+            .insert(RenderLayers::from_layers(&[3]));
+    } else if new_rarity == ItemRarity::Rare {
+        commands
+            .spawn(AsepriteBundle {
+                aseprite: asset_server.load(RarityGlows::PATH),
+                animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
+                transform: Transform::from_translation(pos),
+                ..Default::default()
+            })
+            .insert(VisibilityBundle::default())
+            .insert(DoneAnimation)
+            .insert(RenderLayers::from_layers(&[3]));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4));
+    }
 }

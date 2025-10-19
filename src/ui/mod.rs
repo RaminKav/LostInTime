@@ -2,9 +2,11 @@ pub mod chest_ui;
 pub mod crafting_ui;
 pub mod damage_numbers;
 pub mod guide_hud;
+pub mod item_chest;
 pub mod scrapper_ui;
 pub mod screen_effects;
 use guide_hud::*;
+use item_chest::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
 use damage_numbers::{handle_clamp_screen_locked_icons, NewRecipeTextTimer};
@@ -84,6 +86,7 @@ impl Plugin for UIPlugin {
             .add_event::<ActionSuccessEvent>()
             .add_event::<ScrapperEvent>()
             .add_event::<FlashExpBarEvent>()
+            .add_event::<ItemChestAnimChangeEvent>()
             .add_event::<DropOnSlotEvent>()
             .add_event::<DodgeEvent>()
             .add_event::<RemoveFromSlotEvent>()
@@ -218,16 +221,24 @@ impl Plugin for UIPlugin {
                     setup_skill_choice_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                    setup_item_chest_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
                     setup_active_skill_slot_choice_ui
                         .before(CustomFlush)
                         .run_if(
                             state_changed::<UIState>().and_then(in_state(UIState::ActiveSkills)),
                         ),
+                    handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
                     handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (handle_anim_events.run_if(in_state(UIState::ItemChest)),)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
@@ -239,8 +250,10 @@ impl Plugin for UIPlugin {
                     spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,
+                    toggle_item_chest_visibility.run_if(resource_added::<ItemChestState>()),
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
+                    shuffle_items.run_if(in_state(UIState::ItemChest)),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
                     handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),

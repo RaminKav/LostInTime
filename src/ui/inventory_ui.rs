@@ -23,6 +23,7 @@ pub enum UIState {
     NPC,
     Chest,
     Skills,
+    ItemChest,
     ActiveSkills,
     Crafting,
     Furnace,

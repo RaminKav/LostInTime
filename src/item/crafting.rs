@@ -1,18 +1,17 @@
-use bevy::{prelude::*, reflect::TypeUuid, render::view::RenderLayers, utils::HashMap};
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
+use bevy::{prelude::*, reflect::TypeUuid, utils::HashMap};
 use itertools::Itertools;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use super::EquipmentType;
 use crate::{
-    animations::DoneAnimation,
     assets::Graphics,
     attributes::{
-        attribute_helpers::{levelup_item_stats, reroll_item_bonus_attributes},
-        ItemRarity, RarityGlows,
+        attribute_helpers::{
+            levelup_item_stats, reroll_item_bonus_attributes, spawn_rarity_animation,
+        },
+        ItemRarity,
     },
-    audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     colors::YELLOW,
     container::Container,
@@ -239,34 +238,13 @@ pub fn handle_furnace_slot_update(
                     let rarity_changed = new_rarity != old_item.clone().item_stack.rarity;
 
                     if rarity_changed {
+                        spawn_rarity_animation(
+                            new_rarity.clone(),
+                            &mut commands,
+                            &asset_server,
+                            Vec3::new(99., 55., 20.),
+                        );
                         if new_rarity == ItemRarity::Legendary {
-                            // Sound effect
-                            commands
-                                .spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
-                            commands.spawn(
-                                SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5)
-                                    .with_delay(0.55),
-                            );
-                            commands.spawn(
-                                SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2)
-                                    .with_delay(2.3),
-                            );
-
-                            // glow/shake effects
-                            commands
-                                .spawn(AsepriteBundle {
-                                    aseprite: asset_server.load(RarityGlows::PATH),
-                                    animation: AsepriteAnimation::from(RarityGlows::tags::RARER),
-                                    transform: Transform::from_translation(Vec3::new(
-                                        99., 55., 20.,
-                                    )),
-                                    ..Default::default()
-                                })
-                                .insert(VisibilityBundle::default())
-                                .insert(DoneAnimation)
-                                .insert(RenderLayers::from_layers(&[3]));
-
                             let mut rng = rand::thread_rng();
                             let seed = rng.gen_range(0..100000);
                             let speed = 10.;
@@ -283,24 +261,6 @@ pub fn handle_furnace_slot_update(
                                     dir,
                                 });
                             }
-                        } else if new_rarity == ItemRarity::Rare {
-                            commands
-                                .spawn(AsepriteBundle {
-                                    aseprite: asset_server.load(RarityGlows::PATH),
-                                    animation: AsepriteAnimation::from(RarityGlows::tags::RARE),
-                                    transform: Transform::from_translation(Vec3::new(
-                                        99., 55., 20.,
-                                    )),
-                                    ..Default::default()
-                                })
-                                .insert(VisibilityBundle::default())
-                                .insert(DoneAnimation)
-                                .insert(RenderLayers::from_layers(&[3]));
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
-                            commands.spawn(
-                                SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4),
-                            );
                         }
                     }
                 }

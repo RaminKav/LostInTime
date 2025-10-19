@@ -4,6 +4,7 @@ use crate::{
     attributes::{
         hunger::Hunger,
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
+        ItemRarity,
     },
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     inputs::CursorPos,
@@ -13,8 +14,9 @@ use crate::{
     player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
-        scrapper_ui::ScrapperContainer, ChestContainer, FurnaceContainer, InventorySlotState,
-        InventorySlotType, UIState,
+        item_chest::{ItemChestAnimState, ItemChestState},
+        scrapper_ui::ScrapperContainer,
+        ChestContainer, FurnaceContainer, InventorySlotState, InventorySlotType, UIState,
     },
     world::{
         dimension::DimensionSpawnEvent,
@@ -44,6 +46,7 @@ pub enum ItemAction {
     Essence,
     DungeonKey,
     GrantSkillPoint(u8),
+    ItemChest,
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -147,6 +150,7 @@ impl ItemActions {
         item_action_param: &mut ItemActionParam,
         game: &mut GameParam,
         proto_param: &ProtoParam,
+        commands: &mut Commands,
     ) {
         for action in &self.actions {
             match action {
@@ -217,6 +221,17 @@ impl ItemActions {
                     sp.count += *amount;
 
                     item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ItemChest => {
+                    commands.insert_resource(ItemChestState {
+                        shuffle_timer: Timer::from_seconds(0.06, TimerMode::Once),
+                        shuffle_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
+                        picked_item: None,
+                        current_entity: None,
+                        current_item: None,
+                        state: ItemChestAnimState::Closed,
+                        current_ui_rarity: ItemRarity::Common,
+                    });
                 }
                 _ => {}
             }

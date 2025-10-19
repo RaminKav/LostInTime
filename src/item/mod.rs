@@ -571,7 +571,7 @@ impl WorldObject {
     }
     pub fn is_weapon(&self) -> bool {
         match self {
-            WorldObject::WoodSword => true,
+            // WorldObject::WoodSword => true,
             WorldObject::Sword => true,
             WorldObject::Spear => true,
             WorldObject::Dagger => true,
@@ -584,6 +584,27 @@ impl WorldObject {
             WorldObject::IceStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
+            _ => false,
+        }
+    }
+    pub fn is_armor(&self) -> bool {
+        match self {
+            WorldObject::Chestplate => true,
+            WorldObject::MetalPants => true,
+            WorldObject::MetalShoes => true,
+            WorldObject::LeatherTunic => true,
+            WorldObject::LeatherPants => true,
+            WorldObject::LeatherShoes => true,
+            WorldObject::ForestShirt => true,
+            WorldObject::ForestPants => true,
+            WorldObject::ForestShoes => true,
+            _ => false,
+        }
+    }
+    pub fn is_accessory(&self) -> bool {
+        match self {
+            WorldObject::Ring => true,
+            WorldObject::Pendant => true,
             _ => false,
         }
     }
@@ -692,8 +713,8 @@ impl WorldObject {
             WorldObject::Claw => 2,
             WorldObject::WoodBow => 2,
             WorldObject::IceStaff => 2,
-            WorldObject::BasicStaff => 2,
-            WorldObject::MagicWhip => 2,
+            WorldObject::BasicStaff => 1,
+            WorldObject::MagicWhip => 1,
             _ => 0,
         }
     }

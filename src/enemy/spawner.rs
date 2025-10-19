@@ -130,17 +130,17 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(5.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(10.5, TimerMode::Once),
             min_days_to_spawn: 2,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(4),
             num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(5.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(10.5, TimerMode::Once),
             min_days_to_spawn: 0,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(5),
             num_spawned: 0,
         });
         spawners.push(Spawner {
@@ -151,28 +151,28 @@ fn add_spawners_to_new_chunks(
             num_to_spawn: None,
             num_spawned: 0,
         });
-        spawners.push(Spawner {
-            enemy: Mob::Hog,
-            weight: 20.,
-            spawn_timer: Timer::from_seconds(120., TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: None,
-            num_spawned: 0,
-        });
+        // spawners.push(Spawner {
+        //     enemy: Mob::Hog,
+        //     weight: 20.,
+        //     spawn_timer: Timer::from_seconds(120., TimerMode::Once),
+        //     min_days_to_spawn: 0,
+        //     num_to_spawn: None,
+        //     num_spawned: 0,
+        // });
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(15.5, TimerMode::Once),
             min_days_to_spawn: 2,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(5),
             num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::Bushling,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(5.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(10.5, TimerMode::Once),
             min_days_to_spawn: 1,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(5),
             num_spawned: 0,
         });
     } else {
@@ -409,6 +409,9 @@ fn tick_spawner_timers(
             spawner.spawn_timer.tick(time.delta());
             if night_tracker.is_night() {
                 // double spawn rate at night
+                spawner.spawn_timer.tick(time.delta());
+                spawner.spawn_timer.tick(time.delta());
+                spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());

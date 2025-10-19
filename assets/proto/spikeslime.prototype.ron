@@ -22,145 +22,19 @@
                 item: SmallPotion,
                 min: 1,
                 max: 1,
-                rate: 0.05
+                rate: 0.004
             ),
             (
                 item: LargePotion,
                 min: 1,
                 max: 1,
-                rate: 0.05
-            ),
-        //     (
-        //         item: SlimeGoo,
-        //         min: 1,
-        //         max: 3,
-        //         rate: 0.5
-        //     ),
-        //    (
-        //         item: Arrow,
-        //         min: 1,
-        //         max: 3,
-        //         rate: 0.07
-        //     ),
-        //     (
-        //         item: ThrowingStar,
-        //         min: 1,
-        //         max: 3,
-        //         rate: 0.07
-        //     ),
-            (
-                item: Sword,
-                min: 1,
-                max: 1,
-                rate: 0.003
+                rate: 0.001
             ),
             (
-                item: Spear,
+                item: ChestBlock,
                 min: 1,
                 max: 1,
-                rate: 0.003
-            ),
-            (
-                item: Dagger,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: BasicStaff,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: IceStaff,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: MagicWhip,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: WoodBow,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: Claw,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: Ring,
-                min: 1,
-                max: 1,
-                rate: 0.012
-            ),
-            (
-                item: Pendant,
-                min: 1,
-                max: 1,
-                rate: 0.0065
-            ),
-            (
-                item: Chestplate,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: MetalPants,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: MetalShoes,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: LeatherTunic,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: LeatherPants,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: LeatherShoes,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: ForestShirt,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: ForestPants,
-                min: 1,
-                max: 1,
-                rate: 0.0085
-            ),
-            (
-                item: ForestShoes,
-                min: 1,
-                max: 1,
-                rate: 0.0085
+                rate: 0.008
             ),
             (
                 item: UpgradeTome,

@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Blowdart,
   "survival_rogue_like::item::EquipmentType": Weapon,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 7, end: 10)),
+        attack: Some((start: 6, end: 9)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 2, end: 4)),
@@ -24,7 +24,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Blowdart,
         attributes: (
-            attack_cooldown: 0.85
+            attack_cooldown: 0.35
         ),
         metadata: (
             name: "Blow Dart ", 

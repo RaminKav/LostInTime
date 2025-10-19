@@ -58,7 +58,7 @@ pub fn handle_combat_shrine_activate_animation(
                         fallback_count = 0;
                         num_to_spawn -= 1;
                         //last mob is elite
-                        if num_to_spawn == 0 {
+                        if num_to_spawn <= 1 {
                             commands.entity(mob).insert(EliteMob);
                         }
                         proto_param
@@ -97,31 +97,7 @@ pub fn handle_shrine_rewards(
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
             shrine.num_mobs_left -= 1;
-            let drop_list = [
-                // WorldObject::WoodSword,
-                // WorldObject::WoodSword,
-                WorldObject::Sword,
-                WorldObject::Spear,
-                WorldObject::Dagger,
-                WorldObject::Hammer,
-                WorldObject::Blowdart,
-                WorldObject::FireStaff,
-                WorldObject::Gun,
-                WorldObject::WoodBow,
-                WorldObject::Claw,
-                // WorldObject::MiracleSeed,
-                WorldObject::IceStaff,
-                WorldObject::BasicStaff,
-                WorldObject::MagicWhip,
-                WorldObject::LeatherPants,
-                WorldObject::LeatherShoes,
-                WorldObject::LeatherTunic,
-                WorldObject::LeatherPants,
-                WorldObject::LeatherShoes,
-                WorldObject::LeatherTunic,
-                WorldObject::Ring,
-                WorldObject::Pendant,
-            ];
+            let drop_list = [WorldObject::ChestBlock];
             if shrine.num_mobs_left == 0 {
                 // give rewards
                 proto_commands.spawn_item_from_proto(

@@ -190,6 +190,11 @@ pub fn handle_on_hit_upgrades(
             continue;
         };
         let skills = upgrades.single();
+        if let Some(proj) = &hit.hit_with_projectile {
+            if proj.is_skill_projectile() {
+                continue;
+            }
+        }
 
         if skills.has(Skill::IncreaseProjectilCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
@@ -252,7 +257,7 @@ pub fn handle_on_hit_upgrades(
                 asset_server.load::<Aseprite, _>(IceFloor::PATH),
                 AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                 true,
-                Projectile::Echo,
+                Projectile::IceExplosionAOE,
             );
             commands
                 .entity(ice)

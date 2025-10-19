@@ -89,6 +89,14 @@ impl Projectile {
             _ => false,
         }
     }
+    pub fn is_skill_projectile(&self) -> bool {
+        match self {
+            Projectile::Arc => true,
+            Projectile::Echo => true,
+            Projectile::IceExplosionAOE => true,
+            _ => false,
+        }
+    }
 }
 #[derive(Deserialize, FromReflect, Default, Reflect, Clone, Serialize, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]

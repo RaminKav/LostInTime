@@ -380,8 +380,9 @@ pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
 pub fn close_container(
     key_input: ResMut<Input<KeyCode>>,
     mut next_inv_state: ResMut<NextState<UIState>>,
+    curr_state: Res<State<UIState>>,
 ) {
-    if key_input.just_pressed(KeyCode::Escape) {
+    if key_input.just_pressed(KeyCode::Escape) && curr_state.0 != UIState::ItemChest {
         next_inv_state.set(UIState::Closed);
     }
 }
@@ -529,6 +530,7 @@ pub fn handle_quick_hotbar_consume(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
+                    &mut commands,
                 );
             }
         }
@@ -736,6 +738,7 @@ pub fn mouse_click_system(
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
+                    &mut commands,
                 );
             }
         }

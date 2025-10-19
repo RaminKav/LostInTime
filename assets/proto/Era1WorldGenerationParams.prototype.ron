@@ -10,9 +10,9 @@
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       forest_params: (
-        tree_spacing_radius: 36.,
-        tree_density: 0.02,
-        forest_radius: 10.,
+        tree_spacing_radius: 48.,
+        tree_density: 0.01,
+        forest_radius: 6.,
         max_trees_per_forest: 18,
         tree_weights: {
           SmallGreenTree: 10.0,
