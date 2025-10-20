@@ -29,7 +29,7 @@ impl NightTracker {
     }
     pub fn is_night(&self) -> bool {
         // 12am to 6am ->
-        self.time >= 12. && self.time <= 18.
+        self.time >= 15. && self.time <= 18.
     }
     pub fn is_start_of_new_day(&self) -> bool {
         self.time == 0.
@@ -82,7 +82,7 @@ pub fn spawn_night(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Night(Timer::from_seconds(6., TimerMode::Repeating)))
+        .insert(Night(Timer::from_seconds(7.5, TimerMode::Repeating)))
         .insert(Name::new("night"));
 }
 

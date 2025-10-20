@@ -48,7 +48,7 @@ pub fn handle_item_abilitiy_on_attack(
     for attack in attacks.iter() {
         let mut rng = rand::thread_rng();
         if skills.has(Skill::WaveAttack)
-            && rng.gen_bool(skills.get_count(Skill::WaveAttack) as f64 * 0.1)
+            && rng.gen_bool(skills.get_count(Skill::WaveAttack) as f64 * 0.25)
         {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,
@@ -56,7 +56,7 @@ pub fn handle_item_abilitiy_on_attack(
                 from_enemy: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(dmg.0 / 5),
+                dmg_override: Some(dmg.0 / 3),
                 pos_override: None,
                 spawn_delay: 0.1,
             });

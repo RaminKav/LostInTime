@@ -48,11 +48,12 @@ use crate::world::chunk::Chunk;
 use crate::world::world_helpers::world_pos_to_tile_pos;
 
 use crate::{
-    custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
-    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
+    bounce_player, get_active_skill_keybind, update_bounce_effect, update_shadow, BounceEffect,
+    BounceEvent, Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
-    get_active_skill_keybind, Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+    custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
+    RawPosition, TextureCamera, UICamera, PLAYER_MOVE_SPEED,
 };
 
 const HOTBAR_KEYCODES: [KeyCode; 6] = [
@@ -69,10 +70,19 @@ impl Plugin for InputsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(CursorPos::default())
             .register_type::<CursorPos>()
+            .add_event::<BounceEvent>()
             // .add_plugin(ResourceInspectorPlugin::<CursorPos>::default())
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<AttackEvent>();
             })
+            .add_systems(
+                (
+                    bounce_player.run_if(is_not_paused),
+                    update_shadow.run_if(is_not_paused),
+                    update_bounce_effect.before(handle_hotbar_key_input),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_systems(
                 (
                     player_move_inputs.run_if(is_not_paused),
@@ -227,6 +237,7 @@ pub fn player_move_inputs(
             &Hunger,
             &mut RunDustTimer,
             &PlayerSkills,
+            Option<&BounceEffect>,
         ),
         (
             With<Player>,
@@ -248,8 +259,20 @@ pub fn player_move_inputs(
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
     }
-    let (player_e, mut player_kcc, mut mv, curr_anim, speed, hunger, mut run_dust_timer, skills) =
-        player_query.single_mut();
+    let (
+        player_e,
+        mut player_kcc,
+        mut mv,
+        curr_anim,
+        speed,
+        hunger,
+        mut run_dust_timer,
+        skills,
+        bounce_option,
+    ) = player_query.single_mut();
+    if bounce_option.is_some() {
+        return;
+    }
     let player = game.player_mut();
     let mut d = Vec2::ZERO;
     let s = PLAYER_MOVE_SPEED

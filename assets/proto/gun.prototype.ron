@@ -24,7 +24,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Gun,
         attributes: (
-            attack_cooldown: 0.2
+            attack_cooldown: 0.25
         ),
         metadata: (
             name: "Gun", 

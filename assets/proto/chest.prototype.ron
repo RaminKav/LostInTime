@@ -3,7 +3,6 @@
   templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": Chest,
-  "survival_rogue_like::item::object_actions::ObjectAction": ItemChest,
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8),
   "survival_rogue_like::attributes::MaxHealth": (100),
   }

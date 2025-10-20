@@ -38,7 +38,7 @@ use crate::{
         item_actions::{ConsumableItem, ItemAction, ItemActions, ManaCost},
         item_upgrades::ClawUpgradeMultiThrow,
         melee::MeleeAttack,
-        object_actions::{ObjectAction, ObjectActionCost},
+        object_actions::{ObjectAction, ObjectActionCost, TouchTriggerObjectAction},
         projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttack},
         Block, BreaksWith, EquipmentType, FoliageSize, ItemDisplayMetaData, Loot, LootTable,
         PlacesInto, RequiredEquipmentType, Wall, WorldObject,
@@ -116,6 +116,7 @@ impl Plugin for ProtoPlugin {
             .register_type::<AnimationTimerProto>()
             .register_type::<LeftFacingSideProfile>()
             .register_type::<RequiredEquipmentType>()
+            .register_type::<TouchTriggerObjectAction>()
             .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<ObjectActionCost>()
             .register_type::<ManaCost>()

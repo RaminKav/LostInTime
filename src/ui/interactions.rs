@@ -811,7 +811,7 @@ pub fn handle_cursor_skills_buttons(
                         .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
+                    if left_mouse_pressed && state.interaction_lock_timer.finished() {
                         let (e, mut skills, t, level) = player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
                         if ui_state == &UIState::Skills {

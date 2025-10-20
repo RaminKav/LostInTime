@@ -1,20 +1,14 @@
-use std::time::Duration;
-
 use bevy::prelude::*;
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
-use rand::{
-    seq::{IteratorRandom, SliceRandom},
-    Rng,
-};
-use tracing_subscriber::field::debug;
+use rand::Rng;
 
 use crate::{
     client::is_not_paused,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     item::WorldObject,
-    night::{self, NewDayEvent, NightTracker},
+    night::{NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_screen_locked_icon,
@@ -22,7 +16,6 @@ use crate::{
         chunk::Chunk,
         dimension::ActiveDimension,
         dungeon::Dungeon,
-        generation::DoneGeneratingEvent,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
         TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
@@ -130,7 +123,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(10.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(25.5, TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(4),
             num_spawned: 0,
@@ -162,7 +155,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(15.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(25.5, TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(5),
             num_spawned: 0,
@@ -409,7 +402,6 @@ fn tick_spawner_timers(
             spawner.spawn_timer.tick(time.delta());
             if night_tracker.is_night() {
                 // double spawn rate at night
-                spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());

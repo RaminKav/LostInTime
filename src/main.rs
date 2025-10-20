@@ -15,11 +15,13 @@ use attributes::{
     HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
 mod audio;
+mod bounce;
 mod container;
 mod datafiles;
 mod keybinds;
 mod panic_handler;
 mod vectorize;
+pub use bounce::*;
 pub use keybinds::*;
 
 use audio::AudioPlugin;

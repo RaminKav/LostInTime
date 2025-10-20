@@ -25,7 +25,7 @@ pub struct ExperienceReward(pub u32);
 #[derive(Component)]
 pub struct LevelUpParticles;
 
-pub const BASE_LEVEL_EXP_REQ: f32 = 95.;
+pub const BASE_LEVEL_EXP_REQ: f32 = 125.;
 impl PlayerLevel {
     pub fn new(level: u8) -> Self {
         PlayerLevel {
@@ -33,7 +33,7 @@ impl PlayerLevel {
             next_level: level + 1,
             xp: 0,
             next_level_xp: f32::floor(
-                BASE_LEVEL_EXP_REQ * f32::powf(1. + (0.17 * (level as f32 - 1.)), 2.),
+                BASE_LEVEL_EXP_REQ * f32::powf(1. + (0.2 * (level as f32 - 1.)), 2.),
             ) as u32,
         }
     }
@@ -65,6 +65,7 @@ pub fn handle_level_up(
     mut skills_queue: ResMut<SkillChoiceQueue>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut next_inv_state: ResMut<NextState<UIState>>,
 ) {
     for (mut player_level, mut sp, player_t) in player.iter_mut() {
         if player_level.level == player_level.next_level {
@@ -80,6 +81,7 @@ pub fn handle_level_up(
                 YELLOW,
                 "LEVEL UP!".to_string(),
             );
+            next_inv_state.set(UIState::Skills);
         }
     }
 }

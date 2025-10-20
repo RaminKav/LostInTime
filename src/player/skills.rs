@@ -847,7 +847,7 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::Teleport, SkillRarity::Common),
                 SkillChoiceState::new(Skill::ChanceToProcExtraAttack, SkillRarity::Rare)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::IncreaseProjectilCount, SkillRarity::Legendary)
+                SkillChoiceState::new(Skill::IncreaseProjectilCount, SkillRarity::Rare)
                     .set_repeatable(),
                 SkillChoiceState::new(Skill::BowArrowSpeed, SkillRarity::Uncommon).set_repeatable(),
                 SkillChoiceState::new(Skill::IceStaffAoE, SkillRarity::Legendary).set_repeatable(),
@@ -870,7 +870,7 @@ impl SkillChoiceQueue {
             for i in 0..3 {
                 let rarity = SkillChoiceQueue::gen_rarity(rng);
                 if let Some(picked_skill) = self
-                    .get_skill_of_rarity(rarity.clone(), rng, &|s| new_skills.clone().contains(s))
+                    .get_skill_of_rarity(rarity.clone(), rng, &|s| !new_skills.clone().contains(s))
                 {
                     if !picked_skill.is_one_time_skill {
                         add_back_to_pool.push(picked_skill.clone());
@@ -965,7 +965,7 @@ impl SkillChoiceQueue {
             let rarity = SkillChoiceQueue::gen_rarity(rng);
             //TODO: consolidate this code with the main skill picking area?
             if let Some(picked_skill) =
-                self.get_skill_of_rarity(rarity.clone(), rng, &|s| self.queue[0].contains(s))
+                self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
             {
                 if picked_skill.is_one_time_skill {
                     self.pool.retain(|x| x != &picked_skill);

@@ -23,7 +23,7 @@ use crate::{
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
         TileMapPosition,
     },
-    GameParam, TextureCamera,
+    BounceEvent, GameParam, TextureCamera,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -116,6 +116,7 @@ pub struct ActionSuccessEvent {
 #[derive(SystemParam)]
 pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
+    pub bounce_event: EventWriter<'w, BounceEvent>,
     pub use_item_event: EventWriter<'w, UseItemEvent>,
     pub gamble_shrine_event: EventWriter<'w, GambleShrineEvent>,
     pub currency_event: EventWriter<'w, ModifyTimeFragmentsEvent>,

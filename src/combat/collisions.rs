@@ -1,13 +1,13 @@
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
-    attributes::{
-        modifiers::ModifyHealthEvent, Attack, Defence, Dodge, InvincibilityCooldown, Thorns,
-    },
+    attributes::{Attack, Defence, Dodge, InvincibilityCooldown, Thorns},
     audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
     item::{
+        item_actions::ItemActionParam,
+        object_actions::TouchTriggerObjectAction,
         projectile::{EnemyProjectile, Projectile, ProjectileState, RangedAttackEvent},
         Equipment, MainHand, WorldObject,
     },
@@ -39,6 +39,7 @@ impl Plugin for CollisionPlugion {
                 check_projectile_hit_mob_collisions,
                 check_projectile_hit_player_collisions,
                 check_item_drop_collisions.after(CustomFlush),
+                check_object_trigger_collisions.after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
         );
@@ -402,7 +403,15 @@ fn check_projectile_hit_player_collisions(
 pub fn check_item_drop_collisions(
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
-    allowed_targets: Query<Entity, (With<ItemStack>, Without<MainHand>, Without<Equipment>)>,
+    allowed_targets: Query<
+        Entity,
+        (
+            With<ItemStack>,
+            Without<MainHand>,
+            Without<Equipment>,
+            Without<TouchTriggerObjectAction>,
+        ),
+    >,
     rapier_context: Res<RapierContext>,
     items_query: Query<&ItemStack>,
     mut game: GameParam,
@@ -503,6 +512,38 @@ pub fn check_item_drop_collisions(
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+        }
+    }
+}
+pub fn check_object_trigger_collisions(
+    mut commands: Commands,
+    player: Query<Entity, With<Player>>,
+    allowed_targets: Query<
+        Entity,
+        (
+            Without<MainHand>,
+            Without<Equipment>,
+            With<TouchTriggerObjectAction>,
+        ),
+    >,
+    rapier_context: Res<RapierContext>,
+    items_query: Query<&TouchTriggerObjectAction>,
+    game: GameParam,
+    mut item_action_param: ItemActionParam,
+) {
+    if !game.player().is_moving {
+        return;
+    }
+    let player_e = player.single();
+    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+        for (e1, e2) in [(e1, e2), (e2, e1)] {
+            //if the player is colliding with an entity...
+            let Ok(_) = player.get(e1) else { continue };
+            if !allowed_targets.contains(e2) {
+                continue;
+            }
+            let action = items_query.get(e2).unwrap();
+            action.run_action(e2, &mut commands, &mut item_action_param);
         }
     }
 }

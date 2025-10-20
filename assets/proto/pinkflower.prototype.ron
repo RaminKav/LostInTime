@@ -3,6 +3,9 @@
   templates: ["world_object.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": PinkFlower,
+  "survival_rogue_like::item::object_actions::TouchTriggerObjectAction": Bounce,
+  "survival_rogue_like::proto::ColliderProto": (x: 10., y: 10.),
+  "survival_rogue_like::proto::SensorProto": (),
   "survival_rogue_like::attributes::MaxHealth": (1),
   "survival_rogue_like::player::levels::ExperienceReward": (7),
   "survival_rogue_like::world::y_sort::YSort": (-0.01),

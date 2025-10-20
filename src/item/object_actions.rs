@@ -3,6 +3,7 @@ use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
+use crate::attributes::ItemRarity;
 use crate::container::Container;
 use crate::inventory::Inventory;
 use crate::juice::ShakeEffect;
@@ -10,15 +11,16 @@ use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::damage_numbers::spawn_screen_locked_icon;
+use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 
 use crate::world::TileMapPosition;
-use crate::GameParam;
 use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
     world::world_helpers::world_pos_to_tile_pos,
 };
+use crate::{BounceEvent, GameParam};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -51,6 +53,15 @@ pub enum ObjectActionCost {
     None,
     TimeFragment(i32),
     Item(WorldObject, usize),
+}
+
+#[derive(Component, Reflect, FromReflect, Schematic, Default)]
+#[reflect(Component, Schematic)]
+pub enum TouchTriggerObjectAction {
+    #[default]
+    None,
+    Bounce,
+    ItemChest,
 }
 
 impl ObjectAction {
@@ -287,6 +298,33 @@ impl ObjectAction {
                             GambleShrineAnim::tags::ACTIVATE_FAIL,
                         ));
                 }
+            }
+            _ => {}
+        }
+    }
+}
+impl TouchTriggerObjectAction {
+    pub fn run_action(
+        &self,
+        entity: Entity,
+        commands: &mut Commands,
+        item_action_param: &mut ItemActionParam,
+    ) {
+        match self {
+            TouchTriggerObjectAction::Bounce => {
+                item_action_param.bounce_event.send(BounceEvent);
+            }
+            TouchTriggerObjectAction::ItemChest => {
+                commands.insert_resource(ItemChestState {
+                    shuffle_timer: Timer::from_seconds(0.05, TimerMode::Once),
+                    shuffle_duration_timer: Timer::from_seconds(2., TimerMode::Once),
+                    picked_item: None,
+                    current_entity: None,
+                    current_item: None,
+                    state: ItemChestAnimState::Closed,
+                    current_ui_rarity: ItemRarity::Common,
+                });
+                commands.entity(entity).despawn_recursive();
             }
             _ => {}
         }

@@ -19,6 +19,7 @@ use super::{
 pub struct SkillChoiceUI {
     pub index: usize,
     pub skill_choice: SkillChoiceState,
+    pub interaction_lock_timer: Timer,
 }
 
 #[derive(Component)]
@@ -222,6 +223,17 @@ pub fn setup_active_skill_slot_choice_ui(
         .insert(Name::new("SKILL ICON!!"));
 }
 
+pub fn tick_skill_choice_interaction_lock_timers(
+    time: Res<Time>,
+    mut query: Query<&mut SkillChoiceUI>,
+) {
+    for mut skill_ui in query.iter_mut() {
+        if skill_ui.interaction_lock_timer.finished() {
+            continue;
+        }
+        skill_ui.interaction_lock_timer.tick(time.delta());
+    }
+}
 pub fn spawn_skill_choice_entities(
     graphics: &Graphics,
     commands: &mut Commands,
@@ -259,6 +271,7 @@ pub fn spawn_skill_choice_entities(
             .insert(SkillChoiceUI {
                 index: (i + 1) as usize,
                 skill_choice: choice.clone(),
+                interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
             })
             .insert(ui_element)
             .insert(UIState::Skills)
@@ -341,7 +354,6 @@ pub fn spawn_skill_choice_entities(
 }
 
 pub fn toggle_skills_visibility(
-    mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     key_input: ResMut<Input<KeyCode>>,
     mut queue: ResMut<SkillChoiceQueue>,
@@ -352,9 +364,6 @@ pub fn toggle_skills_visibility(
 ) {
     if curr_ui_state.0 == UIState::ActiveSkills {
         return;
-    }
-    if key_input.just_pressed(KeyCode::B) {
-        next_inv_state.set(UIState::Skills);
     }
 
     if *DEBUG && key_input.just_pressed(KeyCode::N) {
