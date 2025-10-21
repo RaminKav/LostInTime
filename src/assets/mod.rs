@@ -20,7 +20,7 @@ use crate::item::{
 };
 use crate::player::skills::Skill;
 use crate::status_effects::StatusEffect;
-use crate::ui::UIElement;
+use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
 use crate::{GameState, ImageAssets};
 
@@ -97,6 +97,7 @@ impl Plugin for GameAssetsPlugin {
                 item_glows: None,
                 combat_shrine_anim: None,
                 gamble_shrine_anim: None,
+                blacksmith_merchant: None,
                 portal_ase: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
@@ -154,6 +155,7 @@ pub struct Graphics {
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
+    pub blacksmith_merchant: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
 }
 impl Graphics {
@@ -384,6 +386,7 @@ impl GameAssetsPlugin {
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
+            blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
         };
     }

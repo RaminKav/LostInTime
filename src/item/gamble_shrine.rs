@@ -9,7 +9,7 @@ use crate::{
     inventory::ItemStack,
     item::object_actions::ObjectAction,
     proto::proto_param::ProtoParam,
-    ui::key_input_guide::InteractionGuideTrigger,
+    ui::{key_input_guide::InteractionGuideTrigger, BlacksmithMerchant, EssenceShopChoices},
     world::world_helpers::world_pos_to_tile_pos,
     GameParam,
 };
@@ -121,6 +121,17 @@ pub fn add_gamble_visuals_on_spawn(
                     ..default()
                 })
                 .insert(Name::new("GAMBLE_DONE"));
+        } else if obj == &WorldObject::BlacksmithMerchant {
+            commands
+                .entity(e)
+                .insert(AsepriteBundle {
+                    transform: *t,
+                    animation: AsepriteAnimation::from(BlacksmithMerchant::tags::IDLE_WORKING_1),
+                    aseprite: graphics.blacksmith_merchant.as_ref().unwrap().clone(),
+                    ..default()
+                })
+                .insert(EssenceShopChoices::default())
+                .insert(Name::new("BLACKSMITH"));
         }
     }
 }

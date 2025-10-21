@@ -45,6 +45,7 @@ pub enum SchematicType {
     #[default]
     CombatShrine,
     GambleShrine,
+    BlacksmithMerchant,
 }
 
 #[derive(Component)]

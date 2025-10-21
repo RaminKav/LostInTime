@@ -57,6 +57,14 @@ pub fn add_guide_to_unique_objs(
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
                 });
             }
+            WorldObject::BlacksmithMerchant => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Purchase".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                });
+            }
             _ => {}
         }
     }

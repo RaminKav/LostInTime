@@ -61,6 +61,7 @@
       schematic_frequencies: {
         CombatShrine: 0.3,
         GambleShrine: 0.3,
+        BlacksmithMerchant: 0.3,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

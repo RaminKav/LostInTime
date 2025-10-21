@@ -8,19 +8,19 @@
     "survival_rogue_like::world::y_sort::YSort": (0.),
     "survival_rogue_like::enemy::CombatAlignment": Passive,
     "survival_rogue_like::proto::IdleStateProto": (walk_dir_change_time: 2., speed: 0.3),
-    "survival_rogue_like::ui::essence_ui::EssenceShopChoices": (choices: [
-        (item: (
-        obj_type: IceStaff,
-        attributes: (
-            attack_cooldown: 0.85
-        ),
-        metadata: (
-            name: "Ice Staff", 
-            desc: ["A Ice Staff."]
-        ),
-        count: 1),
-        cost: 5),
-        ]),
+    // "survival_rogue_like::ui::essence_ui::EssenceShopChoices": (choices: [
+    //     (item: (
+    //     obj_type: IceStaff,
+    //     attributes: (
+    //         attack_cooldown: 0.85
+    //     ),
+    //     metadata: (
+    //         name: "Ice Staff", 
+    //         desc: ["A Ice Staff."]
+    //     ),
+    //     count: 1),
+    //     cost: 5),
+    //     ]),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5.),
     "survival_rogue_like::attributes::MaxHealth": (100),
   }

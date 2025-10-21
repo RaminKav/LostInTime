@@ -442,6 +442,7 @@ pub enum WorldObject {
     RedBeaconBlock,
     PinkBeacon,
     PinkBeaconBlock,
+    BlacksmithMerchant,
 }
 
 #[derive(

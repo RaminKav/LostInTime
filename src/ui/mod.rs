@@ -212,7 +212,7 @@ impl Plugin for UIPlugin {
                     setup_chest_slots_ui.run_if(in_state(UIState::Chest)),
                     setup_scrapper_slots_ui.run_if(in_state(UIState::Scrapper)),
                     tick_tooltip_timer,
-                    handle_submit_essence_choice,
+                    handle_submit_essence_choice.run_if(resource_exists::<EssenceShopChoices>()),
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
                     handle_cursor_skills_buttons

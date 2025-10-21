@@ -1,18 +1,18 @@
-use std::{fs::File, io::BufReader};
-
-use bevy::{prelude::*, render::view::RenderLayers, transform::commands};
+use bevy::{prelude::*, render::view::RenderLayers};
+use bevy_aseprite::aseprite;
 use bevy_proto::backend::schematics::{ReflectSchematic, Schematic};
-use rand::seq::IteratorRandom;
+use itertools::Itertools;
+use rand::seq::SliceRandom;
+use strum::IntoEnumIterator;
 
 use crate::{
     assets::Graphics,
-    attributes::attribute_helpers::create_new_random_item_stack_with_attributes,
-    client::GameData,
-    datafiles,
+    attributes::{attribute_helpers::create_new_random_item_stack_with_attributes, ItemRarity},
     inventory::ItemStack,
     item::WorldObject,
-    player::{levels::PlayerLevel, ModifyTimeFragmentsEvent, Player, TimeFragmentCurrency},
+    player::{ModifyTimeFragmentsEvent, Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
+    ui::key_input_guide::InteractionGuideTrigger,
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
 
@@ -45,7 +45,9 @@ pub struct SubmitEssenceChoice {
 #[reflect(Component, Schematic)]
 pub struct EssenceShopChoices {
     pub choices: Vec<EssenceOption>,
+    pub owner_entity: Option<Entity>,
 }
+aseprite!(pub BlacksmithMerchant, "textures/blacksmith.ase");
 
 pub fn setup_essence_ui(
     mut commands: Commands,
@@ -82,7 +84,7 @@ pub fn setup_essence_ui(
             ..Default::default()
         })
         .insert(EssenceUI)
-        .insert(Name::new("STATS UI"))
+        .insert(Name::new("SHOP UI"))
         .insert(UIState::Essence)
         .insert(RenderLayers::from_layers(&[3]))
         .id();
@@ -174,6 +176,7 @@ pub fn handle_submit_essence_choice(
     mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
     mut game_param: GameParam,
     player_t: Query<&GlobalTransform, With<Player>>,
+    shop: Res<EssenceShopChoices>,
 ) {
     for choice in ev.iter() {
         let cur = currency.single();
@@ -193,17 +196,23 @@ pub fn handle_submit_essence_choice(
             if let Ok(e) = essence_ui.get_single() {
                 commands.entity(e).despawn_recursive();
             }
+            if let Some(owner_e) = shop.owner_entity {
+                commands
+                    .entity(owner_e)
+                    .remove::<EssenceShopChoices>()
+                    .remove::<InteractionGuideTrigger>();
+            }
         }
     }
 }
 
 pub fn handle_populate_essence_shop_on_new_spawn(
-    mut new_spawns: Query<&mut EssenceShopChoices, Added<EssenceShopChoices>>,
-    player_level: Query<&PlayerLevel>,
+    mut new_spawns: Query<(Entity, &mut EssenceShopChoices), Added<EssenceShopChoices>>,
     proto_param: ProtoParam,
     mut commands: Commands,
+    game: GameParam,
 ) {
-    for mut shop in new_spawns.iter_mut() {
+    for (entity, mut shop) in new_spawns.iter_mut() {
         let mut GENERIC_SHOP_OPTIONS = vec![
             EssenceOption {
                 item: create_new_random_item_stack_with_attributes(
@@ -241,42 +250,56 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         ];
 
         let mut shop_choices = vec![];
-        let player_level = player_level.single().level;
-        if let Ok(file_file) = File::open(datafiles::game_data()) {
-            let reader = BufReader::new(file_file);
-            let mut rng = rand::thread_rng();
-            // Read the JSON contents of the file as an instance of `User`.
-            match serde_json::from_reader::<_, GameData>(reader) {
-                Ok(data) => {
-                    if let Some(seen_item) = data
-                        .seen_gear
-                        .iter()
-                        .filter(|i| i.metadata.level.unwrap_or(1) <= player_level)
-                        .choose(&mut rng)
-                    {
-                        shop_choices.push(EssenceOption {
-                            item: seen_item.clone(),
-                            cost: seen_item.metadata.level.unwrap_or(1) as u32 + 2,
-                        });
-                        while shop_choices.len() < 4 {
-                            let pick = GENERIC_SHOP_OPTIONS
-                                .iter()
-                                .choose(&mut rng)
-                                .unwrap()
-                                .clone();
-                            shop_choices.push(pick.clone());
-                            GENERIC_SHOP_OPTIONS.retain(|x| x.get_obj() != pick.get_obj());
-                        }
-                    } else {
-                        shop_choices = GENERIC_SHOP_OPTIONS;
-                    }
-                }
-                Err(err) => {
-                    warn!("No previous runs found, no gear to populate shop with {err:?}");
-                    shop_choices = GENERIC_SHOP_OPTIONS;
-                }
-            }
-        };
+        let mut rng = rand::thread_rng();
+        // Read the JSON contents of the file as an instance of `User`.
+
+        // if let Some(seen_item) = data
+        //     .seen_gear
+        //     .iter()
+        //     .filter(|i| i.metadata.level.unwrap_or(1) <= player_level)
+        //     .choose(&mut rng)
+        // {
+        //     shop_choices.push(EssenceOption {
+        //         item: seen_item.clone(),
+        //         cost: seen_item.metadata.level.unwrap_or(1) as u32 + 2,
+        //     });
+        //     while shop_choices.len() < 4 {
+        //         let pick = GENERIC_SHOP_OPTIONS
+        //             .iter()
+        //             .choose(&mut rng)
+        //             .unwrap()
+        //             .clone();
+        //         shop_choices.push(pick.clone());
+        //         GENERIC_SHOP_OPTIONS.retain(|x| x.get_obj() != pick.get_obj());
+        //     }
+        // } else {
+        //     shop_choices = GENERIC_SHOP_OPTIONS;
+        // }
+        while shop_choices.len() < 4 {
+            let filtered_items = WorldObject::iter()
+                .filter(|obj| obj.is_weapon() || obj.is_armor() || obj.is_accessory())
+                .collect_vec();
+            let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
+            let mut stack = proto_param
+                .get_item_data(pick_new_item.clone())
+                .unwrap()
+                .clone();
+            stack.metadata.level = Some(game.get_player_level());
+
+            let random_item_stack =
+                create_new_random_item_stack_with_attributes(&stack, &proto_param, &mut commands);
+            let rarity_cost_inc = match random_item_stack.rarity {
+                ItemRarity::Common => 0,
+                ItemRarity::Uncommon => 2,
+                ItemRarity::Rare => 4,
+                ItemRarity::Legendary => 8,
+            };
+            shop_choices.push(EssenceOption {
+                item: random_item_stack.clone(),
+                cost: random_item_stack.metadata.level.unwrap_or(1) as u32 + 2 + rarity_cost_inc,
+            });
+        }
         shop.choices = shop_choices;
+        shop.owner_entity = Some(entity);
     }
 }
