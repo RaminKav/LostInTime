@@ -7,10 +7,12 @@ use super::{
 };
 use crate::{
     assets::Graphics,
-    attributes::{hunger::Hunger, CurrentHealth, CurrentMana, MaxHealth, MaxMana},
+    attributes::{
+        hunger::Hunger, CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana, MaxShield,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     client::GameOverEvent,
-    colors::{BLACK, BLUE, RED, WHITE, YELLOW},
+    colors::{BLACK, BLUE, RED, SHIELD_BLUE, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
@@ -27,6 +29,8 @@ aseprite!(pub Clock, "ui/Clock.aseprite");
 
 #[derive(Component)]
 pub struct HealthBar;
+#[derive(Component)]
+pub struct ShieldBar;
 #[derive(Component)]
 pub struct FoodBar;
 #[derive(Component)]
@@ -94,7 +98,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 17., -1.),
+                translation: Vec3::new(-25., 17., -2.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -108,6 +112,30 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
         .insert(RenderLayers::from_layers(&[3]))
         .insert(HealthBar)
         .insert(Name::new("inner health bar"))
+        .id();
+    let inner_shield = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: SHIELD_BLUE,
+                custom_size: Some(INNER_HUD_BAR_SIZE),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-25., 17., -1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(BarFlashTimer {
+            timer: Timer::from_seconds(0.1, TimerMode::Once),
+            flash_color: WHITE,
+            color: SHIELD_BLUE,
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ShieldBar)
+        .insert(Name::new("inner shield bar"))
         .id();
     let inner_mana = commands
         .spawn(SpriteBundle {
@@ -158,9 +186,12 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
         .insert(Name::new("inner food bar"))
         .id();
 
-    commands
-        .entity(hud_bar_frame)
-        .push_children(&[inner_health, inner_food, inner_mana]);
+    commands.entity(hud_bar_frame).push_children(&[
+        inner_health,
+        inner_food,
+        inner_mana,
+        inner_shield,
+    ]);
 }
 
 pub fn setup_xp_bar_ui(
@@ -349,6 +380,27 @@ pub fn update_healthbar(
         x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
+    flash.timer.tick(Duration::from_nanos(1));
+}
+pub fn update_shieldbar(
+    player_health_query: Query<
+        (&CurrentShield, &MaxShield, &MaxHealth),
+        (
+            Or<(Changed<CurrentShield>, Changed<MaxShield>)>,
+            With<Player>,
+        ),
+    >,
+    mut health_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ShieldBar>>,
+) {
+    let Ok((curr_shield, max_shield, max_health)) = player_health_query.get_single() else {
+        return;
+    };
+    let (mut sprite, mut flash) = health_bar_query.single_mut();
+    sprite.custom_size = Some(Vec2 {
+        x: 65. * curr_shield.0 as f32 / max_shield.0 as f32,
+        y: INNER_HUD_BAR_SIZE.y,
+    });
+
     flash.timer.tick(Duration::from_nanos(1));
 }
 pub fn update_xp_bar(

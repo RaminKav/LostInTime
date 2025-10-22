@@ -177,6 +177,7 @@ impl Plugin for UIPlugin {
                     add_container_to_new_furnace_objs,
                     update_foodbar,
                     update_healthbar,
+                    update_shieldbar,
                     change_ui_state_to_crafting_when_resource_added
                         .before(CustomFlush)
                         .run_if(resource_added::<CraftingContainer>()),

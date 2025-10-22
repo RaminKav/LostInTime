@@ -41,7 +41,7 @@ use crate::{
         modifiers::handle_modify_health_event,
         Attack, AttackCooldown, AttributeQuality, AttributeValue, CritChance, CritDamage,
         CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
-        MaxMana, PlayerAttributeBundle,
+        MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
     client::{is_not_paused, CurrentRunSaveData, GameData},
     container::Container,
@@ -306,6 +306,10 @@ fn spawn_player(
             },
         ))
         .insert(SkillClass::None)
+        .insert(ShieldRegen {
+            delay_timer: Timer::from_seconds(5.0, TimerMode::Once),
+            regen_timer: Timer::from_seconds(0.2, TimerMode::Once),
+        })
         .insert(RawPosition::default())
         .insert(PlayerAttributeBundle {
             health: MaxHealth(100),

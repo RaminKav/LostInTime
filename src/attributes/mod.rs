@@ -65,6 +65,7 @@ pub struct BlockAttributeBundle {
 #[reflect(Schematic, Default)]
 pub struct ItemAttributes {
     pub health: AttributeValue,
+    pub shield: AttributeValue,
     pub attack: AttributeValue,
     pub durability: AttributeValue,
     pub max_durability: AttributeValue,
@@ -915,6 +916,7 @@ impl ItemAttributes {
         entity: &mut EntityCommands,
         old_max_health: i32,
         old_max_mana: i32,
+        old_shield: i32,
         skills: &PlayerSkills,
     ) {
         let computed_health = self.health + skills.get_count(Skill::Health) * 25;
@@ -929,6 +931,9 @@ impl ItemAttributes {
         }
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
+        }
+        if skills.get_count(Skill::Shield) * 10 != old_shield {
+            entity.insert(MaxShield(skills.get_count(Skill::Shield) * 10));
         }
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
@@ -1027,6 +1032,7 @@ impl ItemAttributes {
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {
             "health" => self.health.value += modifier.delta,
+            "shield" => self.shield.value += modifier.delta,
             "attack" => self.attack.value += modifier.delta,
             "crit_chance" => self.crit_chance.value += modifier.delta,
             "crit_damage" => self.crit_damage.value += modifier.delta,
@@ -1054,6 +1060,7 @@ impl ItemAttributes {
     pub fn combine(&self, other: &ItemAttributes) -> ItemAttributes {
         ItemAttributes {
             health: self.health + other.health,
+            shield: self.shield + other.shield,
             attack: self.attack + other.attack,
             durability: self.durability + other.durability,
             max_durability: self.max_durability + other.max_durability,
@@ -1384,6 +1391,7 @@ pub struct AttributeChangeEvent;
 #[derive(Bundle, Clone, Debug, Copy, Default)]
 pub struct PlayerAttributeBundle {
     pub health: MaxHealth,
+    pub shield: MaxShield,
     pub mana: MaxMana,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
@@ -1409,6 +1417,15 @@ pub struct PlayerAttributeBundle {
 )]
 #[reflect(Component, Schematic)]
 pub struct CurrentHealth(pub i32);
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug)]
+#[reflect(Component, Schematic)]
+pub struct CurrentShield(pub i32);
+
+#[derive(Component)]
+pub struct ShieldRegen {
+    pub regen_timer: Timer,
+    pub delay_timer: Timer,
+}
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct MaxMana(pub i32);
@@ -1416,6 +1433,9 @@ pub struct MaxMana(pub i32);
 #[reflect(Component, Schematic)]
 pub struct CurrentMana(pub i32);
 
+#[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
+#[reflect(Component, Schematic)]
+pub struct MaxShield(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct MaxHealth(pub i32);
@@ -1493,20 +1513,37 @@ impl Plugin for AttributesPlugin {
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (add_current_shield_with_max_shield, regen_shield)
+                    .in_set(OnUpdate(GameState::Main)),
             );
     }
 }
 
 pub fn clamp_health(
-    mut health: Query<(&mut CurrentHealth, &MaxHealth), With<Player>>,
+    mut health: Query<
+        (
+            &mut CurrentHealth,
+            &MaxHealth,
+            &mut CurrentShield,
+            &MaxShield,
+        ),
+        With<Player>,
+    >,
     mut game_over_event: EventWriter<GameOverEvent>,
 ) {
-    for (mut h, max_h) in health.iter_mut() {
+    for (mut h, max_h, mut s, max_s) in health.iter_mut() {
         if h.0 < 0 {
             h.0 = 0;
             game_over_event.send_default();
         } else if h.0 > max_h.0 {
             h.0 = max_h.0;
+        }
+        if s.0 < 0 {
+            s.0 = 0;
+        } else if s.0 > max_s.0 {
+            s.0 = max_s.0;
         }
     }
 }
@@ -1525,13 +1562,22 @@ fn handle_player_item_attribute_change_events(
     eqp_attributes: Query<&ItemAttributes, With<Equipment>>,
     mut att_events: EventReader<AttributeChangeEvent>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
-    player_atts: Query<(&ItemAttributes, &PlayerSkills, &MaxHealth, &MaxMana), With<Player>>,
+    player_atts: Query<
+        (
+            &ItemAttributes,
+            &PlayerSkills,
+            &MaxHealth,
+            &MaxMana,
+            &MaxShield,
+        ),
+        With<Player>,
+    >,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
     game: Res<Game>,
 ) {
     for _event in att_events.iter() {
-        let (att, skills, old_health, old_mana) = player_atts.single();
+        let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -1553,6 +1599,7 @@ fn handle_player_item_attribute_change_events(
             &mut commands.entity(player),
             old_health.0,
             old_mana.0,
+            old_shield.0,
             skills,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
@@ -1584,6 +1631,40 @@ pub fn add_current_health_with_max_health(
 ) {
     for (entity, max_health) in health.iter_mut() {
         commands.entity(entity).insert(CurrentHealth(max_health.0));
+    }
+}
+/// Adds a current shield component to all entities with a max shield component
+pub fn add_current_shield_with_max_shield(
+    mut commands: Commands,
+    mut shield: Query<(Entity, &MaxShield), Or<(Changed<MaxShield>, Without<CurrentShield>)>>,
+) {
+    for (entity, max_shield) in shield.iter_mut() {
+        info!("Adding CurrentShield component with value {}", max_shield.0);
+        commands.entity(entity).insert(CurrentShield(max_shield.0));
+    }
+}
+
+pub fn regen_shield(
+    time: Res<Time>,
+    mut shield: Query<(&MaxShield, &mut CurrentShield, &mut ShieldRegen)>,
+) {
+    for (max_shield, mut current_shield, mut timer) in shield.iter_mut() {
+        if current_shield.0 < max_shield.0 {
+            timer.delay_timer.tick(time.delta());
+            info!("Delay timer: {:?}", timer.delay_timer.elapsed());
+            if timer.delay_timer.finished() {
+                info!("delay done");
+                timer.regen_timer.tick(time.delta());
+                if timer.regen_timer.finished() {
+                    info!("regen +1");
+                    current_shield.0 += 1;
+                    timer.regen_timer.reset();
+                }
+            }
+        } else {
+            timer.delay_timer.reset();
+            timer.regen_timer.reset();
+        }
     }
 }
 

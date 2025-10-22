@@ -22,6 +22,7 @@ pub const BLACK: Color = Color::rgba(28. / 255., 48. / 255., 41. / 255., 1.);
 pub const NIGHT: Color = Color::rgba(28. / 255., 48. / 255., 41. / 255., 0.55);
 // pub const BLUE: Color = Color::rgba(61. / 255., 112. / 255., 133. / 255., 1.);
 pub const BLUE: Color = Color::rgba(43. / 255., 119. / 255., 125. / 255., 1.);
+pub const SHIELD_BLUE: Color = Color::rgba(119. / 255., 249. / 255., 253. / 255., 0.5);
 pub const YELLOW: Color = Color::rgba(237. / 255., 182. / 255., 54. / 255., 1.);
 pub const YELLOW_2: Color = Color::rgba(223. / 255., 178. / 255., 91. / 255., 1.);
 pub const WHITE: Color = Color::rgba(226. / 255., 212. / 255., 177. / 255., 1.);

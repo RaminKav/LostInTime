@@ -14,8 +14,8 @@ use crate::{
     animations::{AttackEvent, HitAnimationTracker},
     assets::SpriteAnchor,
     attributes::{
-        modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, InvincibilityCooldown,
-        LootRateBonus, ManaRegen, MaxHealth,
+        modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, CurrentShield,
+        InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -205,6 +205,7 @@ pub fn handle_hits(
         Entity,
         &mut CurrentHealth,
         &MaxHealth,
+        Option<&mut CurrentShield>,
         &GlobalTransform,
         Option<&WorldObject>,
         Option<&Mob>,
@@ -230,6 +231,7 @@ pub fn handle_hits(
             e,
             mut hit_health,
             max_health,
+            mut shields_option,
             t,
             obj_option,
             mob_option,
@@ -295,14 +297,33 @@ pub fn handle_hits(
                         hit_health.0 = 0;
                     }
                 }
-                hit_health.0 -= dmg
+                let final_dmg = dmg
                     - if game.has_skill(Skill::MinusOneDamageOnHit) && is_player {
                         1
                     } else {
                         0
                     };
-                if *DEBUG {
-                    info!("HP {:?}", hit_health.0);
+                let mut shielded_hit = false;
+                if let Some(shields) = shields_option.as_deref_mut() {
+                    if shields.0 > 0 {
+                        let shield_damage = final_dmg.min(shields.0);
+                        shields.0 -= shield_damage;
+                        shielded_hit = true;
+                        if *DEBUG {
+                            info!("Shield HP {:?}", shields.0);
+                        }
+                    }
+                }
+                if !shielded_hit {
+                    hit_health.0 -= final_dmg
+                        - if game.has_skill(Skill::MinusOneDamageOnHit) && is_player {
+                            1
+                        } else {
+                            0
+                        };
+                    if *DEBUG {
+                        info!("HP {:?}", hit_health.0);
+                    }
                 }
 
                 let mob_kb = if let Some(mob) = mob_option {
@@ -321,7 +342,15 @@ pub fn handle_hits(
                         0.2,
                         TimerMode::Once,
                     ),
-                    knockback: if is_player { 400. } else { mob_kb },
+                    knockback: if shielded_hit {
+                        0.
+                    } else {
+                        if is_player {
+                            400.
+                        } else {
+                            mob_kb
+                        }
+                    },
                     dir: hit.dir,
                 });
                 if let Some(i_frames) = i_frame_option {
@@ -347,14 +376,14 @@ pub fn handle_hits(
                     analytics_events.send(AnalyticsUpdateEvent {
                         update_type: AnalyticsTrigger::DamageTaken(
                             hit.hit_by_mob.clone().unwrap_or(Mob::default()),
-                            dmg as u32,
+                            final_dmg as u32,
                         ),
                     });
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::PlayerHit, 0.35));
                 } else if let Some(mob) = mob_option {
                     game.player_mut().next_hit_crit = false;
                     analytics_events.send(AnalyticsUpdateEvent {
-                        update_type: AnalyticsTrigger::DamageDealt(mob.clone(), dmg as u32),
+                        update_type: AnalyticsTrigger::DamageDealt(mob.clone(), final_dmg as u32),
                     });
                 }
             }
