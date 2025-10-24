@@ -87,7 +87,7 @@ pub fn handle_new_pet_state_machine(
                     target: game.player,
                     curr_delta: None,
                     curr_path: None,
-                    speed: pet_state.follow_speed * 1.5,
+                    speed: pet_state.follow_speed * 2.,
                 },
             );
 
@@ -164,7 +164,7 @@ pub fn handle_pet_idle_state(
                     target: player_entity,
                     curr_delta: None,
                     curr_path: None,
-                    speed: pet_state.follow_speed * 1.5,
+                    speed: pet_state.follow_speed * 2.,
                 });
             pet_state.is_following_player = true;
             continue;

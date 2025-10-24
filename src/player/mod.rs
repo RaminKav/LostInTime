@@ -96,8 +96,8 @@ impl Default for PlayerState {
             main_hand_slot: None,
             position: Vec3::ZERO,
             reach_distance: 1.5,
-            player_dash_cooldown: Timer::from_seconds(1.5, TimerMode::Once),
-            player_dash_duration: Timer::from_seconds(0.39, TimerMode::Once),
+            player_dash_cooldown: Timer::from_seconds(0.75, TimerMode::Once),
+            player_dash_duration: Timer::from_seconds(0.28, TimerMode::Once),
             next_hit_crit: false,
         }
     }

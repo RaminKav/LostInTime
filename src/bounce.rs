@@ -21,6 +21,7 @@ pub struct BounceEffect {
     pub timer: Timer,
     pub last_pos: Vec2, // Track last frame's position for delta calculation
     pub last_height: f32,
+    pub dash_boost: bool,
 }
 
 impl BounceEffect {
@@ -28,6 +29,7 @@ impl BounceEffect {
         start_pos: Vec2,
         direction: Vec2,
         speed: f32,
+        dash_boost: bool,
         duration: f32,
         max_height: f32,
     ) -> Self {
@@ -39,6 +41,7 @@ impl BounceEffect {
             timer: Timer::from_seconds(duration, TimerMode::Once),
             last_pos: start_pos,
             last_height: 0.,
+            dash_boost,
         }
     }
 
@@ -52,7 +55,7 @@ impl BounceEffect {
         let t = self.timer.elapsed_secs() / self.timer.duration().as_secs_f32();
 
         // Calculate distance traveled based on speed and time
-        let distance_traveled = self.speed * elapsed;
+        let distance_traveled = (self.speed * if self.dash_boost { 1.75 } else { 1.0 }) * elapsed;
         let offset = self.direction * distance_traveled;
 
         // Current ground position
@@ -255,6 +258,7 @@ pub fn bounce_player(
                 start_pos,
                 direction,
                 bounce_speed,
+                player.is_dashing && player.player_dash_duration.percent() < 0.23,
                 0.35, // duration in seconds
                 20.0, // max height
             ));
