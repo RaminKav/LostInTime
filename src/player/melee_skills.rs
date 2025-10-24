@@ -86,6 +86,7 @@ pub fn handle_second_split_attack(
         let split_damage = f32::floor(damage as f32 / 2.) as i32;
 
         hit_event.send(HitEvent {
+            hit_by_pet: None,
             hit_entity: e,
             damage: split_damage,
             dir: second_hit.dir,

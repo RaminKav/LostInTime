@@ -53,6 +53,7 @@ pub struct HitEvent {
     pub hit_with_melee: Option<WorldObject>,
     pub hit_with_projectile: Option<Projectile>,
     pub hit_by_mob: Option<Mob>,
+    pub hit_by_pet: Option<Entity>,
     pub was_crit: bool,
     pub ignore_tool: bool,
 }

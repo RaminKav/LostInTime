@@ -14,21 +14,16 @@ use crate::{
     combat::HitEvent,
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
-    item::{
-        projectile::{Projectile, RangedAttackEvent},
-        WorldObject,
-    },
+    item::projectile::{Projectile, RangedAttackEvent},
     night::NightTracker,
     player::{
         melee_skills::Parried,
         skills::{PlayerSkills, Skill},
     },
     status_effects::Slow,
-    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
-    GameParam, PLAYER_MOVE_SPEED,
+    world::TILE_SIZE,
+    PLAYER_MOVE_SPEED,
 };
-
-use super::pathfinding::get_next_tile_A_star;
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]
@@ -195,7 +190,6 @@ pub fn follow(
     )>,
     mut commands: Commands,
     time: Res<Time>,
-    mut game: GameParam,
     night_tracker: Res<NightTracker>,
 ) {
     for (
@@ -437,7 +431,8 @@ pub fn projectile_attack(
             events.send(RangedAttackEvent {
                 projectile: attack.projectile.clone(),
                 direction: attack.dir.unwrap(),
-                from_enemy: Some(entity),
+                from_entity: Some(entity),
+                from_enemy: true,
                 is_followup_proj: false,
                 mana_cost: None,
                 dmg_override: None,

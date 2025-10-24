@@ -53,7 +53,8 @@ pub fn handle_item_abilitiy_on_attack(
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,
                 direction: attack.direction,
-                from_enemy: None,
+                from_entity: None,
+                from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
                 dmg_override: Some(dmg.0 / 3),

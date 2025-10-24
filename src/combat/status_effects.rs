@@ -155,6 +155,7 @@ pub fn handle_burning_ticks(
             burning.tick_timer.tick(time.delta());
             if burning.tick_timer.just_finished() {
                 hit_event.send(HitEvent {
+                    hit_by_pet: None,
                     hit_entity: e,
                     damage: burning.damage as i32,
                     dir: Vec2::new(0.5, 0.5),

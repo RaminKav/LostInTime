@@ -53,7 +53,7 @@ use crate::{
         EssenceOption, EssenceShopChoices,
     },
     world::{ForestGenerationParams, WallTextureData},
-    CustomFlush, GameState, YSort,
+    CustomFlush, GameState, Pet, PetState, YSort,
 };
 pub struct ProtoPlugin;
 
@@ -120,6 +120,9 @@ impl Plugin for ProtoPlugin {
             .register_type::<ClawUpgradeMultiThrow>()
             .register_type::<ObjectActionCost>()
             .register_type::<ManaCost>()
+            .register_type::<Option<ItemStack>>()
+            .register_type::<Pet>()
+            .register_type::<PetState>()
             .register_type::<FacingDirection>()
             .register_type::<ForestGenerationParams>()
             .register_type::<CraftingContainerType>()

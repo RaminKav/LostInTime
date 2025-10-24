@@ -49,7 +49,8 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 
 use crate::{
     bounce_player, get_active_skill_keybind, update_bounce_effect, update_shadow, BounceEffect,
-    BounceEvent, Game, GameUpscale, Player, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+    BounceEvent, Game, GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
+    TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -485,6 +486,7 @@ fn handle_hotbar_key_input(
     key_input: ResMut<Input<KeyCode>>,
     mut mouse_wheel_event: EventReader<MouseWheel>,
     mut inv_state: ResMut<InventoryState>,
+    mut events: EventWriter<UpdatePetWeaponEvent>,
 ) {
     for e in mouse_wheel_event.iter() {
         if e.y > 0. {
@@ -493,17 +495,20 @@ fn handle_hotbar_key_input(
                 &mut inv_state,
                 &mut game.inv_slot_query,
             );
+            events.send(UpdatePetWeaponEvent);
         } else if e.y < 0. {
             change_hotbar_slot(
                 (inv_state.active_hotbar_slot + 1) % 6,
                 &mut inv_state,
                 &mut game.inv_slot_query,
             );
+            events.send(UpdatePetWeaponEvent);
         }
     }
     for (slot, key) in HOTBAR_KEYCODES.iter().enumerate() {
         if key_input.just_pressed(*key) {
             change_hotbar_slot(slot, &mut inv_state, &mut game.inv_slot_query);
+            events.send(UpdatePetWeaponEvent);
         }
     }
 }
@@ -670,8 +675,9 @@ pub fn mouse_click_system(
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: ranged_tool.0.clone(),
                     direction,
-                    from_enemy: None,
+                    from_enemy: false,
                     is_followup_proj: false,
+                    from_entity: None,
                     mana_cost: mana_cost_option.map(|m| -m.0),
                     dmg_override: None,
                     pos_override: if ranged_tool.0.is_anchored_to_player_pos() {
@@ -735,6 +741,7 @@ pub fn mouse_click_system(
                 debug!("OBJ: {hit_obj:?}");
             }
             hit_event.send(HitEvent {
+                hit_by_pet: None,
                 hit_entity: hit_obj,
                 damage: game
                     .calculate_player_damage(&mut commands, hit_obj, 0, None, 0, None)

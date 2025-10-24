@@ -1,0 +1,12 @@
+(
+  name: "Pet",
+  templates: [],
+  schematics: {
+    "survival_rogue_like::pets::state::Pet": Test,
+    "survival_rogue_like::proto::KCC": (),
+    "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
+    "survival_rogue_like::proto::SensorProto": (),
+    "survival_rogue_like::world::y_sort::YSort": (0.),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 4.),
+  }
+)

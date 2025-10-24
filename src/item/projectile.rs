@@ -17,7 +17,7 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
-    GameParam, GameState,
+    GameParam, GameState, Pet,
 };
 
 use super::item_upgrades::ArrowSpeedUpgrade;
@@ -119,12 +119,13 @@ pub struct ArcProjectileData {
     pub col_points: Vec<f32>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RangedAttackEvent {
     pub projectile: Projectile,
     pub direction: Vec2,
     pub mana_cost: Option<i32>,
-    pub from_enemy: Option<Entity>,
+    pub from_enemy: bool,
+    pub from_entity: Option<Entity>,
     pub is_followup_proj: bool,
     pub dmg_override: Option<i32>,
     pub pos_override: Option<Vec2>,
@@ -157,10 +158,14 @@ pub struct ProjectileSpawnMarker {
     pub pos: Vec2,
     pub direction: Vec2,
     pub dmg_override: Option<i32>,
-    pub from_enemy: Option<Entity>,
+    pub from_enemy: bool,
+    pub from_entity: Option<Entity>,
     pub was_mana_bar_full: bool,
     pub is_followup_proj: bool,
 }
+
+#[derive(Component)]
+pub struct PetProjectileMarker;
 
 fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
@@ -177,7 +182,7 @@ fn handle_ranged_attack_event(
         ),
         With<Player>,
     >,
-    enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
+    transforms: Query<&GlobalTransform>,
     game: GameParam,
     mut commands: Commands,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
@@ -194,7 +199,8 @@ fn handle_ranged_attack_event(
             teleported_option,
         ) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
-        if proj_event.from_enemy.is_none()
+        if !proj_event.from_enemy
+            && proj_event.from_entity.is_none()
             && player_cooldown.is_some()
             && !proj_event.is_followup_proj
         {
@@ -214,25 +220,24 @@ fn handle_ranged_attack_event(
             ));
         }
 
-        let t = if let Some(enemy) = proj_event.from_enemy {
-            enemy_transforms
-                .get(enemy)
-                .unwrap()
-                .0
-                .translation()
-                .truncate()
+        let spawn_transform = if let Some(entity) = proj_event.from_entity {
+            transforms.get(entity).unwrap().translation().truncate()
         } else {
             game.player().position.truncate()
         };
-        let size = proj_size.get_multiplier();
 
+        let size = proj_size.get_multiplier();
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
-            pos: proj_event.pos_override.map(|v| v * size).unwrap_or(t),
+            pos: proj_event
+                .pos_override
+                .map(|v| v * size)
+                .unwrap_or(spawn_transform),
             direction: proj_event.direction,
             dmg_override: proj_event.dmg_override,
             from_enemy: proj_event.from_enemy,
+            from_entity: proj_event.from_entity,
             was_mana_bar_full: current_mana.0 == max_mana.0,
             is_followup_proj: proj_event.is_followup_proj,
         });
@@ -241,10 +246,14 @@ fn handle_ranged_attack_event(
             commands.spawn(ProjectileSpawnMarker {
                 timer: Timer::from_seconds(proj_event.spawn_delay + 0.2, TimerMode::Once),
                 proj: Projectile::DaggerProjectile2,
-                pos: proj_event.pos_override.map(|v| v * size).unwrap_or(t),
+                pos: proj_event
+                    .pos_override
+                    .map(|v| v * size)
+                    .unwrap_or(spawn_transform),
                 direction: proj_event.direction,
                 dmg_override: proj_event.dmg_override,
                 from_enemy: proj_event.from_enemy,
+                from_entity: proj_event.from_entity,
                 was_mana_bar_full: current_mana.0 == max_mana.0,
                 is_followup_proj: false,
             });
@@ -280,7 +289,8 @@ fn handle_spawn_projectiles_after_delay(
     game: GameParam,
     mut commands: Commands,
     player: Query<Entity, With<Player>>,
-    enemy_transforms: Query<(&GlobalTransform, &Mob), With<Mob>>,
+    pet_check: Query<Entity, With<Pet>>,
+    mobs: Query<&Mob>,
     asset_server: Res<AssetServer>,
     player_projectile_size: Query<&ProjectileSize, With<Player>>,
 ) {
@@ -300,8 +310,8 @@ fn handle_spawn_projectiles_after_delay(
 
             if let Some(p) = p {
                 if proj.proj.is_anchored_to_player_pos() && !proj.is_followup_proj {
-                    let player_e = player.single();
-                    commands.entity(player_e).add_child(p);
+                    let entity = proj.from_entity.unwrap_or(player.single());
+                    commands.entity(entity).add_child(p);
                 }
                 // AUDIO
                 if proj.proj == Projectile::Fireball {
@@ -313,23 +323,31 @@ fn handle_spawn_projectiles_after_delay(
                 } else if proj.proj == Projectile::Electricity {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
                 }
-                if let Some(e) = proj.from_enemy {
-                    if let Ok(enemy_txfm) = enemy_transforms.get(e) {
+
+                if proj.from_enemy {
+                    let mob_e = proj.from_entity.unwrap();
+                    if let Ok(mob) = mobs.get(mob_e) {
                         commands.entity(p).insert(EnemyProjectile {
-                            entity: e,
-                            mob: enemy_txfm.1.clone(),
+                            entity: mob_e,
+                            mob: mob.clone(),
                         });
                     }
                 }
-                let player_att = game.player_stats.single().0;
+
+                if let Some(e) = proj.from_entity {
+                    if pet_check.get(e).is_ok() {
+                        commands.entity(p).insert(PetProjectileMarker);
+                    }
+                }
+
                 let mana_full_bonus = if game.has_skill(Skill::MPBarDMG) && proj.was_mana_bar_full {
                     1.25
                 } else {
                     1.
                 };
-                let computed_dmg =
-                    proj.dmg_override.unwrap_or(player_att.0 as i32) as f32 * mana_full_bonus;
-                commands.entity(p).insert(Attack(computed_dmg as i32));
+                let player_att = game.player_stats.single().0 .0 * mana_full_bonus as i32;
+                let computed_dmg = proj.dmg_override.unwrap_or(player_att);
+                commands.entity(p).insert(Attack(computed_dmg));
             }
             commands.entity(e).despawn_recursive();
         }

@@ -20,9 +20,11 @@ mod container;
 mod datafiles;
 mod keybinds;
 mod panic_handler;
+mod pets;
 mod vectorize;
 pub use bounce::*;
 pub use keybinds::*;
+pub use pets::*;
 
 use audio::AudioPlugin;
 use bevy_aseprite::AsepritePlugin;
@@ -222,6 +224,7 @@ fn main() {
         .add_plugin(ProtoPlugin)
         .add_plugin(SchematicPlugin)
         .add_plugin(JuicePlugin)
+        .add_plugin(PetsPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(

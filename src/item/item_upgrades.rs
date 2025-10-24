@@ -82,9 +82,10 @@ pub fn handle_delayed_ranged_attack(
                 projectile: ranged_attack.0.clone(),
                 direction: (cursor_pos.world_coords.truncate() - game.player().position.truncate())
                     .normalize_or_zero(),
-                from_enemy: None,
+                from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
+                from_entity: None,
                 dmg_override: None,
                 pos_override: None,
                 spawn_delay: 0.05,
@@ -144,9 +145,10 @@ pub fn handle_spread_arrows_attack(
         ranged_attack_event.send(RangedAttackEvent {
             projectile: ranged_attack.0.clone(),
             direction: new_dir,
-            from_enemy: None,
+            from_enemy: false,
             is_followup_proj: true,
             mana_cost: None,
+            from_entity: None,
             dmg_override: None,
             pos_override: None,
             spawn_delay: 0.36,
@@ -223,7 +225,8 @@ pub fn handle_on_hit_upgrades(
                 direction: (nearest_mob_t.1.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
                 .normalize_or_zero(),
-                from_enemy: None,
+                from_enemy: false,
+                from_entity: None,
                 is_followup_proj: true,
                 mana_cost: None,
                 dmg_override: Some(hit.damage / 4),
@@ -269,7 +272,7 @@ pub fn handle_on_hit_upgrades(
         else {
             continue;
         };
-        if main_hand.get_obj() == WorldObject::Blowdart
+        if (hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart)
             || rng.gen_bool(skills.calculate_poison_chance())
         {
             if let Some(mut burning) = burning_option {

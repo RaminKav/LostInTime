@@ -8,7 +8,9 @@ use crate::{
     item::{
         item_actions::ItemActionParam,
         object_actions::TouchTriggerObjectAction,
-        projectile::{EnemyProjectile, Projectile, ProjectileState, RangedAttackEvent},
+        projectile::{
+            EnemyProjectile, PetProjectileMarker, Projectile, ProjectileState, RangedAttackEvent,
+        },
         Equipment, MainHand, WorldObject,
     },
     player::{
@@ -123,6 +125,7 @@ fn check_melee_hit_collisions(
 
             hit_event.send(HitEvent {
                 hit_entity,
+                hit_by_pet: None,
                 damage: damage as i32,
                 dir: delta.normalize_or_zero().truncate() * -1.,
                 hit_with_melee: Some(*weapon_obj),
@@ -161,6 +164,7 @@ fn check_projectile_hit_mob_collisions(
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
+    pet_check: Query<Entity, With<PetProjectileMarker>>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
@@ -246,6 +250,7 @@ fn check_projectile_hit_mob_collisions(
                 try_add_slow_stacks(*e2, &mut commands, &mut status_event, slow.as_deref_mut());
             }
             hit_event.send(HitEvent {
+                hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
                 damage: damage as i32,
                 dir: state.direction,
@@ -373,7 +378,8 @@ fn check_projectile_hit_player_collisions(
                     ranged_attack_event.send(RangedAttackEvent {
                         projectile: proj.clone(),
                         direction: -state.direction,
-                        from_enemy: None,
+                        from_enemy: false,
+                        from_entity: None,
                         is_followup_proj: false,
                         mana_cost: None,
                         dmg_override: Some(p_attack.unwrap().0),
@@ -384,6 +390,7 @@ fn check_projectile_hit_player_collisions(
             }
             if hit_successful {
                 hit_event.send(HitEvent {
+                    hit_by_pet: None,
                     hit_entity: *e2,
                     damage: att.0,
                     dir: state.direction,
@@ -631,6 +638,7 @@ fn check_mob_to_player_collisions(
             }
             if hit_successful {
                 hit_event.send(HitEvent {
+                    hit_by_pet: None,
                     hit_entity: e1,
                     damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
                     dir: delta.normalize_or_zero().truncate(),
@@ -644,6 +652,7 @@ fn check_mob_to_player_collisions(
             // hit back to attacker if we have Thorns
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
                 hit_event.send(HitEvent {
+                    hit_by_pet: None,
                     hit_entity: e2,
                     damage: f32::ceil(attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
                     dir: delta.normalize_or_zero().truncate(),
@@ -690,6 +699,7 @@ fn check_boss_to_objects_collisions(
                 let delta = obj_txfm.translation - world_destroyer_txfm.translation;
 
                 hit_event.send(HitEvent {
+                    hit_by_pet: None,
                     hit_entity: obj_e,
                     damage: f32::round(attack.0 as f32) as i32,
                     dir: delta.normalize_or_zero().truncate(),

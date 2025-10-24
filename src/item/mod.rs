@@ -634,14 +634,18 @@ impl WorldObject {
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
             WorldObject::IceStaff => true,
+            WorldObject::FireStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
+            WorldObject::Gun => true,
+            WorldObject::Blowdart => true,
             _ => false,
         }
     }
     pub fn is_magic_weapon(&self) -> bool {
         match self {
             WorldObject::IceStaff => true,
+            WorldObject::FireStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             _ => false,
