@@ -291,12 +291,12 @@ pub fn handle_populate_essence_shop_on_new_spawn(
             let rarity_cost_inc = match random_item_stack.rarity {
                 ItemRarity::Common => 0,
                 ItemRarity::Uncommon => 2,
-                ItemRarity::Rare => 4,
+                ItemRarity::Rare => 3,
                 ItemRarity::Legendary => 8,
             };
             shop_choices.push(EssenceOption {
                 item: random_item_stack.clone(),
-                cost: random_item_stack.metadata.level.unwrap_or(1) as u32 + 2 + rarity_cost_inc,
+                cost: random_item_stack.metadata.level.unwrap_or(1) as u32 + 1 + rarity_cost_inc,
             });
         }
         shop.choices = shop_choices;

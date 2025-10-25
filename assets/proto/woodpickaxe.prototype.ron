@@ -5,13 +5,13 @@
   "survival_rogue_like::item::WorldObject": WoodPickaxe,
   "survival_rogue_like::item::EquipmentType": Pickaxe,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 5, end: 8)),
+        attack: Some((start: 8, end: 12)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: WoodPickaxe,
         attributes: (
-            attack_cooldown: 0.9
+            attack_cooldown: 0.75
         ),
         metadata: (
             name: "Wood Pickaxe", 

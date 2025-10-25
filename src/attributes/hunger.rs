@@ -47,6 +47,10 @@ impl Hunger {
     }
     pub fn modify_hunger(&mut self, amount: i8) {
         if amount < 0 {
+            if self.current <= amount.unsigned_abs() {
+                self.current = 0;
+                return;
+            }
             self.current -= amount.unsigned_abs();
         } else {
             self.current += amount as u8;

@@ -97,6 +97,7 @@ pub enum Skill {
     Defence,
     Attack,
     Gigantify,
+    Chest,
 
     // On-Attack Triggers
     WaveAttack,
@@ -191,6 +192,7 @@ impl Skill {
             Skill::HealEcho => SkillClass::Melee,
             Skill::FullStomach => SkillClass::Melee,
             Skill::Gigantify => SkillClass::Melee,
+            Skill::Chest => SkillClass::Rogue,
 
             Skill::ReinforcedArmor => SkillClass::Melee,
 
@@ -249,6 +251,7 @@ impl Skill {
             Skill::Lifesteal => "Drain Blood".to_string(),
             Skill::AttackSpeed => "Swift Blows".to_string(),
             Skill::Defence => "Defence!".to_string(),
+            Skill::Chest => "Chest!".to_string(),
             Skill::Attack => "Strength! ".to_string(),
             Skill::DodgeChance => "Evasion".to_string(),
             Skill::WaveAttack => "Sonic Wave".to_string(),
@@ -310,6 +313,7 @@ impl Skill {
         // max 13 char per line, space included
         match self {
             Skill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
+            Skill::Chest => vec!["Gain a Loot Chest".to_string()],
             Skill::CritChance => vec![
                 "Gain +10% Critical".to_string(),
                 "Chance, ".to_string(),
@@ -630,6 +634,7 @@ impl Skill {
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
+            Skill::Chest => Some((WorldObject::ChestBlock, 1)),
             _ => None,
         }
     }
@@ -813,6 +818,7 @@ impl Default for SkillChoiceQueue {
                 SkillChoiceState::new(Skill::Defence, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::Attack, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::Gigantify, SkillRarity::Common).set_repeatable(),
+                SkillChoiceState::new(Skill::Chest, SkillRarity::Uncommon).set_repeatable(),
                 SkillChoiceState::new(Skill::HPRegen, SkillRarity::Common).set_repeatable(),
                 SkillChoiceState::new(Skill::HPRegenCooldown, SkillRarity::Uncommon)
                     .set_repeatable(),

@@ -1651,12 +1651,9 @@ pub fn regen_shield(
     for (max_shield, mut current_shield, mut timer) in shield.iter_mut() {
         if current_shield.0 < max_shield.0 {
             timer.delay_timer.tick(time.delta());
-            info!("Delay timer: {:?}", timer.delay_timer.elapsed());
             if timer.delay_timer.finished() {
-                info!("delay done");
                 timer.regen_timer.tick(time.delta());
                 if timer.regen_timer.finished() {
-                    info!("regen +1");
                     current_shield.0 += 1;
                     timer.regen_timer.reset();
                 }
