@@ -18,7 +18,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkillUsedEvent, Player, PlayerSkills, Skill};
+use super::{ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -48,7 +48,7 @@ pub fn handle_toggle_sprinting(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, sprint_state, skills, was_sprinting) in sprint_query.iter_mut() {
-        if let Some(sprint_slot) = skills.has_active_skill(Skill::Sprint) {
+        if let Some(sprint_slot) = skills.has_active_heirloom(Heirloom::Sprint) {
             if key_inputs.just_pressed(get_active_skill_keybind(sprint_slot))
                 && sprint_state.sprint_cooldown_timer.finished()
             {
@@ -94,7 +94,7 @@ pub fn handle_sprint_timer(
             if anim != &PlayerAnimation::Run && !anim.is_one_time_anim() {
                 commands.entity(e).insert(PlayerAnimation::Run);
             }
-            let speed_bonus_skill = skills.has(Skill::SprintFaster);
+            let speed_bonus_skill = skills.has(Heirloom::SprintFaster);
             mv.0 = mv.0 * (sprint.speed_bonus + if speed_bonus_skill { 0.2 } else { 0. });
             let player_pos = game.player().position;
 
@@ -117,7 +117,7 @@ pub fn handle_sprint_timer(
                 .just_finished()
             {
                 active_skill_event.send(ActiveSkillUsedEvent {
-                    slot: skills.has_active_skill(Skill::Sprint).unwrap(),
+                    slot: skills.has_active_heirloom(Heirloom::Sprint).unwrap(),
                     cooldown: sprint.sprint_cooldown_timer.duration().as_secs_f32(),
                 });
                 commands.entity(e).remove::<Sprinting>();
@@ -143,7 +143,7 @@ pub fn handle_lunge(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
-        if let Some(lunge_slot) = skills.has_active_skill(Skill::SprintLunge) {
+        if let Some(lunge_slot) = skills.has_active_heirloom(Heirloom::SprintLunge) {
             if key_inputs.just_pressed(get_active_skill_keybind(lunge_slot))
                 && lunge_state.lunge_cooldown_timer.finished()
             {
@@ -248,8 +248,8 @@ pub fn handle_enemy_death_sprint_reset(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for _ in enemy_death_events.iter() {
-        if skills.single().has(Skill::SprintKillReset) {
-            if let Some(lunge_slot) = skills.single().has_active_skill(Skill::SprintLunge) {
+        if skills.single().has(Heirloom::SprintKillReset) {
+            if let Some(lunge_slot) = skills.single().has_active_heirloom(Heirloom::SprintLunge) {
                 for mut sprint in lunge_query.iter_mut() {
                     active_skill_event.send(ActiveSkillUsedEvent {
                         slot: lunge_slot,
@@ -266,7 +266,7 @@ pub fn handle_dodge_crit(dodges: EventReader<DodgeEvent>, mut game: GameParam) {
     if dodges.is_empty() {
         return;
     }
-    if game.has_skill(Skill::DodgeCrit) {
+    if game.has_skill(Heirloom::DodgeCrit) {
         game.player_mut().next_hit_crit = true;
     }
 }
@@ -290,7 +290,7 @@ pub fn handle_add_combo_counter(
     asset_server: Res<AssetServer>,
 ) {
     let (player_e, skills) = player.single();
-    if !skills.has(Skill::DaggerCombo) {
+    if !skills.has(Heirloom::DaggerCombo) {
         return;
     }
 

@@ -16,7 +16,7 @@ use crate::{
     player::{
         mage_skills::IceExplosionDmg,
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
     },
     ui::damage_numbers::DodgeEvent,
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
@@ -106,8 +106,8 @@ fn check_melee_hit_collisions(
                 &mut commands,
                 hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-                if skills.has(Skill::Attack) {
-                    Some(1. + skills.get_count(Skill::Attack) as f32 * 0.1)
+                if skills.has(Heirloom::Attack) {
+                    Some(1. + skills.get_count(Heirloom::Attack) as f32 * 0.1)
                 } else {
                     None
                 },
@@ -118,7 +118,7 @@ fn check_melee_hit_collisions(
             let is_status_effected =
                 burning_option.is_some() || slow_option.is_some() || frail_option.is_some();
 
-            if is_status_effected && game.has_skill(Skill::TeleportStatusDMG) {
+            if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
             let delta = weapon_t.translation() - mob_txfm.translation();
@@ -209,11 +209,11 @@ fn check_projectile_hit_mob_collisions(
             let is_slowed = slow.is_some();
             let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
 
-            let crit_bonus = if is_slowed && game.has_skill(Skill::FrozenCrit) {
+            let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
                 10
             } else {
                 0
-            } + if state.mana_bar_full && game.has_skill(Skill::MPBarCrit) {
+            } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
                 10
             } else {
                 0
@@ -222,15 +222,15 @@ fn check_projectile_hit_mob_collisions(
                 &mut commands,
                 *e2,
                 crit_bonus,
-                if game.has_skill(Skill::Attack) {
-                    Some(1. + game.skill_count(Skill::Attack) as f32 * 0.1)
+                if game.has_skill(Heirloom::Attack) {
+                    Some(1. + game.skill_count(Heirloom::Attack) as f32 * 0.1)
                 } else {
                     None
                 },
                 0,
                 Some(att.0),
             );
-            if is_status_effected && game.has_skill(Skill::TeleportStatusDMG) {
+            if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
             let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();

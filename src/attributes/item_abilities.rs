@@ -7,7 +7,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
         Player,
     },
     GameParam,
@@ -47,8 +47,8 @@ pub fn handle_item_abilitiy_on_attack(
     };
     for attack in attacks.iter() {
         let mut rng = rand::thread_rng();
-        if skills.has(Skill::WaveAttack)
-            && rng.gen_bool(skills.get_count(Skill::WaveAttack) as f64 * 0.25)
+        if skills.has(Heirloom::WaveAttack)
+            && rng.gen_bool(skills.get_count(Heirloom::WaveAttack) as f64 * 0.25)
         {
             ranged_attack_event.send(RangedAttackEvent {
                 projectile: Projectile::Arc,

@@ -840,6 +840,319 @@
         
 
     },
+    heirlooms: {
+        // All heirloom sprites - using dummy positions for now
+        Roll: WorldObjectData(
+            texture_pos: (0., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CritChance: WorldObjectData(
+            texture_pos: (1., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CritDamage: WorldObjectData(
+            texture_pos: (2., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Health: WorldObjectData(
+            texture_pos: (3., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Shield: WorldObjectData(
+            texture_pos: (4., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Thorns: WorldObjectData(
+            texture_pos: (5., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Lifesteal: WorldObjectData(
+            texture_pos: (6., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Speed: WorldObjectData(
+            texture_pos: (7., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        AttackSpeed: WorldObjectData(
+            texture_pos: (8., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DodgeChance: WorldObjectData(
+            texture_pos: (9., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Defence: WorldObjectData(
+            texture_pos: (10., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Attack: WorldObjectData(
+            texture_pos: (11., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Gigantify: WorldObjectData(
+            texture_pos: (12., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Chest: WorldObjectData(
+            texture_pos: (13., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        WaveAttack: WorldObjectData(
+            texture_pos: (14., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FrailStacks: WorldObjectData(
+            texture_pos: (15., 18.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SlowStacks: WorldObjectData(
+            texture_pos: (0., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PoisonStacks: WorldObjectData(
+            texture_pos: (1., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LethalBlow: WorldObjectData(
+            texture_pos: (2., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Teleport: WorldObjectData(
+            texture_pos: (3., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TeleportShock: WorldObjectData(
+            texture_pos: (4., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TeleportCooldown: WorldObjectData(
+            texture_pos: (5., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TeleportCount: WorldObjectData(
+            texture_pos: (6., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TeleportManaRegen: WorldObjectData(
+            texture_pos: (7., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Sprint: WorldObjectData(
+            texture_pos: (8., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SprintFaster: WorldObjectData(
+            texture_pos: (9., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SprintLunge: WorldObjectData(
+            texture_pos: (10., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SprintLungeDamage: WorldObjectData(
+            texture_pos: (11., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SprintKillReset: WorldObjectData(
+            texture_pos: (12., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Parry: WorldObjectData(
+            texture_pos: (13., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ParryHPRegen: WorldObjectData(
+            texture_pos: (14., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ParrySpear: WorldObjectData(
+            texture_pos: (15., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ParryDeflectProj: WorldObjectData(
+            texture_pos: (0., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ParryKnockback: WorldObjectData(
+            texture_pos: (1., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ParryEcho: WorldObjectData(
+            texture_pos: (2., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DaggerCombo: WorldObjectData(
+            texture_pos: (3., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        HPRegen: WorldObjectData(
+            texture_pos: (4., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        HPRegenCooldown: WorldObjectData(
+            texture_pos: (5., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MPRegen: WorldObjectData(
+            texture_pos: (6., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MPRegenCooldown: WorldObjectData(
+            texture_pos: (7., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        OnHitEcho: WorldObjectData(
+            texture_pos: (8., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Knockback: WorldObjectData(
+            texture_pos: (9., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DiscountMP: WorldObjectData(
+            texture_pos: (10., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MinusOneDamageOnHit: WorldObjectData(
+            texture_pos: (11., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ChanceToProcExtraAttack: WorldObjectData(
+            texture_pos: (12., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        IncreaseProjectilCount: WorldObjectData(
+            texture_pos: (13., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        IceStaffAoE: WorldObjectData(
+            texture_pos: (14., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BowArrowSpeed: WorldObjectData(
+            texture_pos: (15., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TeleportStatusDMG: WorldObjectData(
+            texture_pos: (0., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FrozenAoE: WorldObjectData(
+            texture_pos: (1., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        IceStaffFloor: WorldObjectData(
+            texture_pos: (2., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FrozenCrit: WorldObjectData(
+            texture_pos: (3., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MPBarDMG: WorldObjectData(
+            texture_pos: (4., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MPBarCrit: WorldObjectData(
+            texture_pos: (5., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FrozenMPRegen: WorldObjectData(
+            texture_pos: (6., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DodgeCrit: WorldObjectData(
+            texture_pos: (7., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PoisonDuration: WorldObjectData(
+            texture_pos: (8., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        PoisonStrength: WorldObjectData(
+            texture_pos: (9., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ViralVenum: WorldObjectData(
+            texture_pos: (10., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        HealEcho: WorldObjectData(
+            texture_pos: (11., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FullStomach: WorldObjectData(
+            texture_pos: (12., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ReinforcedArmor: WorldObjectData(
+            texture_pos: (13., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+    },
     icons : {
         StoneWallBlock: SpriteData(
             texture_pos: (1., 6.),

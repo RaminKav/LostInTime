@@ -13,7 +13,7 @@ use crate::{
     inventory::ItemStack,
     item::WorldObject,
     juice::bounce::BounceOnHit,
-    player::skills::SkillChoiceQueue,
+    player::skills::HeirloomChoiceQueue,
     proto::proto_param::ProtoParam,
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
@@ -58,7 +58,7 @@ pub fn setup_item_chest_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    choices_queue: Res<SkillChoiceQueue>,
+    choices_queue: Res<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     res: Res<ScreenResolution>,
 ) {

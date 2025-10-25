@@ -411,7 +411,7 @@ fn tick_spawner_timers(
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();
                 for _ in 0..spawner.num_to_spawn.unwrap_or(1) {
-                    info!("send spawn event! {:?}", spawner.enemy);
+                    // info!("send spawn event! {:?}", spawner.enemy);
                     spawn_event.send(MobSpawnEvent {
                         spawner: spawner_e,
                         mob: spawner.enemy.clone(),

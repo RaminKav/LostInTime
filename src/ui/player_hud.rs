@@ -19,7 +19,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{ActiveSkillUsedEvent, PlayerSkills, Skill},
+        skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills},
         Player, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -467,7 +467,7 @@ pub fn update_foodbar(
 }
 
 #[derive(Component, Eq, PartialEq)]
-pub struct SkillHudIcon(pub Skill);
+pub struct SkillHudIcon(pub Heirloom);
 
 #[derive(Component)]
 pub struct SkillClassText;
@@ -519,7 +519,7 @@ pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut prev_icons_tracker: Local<PlayerSkills>,
+    mut prev_icons_tracker: Local<Vec<Heirloom>>,
     res: Res<ScreenResolution>,
     mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
     game_over: EventReader<GameOverEvent>,
@@ -527,25 +527,24 @@ pub fn handle_update_player_skills(
     prev_active_skill_icons: Query<Entity, With<ActiveSkillIcon>>,
 ) {
     if !game_over.is_empty() {
-        prev_icons_tracker.skills.clear();
+        prev_icons_tracker.clear();
     }
     if let Ok(new_skills) = player_skills.get_single() {
-        for (i, skill) in new_skills.skills.clone().iter().enumerate() {
-            if prev_icons_tracker.skills.get(i) == Some(skill) {
+        for (i, heirloom_with_rarity) in new_skills.heirlooms.clone().iter().enumerate() {
+            if prev_icons_tracker.get(i) == Some(&heirloom_with_rarity.heirloom) {
                 continue;
             }
-            prev_icons_tracker.skills.push(skill.clone());
+            prev_icons_tracker.push(heirloom_with_rarity.heirloom.clone());
             let offset = Vec2::new(
                 i as f32 * 19. + (-res.game_width) / 2. + 98.,
                 (GAME_HEIGHT - 15.) / 2. - 12.5,
             );
+
+            // Create the main icon
             let icon = commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_skill_icon(skill.clone()),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(16., 16.)),
-                        ..Default::default()
-                    },
+                .spawn(SpriteSheetBundle {
+                    sprite: graphics.get_heirloom_icon(heirloom_with_rarity.heirloom.clone()),
+                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                     transform: Transform {
                         translation: offset.extend(1.),
                         scale: Vec3::new(1., 1., 1.),
@@ -554,26 +553,29 @@ pub fn handle_update_player_skills(
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
-                .insert(SkillHudIcon(skill.clone()))
+                .insert(SkillHudIcon(heirloom_with_rarity.heirloom.clone()))
                 .insert(Name::new("HUD ICON!!"))
                 .id();
-            commands
-                .spawn(SpriteBundle {
-                    sprite: Sprite {
-                        color: BLACK,
-                        custom_size: Some(Vec2::new(18., 18.)),
-                        ..default()
-                    },
-                    transform: Transform {
-                        translation: Vec3::new(0., 0., -1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(icon);
 
+            // Add rarity-based background if not common
+            if let Some(glow) = heirloom_with_rarity.rarity.get_item_glow() {
+                commands
+                    .spawn(SpriteBundle {
+                        texture: graphics.get_item_glow(glow),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(18., 18.)),
+                            ..Default::default()
+                        },
+                        transform: Transform {
+                            translation: Vec3::new(0., 0., -1.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .set_parent(icon);
+            }
             let mut text = skill_class_text.single_mut();
             text.sections[0].value = format!(
                 "  {:}     {:?}     {:?}",
@@ -635,7 +637,7 @@ pub fn handle_update_player_skills(
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
-                        texture: graphics.get_skill_icon(active_skill.skill.clone()),
+                        texture: graphics.get_active_skill_icon(active_skill.heirloom.clone()),
                         sprite: Sprite {
                             custom_size: Some(Vec2::new(16., 16.)),
                             ..Default::default()
@@ -648,7 +650,7 @@ pub fn handle_update_player_skills(
                         ..Default::default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(SkillHudIcon(active_skill.skill))
+                    .insert(SkillHudIcon(active_skill.heirloom.clone()))
                     .insert(Name::new("HUD ICON!!"))
                     .set_parent(icon_bg);
             }

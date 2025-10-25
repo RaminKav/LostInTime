@@ -18,7 +18,7 @@ use crate::{
     night::NightTracker,
     player::{
         melee_skills::Parried,
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
     },
     status_effects::Slow,
     world::TILE_SIZE,
@@ -350,7 +350,7 @@ pub fn leap_attack(
             if let Some(ref mut parried) = parried_option {
                 if !parried.kb_applied {
                     parried.kb_applied = true;
-                    let mult = if skills.single().has(Skill::ParryKnockback) {
+                    let mult = if skills.single().has(Heirloom::ParryKnockback) {
                         1.
                     } else {
                         0.5

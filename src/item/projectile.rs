@@ -13,7 +13,7 @@ use crate::{
     enemy::Mob,
     player::{
         mage_skills::JustTeleported,
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
         Player,
     },
     proto::proto_param::ProtoParam,
@@ -212,7 +212,7 @@ fn handle_ranged_attack_event(
             }
             modify_mana_event.send(ModifyManaEvent(
                 (mana_cost as f32
-                    * if skills.has(Skill::DiscountMP) {
+                    * if skills.has(Heirloom::DiscountMP) {
                         0.75
                     } else {
                         1.
@@ -261,7 +261,7 @@ fn handle_ranged_attack_event(
 
         if teleported_option.is_some() {
             modify_mana_event.send(ModifyManaEvent(
-                mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
+                mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
             ));
         }
     }
@@ -340,7 +340,7 @@ fn handle_spawn_projectiles_after_delay(
                     }
                 }
 
-                let mana_full_bonus = if game.has_skill(Skill::MPBarDMG) && proj.was_mana_bar_full {
+                let mana_full_bonus = if game.has_skill(Heirloom::MPBarDMG) && proj.was_mana_bar_full {
                     1.25
                 } else {
                     1.

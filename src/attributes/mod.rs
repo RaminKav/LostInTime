@@ -23,7 +23,7 @@ use crate::{
     item::{Equipment, EquipmentType, WorldObject},
     juice::ShakeEffect,
     player::{
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
         stats::StatType,
         Limb,
     },
@@ -919,9 +919,9 @@ impl ItemAttributes {
         old_shield: i32,
         skills: &PlayerSkills,
     ) {
-        let computed_health = self.health + skills.get_count(Skill::Health) * 25;
+        let computed_health = self.health + skills.get_count(Heirloom::Health) * 25;
         let computed_speed = self.speed.value
-            - if skills.has(Skill::ReinforcedArmor) {
+            - if skills.has(Heirloom::ReinforcedArmor) {
                 5
             } else {
                 0
@@ -932,13 +932,13 @@ impl ItemAttributes {
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
         }
-        if skills.get_count(Skill::Shield) * 10 != old_shield {
-            entity.insert(MaxShield(skills.get_count(Skill::Shield) * 10));
+        if skills.get_count(Heirloom::Shield) * 10 != old_shield {
+            entity.insert(MaxShield(skills.get_count(Heirloom::Shield) * 10));
         }
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             entity.insert(AttackCooldown(
-                self.attack_cooldown * (1.0 - skills.get_count(Skill::AttackSpeed) as f32 * 0.15)
+                self.attack_cooldown * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
                     / attack_speed_mod,
             ));
         } else {
@@ -947,33 +947,33 @@ impl ItemAttributes {
 
         entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
-            self.crit_chance.value + skills.get_count(Skill::CritChance) * 10,
+            self.crit_chance.value + skills.get_count(Heirloom::CritChance) * 10,
         ));
         entity.insert(CritDamage(
-            self.crit_damage.value + skills.get_count(Skill::CritDamage) * 15,
+            self.crit_damage.value + skills.get_count(Heirloom::CritDamage) * 15,
         ));
         entity.insert(BonusDamage(self.bonus_damage.value));
         entity.insert(HealthRegen(
             self.health_regen.value
-                + skills.get_count(Skill::HPRegen) * 5
-                + skills.get_count(Skill::HealEcho) * 20,
+                + skills.get_count(Heirloom::HPRegen) * 5
+                + skills.get_count(Heirloom::HealEcho) * 20,
         ));
         entity.insert(Healing(self.healing.value));
         entity.insert(Thorns(
-            self.thorns.value + skills.get_count(Skill::Thorns) * 15,
+            self.thorns.value + skills.get_count(Heirloom::Thorns) * 15,
         ));
         entity.insert(Dodge(i32::min(
             80,
             self.dodge.value
-                + skills.get_count(Skill::DodgeChance) * 10
-                + skills.get_count(Skill::DodgeCrit) * 10,
+                + skills.get_count(Heirloom::DodgeChance) * 10
+                + skills.get_count(Heirloom::DodgeCrit) * 10,
         )));
-        entity.insert(Speed(computed_speed + skills.get_count(Skill::Speed) * 15));
+        entity.insert(Speed(computed_speed + skills.get_count(Heirloom::Speed) * 15));
         entity.insert(Lifesteal(self.lifesteal.value));
         entity.insert(Defence(
             self.defence.value
-                + skills.get_count(Skill::Defence) * 10
-                + if skills.has(Skill::ReinforcedArmor) {
+                + skills.get_count(Heirloom::Defence) * 10
+                + if skills.has(Heirloom::ReinforcedArmor) {
                     2 * (min(0, computed_speed) / 5).abs()
                 } else {
                     0
@@ -982,10 +982,10 @@ impl ItemAttributes {
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(self.loot_rate.value));
         entity.insert(ManaRegen(
-            self.mana_regen.value + skills.get_count(Skill::MPRegen) * 5,
+            self.mana_regen.value + skills.get_count(Heirloom::MPRegen) * 5,
         ));
         entity.insert(ProjectileSize(
-            self.size.value + skills.get_count(Skill::Gigantify) * 15,
+            self.size.value + skills.get_count(Heirloom::Gigantify) * 15,
         ));
     }
     pub fn get_random_existing_bonus_attribute_string(&self, filter: &Vec<&str>) -> Option<String> {

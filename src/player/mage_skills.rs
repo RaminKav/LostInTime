@@ -17,7 +17,7 @@ use crate::{
     GameParam,
 };
 
-use super::{ActiveSkillUsedEvent, MovePlayerEvent, Player, PlayerSkills, Skill};
+use super::{ActiveSkillUsedEvent, MovePlayerEvent, Player, PlayerSkills, Heirloom};
 
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
 aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
@@ -68,7 +68,7 @@ pub fn handle_teleport(
     else {
         return;
     };
-    if let Some(teleport_slot) = skills.has_active_skill(Skill::Teleport) {
+    if let Some(teleport_slot) = skills.has_active_heirloom(Heirloom::Teleport) {
         if teleport_state.count > 0
             && key_input.just_pressed(get_active_skill_keybind(teleport_slot))
             && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)
@@ -104,7 +104,7 @@ pub fn handle_teleport(
             }
         }
 
-        if skills.has(Skill::TeleportShock) {
+        if skills.has(Heirloom::TeleportShock) {
             let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
             let shock_e = spawn_temp_collider(
                 &mut commands,
@@ -123,7 +123,7 @@ pub fn handle_teleport(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.3));
         }
 
-        if skills.has(Skill::TeleportManaRegen) {
+        if skills.has(Heirloom::TeleportManaRegen) {
             commands.entity(e).insert(JustTeleported);
         }
 
@@ -168,7 +168,7 @@ pub fn tick_teleport_timer(
             let d = time.delta();
             teleport_state
                 .cooldown_timer
-                .tick(if skills.has(Skill::TeleportCooldown) {
+                .tick(if skills.has(Heirloom::TeleportCooldown) {
                     Duration::new(
                         (d.as_secs() as f32 * 0.75) as u64,
                         (d.subsec_nanos() as f32 * 0.75) as u32,

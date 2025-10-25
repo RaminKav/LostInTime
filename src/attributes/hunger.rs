@@ -6,7 +6,7 @@ use crate::{
     animations::AttackEvent,
     item::item_actions::ActionSuccessEvent,
     player::{
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
         Player,
     },
     Game,
@@ -76,7 +76,7 @@ pub fn tick_hunger(
 ) {
     for (mut hunger, mut tracker, mut health, skills) in hunger_query.iter_mut() {
         let is_moving = game.player_state.is_moving;
-        let skill_mod = if skills.has(Skill::FullStomach) {
+        let skill_mod = if skills.has(Heirloom::FullStomach) {
             0.7
         } else {
             1.

@@ -6,7 +6,7 @@ use crate::{
     animations::DoneAnimation,
     assets::Graphics,
     colors::{BLACK, WHITE},
-    player::skills::{PlayerSkills, SkillChoiceQueue, SkillChoiceState},
+    player::skills::{HeirloomChoiceQueue, HeirloomChoiceState, PlayerSkills},
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
@@ -18,7 +18,7 @@ use super::{
 #[derive(Component)]
 pub struct SkillChoiceUI {
     pub index: usize,
-    pub skill_choice: SkillChoiceState,
+    pub skill_choice: HeirloomChoiceState,
     pub interaction_lock_timer: Timer,
 }
 
@@ -36,7 +36,7 @@ pub fn setup_skill_choice_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    choices_queue: Res<SkillChoiceQueue>,
+    choices_queue: Res<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     res: Res<ScreenResolution>,
 ) {
@@ -98,7 +98,7 @@ pub fn setup_skill_choice_ui(
         t_offset,
     );
 
-    for i in -1..2 {
+    for i in -1i32..2 {
         if !choices_queue.rerolls[(i + 1) as usize] {
             continue;
         }
@@ -135,12 +135,12 @@ pub fn setup_active_skill_slot_choice_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    choices_queue: Res<SkillChoiceQueue>,
+    choices_queue: Res<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     res: Res<ScreenResolution>,
     skills: Query<&PlayerSkills>,
 ) {
-    if choices_queue.active_skill_limbo.is_none() {
+    if choices_queue.active_heirloom_limbo.is_none() {
         next_ui_state.set(UIState::Closed);
         return;
     }
@@ -205,8 +205,13 @@ pub fn setup_active_skill_slot_choice_ui(
     //New Active Skill Icon
     commands
         .spawn(SpriteBundle {
-            texture: graphics
-                .get_skill_icon(choices_queue.active_skill_limbo.clone().unwrap().skill),
+            texture: graphics.get_active_skill_icon(
+                choices_queue
+                    .active_heirloom_limbo
+                    .clone()
+                    .unwrap()
+                    .heirloom,
+            ),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(32., 32.)),
                 ..Default::default()
@@ -238,18 +243,18 @@ pub fn spawn_skill_choice_entities(
     graphics: &Graphics,
     commands: &mut Commands,
     asset_server: &AssetServer,
-    choices: Vec<SkillChoiceState>,
+    choices: Vec<HeirloomChoiceState>,
     t_offset: Vec2,
 ) {
     let size = SKILLS_CHOICE_UI_SIZE;
     let count = choices.len();
-    for i in -1..(choices.len() as i32 - 1) {
+    for i in -1i32..(choices.len() as i32 - 1) {
         let translation = Vec2::new(
             i as f32 * (size.x + 16.) + if count == 2 { size.x / 2. } else { 0. } + 0.1,
             0.,
         );
         let choice = choices[(i + 1) as usize].clone();
-        let ui_element = choice.skill.get_ui_element(choice.rarity.clone());
+        let ui_element = choice.heirloom.get_ui_element(choice.rarity.clone());
         let skills_e = commands
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(ui_element.clone()),
@@ -280,13 +285,10 @@ pub fn spawn_skill_choice_entities(
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         // icon
-        commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_skill_icon(choice.skill.clone()),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(32., 32.)),
-                    ..Default::default()
-                },
+        let skill_icon = commands
+            .spawn(SpriteSheetBundle {
+                sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                 transform: Transform {
                     translation: Vec2::new(0., 25.).extend(4.),
                     scale: Vec3::new(1., 1., 1.),
@@ -296,12 +298,33 @@ pub fn spawn_skill_choice_entities(
             })
             .insert(RenderLayers::from_layers(&[3]))
             .insert(Name::new("SKILL ICON!!"))
-            .set_parent(skills_e);
+            .set_parent(skills_e)
+            .id();
+
+        // Add rarity-based background if not common
+        if let Some(glow) = choice.rarity.get_item_glow() {
+            commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_item_glow(glow),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(32., 32.)),
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: Vec2::new(0., 0.).extend(-1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(skill_icon);
+        }
 
         let mut text_title = commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    choice.skill.get_title(),
+                    choice.heirloom.get_title(),
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
@@ -321,7 +344,7 @@ pub fn spawn_skill_choice_entities(
             RenderLayers::from_layers(&[3]),
         ));
         text_title.set_parent(skills_e);
-        for (j, desc) in choice.skill.get_desc().iter().enumerate() {
+        for (j, desc) in choice.heirloom.get_desc().iter().enumerate() {
             let mut text_desc = commands.spawn((
                 Text2dBundle {
                     text: Text::from_section(
@@ -356,7 +379,7 @@ pub fn spawn_skill_choice_entities(
 pub fn toggle_skills_visibility(
     curr_ui_state: Res<State<UIState>>,
     key_input: ResMut<Input<KeyCode>>,
-    mut queue: ResMut<SkillChoiceQueue>,
+    mut queue: ResMut<HeirloomChoiceQueue>,
     old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -388,7 +411,7 @@ pub fn toggle_skills_visibility(
 }
 pub fn handle_skill_reroll_after_flash(
     flashes: Query<(Entity, &RerollDice, &AsepriteAnimation), With<DoneAnimation>>,
-    mut skill_queue: ResMut<SkillChoiceQueue>,
+    mut skill_queue: ResMut<HeirloomChoiceQueue>,
     old_skill_entities: Query<Entity, With<SkillChoiceUI>>,
     mut commands: Commands,
     graphics: Res<Graphics>,

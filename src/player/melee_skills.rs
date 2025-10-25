@@ -20,7 +20,7 @@ use crate::{
     GameParam, HitEvent, InvincibilityTimer,
 };
 
-use super::{rogue_skills::LungeState, ActiveSkillUsedEvent, Player, PlayerSkills, Skill};
+use super::{rogue_skills::LungeState, ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
 aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -38,7 +38,7 @@ pub fn handle_on_hit_skills(
     in_i_frame: Query<&InvincibilityTimer>,
 ) {
     let (player, attack, skills) = player_q.single();
-    if !skills.has(Skill::OnHitEcho) {
+    if !skills.has(Heirloom::OnHitEcho) {
         return;
     }
     for hit in hit_events.iter() {
@@ -74,8 +74,8 @@ pub fn handle_second_split_attack(
             &mut commands,
             e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-            if skills.has(Skill::Attack) {
-                Some(1. + skills.get_count(Skill::Attack) as f32 * 0.1)
+            if skills.has(Heirloom::Attack) {
+                Some(1. + skills.get_count(Heirloom::Attack) as f32 * 0.1)
             } else {
                 None
             },
@@ -120,7 +120,7 @@ pub fn handle_echo_after_heal(
             continue;
         }
 
-        if skills.has(Skill::HealEcho) {
+        if skills.has(Heirloom::HealEcho) {
             spawn_echo_hitbox(&mut commands, &asset_server, e, attack.0);
         }
     }
@@ -168,7 +168,7 @@ pub fn handle_parry(
         return;
     };
 
-    if let Some(parry_slot) = skills.has_active_skill(Skill::Parry) {
+    if let Some(parry_slot) = skills.has_active_heirloom(Heirloom::Parry) {
         if key_input.just_pressed(get_active_skill_keybind(parry_slot))
             && parry_state.cooldown_timer.finished()
             && !curr_anim.is_parrying()
@@ -219,7 +219,7 @@ pub fn handle_spear(
         return;
     };
 
-    if let Some(spear_slot) = skills.has_active_skill(Skill::ParrySpear) {
+    if let Some(spear_slot) = skills.has_active_heirloom(Heirloom::ParrySpear) {
         if key_input.just_pressed(get_active_skill_keybind(spear_slot))
             && spear_state.cooldown_timer.finished()
         {
@@ -288,10 +288,10 @@ pub fn handle_parry_success(
             LIGHT_RED,
             "Parry!".to_string(),
         );
-        if skills.has(Skill::ParryHPRegen) {
+        if skills.has(Heirloom::ParryHPRegen) {
             modify_health_event.send(ModifyHealthEvent(health_regen.0));
         }
-        if skills.has(Skill::ParryEcho) {
+        if skills.has(Heirloom::ParryEcho) {
             spawn_echo_hitbox(&mut commands, &asset_server, player_e, attack.0);
         }
     }

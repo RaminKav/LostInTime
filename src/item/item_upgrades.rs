@@ -9,7 +9,7 @@ use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::item::WorldObject;
 use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
-use crate::player::skills::{PlayerSkills, Skill};
+use crate::player::skills::{PlayerSkills, Heirloom};
 use crate::status_effects::{
     try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
 };
@@ -198,7 +198,7 @@ pub fn handle_on_hit_upgrades(
             }
         }
 
-        if skills.has(Skill::IncreaseProjectilCount)
+        if skills.has(Heirloom::IncreaseProjectilCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
             && *elec_count == 0
         {
@@ -238,8 +238,8 @@ pub fn handle_on_hit_upgrades(
             continue;
         };
         if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
-            && skills.has(Skill::IceStaffAoE)
-            && rng.gen_bool(skills.get_count(Skill::IceStaffAoE) as f64 * 0.1)
+            && skills.has(Heirloom::IceStaffAoE)
+            && rng.gen_bool(skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.1)
         {
             spawn_ice_explosion_hitbox(
                 &mut commands,
@@ -248,8 +248,8 @@ pub fn handle_on_hit_upgrades(
                 hit.damage / 4,
             );
         }
-        if skills.has(Skill::IceStaffFloor)
-            && rng.gen_bool(skills.get_count(Skill::IceStaffFloor) as f64 * 0.1)
+        if skills.has(Heirloom::IceStaffFloor)
+            && rng.gen_bool(skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1)
         {
             let ice = spawn_one_time_aseprite_collider(
                 &mut commands,
@@ -277,13 +277,13 @@ pub fn handle_on_hit_upgrades(
         {
             if let Some(mut burning) = burning_option {
                 burning.duration_timer.reset();
-            } else if Skill::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
-                let duration_bonus = if skills.has(Skill::PoisonDuration) {
+            } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
+                let duration_bonus = if skills.has(Heirloom::PoisonDuration) {
                     1.5
                 } else {
                     1.
                 };
-                let damage_bonus = skills.get_count(Skill::PoisonStrength) as u8;
+                let damage_bonus = skills.get_count(Heirloom::PoisonStrength) as u8;
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
@@ -297,12 +297,12 @@ pub fn handle_on_hit_upgrades(
             }
         }
         if main_hand.get_obj() == WorldObject::Hammer
-            || (skills.has(Skill::FrailStacks)
-                && rng.gen_bool(skills.get_count(Skill::FrailStacks) as f64 * 0.25))
+            || (skills.has(Heirloom::FrailStacks)
+                && rng.gen_bool(skills.get_count(Heirloom::FrailStacks) as f64 * 0.25))
         {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
-                    && Skill::FrailStacks.is_obj_valid(main_hand.get_obj())
+                    && Heirloom::FrailStacks.is_obj_valid(main_hand.get_obj())
                 {
                     frail_stacks.num_stacks += 1;
                     frail_stacks.timer.reset();
@@ -333,8 +333,8 @@ pub fn handle_on_hit_upgrades(
             );
         }
 
-        if skills.has(Skill::Lifesteal)
-            && rng.gen_bool(skills.get_count(Skill::Lifesteal) as f64 * 0.1)
+        if skills.has(Heirloom::Lifesteal)
+            && rng.gen_bool(skills.get_count(Heirloom::Lifesteal) as f64 * 0.1)
         {
             modify_health_events.send(ModifyHealthEvent(1));
         }

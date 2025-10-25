@@ -16,7 +16,7 @@ use crate::{
     datafiles,
     item::CraftingTracker,
     night::NightTracker,
-    player::skills::{PlayerSkills, SkillChoiceQueue},
+    player::skills::{HeirloomChoiceQueue, PlayerSkills},
     ui::{ChestContainer, FurnaceContainer},
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
@@ -147,7 +147,7 @@ pub fn handle_menu_button_click_events(
                 next_state.0 = Some(GameState::Main);
                 commands.init_resource::<Game>();
                 commands.init_resource::<NightTracker>();
-                commands.init_resource::<SkillChoiceQueue>();
+                commands.init_resource::<HeirloomChoiceQueue>();
                 commands.init_resource::<ContainerRegistry>();
                 commands.init_resource::<PathfindingCache>();
                 commands.init_resource::<CraftingTracker>();
@@ -181,7 +181,14 @@ pub fn handle_menu_button_click_events(
 
                 //set end of game analytics data
                 let night_tracker = night_tracker.as_ref().unwrap();
-                analytics_data.skills = skills.iter().next().unwrap().skills.clone();
+                analytics_data.skills = skills
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .heirlooms
+                    .iter()
+                    .map(|h| h.heirloom.clone())
+                    .collect();
                 analytics_data.timestamp = chrono::offset::Local::now().to_string();
                 analytics_data.nights_survived = night_tracker.days as u32;
                 let analytics_dir = datafiles::analytics_dir();
@@ -219,7 +226,7 @@ pub fn handle_menu_button_click_events(
                 commands.remove_resource::<ChestContainer>();
                 commands.remove_resource::<FurnaceContainer>();
                 commands.remove_resource::<AnalyticsData>();
-                commands.remove_resource::<SkillChoiceQueue>();
+                commands.remove_resource::<HeirloomChoiceQueue>();
                 commands.remove_resource::<Game>();
                 commands.remove_resource::<NightTracker>();
                 commands.remove_resource::<ContainerRegistry>();

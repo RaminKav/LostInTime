@@ -43,13 +43,13 @@ pub fn give_chunks_schematic_spawners(
     mut spawn_event: EventReader<SchematicSpawnEvent>,
 ) {
     for chunk in spawn_event.iter() {
-        if chunk.0 == IVec2::ZERO
-            || chunk.0 == IVec2::new(-1, 0)
-            || chunk.0 == IVec2::new(0, -1)
-            || chunk.0 == IVec2::new(-1, -1)
-        {
-            continue;
-        }
+        // if chunk.0 == IVec2::ZERO
+        //     || chunk.0 == IVec2::new(-1, 0)
+        //     || chunk.0 == IVec2::new(0, -1)
+        //     || chunk.0 == IVec2::new(-1, -1)
+        // {
+        //     continue;
+        // }
         if let Some(e) = game.get_chunk_entity(chunk.0) {
             let mut rng = rand::thread_rng();
             for (schematic, frequency) in game.world_generation_params.schematic_frequencies.iter()

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    attributes::{AttributeQuality, AttributeValue, ItemAttributes},
+    attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
@@ -81,7 +81,7 @@ impl SkillClass {
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
-pub enum Skill {
+pub enum Heirloom {
     Roll,
     // Passives
     #[default]
@@ -167,205 +167,207 @@ pub enum Skill {
     // your echos are bigger
 }
 
-impl Skill {
+impl Heirloom {
     pub fn get_class(&self) -> SkillClass {
         match self {
-            Skill::Health => SkillClass::Melee,
-            Skill::Shield => SkillClass::Magic,
-            Skill::Lifesteal => SkillClass::Melee,
-            Skill::Attack => SkillClass::Melee,
-            Skill::Defence => SkillClass::Melee,
-            Skill::WaveAttack => SkillClass::Melee,
-            Skill::FrailStacks => SkillClass::Melee,
-            Skill::LethalBlow => SkillClass::Melee,
-            Skill::Parry => SkillClass::Melee,
-            Skill::ParryHPRegen => SkillClass::Melee,
-            Skill::ParrySpear => SkillClass::Melee,
-            Skill::ParryDeflectProj => SkillClass::Melee,
-            Skill::ParryKnockback => SkillClass::Melee,
-            Skill::ParryEcho => SkillClass::Melee,
-            Skill::HPRegen => SkillClass::Melee,
-            Skill::OnHitEcho => SkillClass::Melee,
-            Skill::Knockback => SkillClass::Melee,
-            Skill::MinusOneDamageOnHit => SkillClass::Melee,
-            Skill::HPRegenCooldown => SkillClass::Melee,
-            Skill::HealEcho => SkillClass::Melee,
-            Skill::FullStomach => SkillClass::Melee,
-            Skill::Gigantify => SkillClass::Melee,
-            Skill::Chest => SkillClass::Rogue,
+            Heirloom::Health => SkillClass::Melee,
+            Heirloom::Shield => SkillClass::Magic,
+            Heirloom::Lifesteal => SkillClass::Melee,
+            Heirloom::Attack => SkillClass::Melee,
+            Heirloom::Defence => SkillClass::Melee,
+            Heirloom::WaveAttack => SkillClass::Melee,
+            Heirloom::FrailStacks => SkillClass::Melee,
+            Heirloom::LethalBlow => SkillClass::Melee,
+            Heirloom::Parry => SkillClass::Melee,
+            Heirloom::ParryHPRegen => SkillClass::Melee,
+            Heirloom::ParrySpear => SkillClass::Melee,
+            Heirloom::ParryDeflectProj => SkillClass::Melee,
+            Heirloom::ParryKnockback => SkillClass::Melee,
+            Heirloom::ParryEcho => SkillClass::Melee,
+            Heirloom::HPRegen => SkillClass::Melee,
+            Heirloom::OnHitEcho => SkillClass::Melee,
+            Heirloom::Knockback => SkillClass::Melee,
+            Heirloom::MinusOneDamageOnHit => SkillClass::Melee,
+            Heirloom::HPRegenCooldown => SkillClass::Melee,
+            Heirloom::HealEcho => SkillClass::Melee,
+            Heirloom::FullStomach => SkillClass::Melee,
+            Heirloom::Gigantify => SkillClass::Melee,
+            Heirloom::Chest => SkillClass::Rogue,
 
-            Skill::ReinforcedArmor => SkillClass::Melee,
+            Heirloom::ReinforcedArmor => SkillClass::Melee,
 
-            Skill::CritChance => SkillClass::Rogue,
-            Skill::CritDamage => SkillClass::Rogue,
-            Skill::Thorns => SkillClass::Rogue,
-            Skill::Speed => SkillClass::Rogue,
-            Skill::AttackSpeed => SkillClass::Rogue,
-            Skill::DodgeChance => SkillClass::Rogue,
-            Skill::PoisonStacks => SkillClass::Rogue,
-            Skill::DaggerCombo => SkillClass::Rogue,
-            Skill::Sprint => SkillClass::Rogue,
-            Skill::SprintFaster => SkillClass::Rogue,
-            Skill::SprintLunge => SkillClass::Rogue,
-            Skill::SprintLungeDamage => SkillClass::Rogue,
-            Skill::SprintKillReset => SkillClass::Rogue,
-            Skill::ChanceToProcExtraAttack => SkillClass::Rogue,
-            Skill::IncreaseProjectilCount => SkillClass::Rogue,
-            Skill::BowArrowSpeed => SkillClass::Rogue,
-            Skill::DodgeCrit => SkillClass::Rogue,
-            Skill::PoisonDuration => SkillClass::Rogue,
-            Skill::PoisonStrength => SkillClass::Rogue,
-            Skill::ViralVenum => SkillClass::Rogue,
+            Heirloom::CritChance => SkillClass::Rogue,
+            Heirloom::CritDamage => SkillClass::Rogue,
+            Heirloom::Thorns => SkillClass::Rogue,
+            Heirloom::Speed => SkillClass::Rogue,
+            Heirloom::AttackSpeed => SkillClass::Rogue,
+            Heirloom::DodgeChance => SkillClass::Rogue,
+            Heirloom::PoisonStacks => SkillClass::Rogue,
+            Heirloom::DaggerCombo => SkillClass::Rogue,
+            Heirloom::Sprint => SkillClass::Rogue,
+            Heirloom::SprintFaster => SkillClass::Rogue,
+            Heirloom::SprintLunge => SkillClass::Rogue,
+            Heirloom::SprintLungeDamage => SkillClass::Rogue,
+            Heirloom::SprintKillReset => SkillClass::Rogue,
+            Heirloom::ChanceToProcExtraAttack => SkillClass::Rogue,
+            Heirloom::IncreaseProjectilCount => SkillClass::Rogue,
+            Heirloom::BowArrowSpeed => SkillClass::Rogue,
+            Heirloom::DodgeCrit => SkillClass::Rogue,
+            Heirloom::PoisonDuration => SkillClass::Rogue,
+            Heirloom::PoisonStrength => SkillClass::Rogue,
+            Heirloom::ViralVenum => SkillClass::Rogue,
 
-            Skill::SlowStacks => SkillClass::Magic,
-            Skill::Teleport => SkillClass::Magic,
-            Skill::TeleportShock => SkillClass::Magic,
-            Skill::TeleportCooldown => SkillClass::Magic,
-            Skill::TeleportCount => SkillClass::Magic,
-            Skill::TeleportManaRegen => SkillClass::Magic,
-            Skill::MPRegen => SkillClass::Magic,
-            Skill::DiscountMP => SkillClass::Magic,
+            Heirloom::SlowStacks => SkillClass::Magic,
+            Heirloom::Teleport => SkillClass::Magic,
+            Heirloom::TeleportShock => SkillClass::Magic,
+            Heirloom::TeleportCooldown => SkillClass::Magic,
+            Heirloom::TeleportCount => SkillClass::Magic,
+            Heirloom::TeleportManaRegen => SkillClass::Magic,
+            Heirloom::MPRegen => SkillClass::Magic,
+            Heirloom::DiscountMP => SkillClass::Magic,
 
-            Skill::IceStaffAoE => SkillClass::Magic,
-            Skill::MPRegenCooldown => SkillClass::Magic,
-            Skill::TeleportStatusDMG => SkillClass::Magic,
+            Heirloom::IceStaffAoE => SkillClass::Magic,
+            Heirloom::MPRegenCooldown => SkillClass::Magic,
+            Heirloom::TeleportStatusDMG => SkillClass::Magic,
 
-            Skill::FrozenAoE => SkillClass::Magic,
-            Skill::IceStaffFloor => SkillClass::Magic,
-            Skill::FrozenCrit => SkillClass::Magic,
-            Skill::MPBarDMG => SkillClass::Magic,
-            Skill::MPBarCrit => SkillClass::Magic,
-            Skill::FrozenMPRegen => SkillClass::Magic,
+            Heirloom::FrozenAoE => SkillClass::Magic,
+            Heirloom::IceStaffFloor => SkillClass::Magic,
+            Heirloom::FrozenCrit => SkillClass::Magic,
+            Heirloom::MPBarDMG => SkillClass::Magic,
+            Heirloom::MPBarCrit => SkillClass::Magic,
+            Heirloom::FrozenMPRegen => SkillClass::Magic,
 
-            Skill::Roll => SkillClass::None,
+            Heirloom::Roll => SkillClass::None,
         }
     }
     pub fn get_title(&self) -> String {
         match self {
-            Skill::CritChance => "Keen Eyes".to_string(),
-            Skill::CritDamage => "Powerful Blows".to_string(),
-            Skill::Health => "Healthly".to_string(),
-            Skill::Shield => "Shielded".to_string(),
-            Skill::Speed => "Nimble Feet".to_string(),
-            Skill::Thorns => "Forest Scales".to_string(),
-            Skill::Lifesteal => "Drain Blood".to_string(),
-            Skill::AttackSpeed => "Swift Blows".to_string(),
-            Skill::Defence => "Defence!".to_string(),
-            Skill::Chest => "Chest!".to_string(),
-            Skill::Attack => "Strength! ".to_string(),
-            Skill::DodgeChance => "Evasion".to_string(),
-            Skill::WaveAttack => "Sonic Wave".to_string(),
-            Skill::FrailStacks => "Frail Blow".to_string(),
-            Skill::SlowStacks => "Freezing Blow".to_string(),
-            Skill::PoisonStacks => "Toxic Blow".to_string(),
-            Skill::LethalBlow => "Lethal Blow".to_string(),
-            Skill::Teleport => "Teleport".to_string(),
-            Skill::TeleportShock => "Shock Step".to_string(),
-            Skill::TeleportCooldown => "Teleport Faster!".to_string(),
-            Skill::TeleportCount => "Multi-port".to_string(),
-            Skill::TeleportManaRegen => "Infused Cast".to_string(),
-            Skill::TeleportStatusDMG => "Shock Mastery".to_string(),
-            Skill::ChanceToProcExtraAttack => "Double Throw".to_string(),
-            Skill::IncreaseProjectilCount => "Multi Shot".to_string(),
-            Skill::BowArrowSpeed => "Piercing Arrows".to_string(),
-            Skill::Gigantify => "Gigantify".to_string(),
+            Heirloom::CritChance => "Keen Eyes".to_string(),
+            Heirloom::CritDamage => "Powerful Blows".to_string(),
+            Heirloom::Health => "Healthly".to_string(),
+            Heirloom::Shield => "Shielded".to_string(),
+            Heirloom::Speed => "Nimble Feet".to_string(),
+            Heirloom::Thorns => "Forest Scales".to_string(),
+            Heirloom::Lifesteal => "Drain Blood".to_string(),
+            Heirloom::AttackSpeed => "Swift Blows".to_string(),
+            Heirloom::Defence => "Defence!".to_string(),
+            Heirloom::Chest => "Chest!".to_string(),
+            Heirloom::Attack => "Strength! ".to_string(),
+            Heirloom::DodgeChance => "Evasion".to_string(),
+            Heirloom::WaveAttack => "Sonic Wave".to_string(),
+            Heirloom::FrailStacks => "Frail Blow".to_string(),
+            Heirloom::SlowStacks => "Freezing Blow".to_string(),
+            Heirloom::PoisonStacks => "Toxic Blow".to_string(),
+            Heirloom::LethalBlow => "Lethal Blow".to_string(),
+            Heirloom::Teleport => "Teleport".to_string(),
+            Heirloom::TeleportShock => "Shock Step".to_string(),
+            Heirloom::TeleportCooldown => "Teleport Faster!".to_string(),
+            Heirloom::TeleportCount => "Multi-port".to_string(),
+            Heirloom::TeleportManaRegen => "Infused Cast".to_string(),
+            Heirloom::TeleportStatusDMG => "Shock Mastery".to_string(),
+            Heirloom::ChanceToProcExtraAttack => "Double Throw".to_string(),
+            Heirloom::IncreaseProjectilCount => "Multi Shot".to_string(),
+            Heirloom::BowArrowSpeed => "Piercing Arrows".to_string(),
+            Heirloom::Gigantify => "Gigantify".to_string(),
 
-            Skill::IceStaffAoE => "Explosive Blast".to_string(),
-            Skill::Sprint => "Sprint".to_string(),
-            Skill::SprintFaster => "Faster Sprint".to_string(),
-            Skill::SprintLunge => "Lunge".to_string(),
-            Skill::SprintLungeDamage => "Lunge Mastery".to_string(),
-            Skill::SprintKillReset => "Kill Reset".to_string(),
-            Skill::Parry => "Parry".to_string(),
-            Skill::ParryHPRegen => "Rejuvenating Parry".to_string(),
-            Skill::ParrySpear => "Gravitational Spear".to_string(),
-            Skill::ParryDeflectProj => "Parry Deflect".to_string(),
-            Skill::ParryKnockback => "Shield Bash".to_string(),
-            Skill::ParryEcho => "Parry Echo".to_string(),
-            Skill::DaggerCombo => "Combo!".to_string(),
-            Skill::HPRegen => "Health Regeneration ".to_string(),
-            Skill::HPRegenCooldown => "HP Regen Cooldown".to_string(),
-            Skill::MPRegenCooldown => "MP Regen Cooldown".to_string(),
-            Skill::MPRegen => "Mana Regeneration".to_string(),
-            Skill::OnHitEcho => "War Cry ".to_string(),
-            Skill::Knockback => "Heavy Strike".to_string(),
-            Skill::DiscountMP => "Mana Discount".to_string(),
-            Skill::MinusOneDamageOnHit => "Polished Armor".to_string(),
+            Heirloom::IceStaffAoE => "Explosive Blast".to_string(),
+            Heirloom::Sprint => "Sprint".to_string(),
+            Heirloom::SprintFaster => "Faster Sprint".to_string(),
+            Heirloom::SprintLunge => "Lunge".to_string(),
+            Heirloom::SprintLungeDamage => "Lunge Mastery".to_string(),
+            Heirloom::SprintKillReset => "Kill Reset".to_string(),
+            Heirloom::Parry => "Parry".to_string(),
+            Heirloom::ParryHPRegen => "Rejuvenating Parry".to_string(),
+            Heirloom::ParrySpear => "Gravitational Spear".to_string(),
+            Heirloom::ParryDeflectProj => "Parry Deflect".to_string(),
+            Heirloom::ParryKnockback => "Shield Bash".to_string(),
+            Heirloom::ParryEcho => "Parry Echo".to_string(),
+            Heirloom::DaggerCombo => "Combo!".to_string(),
+            Heirloom::HPRegen => "Health Regeneration ".to_string(),
+            Heirloom::HPRegenCooldown => "HP Regen Cooldown".to_string(),
+            Heirloom::MPRegenCooldown => "MP Regen Cooldown".to_string(),
+            Heirloom::MPRegen => "Mana Regeneration".to_string(),
+            Heirloom::OnHitEcho => "War Cry ".to_string(),
+            Heirloom::Knockback => "Heavy Strike".to_string(),
+            Heirloom::DiscountMP => "Mana Discount".to_string(),
+            Heirloom::MinusOneDamageOnHit => "Polished Armor".to_string(),
 
-            Skill::FrozenAoE => "Ice Burst".to_string(),
-            Skill::IceStaffFloor => "Ice Trail ".to_string(),
-            Skill::FrozenCrit => "Frozen Wounds".to_string(),
-            Skill::MPBarDMG => "Mana Infusion".to_string(),
-            Skill::MPBarCrit => "Empowered Spells ".to_string(),
-            Skill::FrozenMPRegen => "Mana Frost".to_string(),
-            Skill::DodgeCrit => "Vengeful Strike".to_string(),
-            Skill::PoisonDuration => "Venum Endurance".to_string(),
-            Skill::PoisonStrength => "Venumous Edge".to_string(),
-            Skill::ViralVenum => "Viral Venum".to_string(),
-            Skill::HealEcho => "Internal Echo".to_string(),
-            Skill::FullStomach => "Full Stomach".to_string(),
+            Heirloom::FrozenAoE => "Ice Burst".to_string(),
+            Heirloom::IceStaffFloor => "Ice Trail ".to_string(),
+            Heirloom::FrozenCrit => "Frozen Wounds".to_string(),
+            Heirloom::MPBarDMG => "Mana Infusion".to_string(),
+            Heirloom::MPBarCrit => "Empowered Spells ".to_string(),
+            Heirloom::FrozenMPRegen => "Mana Frost".to_string(),
+            Heirloom::DodgeCrit => "Vengeful Strike".to_string(),
+            Heirloom::PoisonDuration => "Venum Endurance".to_string(),
+            Heirloom::PoisonStrength => "Venumous Edge".to_string(),
+            Heirloom::ViralVenum => "Viral Venum".to_string(),
+            Heirloom::HealEcho => "Internal Echo".to_string(),
+            Heirloom::FullStomach => "Full Stomach".to_string(),
 
-            Skill::ReinforcedArmor => "Reinforced Armor".to_string(),
-            Skill::Roll => "Roll".to_string(),
+            Heirloom::ReinforcedArmor => "Reinforced Armor".to_string(),
+            Heirloom::Roll => "Roll".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
-            Skill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
-            Skill::Chest => vec!["Gain a Loot Chest".to_string()],
-            Skill::CritChance => vec![
+            Heirloom::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
+            Heirloom::Chest => vec!["Gain a Loot Chest".to_string()],
+            Heirloom::CritChance => vec![
                 "Gain +10% Critical".to_string(),
                 "Chance, ".to_string(),
                 "permanantly.".to_string(),
             ],
-            Skill::CritDamage => vec![
+            Heirloom::CritDamage => vec![
                 "Gain +15% Critical".to_string(),
                 "Damage, permanently".to_string(),
             ],
-            Skill::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
-            Skill::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
-            Skill::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
-            Skill::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
-            Skill::Lifesteal => vec!["Gain +1 Lifesteal,".to_string(), "permanently.".to_string()],
-            Skill::AttackSpeed => vec![
+            Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
+            Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
+            Heirloom::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
+            Heirloom::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
+            Heirloom::Lifesteal => {
+                vec!["Gain +1 Lifesteal,".to_string(), "permanently.".to_string()]
+            }
+            Heirloom::AttackSpeed => vec![
                 "Gain +15% Attack".to_string(),
                 "Speed, permanently. ".to_string(),
             ],
 
-            Skill::DodgeChance => vec![
+            Heirloom::DodgeChance => vec![
                 "Gain +10% Dodge".to_string(),
                 "Chance,".to_string(),
                 "permanently.".to_string(),
             ],
-            Skill::Gigantify => vec![
+            Heirloom::Gigantify => vec![
                 "Your Attacks gain".to_string(),
                 "+15% Size".to_string(),
                 "permanently.".to_string(),
             ],
 
-            Skill::WaveAttack => vec![
+            Heirloom::WaveAttack => vec![
                 "Your Attacks have".to_string(),
                 "a chance to send a".to_string(),
                 "sonic wave attack".to_string(),
                 "that travels a".to_string(),
                 "short distance.".to_string(),
             ],
-            Skill::FrailStacks => vec![
+            Heirloom::FrailStacks => vec![
                 "Your Attacks have".to_string(),
                 "a chance to apply".to_string(),
                 "a Frail stack that".to_string(),
                 "gives +3% critical".to_string(),
                 "chance on hits".to_string(),
             ],
-            Skill::SlowStacks => vec![
+            Heirloom::SlowStacks => vec![
                 "Your Attacks have".to_string(),
                 "a chance to apply".to_string(),
                 "a Slow stack to".to_string(),
                 "enemies, reducing".to_string(),
                 "speed by 15%.".to_string(),
             ],
-            Skill::PoisonStacks => vec![
+            Heirloom::PoisonStacks => vec![
                 "Your Attacks have".to_string(),
                 "a chance to apply".to_string(),
                 "Poison to enemies.".to_string(),
@@ -373,145 +375,145 @@ impl Skill {
                 "lose health over".to_string(),
                 "time.".to_string(),
             ],
-            Skill::LethalBlow => vec![
+            Heirloom::LethalBlow => vec![
                 "Melee attacks ".to_string(),
                 "execute enemies ".to_string(),
                 "below 20% health.".to_string(),
             ],
-            Skill::Teleport => vec![
+            Heirloom::Teleport => vec![
                 "Active: Teleport a".to_string(),
                 "short distance to".to_string(),
                 "dodge attacks or".to_string(),
                 "move around quickly.".to_string(),
             ],
-            Skill::TeleportShock => vec![
+            Heirloom::TeleportShock => vec![
                 "Teleporting through".to_string(),
                 "enemies damages".to_string(),
                 "them.".to_string(),
             ],
-            Skill::TeleportCooldown => vec![
+            Heirloom::TeleportCooldown => vec![
                 "Your Teleport".to_string(),
                 "cooldown is".to_string(),
                 "reduced.".to_string(),
             ],
-            Skill::TeleportCount => vec!["Gain +1 Teleport".to_string(), "count.".to_string()],
-            Skill::TeleportManaRegen => vec![
+            Heirloom::TeleportCount => vec!["Gain +1 Teleport".to_string(), "count.".to_string()],
+            Heirloom::TeleportManaRegen => vec![
                 "Attacking right".to_string(),
                 "after a Teleport".to_string(),
                 "triggers mana".to_string(),
                 "regeneration.".to_string(),
             ],
-            Skill::Sprint => vec![
+            Heirloom::Sprint => vec![
                 "Active: Hold Sprint".to_string(),
                 "to move 60% faster.".to_string(),
                 // "Allows you to attack".to_string(),
                 // "while sprinting.".to_string(),
             ],
-            Skill::SprintFaster => {
+            Heirloom::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
             }
-            Skill::SprintLunge => vec![
+            Heirloom::SprintLunge => vec![
                 "Active: dash through".to_string(),
                 "enemies with a quick".to_string(),
                 "lunge attack.".to_string(),
             ],
-            Skill::SprintLungeDamage => vec![
+            Heirloom::SprintLungeDamage => vec![
                 "Your Lunge attack".to_string(),
                 "does more damage.".to_string(),
             ],
-            Skill::SprintKillReset => vec![
+            Heirloom::SprintKillReset => vec![
                 "Killing an enemy".to_string(),
                 "resets your Sprint".to_string(),
                 "and Lunge attack".to_string(),
                 "cooldown.".to_string(),
             ],
-            Skill::ChanceToProcExtraAttack => vec![
+            Heirloom::ChanceToProcExtraAttack => vec![
                 "Attacks have a.".to_string(),
                 "chance to trigger".to_string(),
                 "another attack.".to_string(),
             ],
-            Skill::IncreaseProjectilCount => vec![
+            Heirloom::IncreaseProjectilCount => vec![
                 "Increase all weapon".to_string(),
                 "projectile count".to_string(),
                 "by 1.".to_string(),
             ],
 
-            Skill::IceStaffAoE => vec![
+            Heirloom::IceStaffAoE => vec![
                 "Your Attacks have".to_string(),
                 "a chance to ".to_string(),
                 "trigger an ice".to_string(),
                 "explosion that".to_string(),
                 "damages enemies. ".to_string(),
             ],
-            Skill::BowArrowSpeed => {
+            Heirloom::BowArrowSpeed => {
                 vec!["Your Projectiles".to_string(), "move faster.".to_string()]
             }
-            Skill::Attack => vec!["Gain +10% Damage,".to_string(), "permanently.".to_string()],
-            Skill::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
-            Skill::Parry => vec![
+            Heirloom::Attack => vec!["Gain +10% Damage,".to_string(), "permanently.".to_string()],
+            Heirloom::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
+            Heirloom::Parry => vec![
                 "Active: Parry".to_string(),
                 "enemy attacks,".to_string(),
                 "ignore damage, and".to_string(),
                 "stun attackers if".to_string(),
                 "timed successfully.".to_string(),
             ],
-            Skill::ParryHPRegen => vec![
+            Heirloom::ParryHPRegen => vec![
                 "A successful".to_string(),
                 "parry triggers".to_string(),
                 "health regeneration".to_string(),
             ],
-            Skill::ParrySpear => vec![
+            Heirloom::ParrySpear => vec![
                 "Active: Spear Attack".to_string(),
                 "that pulls enemies".to_string(),
                 "towards the impact.".to_string(),
             ],
-            Skill::ParryDeflectProj => vec![
+            Heirloom::ParryDeflectProj => vec![
                 "A successful".to_string(),
                 "parry deflects".to_string(),
                 "projectiles.".to_string(),
             ],
-            Skill::ParryKnockback => vec![
+            Heirloom::ParryKnockback => vec![
                 "A successful".to_string(),
                 "parry knocks ".to_string(),
                 "back enemies.".to_string(),
             ],
-            Skill::ParryEcho => vec![
+            Heirloom::ParryEcho => vec![
                 "A successful".to_string(),
                 "parry triggers".to_string(),
                 "an echo that".to_string(),
                 "damages enemies".to_string(),
                 "around you.".to_string(),
             ],
-            Skill::DaggerCombo => vec![
+            Heirloom::DaggerCombo => vec![
                 "Attacks chained".to_string(),
                 "together build ".to_string(),
                 "Combo, increasing ".to_string(),
                 "your critical ".to_string(),
                 "damage.".to_string(),
             ],
-            Skill::HPRegen => vec![
+            Heirloom::HPRegen => vec![
                 "Gain +5 Health".to_string(),
                 "regeneration, ".to_string(),
                 "permanently.".to_string(),
             ],
-            Skill::MPRegen => vec![
+            Heirloom::MPRegen => vec![
                 "Gain +5 Mana ".to_string(),
                 "regeneration,".to_string(),
                 "permanently.".to_string(),
             ],
-            Skill::HPRegenCooldown => vec![
+            Heirloom::HPRegenCooldown => vec![
                 "Your Health".to_string(),
                 "regeneration".to_string(),
                 "cooldown is.".to_string(),
                 "reduced.".to_string(),
             ],
-            Skill::MPRegenCooldown => vec![
+            Heirloom::MPRegenCooldown => vec![
                 "Your Mana".to_string(),
                 "regeneration".to_string(),
                 "cooldown is.".to_string(),
                 "reduced.".to_string(),
             ],
-            Skill::OnHitEcho => vec![
+            Heirloom::OnHitEcho => vec![
                 "After taking ".to_string(),
                 "damage, trigger ".to_string(),
                 "an echo that".to_string(),
@@ -519,101 +521,101 @@ impl Skill {
                 "around you.".to_string(),
             ],
 
-            Skill::Knockback => vec![
+            Heirloom::Knockback => vec![
                 "Your attacks".to_string(),
                 "knockback enemies".to_string(),
                 "further. ".to_string(),
             ],
-            Skill::DiscountMP => vec![
+            Heirloom::DiscountMP => vec![
                 "Your staffs' attacks".to_string(),
                 "cost less mana.".to_string(),
             ],
-            Skill::MinusOneDamageOnHit => vec![
+            Heirloom::MinusOneDamageOnHit => vec![
                 "All incoming enemy ".to_string(),
                 "damage is reduced".to_string(),
                 "by one. ".to_string(),
             ],
-            Skill::TeleportStatusDMG => vec![
+            Heirloom::TeleportStatusDMG => vec![
                 "Teleporting through".to_string(),
                 "an enemy with a".to_string(),
                 "status effect deals".to_string(),
                 "more damage.".to_string(),
             ],
 
-            Skill::FrozenAoE => vec![
+            Heirloom::FrozenAoE => vec![
                 "Killing a frozen".to_string(),
                 "enemy triggers an".to_string(),
                 "ice explosion that".to_string(),
                 "damages enemies.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
-            Skill::IceStaffFloor => vec![
+            Heirloom::IceStaffFloor => vec![
                 "Your Attacks have".to_string(),
                 "a chance to leave".to_string(),
                 "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
-            Skill::FrozenCrit => vec![
+            Heirloom::FrozenCrit => vec![
                 "Attacking frozen".to_string(),
                 "enemies gives you".to_string(),
                 "+10% critical hit".to_string(),
                 "chance.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
-            Skill::MPBarDMG => vec![
+            Heirloom::MPBarDMG => vec![
                 "Your staff's attacks".to_string(),
                 "gain +25% damage".to_string(),
                 "if your mana bar".to_string(),
                 "is full.".to_string(),
             ],
-            Skill::MPBarCrit => vec![
+            Heirloom::MPBarCrit => vec![
                 "Your staff's attacks".to_string(),
                 "gain +10% critical".to_string(),
                 "hit chance if your".to_string(),
                 "mana bar is full.".to_string(),
             ],
-            Skill::FrozenMPRegen => vec![
+            Heirloom::FrozenMPRegen => vec![
                 "Killing a frozen".to_string(),
                 "enemy triggers".to_string(),
                 "mana regeneration.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
-            Skill::DodgeCrit => vec![
+            Heirloom::DodgeCrit => vec![
                 "The next attack".to_string(),
                 "after dodging".to_string(),
                 "is a critical hit.".to_string(),
                 "+10% dodge chance.".to_string(),
             ],
-            Skill::PoisonDuration => vec![
+            Heirloom::PoisonDuration => vec![
                 "Your poison effect".to_string(),
                 "lasts longer.".to_string(),
                 "+25% poison chance.".to_string(),
             ],
-            Skill::PoisonStrength => vec![
+            Heirloom::PoisonStrength => vec![
                 "Your poison effect".to_string(),
                 "does more damage.".to_string(),
                 "+25% poison chance.".to_string(),
             ],
-            Skill::ViralVenum => vec![
+            Heirloom::ViralVenum => vec![
                 "Killing a poisoned".to_string(),
                 "enemy spreads it's".to_string(),
                 "poison to nearby".to_string(),
                 "enemies.".to_string(),
                 "+25% poison chance.".to_string(),
             ],
-            Skill::HealEcho => vec![
+            Heirloom::HealEcho => vec![
                 "Healing triggers".to_string(),
                 "an echo that".to_string(),
                 "damages enemies ".to_string(),
                 "around you.".to_string(),
                 "+20 Health regen.".to_string(),
             ],
-            Skill::FullStomach => vec![
+            Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
                 "at a slower rate.".to_string(),
             ],
-            Skill::ReinforcedArmor => vec![
+            Heirloom::ReinforcedArmor => vec![
                 "You gain Defence".to_string(),
                 "the more speed".to_string(),
                 "you have lost. Lose".to_string(),
@@ -623,18 +625,18 @@ impl Skill {
     }
     pub fn is_active_skill(&self) -> bool {
         match self {
-            Skill::Roll => true,
-            Skill::Parry => true,
-            Skill::ParrySpear => true,
-            Skill::Sprint => true,
-            Skill::SprintLunge => true,
-            Skill::Teleport => true,
+            Heirloom::Roll => true,
+            Heirloom::Parry => true,
+            Heirloom::ParrySpear => true,
+            Heirloom::Sprint => true,
+            Heirloom::SprintLunge => true,
+            Heirloom::Teleport => true,
             _ => false,
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
-            Skill::Chest => Some((WorldObject::ChestBlock, 1)),
+            Heirloom::Chest => Some((WorldObject::ChestBlock, 1)),
             _ => None,
         }
     }
@@ -647,17 +649,17 @@ impl Skill {
         game: &mut Game,
     ) {
         match self {
-            Skill::IncreaseProjectilCount => {
+            Heirloom::IncreaseProjectilCount => {
                 commands.entity(entity).insert(ClawUpgradeMultiThrow(
                     Timer::from_seconds(0.12, TimerMode::Once),
                     1,
                 ));
                 commands.entity(entity).insert(BowUpgradeSpread(1));
             }
-            Skill::BowArrowSpeed => {
+            Heirloom::BowArrowSpeed => {
                 commands.entity(entity).insert(ArrowSpeedUpgrade(1.25));
             }
-            Skill::Sprint => {
+            Heirloom::Sprint => {
                 commands.entity(entity).insert(SprintState {
                     startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
                     sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
@@ -667,7 +669,7 @@ impl Skill {
                     speed_bonus: 1.6,
                 });
             }
-            Skill::SprintLunge => {
+            Heirloom::SprintLunge => {
                 commands.entity(entity).insert(LungeState {
                     lunge_cooldown_timer: Timer::from_seconds(4., TimerMode::Once)
                         .tick(Duration::from_secs(99))
@@ -676,7 +678,7 @@ impl Skill {
                     lunge_speed: 3.9,
                 });
             }
-            Skill::Teleport => {
+            Heirloom::Teleport => {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
@@ -688,25 +690,25 @@ impl Skill {
                     second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
             }
-            &Skill::TeleportCount => {
+            &Heirloom::TeleportCount => {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),
-                    count: skills.get_count(Skill::TeleportCount) as u32,
+                    count: skills.get_count(Heirloom::TeleportCount) as u32,
                     max_count: 2,
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
                     second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
             }
-            &Skill::DaggerCombo => {
+            &Heirloom::DaggerCombo => {
                 commands.entity(entity).insert(ComboCounter {
                     counter: 0,
                     reset_timer: Timer::from_seconds(2., TimerMode::Once),
                 });
             }
-            &Skill::Parry => {
+            &Heirloom::Parry => {
                 commands.entity(entity).insert(ParryState {
                     parry_timer: Timer::from_seconds(0.7, TimerMode::Once),
                     cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once)
@@ -716,7 +718,7 @@ impl Skill {
                     active: false,
                 });
             }
-            &Skill::ParrySpear => {
+            &Heirloom::ParrySpear => {
                 commands.entity(entity).insert(SpearState {
                     cooldown_timer: Timer::from_seconds(5.2, TimerMode::Once)
                         .tick(Duration::from_secs(99))
@@ -728,28 +730,28 @@ impl Skill {
             _ => {}
         }
     }
-    pub fn get_ui_element(&self, rarity: SkillRarity) -> UIElement {
+    pub fn get_ui_element(&self, rarity: HeirloomRarity) -> UIElement {
         match rarity {
-            SkillRarity::Common => UIElement::SkillChoice,
-            SkillRarity::Uncommon => UIElement::SkillChoiceRogue,
-            SkillRarity::Rare => UIElement::SkillChoiceMagic,
-            SkillRarity::Legendary => UIElement::SkillChoiceMelee,
+            HeirloomRarity::Common => UIElement::SkillChoice,
+            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogue,
+            HeirloomRarity::Rare => UIElement::SkillChoiceMagic,
+            HeirloomRarity::Legendary => UIElement::SkillChoiceMelee,
         }
     }
-    pub fn get_ui_element_hover(&self, rarity: SkillRarity) -> UIElement {
+    pub fn get_ui_element_hover(&self, rarity: HeirloomRarity) -> UIElement {
         match rarity {
-            SkillRarity::Common => UIElement::SkillChoice,
-            SkillRarity::Uncommon => UIElement::SkillChoiceRogueHover,
-            SkillRarity::Rare => UIElement::SkillChoiceMagicHover,
-            SkillRarity::Legendary => UIElement::SkillChoiceMeleeHover,
+            HeirloomRarity::Common => UIElement::SkillChoice,
+            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogueHover,
+            HeirloomRarity::Rare => UIElement::SkillChoiceMagicHover,
+            HeirloomRarity::Legendary => UIElement::SkillChoiceMeleeHover,
         }
     }
 
     pub fn is_obj_valid(&self, obj: WorldObject) -> bool {
         match self {
-            Skill::WaveAttack => obj.is_melee_weapon(),
-            Skill::FrailStacks => obj.is_melee_weapon(),
-            Skill::LethalBlow => obj.is_melee_weapon(),
+            Heirloom::WaveAttack => obj.is_melee_weapon(),
+            Heirloom::FrailStacks => obj.is_melee_weapon(),
+            Heirloom::LethalBlow => obj.is_melee_weapon(),
             _ => true,
         }
     }
@@ -761,129 +763,173 @@ pub struct ActiveSkillUsedEvent {
 }
 
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
-pub enum SkillRarity {
+pub enum HeirloomRarity {
     #[default]
     Common,
     Uncommon,
     Rare,
     Legendary,
 }
-#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
-pub struct SkillChoiceState {
-    pub skill: Skill,
-    pub child_skills: Vec<SkillChoiceState>,
-    pub clashing_skills: Vec<Skill>,
-    pub is_one_time_skill: bool,
-    pub rarity: SkillRarity,
+
+impl HeirloomRarity {
+    pub fn get_item_glow(&self) -> Option<ItemGlow> {
+        match self {
+            HeirloomRarity::Common => None,
+            HeirloomRarity::Uncommon => Some(ItemGlow::Green),
+            HeirloomRarity::Rare => Some(ItemGlow::Blue),
+            HeirloomRarity::Legendary => Some(ItemGlow::Red),
+        }
+    }
 }
-impl SkillChoiceState {
-    pub fn new(skill: Skill, rarity: SkillRarity) -> Self {
+#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
+pub struct HeirloomChoiceState {
+    pub heirloom: Heirloom,
+    pub child_heirlooms: Vec<HeirloomChoiceState>,
+    pub clashing_heirlooms: Vec<Heirloom>,
+    pub is_one_time_heirloom: bool,
+    pub rarity: HeirloomRarity,
+}
+impl HeirloomChoiceState {
+    pub fn new(heirloom: Heirloom, rarity: HeirloomRarity) -> Self {
         Self {
-            skill,
-            child_skills: Default::default(),
-            clashing_skills: Default::default(),
-            is_one_time_skill: true,
+            heirloom,
+            child_heirlooms: Default::default(),
+            clashing_heirlooms: Default::default(),
+            is_one_time_heirloom: true,
             rarity,
         }
     }
-    pub fn with_children(mut self, children: Vec<SkillChoiceState>) -> Self {
-        self.child_skills = children;
+    pub fn with_children(mut self, children: Vec<HeirloomChoiceState>) -> Self {
+        self.child_heirlooms = children;
         self
     }
     pub fn set_repeatable(mut self) -> Self {
-        self.is_one_time_skill = false;
+        self.is_one_time_heirloom = false;
         self
     }
-    pub fn _with_clashing(mut self, clashing: Vec<Skill>) -> Self {
-        self.clashing_skills = clashing;
+    pub fn _with_clashing(mut self, clashing: Vec<Heirloom>) -> Self {
+        self.clashing_heirlooms = clashing;
         self
     }
 }
 
 #[derive(Resource, Clone, Serialize, Deserialize)]
-pub struct SkillChoiceQueue {
-    pub queue: Vec<[SkillChoiceState; 3]>,
+pub struct HeirloomChoiceQueue {
+    pub queue: Vec<[HeirloomChoiceState; 3]>,
     pub rerolls: [bool; 3],
-    pub pool: Vec<SkillChoiceState>,
-    pub active_skill_limbo: Option<SkillChoiceState>,
+    pub pool: Vec<HeirloomChoiceState>,
+    pub active_heirloom_limbo: Option<HeirloomChoiceState>,
 }
 
-impl Default for SkillChoiceQueue {
+impl Default for HeirloomChoiceQueue {
     fn default() -> Self {
         Self {
             queue: Default::default(),
             rerolls: [true; 3],
-            active_skill_limbo: None,
+            active_heirloom_limbo: None,
             pool: vec![
-                SkillChoiceState::new(Skill::Defence, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::Attack, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::Gigantify, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::Chest, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::HPRegen, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::HPRegenCooldown, SkillRarity::Uncommon)
+                HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::MPRegenCooldown, SkillRarity::Uncommon)
+                HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common).set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Gigantify, HeirloomRarity::Common)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::MPRegen, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::DodgeCrit, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::Knockback, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::DiscountMP, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::OnHitEcho, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::HealEcho, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::Sprint, SkillRarity::Common),
-                SkillChoiceState::new(Skill::CritChance, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::CritDamage, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::FrailStacks, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::Health, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::Shield, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::Lifesteal, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::Thorns, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::Speed, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::AttackSpeed, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::WaveAttack, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::MPBarDMG, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::MPBarCrit, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::LethalBlow, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::DodgeChance, SkillRarity::Common).set_repeatable(),
-                SkillChoiceState::new(Skill::SlowStacks, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenAoE, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenCrit, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::FrozenMPRegen, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::IceStaffFloor, SkillRarity::Legendary)
+                HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonStacks, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonDuration, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::PoisonStrength, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::ViralVenum, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::Teleport, SkillRarity::Common),
-                SkillChoiceState::new(Skill::ChanceToProcExtraAttack, SkillRarity::Rare)
+                HeirloomChoiceState::new(Heirloom::HPRegen, HeirloomRarity::Common)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::IncreaseProjectilCount, SkillRarity::Rare)
+                HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon)
                     .set_repeatable(),
-                SkillChoiceState::new(Skill::BowArrowSpeed, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::IceStaffAoE, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::FullStomach, SkillRarity::Uncommon).set_repeatable(),
-                SkillChoiceState::new(Skill::ReinforcedArmor, SkillRarity::Rare).set_repeatable(),
-                SkillChoiceState::new(Skill::DaggerCombo, SkillRarity::Legendary).set_repeatable(),
-                SkillChoiceState::new(Skill::ParrySpear, SkillRarity::Common),
-                SkillChoiceState::new(Skill::Parry, SkillRarity::Common),
+                HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Sprint, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Health, HeirloomRarity::Common).set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Shield, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common).set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common).set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare).set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::FrozenMPRegen, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::IceStaffFloor, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::PoisonStacks, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Teleport, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::IncreaseProjectilCount, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::ParrySpear, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Parry, HeirloomRarity::Common),
             ],
         }
     }
 }
-impl SkillChoiceQueue {
+impl HeirloomChoiceQueue {
     pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
         //only push if queue is empty
         if self.queue.is_empty() {
             self.rerolls = [true; 3];
-            let mut new_skills: [SkillChoiceState; 3] = Default::default();
-            let mut add_back_to_pool: Vec<SkillChoiceState> = vec![];
+            let mut new_skills: [HeirloomChoiceState; 3] = Default::default();
+            let mut add_back_to_pool: Vec<HeirloomChoiceState> = vec![];
             for i in 0..3 {
-                let rarity = SkillChoiceQueue::gen_rarity(rng);
+                let rarity = HeirloomChoiceQueue::gen_rarity(rng);
                 if let Some(picked_skill) = self
                     .get_skill_of_rarity(rarity.clone(), rng, &|s| !new_skills.clone().contains(s))
                 {
-                    if !picked_skill.is_one_time_skill {
+                    if !picked_skill.is_one_time_heirloom {
                         add_back_to_pool.push(picked_skill.clone());
                     }
                     new_skills[i] = picked_skill.clone();
@@ -899,52 +945,59 @@ impl SkillChoiceQueue {
     }
     pub fn get_skill_of_rarity(
         &self,
-        rarity: SkillRarity,
+        rarity: HeirloomRarity,
         rng: &mut rand::rngs::ThreadRng,
-        filter: &dyn Fn(&SkillChoiceState) -> bool,
-    ) -> Option<SkillChoiceState> {
+        filter: &dyn Fn(&HeirloomChoiceState) -> bool,
+    ) -> Option<HeirloomChoiceState> {
         self.pool
             .iter()
             .filter(|x| x.rarity == rarity && filter(x))
             .choose(rng)
             .cloned()
     }
-    pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng) -> SkillRarity {
+    pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng) -> HeirloomRarity {
         match rng.gen_range(0..100) {
-            0..=60 => SkillRarity::Common,
-            61..=83 => SkillRarity::Uncommon,
-            84..=96 => SkillRarity::Rare,
-            _ => SkillRarity::Legendary,
+            0..=60 => HeirloomRarity::Common,
+            61..=83 => HeirloomRarity::Uncommon,
+            84..=96 => HeirloomRarity::Rare,
+            _ => HeirloomRarity::Legendary,
         }
     }
 
     pub fn handle_pick_skill(
         &mut self,
-        skill: SkillChoiceState,
+        skill: HeirloomChoiceState,
         proto_commands: &mut ProtoCommands,
         proto: &ProtoParam,
         player_pos: Vec2,
         player_skills: &mut PlayerSkills,
         player_level: u8,
     ) {
-        player_skills.skills.push(skill.skill.clone());
-        player_skills.increment_class_count(skill.skill.clone());
+        player_skills.heirlooms.push(HeirloomWithRarity {
+            heirloom: skill.heirloom.clone(),
+            rarity: skill.rarity.clone(),
+        });
+        player_skills.increment_class_count(skill.heirloom.clone());
 
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
         for choice in remaining_choices.iter() {
             self.pool.push(choice.clone());
         }
-        for child in skill.child_skills.iter() {
-            if !player_skills.skills.contains(&child.skill) {
+        for child in skill.child_heirlooms.iter() {
+            if !player_skills
+                .heirlooms
+                .iter()
+                .any(|h| h.heirloom == child.heirloom)
+            {
                 self.pool.push(child.clone());
             }
         }
-        for clash in skill.clashing_skills.iter() {
-            self.pool.retain(|x| x.skill != *clash);
+        for clash in skill.clashing_heirlooms.iter() {
+            self.pool.retain(|x| x.heirloom != *clash);
         }
         // handle drops
-        if let Some((drop, count)) = skill.skill.get_instant_drop() {
+        if let Some((drop, count)) = skill.heirloom.get_instant_drop() {
             proto_commands.spawn_item_from_proto(
                 drop,
                 proto,
@@ -954,18 +1007,18 @@ impl SkillChoiceQueue {
             );
         }
         //repopulate the queue after each skill selection, if there are skills missing
-        if player_skills.skills.len() < player_level as usize - 1 {
+        if player_skills.heirlooms.len() < player_level as usize - 1 {
             self.add_new_skills_after_levelup(&mut rand::thread_rng());
         }
 
         // handle active skills
-        if skill.skill.is_active_skill() {
+        if skill.heirloom.is_active_skill() {
             if player_skills.active_skill_slot_1.is_none() {
                 player_skills.insert_active_skill(skill.clone(), 1);
             } else if player_skills.active_skill_slot_2.is_none() {
                 player_skills.insert_active_skill(skill.clone(), 2);
             } else {
-                self.active_skill_limbo = Some(skill);
+                self.active_heirloom_limbo = Some(skill);
             }
         }
     }
@@ -973,12 +1026,12 @@ impl SkillChoiceQueue {
         if self.rerolls[slot] {
             self.rerolls[slot] = false;
             let old_skill = self.queue[0][slot].clone();
-            let rarity = SkillChoiceQueue::gen_rarity(rng);
+            let rarity = HeirloomChoiceQueue::gen_rarity(rng);
             //TODO: consolidate this code with the main skill picking area?
             if let Some(picked_skill) =
                 self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
             {
-                if picked_skill.is_one_time_skill {
+                if picked_skill.is_one_time_heirloom {
                     self.pool.retain(|x| x != &picked_skill);
                 }
                 self.pool.push(old_skill);
@@ -988,43 +1041,52 @@ impl SkillChoiceQueue {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct HeirloomWithRarity {
+    pub heirloom: Heirloom,
+    pub rarity: HeirloomRarity,
+}
+
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
-    pub skills: Vec<Skill>,
+    pub heirlooms: Vec<HeirloomWithRarity>,
     pub class: SkillClass,
     pub melee_skill_count: usize,
     pub rogue_skill_count: usize,
     pub magic_skill_count: usize,
-    pub active_skill_slot_1: Option<SkillChoiceState>,
-    pub active_skill_slot_2: Option<SkillChoiceState>,
+    pub active_skill_slot_1: Option<HeirloomChoiceState>,
+    pub active_skill_slot_2: Option<HeirloomChoiceState>,
 }
 
 impl Default for PlayerSkills {
     fn default() -> Self {
         Self {
-            skills: vec![],
+            heirlooms: vec![],
             class: SkillClass::None,
             melee_skill_count: 0,
             rogue_skill_count: 0,
             magic_skill_count: 0,
-            active_skill_slot_1: Some(SkillChoiceState::new(Skill::Roll, SkillRarity::Common)),
+            active_skill_slot_1: Some(HeirloomChoiceState::new(
+                Heirloom::Roll,
+                HeirloomRarity::Common,
+            )),
             active_skill_slot_2: None,
         }
     }
 }
 
 impl PlayerSkills {
-    pub fn has(&self, skill: Skill) -> bool {
-        self.skills.contains(&skill)
+    pub fn has(&self, heirloom: Heirloom) -> bool {
+        self.heirlooms.iter().any(|h| h.heirloom == heirloom)
     }
     pub fn calculate_freeze_chance(&self) -> f64 {
         let mut chance = 0.0;
         let freeze_skills = vec![
-            Skill::FrozenAoE,
-            Skill::IceStaffFloor,
-            Skill::FrozenCrit,
-            Skill::FrozenMPRegen,
-            Skill::SlowStacks,
+            Heirloom::FrozenAoE,
+            Heirloom::IceStaffFloor,
+            Heirloom::FrozenCrit,
+            Heirloom::FrozenMPRegen,
+            Heirloom::SlowStacks,
         ];
         for skill in freeze_skills.iter() {
             chance += self.get_count(skill.clone()) as f64 * 0.25;
@@ -1034,35 +1096,44 @@ impl PlayerSkills {
     pub fn calculate_poison_chance(&self) -> f64 {
         let mut chance = 0.0;
         let poison_skills = vec![
-            Skill::PoisonDuration,
-            Skill::PoisonStrength,
-            Skill::ViralVenum,
-            Skill::PoisonStacks,
+            Heirloom::PoisonDuration,
+            Heirloom::PoisonStrength,
+            Heirloom::ViralVenum,
+            Heirloom::PoisonStacks,
         ];
         for skill in poison_skills.iter() {
             chance += self.get_count(skill.clone()) as f64 * 0.25;
         }
         chance
     }
-    pub fn has_active_skill(&self, skill: Skill) -> Option<usize> {
+    pub fn has_active_heirloom(&self, heirloom: Heirloom) -> Option<usize> {
         if self
             .active_skill_slot_1
             .as_ref()
-            .is_some_and(|s| s.skill == skill)
+            .is_some_and(|s| s.heirloom == heirloom)
         {
             return Some(0);
         }
         if self
             .active_skill_slot_2
             .as_ref()
-            .is_some_and(|s| s.skill == skill)
+            .is_some_and(|s| s.heirloom == heirloom)
         {
             return Some(1);
         }
         None
     }
-    pub fn get_count(&self, skill: Skill) -> i32 {
-        self.skills.iter().filter(|&s| *s == skill).count() as i32
+    pub fn get_count(&self, heirloom: Heirloom) -> i32 {
+        self.heirlooms
+            .iter()
+            .filter(|h| h.heirloom == heirloom)
+            .count() as i32
+    }
+    pub fn get_heirloom_rarity(&self, heirloom: Heirloom) -> Option<HeirloomRarity> {
+        self.heirlooms
+            .iter()
+            .find(|h| h.heirloom == heirloom)
+            .map(|h| h.rarity.clone())
     }
     pub fn get_class_affinity(&self, prev_class: SkillClass) -> SkillClass {
         //return the highest count class
@@ -1091,15 +1162,15 @@ impl PlayerSkills {
             }
         }
     }
-    pub fn increment_class_count(&mut self, skill: Skill) {
-        match skill.get_class() {
+    pub fn increment_class_count(&mut self, heirloom: Heirloom) {
+        match heirloom.get_class() {
             SkillClass::None => unreachable!(),
             SkillClass::Melee => self.melee_skill_count += 1,
             SkillClass::Rogue => self.rogue_skill_count += 1,
             SkillClass::Magic => self.magic_skill_count += 1,
         }
     }
-    pub fn insert_active_skill(&mut self, skill: SkillChoiceState, slot: usize) {
+    pub fn insert_active_skill(&mut self, skill: HeirloomChoiceState, slot: usize) {
         match slot {
             1 => self.active_skill_slot_1 = Some(skill),
             2 => self.active_skill_slot_2 = Some(skill),

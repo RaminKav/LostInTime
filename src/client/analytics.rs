@@ -24,7 +24,7 @@ use bevy::{prelude::*, utils::HashMap};
 use serde::{Deserialize, Serialize};
 use tungstenite::{connect, Message};
 
-use crate::{enemy::Mob, item::WorldObject, player::skills::Skill, GameState};
+use crate::{enemy::Mob, item::WorldObject, player::skills::Heirloom, GameState};
 
 #[derive(Debug, Clone, Resource, Default, Serialize, Deserialize)]
 pub struct AnalyticsData {
@@ -44,7 +44,7 @@ pub struct AnalyticsData {
     pub total_objects_placed: u32,
     pub items_consumed: HashMap<WorldObject, u32>,
     pub total_items_consumed: u32,
-    pub skills: Vec<Skill>,
+    pub skills: Vec<Heirloom>,
     pub nights_survived: u32,
     pub timestamp: String,
 }

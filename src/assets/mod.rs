@@ -18,7 +18,7 @@ use crate::item::{
     Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
 };
-use crate::player::skills::Skill;
+use crate::player::skills::Heirloom;
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
@@ -80,6 +80,7 @@ pub struct SpriteAnchor(pub Vec2);
 pub struct GraphicsDesc {
     items: HashMap<WorldObject, WorldObjectData>,
     icons: HashMap<WorldObject, SpriteData>,
+    heirlooms: HashMap<crate::player::skills::Heirloom, WorldObjectData>,
 }
 
 impl Plugin for GameAssetsPlugin {
@@ -94,6 +95,7 @@ impl Plugin for GameAssetsPlugin {
                 mob_spritesheets: None,
                 status_effect_icons: None,
                 skill_icons: None,
+                heirloom_sprites: None,
                 item_glows: None,
                 combat_shrine_anim: None,
                 gamble_shrine_anim: None,
@@ -151,7 +153,8 @@ pub struct Graphics {
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
-    pub skill_icons: Option<HashMap<Skill, Handle<Image>>>,
+    pub skill_icons: Option<HashMap<Heirloom, Handle<Image>>>,
+    pub heirloom_sprites: Option<HashMap<Heirloom, TextureAtlasSprite>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
@@ -175,11 +178,19 @@ impl Graphics {
             .unwrap()
             .clone()
     }
-    pub fn get_skill_icon(&self, skill: Skill) -> Handle<Image> {
+    pub fn get_heirloom_icon(&self, heirloom: Heirloom) -> TextureAtlasSprite {
+        self.heirloom_sprites
+            .as_ref()
+            .unwrap()
+            .get(&heirloom)
+            .unwrap_or_else(|| panic!("No graphic for object {:?}", heirloom))
+            .clone()
+    }
+    pub fn get_active_skill_icon(&self, heirloom: Heirloom) -> Handle<Image> {
         self.skill_icons
             .as_ref()
             .unwrap()
-            .get(&skill)
+            .get(&heirloom)
             .unwrap()
             .clone()
     }
@@ -330,6 +341,14 @@ impl GameAssetsPlugin {
             icon_map.insert(*item, sprite);
         }
 
+        // load heirloom sprites
+        let mut heirloom_sprites = HashMap::default();
+        for (heirloom, rect) in sprite_desc.heirlooms.iter() {
+            let mut sprite = TextureAtlasSprite::new(atlas.add_texture(rect.to_atlas_rect()));
+            sprite.custom_size = Some(Vec2::new(rect.size.x, rect.size.y));
+            heirloom_sprites.insert(heirloom.clone(), sprite);
+        }
+
         // load recipes
         for (result, recipe) in recipes_desc.0.iter() {
             recipes_list.insert(*result, (recipe.0.clone(), recipe.1.clone(), recipe.2));
@@ -359,8 +378,8 @@ impl GameAssetsPlugin {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
             status_effect_handles.insert(u, handle);
         }
-        // load Skill Icons
-        for u in Skill::iter() {
+        // load Heirloom Icons
+        for u in Heirloom::iter() {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
             skill_handles.insert(u, handle);
         }
@@ -383,6 +402,7 @@ impl GameAssetsPlugin {
             mob_spritesheets: Some(mob_spritesheets),
             status_effect_icons: Some(status_effect_handles),
             skill_icons: Some(skill_handles),
+            heirloom_sprites: Some(heirloom_sprites),
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),

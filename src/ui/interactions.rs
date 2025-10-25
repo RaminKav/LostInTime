@@ -17,7 +17,7 @@ use crate::{
     item::{CraftedItemEvent, EquipmentType},
     player::{
         levels::PlayerLevel,
-        skills::{PlayerSkills, SkillChoiceQueue},
+        skills::{PlayerSkills, HeirloomChoiceQueue},
         stats::StatType,
     },
     proto::proto_param::ProtoParam,
@@ -779,7 +779,7 @@ pub fn handle_cursor_skills_buttons(
         Without<InventorySlotState>,
     >,
     mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform, &PlayerLevel)>,
-    mut skill_queue: ResMut<SkillChoiceQueue>,
+    mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     proto: ProtoParam,
@@ -802,7 +802,7 @@ pub fn handle_cursor_skills_buttons(
 
                     let ui_element = state
                         .skill_choice
-                        .skill
+                        .heirloom
                         .get_ui_element_hover(state.skill_choice.rarity.clone());
                     // swap to hover img
                     commands
@@ -823,13 +823,13 @@ pub fn handle_cursor_skills_buttons(
                                 &mut skills,
                                 level.level,
                             );
-                            picked_skill.skill.add_skill_components(
+                            picked_skill.heirloom.add_skill_components(
                                 e,
                                 &mut commands,
                                 skills.clone(),
                                 &mut game,
                             );
-                            if skill_queue.active_skill_limbo.is_some() {
+                            if skill_queue.active_heirloom_limbo.is_some() {
                                 next_ui_state.set(UIState::ActiveSkills);
                             } else {
                                 next_ui_state.set(UIState::Closed);
@@ -840,25 +840,25 @@ pub fn handle_cursor_skills_buttons(
                                 0 => {
                                     let prev_active_skill =
                                         skills.active_skill_slot_1.clone().unwrap();
-                                    for skill_to_remove in prev_active_skill.child_skills {
+                                    for skill_to_remove in prev_active_skill.child_heirlooms {
                                         skill_queue.pool.retain(|s| s != &skill_to_remove);
                                     }
 
                                     skills.active_skill_slot_1 =
-                                        skill_queue.active_skill_limbo.clone();
+                                        skill_queue.active_heirloom_limbo.clone();
                                 }
                                 1 => {
                                     let prev_active_skill =
                                         skills.active_skill_slot_2.clone().unwrap();
-                                    for skill_to_remove in prev_active_skill.child_skills {
+                                    for skill_to_remove in prev_active_skill.child_heirlooms {
                                         skill_queue.pool.retain(|s| s != &skill_to_remove);
                                     }
                                     skills.active_skill_slot_2 =
-                                        skill_queue.active_skill_limbo.clone();
+                                        skill_queue.active_heirloom_limbo.clone();
                                 }
                                 _ => (),
                             }
-                            skill_queue.active_skill_limbo = None;
+                            skill_queue.active_heirloom_limbo = None;
                             next_ui_state.set(UIState::Closed);
                         }
                     }
@@ -872,7 +872,7 @@ pub fn handle_cursor_skills_buttons(
                 };
                 let ui_element = state
                     .skill_choice
-                    .skill
+                    .heirloom
                     .get_ui_element(state.skill_choice.rarity.clone());
 
                 interactable.change(Interaction::None);

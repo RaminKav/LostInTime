@@ -89,7 +89,7 @@ use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectReso
 use player::{
     levels::PlayerLevel,
     rogue_skills::ComboCounter,
-    skills::{PlayerSkills, Skill},
+    skills::{PlayerSkills, Heirloom},
     Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -615,10 +615,10 @@ impl<'w, 's> GameParam<'w, 's> {
             )
         }
     }
-    pub fn has_skill(&self, skill: Skill) -> bool {
+    pub fn has_skill(&self, skill: Heirloom) -> bool {
         self.player_query.single().2.has(skill)
     }
-    pub fn skill_count(&self, skill: Skill) -> i32 {
+    pub fn skill_count(&self, skill: Heirloom) -> i32 {
         self.player_query.single().2.get_count(skill)
     }
 }

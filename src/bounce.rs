@@ -258,7 +258,7 @@ pub fn bounce_player(
                 start_pos,
                 direction,
                 bounce_speed,
-                player.is_dashing && player.player_dash_duration.percent() < 0.23,
+                player.is_dashing && player.player_dash_duration.percent() < 0.25,
                 0.35, // duration in seconds
                 20.0, // max height
             ));

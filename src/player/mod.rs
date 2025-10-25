@@ -364,8 +364,8 @@ fn spawn_player(
                     Transform::from_translation(data.player_transform.extend(0.)),
                     RawPosition(data.player_transform),
                 ));
-                for skill in data.player_skills.skills.clone() {
-                    skill.add_skill_components(
+                for skill in data.player_skills.heirlooms.clone() {
+                    skill.heirloom.add_skill_components(
                         p,
                         &mut commands,
                         data.player_skills.clone(),

@@ -33,7 +33,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{PlayerSkills, SkillChoiceQueue},
+        skills::{PlayerSkills, HeirloomChoiceQueue},
         stats::{PlayerStats, SkillPoints},
         Player, TimeFragmentCurrency,
     },
@@ -163,7 +163,7 @@ pub struct CurrentRunSaveData {
     pub player_transform: Vec2,
     pub player_hunger: u8,
     pub player_skills: PlayerSkills,
-    pub player_skill_queue: SkillChoiceQueue,
+    pub player_skill_queue: HeirloomChoiceQueue,
     pub currency: (i32, i32),
 
     // Era
@@ -301,7 +301,7 @@ pub fn save_state(
     check_open_chest: Option<Res<ChestContainer>>,
     check_open_furnace: Option<Res<FurnaceContainer>>,
     key_input: ResMut<Input<KeyCode>>,
-    skills_queue: Res<SkillChoiceQueue>,
+    skills_queue: Res<HeirloomChoiceQueue>,
     analytics_data: Res<AnalyticsData>,
     game: GameParam,
 ) {

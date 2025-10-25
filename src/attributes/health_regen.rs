@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::player::{
-    skills::{PlayerSkills, Skill},
+    skills::{PlayerSkills, Heirloom},
     Player,
 };
 
@@ -27,7 +27,7 @@ pub fn handle_health_regen(
     let (health_regen, mut timer, hunger, skills) = player_regen.single_mut();
     let d = time.delta();
 
-    timer.0.tick(if skills.has(Skill::HPRegenCooldown) {
+    timer.0.tick(if skills.has(Heirloom::HPRegenCooldown) {
         Duration::new(
             (d.as_secs() as f32 * 0.75) as u64,
             (d.subsec_nanos() as f32 * 0.75) as u32,
@@ -57,7 +57,7 @@ pub fn handle_mana_regen(
     let (mana_regen, mut timer, hunger, skills) = player_regen.single_mut();
     let d = time.delta();
 
-    timer.0.tick(if skills.has(Skill::MPRegenCooldown) {
+    timer.0.tick(if skills.has(Heirloom::MPRegenCooldown) {
         Duration::new(
             (d.as_secs() as f32 * 0.75) as u64,
             (d.subsec_nanos() as f32 * 0.75) as u32,

@@ -9,7 +9,7 @@ use crate::{
     DEBUG, GAME_HEIGHT,
 };
 
-use super::{stats::SkillPoints, SkillChoiceQueue};
+use super::{stats::SkillPoints, HeirloomChoiceQueue};
 
 #[derive(Component, Clone, Default, Debug, Serialize, Deserialize)]
 pub struct PlayerLevel {
@@ -59,7 +59,7 @@ impl PlayerLevel {
 
 pub fn handle_level_up(
     mut player: Query<(&mut PlayerLevel, &mut SkillPoints, &GlobalTransform), Changed<PlayerLevel>>,
-    mut skills_queue: ResMut<SkillChoiceQueue>,
+    mut skills_queue: ResMut<HeirloomChoiceQueue>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut next_inv_state: ResMut<NextState<UIState>>,
@@ -88,7 +88,7 @@ pub fn spawn_particles_when_leveling(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     existing_particles: Query<Entity, With<LevelUpParticles>>,
     ui_state: Res<State<UIState>>,
-    skill_queue: Res<SkillChoiceQueue>,
+    skill_queue: Res<HeirloomChoiceQueue>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;

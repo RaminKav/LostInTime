@@ -12,7 +12,7 @@ use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::skills::{ActiveSkillUsedEvent, PlayerSkills, Skill};
+use crate::player::skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::input::mouse::MouseWheel;
@@ -299,7 +299,7 @@ pub fn player_move_inputs(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if let Some(roll_slot) = skills.has_active_skill(Skill::Roll) {
+    if let Some(roll_slot) = skills.has_active_heirloom(Heirloom::Roll) {
         if player.player_dash_cooldown.finished()
             && key_input.pressed(get_active_skill_keybind(roll_slot))
         {
@@ -664,8 +664,8 @@ pub fn mouse_click_system(
             let mana_cost_option =
                 proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
             let mut rng = rand::thread_rng();
-            let trigger_count = if game.has_skill(Skill::ChanceToProcExtraAttack)
-                && rng.gen_bool(game.skill_count(Skill::ChanceToProcExtraAttack) as f64 * 0.25)
+            let trigger_count = if game.has_skill(Heirloom::ChanceToProcExtraAttack)
+                && rng.gen_bool(game.skill_count(Heirloom::ChanceToProcExtraAttack) as f64 * 0.25)
             {
                 2
             } else {

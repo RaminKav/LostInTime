@@ -36,7 +36,7 @@ use crate::{
     player::{
         levels::{ExperienceReward, PlayerLevel},
         mage_skills::spawn_ice_explosion_hitbox,
-        skills::{PlayerSkills, Skill},
+        skills::{PlayerSkills, Heirloom},
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
@@ -289,17 +289,17 @@ pub fn handle_hits(
             } else {
                 let is_player = game.game.player == e;
                 if let Some(mob) = mob_option {
-                    if game.get_player_skills().has(Skill::LethalBlow)
+                    if game.get_player_skills().has(Heirloom::LethalBlow)
                         && hit_health.0 <= max_health.0 / 5
                         && !mob.is_boss()
-                        && Skill::LethalBlow
+                        && Heirloom::LethalBlow
                             .is_obj_valid(hit.hit_with_melee.unwrap_or(WorldObject::None))
                     {
                         hit_health.0 = 0;
                     }
                 }
                 let final_dmg = dmg
-                    - if game.has_skill(Skill::MinusOneDamageOnHit) && is_player {
+                    - if game.has_skill(Heirloom::MinusOneDamageOnHit) && is_player {
                         1
                     } else {
                         0
@@ -317,7 +317,7 @@ pub fn handle_hits(
                 }
                 if !shielded_hit {
                     hit_health.0 -= final_dmg
-                        - if game.has_skill(Skill::MinusOneDamageOnHit) && is_player {
+                        - if game.has_skill(Heirloom::MinusOneDamageOnHit) && is_player {
                             1
                         } else {
                             0
@@ -329,7 +329,7 @@ pub fn handle_hits(
 
                 let mob_kb = if let Some(mob) = mob_option {
                     mob.get_base_kb()
-                        + if game.has_skill(Skill::Knockback) {
+                        + if game.has_skill(Heirloom::Knockback) {
                             100.
                         } else {
                             0.
@@ -427,7 +427,7 @@ pub fn cleanup_marked_for_death_entities(
         } else {
             let (skills, attack, mana_regen) = player.single();
             if let Some(_) = slow_option {
-                if skills.has(Skill::FrozenAoE) {
+                if skills.has(Heirloom::FrozenAoE) {
                     spawn_ice_explosion_hitbox(
                         &mut commands,
                         &asset_server,
@@ -435,14 +435,14 @@ pub fn cleanup_marked_for_death_entities(
                         attack.0 / 4,
                     );
                 }
-                if skills.has(Skill::FrozenMPRegen) {
+                if skills.has(Heirloom::FrozenMPRegen) {
                     modify_mana_event.send(ModifyManaEvent(
-                        mana_regen.0 + skills.get_count(Skill::MPRegen) * 5,
+                        mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
                     ));
                 }
             }
             if let Some(p) = poison_option {
-                if skills.has(Skill::ViralVenum) {
+                if skills.has(Heirloom::ViralVenum) {
                     for (mob_e, txfm) in neaby_mobs.iter() {
                         if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x {
                             commands.entity(mob_e).insert(Burning {
