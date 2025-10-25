@@ -579,9 +579,9 @@ pub fn handle_update_player_skills(
             let mut text = skill_class_text.single_mut();
             text.sections[0].value = format!(
                 "  {:}     {:?}     {:?}",
-                new_skills.melee_skill_count,
-                new_skills.rogue_skill_count,
-                new_skills.magic_skill_count
+                0, // melee_skill_count - removed
+                0, // rogue_skill_count - removed
+                0  // magic_skill_count - removed
             );
         }
 

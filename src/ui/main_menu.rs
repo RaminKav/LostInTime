@@ -7,7 +7,6 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::Collider;
 
 use crate::{
-    ai::pathfinding::PathfindingCache,
     assets::{asset_helpers::spawn_sprite, Graphics},
     audio::UpdateBGMTrackEvent,
     client::analytics::{connect_server, AnalyticsData},
@@ -17,7 +16,7 @@ use crate::{
     item::CraftingTracker,
     night::NightTracker,
     player::skills::{HeirloomChoiceQueue, PlayerSkills},
-    ui::{ChestContainer, FurnaceContainer},
+    ui::{ChestContainer, FurnaceContainer, UIState},
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
@@ -26,7 +25,7 @@ use crate::{
 };
 
 use super::{
-    scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
+    scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement,
     OPTIONS_UI_SIZE,
 };
 
@@ -50,7 +49,7 @@ pub struct MenuButtonClickEvent {
 pub struct MainMenu;
 
 #[derive(Component)]
-pub struct GameStartFadein(Timer);
+pub struct GameStartFadein(pub Timer);
 
 pub fn display_main_menu(
     mut commands: Commands,
@@ -103,6 +102,7 @@ pub fn remove_main_menu(
 pub fn handle_menu_button_click_events(
     mut event_reader: EventReader<MenuButtonClickEvent>,
     mut next_state: ResMut<NextState<GameState>>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
     info_modal: Query<Entity, With<InfoModal>>,
     everything: Query<
@@ -112,7 +112,6 @@ pub fn handle_menu_button_click_events(
             Without<DoNotDespawnOnGameOver>,
         ),
     >,
-    res: Res<ScreenResolution>,
     mut analytics_data: Option<ResMut<AnalyticsData>>,
     skills: Query<&PlayerSkills>,
     night_tracker: Option<Res<NightTracker>>,
@@ -125,33 +124,9 @@ pub fn handle_menu_button_click_events(
                 if info_modal.iter().count() != 0 {
                     continue;
                 }
-                info!("START GAME");
-                commands
-                    .spawn(SpriteBundle {
-                        sprite: Sprite {
-                            color: Color::rgba(0., 0., 0., 0.),
-                            custom_size: Some(Vec2::new(res.game_width + 10., GAME_HEIGHT + 20.)),
-                            ..default()
-                        },
-                        transform: Transform {
-                            translation: Vec3::new(0., 0., 10.),
-                            scale: Vec3::new(1., 1., 1.),
-                            ..Default::default()
-                        },
-                        ..default()
-                    })
-                    .insert(RenderLayers::from_layers(&[3]))
-                    .insert(Name::new("overlay"))
-                    .insert(GameStartFadein(Timer::from_seconds(3.0, TimerMode::Once)));
-
-                next_state.0 = Some(GameState::Main);
-                commands.init_resource::<Game>();
-                commands.init_resource::<NightTracker>();
-                commands.init_resource::<HeirloomChoiceQueue>();
-                commands.init_resource::<ContainerRegistry>();
-                commands.init_resource::<PathfindingCache>();
-                commands.init_resource::<CraftingTracker>();
-                commands.init_resource::<EraManager>();
+                info!("SHOW CLASS SELECTION");
+                // Show class selection UI instead of starting game immediately
+                next_ui_state.set(UIState::ClassSelection);
             }
             MenuButton::Options => {
                 if info_modal.iter().count() != 0 {

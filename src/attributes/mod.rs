@@ -23,7 +23,8 @@ use crate::{
     item::{Equipment, EquipmentType, WorldObject},
     juice::ShakeEffect,
     player::{
-        skills::{PlayerSkills, Heirloom},
+        levels::PlayerLevel,
+        skills::{Heirloom, PlayerClass, PlayerSkills},
         stats::StatType,
         Limb,
     },
@@ -938,7 +939,8 @@ impl ItemAttributes {
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             entity.insert(AttackCooldown(
-                self.attack_cooldown * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
+                self.attack_cooldown
+                    * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
                     / attack_speed_mod,
             ));
         } else {
@@ -968,7 +970,9 @@ impl ItemAttributes {
                 + skills.get_count(Heirloom::DodgeChance) * 10
                 + skills.get_count(Heirloom::DodgeCrit) * 10,
         )));
-        entity.insert(Speed(computed_speed + skills.get_count(Heirloom::Speed) * 15));
+        entity.insert(Speed(
+            computed_speed + skills.get_count(Heirloom::Speed) * 15,
+        ));
         entity.insert(Lifesteal(self.lifesteal.value));
         entity.insert(Defence(
             self.defence.value
@@ -1515,7 +1519,11 @@ impl Plugin for AttributesPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
-                (add_current_shield_with_max_shield, regen_shield)
+                (
+                    add_current_shield_with_max_shield,
+                    handle_cape_att_increase_on_level_up,
+                    regen_shield,
+                )
                     .in_set(OnUpdate(GameState::Main)),
             );
     }
@@ -1867,4 +1875,31 @@ pub fn add_item_glows(
             .set_parent(new_item_e)
             .id()
     })
+}
+
+pub fn handle_cape_att_increase_on_level_up(
+    mut player: Query<
+        (&mut Inventory, &PlayerLevel, &PlayerClass),
+        Or<(Added<PlayerSkills>, Changed<PlayerSkills>)>,
+    >,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+    proto: ProtoParam,
+) {
+    for (mut inv, level, class) in player.iter_mut() {
+        let mut cape_stack = proto.get_item_data(class.class.get_cape()).unwrap().clone();
+        let level = level.level as i32 - 1;
+        cape_stack.attributes = class.class.compute_cape_stats(level);
+        if level >= 11 {
+            cape_stack.rarity = ItemRarity::Legendary;
+        } else if level >= 7 {
+            cape_stack.rarity = ItemRarity::Rare;
+        } else if level >= 3 {
+            cape_stack.rarity = ItemRarity::Uncommon;
+        } else {
+            cape_stack.rarity = ItemRarity::Common;
+        }
+        cape_stack.metadata.level = Some((level + 1) as u8);
+        inv.equipment_items.with_item_in_slot(3, cape_stack);
+        att_event.send(AttributeChangeEvent);
+    }
 }

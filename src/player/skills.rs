@@ -29,7 +29,13 @@ pub enum SkillClass {
     None,
     Melee,
     Rogue,
+    Thief,
     Magic,
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize, Resource)]
+pub struct PlayerClass {
+    pub class: SkillClass,
 }
 
 impl SkillClass {
@@ -38,6 +44,7 @@ impl SkillClass {
             SkillClass::Melee => WorldObject::RedCape,
             SkillClass::Rogue => WorldObject::GreenCape,
             SkillClass::Magic => WorldObject::BlueCape,
+            SkillClass::Thief => WorldObject::GreyCape,
             _ => WorldObject::GreyCape,
         }
     }
@@ -55,24 +62,31 @@ impl SkillClass {
             SkillClass::Melee => {
                 stats.attack =
                     AttributeValue::new(f32::floor(level as f32 * 1.5) as i32, quality, 1.);
-                stats.defence = AttributeValue::new(level, quality, 1.);
-                stats.health = AttributeValue::new(level * 10, quality, 1.);
+                // stats.defence = AttributeValue::new(level, quality, 1.);
+                stats.health = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Rogue => {
                 stats.attack =
                     AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
-                stats.speed = AttributeValue::new(level * 5, quality, 1.);
-                stats.dodge = AttributeValue::new(level, quality, 1.);
-                stats.crit_chance = AttributeValue::new(level * 2, quality, 1.);
-                stats.crit_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.5) as i32, quality, 1.);
+                stats.speed = AttributeValue::new(level * 2, quality, 1.);
+                stats.dodge = AttributeValue::new(level * 3, quality, 1.);
+                // stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
+                // stats.crit_damage =
+                //     AttributeValue::new(f32::floor(level as f32 * 3.5) as i32, quality, 1.);
             }
             SkillClass::Magic => {
                 stats.attack =
-                    AttributeValue::new(f32::floor(level as f32 * 1.5) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
                 stats.mana = AttributeValue::new(level * 5, quality, 1.);
                 stats.mana_regen =
                     AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
+            }
+            SkillClass::Thief => {
+                stats.attack =
+                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
+                stats.crit_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 2.) as i32, quality, 1.);
             }
             _ => (),
         }
@@ -168,78 +182,6 @@ pub enum Heirloom {
 }
 
 impl Heirloom {
-    pub fn get_class(&self) -> SkillClass {
-        match self {
-            Heirloom::Health => SkillClass::Melee,
-            Heirloom::Shield => SkillClass::Magic,
-            Heirloom::Lifesteal => SkillClass::Melee,
-            Heirloom::Attack => SkillClass::Melee,
-            Heirloom::Defence => SkillClass::Melee,
-            Heirloom::WaveAttack => SkillClass::Melee,
-            Heirloom::FrailStacks => SkillClass::Melee,
-            Heirloom::LethalBlow => SkillClass::Melee,
-            Heirloom::Parry => SkillClass::Melee,
-            Heirloom::ParryHPRegen => SkillClass::Melee,
-            Heirloom::ParrySpear => SkillClass::Melee,
-            Heirloom::ParryDeflectProj => SkillClass::Melee,
-            Heirloom::ParryKnockback => SkillClass::Melee,
-            Heirloom::ParryEcho => SkillClass::Melee,
-            Heirloom::HPRegen => SkillClass::Melee,
-            Heirloom::OnHitEcho => SkillClass::Melee,
-            Heirloom::Knockback => SkillClass::Melee,
-            Heirloom::MinusOneDamageOnHit => SkillClass::Melee,
-            Heirloom::HPRegenCooldown => SkillClass::Melee,
-            Heirloom::HealEcho => SkillClass::Melee,
-            Heirloom::FullStomach => SkillClass::Melee,
-            Heirloom::Gigantify => SkillClass::Melee,
-            Heirloom::Chest => SkillClass::Rogue,
-
-            Heirloom::ReinforcedArmor => SkillClass::Melee,
-
-            Heirloom::CritChance => SkillClass::Rogue,
-            Heirloom::CritDamage => SkillClass::Rogue,
-            Heirloom::Thorns => SkillClass::Rogue,
-            Heirloom::Speed => SkillClass::Rogue,
-            Heirloom::AttackSpeed => SkillClass::Rogue,
-            Heirloom::DodgeChance => SkillClass::Rogue,
-            Heirloom::PoisonStacks => SkillClass::Rogue,
-            Heirloom::DaggerCombo => SkillClass::Rogue,
-            Heirloom::Sprint => SkillClass::Rogue,
-            Heirloom::SprintFaster => SkillClass::Rogue,
-            Heirloom::SprintLunge => SkillClass::Rogue,
-            Heirloom::SprintLungeDamage => SkillClass::Rogue,
-            Heirloom::SprintKillReset => SkillClass::Rogue,
-            Heirloom::ChanceToProcExtraAttack => SkillClass::Rogue,
-            Heirloom::IncreaseProjectilCount => SkillClass::Rogue,
-            Heirloom::BowArrowSpeed => SkillClass::Rogue,
-            Heirloom::DodgeCrit => SkillClass::Rogue,
-            Heirloom::PoisonDuration => SkillClass::Rogue,
-            Heirloom::PoisonStrength => SkillClass::Rogue,
-            Heirloom::ViralVenum => SkillClass::Rogue,
-
-            Heirloom::SlowStacks => SkillClass::Magic,
-            Heirloom::Teleport => SkillClass::Magic,
-            Heirloom::TeleportShock => SkillClass::Magic,
-            Heirloom::TeleportCooldown => SkillClass::Magic,
-            Heirloom::TeleportCount => SkillClass::Magic,
-            Heirloom::TeleportManaRegen => SkillClass::Magic,
-            Heirloom::MPRegen => SkillClass::Magic,
-            Heirloom::DiscountMP => SkillClass::Magic,
-
-            Heirloom::IceStaffAoE => SkillClass::Magic,
-            Heirloom::MPRegenCooldown => SkillClass::Magic,
-            Heirloom::TeleportStatusDMG => SkillClass::Magic,
-
-            Heirloom::FrozenAoE => SkillClass::Magic,
-            Heirloom::IceStaffFloor => SkillClass::Magic,
-            Heirloom::FrozenCrit => SkillClass::Magic,
-            Heirloom::MPBarDMG => SkillClass::Magic,
-            Heirloom::MPBarCrit => SkillClass::Magic,
-            Heirloom::FrozenMPRegen => SkillClass::Magic,
-
-            Heirloom::Roll => SkillClass::None,
-        }
-    }
     pub fn get_title(&self) -> String {
         match self {
             Heirloom::CritChance => "Keen Eyes".to_string(),
@@ -977,7 +919,6 @@ impl HeirloomChoiceQueue {
             heirloom: skill.heirloom.clone(),
             rarity: skill.rarity.clone(),
         });
-        player_skills.increment_class_count(skill.heirloom.clone());
 
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
@@ -1050,10 +991,6 @@ pub struct HeirloomWithRarity {
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub heirlooms: Vec<HeirloomWithRarity>,
-    pub class: SkillClass,
-    pub melee_skill_count: usize,
-    pub rogue_skill_count: usize,
-    pub magic_skill_count: usize,
     pub active_skill_slot_1: Option<HeirloomChoiceState>,
     pub active_skill_slot_2: Option<HeirloomChoiceState>,
 }
@@ -1062,10 +999,6 @@ impl Default for PlayerSkills {
     fn default() -> Self {
         Self {
             heirlooms: vec![],
-            class: SkillClass::None,
-            melee_skill_count: 0,
-            rogue_skill_count: 0,
-            magic_skill_count: 0,
             active_skill_slot_1: Some(HeirloomChoiceState::new(
                 Heirloom::Roll,
                 HeirloomRarity::Common,
@@ -1134,41 +1067,6 @@ impl PlayerSkills {
             .iter()
             .find(|h| h.heirloom == heirloom)
             .map(|h| h.rarity.clone())
-    }
-    pub fn get_class_affinity(&self, prev_class: SkillClass) -> SkillClass {
-        //return the highest count class
-        let (melee, rogue, magic) = (
-            self.melee_skill_count,
-            self.rogue_skill_count,
-            self.magic_skill_count,
-        );
-        if melee == 0 && rogue == 0 && magic == 0 {
-            return SkillClass::None;
-        }
-        //if there is a tie with the prev class, always return the prev class
-        if prev_class == SkillClass::Melee && melee >= rogue && melee >= magic {
-            SkillClass::Melee
-        } else if prev_class == SkillClass::Rogue && rogue >= melee && rogue >= magic {
-            SkillClass::Rogue
-        } else if prev_class == SkillClass::Magic && magic >= melee && magic >= rogue {
-            SkillClass::Magic
-        } else {
-            if melee >= rogue && melee >= magic {
-                SkillClass::Melee
-            } else if rogue >= melee && rogue >= magic {
-                SkillClass::Rogue
-            } else {
-                SkillClass::Magic
-            }
-        }
-    }
-    pub fn increment_class_count(&mut self, heirloom: Heirloom) {
-        match heirloom.get_class() {
-            SkillClass::None => unreachable!(),
-            SkillClass::Melee => self.melee_skill_count += 1,
-            SkillClass::Rogue => self.rogue_skill_count += 1,
-            SkillClass::Magic => self.magic_skill_count += 1,
-        }
     }
     pub fn insert_active_skill(&mut self, skill: HeirloomChoiceState, slot: usize) {
         match slot {

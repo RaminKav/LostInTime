@@ -17,7 +17,8 @@ use game_over::{
 };
 use player_sprite::{
     change_player_class_visuals, cleanup_one_time_animations,
-    handle_anim_change_when_player_dir_changes, handle_player_animation_change, PlayerAnimation,
+    handle_anim_change_when_player_dir_changes, handle_player_animation_change,
+    preload_player_sprites, PlayerAnimation,
 };
 use serde::{Deserialize, Serialize};
 use ui_animaitons::{handle_move_animations, handle_ui_time_fragments};
@@ -97,10 +98,7 @@ impl Material2d for AnimatedTextureMaterial {
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
-            // .add_systems(
-            //     ().in_set(CoreGameSet::Main)
-            //         .in_schedule(CoreSchedule::FixedUpdate),
-            // )
+            .add_system(preload_player_sprites.in_schedule(OnExit(GameState::Loading)))
             .add_systems(
                 (
                     change_anim_offset_when_character_action_state_changes,

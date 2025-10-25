@@ -2,7 +2,6 @@ use std::{fs::File, io::BufReader};
 
 use bevy::{prelude::*, transform::TransformSystem};
 
-use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     geometry::Sensor,
@@ -32,9 +31,10 @@ pub mod skills;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub mod stats;
+use crate::player::skills::PlayerClass;
 use crate::{
     ai::{follow, idle, leap_attack},
-    animations::player_sprite::{PlayerAnimation, PlayerAnimationState, PlayerGreyAseprite},
+    animations::player_sprite::{PlayerAnimation, PlayerAnimationState},
     attributes::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
@@ -228,7 +228,6 @@ pub fn handle_player_raw_position(
 }
 fn spawn_player(
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut game: ResMut<Game>,
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
     proto: ProtoParam,
@@ -256,16 +255,10 @@ fn spawn_player(
     };
     info!("total currency all time start: {total_currency_all_time}");
 
-    //spawn player entity with limb spritesheets as children
     let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
     let p = commands
         .spawn((
-            AsepriteBundle {
-                aseprite: asset_server.load(PlayerGreyAseprite::PATH),
-                animation: AsepriteAnimation::from(PlayerGreyAseprite::tags::IDLE_FRONT),
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
-                ..default()
-            },
+            TransformBundle::from_transform(Transform::from_translation(Vec3::new(0., 0., 1.))),
             PlayerAnimation::Idle,
             PlayerAnimationState::new(),
             Player,
@@ -381,7 +374,11 @@ fn spawn_player(
     exp_sync_event.send_default();
 }
 
-fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoParam) {
+fn give_player_starting_items(
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+    player_class: Option<Res<PlayerClass>>,
+) {
     if let Ok(save_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(save_file);
 
@@ -389,7 +386,22 @@ fn give_player_starting_items(mut proto_commands: ProtoCommands, proto: ProtoPar
             return;
         }
     }
-    proto_commands.spawn_item_from_proto(WorldObject::Sword, &proto, Vec2::ZERO, 1, Some(1));
+
+    let selected_class = player_class
+        .as_ref()
+        .map(|pc| pc.class.clone())
+        .unwrap_or(SkillClass::None);
+
+    // Give class-specific starting weapon
+    let starting_weapon = match selected_class {
+        SkillClass::Melee => WorldObject::Sword,
+        SkillClass::Rogue => WorldObject::Dagger,
+        SkillClass::Magic => WorldObject::BasicStaff,
+        SkillClass::Thief => WorldObject::Claw,
+        _ => WorldObject::Sword, // Default fallback
+    };
+
+    proto_commands.spawn_item_from_proto(starting_weapon, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Spear, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Hammer, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));

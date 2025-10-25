@@ -17,7 +17,7 @@ use crate::{
     item::{CraftedItemEvent, EquipmentType},
     player::{
         levels::PlayerLevel,
-        skills::{PlayerSkills, HeirloomChoiceQueue},
+        skills::{HeirloomChoiceQueue, PlayerSkills},
         stats::StatType,
     },
     proto::proto_param::ProtoParam,
@@ -125,7 +125,7 @@ impl Interactable {
     pub fn previous(&self) -> &Interaction {
         &self.previous_state
     }
-    fn change(&mut self, new_state: Interaction) {
+    pub fn change(&mut self, new_state: Interaction) {
         std::mem::swap(&mut self.previous_state, &mut self.state);
         self.state = new_state;
     }

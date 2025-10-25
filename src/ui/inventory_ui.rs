@@ -30,6 +30,7 @@ pub enum UIState {
     Essence,
     Options,
     Scrapper,
+    ClassSelection,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {

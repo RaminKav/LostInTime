@@ -13,21 +13,27 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
 use crate::{
-    attributes::{AttributeChangeEvent, ItemRarity},
+    attributes::AttributeChangeEvent,
     inputs::FacingDirection,
-    inventory::Inventory,
     item::WorldObject,
     player::{
-        levels::PlayerLevel,
-        skills::{PlayerSkills, SkillClass},
+        skills::{PlayerClass, SkillClass},
+        Player,
     },
-    proto::proto_param::ProtoParam,
 };
 
 aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
 aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
 aseprite!(pub PlayerGreyAseprite, "textures/player/player_grey.aseprite");
 aseprite!(pub PlayerGreenAseprite, "textures/player/player_green.aseprite");
+
+#[derive(Resource)]
+pub struct PlayerSpriteHandles {
+    pub grey: Handle<Aseprite>,
+    pub red: Handle<Aseprite>,
+    pub green: Handle<Aseprite>,
+    pub blue: Handle<Aseprite>,
+}
 aseprite!(pub PlayerDeadAseprite, "textures/player/player_dead.aseprite");
 
 #[derive(Component, Eq, PartialEq, Debug)]
@@ -237,57 +243,53 @@ pub fn cleanup_one_time_animations(
     }
 }
 
+pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(PlayerSpriteHandles {
+        grey: asset_server.load(PlayerGreyAseprite::PATH),
+        red: asset_server.load(PlayerRedAseprite::PATH),
+        green: asset_server.load(PlayerGreenAseprite::PATH),
+        blue: asset_server.load(PlayerBlueAseprite::PATH),
+    });
+}
+
 pub fn change_player_class_visuals(
-    mut player: Query<
-        (Entity, &mut PlayerSkills, &mut Inventory, &PlayerLevel),
-        Changed<PlayerSkills>,
-    >,
+    mut player: Query<Entity, (Without<PlayerClass>, With<Player>)>,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    proto: ProtoParam,
     mut att_event: EventWriter<AttributeChangeEvent>,
+    player_class: Res<PlayerClass>,
+    sprite_handles: Res<PlayerSpriteHandles>,
 ) {
-    for (e, mut skills, mut inv, level) in player.iter_mut() {
-        let prev_class = skills.class.clone();
-        let class = skills.get_class_affinity(prev_class.clone());
+    for e in player.iter_mut() {
+        let class = &player_class.class;
         let (handle, anim) = match class {
             SkillClass::None => (
-                asset_server.load::<Aseprite, _>(PlayerGreyAseprite::PATH),
+                sprite_handles.grey.clone(),
+                PlayerGreyAseprite::tags::IDLE_FRONT,
+            ),
+            SkillClass::Thief => (
+                sprite_handles.grey.clone(),
                 PlayerGreyAseprite::tags::IDLE_FRONT,
             ),
             SkillClass::Melee => (
-                asset_server.load::<Aseprite, _>(PlayerRedAseprite::PATH),
+                sprite_handles.red.clone(),
                 PlayerRedAseprite::tags::IDLE_FRONT,
             ),
             SkillClass::Magic => (
-                asset_server.load::<Aseprite, _>(PlayerBlueAseprite::PATH),
+                sprite_handles.blue.clone(),
                 PlayerBlueAseprite::tags::IDLE_FRONT,
             ),
             SkillClass::Rogue => (
-                asset_server.load::<Aseprite, _>(PlayerGreenAseprite::PATH),
+                sprite_handles.green.clone(),
                 PlayerGreenAseprite::tags::IDLE_FRONT,
             ),
         };
-        let mut cape_stack = proto.get_item_data(class.get_cape()).unwrap().clone();
-        let level = level.level as i32 - 1;
-        cape_stack.attributes = class.compute_cape_stats(level);
-        if level >= 11 {
-            cape_stack.rarity = ItemRarity::Legendary;
-        } else if level >= 7 {
-            cape_stack.rarity = ItemRarity::Rare;
-        } else if level >= 3 {
-            cape_stack.rarity = ItemRarity::Uncommon;
-        } else {
-            cape_stack.rarity = ItemRarity::Common;
-        }
-        cape_stack.metadata.level = Some(level as u8);
-        inv.equipment_items.with_item_in_slot(3, cape_stack);
-        skills.class = class.clone();
+
         //att update event
         commands
             .entity(e)
             .remove::<TextureAtlasSprite>()
-            .insert(class)
+            .insert(class.clone())
+            .insert(player_class.clone())
             .insert(handle)
             .insert(AsepriteAnimation::from(anim));
 

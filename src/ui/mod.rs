@@ -1,10 +1,12 @@
 pub mod chest_ui;
+pub mod class_selection;
 pub mod crafting_ui;
 pub mod damage_numbers;
 pub mod guide_hud;
 pub mod item_chest;
 pub mod scrapper_ui;
 pub mod screen_effects;
+use class_selection::*;
 use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
@@ -238,6 +240,9 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((setup_class_selection_ui
+                .before(CustomFlush)
+                .run_if(state_changed::<UIState>().and_then(in_state(UIState::ClassSelection))),))
             .add_systems(
                 (
                     handle_anim_events.run_if(in_state(UIState::ItemChest)),
@@ -257,6 +262,11 @@ impl Plugin for UIPlugin {
                     toggle_item_chest_visibility.run_if(resource_added::<ItemChestState>()),
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
                     shuffle_items.run_if(in_state(UIState::ItemChest)),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
@@ -268,6 +278,7 @@ impl Plugin for UIPlugin {
             .add_system(
                 handle_new_ui_state.in_base_set(CoreSet::PostUpdate), // .run_if(in_state(GameState::Main)),
             )
+            .add_system(handle_class_selection.run_if(in_state(UIState::ClassSelection)))
             .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
             .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
