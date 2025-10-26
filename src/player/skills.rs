@@ -706,7 +706,7 @@ pub struct ActiveSkillUsedEvent {
     pub cooldown: f32,
 }
 
-#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
     #[default]
     Common,

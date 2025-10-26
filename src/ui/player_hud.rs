@@ -1,5 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
+use std::collections::HashMap;
 
 use super::{
     damage_numbers::spawn_text, interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon,
@@ -19,7 +20,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills},
+        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         Player, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -384,7 +385,7 @@ pub fn update_healthbar(
 }
 pub fn update_shieldbar(
     player_health_query: Query<
-        (&CurrentShield, &MaxShield, &MaxHealth),
+        (&CurrentShield, &MaxShield),
         (
             Or<(Changed<CurrentShield>, Changed<MaxShield>)>,
             With<Player>,
@@ -392,7 +393,7 @@ pub fn update_shieldbar(
     >,
     mut health_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<ShieldBar>>,
 ) {
-    let Ok((curr_shield, max_shield, max_health)) = player_health_query.get_single() else {
+    let Ok((curr_shield, max_shield)) = player_health_query.get_single() else {
         return;
     };
     let (mut sprite, mut flash) = health_bar_query.single_mut();
@@ -470,6 +471,9 @@ pub fn update_foodbar(
 pub struct SkillHudIcon(pub Heirloom);
 
 #[derive(Component)]
+pub struct HeirloomCounterText;
+
+#[derive(Component)]
 pub struct SkillClassText;
 
 pub fn setup_skills_class_text(
@@ -519,77 +523,147 @@ pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut prev_icons_tracker: Local<Vec<Heirloom>>,
+    mut prev_icons_tracker: Local<Vec<(Heirloom, i32)>>, // Track (heirloom, count) pairs
     res: Res<ScreenResolution>,
-    mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
+    // mut skill_class_text: Query<&mut Text, With<SkillClassText>>,
     game_over: EventReader<GameOverEvent>,
     asset_server: Res<AssetServer>,
     prev_active_skill_icons: Query<Entity, With<ActiveSkillIcon>>,
+    existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
+    _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
     }
+
     if let Ok(new_skills) = player_skills.get_single() {
-        for (i, heirloom_with_rarity) in new_skills.heirlooms.clone().iter().enumerate() {
-            if prev_icons_tracker.get(i) == Some(&heirloom_with_rarity.heirloom) {
-                continue;
+        // Group heirlooms by type and count them
+        let mut heirloom_counts: HashMap<Heirloom, (i32, HeirloomRarity)> = HashMap::new();
+
+        for heirloom_with_rarity in &new_skills.heirlooms {
+            let entry = heirloom_counts
+                .entry(heirloom_with_rarity.heirloom.clone())
+                .or_insert((0, heirloom_with_rarity.rarity.clone()));
+            entry.0 += 1;
+        }
+
+        // Check if we need to update icons (compare with previous state)
+        let current_state: Vec<(Heirloom, i32)> = heirloom_counts
+            .iter()
+            .map(|(heirloom, (count, _))| (heirloom.clone(), *count))
+            .collect();
+
+        let needs_update = prev_icons_tracker.len() != current_state.len()
+            || prev_icons_tracker
+                .iter()
+                .zip(current_state.iter())
+                .any(|(prev, curr)| prev != curr);
+
+        if needs_update {
+            // Despawn existing icons only when we need to update
+            existing_heirloom_icons.for_each(|(e, _)| {
+                commands.entity(e).despawn_recursive();
+            });
+
+            // Create a consolidated list of heirlooms in the correct order
+            let mut ordered_heirlooms: Vec<(Heirloom, i32)> = Vec::new();
+
+            // First, add existing heirlooms in their original order
+            for (heirloom, _prev_count) in &prev_icons_tracker {
+                if let Some((count, _)) = heirloom_counts.get(heirloom) {
+                    ordered_heirlooms.push((heirloom.clone(), *count));
+                }
             }
-            prev_icons_tracker.push(heirloom_with_rarity.heirloom.clone());
-            let offset = Vec2::new(
-                i as f32 * 19. + (-res.game_width) / 2. + 98.,
-                (GAME_HEIGHT - 15.) / 2. - 12.5,
-            );
 
-            // Create the main icon
-            let icon = commands
-                .spawn(SpriteSheetBundle {
-                    sprite: graphics.get_heirloom_icon(heirloom_with_rarity.heirloom.clone()),
-                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                    transform: Transform {
-                        translation: offset.extend(1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..Default::default()
+            // Then, add new heirlooms in sorted order
+            let mut new_heirlooms: Vec<_> = heirloom_counts
+                .iter()
+                .filter(|(heirloom, _)| {
+                    !prev_icons_tracker
+                        .iter()
+                        .any(|(prev_heirloom, _)| prev_heirloom == *heirloom)
                 })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(SkillHudIcon(heirloom_with_rarity.heirloom.clone()))
-                .insert(Name::new("HUD ICON!!"))
-                .id();
+                .collect();
 
-            // Add rarity-based background if not common
-            if let Some(glow) = heirloom_with_rarity.rarity.get_item_glow() {
-                commands
-                    .spawn(SpriteBundle {
-                        texture: graphics.get_item_glow(glow),
-                        sprite: Sprite {
-                            custom_size: Some(Vec2::new(18., 18.)),
-                            ..Default::default()
-                        },
+            // Sort by heirloom enum order for consistent positioning
+            new_heirlooms.sort_by(|a, b| {
+                // Convert heirlooms to strings and compare for consistent ordering
+                format!("{:?}", a.0).cmp(&format!("{:?}", b.0))
+            });
+
+            for (heirloom, (count, _)) in new_heirlooms {
+                ordered_heirlooms.push((heirloom.clone(), *count));
+            }
+
+            // Spawn all icons in one consolidated loop
+            for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
+                let offset = Vec2::new(
+                    i as f32 * 19. + (-res.game_width) / 2. + 98.,
+                    (GAME_HEIGHT - 15.) / 2. - 12.5,
+                );
+
+                // Create the main icon
+                let icon = commands
+                    .spawn(SpriteSheetBundle {
+                        sprite: graphics.get_heirloom_icon(heirloom.clone()),
+                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                         transform: Transform {
-                            translation: Vec3::new(0., 0., -1.),
+                            translation: offset.extend(1.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
                         ..Default::default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .set_parent(icon);
+                    .insert(SkillHudIcon(heirloom.clone()))
+                    .insert(Name::new("HUD ICON!!"))
+                    .id();
+
+                // Add counter text if count > 1
+                if *count > 1 {
+                    let _counter_text = commands
+                        .spawn(Text2dBundle {
+                            text: Text::from_section(
+                                count.to_string(),
+                                TextStyle {
+                                    font: asset_server.load("fonts/4x5.ttf"),
+                                    font_size: 5.0,
+                                    color: BLACK,
+                                },
+                            ),
+                            text_anchor: Anchor::BottomRight,
+                            transform: Transform {
+                                translation: Vec3::new(8., -8., 2.), // Bottom right of icon
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
+                            },
+                            ..default()
+                        })
+                        .insert(RenderLayers::from_layers(&[3]))
+                        .insert(HeirloomCounterText)
+                        .insert(Name::new("HEIRLOOM COUNTER"))
+                        .set_parent(icon)
+                        .id();
+                }
             }
-            let mut text = skill_class_text.single_mut();
-            text.sections[0].value = format!(
-                "  {:}     {:?}     {:?}",
-                0, // melee_skill_count - removed
-                0, // rogue_skill_count - removed
-                0  // magic_skill_count - removed
-            );
+
+            // Update the tracker with the new stable order
+            prev_icons_tracker.clear();
+            prev_icons_tracker.extend(ordered_heirlooms);
         }
+
+        // let mut text = skill_class_text.single_mut();
+        // text.sections[0].value = format!(
+        //     "  {:}     {:?}     {:?}",
+        //     0, // melee_skill_count - removed
+        //     0, // rogue_skill_count - removed
+        //     0  // magic_skill_count - removed
+        // );
 
         // Active Skill Icons
         prev_active_skill_icons.for_each(|e| {
             commands.entity(e).despawn_recursive();
         });
-
         for (i, active_skill_option) in vec![
             new_skills.active_skill_slot_1.clone(),
             new_skills.active_skill_slot_2.clone(),

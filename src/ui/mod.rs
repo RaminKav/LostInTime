@@ -68,7 +68,7 @@ use self::{
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(218., 145.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
 pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
-pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(109., 151.);
+pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(107., 151.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
