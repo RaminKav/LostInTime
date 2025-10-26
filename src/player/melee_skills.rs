@@ -20,7 +20,7 @@ use crate::{
     GameParam, HitEvent, InvincibilityTimer,
 };
 
-use super::{rogue_skills::LungeState, ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
+use super::{ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -59,7 +59,6 @@ pub fn handle_second_split_attack(
     mut hit_event: EventWriter<HitEvent>,
     time: Res<Time>,
     mut commands: Commands,
-    player: Query<(&PlayerSkills, Option<&LungeState>)>,
 ) {
     for (e, mut second_hit) in second_hit_query.iter_mut() {
         if !second_hit.delay.tick(time.delta()).just_finished() {
@@ -68,17 +67,12 @@ pub fn handle_second_split_attack(
         let Ok(frail_option) = mobs.get(e) else {
             continue;
         };
-        let (skills, maybe_lunge) = player.single();
 
         let (damage, was_crit) = game.calculate_player_damage(
             &mut commands,
             e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-            if skills.has(Heirloom::Attack) {
-                Some(1. + skills.get_count(Heirloom::Attack) as f32 * 0.1)
-            } else {
-                None
-            },
+            None,
             0,
             None,
         );

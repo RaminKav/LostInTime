@@ -60,14 +60,14 @@ impl SkillClass {
         };
         match self {
             SkillClass::Melee => {
-                stats.attack =
-                    AttributeValue::new(f32::floor(level as f32 * 1.5) as i32, quality, 1.);
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5. * 1.5) as i32, quality, 1.);
                 // stats.defence = AttributeValue::new(level, quality, 1.);
                 stats.health = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Rogue => {
-                stats.attack =
-                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
                 stats.speed = AttributeValue::new(level * 2, quality, 1.);
                 stats.dodge = AttributeValue::new(level * 3, quality, 1.);
                 // stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
@@ -75,15 +75,15 @@ impl SkillClass {
                 //     AttributeValue::new(f32::floor(level as f32 * 3.5) as i32, quality, 1.);
             }
             SkillClass::Magic => {
-                stats.attack =
-                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
                 stats.mana = AttributeValue::new(level * 5, quality, 1.);
                 stats.mana_regen =
                     AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
             }
             SkillClass::Thief => {
-                stats.attack =
-                    AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
                 stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
                 stats.crit_damage =
                     AttributeValue::new(f32::floor(level as f32 * 2.) as i32, quality, 1.);

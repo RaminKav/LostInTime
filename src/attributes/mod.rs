@@ -444,7 +444,7 @@ impl ItemAttributes {
         if self.bonus_damage.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} Damage",
+                    "{}{}% Damage",
                     if is_positive(self.bonus_damage.value) {
                         "+"
                     } else {
@@ -887,7 +887,10 @@ impl ItemAttributes {
         tooltips.push(("Mana:          ".to_string(), format!("{}", self.mana)));
         tooltips.push((
             "Attack:             ".to_string(),
-            format!("{}", self.attack + self.bonus_damage),
+            format!(
+                "{}",
+                f32::floor(self.attack.value as f32 * (1. + self.bonus_damage.value as f32 / 100.))
+            ),
         ));
         tooltips.push(("Defence:        ".to_string(), format!("{}", self.defence)));
         tooltips.push((
@@ -954,7 +957,9 @@ impl ItemAttributes {
         entity.insert(CritDamage(
             self.crit_damage.value + skills.get_count(Heirloom::CritDamage) * 15,
         ));
-        entity.insert(BonusDamage(self.bonus_damage.value));
+        entity.insert(BonusDamage(
+            self.bonus_damage.value + skills.get_count(Heirloom::Attack) * 10,
+        ));
         entity.insert(HealthRegen(
             self.health_regen.value
                 + skills.get_count(Heirloom::HPRegen) * 5

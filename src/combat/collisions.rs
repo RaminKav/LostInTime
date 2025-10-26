@@ -16,7 +16,7 @@ use crate::{
     player::{
         mage_skills::IceExplosionDmg,
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
-        skills::{PlayerSkills, Heirloom},
+        skills::Heirloom,
     },
     ui::damage_numbers::DodgeEvent,
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
@@ -63,7 +63,6 @@ fn check_melee_hit_collisions(
     mut hit_event: EventWriter<HitEvent>,
     game: GameParam,
     world_obj: Query<Entity, (With<WorldObject>, Without<MainHand>)>,
-    skills: Query<&PlayerSkills>,
     mobs: Query<
         (
             &GlobalTransform,
@@ -100,17 +99,12 @@ fn check_melee_hit_collisions(
             else {
                 continue;
             };
-            let skills = skills.single();
 
             let (mut damage, was_crit) = game.calculate_player_damage(
                 &mut commands,
                 hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
-                if skills.has(Heirloom::Attack) {
-                    Some(1. + skills.get_count(Heirloom::Attack) as f32 * 0.1)
-                } else {
-                    None
-                },
+                None,
                 0,
                 None,
             );
@@ -218,18 +212,8 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 0
             };
-            let (mut damage, was_crit) = game.calculate_player_damage(
-                &mut commands,
-                *e2,
-                crit_bonus,
-                if game.has_skill(Heirloom::Attack) {
-                    Some(1. + game.skill_count(Heirloom::Attack) as f32 * 0.1)
-                } else {
-                    None
-                },
-                0,
-                Some(att.0),
-            );
+            let (mut damage, was_crit) =
+                game.calculate_player_damage(&mut commands, *e2, crit_bonus, None, 0, Some(att.0));
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }

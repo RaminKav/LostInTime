@@ -89,7 +89,7 @@ use item::{Equipment, ItemsPlugin, RecipeListProto, WorldObject, WorldObjectReso
 use player::{
     levels::PlayerLevel,
     rogue_skills::ComboCounter,
-    skills::{PlayerSkills, Heirloom},
+    skills::{Heirloom, PlayerSkills},
     Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
@@ -596,6 +596,8 @@ impl<'w, 's> GameParam<'w, 's> {
         } else {
             0
         };
+        // Convert bonus damage percentage to multiplier (e.g., 30% -> 1.3x)
+        let bonus_damage_multiplier = 1.0 + (bonus_dmg.0 as f32 / 100.0);
         if rng.gen_ratio(
             u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
             100,
@@ -603,14 +605,15 @@ impl<'w, 's> GameParam<'w, 's> {
         {
             commands.entity(hit_entity).insert(WasHitWithCrit);
             (
-                ((dmg_mult * (dmg + bonus_dmg.0 + dmg_bonus as i32) as f32)
+                ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
+                    * bonus_damage_multiplier
                     * (f32::abs((crit_dmg.0 + crit_dmb_bonus) as f32) / 100.))
                     as u32,
                 true,
             )
         } else {
             (
-                (dmg_mult * (dmg + bonus_dmg.0) as f32) as u32 + dmg_bonus,
+                ((dmg_mult * (dmg + dmg_bonus as i32) as f32) * bonus_damage_multiplier) as u32,
                 false,
             )
         }
