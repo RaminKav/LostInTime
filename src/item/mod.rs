@@ -55,6 +55,7 @@ pub mod boss_shrine;
 pub mod combat_shrine;
 pub mod dungeon_shrine;
 pub mod gamble_shrine;
+pub mod potion_buffs;
 use boss_shrine::*;
 pub mod item_upgrades;
 mod loot_table;
@@ -75,6 +76,7 @@ use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
+use self::potion_buffs::{apply_attack_speed_buff, tick_potion_buffs};
 use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
@@ -284,6 +286,8 @@ pub enum WorldObject {
     LargePotion,
     SmallManaPotion,
     LargeManaPotion,
+    AttackSpeedPotion,
+    MovementSpeedPotion,
     Chest,
     ChestBlock,
     DungeonEntrance,
@@ -886,6 +890,8 @@ impl Plugin for ItemsPlugin {
                     handle_dungeon_shrine_rewards,
                     add_dungeon_shrine_visuals_on_spawn,
                     handle_dungeon_shrine_activation,
+                    tick_potion_buffs.run_if(is_not_paused),
+                    apply_attack_speed_buff.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

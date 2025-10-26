@@ -30,7 +30,9 @@ use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use super::{
-    gamble_shrine::GambleShrineEvent, CraftingTracker, PlaceItemEvent, Recipes, WorldObject,
+    gamble_shrine::GambleShrineEvent,
+    potion_buffs::{AttackSpeedBuff, MovementSpeedBuff},
+    CraftingTracker, PlaceItemEvent, Recipes, WorldObject,
 };
 
 #[derive(Component, Reflect, FromReflect, Clone, Schematic, Default, PartialEq)]
@@ -40,6 +42,8 @@ pub enum ItemAction {
     None,
     ModifyHealth(i32),
     ModifyMana(i32),
+    ApplyAttackSpeedBuff(f32, f32),   // (duration, speed_multiplier)
+    ApplyMovementSpeedBuff(f32, f32), // (duration, speed_multiplier)
     TeleportHome,
     PlacesInto(WorldObject),
     Eat(i8),
@@ -58,6 +62,16 @@ impl ItemAction {
                 "{}{} Mana",
                 if delta > &0 { "+" } else { "" },
                 delta
+            )),
+            ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => Some(format!(
+                "+{:.0}% Attack Speed for {:.0}s",
+                (multiplier - 1.0) * 100.0,
+                duration
+            )),
+            ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => Some(format!(
+                "+{:.0}% Movement Speed for {:.0}s",
+                (multiplier - 1.0) * 100.0,
+                duration
             )),
             ItemAction::Eat(delta) => Some(format!(
                 "{}{} Food",
@@ -87,6 +101,8 @@ impl ItemActions {
                 ItemAction::PlacesInto(_) => has_places_into = true,
                 ItemAction::ModifyHealth(_) => has_consumable = true,
                 ItemAction::ModifyMana(_) => has_consumable = true,
+                ItemAction::ApplyAttackSpeedBuff(_, _) => has_consumable = true,
+                ItemAction::ApplyMovementSpeedBuff(_, _) => has_consumable = true,
                 _ => {}
             }
         }
@@ -165,6 +181,24 @@ impl ItemActions {
                     item_action_param
                         .modify_mana_event
                         .send(ModifyManaEvent(*delta));
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => {
+                    // Apply attack speed buff to player
+                    if let Ok((player_entity, _, _, _)) = game.player_query.get_single() {
+                        commands
+                            .entity(player_entity)
+                            .insert(AttackSpeedBuff::new(*duration, *multiplier));
+                    }
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => {
+                    // Apply movement speed buff to player
+                    if let Ok((player_entity, _, _, _)) = game.player_query.get_single() {
+                        commands
+                            .entity(player_entity)
+                            .insert(MovementSpeedBuff::new(*duration, *multiplier));
+                    }
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::TeleportHome => {

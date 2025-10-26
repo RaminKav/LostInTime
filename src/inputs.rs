@@ -1,3 +1,4 @@
+use crate::item::potion_buffs::MovementSpeedBuff;
 use std::f32::consts::PI;
 use std::time::Duration;
 
@@ -239,6 +240,7 @@ pub fn player_move_inputs(
             &mut RunDustTimer,
             &PlayerSkills,
             Option<&BounceEffect>,
+            Option<&MovementSpeedBuff>,
         ),
         (
             With<Player>,
@@ -270,16 +272,22 @@ pub fn player_move_inputs(
         mut run_dust_timer,
         skills,
         bounce_option,
+        movement_speed_buff,
     ) = player_query.single_mut();
     if bounce_option.is_some() {
         return;
     }
     let player = game.player_mut();
     let mut d = Vec2::ZERO;
+    let movement_speed_multiplier = movement_speed_buff
+        .map(|buff| buff.speed_multiplier)
+        .unwrap_or(1.0);
+
     let s = PLAYER_MOVE_SPEED
         * time.delta_seconds()
         * (1. + speed.0 as f32 / 100.)
         * (if hunger.is_starving() { 0.7 } else { 1. })
+        * movement_speed_multiplier
         * curr_anim.action_movement_restriction(player.main_hand_slot.clone().map(|s| s.get_obj()));
 
     if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {

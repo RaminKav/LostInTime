@@ -215,6 +215,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        MovementSpeedPotion: WorldObjectData(
+            texture_pos: (7., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        AttackSpeedPotion: WorldObjectData(
+            texture_pos: (8., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         LargeManaPotion: WorldObjectData(
             texture_pos: (0., 7.),
             size: (16., 16.),
