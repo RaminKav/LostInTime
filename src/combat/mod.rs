@@ -152,7 +152,7 @@ fn handle_enemy_death(
     mut death_events: EventReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
-    mut player_xp: Query<&mut PlayerLevel>,
+    mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills)>,
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
     mut commands: Commands,
@@ -161,7 +161,7 @@ fn handle_enemy_death(
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
             continue;
         };
-        let mut player_level = player_xp.single_mut();
+        let (mut player_level, player_skills) = player_xp.single_mut();
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(
@@ -183,7 +183,7 @@ fn handle_enemy_death(
             }
         }
         //give player xp
-        let did_level = player_level.add_xp(mob_xp.0);
+        let did_level = player_level.add_xp(mob_xp.0, &player_skills);
         spawn_xp_particles(death_event.enemy_pos, &mut commands, mob_xp.0, did_level);
     }
 }

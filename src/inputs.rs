@@ -442,7 +442,8 @@ pub fn toggle_inventory(
             });
         }
         if key_input.just_pressed(KeyCode::C) {
-            let did_level = game.get_player_level_mut().add_xp(100);
+            let skills = game.get_player_skills().clone();
+            let did_level = game.get_player_level_mut().add_xp(100, &skills);
 
             flash_event.send(FlashExpBarEvent {
                 amount: 100,

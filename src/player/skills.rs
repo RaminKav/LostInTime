@@ -112,6 +112,7 @@ pub enum Heirloom {
     Attack,
     Gigantify,
     Chest,
+    XPGain,
 
     // On-Attack Triggers
     WaveAttack,
@@ -211,6 +212,7 @@ impl Heirloom {
             Heirloom::IncreaseProjectilCount => "Multi Shot".to_string(),
             Heirloom::BowArrowSpeed => "Piercing Arrows".to_string(),
             Heirloom::Gigantify => "Gigantify".to_string(),
+            Heirloom::XPGain => "Experience Boost".to_string(),
 
             Heirloom::IceStaffAoE => "Explosive Blast".to_string(),
             Heirloom::Sprint => "Sprint".to_string(),
@@ -276,7 +278,7 @@ impl Heirloom {
                 "Gain +15% Attack".to_string(),
                 "Speed, permanently. ".to_string(),
             ],
-
+            Heirloom::XPGain => vec!["Gain +10% XP".to_string(), "permanently. ".to_string()],
             Heirloom::DodgeChance => vec![
                 "Gain +10% Dodge".to_string(),
                 "Chance,".to_string(),
@@ -779,6 +781,7 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::HPRegen, HeirloomRarity::Common)
                     .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::XPGain, HeirloomRarity::Common).set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon)

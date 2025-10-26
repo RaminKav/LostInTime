@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     animations::AnimationTimer,
     colors::YELLOW,
+    player::skills::{Heirloom, PlayerSkills},
     ui::{damage_numbers::spawn_floating_text_with_shadow, UIState},
     DEBUG, GAME_HEIGHT,
 };
@@ -36,9 +37,9 @@ impl PlayerLevel {
         }
     }
 
-    pub fn add_xp(&mut self, xp: u32) -> bool {
+    pub fn add_xp(&mut self, xp: u32, skills: &PlayerSkills) -> bool {
         let mut did_level_up = false;
-        self.xp += xp;
+        self.xp += (xp as f32 * (1. + skills.get_count(Heirloom::XPGain) as f32 * 0.1)) as u32;
 
         if self.xp >= self.next_level_xp {
             self.level += 1;

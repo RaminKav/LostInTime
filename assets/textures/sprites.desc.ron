@@ -1152,6 +1152,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        XPGain: WorldObjectData(
+            texture_pos: (14., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(
