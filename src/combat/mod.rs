@@ -29,6 +29,7 @@ use crate::{
     },
     item::{
         combat_shrine::{CombatShrineMob, CombatShrineMobDeathEvent},
+        dungeon_shrine::{DungeonShrineMob, DungeonShrineMobDeathEvent},
         projectile::Projectile,
         EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
@@ -36,7 +37,7 @@ use crate::{
     player::{
         levels::{ExperienceReward, PlayerLevel},
         mage_skills::spawn_ice_explosion_hitbox,
-        skills::{PlayerSkills, Heirloom},
+        skills::{Heirloom, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
@@ -213,10 +214,12 @@ pub fn handle_hits(
         Option<&RequiredEquipmentType>,
         Option<&InvincibilityCooldown>,
         Option<&CombatShrineMob>,
+        Option<&DungeonShrineMob>,
     )>,
     mut hit_events: EventReader<HitEvent>,
     mut enemy_death_events: EventWriter<EnemyDeathEvent>,
     mut shrine_mob_death_event: EventWriter<CombatShrineMobDeathEvent>,
+    mut dungeon_shrine_mob_death_event: EventWriter<DungeonShrineMobDeathEvent>,
     mut obj_death_events: EventWriter<ObjBreakEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
@@ -239,6 +242,7 @@ pub fn handle_hits(
             hit_req_option,
             i_frame_option,
             shrine_option,
+            dungeon_shrine_option,
         )) = health.get_mut(hit.hit_entity)
         {
             // don't shoot a dead horse...
@@ -370,6 +374,11 @@ pub fn handle_hits(
                     if let Some(parent_shrine) = shrine_option {
                         shrine_mob_death_event
                             .send(CombatShrineMobDeathEvent(parent_shrine.parent_shrine));
+                    }
+
+                    if let Some(parent_shrine) = dungeon_shrine_option {
+                        dungeon_shrine_mob_death_event
+                            .send(DungeonShrineMobDeathEvent(parent_shrine.parent_shrine));
                     }
                 }
 

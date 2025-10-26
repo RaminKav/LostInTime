@@ -39,7 +39,6 @@ impl Plugin for SpawnerPlugin {
                     test_mob_count,
                     spawn_one_time_enemies_at_day,
                     reduce_chunk_mob_count_on_mob_death,
-                    despawn_out_of_range_mobs,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -168,31 +167,6 @@ fn add_spawners_to_new_chunks(
             num_to_spawn: Some(5),
             num_spawned: 0,
         });
-    } else {
-        spawners.push(Spawner {
-            enemy: Mob::SpikeSlime,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(20., TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: None,
-            num_spawned: 0,
-        });
-        spawners.push(Spawner {
-            enemy: Mob::FurDevil,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(20., TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: None,
-            num_spawned: 0,
-        });
-        spawners.push(Spawner {
-            enemy: Mob::Bushling,
-            weight: 100.,
-            spawn_timer: Timer::from_seconds(20., TimerMode::Once),
-            min_days_to_spawn: 0,
-            num_to_spawn: None,
-            num_spawned: 0,
-        });
     }
     commands.spawn(GlobalSpawners {
         spawners,
@@ -233,20 +207,16 @@ fn handle_spawn_mobs(
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut GlobalSpawners>,
     asset_server: Res<AssetServer>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
+    if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
     'outer: for e in spawner_trigger_event.iter() {
         let mut rng = rand::thread_rng();
         let maybe_spawner = spawners.get_mut(e.spawner);
         let mut picked_mob_to_spawn = None;
         if let Ok(mut chunk_spawner) = maybe_spawner {
-            // let is_currently_spawning = chunk_spawner
-            //     .spawners
-            //     .iter()
-            //     .any(|spawner| spawner.spawn_timer.percent() > 0.);
-            // if is_currently_spawning && !e.bypass_timers {
-            //     continue;
-            // }
-
             let player_pos = player_t.single().translation().truncate();
             let mut pos = player_pos;
             let mut can_spawn_mob_here_check = false;
@@ -320,18 +290,6 @@ fn reduce_chunk_mob_count_on_mob_death(
     }
 }
 
-fn despawn_out_of_range_mobs(
-    game: GameParam,
-    mut commands: Commands,
-    mut query: Query<(Entity, &Transform), With<Mob>>,
-) {
-    for (e, t) in query.iter_mut() {
-        let chunk_pos = camera_pos_to_chunk_pos(&t.translation.truncate());
-        if game.get_chunk_entity(chunk_pos).is_none() {
-            commands.entity(e).despawn_recursive();
-        }
-    }
-}
 fn spawn_one_time_enemies_at_day(
     game: GameParam,
     night_tracker: ResMut<NightTracker>,

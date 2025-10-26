@@ -13,6 +13,9 @@ use crate::attributes::{add_item_glows, ItemGlow};
 use crate::enemy::Mob;
 use crate::inventory::ItemStack;
 use crate::item::combat_shrine::CombatShrineAnim;
+use crate::item::dungeon_shrine::AccessoryShrineAnim;
+use crate::item::dungeon_shrine::ArmorShrineAnim;
+use crate::item::dungeon_shrine::WeaponShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::{
     Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
@@ -99,6 +102,9 @@ impl Plugin for GameAssetsPlugin {
                 item_glows: None,
                 combat_shrine_anim: None,
                 gamble_shrine_anim: None,
+                weapon_shrine_anim: None,
+                armor_shrine_anim: None,
+                accessory_shrine_anim: None,
                 blacksmith_merchant: None,
                 portal_ase: None,
             })
@@ -157,6 +163,9 @@ pub struct Graphics {
     pub heirloom_sprites: Option<HashMap<Heirloom, TextureAtlasSprite>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
+    pub weapon_shrine_anim: Option<Handle<Aseprite>>,
+    pub armor_shrine_anim: Option<Handle<Aseprite>>,
+    pub accessory_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
     pub blacksmith_merchant: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
@@ -406,6 +415,9 @@ impl GameAssetsPlugin {
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
+            weapon_shrine_anim: Some(asset_server.load(WeaponShrineAnim::PATH)),
+            armor_shrine_anim: Some(asset_server.load(ArmorShrineAnim::PATH)),
+            accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
             blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
         };

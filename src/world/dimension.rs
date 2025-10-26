@@ -9,9 +9,8 @@ use crate::{
     player::{MovePlayerEvent, Player},
     world::{
         dungeon::{Dungeon, Dungeontimer},
-        dungeon_generation::{gen_new_dungeon, get_player_spawn_tile, Bias},
+        dungeon_generation::{gen_new_room_dungeon, get_player_spawn_tile, DUNGEON_GRID_SIZE},
         world_helpers::world_pos_to_tile_pos,
-        CHUNK_SIZE,
     },
     CustomFlush, GameParam, GameState,
 };
@@ -160,14 +159,7 @@ impl DimensionPlugin {
                         .insert(CachedPlayerPos(world_pos_to_tile_pos(
                             player_pos.truncate(),
                         )));
-                    let grid = gen_new_dungeon(
-                        3000,
-                        (CHUNK_SIZE * 4 * 2) as usize,
-                        Bias {
-                            bias: super::dungeon_generation::Direction::Left,
-                            strength: 0,
-                        },
-                    );
+                    let grid = gen_new_room_dungeon(DUNGEON_GRID_SIZE as usize);
                     commands
                         .entity(dim_e)
                         .insert(Dungeon { grid: grid.clone() })

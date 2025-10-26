@@ -49,6 +49,30 @@ pub fn add_guide_to_unique_objs(
                     icon_stack: None,
                 });
             }
+            WorldObject::WeaponShrine => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Fight".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: None,
+                });
+            }
+            WorldObject::ArmorShrine => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Fight".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: None,
+                });
+            }
+            WorldObject::AccessoryShrine => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Fight".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: None,
+                });
+            }
             WorldObject::GambleShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
                     key: Some("F".to_string()),

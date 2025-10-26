@@ -25,6 +25,7 @@ use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::dungeon::Dungeon;
+use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
 use crate::world::world_helpers::{
     can_object_be_placed_here, tile_pos_to_world_pos, world_pos_to_tile_pos,
@@ -39,6 +40,10 @@ use combat_shrine::{
     add_shrine_visuals_on_spawn, handle_combat_shrine_activate_animation, handle_shrine_rewards,
     CombatShrineMobDeathEvent,
 };
+use dungeon_shrine::{
+    add_dungeon_shrine_visuals_on_spawn, handle_dungeon_shrine_activation,
+    handle_dungeon_shrine_rewards, DungeonShrineMobDeathEvent,
+};
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
@@ -48,6 +53,7 @@ pub mod item_actions;
 
 pub mod boss_shrine;
 pub mod combat_shrine;
+pub mod dungeon_shrine;
 pub mod gamble_shrine;
 use boss_shrine::*;
 pub mod item_upgrades;
@@ -286,6 +292,12 @@ pub enum WorldObject {
     CombatShrineDone,
     GambleShrine,
     GambleShrineDone,
+    WeaponShrine,
+    WeaponShrineDone,
+    ArmorShrine,
+    ArmorShrineDone,
+    AccessoryShrine,
+    AccessoryShrineDone,
     Grass,
     Grass2,
     Grass3,
@@ -829,6 +841,7 @@ impl Plugin for ItemsPlugin {
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
             .add_event::<CombatShrineMobDeathEvent>()
+            .add_event::<DungeonShrineMobDeathEvent>()
             .add_event::<GambleShrineEvent>()
             .add_plugin(CraftingPlugin)
             .add_plugin(RangedAttackPlugin)
@@ -865,6 +878,14 @@ impl Plugin for ItemsPlugin {
                         .after(handle_hits)
                         .run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    handle_dungeon_shrine_rewards,
+                    add_dungeon_shrine_visuals_on_spawn,
+                    handle_dungeon_shrine_activation,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -921,8 +942,11 @@ pub fn handle_placing_world_object(
                             + (tile_pos.chunk_pos.x * CHUNK_SIZE as i32)
                             + tile_pos.tile_pos.x as i32)
                             as usize;
-                        if dungeon.grid[(original_y as i32 + y).clamp(0, 127) as usize]
-                            [(original_x as i32 + x).clamp(0, 127) as usize]
+                        if dungeon.grid[(original_y as i32 + y)
+                            .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
+                            as usize][(original_x as i32 + x)
+                            .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
+                            as usize]
                             == 1
                         {
                             is_touching_air = true

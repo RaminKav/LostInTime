@@ -24,10 +24,10 @@
       object_generation_frequencies: {
         Grass: 0.0,
         DeadSapling: 0.0,
-        Boulder: 0.005,
-        Boulder2: 0.005,
-        CoalBoulder: 0.003,
-        MetalBoulder: 0.003,
+        Boulder: 0.0,
+        Boulder2: 0.0,
+        CoalBoulder: 0.0,
+        MetalBoulder: 0.0,
         Crate: 0.0008,
         Pebble: 0.01,
         BrownMushroom: 0.005,
@@ -46,6 +46,12 @@
         StoneWall: [GrassTile, StoneTile],
         DungeonExit: [GrassTile, StoneTile],
         GambleShrine: [GrassTile, ],
+        WeaponShrine: [StoneTile],
+        ArmorShrine: [StoneTile],
+        AccessoryShrine: [StoneTile],
+        WeaponShrineDone: [StoneTile],
+        ArmorShrineDone: [StoneTile],
+        AccessoryShrineDone: [StoneTile],
       }
     ),
   }

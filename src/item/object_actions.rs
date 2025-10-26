@@ -1,4 +1,5 @@
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
+use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
@@ -6,6 +7,7 @@ use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 use crate::attributes::ItemRarity;
 use crate::container::Container;
 use crate::inventory::Inventory;
+use crate::item::dungeon_shrine::NUM_DUNGEON_SHRINE_MOBS;
 use crate::juice::ShakeEffect;
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
@@ -43,6 +45,9 @@ pub enum ObjectAction {
     SetHome,
     CombatShrine,
     GambleShrine,
+    WeaponShrine,
+    ArmorShrine,
+    AccessoryShrine,
     ToggleBeacon(WorldObject),
 }
 
@@ -298,6 +303,98 @@ impl ObjectAction {
                             GambleShrineAnim::tags::ACTIVATE_FAIL,
                         ));
                 }
+            }
+            ObjectAction::WeaponShrine => {
+                // Screen Shake
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in item_action_param.game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(4., TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+                commands
+                    .entity(e)
+                    .insert(DungeonShrine {
+                        shrine_type: DungeonShrineType::Weapon,
+                        num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
+                        is_cleared: false,
+                        is_activated: false,
+                    })
+                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
+                    .remove::<InteractionGuideTrigger>()
+                    .remove::<ObjectAction>();
+            }
+            ObjectAction::ArmorShrine => {
+                // Screen Shake
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in item_action_param.game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(4., TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+
+                commands
+                    .entity(e)
+                    .insert(DungeonShrine {
+                        shrine_type: DungeonShrineType::Armor,
+                        num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
+                        is_cleared: false,
+                        is_activated: false,
+                    })
+                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
+                    .remove::<InteractionGuideTrigger>()
+                    .remove::<ObjectAction>();
+            }
+            ObjectAction::AccessoryShrine => {
+                // Screen Shake
+                let mut rng = rand::thread_rng();
+                let seed = rng.gen_range(0..100000);
+                let speed = 10.;
+                let max_mag = 120.;
+                let noise = 0.5;
+                let dir = Vec2::new(1., 1.);
+                for e in item_action_param.game_camera.iter_mut() {
+                    commands.entity(e).insert(ShakeEffect {
+                        timer: Timer::from_seconds(4., TimerMode::Once),
+                        speed,
+                        seed,
+                        max_mag,
+                        noise,
+                        dir,
+                    });
+                }
+
+                commands
+                    .entity(e)
+                    .insert(DungeonShrine {
+                        shrine_type: DungeonShrineType::Accessory,
+                        num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
+                        is_cleared: false,
+                        is_activated: false,
+                    })
+                    .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
+                    .remove::<InteractionGuideTrigger>()
+                    .remove::<ObjectAction>();
             }
             _ => {}
         }

@@ -4,7 +4,7 @@ use crate::{world::dimension::Dimension, GameState, GAME_HEIGHT};
 
 use super::{
     dimension::{ActiveDimension, DimensionSpawnEvent, EraManager},
-    dungeon_generation::{add_dungeon_chests, add_dungeon_exit_block},
+    dungeon_generation::add_dungeon_shrines,
     TileMapPosition,
 };
 
@@ -16,9 +16,8 @@ pub struct DungeonPlugin;
 impl Plugin for DungeonPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems((
-            add_dungeon_chests,
+            add_dungeon_shrines,
             tick_dungeon_timer.run_if(in_state(GameState::Main)),
-            add_dungeon_exit_block,
             spawn_dungeon_text,
         ));
     }

@@ -236,31 +236,18 @@ pub fn handle_new_mob_state_machine(
                     );
             }
             CombatAlignment::Hostile => {
-                state_machine = state_machine
-                    .trans::<IdleState>(
-                        LineOfSight {
-                            target: game.game.player,
-                            range: 130.,
-                        },
-                        FollowState {
-                            target: game.game.player,
-                            curr_delta: None,
-                            curr_path: None,
-                            speed: follow_speed.0,
-                        },
-                    )
-                    .trans::<FollowState>(
-                        Trigger::not(LineOfSight {
-                            target: game.game.player,
-                            range: 160.,
-                        }),
-                        IdleState {
-                            walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
-                            direction: FacingDirection::new_rand_dir(rand::thread_rng()),
-                            speed: 0.5,
-                            is_stopped: false,
-                        },
-                    );
+                state_machine = state_machine.trans::<IdleState>(
+                    LineOfSight {
+                        target: game.game.player,
+                        range: 130.,
+                    },
+                    FollowState {
+                        target: game.game.player,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: follow_speed.0,
+                    },
+                );
             }
             CombatAlignment::Passive => {
                 //TODO: impl run away

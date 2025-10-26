@@ -2,16 +2,14 @@ use crate::{
     ai::HurtByPlayer,
     custom_commands::CommandsExt,
     enemy::spawn_helpers::can_spawn_mob_here,
-    inventory::ItemStack,
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
     player::levels::ExperienceReward,
-    ui::{damage_numbers::spawn_screen_locked_icon, key_input_guide::InteractionGuideTrigger},
     world::{world_helpers::tile_pos_to_world_pos, TILE_SIZE},
     GameParam, TextureCamera,
 };
 use bevy::prelude::*;
-use bevy_proto::prelude::{ProtoCommands, Prototypes};
+use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     control::KinematicCharacterController,
     geometry::{Collider, Sensor},
@@ -350,13 +348,9 @@ pub fn summon_attack(
 }
 pub fn handle_death(
     mut commands: Commands,
-    mut death: Query<(Entity, &mut AsepriteAnimation, &GlobalTransform), With<DeathState>>,
-    asset_server: Res<AssetServer>,
-    prototypes: Prototypes,
-    mut proto_commands: ProtoCommands,
-    game: GameParam,
+    mut death: Query<(Entity, &mut AsepriteAnimation), With<DeathState>>,
 ) {
-    for (entity, mut anim, t) in death.iter_mut() {
+    for (entity, mut anim) in death.iter_mut() {
         if anim.current_frame() < 43 {
             *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_START);
         }
@@ -368,25 +362,6 @@ pub fn handle_death(
         }
         if anim.current_frame() == 62 {
             commands.entity(entity).despawn_recursive();
-            if let Some(spawned_mob) =
-                proto_commands.spawn_from_proto(Mob::Fairy, &prototypes, t.translation().truncate())
-            {
-                spawn_screen_locked_icon(
-                    spawned_mob,
-                    &mut commands,
-                    &game.graphics,
-                    &asset_server,
-                    WorldObject::TimeFragment,
-                );
-                commands
-                    .entity(spawned_mob)
-                    .insert(InteractionGuideTrigger {
-                        key: Some("F".to_string()),
-                        text: Some(" Shop".to_string()),
-                        activation_distance: 32.,
-                        icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
-                    });
-            }
         }
     }
 }
