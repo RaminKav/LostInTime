@@ -25,7 +25,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: FireStaff,
         attributes: (
-            attack_cooldown: 0.85
+            attack_cooldown: 0.35
         ),
         metadata: (
             name: "Fire Staff ", 

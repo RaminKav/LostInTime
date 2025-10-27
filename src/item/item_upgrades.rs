@@ -9,7 +9,7 @@ use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::item::WorldObject;
 use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
-use crate::player::skills::{PlayerSkills, Heirloom};
+use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::status_effects::{
     try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
 };
@@ -229,7 +229,7 @@ pub fn handle_on_hit_upgrades(
                 from_entity: None,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(hit.damage / 4),
+                dmg_override: Some(hit.damage),
                 pos_override: Some(hit_entity_txfm.translation().truncate()),
                 spawn_delay: 0.1,
             });

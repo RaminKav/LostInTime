@@ -309,7 +309,7 @@ fn spawn_player(
             mana: MaxMana(100),
             attack: Attack(0),
             health_regen: HealthRegen(2),
-            mana_regen: ManaRegen(5),
+            mana_regen: ManaRegen(10),
             crit_chance: CritChance(5),
             crit_damage: CritDamage(150),
             attack_cooldown: AttackCooldown(0.4),
@@ -319,7 +319,7 @@ fn spawn_player(
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(ManaRegenTimer(Timer::from_seconds(4., TimerMode::Once)))
+        .insert(ManaRegenTimer(Timer::from_seconds(2., TimerMode::Once)))
         .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))

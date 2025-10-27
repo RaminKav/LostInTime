@@ -49,11 +49,7 @@ impl Plugin for NightPlugin {
         app.register_type::<NightTracker>()
             .add_event::<NewDayEvent>()
             // .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
-            .add_system(
-                spawn_night
-                    .run_if(is_not_paused)
-                    .in_schedule(OnEnter(GameState::Main)),
-            )
+            .add_system(spawn_night.in_schedule(OnEnter(GameState::Main)))
             .add_system(
                 tick_night_color
                     .run_if(is_not_paused)
@@ -67,6 +63,7 @@ pub fn spawn_night(
     night_tracker: Res<NightTracker>,
     res: Res<ScreenResolution>,
 ) {
+    info!("Spawning night overlay");
     commands
         .spawn(SpriteBundle {
             sprite: Sprite {

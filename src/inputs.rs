@@ -711,7 +711,6 @@ pub fn mouse_click_system(
             }
         }
         let mut did_attack = false;
-        let mut is_melee_wep_or_tool = false;
         if let Some(main_hand) = main_hand_option {
             if main_hand == WorldObject::WoodBow {
                 commands.entity(player_e).insert(PlayerAnimation::Bow);
@@ -727,8 +726,6 @@ pub fn mouse_click_system(
                     did_attack = true;
                 }
             }
-
-            is_melee_wep_or_tool = main_hand.is_tool() || main_hand.is_melee_weapon();
         }
         if did_attack {
             commands.entity(player_e).insert(PlayerAnimation::Attack);
@@ -741,7 +738,6 @@ pub fn mouse_click_system(
             .truncate()
             .distance(cursor_pos.world_coords.truncate())
             > game.player().reach_distance * 32.
-            || (ranged_query.get_single().is_ok() && !is_melee_wep_or_tool)
         {
             return;
         }
