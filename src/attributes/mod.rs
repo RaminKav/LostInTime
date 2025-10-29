@@ -844,7 +844,7 @@ impl ItemAttributes {
         if self.attack_speed.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} Attack Speed",
+                    "{}{}% Attack Speed",
                     if is_positive(self.attack_speed.value) {
                         "+"
                     } else {
@@ -852,7 +852,9 @@ impl ItemAttributes {
                     },
                     self.attack_speed.value
                 ),
-                if let Some(attack_speed) = &base_att.unwrap().attack_speed {
+                if is_cape {
+                    "".to_string()
+                } else if let Some(attack_speed) = &base_att.unwrap().attack_speed {
                     format!(
                         "({}-{})",
                         f32::round(*attack_speed.start() as f32 * r) as i32,

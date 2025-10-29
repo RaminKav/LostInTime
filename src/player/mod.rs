@@ -362,7 +362,6 @@ fn spawn_player(
                         p,
                         &mut commands,
                         data.player_skills.clone(),
-                        &mut game,
                     );
                 }
                 info!("LOADED PLAYER DATA FROM SAVE FILE");
@@ -376,6 +375,7 @@ fn spawn_player(
 
 fn give_player_starting_items(
     mut proto_commands: ProtoCommands,
+    mut commands: Commands,
     proto: ProtoParam,
     player_class: Option<Res<PlayerClass>>,
 ) {
@@ -393,15 +393,23 @@ fn give_player_starting_items(
         .unwrap_or(SkillClass::None);
 
     // Give class-specific starting weapon
-    let starting_weapon = match selected_class {
-        SkillClass::Melee => WorldObject::Sword,
-        SkillClass::Rogue => WorldObject::Dagger,
-        SkillClass::Magic => WorldObject::BasicStaff,
-        SkillClass::Thief => WorldObject::Claw,
-        _ => WorldObject::Sword, // Default fallback
-    };
+    let starting_weapon = selected_class.get_starting_wep();
 
     proto_commands.spawn_item_from_proto(starting_weapon, &proto, Vec2::ZERO, 1, Some(1));
+
+    for pet in player_class
+        .as_ref()
+        .map(|pc| pc.pets.clone())
+        .unwrap_or_default()
+    {
+        commands.spawn((
+            pet,
+            YSort(0.001),
+            Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+            Transform::from_xyz(40.0, -40.0, 1.0),
+            Name::new("Pet"),
+        ));
+    }
     // proto_commands.spawn_item_from_proto(WorldObject::Spear, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Hammer, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));

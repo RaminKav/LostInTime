@@ -3,9 +3,12 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use rand::Rng;
 use seldom_state::{prelude::StateMachine, trigger::Trigger};
 
-use crate::{ai::LineOfSight, enemy::Mob, inputs::FacingDirection, player::Player, Game, PetState};
+use crate::{
+    ai::LineOfSight, enemy::Mob, inputs::FacingDirection, player::Player, Game, Pet, PetState,
+};
 
 aseprite!(pub SlimePetSprite, "textures/pets/slime-pet.ase");
+aseprite!(pub FairyPetSprite, "textures/pets/fairy-pet.ase");
 
 pub mod tags {
     pub const IDLE: &str = "IDLE";
@@ -54,19 +57,19 @@ impl Default for PetIdleState {
 
 pub fn handle_new_pet_state_machine(
     mut commands: Commands,
-    spawn_events: Query<(Entity, &Transform, &PetState), Added<crate::pets::state::PetState>>,
+    spawn_events: Query<(Entity, &Transform, &PetState, &Pet), Added<crate::pets::state::PetState>>,
     asset_server: Res<AssetServer>,
     game: Res<Game>,
 ) {
-    for (e, transform, pet_state) in spawn_events.iter() {
+    for (e, transform, pet_state, pet) in spawn_events.iter() {
         let mut e_cmds = commands.entity(e);
 
         // Use Aseprite animation system
-        let mut animation = AsepriteAnimation::from(SlimePetSprite::tags::IDLE);
+        let mut animation = AsepriteAnimation::from(pet.get_idle_anim());
         animation.pause();
         e_cmds
             .insert(AsepriteBundle {
-                aseprite: asset_server.load(SlimePetSprite::PATH),
+                aseprite: asset_server.load(pet.get_aseprite_path()),
                 animation,
                 transform: *transform,
                 ..Default::default()
@@ -103,6 +106,7 @@ pub fn handle_pet_idle_state(
             &mut PetIdleState,
             &mut AsepriteAnimation,
             &mut PetState,
+            &Pet,
         ),
         With<PetIdleState>,
     >,
@@ -112,13 +116,15 @@ pub fn handle_pet_idle_state(
     mob_txfms: Query<&Transform, (With<Mob>, Without<PetIdleState>)>,
 ) {
     let (player_entity, player_transform) = players.single();
-    for (entity, mut transform, mut idle_state, mut animation, mut pet_state) in pets.iter_mut() {
+    for (entity, mut transform, mut idle_state, mut animation, mut pet_state, pet) in
+        pets.iter_mut()
+    {
         idle_state.walk_timer.tick(time.delta());
         idle_state.locked_in_idle_timer.tick(time.delta());
 
         // Set animation to idle
         if animation.current_frame() < 7 || animation.is_paused() {
-            *animation = AsepriteAnimation::from(SlimePetSprite::tags::IDLE);
+            *animation = AsepriteAnimation::from(pet.get_idle_anim());
         }
 
         let pet_txfm = transform.translation;
@@ -194,6 +200,7 @@ pub fn handle_pet_follow_state(
             &PetFollowState,
             &mut AsepriteAnimation,
             &crate::pets::state::PetState,
+            &Pet,
         ),
         With<PetFollowState>,
     >,
@@ -201,9 +208,9 @@ pub fn handle_pet_follow_state(
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (entity, mut transform, follow_state, mut animation, pet_state) in pets.iter_mut() {
+    for (entity, mut transform, follow_state, mut animation, pet_state, pet) in pets.iter_mut() {
         if animation.current_frame() > 7 || animation.is_paused() {
-            *animation = AsepriteAnimation::from(SlimePetSprite::tags::WALK);
+            *animation = AsepriteAnimation::from(pet.get_walk_anim());
         }
 
         // Check if we should return to idle (no target or target is too close)

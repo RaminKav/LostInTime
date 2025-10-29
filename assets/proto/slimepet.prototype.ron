@@ -1,8 +1,8 @@
 (
-  name: "Pet",
+  name: "SlimePet",
   templates: [],
   schematics: {
-    "survival_rogue_like::pets::state::Pet": Test,
+    "survival_rogue_like::pets::state::Pet": Slime,
     "survival_rogue_like::proto::KCC": (),
     "survival_rogue_like::combat::status_effects::StatusEffectTracker": (effects: []),
     "survival_rogue_like::proto::SensorProto": (),

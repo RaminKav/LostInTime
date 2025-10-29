@@ -1,12 +1,17 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
+use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
+    animations::player_sprite::{
+        PlayerBlueAseprite, PlayerGreenAseprite, PlayerGreyAseprite, PlayerRedAseprite,
+        PlayerSpriteHandles,
+    },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
     custom_commands::CommandsExt,
     item::{
@@ -15,7 +20,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::UIElement,
-    Game,
+    Game, Pet,
 };
 
 use super::{
@@ -24,28 +29,89 @@ use super::{
     rogue_skills::{ComboCounter, LungeState, SprintState},
 };
 
-#[derive(Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter)]
 pub enum SkillClass {
     None,
-    Melee,
-    Rogue,
-    Thief,
-    Magic,
+
+    Warrior, //spear
+    Paladin, //hammer
+    Knight,  //sword
+
+    Thief,      //claw
+    Gunslinger, //gun
+
+    FireMage, //fire staff
+    IceMage,  //ice staff
+    Wizard,   //lightning
+    Druid,    // whip
+
+    Rogue,  //dagger
+    Archer, //bow
+    Kid,    // blowdart
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize, Resource)]
 pub struct PlayerClass {
     pub class: SkillClass,
+    pub pets: Vec<Pet>,
 }
 
 impl SkillClass {
     pub fn get_cape(&self) -> WorldObject {
         match self {
-            SkillClass::Melee => WorldObject::RedCape,
-            SkillClass::Rogue => WorldObject::GreenCape,
-            SkillClass::Magic => WorldObject::BlueCape,
+            SkillClass::Warrior => WorldObject::RedCape,
+            SkillClass::Paladin => WorldObject::RedCape,
+            SkillClass::Knight => WorldObject::RedCape,
+
             SkillClass::Thief => WorldObject::GreyCape,
+            SkillClass::Gunslinger => WorldObject::GreyCape,
+
+            SkillClass::FireMage => WorldObject::BlueCape,
+            SkillClass::IceMage => WorldObject::BlueCape,
+            SkillClass::Wizard => WorldObject::BlueCape,
+            SkillClass::Druid => WorldObject::BlueCape,
+
+            SkillClass::Rogue => WorldObject::GreenCape,
+            SkillClass::Archer => WorldObject::GreenCape,
+            SkillClass::Kid => WorldObject::GreenCape,
             _ => WorldObject::GreyCape,
+        }
+    }
+    pub fn get_anim_data(&self, sprites: &PlayerSpriteHandles) -> (Handle<Aseprite>, &str) {
+        match self {
+            SkillClass::Warrior => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
+            SkillClass::Paladin => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
+            SkillClass::Knight => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
+
+            SkillClass::Thief => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
+            SkillClass::Gunslinger => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
+
+            SkillClass::FireMage => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
+            SkillClass::IceMage => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
+            SkillClass::Wizard => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
+            SkillClass::Druid => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
+
+            SkillClass::Rogue => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            SkillClass::Archer => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            SkillClass::Kid => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            _ => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
+        }
+    }
+    pub fn get_starting_wep(&self) -> WorldObject {
+        match self {
+            SkillClass::Warrior => WorldObject::Sword,
+            SkillClass::Paladin => WorldObject::Hammer,
+            SkillClass::Knight => WorldObject::Spear,
+            SkillClass::Thief => WorldObject::Claw,
+            SkillClass::Rogue => WorldObject::Dagger,
+            SkillClass::Gunslinger => WorldObject::Gun,
+            SkillClass::FireMage => WorldObject::FireStaff,
+            SkillClass::IceMage => WorldObject::IceStaff,
+            SkillClass::Wizard => WorldObject::BasicStaff,
+            SkillClass::Druid => WorldObject::MagicWhip,
+            SkillClass::Archer => WorldObject::WoodBow,
+            SkillClass::Kid => WorldObject::Blowdart,
+            _ => WorldObject::Sword,
         }
     }
 
@@ -59,34 +125,68 @@ impl SkillClass {
             AttributeQuality::Low
         };
         match self {
-            SkillClass::Melee => {
+            SkillClass::Warrior => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5. * 1.5) as i32, quality, 1.);
-                // stats.defence = AttributeValue::new(level, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 8.) as i32, quality, 1.);
+            }
+            SkillClass::Paladin => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
                 stats.health = AttributeValue::new(level * 5, quality, 1.);
             }
+            SkillClass::Knight => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.defence = AttributeValue::new(level * 3, quality, 1.);
+            }
+
             SkillClass::Rogue => {
                 stats.bonus_damage =
                     AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
-                stats.speed = AttributeValue::new(level * 2, quality, 1.);
-                stats.dodge = AttributeValue::new(level * 3, quality, 1.);
-                // stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
-                // stats.crit_damage =
-                //     AttributeValue::new(f32::floor(level as f32 * 3.5) as i32, quality, 1.);
+                stats.speed = AttributeValue::new(level * 3, quality, 1.);
             }
-            SkillClass::Magic => {
+            SkillClass::Archer => {
                 stats.bonus_damage =
                     AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
-                stats.mana = AttributeValue::new(level * 5, quality, 1.);
-                stats.mana_regen =
-                    AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
+                stats.crit_damage = AttributeValue::new(level * 4, quality, 1.);
             }
+            SkillClass::Kid => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.dodge = AttributeValue::new(level * 3, quality, 1.);
+            }
+
             SkillClass::Thief => {
                 stats.bonus_damage =
                     AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
                 stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
-                stats.crit_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 2.) as i32, quality, 1.);
+            }
+            SkillClass::Gunslinger => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
+            }
+
+            SkillClass::FireMage => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.mana = AttributeValue::new(level * 5, quality, 1.);
+            }
+            SkillClass::IceMage => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.mana = AttributeValue::new(level * 5, quality, 1.);
+            }
+            SkillClass::Wizard => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.mana_regen =
+                    AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
+            }
+            SkillClass::Druid => {
+                stats.bonus_damage =
+                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                stats.health_regen = AttributeValue::new(level * 1, quality, 1.);
             }
             _ => (),
         }
@@ -590,7 +690,6 @@ impl Heirloom {
         entity: Entity,
         commands: &mut Commands,
         skills: PlayerSkills,
-        game: &mut Game,
     ) {
         match self {
             Heirloom::IncreaseProjectilCount => {

@@ -110,7 +110,7 @@ use world::{
 };
 use world::{dimension::EraManager, WorldGeneration};
 
-use crate::assets::SpriteAnchor;
+use crate::assets::{ClassPetData, SpriteAnchor};
 use lazy_static::lazy_static;
 
 use logs_wheel::LogFileInitializer;
@@ -196,6 +196,7 @@ fn main() {
                 .disable::<LogPlugin>(), // we handle logging ourselves
         )
         .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
+        .add_plugin(RonAssetPlugin::<ClassPetData>::new(&["class.ron"]))
         .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
@@ -334,6 +335,8 @@ pub struct ImageAssets {
     pub walls_sheet: Handle<Image>,
     #[asset(path = "textures/sprites.desc.ron")]
     pub sprite_desc: Handle<GraphicsDesc>,
+    #[asset(path = "class_pet_data.class.ron")]
+    pub class_desc: Handle<ClassPetData>,
     #[asset(path = "recipes/recipes.ron")]
     pub recipes: Handle<RecipeListProto>,
 }

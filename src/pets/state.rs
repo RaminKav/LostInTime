@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy_proto::backend::schematics::ReflectSchematic;
 use bevy_proto::prelude::Schematic;
 use bevy_rapier2d::prelude::Collider;
+use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 use crate::{
     enemy::Mob,
@@ -11,13 +13,49 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::InventoryState,
     world::y_sort::YSort,
+    FairyPetSprite, SlimePetSprite,
 };
 
-#[derive(Component, Reflect, FromReflect, Schematic, Default, Clone)]
+#[derive(
+    Component,
+    Reflect,
+    FromReflect,
+    Schematic,
+    Default,
+    EnumIter,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[reflect(Component, Schematic)]
 pub enum Pet {
     #[default]
-    Test,
+    Slime,
+    Fairy,
+}
+impl Pet {
+    pub fn get_idle_anim(&self) -> &str {
+        match self {
+            Pet::Slime => SlimePetSprite::tags::IDLE,
+            Pet::Fairy => FairyPetSprite::tags::IDLE,
+        }
+    }
+    pub fn get_walk_anim(&self) -> &str {
+        match self {
+            Pet::Slime => SlimePetSprite::tags::WALK,
+            Pet::Fairy => FairyPetSprite::tags::WALK,
+        }
+    }
+    pub fn get_aseprite_path(&self) -> &str {
+        match self {
+            Pet::Slime => SlimePetSprite::PATH,
+            Pet::Fairy => FairyPetSprite::PATH,
+        }
+    }
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -162,7 +200,7 @@ pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Inpu
         return;
     }
     commands.spawn((
-        Pet::Test,
+        Pet::Slime,
         YSort(0.001),
         Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
         Transform::from_xyz(0.0, 0.0, 1.0),

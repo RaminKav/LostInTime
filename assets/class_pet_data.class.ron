@@ -1,0 +1,157 @@
+(
+    classes: {
+        Warrior: (
+            name: "Warrior",
+            weapon_description: [
+                "Close range slash\n\nattack."
+            ],
+            stat_description: [
+                "+3% Damage per Level."
+            ],
+            class_icon: RedPlayerSelectIcon,
+            skill_icon: MeleePowerIcon,
+        ),
+        Paladin: (
+            name: "Paladin",
+            weapon_description: [
+                "Slow & powerful area\n\nattack. Applies Frail on hit."
+            ],
+            stat_description: [
+                "+5 Health per Level."
+            ],
+            class_icon: RedPlayerSelectIcon,
+            skill_icon: HealthIcon,
+        ),
+        Knight: (
+            name: "Knight",
+            weapon_description: [
+                "Piercing medium range\n\nattack."
+            ],
+            stat_description: [
+                "+3 Defence per Level."
+            ],
+            class_icon: RedPlayerSelectIcon,
+            skill_icon: DefenceIcon,
+        ),
+
+        Rogue: (
+            name: "Rogue", 
+            weapon_description: [
+                "Close range multi\n\nstrike attack."
+            ],
+            stat_description: [
+                "+3 Speed per Level."
+            ],
+            class_icon: GreenPlayerSelectIcon,
+            skill_icon: SpeedIcon,
+        ),
+        Archer: (
+            name: "Archer", 
+            weapon_description: [
+                "Long range piercing\n\nprojectile attack."
+            ],
+            stat_description: [
+                "+4% Crit damage per\n\nLevel."
+            ],
+            class_icon: GreenPlayerSelectIcon,
+            skill_icon: CritDamageIcon,
+        ),
+        Kid: (
+            name: "Kid", 
+            weapon_description: [
+                "Long range poison\n\nprojectile attack."
+            ],
+            stat_description: [
+                "+3% Dodge per Level."
+            ],
+            class_icon: GreenPlayerSelectIcon,
+            skill_icon: DodgeChanceIcon,
+        ),
+
+        Wizard: (
+            name: "Wizard",
+            weapon_description: [
+                "Lightning strike\n\nattack.",
+            ],
+            stat_description: [
+                "+1 Mana Regen per\n\nLevel."
+            ],
+            class_icon: BluePlayerSelectIcon,
+            skill_icon: MPRegenIcon,
+        ),
+        IceMage: (
+            name: "Ice Mage",
+            weapon_description: [
+                "Icicle projectile attack.\n\nApplies slow on hit.",
+            ],
+            stat_description: [
+                "+5 Mana per Level."
+            ],
+            class_icon: BluePlayerSelectIcon,
+            skill_icon: ManaIcon,
+        ),
+        FireMage: (
+            name: "Fire Mage",
+            weapon_description: [
+                "Fire projectile attack.\n\nExplodes on hit.",
+            ],
+            stat_description: [
+                "+5 Mana per Level."
+            ],
+            class_icon: BluePlayerSelectIcon,
+            skill_icon: ManaIcon,
+        ),
+        Druid: (
+            name: "Druid",
+            weapon_description: [
+                "Nature whip attack.\n\n",
+            ],
+            stat_description: [
+                "+1 Health Regen per\n\nLevel."
+            ],
+            class_icon: BluePlayerSelectIcon,
+            skill_icon: HPRegenIcon,
+        ),
+
+        Thief: (
+            name: "Thief",
+            weapon_description: [
+                "Long range throwing\n\nstars.",
+            ],
+            stat_description: [
+                "+3% Crit chance per\n\nLevel."
+            ],
+            class_icon: GreyPlayerSelectIcon,
+            skill_icon: CritChanceIcon,
+        ),
+        Gunslinger: (
+            name: "Gunslinger",
+            weapon_description: [
+                "Rapid fire gun attack.",
+            ],
+            stat_description: [
+                "+3% Attack Speed per\n\nLevel"
+            ],
+            class_icon: GreyPlayerSelectIcon,
+            skill_icon: AttackSpeedIcon,
+        ),
+    },
+    pets: {
+        Slime: (
+            name: "Slime",
+            description: [
+                "Periodically covers you\n\nin slime, protecting you\n\nfrom damage."
+            ],
+            pet_icon: SlimePetIcon,
+            skill_icon: MeleePowerIcon,
+        ),
+        Fairy: (
+            name: "Fairy", 
+            description: [
+                "Heals you every once\n\nin a while."
+            ],
+            pet_icon: FairyPetIcon,
+            skill_icon: HPRegenCooldownIcon,
+        ),
+    },
+)

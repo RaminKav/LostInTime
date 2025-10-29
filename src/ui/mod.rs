@@ -81,6 +81,7 @@ impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
             .insert_resource(InventoryState::default())
+            .insert_resource(ClassSelectionState::default())
             .insert_resource(NewRecipeTextTimer::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -278,7 +279,13 @@ impl Plugin for UIPlugin {
             .add_system(
                 handle_new_ui_state.in_base_set(CoreSet::PostUpdate), // .run_if(in_state(GameState::Main)),
             )
-            .add_system(handle_class_selection.run_if(in_state(UIState::ClassSelection)))
+            .add_systems((
+                handle_class_selection.run_if(in_state(UIState::ClassSelection)),
+                handle_slot_deselection.run_if(in_state(UIState::ClassSelection)),
+                update_preview_sprites.run_if(in_state(UIState::ClassSelection)),
+                update_slot_visuals.run_if(in_state(UIState::ClassSelection)),
+                update_info_card.run_if(in_state(UIState::ClassSelection)),
+            ))
             .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
             .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))

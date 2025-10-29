@@ -20,6 +20,7 @@ use crate::{
         skills::{PlayerClass, SkillClass},
         Player,
     },
+    FairyPetSprite, SlimePetSprite,
 };
 
 aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
@@ -33,6 +34,9 @@ pub struct PlayerSpriteHandles {
     pub red: Handle<Aseprite>,
     pub green: Handle<Aseprite>,
     pub blue: Handle<Aseprite>,
+
+    pub slime_pet: Handle<Aseprite>,
+    pub fairy_pet: Handle<Aseprite>,
 }
 aseprite!(pub PlayerDeadAseprite, "textures/player/player_dead.aseprite");
 
@@ -102,8 +106,8 @@ impl PlayerAnimation {
                     WorldObject::Dagger => return 0.85,
                     WorldObject::Hammer => return 0.1,
                     WorldObject::Blowdart => return 0.6,
-                    WorldObject::Gun => return 0.45,
-                    WorldObject::WoodBow => return 0.2,
+                    WorldObject::Gun => return 0.7,
+                    WorldObject::WoodBow => return 0.25,
                     WorldObject::Claw => return 0.8,
                     WorldObject::Spear => return 0.15,
                     _ => return 1.,
@@ -249,6 +253,8 @@ pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetSer
         red: asset_server.load(PlayerRedAseprite::PATH),
         green: asset_server.load(PlayerGreenAseprite::PATH),
         blue: asset_server.load(PlayerBlueAseprite::PATH),
+        slime_pet: asset_server.load(SlimePetSprite::PATH),
+        fairy_pet: asset_server.load(FairyPetSprite::PATH),
     });
 }
 
@@ -261,28 +267,7 @@ pub fn change_player_class_visuals(
 ) {
     for e in player.iter_mut() {
         let class = &player_class.class;
-        let (handle, anim) = match class {
-            SkillClass::None => (
-                sprite_handles.grey.clone(),
-                PlayerGreyAseprite::tags::IDLE_FRONT,
-            ),
-            SkillClass::Thief => (
-                sprite_handles.grey.clone(),
-                PlayerGreyAseprite::tags::IDLE_FRONT,
-            ),
-            SkillClass::Melee => (
-                sprite_handles.red.clone(),
-                PlayerRedAseprite::tags::IDLE_FRONT,
-            ),
-            SkillClass::Magic => (
-                sprite_handles.blue.clone(),
-                PlayerBlueAseprite::tags::IDLE_FRONT,
-            ),
-            SkillClass::Rogue => (
-                sprite_handles.green.clone(),
-                PlayerGreenAseprite::tags::IDLE_FRONT,
-            ),
-        };
+        let (handle, anim) = class.get_anim_data(&sprite_handles);
 
         //att update event
         commands

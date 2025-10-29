@@ -21,7 +21,9 @@ use crate::item::{
     Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
 };
+use crate::pets::state::Pet;
 use crate::player::skills::Heirloom;
+use crate::player::skills::SkillClass;
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
@@ -57,6 +59,33 @@ impl WorldObjectData {
 pub struct SpriteData {
     pub texture_pos: Vec2,
     pub size: Vec2,
+}
+
+/// Data structure for class information loaded from RON
+#[derive(Clone, Debug, Deserialize)]
+pub struct ClassData {
+    pub name: String,
+    pub weapon_description: Vec<String>,
+    pub stat_description: Vec<String>,
+    pub class_icon: UIElement,
+    pub skill_icon: UIElement,
+}
+
+/// Data structure for pet information loaded from RON
+#[derive(Clone, Debug, Deserialize)]
+pub struct PetData {
+    pub name: String,
+    pub description: Vec<String>,
+    pub pet_icon: UIElement,
+    pub skill_icon: UIElement,
+}
+
+/// Container for all class and pet data loaded from RON
+#[derive(Deserialize, TypeUuid, Clone)]
+#[uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"]
+pub struct ClassPetData {
+    pub classes: HashMap<SkillClass, ClassData>,
+    pub pets: HashMap<Pet, PetData>,
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -107,6 +136,7 @@ impl Plugin for GameAssetsPlugin {
                 accessory_shrine_anim: None,
                 blacksmith_merchant: None,
                 portal_ase: None,
+                class_pet_data: None,
             })
             .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
@@ -169,6 +199,7 @@ pub struct Graphics {
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
     pub blacksmith_merchant: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
+    pub class_pet_data: Option<ClassPetData>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -210,6 +241,22 @@ impl Graphics {
             .get(&glow)
             .unwrap()
             .clone()
+    }
+    pub fn get_class_data(&self, class: SkillClass) -> &ClassData {
+        self.class_pet_data
+            .as_ref()
+            .unwrap()
+            .classes
+            .get(&class)
+            .unwrap_or_else(|| panic!("No data for class {:?}", class))
+    }
+    pub fn get_pet_data(&self, pet: Pet) -> &PetData {
+        self.class_pet_data
+            .as_ref()
+            .unwrap()
+            .pets
+            .get(&pet)
+            .unwrap_or_else(|| panic!("No data for pet {:?}", pet))
     }
 }
 
@@ -267,6 +314,7 @@ impl GameAssetsPlugin {
         asset_server: Res<AssetServer>,
         graphics_desc: Res<Assets<GraphicsDesc>>,
         recipes_desc: Res<Assets<RecipeListProto>>,
+        class_pet_desc: Res<Assets<ClassPetData>>,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -288,8 +336,10 @@ impl GameAssetsPlugin {
 
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
         let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
+        let class_pet_desc_handle: Handle<ClassPetData> = sprite_sheet.class_desc.clone();
         let sprite_desc = graphics_desc.get(&sprite_desc_handle).unwrap();
         let recipes_desc: &RecipeListProto = recipes_desc.get(&recipes_desc_handle).unwrap();
+        let class_pet_data = class_pet_desc.get(&class_pet_desc_handle).unwrap();
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
@@ -420,6 +470,7 @@ impl GameAssetsPlugin {
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
             blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
+            class_pet_data: Some(class_pet_data.clone()),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type

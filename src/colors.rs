@@ -18,6 +18,7 @@ pub const UNCOMMON_GREEN: Color = Color::rgba(51. / 255., 116. / 255., 60. / 255
 pub const DARK_GREEN: Color = Color::rgba(31. / 255., 85. / 255., 49. / 255., 1.);
 pub const _BLACK_GREEN: Color = Color::rgba(45. / 255., 61. / 255., 56. / 255., 1.);
 pub const DARK_BROWN: Color = Color::rgba(101. / 255., 58. / 255., 12. / 255., 1.);
+pub const DARK_WOOD_BROWN: Color = Color::rgba(59. / 255., 47. / 255., 28. / 255., 1.);
 pub const BLACK: Color = Color::rgba(28. / 255., 48. / 255., 41. / 255., 1.);
 pub const NIGHT: Color = Color::rgba(28. / 255., 48. / 255., 41. / 255., 0.55);
 // pub const BLUE: Color = Color::rgba(61. / 255., 112. / 255., 133. / 255., 1.);

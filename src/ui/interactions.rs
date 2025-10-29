@@ -3,6 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use bevy_proto::prelude::ProtoCommands;
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
@@ -39,7 +40,9 @@ use super::{
     TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
-#[derive(Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq)]
+#[derive(
+    Component, Debug, EnumIter, Clone, Display, Hash, PartialEq, Eq, Serialize, Deserialize,
+)]
 pub enum UIElement {
     Inventory,
     ChestInventory,
@@ -97,6 +100,28 @@ pub enum UIElement {
     ItemChestOpeningUncommon,
     ItemChestOpeningRare,
     ItemChestOpeningLegendary,
+    FairyPetIcon,
+    SlimePetIcon,
+    GreenPlayerSelectIcon,
+    RedPlayerSelectIcon,
+    BluePlayerSelectIcon,
+    GreyPlayerSelectIcon,
+    PlayerSelect,
+    PlayerSelectSlot,
+    PlayerSelectSlotHover,
+    MeleePowerIcon,
+    ClassWeaponSlot,
+    AttackSpeedIcon,
+    CritChanceIcon,
+    CritDamageIcon,
+    DefenceIcon,
+    DodgeChanceIcon,
+    HealthIcon,
+    ManaIcon,
+    HPRegenCooldownIcon,
+    HPRegenIcon,
+    MPRegenIcon,
+    SpeedIcon,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -827,7 +852,6 @@ pub fn handle_cursor_skills_buttons(
                                 e,
                                 &mut commands,
                                 skills.clone(),
-                                &mut game,
                             );
                             if skill_queue.active_heirloom_limbo.is_some() {
                                 next_ui_state.set(UIState::ActiveSkills);
