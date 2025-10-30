@@ -1,4 +1,7 @@
 pub mod asset_helpers;
+use std::fs::File;
+use std::io::BufReader;
+
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::{AsBindGroup, Extent3d, TextureDimension, TextureFormat};
@@ -10,6 +13,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::attributes::{add_item_glows, ItemGlow};
+use crate::client::GameData;
 use crate::enemy::Mob;
 use crate::inventory::ItemStack;
 use crate::item::combat_shrine::CombatShrineAnim;
@@ -27,7 +31,7 @@ use crate::player::skills::SkillClass;
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
-use crate::{GameState, ImageAssets};
+use crate::{datafiles, GameState, ImageAssets};
 
 pub struct GameAssetsPlugin;
 
@@ -315,6 +319,7 @@ impl GameAssetsPlugin {
         graphics_desc: Res<Assets<GraphicsDesc>>,
         recipes_desc: Res<Assets<RecipeListProto>>,
         class_pet_desc: Res<Assets<ClassPetData>>,
+        mut commands: Commands,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
         let image_handle = sprite_sheet.sprite_sheet.clone();
@@ -333,7 +338,23 @@ impl GameAssetsPlugin {
             )
             .unwrap();
         }
-
+        // Load class ranks early during loading so Class Selection UI can use it
+        let game_data_file_path = datafiles::game_data();
+        if let Ok(file_file) = File::open(game_data_file_path) {
+            let reader = BufReader::new(file_file);
+            match serde_json::from_reader::<_, GameData>(reader) {
+                Ok(game_data) => {
+                    commands.insert_resource(game_data.class_ranks);
+                    info!("Loaded class ranks from game data (loading state)");
+                }
+                Err(err) => {
+                    error!("Failed to load class ranks from game_data.json: {err:?}");
+                    commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+                }
+            }
+        } else {
+            commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+        }
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
         let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
         let class_pet_desc_handle: Handle<ClassPetData> = sprite_sheet.class_desc.clone();

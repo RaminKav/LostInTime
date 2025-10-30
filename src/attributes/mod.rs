@@ -1794,6 +1794,7 @@ fn handle_new_items_raw_attributes(
             &RawItemBaseAttributes,
             &EquipmentType,
             Option<&ItemLevel>,
+            Option<&crate::player::score::StartingWeapon>,
         ),
         Or<(Added<RawItemBaseAttributes>, Added<RawItemBonusAttributes>)>,
     >,
@@ -1801,8 +1802,15 @@ fn handle_new_items_raw_attributes(
     asset_server: Res<AssetServer>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
 ) {
-    for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level) in new_items.iter() {
-        let rarity = get_rarity_rng(rand::thread_rng());
+    for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level, starting_weapon) in
+        new_items.iter()
+    {
+        // Use override rarity for starting weapons, random for others
+        let rarity = if let Some(starting_weapon) = starting_weapon {
+            starting_weapon.rarity.clone()
+        } else {
+            get_rarity_rng(rand::thread_rng())
+        };
         add_item_glows(&mut commands, &graphics, e, rarity.clone());
 
         let new_stack = build_item_stack_with_parsed_attributes(

@@ -22,14 +22,18 @@ use rogue_skills::{
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
+pub mod class_rank;
 pub mod currency;
 pub mod levels;
 pub mod mage_skills;
 pub mod melee_skills;
 pub mod rogue_skills;
+pub mod score;
 pub mod skills;
+pub use class_rank::*;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
+pub use score::*;
 pub mod stats;
 use crate::player::skills::PlayerClass;
 use crate::{
@@ -161,6 +165,8 @@ impl Plugin for PlayerPlugin {
                 handle_spear.after(player_move_inputs).run_if(is_not_paused),
                 tick_parried_timer.run_if(is_not_paused),
                 handle_parry_success,
+                score::track_mob_kills,
+                score::track_item_destruction,
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -378,6 +384,7 @@ fn give_player_starting_items(
     mut commands: Commands,
     proto: ProtoParam,
     player_class: Option<Res<PlayerClass>>,
+    class_ranks: Option<Res<ClassRankSystem>>,
 ) {
     if let Ok(save_file) = File::open(datafiles::save_file()) {
         let reader = BufReader::new(save_file);
@@ -392,10 +399,27 @@ fn give_player_starting_items(
         .map(|pc| pc.class.clone())
         .unwrap_or(SkillClass::None);
 
-    // Give class-specific starting weapon
+    // Give class-specific starting weapon with rarity based on class rank
     let starting_weapon = selected_class.get_starting_wep();
+    let weapon_rarity = if let Some(ranks) = &class_ranks {
+        ranks.get_starting_weapon_rarity(&selected_class)
+    } else {
+        crate::attributes::ItemRarity::Common
+    };
 
-    proto_commands.spawn_item_from_proto(starting_weapon, &proto, Vec2::ZERO, 1, Some(1));
+    // Spawn the starting weapon and mark it for rarity override
+    if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+        starting_weapon,
+        &proto,
+        Vec2::ZERO,
+        1,
+        Some(1), // Use default level, we'll override rarity instead
+    ) {
+        // Mark this weapon as a starting weapon with specific rarity
+        commands.entity(weapon_entity).insert(StartingWeapon {
+            rarity: weapon_rarity,
+        });
+    }
 
     for pet in player_class
         .as_ref()

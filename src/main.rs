@@ -167,6 +167,7 @@ fn main() {
 
     let app = app
         .insert_resource(ClearColor(Color::BLACK))
+        .insert_resource(crate::player::score::RunScore::new())
         .add_state::<GameState>()
         .edit_schedule(CoreSchedule::FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));

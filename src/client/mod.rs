@@ -32,8 +32,9 @@ use crate::{
     },
     night::NightTracker,
     player::{
+        class_rank::ClassRankSystem,
         levels::PlayerLevel,
-        skills::{PlayerSkills, HeirloomChoiceQueue},
+        skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
         stats::{PlayerStats, SkillPoints},
         Player, TimeFragmentCurrency,
     },
@@ -196,6 +197,8 @@ pub struct GameData {
     pub longest_run: u8,
     pub seen_gear: Vec<ItemStack>,
     pub user_id: String,
+    pub class_ranks: ClassRankSystem,
+    pub high_scores: crate::player::score::HighScores,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -206,6 +209,8 @@ pub fn handle_append_run_data_after_death(
     all_time_fragments: Query<Entity, With<MoveUIAnimation>>,
     mut commands: Commands,
     time_fragments: Query<&TimeFragmentCurrency>,
+    player_class: Option<Res<PlayerClass>>,
+    run_score: Option<Res<crate::player::score::RunScore>>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
@@ -246,6 +251,51 @@ pub fn handle_append_run_data_after_death(
         analytics_data.user_id = game_data.user_id.clone();
         for item in inv.equipment_items.items.iter().flatten() {
             game_data.seen_gear.push(item.item_stack.clone());
+        }
+
+        // Award class rank experience based on run performance
+        if let Some(class) = &player_class {
+            // Get mobs killed from run score (if available)
+            let mobs_killed = run_score.as_ref().map(|rs| rs.mobs_killed).unwrap_or(0);
+            let run_experience = calculate_class_experience(
+                night.days,
+                time_fragments.total_collected_time_fragments_this_run,
+                mobs_killed,
+            );
+            let rank_increased = game_data
+                .class_ranks
+                .add_class_experience(&class.class, run_experience);
+
+            if rank_increased {
+                let new_rank = game_data.class_ranks.get_class_rank(&class.class).rank;
+                let new_rarity = game_data
+                    .class_ranks
+                    .get_class_rank(&class.class)
+                    .get_starting_weapon_rarity();
+                info!(
+                    "Class {:?} ranked up to rank {}! Starting weapon rarity upgraded to {:?}",
+                    class.class, new_rank, new_rarity
+                );
+            }
+
+            info!(
+                "Awarded {} class experience to {:?} (Total: {})",
+                run_experience,
+                class.class,
+                game_data
+                    .class_ranks
+                    .get_class_rank(&class.class)
+                    .total_experience
+            );
+        }
+
+        // Update high scores
+        if let Some(score) = &run_score {
+            if let Some(class) = &player_class {
+                game_data
+                    .high_scores
+                    .update_high_score(score.score, &class.class);
+            }
         }
 
         let game_data_path = datafiles::game_data();
@@ -299,7 +349,6 @@ pub fn save_state(
     night_tracker: Res<NightTracker>,
     seed: Res<GenerationSeed>,
     check_open_chest: Option<Res<ChestContainer>>,
-    check_open_furnace: Option<Res<FurnaceContainer>>,
     key_input: ResMut<Input<KeyCode>>,
     skills_queue: Res<HeirloomChoiceQueue>,
     analytics_data: Res<AnalyticsData>,
@@ -500,4 +549,22 @@ pub fn load_state(
 
 pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
     state.0 == ClientState::Unpaused
+}
+
+/// Calculate class experience based on run performance
+fn calculate_class_experience(
+    days_survived: u8,
+    time_fragments_collected: i32,
+    mobs_killed: u32,
+) -> u32 {
+    // Primary experience from mobs killed (10 per mob)
+    let mob_exp = mobs_killed * 10;
+
+    // Secondary experience from days survived (50 per day)
+    let days_exp = days_survived as u32 * 50;
+
+    // Bonus experience from time fragments (1 per fragment)
+    let fragments_exp = time_fragments_collected.max(0) as u32 * 20;
+
+    mob_exp + days_exp + fragments_exp
 }

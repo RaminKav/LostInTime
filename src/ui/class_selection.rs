@@ -14,9 +14,12 @@ use crate::{
     inventory::ItemStack,
     item::{CraftingTracker, ItemDisplayMetaData},
     night::NightTracker,
-    player::skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
+    player::{
+        class_rank::ClassRankSystem,
+        skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
+    },
     ui::{UIElement, UIState},
-    EraManager, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
+    EraManager, FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
 };
 
 use super::{
@@ -80,6 +83,7 @@ pub fn setup_class_selection_ui(
     asset_server: Res<AssetServer>,
     sprite_handles: Res<PlayerSpriteHandles>,
     res: Res<ScreenResolution>,
+    class_ranks: Res<ClassRankSystem>,
 ) {
     // Initialize the selection state
     commands.init_resource::<ClassSelectionState>();
@@ -311,6 +315,7 @@ pub fn setup_class_selection_ui(
         &SkillClass::Warrior, // Default to Melee
         &asset_server,
         &graphics,
+        &class_ranks,
     );
 
     // No pet preview by default - wait for player selection
@@ -505,6 +510,7 @@ fn spawn_player_preview(
     selected_class: &SkillClass,
     asset_server: &Res<AssetServer>,
     graphics: &Res<Graphics>,
+    class_ranks: &Res<ClassRankSystem>,
 ) -> Entity {
     let ICONS_X_OFFSET = 22.;
     let DESC_TEXT_X = ICONS_X_OFFSET + 12.;
@@ -515,6 +521,16 @@ fn spawn_player_preview(
     let class_name = &class_data.name;
     let weapon_description = class_data.weapon_description.join(" ");
     let stat_description = class_data.stat_description.join(" ");
+
+    // Get class rank information
+    let class_rank = class_ranks.get_class_rank(selected_class);
+    let rank_text = format!("Rank {}", class_rank.rank);
+    // let exp_to_next = class_rank.get_experience_to_next_rank();
+    // let progress_text = if exp_to_next > 0 {
+    //     format!("Next rank in {} exp", exp_to_next)
+    // } else {
+    //     "Max rank reached!".to_string()
+    // };
 
     // Spawn the player preview container
     let player_container = commands
@@ -553,6 +569,30 @@ fn spawn_player_preview(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS TITLE"))
+        .set_parent(player_container)
+        .id();
+
+    // Spawn rank information
+    let _rank_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                rank_text,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: DARK_WOOD_BROWN,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(-2., 16., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("CLASS RANK"))
         .set_parent(player_container)
         .id();
 
@@ -700,7 +740,7 @@ fn spawn_pet_preview(
     graphics: &Res<Graphics>,
 ) -> Entity {
     let (aseprite_path, animation_tag) = match selected_pet {
-        Pet::Fairy => (sprite_handles.fairy_pet.clone(), SlimePetSprite::tags::IDLE),
+        Pet::Fairy => (sprite_handles.fairy_pet.clone(), FairyPetSprite::tags::IDLE),
         Pet::Slime => (sprite_handles.slime_pet.clone(), SlimePetSprite::tags::IDLE),
     };
 
@@ -824,6 +864,7 @@ pub fn update_preview_sprites(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
+    class_ranks: Res<ClassRankSystem>,
 ) {
     if !selection_state.is_changed() {
         return;
@@ -848,6 +889,7 @@ pub fn update_preview_sprites(
             selected_class,
             &asset_server,
             &graphics,
+            &class_ranks,
         );
     }
 
