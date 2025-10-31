@@ -1,6 +1,8 @@
+pub mod pet_abilities;
 pub mod pet_animation;
 pub mod state;
 use bevy::prelude::*;
+pub use pet_abilities::*;
 pub use pet_animation::*;
 pub use state::*;
 
@@ -23,6 +25,9 @@ impl Plugin for PetsPlugin {
                     handle_pet_follow_state.run_if(is_not_paused),
                     // Pet configuration system
                     update_pet_weapon_on_inv_change,
+                    // Pet abilities
+                    slime_shield_ability.run_if(is_not_paused),
+                    fairy_heal_ability.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

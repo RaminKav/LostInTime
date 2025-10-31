@@ -213,7 +213,7 @@ pub fn configure_pet_on_spawn(
     new_pets: Query<(Entity, &Pet), Added<Pet>>,
     mut events: EventWriter<UpdatePetWeaponEvent>,
 ) {
-    for (pet_entity, _pet) in new_pets.iter() {
+    for (pet_entity, pet) in new_pets.iter() {
         let pet_state = PetState {
             max_distance_from_player: 16. * 9.,
             max_target_distance: 16. * 9.,
@@ -229,6 +229,25 @@ pub fn configure_pet_on_spawn(
         };
 
         commands.entity(pet_entity).insert(pet_state);
+
+        // Add pet-specific ability timer components
+        match pet {
+            crate::pets::state::Pet::Slime => {
+                commands
+                    .entity(pet_entity)
+                    .insert(crate::pets::pet_abilities::SlimeShieldTimer(
+                        Timer::from_seconds(60.0, TimerMode::Repeating),
+                    ));
+            }
+            crate::pets::state::Pet::Fairy => {
+                commands
+                    .entity(pet_entity)
+                    .insert(crate::pets::pet_abilities::FairyHealTimer(
+                        Timer::from_seconds(25.0, TimerMode::Repeating),
+                    ));
+            }
+        }
+
         events.send(UpdatePetWeaponEvent);
     }
 }

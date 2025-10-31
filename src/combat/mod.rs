@@ -41,7 +41,8 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
-    AppExt, CustomFlush, GameParam, GameState, Player, DEBUG,
+    AppExt, CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite,
+    DEBUG,
 };
 
 use self::collisions::CollisionPlugion;
@@ -208,6 +209,7 @@ pub fn handle_hits(
         &mut CurrentHealth,
         &MaxHealth,
         Option<&mut CurrentShield>,
+        Option<&SlimeTempShield>,
         &GlobalTransform,
         Option<&WorldObject>,
         Option<&Mob>,
@@ -224,6 +226,7 @@ pub fn handle_hits(
     in_i_frame: Query<&InvincibilityTimer>,
     proto_param: ProtoParam,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
+    slime_shields: Query<Entity, With<SlimeTempShieldSprite>>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -236,6 +239,7 @@ pub fn handle_hits(
             mut hit_health,
             max_health,
             mut shields_option,
+            slime_shield_option,
             t,
             obj_option,
             mob_option,
@@ -309,7 +313,17 @@ pub fn handle_hits(
                         0
                     };
                 let mut shielded_hit = false;
-                if let Some(shields) = shields_option.as_deref_mut() {
+                if slime_shield_option.is_some() {
+                    // if we have a slime temp shield, it only has 1 HP
+                    if final_dmg >= 1 {
+                        // shield breaks
+                        commands.entity(e).remove::<SlimeTempShield>();
+                        commands.entity(slime_shields.single()).despawn_recursive();
+                        if *DEBUG {
+                            info!("Slime Temp Shield broken!");
+                        }
+                    }
+                } else if let Some(shields) = shields_option.as_deref_mut() {
                     if shields.0 > 0 {
                         let shield_damage = final_dmg.min(shields.0);
                         shields.0 -= shield_damage;
@@ -319,6 +333,7 @@ pub fn handle_hits(
                         }
                     }
                 }
+
                 if !shielded_hit {
                     hit_health.0 -= final_dmg
                         - if game.has_skill(Heirloom::MinusOneDamageOnHit) && is_player {
