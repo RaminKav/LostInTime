@@ -24,12 +24,14 @@ pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
 pub use skill_choice_ui::*;
+mod active_skill_shrine_ui;
 mod interactions;
 mod inventory_ui;
 pub mod minimap;
 mod player_hud;
 mod skill_choice_ui;
 pub mod stats_ui;
+pub use active_skill_shrine_ui::*;
 mod tile_hover;
 mod tooltips;
 pub mod ui_helpers;
@@ -50,7 +52,7 @@ use crate::{
     attributes::clamp_health,
     client::{is_not_paused, load_state, ClientState},
     handle_hits,
-    item::item_actions::ActionSuccessEvent,
+    item::{active_skill_shrine::ActiveSkillShrineOverwrite, item_actions::ActionSuccessEvent},
     night::NightTracker,
     CustomFlush, Game, GameState, DEBUG,
 };
@@ -219,8 +221,7 @@ impl Plugin for UIPlugin {
                     handle_submit_essence_choice.run_if(resource_exists::<EssenceShopChoices>()),
                     handle_populate_essence_shop_on_new_spawn,
                     handle_cursor_essence_buttons,
-                    handle_cursor_skills_buttons
-                        .run_if(in_state(UIState::Skills).or_else(in_state(UIState::ActiveSkills))),
+                    handle_cursor_skills_buttons.run_if(in_state(UIState::Skills)),
                     update_furnace_bar,
                     setup_skill_choice_ui
                         .before(CustomFlush)
@@ -228,17 +229,39 @@ impl Plugin for UIPlugin {
                     setup_item_chest_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
-                    setup_active_skill_slot_choice_ui
-                        .before(CustomFlush)
-                        .run_if(
-                            state_changed::<UIState>().and_then(in_state(UIState::ActiveSkills)),
-                        ),
+                    
                     handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
                     handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    setup_active_skill_shrine_ui.before(CustomFlush).run_if(
+                        state_changed::<UIState>().and_then(in_state(UIState::ActiveSkillShrine)),
+                    ),
+                    tick_active_skill_shrine_ui_interaction_lock_timers
+                        .run_if(in_state(UIState::ActiveSkillShrine)),
+                    handle_active_skill_shrine_ui_interaction
+                        .run_if(in_state(UIState::ActiveSkillShrine)),
+                    active_skill_shrine_ui::tick_active_skill_slot_choice_ui_interaction_lock_timers
+                        .run_if(in_state(UIState::ActiveSkills)),
+                    handle_active_skill_shrine_overwrite_interaction
+                        .run_if(in_state(UIState::ActiveSkills)),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                active_skill_shrine_ui::setup_active_skill_shrine_overwrite_ui
+                    .before(CustomFlush)
+                    .run_if(
+                        state_changed::<UIState>()
+                            .and_then(in_state(UIState::ActiveSkills))
+                            .and_then(resource_exists::<ActiveSkillShrineOverwrite>()),
+                    )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems((setup_class_selection_ui

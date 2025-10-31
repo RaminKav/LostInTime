@@ -45,6 +45,7 @@ pub enum SchematicType {
     #[default]
     CombatShrine,
     GambleShrine,
+    ActiveSkillShrine,
     BlacksmithMerchant,
 }
 
@@ -175,7 +176,7 @@ fn load_schematic(
         );
         commands
             .spawn(DynamicSceneBundle {
-                scene: asset_server.load("scenes/CombatShrine.scn.ron"),
+                scene: asset_server.load("scenes/ActiveSkillShrine.scn.ron"),
                 transform: Transform::from_translation(game.player().position),
                 ..default()
             })

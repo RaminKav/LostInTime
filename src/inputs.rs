@@ -13,7 +13,7 @@ use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills};
+use crate::player::skills::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, PlayerSkills};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::input::mouse::MouseWheel;
@@ -309,7 +309,7 @@ pub fn player_move_inputs(
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
-    if let Some(roll_slot) = skills.has_active_heirloom(Heirloom::Roll) {
+    if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
         if player.player_dash_cooldown.finished()
             && key_input.pressed(get_active_skill_keybind(roll_slot))
         {

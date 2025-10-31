@@ -1,12 +1,11 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
-use itertools::Itertools;
 
 use crate::{
     animations::DoneAnimation,
     assets::Graphics,
     colors::{BLACK, WHITE},
-    player::skills::{HeirloomChoiceQueue, HeirloomChoiceState, PlayerSkills},
+    player::skills::{HeirloomChoiceQueue, HeirloomChoiceState},
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
@@ -131,102 +130,6 @@ pub fn setup_skill_choice_ui(
             .insert(Name::new("DICE"));
     }
 }
-pub fn setup_active_skill_slot_choice_ui(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
-    choices_queue: Res<HeirloomChoiceQueue>,
-    mut next_ui_state: ResMut<NextState<UIState>>,
-    res: Res<ScreenResolution>,
-    skills: Query<&PlayerSkills>,
-) {
-    if choices_queue.active_heirloom_limbo.is_none() {
-        next_ui_state.set(UIState::Closed);
-        return;
-    }
-    let skills = skills.single();
-    let choices = vec![
-        skills.active_skill_slot_1.clone(),
-        skills.active_skill_slot_2.clone(),
-    ];
-    let t_offset = Vec2::new(4., 4.);
-
-    // title bar
-    let title_sprite = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::TitleBar).clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(168., 16.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(0., 80., 10.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(UIElement::TitleBar)
-        .insert(UIState::ActiveSkills)
-        .insert(Name::new("SKILL ICON!!"))
-        .id();
-
-    let title_text = spawn_text(
-        &mut commands,
-        &asset_server,
-        Vec3::new(0., 0., 1.),
-        BLACK,
-        "swap active skill".to_string(),
-        Anchor::Center,
-        2.,
-        3,
-    );
-    commands
-        .entity(title_text)
-        .insert(UIState::ActiveSkills)
-        .set_parent(title_sprite);
-
-    spawn_ui_overlay(
-        &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
-        0.8,
-        9.,
-    );
-
-    spawn_skill_choice_entities(
-        &graphics,
-        &mut commands,
-        &asset_server,
-        choices.into_iter().flatten().collect_vec(),
-        t_offset,
-    );
-
-    //New Active Skill Icon
-    commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_active_skill_icon(
-                choices_queue
-                    .active_heirloom_limbo
-                    .clone()
-                    .unwrap()
-                    .heirloom,
-            ),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(32., 32.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec2::new(-4., -60.).extend(20.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(UIState::ActiveSkills)
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("SKILL ICON!!"));
-}
 
 pub fn tick_skill_choice_interaction_lock_timers(
     time: Res<Time>,
@@ -284,43 +187,22 @@ pub fn spawn_skill_choice_entities(
             .insert(Name::new("SKILLS UI"))
             .insert(RenderLayers::from_layers(&[3]))
             .id();
-        // icon
-        let skill_icon = if choice.heirloom.is_active_skill() {
-            commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_active_skill_icon(choice.heirloom.clone()),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(32., 32.)),
-                        ..Default::default()
-                    },
-                    transform: Transform {
-                        translation: Vec2::new(0., 25.).extend(4.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
+        // icon - all heirlooms use the heirloom icon (active skills are now separate)
+        let skill_icon = commands
+            .spawn(SpriteSheetBundle {
+                sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: Vec2::new(0., 25.).extend(4.),
+                    scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(Name::new("SKILL ICON!!"))
-                .set_parent(skills_e)
-                .id()
-        } else {
-            commands
-                .spawn(SpriteSheetBundle {
-                    sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
-                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                    transform: Transform {
-                        translation: Vec2::new(0., 25.).extend(4.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .insert(Name::new("SKILL ICON!!"))
-                .set_parent(skills_e)
-                .id()
-        };
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("SKILL ICON!!"))
+            .set_parent(skills_e)
+            .id();
 
         // Add rarity-based background if not common
         if let Some(glow) = choice.rarity.get_item_glow() {

@@ -89,6 +89,14 @@ pub fn add_guide_to_unique_objs(
                     icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
                 });
             }
+            WorldObject::ActiveSkillShrine => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Get Skill".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                });
+            }
             _ => {}
         }
     }

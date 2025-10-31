@@ -851,12 +851,6 @@
 
     },
     heirlooms: {
-        // All heirloom sprites - using dummy positions for now
-        Roll: WorldObjectData(
-            texture_pos: (0., 18.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         CritChance: WorldObjectData(
             texture_pos: (0., 18.),
             size: (16., 16.),
@@ -947,11 +941,6 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Teleport: WorldObjectData(
-            texture_pos: (0., 21.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         TeleportShock: WorldObjectData(
             texture_pos: (4., 19.),
             size: (16., 16.),
@@ -972,18 +961,8 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Sprint: WorldObjectData(
-            texture_pos: (3., 21.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         SprintFaster: WorldObjectData(
             texture_pos: (9., 19.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SprintLunge: WorldObjectData(
-            texture_pos: (10., 19.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -997,18 +976,8 @@
             size: (16., 16.),
             anchor: None,
         ),
-        Parry: WorldObjectData(
-            texture_pos: (1., 21.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         ParryHPRegen: WorldObjectData(
             texture_pos: (14., 19.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        ParrySpear: WorldObjectData(
-            texture_pos: (2., 21.),
             size: (16., 16.),
             anchor: None,
         ),

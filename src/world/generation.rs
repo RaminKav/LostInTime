@@ -45,9 +45,10 @@ pub struct DoneGeneratingEvent {
     pub chunk_pos: IVec2,
 }
 
-const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 2] = [
+const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
     (WorldObject::BossShrine, Vec2::new(8., 8.), 10),
     (WorldObject::DungeonEntrance, Vec2::new(2., 2.), 7),
+    (WorldObject::ActiveSkillShrine, Vec2::new(2., 2.), 7),
     // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
 const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [

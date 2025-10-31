@@ -16,6 +16,7 @@ use crate::attributes::{add_item_glows, ItemGlow};
 use crate::client::GameData;
 use crate::enemy::Mob;
 use crate::inventory::ItemStack;
+use crate::item::active_skill_shrine::ActiveSkillSprite;
 use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::dungeon_shrine::AccessoryShrineAnim;
 use crate::item::dungeon_shrine::ArmorShrineAnim;
@@ -26,8 +27,8 @@ use crate::item::{
     WorldObjectResource,
 };
 use crate::pets::state::Pet;
-use crate::player::skills::Heirloom;
 use crate::player::skills::SkillClass;
+use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
@@ -131,6 +132,7 @@ impl Plugin for GameAssetsPlugin {
                 mob_spritesheets: None,
                 status_effect_icons: None,
                 skill_icons: None,
+                heirloom_skill_icons: None,
                 heirloom_sprites: None,
                 item_glows: None,
                 combat_shrine_anim: None,
@@ -139,6 +141,7 @@ impl Plugin for GameAssetsPlugin {
                 armor_shrine_anim: None,
                 accessory_shrine_anim: None,
                 blacksmith_merchant: None,
+                active_skill_shrine: None,
                 portal_ase: None,
                 class_pet_data: None,
             })
@@ -193,7 +196,8 @@ pub struct Graphics {
     pub ui_image_handles: Option<HashMap<UIElement, Handle<Image>>>,
     pub mob_spritesheets: Option<HashMap<Mob, Vec<Handle<Image>>>>,
     pub status_effect_icons: Option<HashMap<StatusEffect, Handle<Image>>>,
-    pub skill_icons: Option<HashMap<Heirloom, Handle<Image>>>,
+    pub skill_icons: Option<HashMap<ActiveSkill, Handle<Image>>>,
+    pub heirloom_skill_icons: Option<HashMap<Heirloom, Handle<Image>>>,
     pub heirloom_sprites: Option<HashMap<Heirloom, TextureAtlasSprite>>,
     pub item_glows: Option<HashMap<ItemGlow, Handle<Image>>>,
     pub combat_shrine_anim: Option<Handle<Aseprite>>,
@@ -202,6 +206,7 @@ pub struct Graphics {
     pub accessory_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
     pub blacksmith_merchant: Option<Handle<Aseprite>>,
+    pub active_skill_shrine: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
 }
@@ -230,11 +235,11 @@ impl Graphics {
             .unwrap_or_else(|| panic!("No graphic for object {:?}", heirloom))
             .clone()
     }
-    pub fn get_active_skill_icon(&self, heirloom: Heirloom) -> Handle<Image> {
+    pub fn get_active_skill_icon(&self, active_skill: ActiveSkill) -> Handle<Image> {
         self.skill_icons
             .as_ref()
             .unwrap()
-            .get(&heirloom)
+            .get(&active_skill)
             .unwrap()
             .clone()
     }
@@ -375,7 +380,7 @@ impl GameAssetsPlugin {
         let mut icon_map = HashMap::default();
         let mut ui_image_handles = HashMap::default();
         let mut status_effect_handles = HashMap::default();
-        let mut skill_handles = HashMap::default();
+        let skill_handles = HashMap::default();
         let mut item_glow_handles = HashMap::default();
 
         let mob_spritesheets = Mob::iter()
@@ -458,10 +463,11 @@ impl GameAssetsPlugin {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
             status_effect_handles.insert(u, handle);
         }
-        // load Heirloom Icons
-        for u in Heirloom::iter() {
+        // load Active Skill Icons
+        let mut active_skill_handles = HashMap::default();
+        for u in crate::player::skills::ActiveSkill::iter() {
             let handle = asset_server.load(format!("effects/{u}Icon.png"));
-            skill_handles.insert(u, handle);
+            active_skill_handles.insert(u, handle);
         }
         // load Item Glows
         for u in ItemGlow::iter() {
@@ -481,7 +487,8 @@ impl GameAssetsPlugin {
             icons: Some(icon_map),
             mob_spritesheets: Some(mob_spritesheets),
             status_effect_icons: Some(status_effect_handles),
-            skill_icons: Some(skill_handles),
+            skill_icons: Some(active_skill_handles),
+            heirloom_skill_icons: Some(skill_handles),
             heirloom_sprites: Some(heirloom_sprites),
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
@@ -490,6 +497,7 @@ impl GameAssetsPlugin {
             armor_shrine_anim: Some(asset_server.load(ArmorShrineAnim::PATH)),
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
             blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
+            active_skill_shrine: Some(asset_server.load(ActiveSkillSprite::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
         };

@@ -29,7 +29,7 @@ use crate::{
         },
         InventoryState,
     },
-    Game, GameParam,
+    GameParam,
 };
 
 use super::{
@@ -813,7 +813,6 @@ pub fn handle_cursor_skills_buttons(
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
-    mut game: ResMut<Game>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -863,28 +862,26 @@ pub fn handle_cursor_skills_buttons(
                         } else if ui_state == &UIState::ActiveSkills {
                             match state.index {
                                 0 => {
-                                    let prev_active_skill =
-                                        skills.active_skill_slot_1.clone().unwrap();
-                                    for skill_to_remove in prev_active_skill.child_heirlooms {
-                                        skill_queue.pool.retain(|s| s != &skill_to_remove);
-                                    }
-
                                     skills.active_skill_slot_1 =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 1 => {
-                                    let prev_active_skill =
-                                        skills.active_skill_slot_2.clone().unwrap();
-                                    for skill_to_remove in prev_active_skill.child_heirlooms {
-                                        skill_queue.pool.retain(|s| s != &skill_to_remove);
-                                    }
                                     skills.active_skill_slot_2 =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 _ => (),
                             }
+
+                            // Add skill components for the new active skill
+                            if let Some(ref new_skill) = skill_queue.active_heirloom_limbo {
+                                new_skill
+                                    .active_skill
+                                    .add_skill_components(e, &mut commands);
+                            }
+
                             skill_queue.active_heirloom_limbo = None;
                             next_ui_state.set(UIState::Closed);
+                            att_event.send(AttributeChangeEvent);
                         }
                     }
                 }

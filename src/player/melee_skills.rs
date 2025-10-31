@@ -20,7 +20,7 @@ use crate::{
     GameParam, HitEvent, InvincibilityTimer,
 };
 
-use super::{ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -162,7 +162,7 @@ pub fn handle_parry(
         return;
     };
 
-    if let Some(parry_slot) = skills.has_active_heirloom(Heirloom::Parry) {
+    if let Some(parry_slot) = skills.has_active_skill(ActiveSkill::Parry) {
         if key_input.just_pressed(get_active_skill_keybind(parry_slot))
             && parry_state.cooldown_timer.finished()
             && !curr_anim.is_parrying()
@@ -213,7 +213,7 @@ pub fn handle_spear(
         return;
     };
 
-    if let Some(spear_slot) = skills.has_active_heirloom(Heirloom::ParrySpear) {
+    if let Some(spear_slot) = skills.has_active_skill(ActiveSkill::ParrySpear) {
         if key_input.just_pressed(get_active_skill_keybind(spear_slot))
             && spear_state.cooldown_timer.finished()
         {

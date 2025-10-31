@@ -103,6 +103,7 @@
         DungeonEntrance: [GrassTile, ],
         CombatShrine: [GrassTile, ],
         GambleShrine: [GrassTile, ],
+        ActiveSkillShrine: [GrassTile, ],
       }
     ),
   }

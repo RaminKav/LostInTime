@@ -18,7 +18,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -48,7 +48,7 @@ pub fn handle_toggle_sprinting(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, sprint_state, skills, was_sprinting) in sprint_query.iter_mut() {
-        if let Some(sprint_slot) = skills.has_active_heirloom(Heirloom::Sprint) {
+        if let Some(sprint_slot) = skills.has_active_skill(ActiveSkill::Sprint) {
             if key_inputs.just_pressed(get_active_skill_keybind(sprint_slot))
                 && sprint_state.sprint_cooldown_timer.finished()
             {
@@ -117,7 +117,7 @@ pub fn handle_sprint_timer(
                 .just_finished()
             {
                 active_skill_event.send(ActiveSkillUsedEvent {
-                    slot: skills.has_active_heirloom(Heirloom::Sprint).unwrap(),
+                    slot: skills.has_active_skill(ActiveSkill::Sprint).unwrap(),
                     cooldown: sprint.sprint_cooldown_timer.duration().as_secs_f32(),
                 });
                 commands.entity(e).remove::<Sprinting>();
@@ -143,7 +143,7 @@ pub fn handle_lunge(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
-        if let Some(lunge_slot) = skills.has_active_heirloom(Heirloom::SprintLunge) {
+        if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
             if key_inputs.just_pressed(get_active_skill_keybind(lunge_slot))
                 && lunge_state.lunge_cooldown_timer.finished()
             {
@@ -249,7 +249,7 @@ pub fn handle_enemy_death_sprint_reset(
 ) {
     for _ in enemy_death_events.iter() {
         if skills.single().has(Heirloom::SprintKillReset) {
-            if let Some(lunge_slot) = skills.single().has_active_heirloom(Heirloom::SprintLunge) {
+            if let Some(lunge_slot) = skills.single().has_active_skill(ActiveSkill::SprintLunge) {
                 for mut sprint in lunge_query.iter_mut() {
                     active_skill_event.send(ActiveSkillUsedEvent {
                         slot: lunge_slot,

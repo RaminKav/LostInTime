@@ -17,7 +17,7 @@ use crate::{
     GameParam,
 };
 
-use super::{ActiveSkillUsedEvent, MovePlayerEvent, Player, PlayerSkills, Heirloom};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills};
 
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
 aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
@@ -60,7 +60,6 @@ pub fn handle_teleport(
     proto_param: ProtoParam,
     mut commands: Commands,
     time: Res<Time>,
-    asset_server: Res<AssetServer>,
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     let Ok((e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc, mut teleport_state)) =
@@ -68,7 +67,7 @@ pub fn handle_teleport(
     else {
         return;
     };
-    if let Some(teleport_slot) = skills.has_active_heirloom(Heirloom::Teleport) {
+    if let Some(teleport_slot) = skills.has_active_skill(ActiveSkill::Teleport) {
         if teleport_state.count > 0
             && key_input.just_pressed(get_active_skill_keybind(teleport_slot))
             && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)

@@ -1,3 +1,4 @@
+use super::active_skill_shrine::{ActiveSkillShrineSelection, ActiveSkillShrineState};
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
@@ -9,13 +10,16 @@ use crate::container::Container;
 use crate::inventory::Inventory;
 use crate::item::dungeon_shrine::NUM_DUNGEON_SHRINE_MOBS;
 use crate::juice::ShakeEffect;
+use crate::player::skills::{ActiveSkill, ActiveSkillChoiceState, HeirloomRarity};
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
+use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use rand::seq::IteratorRandom;
 
 use crate::world::TileMapPosition;
 use crate::{
@@ -45,6 +49,7 @@ pub enum ObjectAction {
     SetHome,
     CombatShrine,
     GambleShrine,
+    ActiveSkillShrine,
     WeaponShrine,
     ArmorShrine,
     AccessoryShrine,
@@ -303,6 +308,46 @@ impl ObjectAction {
                             GambleShrineAnim::tags::ACTIVATE_FAIL,
                         ));
                 }
+            }
+            ObjectAction::ActiveSkillShrine => {
+                // Generate a random active skill choice
+                let mut rng = rand::thread_rng();
+
+                // Get all active skills from ActiveSkill enum
+                let active_skills: Vec<ActiveSkill> = vec![
+                    // ActiveSkill::Roll,
+                    ActiveSkill::Parry,
+                    ActiveSkill::ParrySpear,
+                    ActiveSkill::Sprint,
+                    ActiveSkill::SprintLunge,
+                    ActiveSkill::Teleport,
+                ];
+
+                // Pick a random active skill
+                let chosen_active_skill = active_skills.iter().choose(&mut rng).unwrap();
+
+                let skill_choice = ActiveSkillChoiceState::new(
+                    chosen_active_skill.clone(),
+                    HeirloomRarity::Common,
+                );
+
+                // Create a resource with the skill choice and shrine entity
+                commands.insert_resource(ActiveSkillShrineSelection {
+                    skill_choice: skill_choice.clone(),
+                    shrine_entity: e,
+                });
+
+                // Mark shrine as activated
+                commands
+                    .entity(e)
+                    .remove::<ObjectAction>()
+                    .remove::<InteractionGuideTrigger>()
+                    .insert(ActiveSkillShrineState { is_used: false });
+
+                // Open active skill shrine selection UI
+                item_action_param
+                    .next_inv_state
+                    .set(UIState::ActiveSkillShrine);
             }
             ObjectAction::WeaponShrine => {
                 // Screen Shake

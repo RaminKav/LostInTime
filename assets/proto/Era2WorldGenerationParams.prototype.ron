@@ -56,6 +56,7 @@
       schematic_frequencies: {
         CombatShrine: 0.06,
         GambleShrine: 0.06,
+        ActiveSkillShrine: 0.05,
       },
       obj_allowed_tiles_map: {
         Era2SmallTree: [GrassTile],
@@ -94,6 +95,7 @@
         DungeonEntrance: [GrassTile, ],
         CombatShrine: [GrassTile, ],
         GambleShrine: [GrassTile, ],
+        ActiveSkillShrine: [GrassTile, ],
       }
     ),
   }

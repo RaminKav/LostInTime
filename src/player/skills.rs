@@ -23,11 +23,7 @@ use crate::{
     Pet,
 };
 
-use super::{
-    mage_skills::TeleportState,
-    melee_skills::{ParryState, SpearState},
-    rogue_skills::{ComboCounter, LungeState, SprintState},
-};
+use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 
 #[derive(Component, Debug, Clone, Eq, PartialEq, Serialize, Deserialize, Hash, EnumIter)]
 pub enum SkillClass {
@@ -194,9 +190,148 @@ impl SkillClass {
     }
 }
 
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default)]
+pub enum ActiveSkill {
+    #[default]
+    Roll,
+    Parry,
+    ParrySpear,
+    Sprint,
+    SprintLunge,
+    Teleport,
+}
+
+impl ActiveSkill {
+    pub fn get_title(&self) -> String {
+        match self {
+            ActiveSkill::Roll => "Roll".to_string(),
+            ActiveSkill::Parry => "Parry".to_string(),
+            ActiveSkill::ParrySpear => "Gravitational Spear".to_string(),
+            ActiveSkill::Sprint => "Sprint".to_string(),
+            ActiveSkill::SprintLunge => "Lunge".to_string(),
+            ActiveSkill::Teleport => "Teleport".to_string(),
+        }
+    }
+
+    pub fn get_desc(&self) -> Vec<String> {
+        match self {
+            ActiveSkill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
+            ActiveSkill::Parry => vec![
+                "Active: Parry".to_string(),
+                "enemy attacks,".to_string(),
+                "ignore damage, and".to_string(),
+                "stun attackers if".to_string(),
+                "timed successfully.".to_string(),
+            ],
+            ActiveSkill::ParrySpear => vec![
+                "Active: Spear Attack".to_string(),
+                "that pulls enemies".to_string(),
+                "towards the impact.".to_string(),
+            ],
+            ActiveSkill::Sprint => vec![
+                "Active: Hold Sprint".to_string(),
+                "to move 60% faster.".to_string(),
+            ],
+            ActiveSkill::SprintLunge => vec![
+                "Active: dash through".to_string(),
+                "enemies with a quick".to_string(),
+                "lunge attack.".to_string(),
+            ],
+            ActiveSkill::Teleport => vec![
+                "Active: Teleport a".to_string(),
+                "short distance to".to_string(),
+                "dodge attacks or".to_string(),
+                "move around quickly.".to_string(),
+            ],
+        }
+    }
+
+    pub fn add_skill_components(&self, entity: Entity, commands: &mut Commands) {
+        match self {
+            ActiveSkill::Sprint => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::rogue_skills::SprintState {
+                        startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
+                        sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
+                        sprint_cooldown_timer: Timer::from_seconds(6., TimerMode::Once)
+                            .tick(Duration::from_secs(99))
+                            .clone(),
+                        speed_bonus: 1.6,
+                    });
+            }
+            ActiveSkill::SprintLunge => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::rogue_skills::LungeState {
+                        lunge_cooldown_timer: Timer::from_seconds(4., TimerMode::Once)
+                            .tick(Duration::from_secs(99))
+                            .clone(),
+                        lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
+                        lunge_speed: 3.9,
+                    });
+            }
+            ActiveSkill::Teleport => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::mage_skills::TeleportState {
+                        just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
+                        cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
+                            .tick(Duration::from_secs(99))
+                            .clone(),
+                        count: 1,
+                        max_count: 1,
+                        timer: Timer::from_seconds(0.17, TimerMode::Once),
+                        second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
+                    });
+            }
+            ActiveSkill::Parry => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::melee_skills::ParryState {
+                        parry_timer: Timer::from_seconds(0.7, TimerMode::Once),
+                        cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once)
+                            .tick(Duration::from_secs(99))
+                            .clone(),
+                        success: false,
+                        active: false,
+                    });
+            }
+            ActiveSkill::ParrySpear => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::melee_skills::SpearState {
+                        cooldown_timer: Timer::from_seconds(5.2, TimerMode::Once)
+                            .tick(Duration::from_secs(99))
+                            .clone(),
+                        spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
+                    });
+            }
+            ActiveSkill::Roll => {}
+        }
+    }
+
+    pub fn get_ui_element(&self, rarity: HeirloomRarity) -> UIElement {
+        match rarity {
+            HeirloomRarity::Common => UIElement::SkillChoice,
+            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogue,
+            HeirloomRarity::Rare => UIElement::SkillChoiceMagic,
+            HeirloomRarity::Legendary => UIElement::SkillChoiceMelee,
+        }
+    }
+
+    pub fn get_ui_element_hover(&self, rarity: HeirloomRarity) -> UIElement {
+        match rarity {
+            HeirloomRarity::Common => UIElement::SkillChoice,
+            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogueHover,
+            HeirloomRarity::Rare => UIElement::SkillChoiceMagicHover,
+            HeirloomRarity::Legendary => UIElement::SkillChoiceMeleeHover,
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq, Hash, Default, Debug, Serialize, EnumIter, Display, Deserialize)]
 pub enum Heirloom {
-    Roll,
     // Passives
     #[default]
     CritChance, //tusk
@@ -259,22 +394,16 @@ pub enum Heirloom {
     PoisonStacks, // grandma's recipe
     LethalBlow,   // red purple mushroom
 
-    // Skills
-    Teleport,
     TeleportShock,
     TeleportCooldown,
     TeleportCount,
     TeleportManaRegen,
 
-    Sprint,
     SprintFaster,
-    SprintLunge,
     SprintLungeDamage,
     SprintKillReset,
 
-    Parry,
     ParryHPRegen,
-    ParrySpear,
     ParryDeflectProj,
     ParryKnockback, // needs art prompt/art
     ParryEcho,
@@ -302,7 +431,6 @@ impl Heirloom {
             Heirloom::SlowStacks => "Sea Shell".to_string(),
             Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
             Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
-            Heirloom::Teleport => "Teleport".to_string(),
             Heirloom::TeleportShock => "Shock Step".to_string(),
             Heirloom::TeleportCooldown => "Teleport Faster!".to_string(),
             Heirloom::TeleportCount => "Multi-port".to_string(),
@@ -315,14 +443,10 @@ impl Heirloom {
             Heirloom::XPGain => "Microchip".to_string(),
 
             Heirloom::IceStaffAoE => "Frozen Tear".to_string(),
-            Heirloom::Sprint => "Sprint".to_string(),
             Heirloom::SprintFaster => "Faster Sprint".to_string(),
-            Heirloom::SprintLunge => "Lunge".to_string(),
             Heirloom::SprintLungeDamage => "Lunge Mastery".to_string(),
             Heirloom::SprintKillReset => "Kill Reset".to_string(),
-            Heirloom::Parry => "Parry".to_string(),
             Heirloom::ParryHPRegen => "Rejuvenating Parry".to_string(),
-            Heirloom::ParrySpear => "Gravitational Spear".to_string(),
             Heirloom::ParryDeflectProj => "Parry Deflect".to_string(),
             Heirloom::ParryKnockback => "Shield Bash".to_string(),
             Heirloom::ParryEcho => "Parry Echo".to_string(),
@@ -350,13 +474,11 @@ impl Heirloom {
             Heirloom::FullStomach => "Jam".to_string(),
 
             Heirloom::ReinforcedArmor => "Scales".to_string(),
-            Heirloom::Roll => "Roll".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
-            Heirloom::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
             Heirloom::Chest => vec!["Gain a Loot Chest".to_string()],
             Heirloom::CritChance => vec![
                 "Gain +10% Critical".to_string(),
@@ -424,12 +546,6 @@ impl Heirloom {
                 "execute enemies ".to_string(),
                 "below 20% health.".to_string(),
             ],
-            Heirloom::Teleport => vec![
-                "Active: Teleport a".to_string(),
-                "short distance to".to_string(),
-                "dodge attacks or".to_string(),
-                "move around quickly.".to_string(),
-            ],
             Heirloom::TeleportShock => vec![
                 "Teleporting through".to_string(),
                 "enemies damages".to_string(),
@@ -447,20 +563,9 @@ impl Heirloom {
                 "triggers mana".to_string(),
                 "regeneration.".to_string(),
             ],
-            Heirloom::Sprint => vec![
-                "Active: Hold Sprint".to_string(),
-                "to move 60% faster.".to_string(),
-                // "Allows you to attack".to_string(),
-                // "while sprinting.".to_string(),
-            ],
             Heirloom::SprintFaster => {
                 vec!["Your Sprint ability".to_string(), "is faster.".to_string()]
             }
-            Heirloom::SprintLunge => vec![
-                "Active: dash through".to_string(),
-                "enemies with a quick".to_string(),
-                "lunge attack.".to_string(),
-            ],
             Heirloom::SprintLungeDamage => vec![
                 "Your Lunge attack".to_string(),
                 "does more damage.".to_string(),
@@ -494,22 +599,10 @@ impl Heirloom {
             }
             Heirloom::Attack => vec!["Gain +10% Damage,".to_string(), "permanently.".to_string()],
             Heirloom::Defence => vec!["Gain +10 Defence,".to_string(), "permanently.".to_string()],
-            Heirloom::Parry => vec![
-                "Active: Parry".to_string(),
-                "enemy attacks,".to_string(),
-                "ignore damage, and".to_string(),
-                "stun attackers if".to_string(),
-                "timed successfully.".to_string(),
-            ],
             Heirloom::ParryHPRegen => vec![
                 "A successful".to_string(),
                 "parry triggers".to_string(),
                 "health regeneration".to_string(),
-            ],
-            Heirloom::ParrySpear => vec![
-                "Active: Spear Attack".to_string(),
-                "that pulls enemies".to_string(),
-                "towards the impact.".to_string(),
             ],
             Heirloom::ParryDeflectProj => vec![
                 "A successful".to_string(),
@@ -667,17 +760,6 @@ impl Heirloom {
             ],
         }
     }
-    pub fn is_active_skill(&self) -> bool {
-        match self {
-            Heirloom::Roll => true,
-            Heirloom::Parry => true,
-            Heirloom::ParrySpear => true,
-            Heirloom::Sprint => true,
-            Heirloom::SprintLunge => true,
-            Heirloom::Teleport => true,
-            _ => false,
-        }
-    }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
         match self {
             Heirloom::Chest => Some((WorldObject::ChestBlock, 1)),
@@ -702,37 +784,6 @@ impl Heirloom {
             Heirloom::BowArrowSpeed => {
                 commands.entity(entity).insert(ArrowSpeedUpgrade(1.25));
             }
-            Heirloom::Sprint => {
-                commands.entity(entity).insert(SprintState {
-                    startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
-                    sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
-                    sprint_cooldown_timer: Timer::from_seconds(6., TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    speed_bonus: 1.6,
-                });
-            }
-            Heirloom::SprintLunge => {
-                commands.entity(entity).insert(LungeState {
-                    lunge_cooldown_timer: Timer::from_seconds(4., TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
-                    lunge_speed: 3.9,
-                });
-            }
-            Heirloom::Teleport => {
-                commands.entity(entity).insert(TeleportState {
-                    just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    count: 1,
-                    max_count: 1,
-                    timer: Timer::from_seconds(0.17, TimerMode::Once),
-                    second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
-                });
-            }
             &Heirloom::TeleportCount => {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -749,24 +800,6 @@ impl Heirloom {
                 commands.entity(entity).insert(ComboCounter {
                     counter: 0,
                     reset_timer: Timer::from_seconds(2., TimerMode::Once),
-                });
-            }
-            &Heirloom::Parry => {
-                commands.entity(entity).insert(ParryState {
-                    parry_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.2, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    success: false,
-                    active: false,
-                });
-            }
-            &Heirloom::ParrySpear => {
-                commands.entity(entity).insert(SpearState {
-                    cooldown_timer: Timer::from_seconds(5.2, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
                 });
             }
 
@@ -832,6 +865,21 @@ pub struct HeirloomChoiceState {
     pub is_one_time_heirloom: bool,
     pub rarity: HeirloomRarity,
 }
+
+#[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
+pub struct ActiveSkillChoiceState {
+    pub active_skill: ActiveSkill,
+    pub rarity: HeirloomRarity,
+}
+
+impl ActiveSkillChoiceState {
+    pub fn new(active_skill: ActiveSkill, rarity: HeirloomRarity) -> Self {
+        Self {
+            active_skill,
+            rarity,
+        }
+    }
+}
 impl HeirloomChoiceState {
     pub fn new(heirloom: Heirloom, rarity: HeirloomRarity) -> Self {
         Self {
@@ -861,7 +909,7 @@ pub struct HeirloomChoiceQueue {
     pub queue: Vec<[HeirloomChoiceState; 3]>,
     pub rerolls: [bool; 3],
     pub pool: Vec<HeirloomChoiceState>,
-    pub active_heirloom_limbo: Option<HeirloomChoiceState>,
+    pub active_heirloom_limbo: Option<ActiveSkillChoiceState>,
 }
 
 impl Default for HeirloomChoiceQueue {
@@ -897,7 +945,6 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary)
                     .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Sprint, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common)
@@ -940,7 +987,6 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary)
                     .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Teleport, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::IncreaseProjectilCount, HeirloomRarity::Rare)
@@ -955,8 +1001,6 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary)
                     .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::ParrySpear, HeirloomRarity::Common),
-                HeirloomChoiceState::new(Heirloom::Parry, HeirloomRarity::Common),
             ],
         }
     }
@@ -1021,12 +1065,12 @@ impl HeirloomChoiceQueue {
             heirloom: skill.heirloom.clone(),
             rarity: skill.rarity.clone(),
         });
-
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
         for choice in remaining_choices.iter() {
             self.pool.push(choice.clone());
         }
+
         for child in skill.child_heirlooms.iter() {
             if !player_skills
                 .heirlooms
@@ -1039,6 +1083,7 @@ impl HeirloomChoiceQueue {
         for clash in skill.clashing_heirlooms.iter() {
             self.pool.retain(|x| x.heirloom != *clash);
         }
+
         // handle drops
         if let Some((drop, count)) = skill.heirloom.get_instant_drop() {
             proto_commands.spawn_item_from_proto(
@@ -1049,20 +1094,10 @@ impl HeirloomChoiceQueue {
                 Some(player_level),
             );
         }
+
         //repopulate the queue after each skill selection, if there are skills missing
         if player_skills.heirlooms.len() < player_level as usize - 1 {
             self.add_new_skills_after_levelup(&mut rand::thread_rng());
-        }
-
-        // handle active skills
-        if skill.heirloom.is_active_skill() {
-            if player_skills.active_skill_slot_1.is_none() {
-                player_skills.insert_active_skill(skill.clone(), 1);
-            } else if player_skills.active_skill_slot_2.is_none() {
-                player_skills.insert_active_skill(skill.clone(), 2);
-            } else {
-                self.active_heirloom_limbo = Some(skill);
-            }
         }
     }
     pub fn handle_reroll_slot(&mut self, slot: usize, rng: &mut rand::rngs::ThreadRng) {
@@ -1093,16 +1128,16 @@ pub struct HeirloomWithRarity {
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub heirlooms: Vec<HeirloomWithRarity>,
-    pub active_skill_slot_1: Option<HeirloomChoiceState>,
-    pub active_skill_slot_2: Option<HeirloomChoiceState>,
+    pub active_skill_slot_1: Option<ActiveSkillChoiceState>,
+    pub active_skill_slot_2: Option<ActiveSkillChoiceState>,
 }
 
 impl Default for PlayerSkills {
     fn default() -> Self {
         Self {
             heirlooms: vec![],
-            active_skill_slot_1: Some(HeirloomChoiceState::new(
-                Heirloom::Roll,
+            active_skill_slot_1: Some(ActiveSkillChoiceState::new(
+                ActiveSkill::Roll,
                 HeirloomRarity::Common,
             )),
             active_skill_slot_2: None,
@@ -1141,18 +1176,18 @@ impl PlayerSkills {
         }
         chance
     }
-    pub fn has_active_heirloom(&self, heirloom: Heirloom) -> Option<usize> {
+    pub fn has_active_skill(&self, active_skill: ActiveSkill) -> Option<usize> {
         if self
             .active_skill_slot_1
             .as_ref()
-            .is_some_and(|s| s.heirloom == heirloom)
+            .is_some_and(|s| s.active_skill == active_skill)
         {
             return Some(0);
         }
         if self
             .active_skill_slot_2
             .as_ref()
-            .is_some_and(|s| s.heirloom == heirloom)
+            .is_some_and(|s| s.active_skill == active_skill)
         {
             return Some(1);
         }
@@ -1170,7 +1205,7 @@ impl PlayerSkills {
             .find(|h| h.heirloom == heirloom)
             .map(|h| h.rarity.clone())
     }
-    pub fn insert_active_skill(&mut self, skill: HeirloomChoiceState, slot: usize) {
+    pub fn insert_active_skill(&mut self, skill: ActiveSkillChoiceState, slot: usize) {
         match slot {
             1 => self.active_skill_slot_1 = Some(skill),
             2 => self.active_skill_slot_2 = Some(skill),

@@ -33,6 +33,9 @@ use crate::world::world_helpers::{
 };
 use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
+use active_skill_shrine::{
+    add_active_skill_shrine_visuals_on_spawn, handle_active_skill_shrine_completion,
+};
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
 use bevy::utils::HashMap;
@@ -52,6 +55,7 @@ use rand::Rng;
 mod crafting;
 pub mod item_actions;
 
+pub mod active_skill_shrine;
 pub mod ammo;
 pub mod boss_shrine;
 pub mod combat_shrine;
@@ -299,6 +303,8 @@ pub enum WorldObject {
     CombatShrineDone,
     GambleShrine,
     GambleShrineDone,
+    ActiveSkillShrine,
+    ActiveSkillShrineDone,
     WeaponShrine,
     WeaponShrineDone,
     ArmorShrine,
@@ -707,6 +713,8 @@ impl WorldObject {
             WorldObject::CombatShrineDone => true,
             WorldObject::GambleShrine => true,
             WorldObject::GambleShrineDone => true,
+            WorldObject::ActiveSkillShrine => true,
+            WorldObject::ActiveSkillShrineDone => true,
             _ => false,
         }
     }
@@ -828,6 +836,8 @@ impl WorldObject {
             WorldObject::CombatShrineDone => LIGHT_GREY,
             WorldObject::GambleShrine => LIGHT_GREY,
             WorldObject::GambleShrineDone => LIGHT_GREY,
+            WorldObject::ActiveSkillShrine => LIGHT_GREY,
+            WorldObject::ActiveSkillShrineDone => LIGHT_GREY,
 
             _ => BLACK,
         }
@@ -905,6 +915,8 @@ impl Plugin for ItemsPlugin {
             )
             .add_systems(
                 (
+                    add_active_skill_shrine_visuals_on_spawn,
+                    handle_active_skill_shrine_completion,
                     handle_dungeon_shrine_rewards,
                     add_dungeon_shrine_visuals_on_spawn,
                     handle_dungeon_shrine_activation,

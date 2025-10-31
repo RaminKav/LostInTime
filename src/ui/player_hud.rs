@@ -665,7 +665,7 @@ pub fn handle_update_player_skills(
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
-                        texture: graphics.get_active_skill_icon(active_skill.heirloom.clone()),
+                        texture: graphics.get_active_skill_icon(active_skill.active_skill.clone()),
                         sprite: Sprite {
                             custom_size: Some(Vec2::new(16., 16.)),
                             ..Default::default()
@@ -678,7 +678,7 @@ pub fn handle_update_player_skills(
                         ..Default::default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(SkillHudIcon(active_skill.heirloom.clone()))
+                    .insert(ActiveSkillIcon)
                     .insert(Name::new("HUD ICON!!"))
                     .set_parent(icon_bg);
             }
