@@ -20,6 +20,7 @@ pub mod analytics;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
+use crate::player::score::HighScores;
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
@@ -538,6 +539,24 @@ pub fn load_state(
         commands.init_resource::<WorldObjectCache>();
     }
     commands.insert_resource(GenerationSeed { seed });
+
+    // Load HighScores early so UI (class selection) can use it
+    let game_data_file_path = datafiles::game_data();
+    if let Ok(file_file) = File::open(game_data_file_path) {
+        let reader = BufReader::new(file_file);
+        match serde_json::from_reader::<_, GameData>(reader) {
+            Ok(game_data) => {
+                commands.insert_resource(game_data.high_scores);
+                // Also make sure class ranks are available early if present
+                commands.insert_resource(game_data.class_ranks);
+            }
+            Err(_) => {
+                commands.insert_resource(HighScores::default());
+            }
+        }
+    } else {
+        commands.insert_resource(HighScores::default());
+    }
 
     dim_event.send(DimensionSpawnEvent {
         swap_to_dim_now: true,

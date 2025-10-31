@@ -143,7 +143,7 @@
                 "Periodically covers you\n\nin slime, protecting you\n\nfrom damage."
             ],
             pet_icon: SlimePetIcon,
-            skill_icon: MeleePowerIcon,
+            skill_icon: SlimeShieldIcon,
         ),
         Fairy: (
             name: "Fairy", 

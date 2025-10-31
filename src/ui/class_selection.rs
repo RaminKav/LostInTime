@@ -16,6 +16,7 @@ use crate::{
     night::NightTracker,
     player::{
         class_rank::ClassRankSystem,
+        score::HighScores,
         skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
     },
     ui::{UIElement, UIState},
@@ -84,6 +85,7 @@ pub fn setup_class_selection_ui(
     sprite_handles: Res<PlayerSpriteHandles>,
     res: Res<ScreenResolution>,
     class_ranks: Res<ClassRankSystem>,
+    high_scores: Option<Res<HighScores>>,
 ) {
     // Initialize the selection state
     commands.init_resource::<ClassSelectionState>();
@@ -316,6 +318,7 @@ pub fn setup_class_selection_ui(
         &asset_server,
         &graphics,
         &class_ranks,
+        high_scores.as_ref(),
     );
 
     // No pet preview by default - wait for player selection
@@ -511,6 +514,7 @@ fn spawn_player_preview(
     asset_server: &Res<AssetServer>,
     graphics: &Res<Graphics>,
     class_ranks: &Res<ClassRankSystem>,
+    high_scores: Option<&Res<HighScores>>,
 ) -> Entity {
     let ICONS_X_OFFSET = 22.;
     let DESC_TEXT_X = ICONS_X_OFFSET + 12.;
@@ -593,6 +597,34 @@ fn spawn_player_preview(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("CLASS RANK"))
+        .set_parent(player_container)
+        .id();
+
+    // Highest score for this class (top-right corner display)
+    let class_high_score = high_scores
+        .and_then(|hs| hs.class_high_scores.get(selected_class).copied())
+        .unwrap_or(0);
+    let high_score_text = format!("Best: {}", class_high_score);
+    let _high_score = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                high_score_text,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: DARK_WOOD_BROWN,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(120., 16., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("CLASS HIGH SCORE"))
         .set_parent(player_container)
         .id();
 
@@ -865,6 +897,7 @@ pub fn update_preview_sprites(
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
     class_ranks: Res<ClassRankSystem>,
+    high_scores: Option<Res<HighScores>>,
 ) {
     if !selection_state.is_changed() {
         return;
@@ -890,6 +923,7 @@ pub fn update_preview_sprites(
             &asset_server,
             &graphics,
             &class_ranks,
+            high_scores.as_ref(),
         );
     }
 

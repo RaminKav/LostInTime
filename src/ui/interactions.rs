@@ -119,6 +119,7 @@ pub enum UIElement {
     HealthIcon,
     ManaIcon,
     HPRegenCooldownIcon,
+    SlimeShieldIcon,
     HPRegenIcon,
     MPRegenIcon,
     SpeedIcon,
