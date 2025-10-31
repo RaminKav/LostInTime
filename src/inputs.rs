@@ -35,6 +35,7 @@ use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
 use crate::inventory::Inventory;
+use crate::item::ammo::Ammo;
 use crate::item::item_actions::{ItemActionParam, ItemActions, ManaCost};
 use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
@@ -258,6 +259,7 @@ pub fn player_move_inputs(
     audio: Res<Audio>,
     mut audio_timer: Local<Timer>,
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+    mut ammo_query: Query<&mut Ammo>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -325,6 +327,17 @@ pub fn player_move_inputs(
         || (d.x == 0. && d.y == 0.)
     {
         player.is_moving = false;
+    }
+
+    // Manual reload on R key for current ranged weapon
+    if key_input.just_pressed(KeyCode::R) {
+        if let Some(main_hand) = player.main_hand_slot.clone() {
+            if let Ok(mut ammo) = ammo_query.get_mut(main_hand.entity) {
+                if !ammo.reloading && ammo.current < ammo.max {
+                    ammo.start_reload();
+                }
+            }
+        }
     }
     if d.x != 0. || d.y != 0. {
         d = d.normalize() * s;
@@ -636,6 +649,7 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     obj_actions: Query<&ObjectAction>,
+    ammo_query_any: Query<&Ammo>,
     // mut meshes: ResMut<Assets<Mesh>>,
     // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -670,6 +684,20 @@ pub fn mouse_click_system(
         let direction =
             (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
         if let Ok((obj, ranged_tool)) = ranged_query.get_single() {
+            // Gate ranged attacks on ammo availability for non-magic ranged weapons
+            if obj.is_ranged_weapon() && !obj.is_magic_weapon() {
+                if let Some(main_hand) = game.player().main_hand_slot.clone() {
+                    if let Ok(ammo) = ammo_query_any.get(main_hand.entity) {
+                        if !ammo.can_fire() {
+                            // Out of ammo: do not send any attack or animation for ranged
+                            return;
+                        }
+                    } else {
+                        // No ammo component yet: treat as empty and block attack until projectile handler initializes
+                        return;
+                    }
+                }
+            }
             let mana_cost_option =
                 proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
             let mut rng = rand::thread_rng();

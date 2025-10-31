@@ -162,6 +162,7 @@ impl Plugin for UIPlugin {
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
+                    update_hotbar_ammo_bar,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

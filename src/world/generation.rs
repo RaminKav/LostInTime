@@ -415,7 +415,7 @@ impl GenerationPlugin {
             let dungeon_check = dungeon_check.get_single();
             let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
-                info!(
+                debug!(
                     "Generating new objects for {chunk_pos:?} {:?}",
                     game.get_chunk_entity(chunk_pos).is_some()
                 );
@@ -718,7 +718,7 @@ impl GenerationPlugin {
                 schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
-                info!("Chunk already generated: {chunk_pos:?} {:?}", objs.len());
+                debug!("Chunk already generated: {chunk_pos:?} {:?}", objs.len());
                 for (pos, obj_to_spawn) in objs {
                     place_item_event.send(PlaceItemEvent {
                         obj: obj_to_spawn,

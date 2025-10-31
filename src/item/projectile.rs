@@ -13,13 +13,14 @@ use crate::{
     enemy::Mob,
     player::{
         mage_skills::JustTeleported,
-        skills::{PlayerSkills, Heirloom},
+        skills::{Heirloom, PlayerSkills},
         Player,
     },
     proto::proto_param::ProtoParam,
     GameParam, GameState, Pet,
 };
 
+use super::ammo::Ammo;
 use super::item_upgrades::ArrowSpeedUpgrade;
 
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
@@ -186,6 +187,7 @@ fn handle_ranged_attack_event(
     game: GameParam,
     mut commands: Commands,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut ammo_query: Query<&mut Ammo>,
 ) {
     for proj_event in events.iter() {
         let (
@@ -206,6 +208,24 @@ fn handle_ranged_attack_event(
         {
             continue;
         }
+        // Ammo gate for non-staff player shots
+        if !proj_event.from_enemy
+            && proj_event.from_entity.is_none()
+            && !proj_event.projectile.is_staff_proj()
+        {
+            if let Some(main_hand) = game.player().main_hand_slot.clone() {
+                let held_e = main_hand.entity;
+                if let Ok(mut ammo) = ammo_query.get_mut(held_e) {
+                    if !ammo.can_fire() {
+                        ammo.start_reload();
+                        continue;
+                    }
+                    // consume one round, will auto-reload if hits zero
+                    ammo.use_ammo_and_maybe_reload();
+                }
+            }
+        }
+
         if let Some(mana_cost) = proj_event.mana_cost {
             if mana_cost.abs() > current_mana.0 {
                 continue;
@@ -340,11 +360,12 @@ fn handle_spawn_projectiles_after_delay(
                     }
                 }
 
-                let mana_full_bonus = if game.has_skill(Heirloom::MPBarDMG) && proj.was_mana_bar_full {
-                    1.25
-                } else {
-                    1.
-                };
+                let mana_full_bonus =
+                    if game.has_skill(Heirloom::MPBarDMG) && proj.was_mana_bar_full {
+                        1.25
+                    } else {
+                        1.
+                    };
                 let player_att = game.player_stats.single().0 .0 * mana_full_bonus as i32;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
                 commands.entity(p).insert(Attack(computed_dmg));

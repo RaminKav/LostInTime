@@ -24,7 +24,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: Blowdart,
         attributes: (
-            attack_cooldown: 0.35
+            attack_cooldown: 0.4
         ),
         metadata: (
             name: "Blow Dart ", 

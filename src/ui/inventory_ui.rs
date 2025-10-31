@@ -1,5 +1,8 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
+use crate::colors::UNCOMMON_GREEN;
+use crate::item::ammo::Ammo;
+use crate::GameParam;
 use crate::{
     assets::Graphics,
     attributes::{add_item_glows, AttributeChangeEvent},
@@ -475,7 +478,61 @@ pub fn spawn_inv_slot(
     if let Some(icon_entity) = icon_entity_option {
         slot_entity.push_children(&[icon_entity]);
     }
-    slot_entity.id()
+    let id = slot_entity.id();
+    // Attach an ammo bar to the active hotbar slot (UI only shows for active weapon)
+    if slot_type.is_hotbar() && inv_state.active_hotbar_slot == slot_index {
+        commands
+            .spawn(SpriteBundle {
+                sprite: Sprite {
+                    color: UNCOMMON_GREEN,
+                    custom_size: Some(Vec2::new(0., 1.)),
+                    anchor: Anchor::CenterLeft,
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(-6., -6.5, 4.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new("AMMO BAR"))
+            .insert(AmmoBarHotbar)
+            .set_parent(id);
+    }
+
+    id
+}
+
+#[derive(Component)]
+pub struct AmmoBarHotbar;
+
+pub fn update_hotbar_ammo_bar(
+    game: GameParam,
+    mut bars: Query<&mut Sprite, With<AmmoBarHotbar>>,
+    ammo_query: Query<&Ammo>,
+) {
+    if bars.is_empty() {
+        return;
+    }
+    if let Some(main_hand) = game.player().main_hand_slot.clone() {
+        if let Ok(ammo) = ammo_query.get(main_hand.entity) {
+            let percent = if ammo.reloading {
+                ammo.reload.percent()
+            } else if ammo.max > 0 {
+                ammo.current as f32 / ammo.max as f32
+            } else {
+                0.
+            };
+            for mut sprite in bars.iter_mut() {
+                sprite.custom_size = Some(Vec2::new(12. * percent.clamp(0.0, 1.0), 1.));
+            }
+        } else {
+            for mut sprite in bars.iter_mut() {
+                sprite.custom_size = Some(Vec2::new(0., 1.));
+            }
+        }
+    }
 }
 pub fn spawn_item_stack_icon(
     commands: &mut Commands,

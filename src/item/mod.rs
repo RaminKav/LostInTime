@@ -12,6 +12,7 @@ use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
 
 use crate::inventory::ItemStack;
+use crate::item::ammo::AmmoMemory;
 use crate::juice::{spawn_obj_death_particles, spawn_xp_particles};
 use crate::player::levels::ExperienceReward;
 use crate::player::Player;
@@ -51,6 +52,7 @@ use rand::Rng;
 mod crafting;
 pub mod item_actions;
 
+pub mod ammo;
 pub mod boss_shrine;
 pub mod combat_shrine;
 pub mod dungeon_shrine;
@@ -71,6 +73,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter, IntoStaticStr};
 
+use self::ammo::tick_reload;
 use self::crafting::CraftingPlugin;
 use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
@@ -658,6 +661,15 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn get_ammo(&self) -> (u32, f32) {
+        match self {
+            WorldObject::Gun => (6, 0.9),
+            WorldObject::WoodBow => (6, 1.25),
+            WorldObject::Claw => (10, 1.25),
+            WorldObject::Blowdart => (8, 1.25),
+            _ => (0, 0.0),
+        }
+    }
     pub fn is_magic_weapon(&self) -> bool {
         match self {
             WorldObject::IceStaff => true,
@@ -842,6 +854,7 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(WorldObjectResource::new())
+            .insert_resource(AmmoMemory::default())
             .add_event::<PlaceItemEvent>()
             .add_event::<UpdateObjectEvent>()
             .add_event::<CombatShrineMobDeathEvent>()
@@ -883,6 +896,11 @@ impl Plugin for ItemsPlugin {
                         .run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                tick_reload
+                    .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(

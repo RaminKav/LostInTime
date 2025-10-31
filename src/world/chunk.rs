@@ -62,8 +62,6 @@ impl Plugin for ChunkPlugin {
     }
 }
 
-#[derive(Component)]
-pub struct SpawnedChunk;
 #[derive(Eq, Hash, Reflect, Component, PartialEq, Default, Debug, Clone)]
 #[reflect(Component)]
 pub struct TileSpriteData {
@@ -85,8 +83,6 @@ pub struct GenerateObjectsEvent {
     pub chunk_pos: IVec2,
 }
 
-#[derive(Component)]
-pub struct VisibleObject;
 #[derive(Clone)]
 pub struct CreateChunkEvent {
     pub chunk_pos: IVec2,
@@ -213,7 +209,7 @@ impl ChunkPlugin {
             let map_type = TilemapType::default();
             let mut water_colliders = vec![];
 
-            info!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
+            debug!("Creating new chunk {chunk_pos:?} with seed {:?}", seed.seed);
             for y in 0..CHUNK_SIZE {
                 for x in 0..CHUNK_SIZE {
                     let tile_pos = TilePos { x, y };
@@ -480,7 +476,7 @@ impl ChunkPlugin {
                     && game.get_chunk_entity(chunk_pos).is_some()
                     && game.is_chunk_generated(chunk_pos)
                 {
-                    info!("            despawning chunk {x:?},{y:?}");
+                    debug!("            despawning chunk {x:?},{y:?}");
 
                     // add all containers in this chunk into the registry so their contents are safe
                     for child in children.iter() {

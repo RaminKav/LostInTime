@@ -20,6 +20,7 @@ use rand::Rng;
 
 use bevy::prelude::*;
 
+use crate::item::ammo::Ammo;
 use bevy_proto::prelude::*;
 use bevy_rapier2d::prelude::{Collider, Sensor};
 use serde::{Deserialize, Serialize};
@@ -195,6 +196,14 @@ impl InventoryItemStack {
         }
         if let Some(ranged) = proto.is_item_ranged_weapon(obj) {
             item_entity.insert(ranged.clone());
+        }
+
+        // Initialize Ammo for non-magic ranged weapons at equip time
+        let (max, reload_s) = obj.get_ammo();
+        if max > 0 {
+            let mut new = Ammo::new(max, reload_s);
+            new.start_reload();
+            item_entity.insert(new);
         }
 
         item
