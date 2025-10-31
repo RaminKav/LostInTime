@@ -20,7 +20,7 @@ use crate::{
     },
     proto::proto_param::ProtoParam,
     ui::UIElement,
-    Game, Pet,
+    Pet,
 };
 
 use super::{
@@ -199,27 +199,65 @@ pub enum Heirloom {
     Roll,
     // Passives
     #[default]
-    CritChance,
-    CritDamage,
-    Health,
-    Shield,
-    Thorns,
-    Lifesteal,
-    Speed,
-    AttackSpeed,
-    DodgeChance,
-    Defence,
-    Attack,
-    Gigantify,
-    Chest,
-    XPGain,
+    CritChance, //tusk
+    CritDamage,  //flint
+    Health,      //red mushroom
+    Shield,      // CD
+    Thorns,      //bushling scale
+    Lifesteal,   // rose
+    Speed,       // feather
+    AttackSpeed, // soda can
+    DodgeChance, // leather
+    Defence,     // coal
+    Attack,      // anvil
+    Gigantify,   // sappling
+    Chest,       // loot bag
+    XPGain,      //memory chip
+
+    DaggerCombo,         // dagger
+    HPRegen,             // red book
+    HPRegenCooldown,     // red phone
+    MPRegen,             // blue book
+    MPRegenCooldown,     // blue phone
+    OnHitEcho,           // fossile thing
+    Knockback,           // horseshoe
+    DiscountMP,          // pen quill
+    MinusOneDamageOnHit, // shield
+
+    // Weapon Upgrades
+    ChanceToProcExtraAttack, // sceptor
+    IncreaseProjectilCount,  //whip
+
+    IceStaffAoE,   // frozen tear
+    BowArrowSpeed, // yarn
+
+    //magic
+    TeleportStatusDMG, //NOT USED
+
+    FrozenAoE,     // lantern
+    IceStaffFloor, // weird ice stick thing
+    FrozenCrit,    // diamond
+    MPBarDMG,      // purple card
+    MPBarCrit,     // brown card
+    FrozenMPRegen, // mirror
+
+    //rogue
+    DodgeCrit,      // telescope
+    PoisonDuration, // belt
+    PoisonStrength, //ring
+    ViralVenum,     //poison sceptor
+
+    //melee
+    HealEcho,        // chalice
+    FullStomach,     //jam
+    ReinforcedArmor, // Scale
 
     // On-Attack Triggers
-    WaveAttack,
-    FrailStacks,
-    SlowStacks,
-    PoisonStacks,
-    LethalBlow,
+    WaveAttack,   // hero sword
+    FrailStacks,  // skull
+    SlowStacks,   // sea shell
+    PoisonStacks, // grandma's recipe
+    LethalBlow,   // red purple mushroom
 
     // Skills
     Teleport,
@@ -240,44 +278,6 @@ pub enum Heirloom {
     ParryDeflectProj,
     ParryKnockback, // needs art prompt/art
     ParryEcho,
-
-    DaggerCombo,
-    HPRegen,
-    HPRegenCooldown,
-    MPRegen,
-    MPRegenCooldown,
-    OnHitEcho,
-    Knockback, // needs art prompt/art
-    DiscountMP,
-    MinusOneDamageOnHit, // needs art prompt/art
-
-    // Weapon Upgrades
-    ChanceToProcExtraAttack,
-    IncreaseProjectilCount,
-
-    IceStaffAoE,
-    BowArrowSpeed,
-
-    //magic
-    TeleportStatusDMG,
-
-    FrozenAoE,
-    IceStaffFloor,
-    FrozenCrit,
-    MPBarDMG,
-    MPBarCrit,
-    FrozenMPRegen,
-
-    //rogue
-    DodgeCrit,
-    PoisonDuration,
-    PoisonStrength,
-    ViralVenum,
-
-    //melee
-    HealEcho,
-    FullStomach,
-    ReinforcedArmor,
     //Your echos are stronger
     // your echos are bigger
 }
@@ -285,36 +285,36 @@ pub enum Heirloom {
 impl Heirloom {
     pub fn get_title(&self) -> String {
         match self {
-            Heirloom::CritChance => "Keen Eyes".to_string(),
-            Heirloom::CritDamage => "Powerful Blows".to_string(),
-            Heirloom::Health => "Healthly".to_string(),
-            Heirloom::Shield => "Shielded".to_string(),
-            Heirloom::Speed => "Nimble Feet".to_string(),
-            Heirloom::Thorns => "Forest Scales".to_string(),
-            Heirloom::Lifesteal => "Drain Blood".to_string(),
-            Heirloom::AttackSpeed => "Swift Blows".to_string(),
-            Heirloom::Defence => "Defence!".to_string(),
-            Heirloom::Chest => "Chest!".to_string(),
-            Heirloom::Attack => "Strength! ".to_string(),
-            Heirloom::DodgeChance => "Evasion".to_string(),
-            Heirloom::WaveAttack => "Sonic Wave".to_string(),
-            Heirloom::FrailStacks => "Frail Blow".to_string(),
-            Heirloom::SlowStacks => "Freezing Blow".to_string(),
-            Heirloom::PoisonStacks => "Toxic Blow".to_string(),
-            Heirloom::LethalBlow => "Lethal Blow".to_string(),
+            Heirloom::CritChance => "Tusk".to_string(),
+            Heirloom::CritDamage => "Flint".to_string(),
+            Heirloom::Health => "Weird Mushroom".to_string(),
+            Heirloom::Shield => "CDz".to_string(),
+            Heirloom::Speed => "Feather".to_string(),
+            Heirloom::Thorns => "Bushling Scales".to_string(),
+            Heirloom::Lifesteal => "Rose".to_string(),
+            Heirloom::AttackSpeed => "Red Soda".to_string(),
+            Heirloom::Defence => "Coal".to_string(),
+            Heirloom::Chest => "Loot Bag".to_string(),
+            Heirloom::Attack => "Anvil ".to_string(),
+            Heirloom::DodgeChance => "Leather".to_string(),
+            Heirloom::WaveAttack => "Hero Sword".to_string(),
+            Heirloom::FrailStacks => "Skull".to_string(),
+            Heirloom::SlowStacks => "Sea Shell".to_string(),
+            Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
+            Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
             Heirloom::Teleport => "Teleport".to_string(),
             Heirloom::TeleportShock => "Shock Step".to_string(),
             Heirloom::TeleportCooldown => "Teleport Faster!".to_string(),
             Heirloom::TeleportCount => "Multi-port".to_string(),
             Heirloom::TeleportManaRegen => "Infused Cast".to_string(),
             Heirloom::TeleportStatusDMG => "Shock Mastery".to_string(),
-            Heirloom::ChanceToProcExtraAttack => "Double Throw".to_string(),
-            Heirloom::IncreaseProjectilCount => "Multi Shot".to_string(),
-            Heirloom::BowArrowSpeed => "Piercing Arrows".to_string(),
-            Heirloom::Gigantify => "Gigantify".to_string(),
-            Heirloom::XPGain => "Experience Boost".to_string(),
+            Heirloom::ChanceToProcExtraAttack => "Sceptor".to_string(),
+            Heirloom::IncreaseProjectilCount => "Whip".to_string(),
+            Heirloom::BowArrowSpeed => "Thread".to_string(),
+            Heirloom::Gigantify => "Sappling".to_string(),
+            Heirloom::XPGain => "Microchip".to_string(),
 
-            Heirloom::IceStaffAoE => "Explosive Blast".to_string(),
+            Heirloom::IceStaffAoE => "Frozen Tear".to_string(),
             Heirloom::Sprint => "Sprint".to_string(),
             Heirloom::SprintFaster => "Faster Sprint".to_string(),
             Heirloom::SprintLunge => "Lunge".to_string(),
@@ -326,30 +326,30 @@ impl Heirloom {
             Heirloom::ParryDeflectProj => "Parry Deflect".to_string(),
             Heirloom::ParryKnockback => "Shield Bash".to_string(),
             Heirloom::ParryEcho => "Parry Echo".to_string(),
-            Heirloom::DaggerCombo => "Combo!".to_string(),
-            Heirloom::HPRegen => "Health Regeneration ".to_string(),
-            Heirloom::HPRegenCooldown => "HP Regen Cooldown".to_string(),
-            Heirloom::MPRegenCooldown => "MP Regen Cooldown".to_string(),
-            Heirloom::MPRegen => "Mana Regeneration".to_string(),
-            Heirloom::OnHitEcho => "War Cry ".to_string(),
-            Heirloom::Knockback => "Heavy Strike".to_string(),
-            Heirloom::DiscountMP => "Mana Discount".to_string(),
-            Heirloom::MinusOneDamageOnHit => "Polished Armor".to_string(),
+            Heirloom::DaggerCombo => "Lost Dagger".to_string(),
+            Heirloom::HPRegen => "Red Book ".to_string(),
+            Heirloom::HPRegenCooldown => "Red Phone".to_string(),
+            Heirloom::MPRegenCooldown => "Blue Phone".to_string(),
+            Heirloom::MPRegen => "Blue Book".to_string(),
+            Heirloom::OnHitEcho => "Ancient Fossil ".to_string(),
+            Heirloom::Knockback => "Horse Shoe".to_string(),
+            Heirloom::DiscountMP => "Ink & Quill".to_string(),
+            Heirloom::MinusOneDamageOnHit => "Holy Shield".to_string(),
 
-            Heirloom::FrozenAoE => "Ice Burst".to_string(),
-            Heirloom::IceStaffFloor => "Ice Trail ".to_string(),
-            Heirloom::FrozenCrit => "Frozen Wounds".to_string(),
-            Heirloom::MPBarDMG => "Mana Infusion".to_string(),
-            Heirloom::MPBarCrit => "Empowered Spells ".to_string(),
-            Heirloom::FrozenMPRegen => "Mana Frost".to_string(),
-            Heirloom::DodgeCrit => "Vengeful Strike".to_string(),
-            Heirloom::PoisonDuration => "Venum Endurance".to_string(),
-            Heirloom::PoisonStrength => "Venumous Edge".to_string(),
-            Heirloom::ViralVenum => "Viral Venum".to_string(),
-            Heirloom::HealEcho => "Internal Echo".to_string(),
-            Heirloom::FullStomach => "Full Stomach".to_string(),
+            Heirloom::FrozenAoE => "Ice Lantern".to_string(),
+            Heirloom::IceStaffFloor => "Ice Wand".to_string(),
+            Heirloom::FrozenCrit => "Diamond".to_string(),
+            Heirloom::MPBarDMG => "Purple Card".to_string(),
+            Heirloom::MPBarCrit => "Brown Card".to_string(),
+            Heirloom::FrozenMPRegen => "Mirror".to_string(),
+            Heirloom::DodgeCrit => "Telescope".to_string(),
+            Heirloom::PoisonDuration => "Cursed Belt".to_string(),
+            Heirloom::PoisonStrength => "Green Ring".to_string(),
+            Heirloom::ViralVenum => "Poison Sceptor".to_string(),
+            Heirloom::HealEcho => "Chalice".to_string(),
+            Heirloom::FullStomach => "Jam".to_string(),
 
-            Heirloom::ReinforcedArmor => "Reinforced Armor".to_string(),
+            Heirloom::ReinforcedArmor => "Scales".to_string(),
             Heirloom::Roll => "Roll".to_string(),
         }
     }

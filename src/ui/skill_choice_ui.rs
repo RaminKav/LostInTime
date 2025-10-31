@@ -285,21 +285,42 @@ pub fn spawn_skill_choice_entities(
             .insert(RenderLayers::from_layers(&[3]))
             .id();
         // icon
-        let skill_icon = commands
-            .spawn(SpriteSheetBundle {
-                sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: Vec2::new(0., 25.).extend(4.),
-                    scale: Vec3::new(1., 1., 1.),
+        let skill_icon = if choice.heirloom.is_active_skill() {
+            commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_active_skill_icon(choice.heirloom.clone()),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(32., 32.)),
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        translation: Vec2::new(0., 25.).extend(4.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("SKILL ICON!!"))
-            .set_parent(skills_e)
-            .id();
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(Name::new("SKILL ICON!!"))
+                .set_parent(skills_e)
+                .id()
+        } else {
+            commands
+                .spawn(SpriteSheetBundle {
+                    sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
+                    texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                    transform: Transform {
+                        translation: Vec2::new(0., 25.).extend(4.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(Name::new("SKILL ICON!!"))
+                .set_parent(skills_e)
+                .id()
+        };
 
         // Add rarity-based background if not common
         if let Some(glow) = choice.rarity.get_item_glow() {

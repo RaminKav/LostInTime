@@ -319,6 +319,7 @@ pub fn handle_hits(
                         // shield breaks
                         commands.entity(e).remove::<SlimeTempShield>();
                         commands.entity(slime_shields.single()).despawn_recursive();
+                        shielded_hit = true;
                         if *DEBUG {
                             info!("Slime Temp Shield broken!");
                         }

@@ -236,14 +236,14 @@ pub fn configure_pet_on_spawn(
                 commands
                     .entity(pet_entity)
                     .insert(crate::pets::pet_abilities::SlimeShieldTimer(
-                        Timer::from_seconds(60.0, TimerMode::Repeating),
+                        Timer::from_seconds(30.0, TimerMode::Repeating),
                     ));
             }
             crate::pets::state::Pet::Fairy => {
                 commands
                     .entity(pet_entity)
                     .insert(crate::pets::pet_abilities::FairyHealTimer(
-                        Timer::from_seconds(25.0, TimerMode::Repeating),
+                        Timer::from_seconds(35.0, TimerMode::Repeating),
                     ));
             }
         }
