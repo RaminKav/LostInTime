@@ -1877,7 +1877,7 @@ pub fn add_item_glows(
             .spawn(SpriteBundle {
                 texture: graphics.get_item_glow(glow.clone()),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(18., 18.)),
+                    custom_size: Some(Vec2::new(20., 20.)),
                     ..Default::default()
                 },
                 transform: Transform {
