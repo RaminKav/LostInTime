@@ -552,7 +552,7 @@ pub fn handle_update_player_skills(
             // Spawn all icons in one consolidated loop
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
                 let offset = Vec2::new(
-                    i as f32 * 19. + (-res.game_width) / 2. + 98.,
+                    i as f32 * 16. + (-res.game_width) / 2. + 98.,
                     (GAME_HEIGHT - 15.) / 2. - 12.5,
                 );
 
