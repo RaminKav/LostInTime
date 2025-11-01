@@ -49,6 +49,7 @@ use dungeon_shrine::{
     handle_dungeon_shrine_rewards, DungeonShrineMobDeathEvent,
 };
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
+use heirloom_shrine::{add_heirloom_shrine_visuals_on_spawn, handle_heirloom_shrine_completion};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
 
@@ -61,6 +62,7 @@ pub mod boss_shrine;
 pub mod combat_shrine;
 pub mod dungeon_shrine;
 pub mod gamble_shrine;
+pub mod heirloom_shrine;
 pub mod potion_buffs;
 use boss_shrine::*;
 pub mod item_upgrades;
@@ -468,6 +470,9 @@ pub enum WorldObject {
     PinkBeacon,
     PinkBeaconBlock,
     BlacksmithMerchant,
+    BlacksmithMerchantDone,
+    HeirloomShrine,
+    HeirloomShrineDone,
 }
 
 #[derive(
@@ -707,17 +712,6 @@ impl WorldObject {
             _ => false,
         }
     }
-    pub fn is_structure(&self) -> bool {
-        match self {
-            WorldObject::CombatShrine => true,
-            WorldObject::CombatShrineDone => true,
-            WorldObject::GambleShrine => true,
-            WorldObject::GambleShrineDone => true,
-            WorldObject::ActiveSkillShrine => true,
-            WorldObject::ActiveSkillShrineDone => true,
-            _ => false,
-        }
-    }
     pub fn is_beacon(&self) -> bool {
         match self {
             WorldObject::YellowBeacon => true,
@@ -920,6 +914,8 @@ impl Plugin for ItemsPlugin {
                     handle_dungeon_shrine_rewards,
                     add_dungeon_shrine_visuals_on_spawn,
                     handle_dungeon_shrine_activation,
+                    add_heirloom_shrine_visuals_on_spawn,
+                    handle_heirloom_shrine_completion,
                     tick_potion_buffs.run_if(is_not_paused),
                     apply_attack_speed_buff.run_if(is_not_paused),
                 )

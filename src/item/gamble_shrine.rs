@@ -97,7 +97,10 @@ aseprite!(pub GambleShrineAnim, "textures/gamble_shrine/gamble_shrine.ase");
 
 pub fn add_gamble_visuals_on_spawn(
     mut commands: Commands,
-    new_shrines: Query<(Entity, &WorldObject, &Transform), Added<WorldObject>>,
+    new_shrines: Query<
+        (Entity, &WorldObject, &Transform),
+        Or<(Added<WorldObject>, Changed<WorldObject>)>,
+    >,
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
@@ -131,6 +134,16 @@ pub fn add_gamble_visuals_on_spawn(
                     ..default()
                 })
                 .insert(EssenceShopChoices::default())
+                .insert(Name::new("BLACKSMITH"));
+        } else if obj == &WorldObject::BlacksmithMerchantDone {
+            commands
+                .entity(e)
+                .insert(AsepriteBundle {
+                    transform: *t,
+                    animation: AsepriteAnimation::from(BlacksmithMerchant::tags::DONE),
+                    aseprite: graphics.blacksmith_merchant.as_ref().unwrap().clone(),
+                    ..default()
+                })
                 .insert(Name::new("BLACKSMITH"));
         }
     }

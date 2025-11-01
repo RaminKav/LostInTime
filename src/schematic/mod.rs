@@ -46,6 +46,7 @@ pub enum SchematicType {
     CombatShrine,
     GambleShrine,
     ActiveSkillShrine,
+    HeirloomShrine,
     BlacksmithMerchant,
 }
 

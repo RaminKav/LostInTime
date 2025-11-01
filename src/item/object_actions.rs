@@ -2,6 +2,7 @@ use super::active_skill_shrine::{ActiveSkillShrineSelection, ActiveSkillShrineSt
 use super::combat_shrine::{CombatShrine, CombatShrineAnim};
 use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
+use super::heirloom_shrine::HeirloomShrineState;
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
@@ -50,6 +51,7 @@ pub enum ObjectAction {
     CombatShrine,
     GambleShrine,
     ActiveSkillShrine,
+    HeirloomShrine,
     WeaponShrine,
     ArmorShrine,
     AccessoryShrine,
@@ -348,6 +350,17 @@ impl ObjectAction {
                 item_action_param
                     .next_inv_state
                     .set(UIState::ActiveSkillShrine);
+            }
+            ObjectAction::HeirloomShrine => {
+                // Mark shrine as activated
+                commands
+                    .entity(e)
+                    .remove::<ObjectAction>()
+                    .remove::<InteractionGuideTrigger>()
+                    .insert(HeirloomShrineState { is_used: false });
+
+                // Open skills choice UI - will be populated by handle_heirloom_shrine_interaction
+                item_action_param.next_inv_state.set(UIState::Skills);
             }
             ObjectAction::WeaponShrine => {
                 // Screen Shake

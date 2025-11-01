@@ -200,6 +200,7 @@ pub fn handle_submit_essence_choice(
                 commands
                     .entity(owner_e)
                     .remove::<EssenceShopChoices>()
+                    .insert(WorldObject::BlacksmithMerchantDone)
                     .remove::<InteractionGuideTrigger>();
             }
         }

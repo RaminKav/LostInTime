@@ -22,6 +22,7 @@ use crate::item::dungeon_shrine::AccessoryShrineAnim;
 use crate::item::dungeon_shrine::ArmorShrineAnim;
 use crate::item::dungeon_shrine::WeaponShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
+use crate::item::heirloom_shrine::HeirloomMerchantSprite;
 use crate::item::{
     Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
     WorldObjectResource,
@@ -142,6 +143,7 @@ impl Plugin for GameAssetsPlugin {
                 accessory_shrine_anim: None,
                 blacksmith_merchant: None,
                 active_skill_shrine: None,
+                heirloom_shrine_anim: None,
                 portal_ase: None,
                 class_pet_data: None,
             })
@@ -207,6 +209,7 @@ pub struct Graphics {
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
     pub blacksmith_merchant: Option<Handle<Aseprite>>,
     pub active_skill_shrine: Option<Handle<Aseprite>>,
+    pub heirloom_shrine_anim: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
 }
@@ -498,6 +501,7 @@ impl GameAssetsPlugin {
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),
             blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
             active_skill_shrine: Some(asset_server.load(ActiveSkillSprite::PATH)),
+            heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
         };

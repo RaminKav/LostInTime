@@ -15,7 +15,7 @@ use crate::{
     colors::{DARK_GREEN, RED, WHITE, YELLOW_2},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
-    item::{CraftedItemEvent, EquipmentType},
+    item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     player::{
         levels::PlayerLevel,
         skills::{HeirloomChoiceQueue, PlayerSkills},
@@ -813,6 +813,7 @@ pub fn handle_cursor_skills_buttons(
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
+    mut shrine_query: Query<&mut HeirloomShrineState>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -853,6 +854,14 @@ pub fn handle_cursor_skills_buttons(
                                 &mut commands,
                                 skills.clone(),
                             );
+
+                            // Mark heirloom shrine as used if this was from a shrine
+                            for mut shrine in shrine_query.iter_mut() {
+                                if !shrine.is_used {
+                                    shrine.is_used = true;
+                                }
+                            }
+
                             if skill_queue.active_heirloom_limbo.is_some() {
                                 next_ui_state.set(UIState::ActiveSkills);
                             } else {

@@ -52,7 +52,11 @@ use crate::{
     attributes::clamp_health,
     client::{is_not_paused, load_state, ClientState},
     handle_hits,
-    item::{active_skill_shrine::ActiveSkillShrineOverwrite, item_actions::ActionSuccessEvent},
+    item::{
+        active_skill_shrine::ActiveSkillShrineOverwrite,
+        heirloom_shrine::handle_heirloom_shrine_ui_setup,
+        item_actions::ActionSuccessEvent,
+    },
     night::NightTracker,
     CustomFlush, Game, GameState, DEBUG,
 };
@@ -225,6 +229,9 @@ impl Plugin for UIPlugin {
                     update_furnace_bar,
                     setup_skill_choice_ui
                         .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
+                    handle_heirloom_shrine_ui_setup
+                        .before(setup_skill_choice_ui)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Skills))),
                     setup_item_chest_ui
                         .before(CustomFlush)
