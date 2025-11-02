@@ -15,7 +15,7 @@ use crate::{
     assets::SpriteAnchor,
     attributes::{
         modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, CurrentShield,
-        InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth,
+        InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth, ShieldRegen,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -209,6 +209,7 @@ pub fn handle_hits(
         &mut CurrentHealth,
         &MaxHealth,
         Option<&mut CurrentShield>,
+        Option<&mut ShieldRegen>,
         Option<&SlimeTempShield>,
         &GlobalTransform,
         Option<&WorldObject>,
@@ -239,6 +240,7 @@ pub fn handle_hits(
             mut hit_health,
             max_health,
             mut shields_option,
+            mut shield_regen_option,
             slime_shield_option,
             t,
             obj_option,
@@ -345,6 +347,10 @@ pub fn handle_hits(
                     if *DEBUG {
                         info!("HP {:?}", hit_health.0);
                     }
+                }
+                if let Some(shield_regen) = shield_regen_option.as_deref_mut() {
+                    shield_regen.delay_timer.reset();
+                    shield_regen.regen_timer.reset();
                 }
 
                 let mob_kb = if let Some(mob) = mob_option {

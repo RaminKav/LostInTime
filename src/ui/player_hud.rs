@@ -21,7 +21,7 @@ use crate::{
     player::{
         levels::PlayerLevel,
         skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
-        Player, TimeFragmentCurrency,
+        Player, RunScore, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
 };
@@ -42,6 +42,8 @@ pub struct XPBar;
 pub struct XPBarText;
 #[derive(Component)]
 pub struct CurrencyText;
+#[derive(Component)]
+pub struct ScoreText;
 
 #[derive(Component)]
 pub struct ClockHUD;
@@ -291,7 +293,11 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 22., GAME_HEIGHT / 2. - 43.5, 6.),
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 20.5,
+                        GAME_HEIGHT / 2. - 43.5,
+                        6.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -302,6 +308,28 @@ pub fn setup_currency_ui(
             RenderLayers::from_layers(&[3]),
         ))
         .id();
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                format!("Score: {:}", 0),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: BLACK,
+                },
+            ),
+            text_anchor: Anchor::CenterLeft,
+            transform: Transform {
+                translation: Vec3::new(-res.game_width / 2. + 36.5, GAME_HEIGHT / 2. - 43.5, 6.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        },
+        Name::new("SCORE TEXT"),
+        ScoreText,
+        RenderLayers::from_layers(&[3]),
+    ));
 
     let stack = spawn_item_stack_icon(
         &mut commands,
@@ -363,6 +391,12 @@ pub fn update_currency_text(
                 }
             );
         }
+    }
+}
+pub fn update_score_text(score: Res<RunScore>, mut text_query: Query<&mut Text, With<ScoreText>>) {
+    // handles different text for two different UI elements, game end count and normal in-game
+    for mut text in text_query.iter_mut() {
+        text.sections[0].value = format!("Score: {:}", score.score);
     }
 }
 pub fn update_healthbar(

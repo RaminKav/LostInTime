@@ -356,6 +356,8 @@ impl GameAssetsPlugin {
             match serde_json::from_reader::<_, GameData>(reader) {
                 Ok(game_data) => {
                     commands.insert_resource(game_data.class_ranks);
+                    commands.insert_resource(game_data.high_scores);
+                    commands.insert_resource(game_data.achievements);
                     info!("Loaded class ranks from game data (loading state)");
                 }
                 Err(err) => {

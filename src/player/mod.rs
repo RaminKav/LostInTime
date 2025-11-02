@@ -22,6 +22,7 @@ use rogue_skills::{
 };
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
+pub mod achievements;
 pub mod class_rank;
 pub mod currency;
 pub mod levels;
@@ -30,12 +31,13 @@ pub mod melee_skills;
 pub mod rogue_skills;
 pub mod score;
 pub mod skills;
+pub use achievements::*;
 pub use class_rank::*;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub use score::*;
 pub mod stats;
-use crate::player::skills::PlayerClass;
+use crate::player::{achievements::AchievementsPlugin, skills::PlayerClass};
 use crate::{
     ai::{follow, idle, leap_attack},
     animations::player_sprite::{PlayerAnimation, PlayerAnimationState},
@@ -126,74 +128,75 @@ impl Limb {
 }
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
-            app.add_event::<MovePlayerEvent>()
-                .add_event::<ModifyTimeFragmentsEvent>()
-                .add_event::<ActiveSkillUsedEvent>()
-                .add_event::<ParrySuccessEvent>();
-        })
-        .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
-        .add_systems(
-            (
-                handle_sprint_timer
-                    .after(player_move_inputs)
-                    .run_if(is_not_paused),
-                handle_sprinting_cooldown.run_if(is_not_paused),
-                handle_enemy_death_sprint_reset.after(handle_lunge),
-                handle_lunge_cooldown.run_if(is_not_paused),
-                send_attribute_event_on_stats_update,
-                handle_level_up,
-                handle_toggle_sprinting,
-                spawn_particles_when_leveling,
-                handle_teleport.run_if(is_not_paused),
-                hide_particles_when_inv_open,
-                tick_just_teleported.run_if(is_not_paused),
-                tick_teleport_timer.run_if(is_not_paused),
-                handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
-                handle_on_hit_skills.after(handle_hits),
-                handle_dodge_crit,
+        app.add_plugin(AchievementsPlugin)
+            .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
+                app.add_event::<MovePlayerEvent>()
+                    .add_event::<ModifyTimeFragmentsEvent>()
+                    .add_event::<ActiveSkillUsedEvent>()
+                    .add_event::<ParrySuccessEvent>();
+            })
+            .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
+            .add_systems(
+                (
+                    handle_sprint_timer
+                        .after(player_move_inputs)
+                        .run_if(is_not_paused),
+                    handle_sprinting_cooldown.run_if(is_not_paused),
+                    handle_enemy_death_sprint_reset.after(handle_lunge),
+                    handle_lunge_cooldown.run_if(is_not_paused),
+                    send_attribute_event_on_stats_update,
+                    handle_level_up,
+                    handle_toggle_sprinting,
+                    spawn_particles_when_leveling,
+                    handle_teleport.run_if(is_not_paused),
+                    hide_particles_when_inv_open,
+                    tick_just_teleported.run_if(is_not_paused),
+                    tick_teleport_timer.run_if(is_not_paused),
+                    handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
+                    handle_on_hit_skills.after(handle_hits),
+                    handle_dodge_crit,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
-                .in_set(OnUpdate(GameState::Main)),
-        )
-        .add_systems(
-            (
-                handle_lunge.after(player_move_inputs).run_if(is_not_paused),
-                tick_combo_counter.run_if(is_not_paused),
-                handle_add_combo_counter,
-                pause_combo_anim_when_done,
-                handle_parry.run_if(is_not_paused),
-                handle_spear.after(player_move_inputs).run_if(is_not_paused),
-                tick_parried_timer.run_if(is_not_paused),
-                handle_parry_success,
-                score::track_mob_kills,
-                score::track_item_destruction,
+            .add_systems(
+                (
+                    handle_lunge.after(player_move_inputs).run_if(is_not_paused),
+                    tick_combo_counter.run_if(is_not_paused),
+                    handle_add_combo_counter,
+                    pause_combo_anim_when_done,
+                    handle_parry.run_if(is_not_paused),
+                    handle_spear.after(player_move_inputs).run_if(is_not_paused),
+                    tick_parried_timer.run_if(is_not_paused),
+                    handle_parry_success,
+                    score::track_mob_kills,
+                    score::track_item_destruction,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
-                .in_set(OnUpdate(GameState::Main)),
-        )
-        .add_system(
-            handle_spear_gravity
-                .after(idle)
-                .after(follow)
-                .after(leap_attack)
-                .in_set(OnUpdate(GameState::Main)),
-        )
-        .add_systems((handle_modify_time_fragments,))
-        .add_systems(
-            (handle_echo_after_heal
-                .after(handle_modify_health_event)
-                .before(handle_add_damage_numbers_after_hit),)
-                .in_set(OnUpdate(GameState::Main)),
-        )
-        .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
-        .add_system(handle_move_player.before(CustomFlush))
-        .add_system(
-            handle_player_raw_position
-                .run_if(in_state(GameState::Main))
-                .after(PhysicsSet::SyncBackendFlush)
-                .before(TransformSystem::TransformPropagate)
-                .before(move_camera_with_player)
-                .in_base_set(CoreSet::PostUpdate),
-        );
+            .add_system(
+                handle_spear_gravity
+                    .after(idle)
+                    .after(follow)
+                    .after(leap_attack)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems((handle_modify_time_fragments,))
+            .add_systems(
+                (handle_echo_after_heal
+                    .after(handle_modify_health_event)
+                    .before(handle_add_damage_numbers_after_hit),)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
+            .add_system(handle_move_player.before(CustomFlush))
+            .add_system(
+                handle_player_raw_position
+                    .run_if(in_state(GameState::Main))
+                    .after(PhysicsSet::SyncBackendFlush)
+                    .before(TransformSystem::TransformPropagate)
+                    .before(move_camera_with_player)
+                    .in_base_set(CoreSet::PostUpdate),
+            );
     }
 }
 pub fn handle_move_player(

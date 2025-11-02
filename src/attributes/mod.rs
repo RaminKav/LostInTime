@@ -1549,7 +1549,7 @@ pub fn clamp_health(
     mut game_over_event: EventWriter<GameOverEvent>,
 ) {
     for (mut h, max_h, mut s, max_s) in health.iter_mut() {
-        if h.0 < 0 {
+        if h.0 <= 0 {
             h.0 = 0;
             game_over_event.send_default();
         } else if h.0 > max_h.0 {

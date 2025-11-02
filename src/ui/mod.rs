@@ -51,16 +51,11 @@ pub use essence_ui::*;
 use loading_screen::*;
 
 use crate::{
-    attributes::clamp_health,
-    client::{is_not_paused, load_state, ClientState},
-    handle_hits,
-    item::{
+    attributes::clamp_health, client::{is_not_paused, load_state, ClientState}, handle_hits, item::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
         heirloom_shrine::handle_heirloom_shrine_ui_setup,
         item_actions::ActionSuccessEvent,
-    },
-    night::NightTracker,
-    CustomFlush, Game, GameState, DEBUG,
+    }, night::NightTracker, player::RunScore, CustomFlush, Game, GameState, DEBUG
 };
 
 use self::{
@@ -329,6 +324,7 @@ impl Plugin for UIPlugin {
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(update_currency_text.run_if(in_state(GameState::Main)))
+            .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

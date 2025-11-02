@@ -20,7 +20,11 @@ pub mod analytics;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
-use crate::player::score::HighScores;
+use crate::player::{
+    check_first_run_achievement,
+    score::{HighScores, RunScore},
+    Achievements,
+};
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
@@ -134,7 +138,9 @@ impl Plugin for ClientPlugin {
                 (
                     save_state.run_if(resource_exists::<AnalyticsData>()),
                     tick_save_timer,
-                    handle_append_run_data_after_death.run_if(resource_exists::<AnalyticsData>()),
+                    handle_append_run_data_after_death
+                        .run_if(resource_exists::<AnalyticsData>())
+                        .after(check_first_run_achievement),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -201,7 +207,8 @@ pub struct GameData {
     pub seen_gear: Vec<ItemStack>,
     pub user_id: String,
     pub class_ranks: ClassRankSystem,
-    pub high_scores: crate::player::score::HighScores,
+    pub high_scores: HighScores,
+    pub achievements: Achievements,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -213,21 +220,36 @@ pub fn handle_append_run_data_after_death(
     mut commands: Commands,
     time_fragments: Query<&TimeFragmentCurrency>,
     player_class: Option<Res<PlayerClass>>,
-    run_score: Option<Res<crate::player::score::RunScore>>,
+    run_score: Option<Res<RunScore>>,
+    achievements: ResMut<Achievements>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
         let mut game_data: GameData = GameData::default();
         let game_data_file_path = datafiles::game_data();
-        if let Ok(file_file) = File::open(game_data_file_path) {
+        if let Ok(file_file) = File::open(&game_data_file_path) {
             let reader = BufReader::new(file_file);
 
             // Read the JSON contents of the file as an instance of `GameData`.
             match serde_json::from_reader::<_, GameData>(reader) {
-                Ok(data) => game_data = data,
-                Err(err) => error!("Failed to load data from game_data.json file {err:?}"),
+                Ok(data) => {
+                    game_data = data;
+                    info!(
+                        "Loaded existing game_data.json with {} achievements",
+                        game_data.achievements.unlocked.len()
+                    );
+                }
+                Err(err) => {
+                    error!("Failed to load data from game_data.json file {err:?}");
+                    // If deserialization fails, start fresh but try to preserve achievements from resource
+                    game_data.achievements = achievements.clone();
+                }
             }
-        };
+        } else {
+            // File doesn't exist, initialize with achievements from resource if available
+            game_data.achievements = achievements.clone();
+        }
+        // game_data.achievements = achievements.clone();
         game_data.num_runs += 1;
         if game_data.longest_run < night.days {
             game_data.longest_run = night.days;
@@ -301,6 +323,20 @@ pub fn handle_append_run_data_after_death(
             }
         }
 
+        // Update achievements from resource (merge with any from file)
+        // This ensures we preserve achievements that were already saved and add new ones
+        // Merge achievements: add any new ones from the resource to the loaded game_data
+        info!(
+            "Merging {:?} achievements from resource into game data",
+            achievements.clone()
+        );
+        for achievement in achievements.clone().unlocked {
+            if !game_data.achievements.has(achievement) {
+                game_data.achievements.unlock(achievement);
+                info!("Saving newly unlocked achievement: {:?}", achievement);
+            }
+        }
+
         let game_data_path = datafiles::game_data();
 
         let file = File::create(game_data_path)
@@ -310,7 +346,10 @@ pub fn handle_append_run_data_after_death(
         if let Err(result) = serde_json::to_writer(file, &game_data.clone()) {
             error!("Failed to save game data after death: {result:?}");
         } else {
-            info!("UPDATED GAME DATA...");
+            info!(
+                "UPDATED GAME DATA with {} achievements",
+                game_data.achievements.unlocked.len()
+            );
         }
 
         //despawn ui animations
@@ -548,7 +587,7 @@ pub fn load_state(
     }
     commands.insert_resource(GenerationSeed { seed });
 
-    // Load HighScores early so UI (class selection) can use it
+    // Load HighScores and Achievements early so UI (class selection) can use them
     let game_data_file_path = datafiles::game_data();
     if let Ok(file_file) = File::open(game_data_file_path) {
         let reader = BufReader::new(file_file);
@@ -557,13 +596,16 @@ pub fn load_state(
                 commands.insert_resource(game_data.high_scores);
                 // Also make sure class ranks are available early if present
                 commands.insert_resource(game_data.class_ranks);
+                commands.insert_resource(game_data.achievements);
             }
             Err(_) => {
                 commands.insert_resource(HighScores::default());
+                commands.insert_resource(Achievements::default());
             }
         }
     } else {
         commands.insert_resource(HighScores::default());
+        commands.insert_resource(Achievements::default());
     }
 
     dim_event.send(DimensionSpawnEvent {

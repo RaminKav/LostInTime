@@ -9,14 +9,16 @@ use crate::{
     assets::Graphics,
     attributes::{ItemAttributes, ItemRarity},
     chaos::ChaosTracker,
-    colors::{BLACK, DARK_WOOD_BROWN},
+    colors::{BLACK, DARK_WOOD_BROWN, GREY},
     container::ContainerRegistry,
     inputs::CursorPos,
     inventory::ItemStack,
     item::{CraftingTracker, ItemDisplayMetaData},
     night::NightTracker,
     player::{
+        achievements::{is_class_unlocked, Achievements},
         class_rank::ClassRankSystem,
+        get_default_unlocked_classes,
         score::HighScores,
         skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
     },
@@ -44,6 +46,7 @@ pub struct PlayerSelectSlot {
     pub is_hovered: bool,
     pub is_selected: bool,
     pub class: SkillClass,
+    pub is_locked: bool,
 }
 
 #[derive(Component)]
@@ -87,10 +90,8 @@ pub fn setup_class_selection_ui(
     res: Res<ScreenResolution>,
     class_ranks: Res<ClassRankSystem>,
     high_scores: Option<Res<HighScores>>,
+    achievements: Option<Res<Achievements>>,
 ) {
-    // Initialize the selection state
-    commands.init_resource::<ClassSelectionState>();
-
     // Background overlay
     spawn_ui_overlay(
         &mut commands,
@@ -130,6 +131,24 @@ pub fn setup_class_selection_ui(
         .filter(|class| *class != SkillClass::None)
         .collect::<Vec<_>>();
 
+    let achievements_ref = achievements.as_ref().map(|a| a.as_ref());
+
+    // Find first unlocked class for default selection
+    let first_unlocked_class = class_options
+        .iter()
+        .find(|class| {
+            achievements_ref
+                .map(|a| is_class_unlocked(class, a))
+                .unwrap_or_else(|| get_default_unlocked_classes().contains(class))
+        })
+        .cloned();
+
+    // Initialize the selection state with first unlocked class
+    commands.insert_resource(ClassSelectionState {
+        selected_class: first_unlocked_class.clone(),
+        selected_pet: None,
+    });
+
     let _class_select_bg = commands
         .spawn(SpriteBundle {
             texture: graphics
@@ -155,9 +174,19 @@ pub fn setup_class_selection_ui(
     for (i, class) in class_options.iter().enumerate() {
         let x_offset = (i % 6) as f32 * 27.0 - 166.; // Center the options
         let y_offset = ((i / 6) as f32).trunc() * -29.0; // every 6 options, go to next row
-                                                         // Class slot background
-        let icon_slot = commands
-            .spawn(SpriteBundle {
+
+        // Check if class is unlocked
+        let class_unlocked = achievements_ref
+            .map(|a| is_class_unlocked(class, a))
+            .unwrap_or_else(|| {
+                // Default unlocked classes if no achievements resource
+                use crate::player::achievements::get_default_unlocked_classes;
+                get_default_unlocked_classes().contains(class)
+            });
+
+        // Class slot background
+        let mut slot_entity_commands = commands.spawn((
+            SpriteBundle {
                 texture: graphics
                     .get_ui_element_texture(UIElement::PlayerSelectSlot)
                     .clone(),
@@ -171,29 +200,47 @@ pub fn setup_class_selection_ui(
                     ..Default::default()
                 },
                 ..Default::default()
-            })
-            .insert(UIState::ClassSelection)
-            .insert(ClassSelectionUI)
-            .insert(ClassOption)
-            .insert(PlayerSelectSlot {
+            },
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            ClassOption,
+            PlayerSelectSlot {
                 is_hovered: false,
-                is_selected: i == 0, // First class (Melee) is selected by default
+                is_selected: first_unlocked_class.as_ref() == Some(class) && class_unlocked, // First unlocked class is selected by default
                 class: class.clone(),
-            })
-            .insert(super::Interactable::default())
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("CLASS OPTION"))
-            .id();
+                is_locked: !class_unlocked,
+            },
+            RenderLayers::from_layers(&[3]),
+            Name::new("CLASS OPTION"),
+        ));
 
-        // Class icon background
+        // Only add Interactable component for unlocked classes
+        if class_unlocked {
+            slot_entity_commands.insert(super::Interactable::default());
+        }
+
+        let icon_slot = slot_entity_commands.id();
+
+        // Class icon - show actual icon if unlocked, or grey locked version if locked
         let class_data = graphics.get_class_data(class.clone());
-        let _player_icon = commands
-            .spawn(SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(class_data.class_icon.clone())
-                    .clone(),
+        let icon_texture = if class_unlocked {
+            graphics
+                .get_ui_element_texture(class_data.class_icon.clone())
+                .clone()
+        } else {
+            // Use a default locked icon - using GreyPlayerSelectIcon as placeholder
+            // You may want to add a LockedClassIcon to UIElement enum later
+            graphics
+                .get_ui_element_texture(UIElement::GreyPlayerSelectIcon)
+                .clone()
+        };
+
+        let mut icon_entity_commands = commands.spawn((
+            SpriteBundle {
+                texture: icon_texture,
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(22., 22.)),
+                    color: if class_unlocked { Color::WHITE } else { GREY },
                     ..Default::default()
                 },
                 transform: Transform {
@@ -202,15 +249,19 @@ pub fn setup_class_selection_ui(
                     ..Default::default()
                 },
                 ..Default::default()
-            })
-            .insert(UIState::ClassSelection)
-            .insert(ClassSelectionUI)
-            .insert(ClassOption)
-            .insert(super::Interactable::default())
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("CLASS OPTION"))
-            .set_parent(icon_slot)
-            .id();
+            },
+            UIState::ClassSelection,
+            ClassSelectionUI,
+            ClassOption,
+            RenderLayers::from_layers(&[3]),
+            Name::new("CLASS OPTION"),
+        ));
+
+        if class_unlocked {
+            icon_entity_commands.insert(super::Interactable::default());
+        }
+
+        icon_entity_commands.set_parent(icon_slot);
     }
 
     for (i, pet) in Pet::iter().enumerate() {
@@ -331,7 +382,7 @@ pub fn handle_class_selection(
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut class_options: Query<(
         Entity,
-        &mut Interactable,
+        Option<&mut Interactable>,
         Option<&mut PlayerSelectSlot>,
         Option<&mut PetSelectSlot>,
         Option<&ConfirmButton>,
@@ -353,15 +404,25 @@ pub fn handle_class_selection(
     for (e, mut interactable, mut class_option, mut pet_option, confirm_button_option) in
         class_options.iter_mut()
     {
+        // Skip entities without Interactable component (locked classes)
+        let Some(mut interactable) = interactable else {
+            continue;
+        };
+
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
-                    interactable.change(Interaction::Hovering);
-                    if let Some(mut class_state) = class_option {
-                        class_state.is_hovered = true;
-                    }
-                    if let Some(mut pet_state) = pet_option {
+                    if let Some(slot) = class_option.as_mut() {
+                        // Only allow hovering if class is not locked
+                        if !slot.is_locked {
+                            interactable.change(Interaction::Hovering);
+                            slot.is_hovered = true;
+                        }
+                    } else if let Some(mut pet_state) = pet_option.as_mut() {
+                        interactable.change(Interaction::Hovering);
                         pet_state.is_hovered = true;
+                    } else {
+                        interactable.change(Interaction::Hovering);
                     }
                     if let Some(_) = confirm_button_option {
                         commands
@@ -377,6 +438,11 @@ pub fn handle_class_selection(
                 Interaction::Hovering => {
                     if left_mouse_pressed {
                         if let Some(mut class_state) = class_option {
+                            // Don't allow selection of locked classes
+                            if class_state.is_locked {
+                                info!("Class {:?} is locked!", class_state.class);
+                                return;
+                            }
                             info!("Class selected: {:?}", class_state.class);
                             // Update selection state
                             selection_state.selected_class = Some(class_state.class.clone());
