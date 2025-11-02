@@ -43,7 +43,7 @@
         Crate: 0.0025,
         Crate2: 0.002,
         DeadSapling: 0.004,
-
+        ChaosTotem: 0.0003,
         Bush: 0.0015,
         Bush2: 0.0015,
         LargeStump: 0.001,
@@ -107,6 +107,7 @@
         GambleShrine: [GrassTile, ],
         ActiveSkillShrine: [GrassTile, ],
         HeirloomShrine: [GrassTile, ],
+        ChaosTotem: [GrassTile, ],
       }
     ),
   }

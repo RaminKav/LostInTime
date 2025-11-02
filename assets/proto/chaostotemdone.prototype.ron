@@ -1,0 +1,9 @@
+(
+  name: "ChaosTotemDone",
+  templates: ["world_object.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ChaosTotemDone,
+  "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
+  }
+)
+

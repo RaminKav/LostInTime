@@ -17,11 +17,15 @@ use crate::{
         NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
+    chaos::ChaosTracker,
     colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
-    player::levels::{ExperienceReward, PlayerLevel},
+    player::{
+        levels::{ExperienceReward, PlayerLevel},
+        skills::{Heirloom, PlayerSkills},
+    },
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
     world::{dungeon::Dungeon, TileMapPosition},
@@ -415,18 +419,30 @@ fn juice_up_spawned_mobs_per_day(
         Added<Mob>,
     >,
     night_tracker: Res<NightTracker>,
+    chaos_tracker: Option<Res<ChaosTracker>>,
     player_level: Query<&PlayerLevel>,
+    player_skills: Query<&PlayerSkills>,
     mut commands: Commands,
 ) {
+    // Get chaos from tracker (defaults to 0.0 if not present)
+    let chaos_from_totem = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
+
+    // Get chaos boost from heirlooms
+    let chaos_from_heirlooms = player_skills.single().get_count(Heirloom::ChaosBoost) as f32 * 1.5; // Each ChaosBoost heirloom adds 0.5 to chaos
+
+    let total_chaos = chaos_from_totem + chaos_from_heirlooms;
+    info!("Total chaos affecting mobs: {}", total_chaos);
     for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
         if mob.is_boss() {
             continue;
         }
-        let chaos_factor =
-            1.5 * night_tracker.days as f32 + (player_level.single().level as f32 * 0.2);
-        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.30)) as i32;
+        // 1.5 per day, 0.2 per level, 1 per heirloom, 1 per totem,
+        let chaos_factor = 1.5 * night_tracker.days as f32
+            + (player_level.single().level as f32 * 0.2)
+            + total_chaos;
+        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.33)) as i32;
         att.0 = (att.0 as f32 * (1. + chaos_factor * 0.15)) as i32;
-        exp.0 = (exp.0 as f32 * (1. + night_tracker.days as f32 * 0.08)) as u32;
+        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.1)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }

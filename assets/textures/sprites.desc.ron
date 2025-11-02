@@ -745,6 +745,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        ChaosTotem: WorldObjectData(
+            texture_pos: (9., 14.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ChaosTotemDone: WorldObjectData(
+            texture_pos: (10., 14.),
+            size: (16., 16.),
+            anchor: None,
+        ),
 
         // Era 2
         Era2Grass: WorldObjectData(

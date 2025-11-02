@@ -388,9 +388,12 @@ pub enum Heirloom {
     ReinforcedArmor, // Scale
 
     // On-Attack Triggers
-    WaveAttack,   // hero sword
-    FrailStacks,  // skull
-    SlowStacks,   // sea shell
+    WaveAttack,  // hero sword
+    FrailStacks, // skull
+    SlowStacks,  // sea shell
+
+    // Chaos
+    ChaosBoost,   // chaos totem item
     PoisonStacks, // grandma's recipe
     LethalBlow,   // red purple mushroom
 
@@ -474,6 +477,7 @@ impl Heirloom {
             Heirloom::FullStomach => "Jam".to_string(),
 
             Heirloom::ReinforcedArmor => "Scales".to_string(),
+            Heirloom::ChaosBoost => "Chaos Totem".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -758,6 +762,12 @@ impl Heirloom {
                 "you have lost. Lose".to_string(),
                 "5 speed. ".to_string(),
             ],
+            Heirloom::ChaosBoost => vec![
+                "Increases chaos,".to_string(),
+                "making enemies".to_string(),
+                "stronger and".to_string(),
+                "more rewarding.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1000,6 +1010,8 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon)
                     .set_repeatable(),
             ],
         }

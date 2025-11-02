@@ -24,6 +24,7 @@ use crate::player::score::HighScores;
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
+    chaos::ChaosTracker,
     container::{Container, ContainerRegistry},
     datafiles,
     inventory::{Inventory, ItemStack},
@@ -155,6 +156,7 @@ pub struct CurrentRunSaveData {
     container_reg: HashMap<TileMapPosition, Container>,
     craft_tracker: CraftingTracker,
     night_tracker: NightTracker,
+    chaos_tracker: ChaosTracker,
 
     //Player Data
     pub inventory: Inventory,
@@ -353,6 +355,7 @@ pub fn save_state(
     key_input: ResMut<Input<KeyCode>>,
     skills_queue: Res<HeirloomChoiceQueue>,
     analytics_data: Res<AnalyticsData>,
+    chaos_tracker: Option<Res<ChaosTracker>>,
     game: GameParam,
 ) {
     // only save if the timer is done and we are not in a dungeon
@@ -432,6 +435,10 @@ pub fn save_state(
     // }
     save_data.container_reg = container_reg.containers.clone();
     save_data.night_tracker = night_tracker.clone();
+    save_data.chaos_tracker = chaos_tracker
+        .as_ref()
+        .map(|tracker| (**tracker).clone())
+        .unwrap_or_else(|| ChaosTracker::default());
     save_data.seed = seed.seed;
     save_data.analytics_data = analytics_data.clone();
     let async_task_pool = bevy::tasks::IoTaskPool::get();
@@ -505,6 +512,7 @@ pub fn load_state(
                 era.visited_eras = data.visited_eras;
                 seed = data.seed;
                 commands.insert_resource(data.night_tracker);
+                commands.insert_resource(data.chaos_tracker);
                 commands.insert_resource(ContainerRegistry {
                     containers: data.containers,
                 });

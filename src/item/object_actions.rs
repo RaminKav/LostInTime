@@ -7,7 +7,10 @@ use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::attributes::ItemRarity;
+use crate::chaos::IncreaseChaosEvent;
+use crate::colors::RED;
 use crate::container::Container;
+use crate::custom_commands::CommandsExt;
 use crate::inventory::Inventory;
 use crate::item::dungeon_shrine::NUM_DUNGEON_SHRINE_MOBS;
 use crate::juice::ShakeEffect;
@@ -15,11 +18,12 @@ use crate::player::skills::{ActiveSkill, ActiveSkillChoiceState, HeirloomRarity}
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
-use crate::ui::damage_numbers::spawn_screen_locked_icon;
+use crate::ui::damage_numbers::{spawn_floating_text_with_shadow, spawn_screen_locked_icon};
 use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use crate::world::world_helpers::tile_pos_to_world_pos;
 use rand::seq::IteratorRandom;
 
 use crate::world::TileMapPosition;
@@ -56,6 +60,7 @@ pub enum ObjectAction {
     ArmorShrine,
     AccessoryShrine,
     ToggleBeacon(WorldObject),
+    IncreaseChaos(f32),
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -453,6 +458,39 @@ impl ObjectAction {
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+            }
+            ObjectAction::IncreaseChaos(amount) => {
+                item_action_param
+                    .increase_chaos_event
+                    .send(IncreaseChaosEvent { amount: *amount });
+                let pos = tile_pos_to_world_pos(_obj_pos, true);
+                info!("{pos:?} {_obj_pos:?}");
+                commands
+                    .entity(e)
+                    .insert(WorldObject::ChaosTotemDone)
+                    .remove::<InteractionGuideTrigger>()
+                    .remove::<ObjectAction>();
+                let spawn_pos = pos + Vec2::new(0., -18.);
+                // We need both mutable proto_commands and immutable proto_param.
+                // Since spawn_item_from_proto only reads from proto_param, we can safely
+                // create an immutable reference using a raw pointer cast.
+                let proto_ref: &ProtoParam =
+                    unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
+                proto_param.proto_commands.spawn_item_from_proto(
+                    WorldObject::TimeFragment,
+                    proto_ref,
+                    spawn_pos,
+                    1,
+                    None,
+                );
+
+                spawn_floating_text_with_shadow(
+                    commands,
+                    &item_action_param.asset_server,
+                    pos.extend(game.player().position.z) + Vec3::new(0., 20., 0.),
+                    RED,
+                    format!("+{} Chaos", amount),
+                );
             }
             _ => {}
         }

@@ -473,6 +473,8 @@ pub enum WorldObject {
     BlacksmithMerchantDone,
     HeirloomShrine,
     HeirloomShrineDone,
+    ChaosTotem,
+    ChaosTotemDone,
 }
 
 #[derive(

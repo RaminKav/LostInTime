@@ -1,0 +1,10 @@
+(
+  name: "ChaosTotem",
+  templates: ["world_object.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ChaosTotem,
+  "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
+  "survival_rogue_like::item::object_actions::ObjectAction": IncreaseChaos(1.0),
+  }
+)
+

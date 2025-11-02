@@ -39,6 +39,7 @@
         Crate: 0.0007,
         Crate2: 0.0007,
         Era2DeadBranch: 0.017,
+        ChaosTotem: 0.0008,
 
         // Bush: 0.003,
         // Bush2: 0.003,
@@ -99,6 +100,7 @@
         GambleShrine: [GrassTile, ],
         ActiveSkillShrine: [GrassTile, ],
         HeirloomShrine: [GrassTile, ],
+        ChaosTotem: [GrassTile, ],
       }
     ),
   }

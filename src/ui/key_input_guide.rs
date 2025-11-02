@@ -105,6 +105,14 @@ pub fn add_guide_to_unique_objs(
                     icon_stack: None,
                 });
             }
+            WorldObject::ChaosTotem => {
+                commands.entity(e).insert(InteractionGuideTrigger {
+                    key: Some("F".to_string()),
+                    text: Some("Activate".to_string()),
+                    activation_distance: 32.,
+                    icon_stack: None,
+                });
+            }
             _ => {}
         }
     }

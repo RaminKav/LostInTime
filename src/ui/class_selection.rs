@@ -8,6 +8,7 @@ use crate::{
     animations::player_sprite::PlayerSpriteHandles,
     assets::Graphics,
     attributes::{ItemAttributes, ItemRarity},
+    chaos::ChaosTracker,
     colors::{BLACK, DARK_WOOD_BROWN},
     container::ContainerRegistry,
     inputs::CursorPos,
@@ -402,6 +403,7 @@ pub fn handle_class_selection(
                                 // Initialize game resources
                                 commands.init_resource::<crate::Game>();
                                 commands.init_resource::<NightTracker>();
+                                commands.init_resource::<ChaosTracker>();
                                 commands.init_resource::<HeirloomChoiceQueue>();
                                 commands.init_resource::<ContainerRegistry>();
                                 commands.init_resource::<PathfindingCache>();

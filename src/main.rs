@@ -49,6 +49,7 @@ use bevy::{
 };
 use bevy_common_assets::ron::RonAssetPlugin;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
+use chaos::ChaosPlugin;
 use juice::JuicePlugin;
 use night::NightPlugin;
 use rand::Rng;
@@ -61,6 +62,7 @@ mod ai;
 mod animations;
 mod assets;
 mod attributes;
+mod chaos;
 mod client;
 mod colors;
 mod combat;
@@ -215,6 +217,7 @@ fn main() {
         .add_plugin(InputsPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
+        .add_plugin(ChaosPlugin)
         .add_plugin(SaplingPlugin)
         .add_plugin(AIPlugin)
         .add_plugin(AttributesPlugin)
