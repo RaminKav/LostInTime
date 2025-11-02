@@ -718,10 +718,13 @@ fn spawn_player_preview(
     // Spawn starting weapon to the right of the player
     let starting_weapon = selected_class.get_starting_wep();
 
+    // Get the starting weapon rarity based on class rank
+    let weapon_rarity = class_rank.get_starting_weapon_rarity();
+
     let weapon_item_stack = ItemStack {
         obj_type: starting_weapon,
         count: 1,
-        rarity: ItemRarity::Common,
+        rarity: weapon_rarity.clone(),
         attributes: ItemAttributes::default(),
         metadata: ItemDisplayMetaData::default(),
     };
@@ -735,6 +738,7 @@ fn spawn_player_preview(
         Vec2::ZERO,
         3,
     );
+    // Note: spawn_item_stack_icon automatically adds rarity glows based on item_stack.rarity
     // power icon
     let _wep_icon_slot = commands
         .spawn(SpriteBundle {
