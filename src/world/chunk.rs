@@ -36,24 +36,36 @@ impl Plugin for ChunkPlugin {
             .add_event::<CreateChunkEvent>()
             .add_event::<DoneCreateChunkEvent>()
             .add_event::<GenerateObjectsEvent>()
-            .add_systems(
-                (
-                    Self::spawn_chunks_around_camera
-                        .after(handle_move_player)
-                        .run_if(dim_spawned),
-                    Self::handle_new_chunk_event
-                        .after(Self::startup_chunk_generation)
-                        .after(Self::spawn_chunks_around_camera),
-                    Self::startup_chunk_generation,
-                    Self::handle_update_tiles_for_new_chunks.after(CustomFlush),
-                    Self::toggle_on_screen_mesh_visibility.before(CustomFlush),
-                )
-                    .in_set(OnUpdate(GameState::Main)),
+            .add_system(
+                Self::spawn_chunks_around_camera
+                    .after(handle_move_player)
+                    .run_if(dim_spawned)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::handle_new_chunk_event
+                    .after(Self::startup_chunk_generation)
+                    .after(Self::spawn_chunks_around_camera)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::startup_chunk_generation
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::handle_update_tiles_for_new_chunks
+                    .after(CustomFlush)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::toggle_on_screen_mesh_visibility
+                    .before(CustomFlush)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
                 Self::despawn_outofrange_chunks
                     .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
                 generate_and_cache_island_chunks.run_if(resource_added::<WorldObjectCache>()),
@@ -378,14 +390,6 @@ impl ChunkPlugin {
                 }
             }
             gen_events.send(GenerateObjectsEvent { chunk_pos });
-
-            //TODO: add event for this
-            // GenerationPlugin::generate_and_cache_objects(
-            //     &mut game,
-            //     &mut pkv,
-            //     chunk_pos,
-            //     seed.single().seed,
-            // );
         }
     }
 

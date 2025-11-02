@@ -2,6 +2,7 @@ pub mod chest_ui;
 pub mod class_selection;
 pub mod crafting_ui;
 pub mod damage_numbers;
+mod loading_screen;
 pub mod guide_hud;
 pub mod item_chest;
 pub mod scrapper_ui;
@@ -47,6 +48,7 @@ mod main_menu;
 pub use main_menu::*;
 mod essence_ui;
 pub use essence_ui::*;
+use loading_screen::*;
 
 use crate::{
     attributes::clamp_health,
@@ -108,6 +110,11 @@ impl Plugin for UIPlugin {
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
+            .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
+            .add_system(
+                check_initialization_complete
+                    .run_if(in_state(GameState::Initializing)),
+            )
             .add_system(spawn_fps_text.in_schedule(OnEnter(GameState::Main)))
             .add_systems((
                 setup_inv_ui
@@ -321,7 +328,7 @@ impl Plugin for UIPlugin {
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
-            .add_system(update_currency_text)
+            .add_system(update_currency_text.run_if(in_state(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

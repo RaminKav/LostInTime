@@ -878,7 +878,7 @@ impl Plugin for ItemsPlugin {
             .add_system(
                 handle_placing_world_object
                     .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_systems(
                 (
@@ -962,95 +962,108 @@ pub fn handle_placing_world_object(
         }
 
         // Place New Object
-        if let Some(chunk) = game.get_chunk_entity(tile_pos.chunk_pos) {
-            let mut is_touching_air = true;
-            if let Ok(dungeon) = dungeon_check.get_single() {
-                is_touching_air = false;
-                for x in -1_i32..2 {
-                    for y in -1_i32..2 {
-                        let original_y = ((CHUNK_SIZE) as i32 * (4 - tile_pos.chunk_pos.y)
-                            - 1
-                            - (tile_pos.tile_pos.y as i32))
-                            as usize;
-                        let original_x = ((3 * CHUNK_SIZE) as i32
-                            + (tile_pos.chunk_pos.x * CHUNK_SIZE as i32)
-                            + tile_pos.tile_pos.x as i32)
-                            as usize;
-                        if dungeon.grid[(original_y as i32 + y)
-                            .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
-                            as usize][(original_x as i32 + x)
-                            .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
-                            as usize]
-                            == 1
-                        {
-                            is_touching_air = true
+        let chunk_entity = game.get_chunk_entity(tile_pos.chunk_pos);
+        match chunk_entity {
+            Some(chunk) => {
+                let mut is_touching_air = true;
+                if let Ok(dungeon) = dungeon_check.get_single() {
+                    is_touching_air = false;
+                    for x in -1_i32..2 {
+                        for y in -1_i32..2 {
+                            let original_y = ((CHUNK_SIZE) as i32 * (4 - tile_pos.chunk_pos.y)
+                                - 1
+                                - (tile_pos.tile_pos.y as i32))
+                                as usize;
+                            let original_x = ((3 * CHUNK_SIZE) as i32
+                                + (tile_pos.chunk_pos.x * CHUNK_SIZE as i32)
+                                + tile_pos.tile_pos.x as i32)
+                                as usize;
+                            if dungeon.grid[(original_y as i32 + y)
+                                .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
+                                as usize][(original_x as i32 + x)
+                                .clamp(0, DUNGEON_GRID_SIZE as i32 - 1)
+                                as usize]
+                                == 1
+                            {
+                                is_touching_air = true
+                            }
                         }
                     }
                 }
-            }
-            let item = proto_commands.spawn_object_from_proto(
-                place_event.obj,
-                pos,
-                &prototypes,
-                &mut proto_param,
-                is_touching_air,
-            );
-            if let Some(item_e) = item {
-                //TODO: do what old game data did, add obj to registry
-                commands.entity(item_e).set_parent(chunk);
-                if !place_event.placed_by_player
-                    && container_reg.containers.get(&tile_pos).is_none()
-                    && place_event.obj == WorldObject::Chest
-                {
-                    commands
-                        .entity(item_e)
-                        .insert(get_random_loot_chest_type(rand::thread_rng()));
-                }
-                if place_event.obj.is_beacon() {
-                    spawn_screen_locked_icon(
-                        item_e,
-                        &mut commands,
-                        &game.graphics,
-                        &asset_server,
-                        place_event.obj.clone(),
-                    );
-                }
-
-                if place_event.obj.is_medium_size(&proto_param) {
-                    minimap_event.send(UpdateMiniMapEvent {
-                        pos: Some(tile_pos),
-                        new_tile: Some(place_event.obj),
-                    });
-                    for q in 0..3 {
-                        minimap_event.send(UpdateMiniMapEvent {
-                            pos: Some(tile_pos.get_neighbour_tiles_for_medium_objects()[q]),
-                            new_tile: Some(place_event.obj),
-                        });
-                    }
-                } else {
-                    minimap_event.send(UpdateMiniMapEvent {
-                        pos: Some(tile_pos),
-                        new_tile: Some(place_event.obj),
-                    });
-                }
-
-                if place_event.obj.is_water_placeable() {
-                    for (e, _c, t) in water_colliders.iter() {
-                        if t.translation()
-                            .truncate()
-                            .distance(tile_pos_to_world_pos(tile_pos, false))
-                            <= 6.
+                let item = proto_commands.spawn_object_from_proto(
+                    place_event.obj,
+                    pos,
+                    &prototypes,
+                    &mut proto_param,
+                    is_touching_air,
+                );
+                match item {
+                    Some(item_e) => {
+                        // Successfully spawned - register in cache
+                        game.add_object_to_chunk_cache(tile_pos, place_event.obj);
+                        //TODO: do what old game data did, add obj to registry
+                        commands.entity(item_e).set_parent(chunk);
+                        if !place_event.placed_by_player
+                            && container_reg.containers.get(&tile_pos).is_none()
+                            && place_event.obj == WorldObject::Chest
                         {
-                            commands.entity(e).insert(Sensor);
+                            commands
+                                .entity(item_e)
+                                .insert(get_random_loot_chest_type(rand::thread_rng()));
+                        }
+                        if place_event.obj.is_beacon() {
+                            spawn_screen_locked_icon(
+                                item_e,
+                                &mut commands,
+                                &game.graphics,
+                                &asset_server,
+                                place_event.obj.clone(),
+                            );
+                        }
+
+                        if place_event.obj.is_medium_size(&proto_param) {
+                            minimap_event.send(UpdateMiniMapEvent {
+                                pos: Some(tile_pos),
+                                new_tile: Some(place_event.obj),
+                            });
+                            for q in 0..3 {
+                                minimap_event.send(UpdateMiniMapEvent {
+                                    pos: Some(tile_pos.get_neighbour_tiles_for_medium_objects()[q]),
+                                    new_tile: Some(place_event.obj),
+                                });
+                            }
+                        } else {
+                            minimap_event.send(UpdateMiniMapEvent {
+                                pos: Some(tile_pos),
+                                new_tile: Some(place_event.obj),
+                            });
+                        }
+
+                        if place_event.obj.is_water_placeable() {
+                            for (e, _c, t) in water_colliders.iter() {
+                                if t.translation()
+                                    .truncate()
+                                    .distance(tile_pos_to_world_pos(tile_pos, false))
+                                    <= 6.
+                                {
+                                    commands.entity(e).insert(Sensor);
+                                }
+                            }
                         }
                     }
+                    None => {
+                        // spawn_object_from_proto returned None - prototype not ready or other issue
+                        // Cache for later spawning
+                        game.add_object_to_chunk_cache(tile_pos, place_event.obj);
+                    }
                 }
             }
-        } else {
-            info!("no chunk when spawn {:?} {:?}", tile_pos, place_event.obj);
+            None => {
+                // Chunk entity not found - cache objects that can't be placed yet (chunk not ready)
+                // so they can be spawned later when chunk is ready
+                game.add_object_to_chunk_cache(tile_pos, place_event.obj);
+            }
         }
-
-        game.add_object_to_chunk_cache(tile_pos, place_event.obj);
     }
 }
 pub fn handle_break_object(

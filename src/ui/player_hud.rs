@@ -347,8 +347,10 @@ pub fn update_currency_text(
 ) {
     for time_fragments in currency.iter() {
         if game_state.0 != GameState::GameOver {
-            let icon_e = icon.single();
-            commands.entity(icon_e).insert(BounceOnHit::new());
+            // Only try to insert bounce effect if currency icon exists (might not be spawned yet)
+            if let Ok(icon_e) = icon.get_single() {
+                commands.entity(icon_e).insert(BounceOnHit::new());
+            }
         }
         // handles different text for two different UI elements, game end count and normal in-game
         for mut text in text_query.iter_mut() {

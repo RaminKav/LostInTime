@@ -323,6 +323,7 @@ pub enum GameState {
     Loading,
     LoadingProtos,
     MainMenu,
+    Initializing, // New state for game initialization with loading screen
     Main,
     GameOver,
 }

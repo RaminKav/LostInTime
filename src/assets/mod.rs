@@ -147,7 +147,10 @@ impl Plugin for GameAssetsPlugin {
                 portal_ase: None,
                 class_pet_data: None,
             })
-            .add_system(Self::update_graphics.in_set(OnUpdate(GameState::Main)))
+            .add_system(
+                Self::update_graphics
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
             .add_system(Self::load_graphics.in_schedule(OnExit(GameState::Loading)));
     }
 }

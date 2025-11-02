@@ -434,9 +434,9 @@ pub fn handle_class_selection(
                                         Timer::from_seconds(3.0, TimerMode::Once),
                                     ));
 
-                                // Close the class selection UI and start the game
+                                // Close the class selection UI and transition to loading state
                                 next_ui_state.set(UIState::Closed);
-                                next_game_state.set(crate::GameState::Main);
+                                next_game_state.set(crate::GameState::Initializing);
 
                                 // Despawn the class selection UI
                                 commands.entity(e).despawn_recursive();

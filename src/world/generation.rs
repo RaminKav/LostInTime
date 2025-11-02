@@ -20,9 +20,7 @@ use bevy_aseprite::AsepriteBundle;
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
-use crate::world::{
-    noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, NUM_CHUNKS_AROUND_CAMERA, TILE_SIZE,
-};
+use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
 use crate::{CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN};
 
@@ -82,22 +80,23 @@ impl Plugin for GenerationPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
-                Self::generate_unique_objects_for_new_world.in_set(OnUpdate(GameState::Main)),
+                Self::generate_unique_objects_for_new_world
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
                 Self::generate_and_cache_objects
                     .before(ChunkPlugin::despawn_outofrange_chunks)
                     .before(CustomFlush)
-                    .run_if(
-                        resource_exists::<GenerationSeed>().and_then(in_state(GameState::Main)),
-                    ),
+                    .run_if(resource_exists::<GenerationSeed>().and_then(
+                        in_state(GameState::Main).or_else(in_state(GameState::Initializing)),
+                    )),
             )
             .add_system(
                 update_wall
                     .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(spawn_debug_chunk_borders.in_schedule(OnEnter(GameState::Main)))
+            .add_system(Self::spawn_debug_chunk_borders.in_schedule(OnEnter(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -411,9 +410,10 @@ impl GenerationPlugin {
         }
         let mut total_coal = 0;
         let mut total_metal = 0;
+        // Get dungeon check result once for all chunks (it's the same query result)
+        let dungeon_check_result = dungeon_check.get_single();
         for chunk in chunk_spawn_event.iter() {
             let chunk_pos = chunk.chunk_pos;
-            let dungeon_check = dungeon_check.get_single();
             let is_chunk_generated = game.is_chunk_generated(chunk_pos);
             if !is_chunk_generated {
                 debug!(
@@ -512,7 +512,7 @@ impl GenerationPlugin {
                     .collect::<Vec<(TileMapPosition, WorldObject)>>();
 
                 // Gen stone walls for dungeons
-                if let Ok(dungeon) = dungeon_check {
+                if let Ok(dungeon) = dungeon_check_result {
                     let chunk_e = game.get_chunk_entity(chunk_pos).unwrap();
                     let mut wall_cache = chunk_wall_cache.get_mut(chunk_e).unwrap();
                     for x in 0..CHUNK_SIZE {
@@ -572,7 +572,7 @@ impl GenerationPlugin {
                     .copied()
                     .collect::<HashMap<_, _>>();
 
-                if dungeon_check.is_err() {
+                if dungeon_check_result.is_err() {
                     // clear out spawn area
                     let clear_tiles = get_radial_tile_positions(
                         TileMapPosition::new(IVec2::ZERO, TilePos::new(0, 0)),
@@ -673,14 +673,6 @@ impl GenerationPlugin {
                 // For non-dungeon chunks, we don't need distance checks since chunks are generated dynamically
                 // and we already check if chunk_entity exists and chunk is generated
                 // Distance check is only needed for dungeon chunks
-                let chunk_dist = if dungeon_check.is_err() {
-                    Vec2::ZERO // Not used for non-dungeon, but needs to exist
-                } else {
-                    Vec2::new(chunk.chunk_pos.x as f32, chunk.chunk_pos.y as f32)
-                        * CHUNK_SIZE as f32
-                        * TILE_SIZE.x as f32
-                };
-                let distance = Vec2::new(0., 0.).distance(chunk_dist);
 
                 for (pos, mut obj_to_spawn) in objs.iter() {
                     // only spawn if generated obj is in our chunk or a previously genereated chunk,
@@ -701,7 +693,7 @@ impl GenerationPlugin {
                     // Fixed: Remove distance restriction for non-dungeon chunks - objects should spawn
                     // wherever chunks are generated. Distance check only applies to dungeons.
                     // The chunk existence and generation checks are sufficient for normal world gen.
-                    if (dungeon_check.is_ok() || game.get_chunk_entity(chunk_pos).is_some())
+                    if (dungeon_check_result.is_ok() || game.get_chunk_entity(chunk_pos).is_some())
                         && (pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos))
                     {
                         place_item_event.send(PlaceItemEvent {
@@ -724,7 +716,6 @@ impl GenerationPlugin {
                 schematic_spawn_event.send(SchematicSpawnEvent(chunk_pos));
             } else {
                 let objs = game.get_objects_from_chunk_cache(chunk_pos);
-                debug!("Chunk already generated: {chunk_pos:?} {:?}", objs.len());
                 for (pos, obj_to_spawn) in objs {
                     place_item_event.send(PlaceItemEvent {
                         obj: obj_to_spawn,
@@ -738,63 +729,63 @@ impl GenerationPlugin {
             done_event.send(DoneGeneratingEvent { chunk_pos });
         }
     }
-}
 
-fn spawn_debug_chunk_borders(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    if !*DEBUG {
-        return;
-    }
-    let offset = Vec2::new(-8., -8.);
-    //vertical
-    for i in -10..10 {
-        commands
-            .spawn(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(1.0, 100000.0),
-                            ..Default::default()
-                        }
+    fn spawn_debug_chunk_borders(
+        mut commands: Commands,
+        mut meshes: ResMut<Assets<Mesh>>,
+        mut materials: ResMut<Assets<ColorMaterial>>,
+    ) {
+        if !*DEBUG {
+            return;
+        }
+        let offset = Vec2::new(-8., -8.);
+        //vertical
+        for i in -10..10 {
+            commands
+                .spawn(MaterialMesh2dBundle {
+                    mesh: meshes
+                        .add(
+                            shape::Quad {
+                                size: Vec2::new(1.0, 100000.0),
+                                ..Default::default()
+                            }
+                            .into(),
+                        )
                         .into(),
-                    )
-                    .into(),
-                transform: Transform::from_translation(Vec3::new(
-                    i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x + offset.x,
-                    0. + offset.y,
-                    900.,
-                )),
-                material: materials.add(Color::RED.into()),
-                ..default()
-            })
-            .insert(Name::new("debug chunk border y"));
-    }
+                    transform: Transform::from_translation(Vec3::new(
+                        i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x + offset.x,
+                        0. + offset.y,
+                        900.,
+                    )),
+                    material: materials.add(Color::RED.into()),
+                    ..default()
+                })
+                .insert(Name::new("debug chunk border y"));
+        }
 
-    //horizontal
-    for i in -10..10 {
-        commands
-            .spawn(MaterialMesh2dBundle {
-                mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(100000.0, 1.0),
-                            ..Default::default()
-                        }
+        //horizontal
+        for i in -10..10 {
+            commands
+                .spawn(MaterialMesh2dBundle {
+                    mesh: meshes
+                        .add(
+                            shape::Quad {
+                                size: Vec2::new(100000.0, 1.0),
+                                ..Default::default()
+                            }
+                            .into(),
+                        )
                         .into(),
-                    )
-                    .into(),
-                transform: Transform::from_translation(Vec3::new(
-                    offset.x,
-                    i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y + offset.y,
-                    900.,
-                )),
-                material: materials.add(Color::RED.into()),
-                ..default()
-            })
-            .insert(Name::new("debug chunk border x"));
+                    transform: Transform::from_translation(Vec3::new(
+                        offset.x,
+                        i as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y + offset.y,
+                        900.,
+                    )),
+                    material: materials.add(Color::RED.into()),
+                    ..default()
+                })
+                .insert(Name::new("debug chunk border x"));
+        }
     }
 }
 
