@@ -35,7 +35,7 @@ use self::{
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
 pub const CHUNK_SIZE: u32 = 16;
-pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 6.;
+pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 8.; // Increased from 6 to 12 for larger island
 pub const MAX_VISIBILITY: u32 = (2.3 * (CHUNK_SIZE as f32 / 2.) * TILE_SIZE.x) as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 

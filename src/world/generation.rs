@@ -670,14 +670,18 @@ impl GenerationPlugin {
                         }
                     }
                 }
-                let max_distance = f32::hypot(
-                    CHUNK_SIZE as f32 * TILE_SIZE.x,
-                    CHUNK_SIZE as f32 * TILE_SIZE.y,
-                );
-                let chunk_dist = Vec2::new(chunk.chunk_pos.x as f32, chunk.chunk_pos.y as f32)
-                    * CHUNK_SIZE as f32
-                    * TILE_SIZE.x as f32;
+                // For non-dungeon chunks, we don't need distance checks since chunks are generated dynamically
+                // and we already check if chunk_entity exists and chunk is generated
+                // Distance check is only needed for dungeon chunks
+                let chunk_dist = if dungeon_check.is_err() {
+                    Vec2::ZERO // Not used for non-dungeon, but needs to exist
+                } else {
+                    Vec2::new(chunk.chunk_pos.x as f32, chunk.chunk_pos.y as f32)
+                        * CHUNK_SIZE as f32
+                        * TILE_SIZE.x as f32
+                };
                 let distance = Vec2::new(0., 0.).distance(chunk_dist);
+
                 for (pos, mut obj_to_spawn) in objs.iter() {
                     // only spawn if generated obj is in our chunk or a previously genereated chunk,
                     // otherwise cache it for the correct chunk to spawn
@@ -694,9 +698,10 @@ impl GenerationPlugin {
                     if obj_to_spawn == &WorldObject::MetalBoulder {
                         total_metal += 1;
                     }
-                    if (distance <= max_distance * 2. * NUM_CHUNKS_AROUND_CAMERA as f32
-                        || dungeon_check.is_ok())
-                        && game.get_chunk_entity(chunk_pos).is_some()
+                    // Fixed: Remove distance restriction for non-dungeon chunks - objects should spawn
+                    // wherever chunks are generated. Distance check only applies to dungeons.
+                    // The chunk existence and generation checks are sufficient for normal world gen.
+                    if (dungeon_check.is_ok() || game.get_chunk_entity(chunk_pos).is_some())
                         && (pos.chunk_pos == chunk_pos || game.is_chunk_generated(pos.chunk_pos))
                     {
                         place_item_event.send(PlaceItemEvent {

@@ -430,7 +430,9 @@ impl ChunkPlugin {
             return;
         }
         info!("BEGIN STARTUP CHUNK GENERATION!!");
-        let num_chunks = 6;
+        // Use ISLAND_SIZE to determine startup chunk radius instead of hardcoded 6
+        let num_chunks =
+            ((crate::world::ISLAND_SIZE / crate::world::CHUNK_SIZE as f32) + 1.) as i32;
         for y in -num_chunks..=num_chunks {
             for x in -num_chunks..=num_chunks {
                 let chunk_pos = IVec2::new(x, y);

@@ -431,7 +431,6 @@ fn juice_up_spawned_mobs_per_day(
     let chaos_from_heirlooms = player_skills.single().get_count(Heirloom::ChaosBoost) as f32 * 1.5; // Each ChaosBoost heirloom adds 0.5 to chaos
 
     let total_chaos = chaos_from_totem + chaos_from_heirlooms;
-    info!("Total chaos affecting mobs: {}", total_chaos);
     for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
         if mob.is_boss() {
             continue;
