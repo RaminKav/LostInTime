@@ -168,6 +168,7 @@ fn main() {
     }
 
     let app = app
+        .insert_resource(StartOfRunActionsHappened(false))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(crate::player::score::RunScore::new())
         .add_state::<GameState>()
@@ -237,6 +238,14 @@ fn main() {
         )
         .add_collection_to_loading_state::<_, ImageAssets>(GameState::Loading)
         .add_system(display_main_menu.in_schedule(OnEnter(GameState::MainMenu)))
+        .add_system(
+            set_start_of_run_action_resource_true
+                .run_if(run_once_per_run())
+                .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_system(
+            set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::GameOver)),
+        )
         .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
         .add_system(
             spawn_info_modal
@@ -908,4 +917,26 @@ impl AppExt for App {
 
 pub fn should_show_inspector() -> bool {
     *DEBUG
+}
+
+#[derive(Resource)]
+pub struct StartOfRunActionsHappened(pub bool);
+
+pub fn run_once_per_run() -> impl Fn(Res<StartOfRunActionsHappened>) -> bool {
+    move |res: Res<StartOfRunActionsHappened>| {
+        info!("run once per run check: {}", res.0);
+        if res.0 {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+pub fn set_start_of_run_action_resource_true(mut res: ResMut<StartOfRunActionsHappened>) {
+    res.0 = true;
+}
+
+pub fn set_start_of_run_action_resource_false(mut res: ResMut<StartOfRunActionsHappened>) {
+    res.0 = false;
 }

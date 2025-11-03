@@ -834,6 +834,23 @@ impl WorldObject {
             WorldObject::ActiveSkillShrine => LIGHT_GREY,
             WorldObject::ActiveSkillShrineDone => LIGHT_GREY,
 
+            //era2
+            WorldObject::Era2Boulder => LIGHT_GREY,
+            WorldObject::Era2Boulder2 => LIGHT_GREY,
+            WorldObject::Era2CoalBoulder => LIGHT_GREY,
+            WorldObject::Era2MagicBoulder => LIGHT_GREY,
+
+            WorldObject::Era2Grass => LIGHT_GREEN,
+            WorldObject::Era2Grass2 => LIGHT_GREEN,
+            WorldObject::Era2Grass3 => LIGHT_GREEN,
+
+            WorldObject::Era2Pebble => LIGHT_GREEN,
+            WorldObject::Era2RedMushroom => LIGHT_GREEN,
+            WorldObject::Era2BrownMushroom => LIGHT_GREEN,
+            WorldObject::Era2Stump => LIGHT_BROWN,
+            WorldObject::Era2Stump2 => LIGHT_BROWN,
+            WorldObject::Era2DeadBranch => LIGHT_BROWN,
+
             _ => BLACK,
         }
     }

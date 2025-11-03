@@ -37,7 +37,6 @@ pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub use score::*;
 pub mod stats;
-use crate::player::{achievements::AchievementsPlugin, skills::PlayerClass};
 use crate::{
     ai::{follow, idle, leap_attack},
     animations::player_sprite::{PlayerAnimation, PlayerAnimationState},
@@ -61,6 +60,10 @@ use crate::{
     ui::{damage_numbers::handle_add_damage_numbers_after_hit, FlashExpBarEvent},
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
+};
+use crate::{
+    player::{achievements::AchievementsPlugin, skills::PlayerClass},
+    run_once_per_run,
 };
 use skills::*;
 
@@ -186,7 +189,7 @@ impl Plugin for PlayerPlugin {
             )
             .add_system(
                 give_player_starting_items
-                    .run_if(run_once())
+                    .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
             )
             .add_system(handle_move_player.before(CustomFlush))

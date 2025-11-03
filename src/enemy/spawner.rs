@@ -10,6 +10,7 @@ use crate::{
     night::{NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
+    run_once_per_run,
     world::{
         chunk::Chunk,
         dimension::ActiveDimension,
@@ -41,7 +42,7 @@ impl Plugin for SpawnerPlugin {
             )
             .add_system(
                 add_spawners_to_new_chunks
-                    .run_if(run_once())
+                    .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
             );
     }

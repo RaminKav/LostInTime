@@ -21,7 +21,7 @@ use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
 use crate::world::{noise_helpers, world_helpers, TileMapPosition, CHUNK_SIZE, TILE_SIZE};
-use crate::{CustomFlush, GameParam, GameState, DEBUG_AI};
+use crate::{run_once_per_run, CustomFlush, GameParam, GameState, DEBUG_AI};
 use crate::{DEBUG, NO_GEN};
 
 use bevy::prelude::*;
@@ -93,7 +93,7 @@ impl Plugin for GenerationPlugin {
             )
             .add_system(
                 Self::spawn_debug_chunk_borders
-                    .run_if(run_once())
+                    .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));

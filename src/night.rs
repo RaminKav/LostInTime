@@ -5,7 +5,7 @@ use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
     client::is_not_paused,
     colors::{overwrite_alpha, NIGHT},
-    GameState, ScreenResolution, GAME_HEIGHT,
+    run_once_per_run, GameState, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -51,7 +51,7 @@ impl Plugin for NightPlugin {
             // .add_plugin(ResourceInspectorPlugin::<NightTracker>::default().run_if(dim_spawned))
             .add_system(
                 spawn_night
-                    .run_if(run_once())
+                    .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
             )
             .add_system(
