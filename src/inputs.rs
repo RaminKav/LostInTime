@@ -459,7 +459,7 @@ pub fn toggle_inventory(
         if key_input.just_pressed(KeyCode::O) {
             dim_event.send(DimensionSpawnEvent {
                 swap_to_dim_now: true,
-                new_era: Some(Era::Second),
+                new_era: Some(Era::Third),
             });
         }
         if key_input.just_pressed(KeyCode::C) {

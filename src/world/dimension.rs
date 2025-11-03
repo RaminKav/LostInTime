@@ -67,6 +67,7 @@ pub enum Era {
     #[default]
     Main,
     Second,
+    Third,
     DungeonMain,
 }
 
@@ -76,20 +77,23 @@ impl Era {
             Era::Main => 0,
             Era::DungeonMain => 1 * 16,
             Era::Second => 2 * 16,
+            Era::Third => 3 * 16,
         }
     }
     pub fn index(&self) -> usize {
         match self {
             Era::Main => 0,
             Era::Second => 1,
-            Era::DungeonMain => 2,
+            Era::Third => 2,
+            Era::DungeonMain => 3,
         }
     }
     pub fn from_index(index: usize) -> Self {
         match index {
             0 => Era::Main,
             1 => Era::Second,
-            2 => Era::DungeonMain,
+            2 => Era::Third,
+            3 => Era::DungeonMain,
             i => panic!("Invalid Era index:{}", i),
         }
     }
@@ -109,6 +113,7 @@ impl Era {
         match self {
             Era::Main => 0.,
             Era::Second => 3.0,
+            Era::Third => 6.0,
             Era::DungeonMain => 1.0,
         }
     }

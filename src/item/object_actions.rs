@@ -581,9 +581,8 @@ impl ObjectAction {
                 // Determine next era based on current era
                 let next_era = match current_era {
                     Era::Main => Some(Era::Second),
-                    Era::Second => {
-                        // No Era::Third exists, so this is the end
-                        // Could return None or keep at Second
+                    Era::Second => Some(Era::Third),
+                    Era::Third => {
                         return;
                     }
                     Era::DungeonMain => {

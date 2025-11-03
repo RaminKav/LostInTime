@@ -433,9 +433,6 @@ fn juice_up_spawned_mobs_per_day(
     let chaos_from_era = era_manager.current_era.get_chaos_modifier();
     let total_chaos = chaos_from_totem + chaos_from_heirlooms + chaos_from_era;
     for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
-        if mob.is_boss() {
-            continue;
-        }
         // 1.5 per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1.5 * night_tracker.days as f32
             + (player_level.single().level as f32 * 0.2)
