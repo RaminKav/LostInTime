@@ -30,7 +30,6 @@ pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MobSpawnEvent>()
-            .add_system(add_global_spawn_timer.in_schedule(OnEnter(GameState::Main)))
             .add_systems(
                 (
                     handle_spawn_mobs,
@@ -42,13 +41,12 @@ impl Plugin for SpawnerPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(add_spawners_to_new_chunks.in_schedule(OnEnter(GameState::Main)));
+            .add_system(
+                add_spawners_to_new_chunks
+                    .run_if(run_once())
+                    .in_schedule(OnEnter(GameState::Main)),
+            );
     }
-}
-
-#[derive(Resource, Debug)]
-pub struct GlobalSpawnTimer {
-    pub timer: Timer,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -83,11 +81,6 @@ pub struct MobSpawnEvent {
     bypass_timers: bool,
 }
 
-fn add_global_spawn_timer(mut commands: Commands) {
-    commands.insert_resource(GlobalSpawnTimer {
-        timer: Timer::from_seconds(1., TimerMode::Once),
-    });
-}
 fn test_mob_count(q: Query<&Mob>, key_input: Res<Input<KeyCode>>) {
     if *DEBUG && key_input.just_pressed(KeyCode::G) {
         info!(

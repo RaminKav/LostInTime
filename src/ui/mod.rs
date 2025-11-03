@@ -110,7 +110,7 @@ impl Plugin for UIPlugin {
                 check_initialization_complete
                     .run_if(in_state(GameState::Initializing)),
             )
-            .add_system(spawn_fps_text.in_schedule(OnEnter(GameState::Main)))
+            .add_system(spawn_fps_text.run_if(run_once()).in_schedule(OnEnter(GameState::Main)))
             .add_systems((
                 setup_inv_ui
                     .before(CustomFlush)
@@ -130,11 +130,11 @@ impl Plugin for UIPlugin {
             ))
             .add_systems(
                 (
-                    setup_hotbar_hud,
-                    setup_xp_bar_ui.after(load_state),
-                    setup_bars_ui.after(load_state),
-                    setup_currency_ui,
-                    setup_clock_hud,
+                    setup_hotbar_hud.run_if(run_once()),
+                    setup_xp_bar_ui.after(load_state).run_if(run_once()),
+                    setup_bars_ui.after(load_state).run_if(run_once()),
+                    setup_currency_ui.run_if(run_once()),
+                    setup_clock_hud.run_if(run_once())
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -318,7 +318,7 @@ impl Plugin for UIPlugin {
                 update_slot_visuals.run_if(in_state(UIState::ClassSelection)),
                 update_info_card.run_if(in_state(UIState::ClassSelection)),
             ))
-            .add_system(init_starting_goal.in_schedule(OnEnter(GameState::Main)))
+            .add_system(init_starting_goal.run_if(run_once()).in_schedule(OnEnter(GameState::Main)))
             .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
             .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))

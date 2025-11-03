@@ -6,6 +6,7 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
+    assets::Graphics,
     attributes::Attack,
     audio::{AudioSoundEffect, SoundSpawner},
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
@@ -188,7 +189,7 @@ pub fn tick_teleport_timer(
 
 pub fn spawn_ice_explosion_hitbox(
     commands: &mut Commands,
-    asset_server: &AssetServer,
+    graphics: &Graphics,
     pos: Vec3,
     dmg: i32,
 ) {
@@ -200,7 +201,7 @@ pub fn spawn_ice_explosion_hitbox(
         10.5,
         dmg,
         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 28.),
-        asset_server.load::<Aseprite, _>(IceExplosion::PATH),
+        graphics.ice_explosion_ase.as_ref().unwrap().clone(),
         anim,
         false,
         Projectile::IceExplosionAOE,

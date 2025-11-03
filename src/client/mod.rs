@@ -515,75 +515,75 @@ pub fn load_state(
     let mut seed = rng.gen_range(0..100000);
     let mut save_data_exists = false;
     // Load data if it exists
-    if let Ok(file_file) = File::open(datafiles::save_file()) {
-        let reader = BufReader::new(file_file);
+    // if let Ok(file_file) = File::open(datafiles::save_file()) {
+    //     let reader = BufReader::new(file_file);
 
-        // Read the JSON contents of the file as an instance of `User`.
-        match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
-            Ok(data) => {
-                save_data_exists = true;
-                let mut cache = WorldObjectCache::default();
-                for (tp, _) in data.placed_objs[data.current_era.index()].iter() {
-                    if !cache.generated_chunks.contains(&tp.chunk_pos) {
-                        cache.generated_chunks.push(tp.chunk_pos);
-                    }
-                }
-                cache.objects = data.placed_objs[data.current_era.index()].clone();
-                cache.unique_objs = data.unique_objs[data.current_era.index()].clone();
+    //     // Read the JSON contents of the file as an instance of `User`.
+    //     match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
+    //         Ok(data) => {
+    //             save_data_exists = true;
+    //             let mut cache = WorldObjectCache::default();
+    //             for (tp, _) in data.placed_objs[data.current_era.index()].iter() {
+    //                 if !cache.generated_chunks.contains(&tp.chunk_pos) {
+    //                     cache.generated_chunks.push(tp.chunk_pos);
+    //                 }
+    //             }
+    //             cache.objects = data.placed_objs[data.current_era.index()].clone();
+    //             cache.unique_objs = data.unique_objs[data.current_era.index()].clone();
 
-                commands.insert_resource(cache);
-                for (i, (objs, unique_objs)) in data
-                    .placed_objs
-                    .iter()
-                    .zip(data.unique_objs.iter())
-                    .enumerate()
-                {
-                    if data.current_era.index() == i {
-                        continue;
-                    }
-                    era.era_generation_cache.insert(
-                        Era::from_index(i),
-                        WorldObjectCache {
-                            objects: objs.clone(),
-                            unique_objs: unique_objs.clone(),
-                            ..Default::default()
-                        },
-                    );
-                }
-                era.current_era = data.current_era;
-                era.visited_eras = data.visited_eras;
-                seed = data.seed;
-                commands.insert_resource(data.night_tracker);
-                commands.insert_resource(data.chaos_tracker);
-                commands.insert_resource(ContainerRegistry {
-                    containers: data.containers,
-                });
-                commands.insert_resource(data.player_skill_queue);
-                commands.insert_resource(data.analytics_data);
-                commands.insert_resource(data.craft_tracker);
-                proto_commands.apply(format!(
-                    "Era{}WorldGenerationParams",
-                    era.current_era.clone().index() + 1
-                ));
-                // PRE-MOVE CAMERAS TO PLAYER
-                let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
+    //             commands.insert_resource(cache);
+    //             for (i, (objs, unique_objs)) in data
+    //                 .placed_objs
+    //                 .iter()
+    //                 .zip(data.unique_objs.iter())
+    //                 .enumerate()
+    //             {
+    //                 if data.current_era.index() == i {
+    //                     continue;
+    //                 }
+    //                 era.era_generation_cache.insert(
+    //                     Era::from_index(i),
+    //                     WorldObjectCache {
+    //                         objects: objs.clone(),
+    //                         unique_objs: unique_objs.clone(),
+    //                         ..Default::default()
+    //                     },
+    //                 );
+    //             }
+    //             era.current_era = data.current_era;
+    //             era.visited_eras = data.visited_eras;
+    //             seed = data.seed;
+    //             commands.insert_resource(data.night_tracker);
+    //             commands.insert_resource(data.chaos_tracker);
+    //             commands.insert_resource(ContainerRegistry {
+    //                 containers: data.containers,
+    //             });
+    //             commands.insert_resource(data.player_skill_queue);
+    //             commands.insert_resource(data.analytics_data);
+    //             commands.insert_resource(data.craft_tracker);
+    //             proto_commands.apply(format!(
+    //                 "Era{}WorldGenerationParams",
+    //                 era.current_era.clone().index() + 1
+    //             ));
+    //             // PRE-MOVE CAMERAS TO PLAYER
+    //             let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
 
-                raw_camera_pos.0 = data.player_transform;
-                game_camera_transform.translation.x = data.player_transform.x;
-                game_camera_transform.translation.y = data.player_transform.y;
-            }
-            Err(err) => {
-                let new_file = File::create(datafiles::save_file())
-                    .expect("Could not create save data file for serialization");
-                if let Err(result) = serde_json::to_writer(new_file, "") {
-                    error!("Failed to save game data after death: {result:?}");
-                } else {
-                    info!("UPDATED SAVE DATA...");
-                }
-                println!("Failed to load data from file {err:?}")
-            }
-        }
-    }
+    //             raw_camera_pos.0 = data.player_transform;
+    //             game_camera_transform.translation.x = data.player_transform.x;
+    //             game_camera_transform.translation.y = data.player_transform.y;
+    //         }
+    //         Err(err) => {
+    //             let new_file = File::create(datafiles::save_file())
+    //                 .expect("Could not create save data file for serialization");
+    //             if let Err(result) = serde_json::to_writer(new_file, "") {
+    //                 error!("Failed to save game data after death: {result:?}");
+    //             } else {
+    //                 info!("UPDATED SAVE DATA...");
+    //             }
+    //             println!("Failed to load data from file {err:?}")
+    //         }
+    //     }
+    // }
     if !save_data_exists {
         proto_commands.apply("Era1WorldGenerationParams");
         commands.init_resource::<WorldObjectCache>();

@@ -14,6 +14,7 @@ use crate::{
     },
     CustomFlush, GameParam, GameState,
 };
+use bevy::ecs::schedule::NextState;
 
 use super::{
     chunk::Chunk,
@@ -137,6 +138,7 @@ impl DimensionPlugin {
         mut game: GameParam,
         mut proto_commands: ProtoCommands,
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
+        mut next_state: ResMut<NextState<GameState>>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -151,6 +153,14 @@ impl DimensionPlugin {
 
             //swap era data
             if let Some(new_era) = &new_dim.new_era {
+                // Transition to Initializing state for non-dungeon era changes to show loading screen
+                if new_dim.swap_to_dim_now && !new_era.is_dungeon() {
+                    info!(
+                        "Transitioning to Initializing state for era change to {:?}",
+                        new_era
+                    );
+                    next_state.set(GameState::Initializing);
+                }
                 if new_era.is_dungeon() {
                     let player = game.player_query.single().0;
                     let player_pos = game.player().position;

@@ -46,7 +46,8 @@ pub fn handle_new_red_mushling_state_machine(
                 LineOfSight {
                     target: game.player,
                     range: 40.,
-                },
+                }
+                .or(MushkingSummoned),
                 SproutingState,
             )
             .trans::<IdleState>(
@@ -56,6 +57,7 @@ pub fn handle_new_red_mushling_state_machine(
                 },
                 GasAttackState {
                     hitbox: None,
+                    speed_up_anim: false,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
                 },
             )
@@ -63,10 +65,21 @@ pub fn handle_new_red_mushling_state_machine(
                 LineOfSight {
                     target: game.player,
                     range: 20.,
-                },
+                }
+                .and(MushkingSummoned.not()),
                 GasAttackState {
                     hitbox: None,
+                    speed_up_anim: false,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                },
+            )
+            .trans::<IdleState>(
+                MushkingSummoned,
+                FollowState {
+                    target: game.player,
+                    curr_delta: None,
+                    curr_path: None,
+                    speed: 1.,
                 },
             )
             .trans::<IdleState>(
@@ -76,6 +89,17 @@ pub fn handle_new_red_mushling_state_machine(
                     curr_delta: None,
                     curr_path: None,
                     speed: 0.4,
+                },
+            )
+            .trans::<FollowState>(
+                MushkingSummoned.and(LineOfSight {
+                    target: game.player,
+                    range: 20.,
+                }),
+                GasAttackState {
+                    hitbox: None,
+                    speed_up_anim: true,
+                    cooldown: Timer::from_seconds(0.0, TimerMode::Once),
                 },
             );
 
@@ -91,6 +115,7 @@ pub struct SproutingState;
 #[component(storage = "SparseSet")]
 pub struct GasAttackState {
     hitbox: Option<Entity>,
+    speed_up_anim: bool,
     cooldown: Timer,
 }
 #[derive(Clone, Component, Reflect)]
@@ -112,6 +137,7 @@ pub fn sprout(
                 .remove::<SproutingState>()
                 .insert(GasAttackState {
                     hitbox: None,
+                    speed_up_anim: false,
                     cooldown: Timer::from_seconds(0.6, TimerMode::Once),
                 });
             *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
@@ -129,13 +155,19 @@ pub fn gas_attack(
         if !gas_state.cooldown.finished() {
             continue;
         }
-        if anim.current_frame() < 18 || anim.current_frame() > 46 {
+
+        if !gas_state.speed_up_anim && (anim.current_frame() < 18 || anim.current_frame() > 46) {
             *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+        }
+        if gas_state.speed_up_anim && (anim.current_frame() < 66 || anim.current_frame() > 77) {
+            *anim = AsepriteAnimation::from(RedMushling::tags::NUKE);
         }
         if anim.is_paused() {
             anim.play();
         }
-        if anim.current_frame() >= 33 && anim.current_frame() < 39 {
+        if anim.current_frame() >= 33 && anim.current_frame() < 39
+            || (gas_state.speed_up_anim && anim.current_frame() >= 66)
+        {
             if let Some(hitbox) = gas_state.hitbox {
                 if let Some(mut hit_e) = commands.get_entity(hitbox) {
                     hit_e.insert(Collider::capsule(Vec2::ZERO, Vec2::ZERO, 24.));
@@ -155,6 +187,10 @@ pub fn gas_attack(
             }
         }
         if anim.just_finished() {
+            if gas_state.speed_up_anim {
+                commands.entity(entity).despawn_recursive();
+                continue;
+            }
             commands
                 .entity(entity)
                 .remove::<GasAttackState>()

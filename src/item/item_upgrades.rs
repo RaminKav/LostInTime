@@ -243,7 +243,7 @@ pub fn handle_on_hit_upgrades(
         {
             spawn_ice_explosion_hitbox(
                 &mut commands,
-                &asset_server,
+                &game.graphics,
                 hit_entity_txfm.translation(),
                 hit.damage / 4,
             );

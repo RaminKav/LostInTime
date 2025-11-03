@@ -187,7 +187,11 @@ impl Plugin for PlayerPlugin {
                     .before(handle_add_damage_numbers_after_hit),)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(give_player_starting_items.in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                give_player_starting_items
+                    .run_if(run_once())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
             .add_system(handle_move_player.before(CustomFlush))
             .add_system(
                 handle_player_raw_position
@@ -342,42 +346,42 @@ fn spawn_player(
     let mut hunger = Hunger::new(100);
 
     // Try to load inv from save
-    if let Ok(save_file) = File::open(datafiles::save_file()) {
-        let reader = BufReader::new(save_file);
+    // if let Ok(save_file) = File::open(datafiles::save_file()) {
+    //     let reader = BufReader::new(save_file);
 
-        // Read the JSON contents of the file as an instance of `User`.
-        match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
-            Ok(data) => {
-                hunger.current = data.player_hunger;
-                commands.entity(p).insert((
-                    data.inventory,
-                    data.player_level,
-                    data.player_stats,
-                    data.skill_points,
-                    data.current_health,
-                    data.player_skills.clone(),
-                    PreviousHealth(data.current_health.0),
-                    TimeFragmentCurrency::new(
-                        data.currency.0,
-                        data.currency.1,
-                        total_currency_all_time,
-                    ),
-                    hunger,
-                    Transform::from_translation(data.player_transform.extend(0.)),
-                    RawPosition(data.player_transform),
-                ));
-                for skill in data.player_skills.heirlooms.clone() {
-                    skill.heirloom.add_skill_components(
-                        p,
-                        &mut commands,
-                        data.player_skills.clone(),
-                    );
-                }
-                info!("LOADED PLAYER DATA FROM SAVE FILE");
-            }
-            Err(err) => error!("Failed to load data from file {err:?}"),
-        }
-    }
+    //     // Read the JSON contents of the file as an instance of `User`.
+    //     match serde_json::from_reader::<_, CurrentRunSaveData>(reader) {
+    //         Ok(data) => {
+    //             hunger.current = data.player_hunger;
+    //             commands.entity(p).insert((
+    //                 data.inventory,
+    //                 data.player_level,
+    //                 data.player_stats,
+    //                 data.skill_points,
+    //                 data.current_health,
+    //                 data.player_skills.clone(),
+    //                 PreviousHealth(data.current_health.0),
+    //                 TimeFragmentCurrency::new(
+    //                     data.currency.0,
+    //                     data.currency.1,
+    //                     total_currency_all_time,
+    //                 ),
+    //                 hunger,
+    //                 Transform::from_translation(data.player_transform.extend(0.)),
+    //                 RawPosition(data.player_transform),
+    //             ));
+    //             for skill in data.player_skills.heirlooms.clone() {
+    //                 skill.heirloom.add_skill_components(
+    //                     p,
+    //                     &mut commands,
+    //                     data.player_skills.clone(),
+    //                 );
+    //             }
+    //             info!("LOADED PLAYER DATA FROM SAVE FILE");
+    //         }
+    //         Err(err) => error!("Failed to load data from file {err:?}"),
+    //     }
+    // }
     game.player = p;
     exp_sync_event.send_default();
 }
@@ -389,13 +393,13 @@ fn give_player_starting_items(
     player_class: Option<Res<PlayerClass>>,
     class_ranks: Option<Res<ClassRankSystem>>,
 ) {
-    if let Ok(save_file) = File::open(datafiles::save_file()) {
-        let reader = BufReader::new(save_file);
+    // if let Ok(save_file) = File::open(datafiles::save_file()) {
+    //     let reader = BufReader::new(save_file);
 
-        if serde_json::from_reader::<_, CurrentRunSaveData>(reader).is_ok() {
-            return;
-        }
-    }
+    //     if serde_json::from_reader::<_, CurrentRunSaveData>(reader).is_ok() {
+    //         return;
+    //     }
+    // }
 
     let selected_class = player_class
         .as_ref()

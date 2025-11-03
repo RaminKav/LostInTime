@@ -28,6 +28,7 @@ use crate::item::{
     WorldObjectResource,
 };
 use crate::pets::state::Pet;
+use crate::player::mage_skills::IceExplosion;
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::status_effects::StatusEffect;
@@ -146,6 +147,7 @@ impl Plugin for GameAssetsPlugin {
                 heirloom_shrine_anim: None,
                 portal_ase: None,
                 class_pet_data: None,
+                ice_explosion_ase: None,
             })
             .add_system(
                 Self::update_graphics
@@ -215,6 +217,7 @@ pub struct Graphics {
     pub heirloom_shrine_anim: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
+    pub ice_explosion_ase: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -507,6 +510,7 @@ impl GameAssetsPlugin {
             blacksmith_merchant: Some(asset_server.load(BlacksmithMerchant::PATH)),
             active_skill_shrine: Some(asset_server.load(ActiveSkillSprite::PATH)),
             heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
+            ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
         };

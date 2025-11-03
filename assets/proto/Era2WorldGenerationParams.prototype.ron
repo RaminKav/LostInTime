@@ -22,9 +22,6 @@
       ),
       stone_wall_frequency: 0.0,
       object_generation_frequencies: {
-        Era2SmallTree: 0.025,
-        Era2MediumTree: 0.015,
-        Era2LargeTree: 0.007,
         Era2Boulder: 0.003,
         Era2Boulder2: 0.003,
         Era2CoalBoulder: 0.002,

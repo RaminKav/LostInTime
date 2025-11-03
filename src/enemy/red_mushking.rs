@@ -1,7 +1,8 @@
 use crate::{
-    ai::HurtByPlayer,
+    ai::{HurtByPlayer, IdleState},
     custom_commands::CommandsExt,
     enemy::spawn_helpers::can_spawn_mob_here,
+    inputs::FacingDirection,
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
     player::levels::ExperienceReward,
@@ -114,23 +115,23 @@ pub fn handle_new_red_mushking_state_machine(
                     dir: None,
                     speed: leap_attack.speed,
                 },
-            )
-            .trans::<FollowState>(
-                Trigger::not(ShrineLOS {
-                    range: TILE_SIZE.x * 16.,
-                    shrine_pos,
-                }),
-                ReturnToShrineState,
-            )
-            .trans::<ReturnToShrineState>(
-                HurtByPlayer,
-                FollowState {
-                    target: game.game.player,
-                    curr_delta: None,
-                    curr_path: None,
-                    speed: follow_speed.0,
-                },
             );
+        // .trans::<FollowState>(
+        //     Trigger::not(ShrineLOS {
+        //         range: TILE_SIZE.x * 16.,
+        //         shrine_pos,
+        //     }),
+        //     ReturnToShrineState,
+        // )
+        // .trans::<ReturnToShrineState>(
+        //     HurtByPlayer,
+        //     FollowState {
+        //         target: game.game.player,
+        //         curr_delta: None,
+        //         curr_path: None,
+        //         speed: follow_speed.0,
+        //     },
+        // );
 
         e_cmds.insert(state_machine);
     }

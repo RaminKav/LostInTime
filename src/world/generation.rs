@@ -96,7 +96,11 @@ impl Plugin for GenerationPlugin {
                     .in_base_set(CoreSet::PostUpdate)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
-            .add_system(Self::spawn_debug_chunk_borders.in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                Self::spawn_debug_chunk_borders
+                    .run_if(run_once())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

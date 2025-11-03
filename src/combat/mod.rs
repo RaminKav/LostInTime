@@ -12,7 +12,7 @@ pub mod combat_helpers;
 use crate::{
     ai::{FollowState, LeapAttackState},
     animations::{AttackEvent, HitAnimationTracker},
-    assets::SpriteAnchor,
+    assets::{Graphics, SpriteAnchor},
     attributes::{
         modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, CurrentShield,
         InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth, ShieldRegen,
@@ -440,7 +440,7 @@ pub fn cleanup_marked_for_death_entities(
     >,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
     player: Query<(&PlayerSkills, &Attack, &ManaRegen)>,
-    asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     neaby_mobs: Query<(Entity, &GlobalTransform), (With<Mob>, Without<MarkedForDeath>)>,
     mut status_event: EventWriter<StatusEffectEvent>,
@@ -461,7 +461,7 @@ pub fn cleanup_marked_for_death_entities(
                 if skills.has(Heirloom::FrozenAoE) {
                     spawn_ice_explosion_hitbox(
                         &mut commands,
-                        &asset_server,
+                        &graphics,
                         mob_pos.translation(),
                         attack.0 / 4,
                     );

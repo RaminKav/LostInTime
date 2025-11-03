@@ -2,8 +2,8 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::{
-    colors::DARK_WOOD_BROWN, player::Player, world::chunk::DoneCreateChunkEvent, GameState,
-    RenderLayers, ScreenResolution, GAME_HEIGHT,
+    colors::DARK_WOOD_BROWN, enemy::spawner::GlobalSpawners, player::Player,
+    world::chunk::DoneCreateChunkEvent, GameState, RenderLayers, ScreenResolution, GAME_HEIGHT,
 };
 
 #[derive(Component)]
@@ -71,6 +71,7 @@ pub fn check_initialization_complete(
     chunk_query: Query<&crate::world::chunk::Chunk>,
     mut init_timer: Local<Option<InitializationTimer>>,
     time: Res<Time>,
+    mut spawners: Query<&mut GlobalSpawners>,
 ) {
     // Initialize timer on first run
     if init_timer.is_none() {
@@ -140,5 +141,9 @@ pub fn check_initialization_complete(
 
         // Transition to Main state
         next_state.set(GameState::Main);
+        *init_timer = None;
+        for mut spawner in spawners.iter_mut() {
+            spawner.initial_spawn_delay.reset();
+        }
     }
 }
