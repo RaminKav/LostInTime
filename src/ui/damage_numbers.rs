@@ -7,7 +7,7 @@ use crate::{
     colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
     inventory::ItemStack,
     item::WorldObject,
-    world::TILE_SIZE,
+    world::{world_helpers, TILE_SIZE},
     Game, TextureCamera, WasHitWithCrit,
 };
 
@@ -25,10 +25,26 @@ pub struct PreviousHealth(pub i32);
 pub struct DodgeEvent {
     pub entity: Entity,
 }
-#[derive(Component)]
-pub struct ScreenLockedIcon {
-    parent: Entity,
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BeaconTarget {
+    Portal,
+    DungeonEntrance,
+    BossShrine,
 }
+
+#[derive(Component)]
+pub struct BeaconGuidance(pub BeaconTarget);
+
+#[derive(Resource, Default)]
+pub struct BeaconGuidanceRegistry {
+    pub portal: Option<Entity>,
+    pub dungeon: Option<Entity>,
+    pub boss: Option<Entity>,
+}
+
+#[derive(Component)]
+pub struct ScreenLockedTargetWorldPos(pub Vec2);
 
 #[derive(Resource)]
 pub struct NewRecipeTextTimer {
@@ -161,13 +177,13 @@ pub fn tick_damage_numbers(
     }
 }
 
-pub fn spawn_screen_locked_icon(
-    parent: Entity,
+pub fn spawn_screen_locked_icon_to_world_pos(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
     obj: WorldObject,
-) {
+    world_pos: Vec2,
+) -> Entity {
     let item_icon = spawn_item_stack_icon(
         commands,
         graphics,
@@ -175,69 +191,70 @@ pub fn spawn_screen_locked_icon(
         asset_server,
         Vec2::ZERO,
         Vec2::new(0., 0.),
-        0,
+        3,
     );
     commands
         .entity(item_icon)
         .insert(Name::new("SCREEN ICON ITEM"));
 
-    let mut slot_entity = commands.spawn(SpriteBundle {
+    let mut binding = commands.spawn(SpriteBundle {
         texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
-        transform: Transform::default(),
+        transform: Transform::default(), // Position will be set in handle_clamp_screen_locked_icons_worldpos
         sprite: Sprite {
             custom_size: Some(Vec2::new(20., 20.)),
             ..Default::default()
         },
         ..Default::default()
     });
-    slot_entity
-        .insert(ScreenLockedIcon { parent })
-        .insert(Name::new("SCREEN ICON"));
-
-    slot_entity.push_children(&[item_icon]);
+    let slot_entity = binding
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ScreenLockedTargetWorldPos(world_pos))
+        .insert(Name::new("SCREEN ICON (WORLD POS)"))
+        .push_children(&[item_icon]);
+    slot_entity.id()
 }
 
-pub fn handle_clamp_screen_locked_icons(
-    mut commands: Commands,
-    mut query: Query<(Entity, &ScreenLockedIcon, &mut Transform, &mut Visibility)>,
-    txfms: Query<&GlobalTransform>,
+pub fn handle_clamp_screen_locked_icons_worldpos(
+    mut query: Query<(&ScreenLockedTargetWorldPos, &mut Transform, &mut Visibility)>,
     game_camera: Query<&GlobalTransform, With<TextureCamera>>,
 ) {
     let MAX_DIST: Vec2 = Vec2::new(11.5, 7.) * TILE_SIZE.x - Vec2::new(0., 0.);
     let offset = Vec2::new(6., 5.);
 
-    for (e, screen_locked_icon, mut icon_txfm, mut v) in query.iter_mut() {
-        if let Ok(parent_txfm) = txfms.get(screen_locked_icon.parent) {
-            icon_txfm.translation = parent_txfm.translation() + Vec3::new(0., 20., 1.);
-            let camera_txfm = game_camera.single();
+    let camera_txfm = match game_camera.get_single() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
 
-            let cx = camera_txfm.translation().x;
-            let cy = camera_txfm.translation().y;
+    let camera_pos = camera_txfm.translation().truncate();
 
-            if icon_txfm.translation.x > cx + MAX_DIST.x - offset.x {
-                icon_txfm.translation.x = cx + MAX_DIST.x - offset.x;
-            } else if icon_txfm.translation.x < cx - MAX_DIST.x + offset.x {
-                icon_txfm.translation.x = cx - MAX_DIST.x + offset.x;
-            }
-            if icon_txfm.translation.y > cy + MAX_DIST.y - offset.y {
-                icon_txfm.translation.y = cy + MAX_DIST.y - offset.y;
-            } else if icon_txfm.translation.y < cy - MAX_DIST.y + offset.y {
-                icon_txfm.translation.y = cy - MAX_DIST.y + offset.y;
-            }
+    for (target, mut icon_txfm, mut v) in query.iter_mut() {
+        // Vector from camera (UI origin) to target in UI space
+        let ui_vec = world_helpers::world_pos_to_ui_screen_pos(target.0, camera_pos);
 
-            // TOGGLE VISIBILITY WHEN PARENT IN VIEW
-            if icon_txfm.translation.x < cx + MAX_DIST.x - offset.x
-                && icon_txfm.translation.x > cx - MAX_DIST.x + offset.x
-                && icon_txfm.translation.y < cy + MAX_DIST.y - offset.y
-                && icon_txfm.translation.y > cy - MAX_DIST.y + offset.y
-            {
-                *v = Visibility::Hidden;
-            } else {
-                *v = Visibility::Visible;
-            }
-        } else if commands.get_entity(screen_locked_icon.parent).is_none() {
-            commands.entity(e).despawn_recursive();
+        // Half extents with padding
+        let rx = MAX_DIST.x - offset.x;
+        let ry = MAX_DIST.y - offset.y;
+
+        // If the target is within the visible region, hide the icon
+        if ui_vec.x.abs() <= rx && ui_vec.y.abs() <= ry {
+            *v = Visibility::Hidden;
+            continue;
         }
+
+        if ui_vec.x == 0. && ui_vec.y == 0. {
+            *v = Visibility::Hidden;
+            continue;
+        }
+
+        // Project to the edge of the rect: scale vector so it hits the border
+        let tx = rx / ui_vec.x.abs();
+        let ty = ry / ui_vec.y.abs();
+        let t = tx.min(ty);
+        let edge = ui_vec * t;
+
+        icon_txfm.translation = edge.extend(20.);
+        *v = Visibility::Visible;
     }
 }
 

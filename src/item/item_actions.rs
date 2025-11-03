@@ -52,6 +52,9 @@ pub enum ItemAction {
     DungeonKey,
     GrantSkillPoint(u8),
     ItemChest,
+    BeaconPortal,
+    BeaconDungeonEntrance,
+    BeaconBossShrine,
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -155,6 +158,7 @@ pub struct ItemActionParam<'w, 's> {
     pub skill_points_query: Query<'w, 's, &'static mut SkillPoints>,
     pub game_camera: Query<'w, 's, Entity, With<TextureCamera>>,
     pub asset_server: Res<'w, AssetServer>,
+    pub beacon_guidance: ResMut<'w, crate::ui::damage_numbers::BeaconGuidanceRegistry>,
     pub boss_kill_tracker: Option<Res<'w, BossKillTracker>>,
 
     #[system_param(ignore)]
@@ -269,6 +273,67 @@ impl ItemActions {
                         state: ItemChestAnimState::Closed,
                         current_ui_rarity: ItemRarity::Common,
                     });
+                }
+                ItemAction::BeaconPortal => {
+                    if let Some(e) = item_action_param.beacon_guidance.portal.take() {
+                        commands.entity(e).despawn_recursive();
+                    } else {
+                        let icon_e =
+                            crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
+                                commands,
+                                &game.graphics,
+                                &item_action_param.asset_server,
+                                obj,
+                                Vec2::ZERO,
+                            );
+                        item_action_param.beacon_guidance.portal = Some(icon_e);
+                    }
+                }
+                ItemAction::BeaconDungeonEntrance => {
+                    if let Some(e) = item_action_param.beacon_guidance.dungeon.take() {
+                        commands.entity(e).despawn_recursive();
+                    } else {
+                        let pos = game
+                            .world_obj_cache
+                            .unique_objs
+                            .get(&WorldObject::DungeonEntrance)
+                            .map(|tp| {
+                                crate::world::world_helpers::tile_pos_to_world_pos(*tp, false)
+                            })
+                            .unwrap_or(Vec2::ZERO);
+                        let icon_e =
+                            crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
+                                commands,
+                                &game.graphics,
+                                &item_action_param.asset_server,
+                                obj,
+                                pos,
+                            );
+                        item_action_param.beacon_guidance.dungeon = Some(icon_e);
+                    }
+                }
+                ItemAction::BeaconBossShrine => {
+                    if let Some(e) = item_action_param.beacon_guidance.boss.take() {
+                        commands.entity(e).despawn_recursive();
+                    } else {
+                        let pos = game
+                            .world_obj_cache
+                            .unique_objs
+                            .get(&WorldObject::BossShrine)
+                            .map(|tp| {
+                                crate::world::world_helpers::tile_pos_to_world_pos(*tp, false)
+                            })
+                            .unwrap_or(Vec2::ZERO);
+                        let icon_e =
+                            crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
+                                commands,
+                                &game.graphics,
+                                &item_action_param.asset_server,
+                                obj,
+                                pos,
+                            );
+                        item_action_param.beacon_guidance.boss = Some(icon_e);
+                    }
                 }
                 _ => {}
             }

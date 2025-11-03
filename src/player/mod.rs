@@ -49,7 +49,7 @@ use crate::{
         CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
         MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
-    client::{is_not_paused, CurrentRunSaveData, GameData},
+    client::{is_not_paused, GameData},
     container::Container,
     custom_commands::CommandsExt,
     datafiles, handle_hits,
@@ -58,10 +58,7 @@ use crate::{
     item::{ActiveMainHandState, WorldObject},
     juice::RunDustTimer,
     proto::proto_param::ProtoParam,
-    ui::{
-        damage_numbers::{handle_add_damage_numbers_after_hit, PreviousHealth},
-        FlashExpBarEvent,
-    },
+    ui::{damage_numbers::handle_add_damage_numbers_after_hit, FlashExpBarEvent},
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort, TileMapPosition},
     AppExt, CustomFlush, Game, GameParam, GameState, RawPosition,
 };
@@ -343,7 +340,7 @@ fn spawn_player(
         .insert(SkillPoints { count: 0 })
         .id();
 
-    let mut hunger = Hunger::new(100);
+    // let mut hunger = Hunger::new(100);
 
     // Try to load inv from save
     // if let Ok(save_file) = File::open(datafiles::save_file()) {

@@ -12,7 +12,7 @@ use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
-use damage_numbers::{handle_clamp_screen_locked_icons, NewRecipeTextTimer};
+use damage_numbers::{NewRecipeTextTimer};
 use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
     handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
@@ -49,6 +49,9 @@ pub use main_menu::*;
 mod essence_ui;
 pub use essence_ui::*;
 use loading_screen::*;
+use crate::ui::damage_numbers::{
+    handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
+};
 
 use crate::{
     attributes::clamp_health, client::{is_not_paused, load_state, ClientState}, handle_hits, item::{
@@ -97,6 +100,7 @@ impl Plugin for UIPlugin {
             .add_event::<DodgeEvent>()
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
+            .init_resource::<BeaconGuidanceRegistry>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<SubmitEssenceChoice>()
@@ -288,7 +292,7 @@ impl Plugin for UIPlugin {
                     tick_skill_cooldown_overlays.run_if(is_not_paused),
                     handle_active_skill_event.run_if(is_not_paused),
                     tick_game_start_overlay,
-                    handle_clamp_screen_locked_icons,
+                    handle_clamp_screen_locked_icons_worldpos,
                     spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,

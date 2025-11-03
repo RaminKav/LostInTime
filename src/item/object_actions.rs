@@ -18,11 +18,15 @@ use crate::player::skills::{ActiveSkill, ActiveSkillChoiceState, HeirloomRarity}
 use crate::player::ModifyTimeFragmentsEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
-use crate::ui::damage_numbers::{spawn_floating_text_with_shadow, spawn_screen_locked_icon};
+use crate::ui::damage_numbers::{
+    spawn_floating_text_with_shadow, spawn_screen_locked_icon_to_world_pos, BeaconGuidance,
+    BeaconTarget,
+};
 use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use crate::world::world_helpers;
 use crate::world::world_helpers::tile_pos_to_world_pos;
 use rand::seq::IteratorRandom;
 
@@ -240,13 +244,79 @@ impl ObjectAction {
                 game.game.home_pos = Some(pos);
             }
             ObjectAction::ToggleBeacon(obj) => {
-                spawn_screen_locked_icon(
-                    e,
+                // Map beacon color to target
+                let (target, world_pos) = match obj {
+                    WorldObject::YellowBeacon | WorldObject::YellowBeaconBlock => {
+                        (BeaconTarget::Portal, Vec2::ZERO)
+                    }
+                    WorldObject::RedBeacon | WorldObject::RedBeaconBlock => {
+                        if let Some(tp) = game
+                            .world_obj_cache
+                            .unique_objs
+                            .get(&WorldObject::DungeonEntrance)
+                        {
+                            (
+                                BeaconTarget::DungeonEntrance,
+                                world_helpers::tile_pos_to_world_pos(*tp, false),
+                            )
+                        } else {
+                            (BeaconTarget::DungeonEntrance, Vec2::ZERO)
+                        }
+                    }
+                    WorldObject::PinkBeacon | WorldObject::PinkBeaconBlock => {
+                        if let Some(tp) = game
+                            .world_obj_cache
+                            .unique_objs
+                            .get(&WorldObject::BossShrine)
+                        {
+                            (
+                                BeaconTarget::BossShrine,
+                                world_helpers::tile_pos_to_world_pos(*tp, false),
+                            )
+                        } else {
+                            (BeaconTarget::BossShrine, Vec2::ZERO)
+                        }
+                    }
+                    _ => (BeaconTarget::Portal, Vec2::ZERO),
+                };
+
+                // Ensure only one exists per target
+                match target {
+                    BeaconTarget::Portal => {
+                        if let Some(e) = item_action_param.beacon_guidance.portal.take() {
+                            commands.entity(e).despawn_recursive();
+                        }
+                    }
+                    BeaconTarget::DungeonEntrance => {
+                        if let Some(e) = item_action_param.beacon_guidance.dungeon.take() {
+                            commands.entity(e).despawn_recursive();
+                        }
+                    }
+                    BeaconTarget::BossShrine => {
+                        if let Some(e) = item_action_param.beacon_guidance.boss.take() {
+                            commands.entity(e).despawn_recursive();
+                        }
+                    }
+                }
+
+                let icon_e = spawn_screen_locked_icon_to_world_pos(
                     commands,
                     &game.graphics,
                     &item_action_param.asset_server,
                     obj.clone(),
+                    world_pos,
                 );
+                commands.entity(icon_e).insert(BeaconGuidance(target));
+
+                match target {
+                    BeaconTarget::Portal => item_action_param.beacon_guidance.portal = Some(icon_e),
+                    BeaconTarget::DungeonEntrance => {
+                        item_action_param.beacon_guidance.dungeon = Some(icon_e)
+                    }
+                    BeaconTarget::BossShrine => {
+                        item_action_param.beacon_guidance.boss = Some(icon_e)
+                    }
+                }
             }
             ObjectAction::CombatShrine => {
                 // Screen Shake

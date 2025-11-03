@@ -28,7 +28,7 @@ use crate::{
     },
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
-    world::{dungeon::Dungeon, TileMapPosition},
+    world::{dimension::EraManager, dungeon::Dungeon, TileMapPosition},
     AppExt, GameParam, GameState,
 };
 
@@ -423,14 +423,15 @@ fn juice_up_spawned_mobs_per_day(
     player_level: Query<&PlayerLevel>,
     player_skills: Query<&PlayerSkills>,
     mut commands: Commands,
+    era_manager: Res<EraManager>,
 ) {
     // Get chaos from tracker (defaults to 0.0 if not present)
     let chaos_from_totem = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
 
     // Get chaos boost from heirlooms
     let chaos_from_heirlooms = player_skills.single().get_count(Heirloom::ChaosBoost) as f32 * 1.5; // Each ChaosBoost heirloom adds 0.5 to chaos
-
-    let total_chaos = chaos_from_totem + chaos_from_heirlooms;
+    let chaos_from_era = era_manager.current_era.get_chaos_modifier();
+    let total_chaos = chaos_from_totem + chaos_from_heirlooms + chaos_from_era;
     for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
         if mob.is_boss() {
             continue;

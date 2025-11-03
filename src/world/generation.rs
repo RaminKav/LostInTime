@@ -49,11 +49,6 @@ const UNIQUE_OBJECTS_DATA: [(WorldObject, Vec2, i32); 3] = [
     (WorldObject::ActiveSkillShrine, Vec2::new(2., 2.), 7),
     // (WorldObject::TimeGate, Vec2::new(2., 2.), 3),
 ];
-const STARTING_ZONE_OBJS: [(WorldObject, i32); 3] = [
-    (WorldObject::BrownMushroom, 1),
-    (WorldObject::DeadSapling, 1),
-    (WorldObject::Pebble, 1),
-];
 
 #[derive(Resource, Debug, Default, Clone)]
 pub struct WorldObjectCache {
@@ -604,36 +599,6 @@ impl GenerationPlugin {
                                 || obj == &WorldObject::Grass3
                             {
                                 objs.remove(&pos);
-                            }
-                        }
-                    }
-
-                    // generate starting area objs to ensure player has enough pebbles/sticks
-                    if chunk_pos == IVec2::ZERO
-                        || chunk_pos == IVec2::new(-1, 0)
-                        || chunk_pos == IVec2::new(0, -1)
-                        || chunk_pos == IVec2::new(-1, -1)
-                    {
-                        for (obj_to_spawn, num) in STARTING_ZONE_OBJS.iter() {
-                            let x_range = if chunk_pos.x == 0 {
-                                2..5
-                            } else {
-                                11..CHUNK_SIZE
-                            };
-                            let y_range = if chunk_pos.y == 0 {
-                                2..5
-                            } else {
-                                11..CHUNK_SIZE
-                            };
-                            for _ in 0..*num {
-                                let p = TileMapPosition::new(
-                                    chunk_pos,
-                                    TilePos::new(
-                                        rand::thread_rng().gen_range(x_range.clone()),
-                                        rand::thread_rng().gen_range(y_range.clone()),
-                                    ),
-                                );
-                                objs.insert(p, *obj_to_spawn);
                             }
                         }
                     }

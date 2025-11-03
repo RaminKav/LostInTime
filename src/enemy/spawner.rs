@@ -7,11 +7,9 @@ use crate::{
     client::is_not_paused,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
-    item::WorldObject,
     night::{NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
-    ui::damage_numbers::spawn_screen_locked_icon,
     world::{
         chunk::Chunk,
         dimension::ActiveDimension,
@@ -199,7 +197,6 @@ fn handle_spawn_mobs(
     proto_param: ProtoParam,
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut GlobalSpawners>,
-    asset_server: Res<AssetServer>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
 ) {
     if maybe_dungeon.get_single().is_ok() {
@@ -246,16 +243,6 @@ fn handle_spawn_mobs(
                 proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
             {
                 debug!("SPAWNED A MOB!!! {spawned_mob:?}");
-                if mob.clone() == Mob::Fairy {
-                    debug!("SPAWNED A FAIRY!!! {spawned_mob:?}");
-                    spawn_screen_locked_icon(
-                        spawned_mob,
-                        &mut commands,
-                        &game.graphics,
-                        &asset_server,
-                        WorldObject::TimeFragment,
-                    );
-                }
                 if rng.gen::<f32>() < ELITE_SPAWN_RATE
                     && !(proto_param
                         .get_component::<CombatAlignment, _>(mob)

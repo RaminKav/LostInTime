@@ -105,6 +105,13 @@ impl Era {
             _ => panic!("Invalid era for dungeon era"),
         }
     }
+    pub fn get_chaos_modifier(&self) -> f32 {
+        match self {
+            Era::Main => 0.,
+            Era::Second => 3.0,
+            Era::DungeonMain => 1.0,
+        }
+    }
 }
 
 #[derive(Resource, Default, Debug, Clone)]

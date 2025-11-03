@@ -22,7 +22,6 @@ use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::status_effects::{
     handle_burning_ticks, handle_frail_stack_ticks, handle_slow_stack_ticks,
 };
-use crate::ui::damage_numbers::spawn_screen_locked_icon;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
 use crate::world::dungeon::Dungeon;
@@ -934,7 +933,6 @@ pub fn handle_placing_world_object(
     mut proto_param: ProtoParam,
     mut game: GameParam,
     mut commands: Commands,
-    asset_server: Res<AssetServer>,
     mut events: EventReader<PlaceItemEvent>,
     water_colliders: Query<
         (Entity, &Collider, &GlobalTransform),
@@ -1010,15 +1008,6 @@ pub fn handle_placing_world_object(
                             commands
                                 .entity(item_e)
                                 .insert(get_random_loot_chest_type(rand::thread_rng()));
-                        }
-                        if place_event.obj.is_beacon() {
-                            spawn_screen_locked_icon(
-                                item_e,
-                                &mut commands,
-                                &game.graphics,
-                                &asset_server,
-                                place_event.obj.clone(),
-                            );
                         }
 
                         if place_event.obj.is_medium_size(&proto_param) {
