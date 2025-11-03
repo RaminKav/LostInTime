@@ -26,7 +26,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: BasicStaff,
         attributes: (
-            attack_cooldown: 0.35
+            attack_cooldown: 0.45
         ),
         metadata: (
             name: "Lightning Staff", 

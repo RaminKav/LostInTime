@@ -88,18 +88,24 @@ impl PetState {
 
         match new_weapon {
             Some(item) => {
-                self.attack_cooldown =
-                    Timer::from_seconds(item.attributes.attack_cooldown, TimerMode::Repeating);
+                let obj = item.obj_type;
+                let pet_att_speed_nerf = if obj.is_melee_weapon() {
+                    1.25
+                } else if obj.is_magic_weapon() {
+                    2.
+                } else {
+                    1.55
+                };
+                self.attack_cooldown = Timer::from_seconds(
+                    item.attributes.attack_cooldown * pet_att_speed_nerf,
+                    TimerMode::Repeating,
+                );
                 self.projectile = proto
-                    .get_component::<RangedAttack, _>(item.obj_type)
+                    .get_component::<RangedAttack, _>(obj)
                     .expect("Weapon with no RangedAttack Projectile!")
                     .0
                     .clone();
-                self.min_target_distance = item
-                    .obj_type
-                    .is_ranged_weapon()
-                    .then(|| 100.0)
-                    .unwrap_or(25.0);
+                self.min_target_distance = obj.is_ranged_weapon().then(|| 100.0).unwrap_or(25.0);
             }
             None => {
                 self.attack_cooldown = Timer::from_seconds(10., TimerMode::Repeating);
