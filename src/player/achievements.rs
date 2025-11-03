@@ -12,6 +12,8 @@ use crate::{
 pub enum Achievement {
     FirstRunComplete,
     Kill100FurDevils,
+    SlimePet,
+    FairyPet,
     // Add more achievements here as needed
 }
 
@@ -96,6 +98,16 @@ impl Achievement {
             Achievement::FirstRunComplete => Some(crate::player::skills::SkillClass::Knight),
             Achievement::Kill100FurDevils => Some(crate::player::skills::SkillClass::Thief),
             // Add more mappings as needed
+            _ => None,
+        }
+    }
+
+    /// Maps achievements to the pets they unlock
+    pub fn unlocks_pet(&self) -> Option<crate::pets::state::Pet> {
+        match self {
+            Achievement::SlimePet => Some(crate::pets::state::Pet::Slime),
+            Achievement::FairyPet => Some(crate::pets::state::Pet::Fairy),
+            _ => None,
         }
     }
 }
@@ -123,6 +135,20 @@ pub fn is_class_unlocked(
     for achievement in &achievements.unlocked {
         if let Some(unlocked_class) = achievement.unlocks_class() {
             if unlocked_class == *class {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Check if a pet is unlocked based on achievements
+pub fn is_pet_unlocked(pet: &crate::pets::state::Pet, achievements: &Achievements) -> bool {
+    // Check if any achievement unlocks this pet
+    for achievement in &achievements.unlocked {
+        if let Some(unlocked_pet) = achievement.unlocks_pet() {
+            if unlocked_pet == *pet {
                 return true;
             }
         }

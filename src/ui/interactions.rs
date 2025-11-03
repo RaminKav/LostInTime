@@ -123,6 +123,7 @@ pub enum UIElement {
     HPRegenIcon,
     MPRegenIcon,
     SpeedIcon,
+    UnknownUnlockIcon,
 }
 
 #[derive(Component, Debug, Clone)]

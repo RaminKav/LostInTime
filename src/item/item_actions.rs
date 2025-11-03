@@ -160,6 +160,9 @@ pub struct ItemActionParam<'w, 's> {
     pub asset_server: Res<'w, AssetServer>,
     pub beacon_guidance: ResMut<'w, crate::ui::damage_numbers::BeaconGuidanceRegistry>,
     pub boss_kill_tracker: Option<Res<'w, BossKillTracker>>,
+    pub achievements: Option<ResMut<'w, crate::player::achievements::Achievements>>,
+    pub player_class: Option<ResMut<'w, crate::player::skills::PlayerClass>>,
+    pub achievement_events: EventWriter<'w, crate::player::achievements::AchievementUnlockedEvent>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

@@ -924,7 +924,6 @@ pub struct StartOfRunActionsHappened(pub bool);
 
 pub fn run_once_per_run() -> impl Fn(Res<StartOfRunActionsHappened>) -> bool {
     move |res: Res<StartOfRunActionsHappened>| {
-        info!("run once per run check: {}", res.0);
         if res.0 {
             false
         } else {

@@ -1,5 +1,5 @@
 use super::chunk::{ChunkPlugin, GenerateObjectsEvent, TileSpriteData};
-use super::dimension::{ActiveDimension, GenerationSeed};
+use super::dimension::{ActiveDimension, Era, GenerationSeed};
 use super::dungeon::Dungeon;
 use super::noise_helpers::{_poisson_disk_sampling, get_object_points_for_chunk};
 use super::portal::{Portal, TimePortal};
@@ -11,12 +11,12 @@ use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{Graphics, SpriteAnchor};
 use crate::enemy::spawn_helpers::is_tile_water;
 use crate::item::{handle_break_object, object_actions::ObjectAction, PlaceItemEvent, WorldObject};
+use crate::pets::state::{Pet, PetSpawner};
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::chunk::DoneCreateChunkEvent;
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_aseprite::AsepriteBundle;
+use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use itertools::Itertools;
 
 use crate::world::world_helpers::{get_neighbour_tile, world_pos_to_tile_pos};
@@ -101,6 +101,41 @@ impl Plugin for GenerationPlugin {
 }
 
 impl GenerationPlugin {
+    fn spawn_pet_spawner(
+        commands: &mut Commands,
+        asset_server: &AssetServer,
+        pet_type: Pet,
+        world_pos: Vec2,
+    ) {
+        let aseprite_path = pet_type.get_aseprite_path();
+        let idle_anim = pet_type.get_idle_anim();
+
+        // Animation is not paused, so it will loop continuously
+        let animation = AsepriteAnimation::from(idle_anim);
+        // Don't pause - let it loop
+
+        commands.spawn((
+            PetSpawner {
+                pet_type: pet_type.clone(),
+            },
+            AsepriteBundle {
+                aseprite: asset_server.load(aseprite_path),
+                animation,
+                transform: Transform::from_translation(world_pos.extend(1.0)),
+                ..Default::default()
+            },
+            YSort(0.001),
+            Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+            InteractionGuideTrigger {
+                key: Some("F".to_string()),
+                text: Some("Interact".to_string()),
+                activation_distance: 32.,
+                icon_stack: None,
+            },
+            Name::new(format!("{:?} Pet Spawner", pet_type)),
+        ));
+    }
+
     fn _get_perlin_block_at_tile(
         world_generation_params: &WorldGeneration,
         pos: TileMapPosition,
@@ -255,11 +290,59 @@ impl GenerationPlugin {
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<ColorMaterial>>,
         graphics: Res<Graphics>,
+        achievements: Option<Res<crate::player::achievements::Achievements>>,
+        asset_server: Res<AssetServer>,
     ) {
         if done_chunks_event.len() == 0 {
             return;
         }
         let max_obj_spawn_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) - 3.) as i32;
+
+        // Spawn pet spawners if conditions are met
+        // Spawn Slime Pet in Era1
+        if game.era.current_era == Era::Main {
+            let achievement_ok = achievements
+                .as_ref()
+                .map(|a| !a.has(crate::player::achievements::Achievement::SlimePet))
+                .unwrap_or(true);
+            if achievement_ok {
+                let mut rng = rand::thread_rng();
+                let pos = TileMapPosition::new(
+                    IVec2::new(
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                    ),
+                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                );
+
+                let world_pos = tile_pos_to_world_pos(pos, false);
+                info!("spawning pet slime at {world_pos:?}");
+                Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Slime, world_pos);
+            }
+        }
+
+        // Spawn Fairy Pet in Era2
+        if game.era.current_era == Era::Second {
+            let achievement_ok = achievements
+                .as_ref()
+                .map(|a| !a.has(crate::player::achievements::Achievement::FairyPet))
+                .unwrap_or(true);
+            if achievement_ok {
+                let mut rng = rand::thread_rng();
+                let pos = TileMapPosition::new(
+                    IVec2::new(
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                        rng.gen_range(-max_obj_spawn_radius..max_obj_spawn_radius),
+                    ),
+                    TilePos::new(rng.gen_range(0..15), rng.gen_range(0..15)),
+                );
+                let world_pos = tile_pos_to_world_pos(pos, false);
+                info!("spawning pet fairy at {world_pos:?}");
+
+                Self::spawn_pet_spawner(&mut commands, &asset_server, Pet::Fairy, world_pos);
+            }
+        }
+
         for (obj_to_spawn, size, _) in UNIQUE_OBJECTS_DATA {
             if !game.world_obj_cache.unique_objs.contains_key(&obj_to_spawn) {
                 let mut rng = rand::thread_rng();

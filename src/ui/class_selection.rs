@@ -16,7 +16,7 @@ use crate::{
     item::{CraftingTracker, ItemDisplayMetaData},
     night::NightTracker,
     player::{
-        achievements::{is_class_unlocked, Achievements},
+        achievements::{is_class_unlocked, is_pet_unlocked, Achievements},
         class_rank::ClassRankSystem,
         get_default_unlocked_classes,
         score::HighScores,
@@ -228,10 +228,9 @@ pub fn setup_class_selection_ui(
                 .get_ui_element_texture(class_data.class_icon.clone())
                 .clone()
         } else {
-            // Use a default locked icon - using GreyPlayerSelectIcon as placeholder
-            // You may want to add a LockedClassIcon to UIElement enum later
+            // Use UnknownUnlockIcon for locked classes
             graphics
-                .get_ui_element_texture(UIElement::GreyPlayerSelectIcon)
+                .get_ui_element_texture(UIElement::UnknownUnlockIcon)
                 .clone()
         };
 
@@ -240,7 +239,7 @@ pub fn setup_class_selection_ui(
                 texture: icon_texture,
                 sprite: Sprite {
                     custom_size: Some(Vec2::new(22., 22.)),
-                    color: if class_unlocked { Color::WHITE } else { GREY },
+                    // color: if class_unlocked { Color::WHITE } else { GREY },
                     ..Default::default()
                 },
                 transform: Transform {
@@ -265,24 +264,30 @@ pub fn setup_class_selection_ui(
     }
 
     for (i, pet) in Pet::iter().enumerate() {
+        // Check if pet is unlocked
+        let pet_unlocked = achievements_ref
+            .map(|a| is_pet_unlocked(&pet, a))
+            .unwrap_or(false);
+
         // Pet option background
         let x_offset = (i as f32 - 1.0) * 27.0 - 139.; // Center the options
-        let icon_slot = commands
-            .spawn(SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(UIElement::PlayerSelectSlot)
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(22., 22.)),
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(x_offset, -49., 11.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
+        let mut slot_entity_commands = commands.spawn(SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::PlayerSelectSlot)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(22., 22.)),
                 ..Default::default()
-            })
+            },
+            transform: Transform {
+                translation: Vec3::new(x_offset, -49., 11.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        slot_entity_commands
             .insert(UIState::ClassSelection)
             .insert(ClassSelectionUI)
             .insert(PetOption)
@@ -291,37 +296,55 @@ pub fn setup_class_selection_ui(
                 is_selected: false,
                 pet: pet.clone(),
             })
-            .insert(super::Interactable::default())
             .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("CLASS OPTION"))
-            .id();
+            .insert(Name::new("PET OPTION"));
 
-        // Pet icon background
+        // Only add Interactable component for unlocked pets
+        if pet_unlocked {
+            slot_entity_commands.insert(super::Interactable::default());
+        }
+
+        let icon_slot = slot_entity_commands.id();
+
+        // Pet icon - show actual icon if unlocked, or UnknownUnlockIcon if locked
         let pet_data = graphics.get_pet_data(pet.clone());
-        let _player_icon = commands
-            .spawn(SpriteBundle {
-                texture: graphics
-                    .get_ui_element_texture(pet_data.pet_icon.clone())
-                    .clone(),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(22., 22.)),
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
+        let icon_texture = if pet_unlocked {
+            graphics
+                .get_ui_element_texture(pet_data.pet_icon.clone())
+                .clone()
+        } else {
+            graphics
+                .get_ui_element_texture(UIElement::UnknownUnlockIcon)
+                .clone()
+        };
+
+        let mut icon_entity_commands = commands.spawn(SpriteBundle {
+            texture: icon_texture,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(22., 22.)),
+                color: if pet_unlocked { Color::WHITE } else { GREY },
                 ..Default::default()
-            })
+            },
+            transform: Transform {
+                translation: Vec3::new(0., 0., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+        icon_entity_commands
             .insert(UIState::ClassSelection)
             .insert(ClassSelectionUI)
             .insert(PetOption)
-            .insert(super::Interactable::default())
             .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("CLASS OPTION"))
-            .set_parent(icon_slot)
-            .id();
+            .insert(Name::new("PET OPTION ICON"));
+
+        if pet_unlocked {
+            icon_entity_commands.insert(super::Interactable::default());
+        }
+
+        icon_entity_commands.set_parent(icon_slot);
     }
 
     // Confirm button
@@ -419,6 +442,7 @@ pub fn handle_class_selection(
                             slot.is_hovered = true;
                         }
                     } else if let Some(pet_state) = pet_option.as_mut() {
+                        // Only allow hovering if pet is unlocked (has Interactable component)
                         interactable.change(Interaction::Hovering);
                         pet_state.is_hovered = true;
                     } else {
@@ -450,6 +474,7 @@ pub fn handle_class_selection(
                             _selected_class_entity = Some(e);
                         }
                         if let Some(mut pet_state) = pet_option {
+                            // Pet selection is only allowed if pet is unlocked (has Interactable component)
                             info!("Pet selected: {:?}", pet_state.pet);
                             // Update selection state
                             selection_state.selected_pet = Some(pet_state.pet.clone());

@@ -37,6 +37,12 @@ pub enum Pet {
     Slime,
     Fairy,
 }
+
+/// Marker component for pet spawners (pets that can be collected by the player)
+#[derive(Component, Debug, Clone)]
+pub struct PetSpawner {
+    pub pet_type: Pet,
+}
 impl Pet {
     pub fn get_idle_anim(&self) -> &str {
         match self {
