@@ -1146,6 +1146,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        ChaosBoost: WorldObjectData(
+            texture_pos: (13., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

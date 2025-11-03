@@ -1,10 +1,11 @@
-use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite};
-
+use crate::combat::EnemyDeathEvent;
+use crate::enemy::Mob;
 use crate::player::Player;
-
-#[derive(Component)]
-pub struct TimePortal;
+use crate::world::dimension::{Era, EraManager};
+use bevy::prelude::*;
+use bevy_aseprite::anim::AsepriteAnimation;
+use bevy_aseprite::aseprite;
+use std::collections::HashSet;
 
 aseprite!(pub Portal, "textures/portal/portal.ase");
 
@@ -25,6 +26,44 @@ pub fn handle_player_near_portal(
     for (_portal_transform, mut anim) in portal_query.iter_mut() {
         if anim.current_frame() == 35 {
             *anim = AsepriteAnimation::from(Portal::tags::IDLE);
+        }
+    }
+}
+
+/// Component marker for the time portal entity
+#[derive(Component, Default, Debug)]
+pub struct TimePortal;
+
+/// Resource to track which eras have had their bosses killed
+#[derive(Resource, Default, Debug, Clone)]
+pub struct BossKillTracker {
+    pub killed_eras: HashSet<Era>,
+}
+
+impl BossKillTracker {
+    pub fn mark_boss_killed(&mut self, era: Era) {
+        self.killed_eras.insert(era);
+    }
+
+    pub fn is_boss_killed(&self, era: &Era) -> bool {
+        self.killed_eras.contains(era)
+    }
+}
+
+/// System to track boss kills and update the tracker
+pub fn track_boss_kills(
+    mut death_events: EventReader<EnemyDeathEvent>,
+    mob_query: Query<&Mob>,
+    era_manager: Res<EraManager>,
+    mut boss_kill_tracker: ResMut<BossKillTracker>,
+) {
+    for death_event in death_events.iter() {
+        if let Ok(mob) = mob_query.get(death_event.entity) {
+            if mob.is_boss() {
+                // Mark the current era's boss as killed
+                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                info!("Boss killed in era {:?}", era_manager.current_era);
+            }
         }
     }
 }

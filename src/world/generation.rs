@@ -10,7 +10,7 @@ use super::{WorldGeneration, ISLAND_SIZE};
 use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{Graphics, SpriteAnchor};
 use crate::enemy::spawn_helpers::is_tile_water;
-use crate::item::{handle_break_object, PlaceItemEvent, WorldObject};
+use crate::item::{handle_break_object, object_actions::ObjectAction, PlaceItemEvent, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::schematic::SchematicSpawnEvent;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
@@ -338,11 +338,12 @@ impl GenerationPlugin {
                 .insert(WorldObject::TimePortal)
                 .insert(SpriteAnchor(Vec2::new(0., 10.)))
                 .insert(InteractionGuideTrigger {
-                    key: None,
+                    key: Some("F".to_string()),
                     text: Some("???".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 })
+                .insert(ObjectAction::TimePortal)
                 .insert(Collider::capsule(
                     Vec2::new(0., 10.),
                     Vec2::new(0., -18.),

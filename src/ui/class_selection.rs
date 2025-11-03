@@ -7,7 +7,7 @@ use crate::{
     ai::pathfinding::PathfindingCache,
     animations::player_sprite::PlayerSpriteHandles,
     assets::Graphics,
-    attributes::{ItemAttributes, ItemRarity},
+    attributes::ItemAttributes,
     chaos::ChaosTracker,
     colors::{BLACK, DARK_WOOD_BROWN, GREY},
     container::ContainerRegistry,
@@ -401,7 +401,7 @@ pub fn handle_class_selection(
     let mut _selected_class_entity: Option<Entity> = None;
     let mut _selected_pet_entity: Option<Entity> = None;
 
-    for (e, mut interactable, mut class_option, mut pet_option, confirm_button_option) in
+    for (e, interactable, mut class_option, mut pet_option, confirm_button_option) in
         class_options.iter_mut()
     {
         // Skip entities without Interactable component (locked classes)
@@ -418,7 +418,7 @@ pub fn handle_class_selection(
                             interactable.change(Interaction::Hovering);
                             slot.is_hovered = true;
                         }
-                    } else if let Some(mut pet_state) = pet_option.as_mut() {
+                    } else if let Some(pet_state) = pet_option.as_mut() {
                         interactable.change(Interaction::Hovering);
                         pet_state.is_hovered = true;
                     } else {
@@ -655,9 +655,9 @@ fn spawn_player_preview(
                     color: DARK_WOOD_BROWN,
                 },
             ),
-            text_anchor: Anchor::Center,
+            text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(-2., 16., 1.),
+                translation: Vec3::new(-19., 16., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -683,9 +683,9 @@ fn spawn_player_preview(
                     color: DARK_WOOD_BROWN,
                 },
             ),
-            text_anchor: Anchor::Center,
+            text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(120., 16., 1.),
+                translation: Vec3::new(103., 16., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

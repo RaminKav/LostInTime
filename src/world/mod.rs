@@ -20,6 +20,7 @@ use portal::handle_player_near_portal;
 use serde::{Deserialize, Serialize};
 use world_helpers::tile_pos_to_world_pos;
 
+use crate::GameState;
 use crate::{item::WorldObject, schematic::SchematicType};
 
 use self::{
@@ -152,7 +153,9 @@ impl Plugin for WorldPlugin {
             .init_resource::<NumSteps>()
             .init_resource::<GridSize>()
             .init_resource::<Bias>()
-            .add_system(handle_player_near_portal);
+            .init_resource::<portal::BossKillTracker>()
+            .add_system(portal::track_boss_kills.in_set(OnUpdate(GameState::Main)))
+            .add_system(handle_player_near_portal.in_set(OnUpdate(GameState::Main)));
         // .register_type::<NumSteps>()
         // .register_type::<GridSize>()
         // .register_type::<Bias>();

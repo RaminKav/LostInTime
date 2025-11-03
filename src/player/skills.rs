@@ -477,7 +477,7 @@ impl Heirloom {
             Heirloom::FullStomach => "Jam".to_string(),
 
             Heirloom::ReinforcedArmor => "Scales".to_string(),
-            Heirloom::ChaosBoost => "Chaos Totem".to_string(),
+            Heirloom::ChaosBoost => "Cursed Mask".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {

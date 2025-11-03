@@ -337,6 +337,9 @@ pub fn handle_append_run_data_after_death(
             }
         }
 
+        commands.insert_resource(game_data.clone().class_ranks);
+        commands.insert_resource(game_data.clone().high_scores);
+
         let game_data_path = datafiles::game_data();
 
         let file = File::create(game_data_path)

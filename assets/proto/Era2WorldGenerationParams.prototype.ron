@@ -5,15 +5,15 @@
   entity: false,
   schematics: {
     "survival_rogue_like::world::WorldGeneration": (
-      water_frequency: 0.25,
+      water_frequency: 0.33,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,
       forest_params: (
-              tree_spacing_radius: 20.,
-              tree_density: 0.65,
-              forest_radius: 12.,
-              max_trees_per_forest: 35,
+        tree_spacing_radius: 48.,
+        tree_density: 0.01,
+        forest_radius: 6.,
+        max_trees_per_forest: 18,
               tree_weights: {
                 Era2LargeTree: 3.0,
                 Era2MediumTree: 5.0,

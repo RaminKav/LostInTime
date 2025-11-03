@@ -21,6 +21,7 @@ use crate::{
     },
     world::{
         dimension::DimensionSpawnEvent,
+        portal::BossKillTracker,
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
         TileMapPosition,
     },
@@ -31,7 +32,6 @@ use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use super::{
-    gamble_shrine::GambleShrineEvent,
     potion_buffs::{AttackSpeedBuff, MovementSpeedBuff},
     CraftingTracker, PlaceItemEvent, Recipes, WorldObject,
 };
@@ -155,6 +155,7 @@ pub struct ItemActionParam<'w, 's> {
     pub skill_points_query: Query<'w, 's, &'static mut SkillPoints>,
     pub game_camera: Query<'w, 's, Entity, With<TextureCamera>>,
     pub asset_server: Res<'w, AssetServer>,
+    pub boss_kill_tracker: Option<Res<'w, BossKillTracker>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

@@ -61,6 +61,7 @@ pub enum ObjectAction {
     AccessoryShrine,
     ToggleBeacon(WorldObject),
     IncreaseChaos(f32),
+    TimePortal,
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]
@@ -491,6 +492,42 @@ impl ObjectAction {
                     RED,
                     format!("+{} Chaos", amount),
                 );
+            }
+            ObjectAction::TimePortal => {
+                let current_era = game.era.current_era.clone();
+
+                // Check if boss_kill_tracker exists and if boss for current era has been killed
+                if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
+                    if !boss_kill_tracker.is_boss_killed(&current_era) {
+                        // Boss not killed yet, don't allow teleportation
+                        // TODO: Maybe show some message to player?
+                        return;
+                    }
+                } else {
+                    // No boss kill tracker, can't proceed
+                    return;
+                }
+
+                // Determine next era based on current era
+                let next_era = match current_era {
+                    Era::Main => Some(Era::Second),
+                    Era::Second => {
+                        // No Era::Third exists, so this is the end
+                        // Could return None or keep at Second
+                        return;
+                    }
+                    Era::DungeonMain => {
+                        // Shouldn't be able to use portal in dungeon
+                        return;
+                    }
+                };
+
+                if let Some(era) = next_era {
+                    item_action_param.dim_event.send(DimensionSpawnEvent {
+                        swap_to_dim_now: true,
+                        new_era: Some(era),
+                    });
+                }
             }
             _ => {}
         }
