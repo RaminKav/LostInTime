@@ -13,7 +13,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::InventoryState,
     world::y_sort::YSort,
-    FairyPetSprite, SlimePetSprite,
+    FairyPetSprite, SlimePetSprite, DEBUG,
 };
 
 #[derive(
@@ -208,7 +208,7 @@ pub fn use_weapon(
 }
 
 pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Input<KeyCode>>) {
-    if !keys.just_pressed(KeyCode::Z) {
+    if !keys.just_pressed(KeyCode::Z) || !*DEBUG {
         return;
     }
     commands.spawn((

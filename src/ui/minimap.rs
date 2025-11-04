@@ -22,7 +22,8 @@ impl Plugin for MinimapPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MinimapTileCache::default())
             .add_event::<UpdateMiniMapEvent>()
-            .add_systems((clear_cache_for_new_dimensions,).in_set(OnUpdate(GameState::Main)))
+            .add_systems((clear_cache_for_new_dimensions
+                .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),))
             .add_system(
                 update_minimap_cache
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
