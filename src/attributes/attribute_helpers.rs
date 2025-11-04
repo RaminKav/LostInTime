@@ -169,15 +169,15 @@ pub fn levelup_item_stats(
             if eqp_type.is_weapon() || eqp_type.is_tool() {
                 if !skip_main_attributes {
                     modifiers.push(("attack".to_owned(), 1));
-                    filter.push("attack");
                 }
+                filter.push("attack");
             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
                 if !skip_main_attributes {
                     modifiers.push(("health".to_owned(), 2));
                     modifiers.push(("armor".to_owned(), 1));
-                    filter.push("health");
-                    filter.push("armor");
                 }
+                filter.push("health");
+                filter.push("armor");
             }
             for _ in 0..num_upgrades {
                 if let Some(bonus_mod) = stack
