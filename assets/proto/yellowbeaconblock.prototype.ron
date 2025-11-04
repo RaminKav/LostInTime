@@ -7,8 +7,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: YellowBeaconBlock,
         metadata: (
-            name: "Yellow Beacon ", 
-            desc: ["Place this down to","mark this location."]
+            name: "Dungeon Map ", 
+            desc: ["Guides you to","the Dungeon."]
         ),
         count: 1
   ),

@@ -11,12 +11,7 @@
   "survival_rogue_like::attributes::MaxHealth": (50),
   "survival_rogue_like::player::levels::ExperienceReward": (100),
   "survival_rogue_like::item::loot_table::LootTable": (
-        drops: [(
-                item: Coal,
-                min: 2,
-                max: 4,
-                rate: 1.
-            ),
+        drops: [
             (
             item: StoneChunk,
                 min: 1,

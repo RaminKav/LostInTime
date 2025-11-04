@@ -7,8 +7,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: RedBeaconBlock,
         metadata: (
-            name: "Red Beacon ", 
-            desc: ["Place this down to","mark this location."]
+            name: "Boss Map ", 
+            desc: ["Guides you to","the Boss Shrine."]
         ),
         count: 1
   ),
