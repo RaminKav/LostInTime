@@ -172,6 +172,8 @@ impl Plugin for UIPlugin {
                     handle_interaction_clicks
                         .before(handle_item_drop_clicks)
                         .run_if(not(in_state(UIState::Closed))),
+                    handle_hotbar_slot_clicks_when_inv_closed
+                        .run_if(in_state(UIState::Closed)),
                     handle_spawn_inv_item_tooltip,
                     update_inventory_ui.after(CustomFlush),
                     handle_update_inv_item_entities,
@@ -323,9 +325,16 @@ impl Plugin for UIPlugin {
                 update_slot_visuals.run_if(in_state(UIState::ClassSelection)),
                 update_info_card.run_if(in_state(UIState::ClassSelection)),
             ))
-            .add_system(init_starting_goal.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
-            .add_system(handle_display_new_goal.run_if(resource_added::<CurrentGoal>()))
-            .add_system(handle_update_goal_progress.run_if(resource_exists::<CurrentGoal>()))
+            .add_system(init_goal_state.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
+            .add_system(display_goal_text.run_if(resource_added::<GoalState>()).in_schedule(OnEnter(GameState::Main)))
+            .add_systems(
+                (
+                    handle_goal_state_updates,
+                    handle_goal_reset_on_era_change,
+                    display_goal_text,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
             .add_system(update_currency_text.run_if(in_state(GameState::Main)))

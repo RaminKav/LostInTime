@@ -778,8 +778,8 @@ pub fn setup_clock_hud(
             aseprite: asset_server.load::<Aseprite, _>(Clock::PATH),
             transform: Transform {
                 translation: Vec3::new(
-                    -res.game_width / 2. + 28.5,
-                    (GAME_HEIGHT - 15.) / 2. - 65.5,
+                    res.game_width / 2. - 17.5,
+                    (GAME_HEIGHT - 15.) / 2. - 76.5,
                     6.,
                 ),
                 scale: Vec3::new(1., 1., 1.),

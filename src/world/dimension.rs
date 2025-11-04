@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     enemy::Mob,
     item::{Equipment, ItemDrop},
+    night::NightTracker,
     player::{MovePlayerEvent, Player},
     world::{
         dungeon::{Dungeon, Dungeontimer},
@@ -151,6 +152,7 @@ impl DimensionPlugin {
         mut proto_commands: ProtoCommands,
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         mut next_state: ResMut<NextState<GameState>>,
+        mut night: ResMut<NightTracker>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -191,6 +193,8 @@ impl DimensionPlugin {
                         info!("MOVING PLAYER TO {:?}", pos);
                         move_player_event.send(MovePlayerEvent { pos });
                     }
+                } else {
+                    night.days = 0;
                 }
 
                 let curr_era = game.era.current_era.clone();

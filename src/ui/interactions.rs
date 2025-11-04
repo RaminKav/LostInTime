@@ -16,6 +16,7 @@ use crate::{
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
+    pets::state::UpdatePetWeaponEvent,
     player::{
         levels::PlayerLevel,
         skills::{HeirloomChoiceQueue, PlayerSkills},
@@ -24,6 +25,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::UpgradeButton,
+        inventory_ui::change_hotbar_slot,
         item_chest::{
             ItemChestAnimChangeEvent, ItemChestAnimState, ItemChestButton, ItemChestState,
         },
@@ -1236,6 +1238,61 @@ pub fn handle_cursor_essence_buttons(
 
                 interactable.change(Interaction::None);
             }
+        }
+    }
+}
+
+pub fn handle_hotbar_slot_clicks_when_inv_closed(
+    mut param_set: ParamSet<(
+        Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+        Query<(Entity, &InventorySlotState)>,
+        Query<&mut InventorySlotState>,
+    )>,
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    mut inv_state: ResMut<InventoryState>,
+    ui_state: Res<State<UIState>>,
+    mut pet_weapon_events: EventWriter<UpdatePetWeaponEvent>,
+) {
+    // Only handle clicks when inventory is closed
+    if ui_state.0.is_inv_open() {
+        return;
+    }
+
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    if !left_mouse_pressed {
+        return;
+    }
+
+    // Extract slot_index first using read queries
+    let clicked_slot_index = {
+        // First, find which entity was clicked
+        let ui_sprites = param_set.p0();
+        let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+
+        let clicked_entity = if let Some((hit_entity, _, _)) = hit_test {
+            hit_entity
+        } else {
+            return;
+        };
+
+        // Then, check if it's a hotbar slot and get its slot_index
+        let slot_slots = param_set.p1();
+        slot_slots.iter().find_map(|(entity, slot_state)| {
+            if entity == clicked_entity && slot_state.r#type.is_hotbar() {
+                Some(slot_state.slot_index)
+            } else {
+                None
+            }
+        })
+    };
+
+    // If we found a clicked hotbar slot, change to it using mutable query
+    if let Some(slot_index) = clicked_slot_index {
+        if slot_index != inv_state.active_hotbar_slot {
+            let mut slot_query = param_set.p2();
+            change_hotbar_slot(slot_index, &mut inv_state, &mut slot_query);
+            pet_weapon_events.send(UpdatePetWeaponEvent);
         }
     }
 }

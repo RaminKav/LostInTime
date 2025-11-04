@@ -5,7 +5,7 @@
   entity: false,
   schematics: {
     "survival_rogue_like::world::WorldGeneration": (
-      water_frequency: 0.33,
+      water_frequency: 0.29,
       stone_frequency: 0.0,
       sand_frequency: 0.32,
       dirt_frequency: 0.0,

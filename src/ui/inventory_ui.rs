@@ -474,6 +474,9 @@ pub fn spawn_inv_slot(
         slot_entity
             .set_parent(inv_e)
             .insert(Interactable::from_state(interactable_state));
+    } else {
+        // Hotbar slots also get Interactable for click detection when inventory is closed
+        slot_entity.insert(Interactable::from_state(interactable_state));
     }
 
     if let Some(icon_entity) = icon_entity_option {

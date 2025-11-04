@@ -25,7 +25,7 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: IceStaff,
         attributes: (
-            attack_cooldown: 0.85
+            attack_cooldown: 0.5
         ),
         metadata: (
             name: "Ice Staff", 

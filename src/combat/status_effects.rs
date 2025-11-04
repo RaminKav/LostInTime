@@ -4,6 +4,8 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
+use crate::player::skills::{Heirloom, PlayerSkills};
+use crate::Player;
 
 use super::HitEvent;
 
@@ -41,7 +43,7 @@ pub struct StatusEffectEvent {
 pub struct Burning {
     pub tick_timer: Timer,
     pub duration_timer: Timer,
-    pub damage: u8,
+    pub stacks: u8,
 }
 #[derive(Component)]
 pub struct Poisoned {
@@ -148,16 +150,26 @@ pub fn handle_burning_ticks(
     mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut hit_event: EventWriter<HitEvent>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
+    // Get poison strength bonus from player skills (if player exists)
+    let poison_strength_bonus = player_skills
+        .get_single()
+        .map(|skills| skills.get_count(Heirloom::PoisonStrength) as i32)
+        .unwrap_or(0);
+
     for (e, mut burning) in burning.iter_mut() {
         burning.duration_timer.tick(time.delta());
         if !burning.duration_timer.just_finished() {
             burning.tick_timer.tick(time.delta());
             if burning.tick_timer.just_finished() {
+                // Damage = stacks + bonus damage from PoisonStrength heirloom
+                let base_damage = burning.stacks as i32;
+                let damage = base_damage + poison_strength_bonus;
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e,
-                    damage: burning.damage as i32,
+                    damage,
                     dir: Vec2::new(0.5, 0.5),
                     hit_with_melee: None,
                     hit_with_projectile: None,

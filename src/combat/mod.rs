@@ -477,7 +477,7 @@ pub fn cleanup_marked_for_death_entities(
                     for (mob_e, txfm) in neaby_mobs.iter() {
                         if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x {
                             commands.entity(mob_e).insert(Burning {
-                                damage: p.damage,
+                                stacks: p.stacks,
                                 duration_timer: Timer::from_seconds(
                                     p.duration_timer.duration().as_secs_f32(),
                                     TimerMode::Once,
@@ -487,7 +487,7 @@ pub fn cleanup_marked_for_death_entities(
                             status_event.send(StatusEffectEvent {
                                 entity: mob_e,
                                 effect: StatusEffect::Poison,
-                                num_stacks: 1,
+                                num_stacks: p.stacks as i32,
                             });
                         }
                     }

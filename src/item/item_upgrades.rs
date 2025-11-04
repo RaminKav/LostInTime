@@ -276,18 +276,25 @@ pub fn handle_on_hit_upgrades(
             || rng.gen_bool(skills.calculate_poison_chance())
         {
             if let Some(mut burning) = burning_option {
+                // Increment stacks and reset duration
+                burning.stacks += 1;
                 burning.duration_timer.reset();
+                status_event.send(StatusEffectEvent {
+                    entity: hit_e,
+                    effect: StatusEffect::Poison,
+                    num_stacks: burning.stacks as i32,
+                });
             } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
                 let duration_bonus = if skills.has(Heirloom::PoisonDuration) {
                     1.5
                 } else {
                     1.
                 };
-                let damage_bonus = skills.get_count(Heirloom::PoisonStrength) as u8;
+                // Start with 1 stack
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
-                    damage: 1 + damage_bonus,
+                    stacks: 1,
                 });
                 status_event.send(StatusEffectEvent {
                     entity: hit_e,

@@ -520,10 +520,10 @@ pub fn spawn_xp_particles(t: Vec2, commands: &mut Commands, amount: u32, did_lev
     commands.spawn((
         TransformBundle::from_transform(Transform::from_translation(t.extend(0.))),
         CpuParticleGenerator {
-            min_particle_size: 1. + f32::floor(amount as f32 / 10.),
-            max_particle_size: 2. + f32::floor(amount as f32 / 10.),
-            min_particle_count: 1 + f32::floor(amount as f32 / 5.) as usize,
-            max_particle_count: 3 + f32::floor(amount as f32 / 5.) as usize,
+            min_particle_size: 1. + f32::min(f32::floor(amount as f32 / 10.), 3.),
+            max_particle_size: 2. + f32::min(f32::floor(amount as f32 / 10.), 10.),
+            min_particle_count: 1 + f32::min(f32::floor(amount as f32 / 5.), 2.) as usize,
+            max_particle_count: 3 + f32::min(f32::floor(amount as f32 / 5.), 3.) as usize,
             pos_offset: Vec2::ZERO,
             min_spawn_radius: 6.,
             max_spawn_radius: 12.,
