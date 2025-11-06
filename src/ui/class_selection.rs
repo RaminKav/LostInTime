@@ -4,30 +4,29 @@ use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use strum::IntoEnumIterator;
 
 use crate::{
-    ai::pathfinding::PathfindingCache,
     animations::player_sprite::PlayerSpriteHandles,
     assets::Graphics,
     attributes::ItemAttributes,
-    chaos::ChaosTracker,
-    colors::{BLACK, DARK_WOOD_BROWN, GREY},
-    container::ContainerRegistry,
+    audio::{AudioSoundEffect, SoundSpawner},
+    colors::{DARK_WOOD_BROWN, GREY, WHITE},
     inputs::CursorPos,
     inventory::ItemStack,
-    item::{CraftingTracker, ItemDisplayMetaData},
-    night::NightTracker,
+    item::ItemDisplayMetaData,
     player::{
         achievements::{is_class_unlocked, is_pet_unlocked, Achievements},
         class_rank::ClassRankSystem,
         get_default_unlocked_classes,
         score::HighScores,
-        skills::{HeirloomChoiceQueue, PlayerClass, SkillClass},
+        skills::SkillClass,
     },
-    ui::{UIElement, UIState},
-    EraManager, FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
+    ui::{
+        spawn_back_button, spawn_back_button_texture_only, BackButton, MenuButton, UIElement,
+        UIState,
+    },
+    FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
 };
 
 use super::{
-    damage_numbers::spawn_text,
     interactions::{Interactable, Interaction},
     inventory_ui::spawn_item_stack_icon,
     ui_helpers::spawn_ui_overlay,
@@ -348,42 +347,50 @@ pub fn setup_class_selection_ui(
     }
 
     // Confirm button
-    let confirm_button = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::UpgradeButton)
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(60., 20.)),
-                ..Default::default()
-            },
+    let confirm_button =
+        spawn_back_button_texture_only(Vec3::new(80., -90., 11.), &mut commands, &graphics);
+
+    commands
+        .entity(confirm_button)
+        .insert(UIState::ClassSelection)
+        .insert(ClassSelectionUI)
+        .insert(MenuButton::Begin)
+        .insert(ConfirmButton);
+
+    // Confirm button text
+    let _confirm_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "BEGIN",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: WHITE,
+                },
+            ),
+            text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(80., -80., 11.),
+                translation: Vec3::new(0., -1., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
-            ..Default::default()
+            ..default()
         })
-        .insert(UIState::ClassSelection)
-        .insert(ClassSelectionUI)
-        .insert(ConfirmButton)
-        .insert(super::Interactable::default())
         .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("CONFIRM BUTTON"))
-        .id();
+        .set_parent(confirm_button);
 
-    // Confirm button text
-    let confirm_text = spawn_text(
+    // Back Button (parent sprite + child text)
+    let back_button_e = spawn_back_button(
+        Vec3::new(-152., -90., 11.),
         &mut commands,
+        &graphics,
         &asset_server,
-        Vec3::new(0., 0., 1.),
-        BLACK,
-        "Confirm".to_string(),
-        bevy::sprite::Anchor::Center,
-        2.,
-        3,
     );
-    commands.entity(confirm_text).set_parent(confirm_button);
+
+    commands
+        .entity(back_button_e)
+        .insert(UIState::ClassSelection)
+        .insert(ClassSelectionUI);
 
     // Class preview sprite (shows default selected class)
     let _class_preview = spawn_player_preview(
@@ -403,19 +410,17 @@ pub fn handle_class_selection(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut class_options: Query<(
-        Entity,
-        Option<&mut Interactable>,
-        Option<&mut PlayerSelectSlot>,
-        Option<&mut PetSelectSlot>,
-        Option<&ConfirmButton>,
+    mut param_set: ParamSet<(
+        Query<(
+            Entity,
+            Option<&mut Interactable>,
+            Option<&mut PlayerSelectSlot>,
+            Option<&mut PetSelectSlot>,
+        )>,
+        Query<(Entity, &mut Interactable), With<BackButton>>,
     )>,
     mut commands: Commands,
-    mut next_ui_state: ResMut<NextState<UIState>>,
-    mut next_game_state: ResMut<NextState<crate::GameState>>,
     mut selection_state: ResMut<ClassSelectionState>,
-    res: Res<crate::ScreenResolution>,
-    graphics: Res<Graphics>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -424,9 +429,8 @@ pub fn handle_class_selection(
     let mut _selected_class_entity: Option<Entity> = None;
     let mut _selected_pet_entity: Option<Entity> = None;
 
-    for (e, interactable, mut class_option, mut pet_option, confirm_button_option) in
-        class_options.iter_mut()
-    {
+    let mut class_options = param_set.p0();
+    for (e, interactable, mut class_option, mut pet_option) in class_options.iter_mut() {
         // Skip entities without Interactable component (locked classes)
         let Some(mut interactable) = interactable else {
             continue;
@@ -436,104 +440,35 @@ pub fn handle_class_selection(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     if let Some(slot) = class_option.as_mut() {
-                        // Only allow hovering if class is not locked
                         if !slot.is_locked {
                             interactable.change(Interaction::Hovering);
                             slot.is_hovered = true;
                         }
+
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.15));
                     } else if let Some(pet_state) = pet_option.as_mut() {
-                        // Only allow hovering if pet is unlocked (has Interactable component)
                         interactable.change(Interaction::Hovering);
                         pet_state.is_hovered = true;
-                    } else {
-                        interactable.change(Interaction::Hovering);
-                    }
-                    if let Some(_) = confirm_button_option {
-                        commands
-                            .entity(e)
-                            .insert(graphics.get_ui_element_texture(UIElement::UpgradeButtonHover));
-                    }
 
-                    commands.spawn(crate::audio::SoundSpawner::new(
-                        crate::audio::AudioSoundEffect::ButtonHover,
-                        0.15,
-                    ));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.15));
+                    }
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
                         if let Some(mut class_state) = class_option {
-                            // Don't allow selection of locked classes
                             if class_state.is_locked {
-                                info!("Class {:?} is locked!", class_state.class);
                                 return;
                             }
-                            info!("Class selected: {:?}", class_state.class);
-                            // Update selection state
                             selection_state.selected_class = Some(class_state.class.clone());
                             class_state.is_selected = true;
                             _selected_class_entity = Some(e);
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         }
                         if let Some(mut pet_state) = pet_option {
-                            // Pet selection is only allowed if pet is unlocked (has Interactable component)
-                            info!("Pet selected: {:?}", pet_state.pet);
-                            // Update selection state
                             selection_state.selected_pet = Some(pet_state.pet.clone());
                             pet_state.is_selected = true;
                             _selected_pet_entity = Some(e);
-                        }
-                        if let Some(_confirm_button) = confirm_button_option {
-                            // Confirm button clicked
-                            // Check if class is selected (pet is optional)
-                            if let Some(class) = &selection_state.selected_class {
-                                // Add PlayerClass component to the game
-                                commands.insert_resource(PlayerClass {
-                                    class: class.clone(),
-                                    pets: selection_state.selected_pet.iter().cloned().collect(),
-                                });
-
-                                // Initialize game resources
-                                commands.init_resource::<crate::Game>();
-                                commands.init_resource::<NightTracker>();
-                                commands.init_resource::<ChaosTracker>();
-                                commands.init_resource::<HeirloomChoiceQueue>();
-                                commands.init_resource::<ContainerRegistry>();
-                                commands.init_resource::<PathfindingCache>();
-                                commands.init_resource::<CraftingTracker>();
-                                commands.init_resource::<EraManager>();
-
-                                // Start the game with fade-in overlay
-                                commands
-                                    .spawn(SpriteBundle {
-                                        sprite: Sprite {
-                                            color: Color::rgba(0., 0., 0., 0.),
-                                            custom_size: Some(Vec2::new(
-                                                res.game_width + 10.,
-                                                crate::GAME_HEIGHT + 20.,
-                                            )),
-                                            ..default()
-                                        },
-                                        transform: Transform {
-                                            translation: Vec3::new(0., 0., 10.),
-                                            scale: Vec3::new(1., 1., 1.),
-                                            ..Default::default()
-                                        },
-                                        ..default()
-                                    })
-                                    .insert(RenderLayers::from_layers(&[3]))
-                                    .insert(Name::new("overlay"))
-                                    .insert(crate::ui::main_menu::GameStartFadein(
-                                        Timer::from_seconds(3.0, TimerMode::Once),
-                                    ));
-
-                                // Close the class selection UI and transition to loading state
-                                next_ui_state.set(UIState::Closed);
-                                next_game_state.set(crate::GameState::Initializing);
-
-                                // Despawn the class selection UI
-                                commands.entity(e).despawn_recursive();
-                            } else {
-                                info!("Please select a class before confirming");
-                            }
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         }
                     }
                 }
@@ -552,11 +487,6 @@ pub fn handle_class_selection(
                         interactable.change(Interaction::None);
                         slot.is_hovered = false;
                     }
-                }
-                if let Some(_) = confirm_button_option {
-                    commands
-                        .entity(e)
-                        .insert(graphics.get_ui_element_texture(UIElement::UpgradeButton));
                 }
             }
         }

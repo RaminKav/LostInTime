@@ -7,16 +7,18 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::Collider;
 
 use crate::{
-    assets::{asset_helpers::spawn_sprite, Graphics},
+    ai::pathfinding::PathfindingCache,
+    assets::Graphics,
     audio::UpdateBGMTrackEvent,
+    chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
-    colors::{overwrite_alpha, BLACK, WHITE, YELLOW_2},
+    colors::{overwrite_alpha, BLACK, WHITE},
     container::ContainerRegistry,
     datafiles,
     item::CraftingTracker,
     night::NightTracker,
-    player::skills::{HeirloomChoiceQueue, PlayerSkills},
-    ui::{ChestContainer, FurnaceContainer, UIState},
+    player::skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
+    ui::{class_selection::ClassSelectionState, ChestContainer, FurnaceContainer, UIState},
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
@@ -24,19 +26,19 @@ use crate::{
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
 };
 
-use super::{
-    scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement,
-    OPTIONS_UI_SIZE,
-};
+use super::{scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement};
 
 #[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
     Start,
     Options,
+    Achievements,
     Quit,
     InfoOK,
     GameOverOK,
     Scrapper,
+    Back,
+    Begin,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -117,6 +119,8 @@ pub fn handle_menu_button_click_events(
     night_tracker: Option<Res<NightTracker>>,
     seed: Option<Res<GenerationSeed>>,
     mut scrapper_event: EventWriter<ScrapperEvent>,
+    selection_state: ResMut<ClassSelectionState>,
+    res: Res<crate::ScreenResolution>,
 ) {
     for event in event_reader.iter() {
         match event.button {
@@ -124,7 +128,6 @@ pub fn handle_menu_button_click_events(
                 if info_modal.iter().count() != 0 {
                     continue;
                 }
-                info!("SHOW CLASS SELECTION");
                 // Show class selection UI instead of starting game immediately
                 next_ui_state.set(UIState::ClassSelection);
             }
@@ -132,9 +135,13 @@ pub fn handle_menu_button_click_events(
                 if info_modal.iter().count() != 0 {
                     continue;
                 }
-                if webbrowser::open("https://discord.gg/c4Aqd6RXGm").is_ok() {
-                    // ...
+                next_ui_state.set(UIState::Options);
+            }
+            MenuButton::Achievements => {
+                if info_modal.iter().count() != 0 {
+                    continue;
                 }
+                next_ui_state.set(UIState::Achievements);
             }
             MenuButton::Quit => {
                 if info_modal.iter().count() != 0 {
@@ -150,6 +157,63 @@ pub fn handle_menu_button_click_events(
             }
             MenuButton::Scrapper => {
                 scrapper_event.send_default();
+            }
+            MenuButton::Back => {
+                next_ui_state.set(crate::ui::UIState::Closed);
+            }
+            MenuButton::Begin => {
+                // Confirm button clicked
+                // Check if class is selected (pet is optional)
+                if let Some(class) = &selection_state.selected_class {
+                    // Close the class selection UI and transition to loading state
+                    next_ui_state.set(UIState::Closed);
+                    next_state.set(crate::GameState::Initializing);
+                    // Add PlayerClass component to the game
+                    commands.insert_resource(PlayerClass {
+                        class: class.clone(),
+                        pets: selection_state.selected_pet.iter().cloned().collect(),
+                    });
+
+                    // Initialize game resources
+                    commands.init_resource::<crate::Game>();
+                    commands.init_resource::<NightTracker>();
+                    commands.init_resource::<ChaosTracker>();
+                    commands.init_resource::<HeirloomChoiceQueue>();
+                    commands.init_resource::<ContainerRegistry>();
+                    commands.init_resource::<PathfindingCache>();
+                    commands.init_resource::<CraftingTracker>();
+                    commands.init_resource::<EraManager>();
+
+                    // Start the game with fade-in overlay
+                    commands
+                        .spawn(SpriteBundle {
+                            sprite: Sprite {
+                                color: Color::rgba(0., 0., 0., 0.),
+                                custom_size: Some(Vec2::new(
+                                    res.game_width + 10.,
+                                    crate::GAME_HEIGHT + 20.,
+                                )),
+                                ..default()
+                            },
+                            transform: Transform {
+                                translation: Vec3::new(0., 0., 10.),
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
+                            },
+                            ..default()
+                        })
+                        .insert(RenderLayers::from_layers(&[3]))
+                        .insert(Name::new("overlay"))
+                        .insert(crate::ui::main_menu::GameStartFadein(Timer::from_seconds(
+                            3.0,
+                            TimerMode::Once,
+                        )));
+
+                    // Despawn the class selection UI
+                    // commands.entity(e).despawn_recursive();
+                } else {
+                    info!("Please select a class before confirming");
+                }
             }
             MenuButton::GameOverOK => {
                 let analytics_data = analytics_data.as_mut().unwrap();
@@ -212,190 +276,106 @@ pub fn handle_menu_button_click_events(
         }
     }
 }
-pub fn spawn_menu_text_buttons(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // MENU TEXT BUTTONS
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Start",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
-                    color: YELLOW_2,
-                },
-            ),
-            // .with_alignment(TextAlignment::Right),
-            transform: Transform {
-                translation: Vec3::new(14., -28.5, 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        },
-        Name::new("MENU TEXT"),
-        RenderLayers::from_layers(&[3]),
-        Interactable::default(),
-        UIElement::MenuButton,
-        MenuButton::Start,
-        Sprite {
-            custom_size: Some(Vec2::new(38., 11.)),
-            ..default()
-        },
-    ));
-    let discord_icon = spawn_sprite(
-        &mut commands,
-        Vec3::new(-40., 0.5, 1.),
-        asset_server.load("ui/icons/DiscordIcon.png"),
-        3,
-    );
-
-    commands
+pub fn spawn_menu_button(
+    pos: Vec3,
+    text: &str,
+    button_type: MenuButton,
+    size: Vec2,
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+) -> Entity {
+    let button_e = commands
         .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Discord",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: YELLOW_2,
-                    },
-                ),
-                // .with_alignment(TextAlignment::Right),
-                transform: Transform {
-                    translation: Vec3::new(-8., -49.5, 1.),
-                    scale: Vec3::new(1., 1., 1.),
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                sprite: Sprite {
+                    custom_size: Some(size),
                     ..Default::default()
                 },
-                ..default()
+                transform: Transform::from_translation(pos),
+                ..Default::default()
             },
-            Name::new("MENU TEXT"),
-            RenderLayers::from_layers(&[3]),
             Interactable::default(),
-            UIElement::MenuButton,
-            MenuButton::Options,
-            Sprite {
-                custom_size: Some(Vec2::new(58., 11.)),
-                ..default()
-            },
+            UIElement::BackButton,
+            button_type,
+            RenderLayers::from_layers(&[3]),
+            Name::new(format!("Menu Button: {}", text)),
         ))
-        .add_child(discord_icon);
+        .id();
 
-    commands.spawn((
-        Text2dBundle {
+    // Button text
+    commands
+        .spawn(Text2dBundle {
             text: Text::from_section(
-                "Quit",
+                text,
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: YELLOW_2,
+                    color: WHITE,
                 },
             ),
-            // .with_alignment(TextAlignment::Right),
+            text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(-39.5, -74., 1.),
+                translation: Vec3::new(0., -1., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
             ..default()
-        },
-        Name::new("MENU TEXT"),
-        RenderLayers::from_layers(&[3]),
-        Interactable::default(),
-        UIElement::MenuButton,
-        MenuButton::Quit,
-        Sprite {
-            custom_size: Some(Vec2::new(30., 11.)),
-            ..default()
-        },
-    ));
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(button_e);
+
+    button_e
 }
 
-pub fn spawn_info_modal(
+pub fn spawn_menu_text_buttons(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     graphics: Res<Graphics>,
 ) {
-    // OK BUTTON
-    let ok_text = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "OK!",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: BLACK,
-                    },
-                ),
-                transform: Transform {
-                    translation: Vec3::new(0., -64.5, 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("INFO OK TEXT"),
-            RenderLayers::from_layers(&[3]),
-            Interactable::default(),
-            UIElement::MenuButton,
-            MenuButton::InfoOK,
-            Sprite {
-                custom_size: Some(Vec2::new(20., 11.)),
-                ..default()
-            },
-        ))
-        .id();
-    // INFO TEXT
-    let info_texts = commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_sections([TextSection::new(
-                    "                Note \n\n",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 10.0,
-                        color: WHITE,
-                    },
-                ),
-                TextSection::new(
-                    "This is an alpha release. It is also the first time\n\nanyone's playtested this game! As such, many features\n\nmay be incomplete, unbalanced, or potentially buggy.\n\nAdditionally, some artwork and UI are placeholders.\n\n\nJoin the discord channel to follow along with the\n\nproject. If you encounter any issues or bugs, or have\n\nany feedback, please let me know.\n\n\nThank you for play testing my game.\n\nI hope you enjoy it!\n\n\n                                                                 - Fleam",
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
-                )]),
-                transform: Transform {
-                    translation: Vec3::new(0., 7.5, 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            RenderLayers::from_layers(&[3]),
-        ))
-        .id();
+    // Start Button
+    spawn_menu_button(
+        Vec3::new(42., -10.5, 1.),
+        "Start",
+        MenuButton::Start,
+        Vec2::new(48., 22.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+    );
 
-    commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::InfoModal),
-            transform: Transform {
-                translation: Vec3::new(0.5, 0.5, 10.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(251., 161.)),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(UIElement::InfoModal)
-        .insert(InfoModal)
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("Info Modal"))
-        .add_child(ok_text)
-        .add_child(info_texts);
+    // Achievements Button
+    spawn_menu_button(
+        Vec3::new(8., -34.5, 1.),
+        "Achievements",
+        MenuButton::Achievements,
+        Vec2::new(118., 22.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+    );
+    // Options Button
+    spawn_menu_button(
+        Vec3::new(-8., -58., 1.),
+        "Options",
+        MenuButton::Options,
+        Vec2::new(68., 22.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+    );
+
+    // Quit Button
+    spawn_menu_button(
+        Vec3::new(-39.5, -81., 1.),
+        "Quit",
+        MenuButton::Quit,
+        Vec2::new(40., 22.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+    );
 }
 
 #[derive(Component)]
@@ -408,7 +388,7 @@ pub fn handle_enter_options_ui(
     res: Res<ScreenResolution>,
 ) {
     let (size, texture, t_offset) = (
-        OPTIONS_UI_SIZE,
+        crate::ui::OPTIONS_UI_SIZE,
         graphics.get_ui_element_texture(UIElement::Options),
         Vec2::new(0., 0.),
     );
@@ -530,4 +510,62 @@ pub fn tick_game_start_overlay(
             sprite.color = overwrite_alpha(sprite.color, alpha);
         }
     }
+}
+pub fn spawn_back_button_texture_only(
+    pos: Vec3,
+    commands: &mut Commands,
+    graphics: &Graphics,
+) -> Entity {
+    // Back Button (parent sprite + child text)
+    let back_button_e = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(53., 20.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(pos),
+                ..Default::default()
+            },
+            Interactable::default(),
+            UIElement::BackButton,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Back Button"),
+        ))
+        .id();
+    back_button_e
+}
+
+pub fn spawn_back_button(
+    pos: Vec3,
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+) -> Entity {
+    // Back Button (parent sprite + child text)
+    let back_button_e = spawn_back_button_texture_only(pos, commands, graphics);
+    commands.entity(back_button_e).insert(MenuButton::Back);
+    // Back button text
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "BACK",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: WHITE,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0., -1., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(back_button_e);
+    back_button_e
 }

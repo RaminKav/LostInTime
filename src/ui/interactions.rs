@@ -12,7 +12,7 @@ use crate::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
     },
     audio::{AudioSoundEffect, SoundSpawner},
-    colors::{DARK_GREEN, RED, WHITE, YELLOW_2},
+    colors::{DARK_GREEN, RED},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
@@ -98,6 +98,8 @@ pub enum UIElement {
     RerollDiceHover,
     UpgradeButton,
     UpgradeButtonHover,
+    BackButton,
+    BackButtonHover,
     ItemChestOpeningCommon,
     ItemChestOpeningUncommon,
     ItemChestOpeningRare,
@@ -126,6 +128,10 @@ pub enum UIElement {
     MPRegenIcon,
     SpeedIcon,
     UnknownUnlockIcon,
+    Achievements,
+    CheckBox,
+    CheckBoxSelected,
+    AchievementCrossOut,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -1150,13 +1156,29 @@ pub fn handle_cursor_main_menu_buttons(
     mut text: Query<&mut Text, With<MenuButton>>,
     mut send_menu_button_event: EventWriter<MenuButtonClickEvent>,
     mut commands: Commands,
+    graphics: Res<Graphics>,
     info_check: Query<&InfoModal>,
+    curr_ui_state: Res<State<UIState>>,
 ) {
+    let menu_open = curr_ui_state.0 == UIState::ClassSelection
+        || curr_ui_state.0 == UIState::Options
+        || curr_ui_state.0 == UIState::Achievements;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
     for (e, mut interactable, menu_button) in menu_buttons.iter_mut() {
         if !info_check.is_empty() && menu_button != &MenuButton::InfoOK {
+            continue;
+        }
+        if menu_open
+            && matches!(
+                menu_button,
+                MenuButton::Start
+                    | MenuButton::Achievements
+                    | MenuButton::Options
+                    | MenuButton::Quit
+            )
+        {
             continue;
         }
         match hit_test {
@@ -1165,15 +1187,34 @@ pub fn handle_cursor_main_menu_buttons(
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.25));
 
-                    let color = if menu_button == &MenuButton::GameOverOK
-                        || menu_button == &MenuButton::InfoOK
-                        || menu_button == &MenuButton::Scrapper
-                    {
-                        RED
+                    // Use sprite hover for main menu buttons (Start, Options, Achievements, Quit)
+                    if matches!(
+                        menu_button,
+                        MenuButton::Start
+                            | MenuButton::Options
+                            | MenuButton::Achievements
+                            | MenuButton::Quit
+                            | MenuButton::Back
+                            | MenuButton::Begin
+                    ) {
+                        commands
+                            .entity(e)
+                            .insert(UIElement::BackButtonHover)
+                            .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
                     } else {
-                        DARK_GREEN
-                    };
-                    text.get_mut(e).unwrap().sections[0].style.color = color;
+                        // Old text color change for other buttons (InfoOK, GameOverOK, Scrapper)
+                        let color = if menu_button == &MenuButton::GameOverOK
+                            || menu_button == &MenuButton::InfoOK
+                            || menu_button == &MenuButton::Scrapper
+                        {
+                            RED
+                        } else {
+                            DARK_GREEN
+                        };
+                        if let Ok(mut text_comp) = text.get_mut(e) {
+                            text_comp.sections[0].style.color = color;
+                        }
+                    }
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
@@ -1186,20 +1227,16 @@ pub fn handle_cursor_main_menu_buttons(
                 _ => (),
             },
             _ => {
-                // reset hovering states if we stop hovering ?
+                // reset hovering states if we stop hovering
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
-                let color = if menu_button == &MenuButton::GameOverOK
-                    || menu_button == &MenuButton::InfoOK
-                    || menu_button == &MenuButton::Scrapper
-                {
-                    WHITE
-                } else {
-                    YELLOW_2
-                };
                 interactable.change(Interaction::None);
-                text.get_mut(e).unwrap().sections[0].style.color = color;
+
+                commands
+                    .entity(e)
+                    .insert(UIElement::BackButton)
+                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
             }
         }
     }

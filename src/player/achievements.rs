@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
+use strum_macros::{Display, EnumIter};
 
 use crate::{
     client::{analytics::AnalyticsData, handle_append_run_data_after_death},
@@ -8,7 +8,7 @@ use crate::{
     GameState,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Display, EnumIter)]
 pub enum Achievement {
     FirstRunComplete,
     Kill100FurDevils,
@@ -20,6 +20,24 @@ pub enum Achievement {
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Achievements {
     pub unlocked: Vec<Achievement>,
+}
+impl Achievement {
+    pub fn get_name(&self) -> String {
+        match self {
+            Achievement::FirstRunComplete => "That was weird".to_string(),
+            Achievement::Kill100FurDevils => "Fur Devil Slayer".to_string(),
+            Achievement::SlimePet => "Slimed".to_string(),
+            Achievement::FairyPet => "Fairy Friend".to_string(),
+        }
+    }
+    pub fn get_desc(&self) -> String {
+        match self {
+            Achievement::FirstRunComplete => "Complete your first run.".to_string(),
+            Achievement::Kill100FurDevils => "Defeat 100 Fur Devils.".to_string(),
+            Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
+            Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
+        }
+    }
 }
 
 impl Achievements {

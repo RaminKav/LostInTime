@@ -100,8 +100,8 @@ use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, EnvFilter};
 use ui::{
-    display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_info_modal,
-    spawn_menu_text_buttons, InventorySlotState, UIPlugin,
+    display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
+    InventorySlotState, UIPlugin,
 };
 use world::{
     chunk::{Chunk, TileEntityCollection, TileSpriteData},
@@ -247,11 +247,6 @@ fn main() {
             set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::GameOver)),
         )
         .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
-        .add_system(
-            spawn_info_modal
-                .in_schedule(OnEnter(GameState::MainMenu))
-                .run_if(run_once()),
-        )
         .add_system(handle_menu_button_click_events)
         .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));
 

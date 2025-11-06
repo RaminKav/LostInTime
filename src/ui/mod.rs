@@ -48,6 +48,10 @@ mod main_menu;
 pub use main_menu::*;
 mod essence_ui;
 pub use essence_ui::*;
+mod options_ui;
+pub use options_ui::*;
+mod achievements_ui;
+pub use achievements_ui::*;
 use loading_screen::*;
 use crate::run_once_per_run;
 use crate::ui::damage_numbers::{
@@ -87,6 +91,7 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
+            .init_resource::<options_ui::AudioSettings>()
             .insert_resource(InventoryState::default())
             .insert_resource(ClassSelectionState::default())
             .insert_resource(NewRecipeTextTimer::new(0.8))
@@ -215,10 +220,35 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Main)),
             )
             .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
-            .add_system(
-                handle_enter_options_ui
-                    .before(CustomFlush)
-                    .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+            .add_systems(
+                (
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+                    cleanup_options_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                    setup_achievements_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
+                    cleanup_achievements_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                )
+                    .in_set(OnUpdate(GameState::MainMenu)),
+            )
+            .add_systems(
+                (
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+                    cleanup_options_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                    setup_achievements_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
+                    cleanup_achievements_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
                 handle_tooltip_teardown
@@ -337,6 +367,7 @@ impl Plugin for UIPlugin {
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons)
+           
             .add_system(update_currency_text.run_if(in_state(GameState::Main)))
             .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
             .add_system(apply_system_buffers.in_set(CustomFlush));
