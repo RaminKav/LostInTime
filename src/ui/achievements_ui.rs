@@ -1,20 +1,51 @@
+use bevy::ecs::system::ParamSet;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
+use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
 use crate::{
     assets::Graphics,
     player::achievements::{Achievement, Achievements},
-    ui::{damage_numbers::spawn_text, spawn_back_button, ui_helpers, UIElement, UIState},
+    ui::{
+        damage_numbers::spawn_text, spawn_back_button, spawn_back_button_texture_only, ui_helpers,
+        Interactable, Interaction, MenuButton, UIElement, UIState,
+    },
     ScreenResolution,
 };
 
 #[derive(Component)]
 pub struct AchievementsUI;
 
-#[derive(Component)]
+pub const ACHIEVEMENTS_PER_PAGE: usize = 8;
 
-pub struct BackButton;
+#[derive(Resource, Default)]
+pub struct AchievementsPagination {
+    pub page: usize,
+}
+
+#[derive(Component)]
+pub struct AchievementRow {
+    index: usize,
+}
+
+#[derive(Component)]
+pub struct AchievementNameText;
+
+#[derive(Component)]
+pub struct AchievementDescText;
+
+#[derive(Component)]
+pub struct AchievementCheckbox;
+
+#[derive(Component)]
+pub struct AchievementCrossout;
+
+#[derive(Component)]
+pub struct AchievementsPrevButton;
+
+#[derive(Component)]
+pub struct AchievementsNextButton;
 
 pub fn setup_achievements_ui(
     mut commands: Commands,
@@ -22,7 +53,10 @@ pub fn setup_achievements_ui(
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
     achievements: Res<Achievements>,
+    mut pagination: ResMut<AchievementsPagination>,
 ) {
+    pagination.page = 0;
+
     // Spawn overlay
     let overlay = ui_helpers::spawn_ui_overlay(
         &mut commands,
@@ -75,110 +109,239 @@ pub fn setup_achievements_ui(
         .insert(Name::new("ACHIEVEMENTS UI"))
         .id();
 
-    // List all achievements
-    let all_achievements: Vec<Achievement> = Achievement::iter().collect();
+    // List all achievements (paginated)
+    let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
+    all_achievements.sort_by_key(|achievement| !achievements.has(*achievement));
+    let total_pages = if all_achievements.is_empty() {
+        0
+    } else {
+        (all_achievements.len() + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE
+    };
     let start_y = 92.5;
     let row_spacing = 23.0;
+    let font_handle = asset_server.load("fonts/alagard.ttf");
 
-    for (i, achievement) in all_achievements.iter().enumerate() {
-        let is_unlocked = achievements.has(*achievement);
-        let y_pos = start_y - (i as f32 * row_spacing);
+    for row_index in 0..ACHIEVEMENTS_PER_PAGE {
+        let y_pos = start_y - (row_index as f32 * row_spacing);
+        let achievement_index = pagination.page * ACHIEVEMENTS_PER_PAGE + row_index;
+        let maybe_achievement = all_achievements.get(achievement_index);
 
-        let desc_text_color = if is_unlocked {
-            Color::rgba(0.5, 0.5, 0.5, 1.0)
-        } else {
-            crate::colors::BLACK
-        };
-        let text_color = if is_unlocked {
-            Color::rgba(0.5, 0.5, 0.5, 1.0)
-        } else {
-            crate::colors::LIGHT_BROWN
-        };
+        let (name_text, desc_text, text_color, desc_color, checkbox_texture, crossout_visible) =
+            if let Some(achievement) = maybe_achievement {
+                let is_unlocked = achievements.has(*achievement);
+                (
+                    achievement.get_name(),
+                    achievement.get_desc(),
+                    if is_unlocked {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    } else {
+                        crate::colors::LIGHT_BROWN
+                    },
+                    if is_unlocked {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    } else {
+                        crate::colors::BLACK
+                    },
+                    if is_unlocked {
+                        UIElement::CheckBoxSelected
+                    } else {
+                        UIElement::CheckBox
+                    },
+                    is_unlocked,
+                )
+            } else {
+                (
+                    "".to_string(),
+                    "".to_string(),
+                    crate::colors::LIGHT_BROWN,
+                    crate::colors::BLACK,
+                    UIElement::CheckBox,
+                    false,
+                )
+            };
 
-        let achievement_name_text = commands
-            .spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        achievement.get_name(),
-                        TextStyle {
-                            font: asset_server.load("fonts/alagard.ttf"),
-                            font_size: 15.0,
-                            color: text_color,
-                        },
-                    )
-                    .with_alignment(TextAlignment::Center),
-                    text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(-147., y_pos, 1.)),
-                    ..Default::default()
+        let name_bundle = Text2dBundle {
+            text: Text::from_section(
+                name_text,
+                TextStyle {
+                    font: font_handle.clone(),
+                    font_size: 15.0,
+                    color: text_color,
                 },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(-147., y_pos, 1.)),
+            visibility: if maybe_achievement.is_some() {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            },
+            ..Default::default()
+        };
+
+        let name_entity = commands
+            .spawn((
+                name_bundle,
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
                 UIState::Achievements,
-                Name::new("Achievements desc"),
+                AchievementRow { index: row_index },
+                AchievementNameText,
+                Name::new("Achievement Name"),
             ))
             .id();
 
-        let achievement_desc_text = spawn_text(
+        let desc_entity = spawn_text(
             &mut commands,
             &asset_server,
             Vec3::new(-21., y_pos, 1.),
-            desc_text_color,
-            achievement.get_desc(),
+            desc_color,
+            desc_text,
             bevy::sprite::Anchor::CenterLeft,
             1.,
             3,
         );
-        commands
-            .entity(achievement_desc_text)
-            .set_parent(achievements_bg);
-        commands
-            .entity(achievement_name_text)
-            .set_parent(achievements_bg);
-        // Back Button (parent sprite + child text)
-        info!("Is unlocked: {}", is_unlocked);
-        let checkbox_type = if is_unlocked {
-            UIElement::CheckBoxSelected
-        } else {
-            UIElement::CheckBox
-        };
-        let _checkbox = commands
+
+        commands.entity(desc_entity).insert((
+            AchievementsUI,
+            UIState::Achievements,
+            AchievementRow { index: row_index },
+            AchievementDescText,
+            Name::new("Achievement Description"),
+        ));
+
+        if maybe_achievement.is_none() {
+            commands.entity(desc_entity).insert(Visibility::Hidden);
+        }
+
+        commands.entity(desc_entity).set_parent(achievements_bg);
+        commands.entity(name_entity).set_parent(achievements_bg);
+
+        let checkbox_entity = commands
             .spawn((
                 SpriteBundle {
-                    texture: graphics.get_ui_element_texture(checkbox_type.clone()),
+                    texture: graphics.get_ui_element_texture(checkbox_texture.clone()),
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(9., 9.)),
                         ..Default::default()
                     },
                     transform: Transform::from_translation(Vec3::new(-8.5, 0., 1.)),
+                    visibility: if maybe_achievement.is_some() {
+                        Visibility::Visible
+                    } else {
+                        Visibility::Hidden
+                    },
                     ..Default::default()
                 },
-                checkbox_type,
                 RenderLayers::from_layers(&[3]),
                 AchievementsUI,
-                Name::new("Back Button"),
+                AchievementCheckbox,
+                AchievementRow { index: row_index },
+                Name::new("Achievement Checkbox"),
             ))
-            .set_parent(achievement_name_text)
             .id();
-        if is_unlocked {
-            commands
-                .spawn((
-                    SpriteBundle {
-                        texture: graphics.get_ui_element_texture(UIElement::AchievementCrossOut),
-                        sprite: Sprite {
-                            custom_size: Some(Vec2::new(289., 7.)),
-                            ..Default::default()
-                        },
-                        transform: Transform::from_translation(Vec3::new(142., 0., 1.)),
+
+        commands.entity(checkbox_entity).set_parent(name_entity);
+
+        let crossout_visibility = if crossout_visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+
+        let crossout_entity = commands
+            .spawn((
+                SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::AchievementCrossOut),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(289., 7.)),
                         ..Default::default()
                     },
-                    UIElement::AchievementCrossOut,
-                    RenderLayers::from_layers(&[3]),
-                    AchievementsUI,
-                    Name::new("Back Button"),
-                ))
-                .set_parent(achievement_name_text);
-        }
+                    transform: Transform::from_translation(Vec3::new(142., 0., 1.)),
+                    visibility: if maybe_achievement.is_some() {
+                        crossout_visibility
+                    } else {
+                        Visibility::Hidden
+                    },
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                AchievementCrossout,
+                AchievementRow { index: row_index },
+                Name::new("Achievement Crossout"),
+            ))
+            .id();
+
+        commands.entity(crossout_entity).set_parent(name_entity);
     }
+
+    let prev_button =
+        spawn_back_button_texture_only(Vec3::new(-90., -108., 1.), &mut commands, &graphics);
+    commands
+        .entity(prev_button)
+        .insert((
+            AchievementsUI,
+            UIState::Achievements,
+            MenuButton::AchievementsPrev,
+            AchievementsPrevButton,
+            Name::new("Achievements Prev Button"),
+            Visibility::Hidden,
+        ))
+        .set_parent(achievements_bg);
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Prev",
+                TextStyle {
+                    font: font_handle.clone(),
+                    font_size: 15.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(prev_button);
+
+    let next_button =
+        spawn_back_button_texture_only(Vec3::new(90., -108., 1.), &mut commands, &graphics);
+    commands
+        .entity(next_button)
+        .insert((
+            AchievementsUI,
+            UIState::Achievements,
+            MenuButton::AchievementsNext,
+            AchievementsNextButton,
+            Name::new("Achievements Next Button"),
+            if pagination.page + 1 < total_pages {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            },
+        ))
+        .set_parent(achievements_bg);
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Next",
+                TextStyle {
+                    font: font_handle.clone(),
+                    font_size: 15.0,
+                    color: crate::colors::WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(next_button);
 
     // Back Button (parent sprite + child text)
     let back_button_e = spawn_back_button(
@@ -200,5 +363,156 @@ pub fn cleanup_achievements_ui(
 ) {
     for entity in achievements_ui.iter() {
         commands.entity(entity).despawn_recursive();
+    }
+}
+
+pub fn update_achievements_page_display(
+    achievements: Res<Achievements>,
+    pagination: Res<AchievementsPagination>,
+    graphics: Res<Graphics>,
+    mut param_set: ParamSet<(
+        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementNameText>>,
+        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementDescText>>,
+        Query<(&AchievementRow, &mut Handle<Image>, &mut Visibility), With<AchievementCheckbox>>,
+        Query<(&AchievementRow, &mut Visibility), With<AchievementCrossout>>,
+    )>,
+) {
+    if !pagination.is_changed() && !achievements.is_changed() {
+        return;
+    }
+
+    let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
+    all_achievements.sort_by_key(|achievement| !achievements.has(*achievement));
+    let start_index = pagination.page * ACHIEVEMENTS_PER_PAGE;
+
+    let mut row_states = Vec::with_capacity(ACHIEVEMENTS_PER_PAGE);
+    for offset in 0..ACHIEVEMENTS_PER_PAGE {
+        let maybe_achievement = all_achievements.get(start_index + offset).copied();
+        row_states.push(maybe_achievement.map(|achievement| {
+            let unlocked = achievements.has(achievement);
+            (achievement, unlocked)
+        }));
+    }
+
+    {
+        let mut name_query = param_set.p0();
+        for (row, mut text, mut visibility) in name_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((achievement, unlocked)) => {
+                    text.sections[0].value = achievement.get_name();
+                    text.sections[0].style.color = if unlocked {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    } else {
+                        crate::colors::LIGHT_BROWN
+                    };
+                    *visibility = Visibility::Visible;
+                }
+                None => {
+                    text.sections[0].value.clear();
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+    }
+
+    {
+        let mut desc_query = param_set.p1();
+        for (row, mut text, mut visibility) in desc_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((achievement, unlocked)) => {
+                    text.sections[0].value = achievement.get_desc();
+                    text.sections[0].style.color = if unlocked {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    } else {
+                        crate::colors::BLACK
+                    };
+                    *visibility = Visibility::Visible;
+                }
+                None => {
+                    text.sections[0].value.clear();
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+    }
+
+    {
+        let mut checkbox_query = param_set.p2();
+        for (row, mut texture, mut visibility) in checkbox_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((_, unlocked)) => {
+                    let checkbox_type = if unlocked {
+                        UIElement::CheckBoxSelected
+                    } else {
+                        UIElement::CheckBox
+                    };
+                    *texture = graphics.get_ui_element_texture(checkbox_type).clone();
+                    *visibility = Visibility::Visible;
+                }
+                None => {
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+    }
+
+    {
+        let mut crossout_query = param_set.p3();
+        for (row, mut visibility) in crossout_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((_, unlocked)) if unlocked => {
+                    *visibility = Visibility::Visible;
+                }
+                _ => {
+                    *visibility = Visibility::Hidden;
+                }
+            }
+        }
+    }
+}
+
+pub fn update_achievements_navigation_buttons(
+    pagination: Res<AchievementsPagination>,
+    mut pagination_buttons: Query<(
+        &mut Visibility,
+        &mut Interactable,
+        Option<&AchievementsPrevButton>,
+        Option<&AchievementsNextButton>,
+    )>,
+) {
+    if !pagination.is_changed() {
+        return;
+    }
+
+    let total_achievements = Achievement::iter().count();
+    let total_pages = if total_achievements == 0 {
+        0
+    } else {
+        (total_achievements + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE
+    };
+
+    for (mut visibility, mut interactable, prev_button, next_button) in
+        pagination_buttons.iter_mut()
+    {
+        if prev_button.is_some() {
+            if pagination.page > 0 && total_pages > 0 {
+                *visibility = Visibility::Visible;
+            } else {
+                *visibility = Visibility::Hidden;
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
+            }
+        }
+        if next_button.is_some() {
+            if pagination.page + 1 < total_pages {
+                *visibility = Visibility::Visible;
+            } else {
+                *visibility = Visibility::Hidden;
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                }
+            }
+        }
     }
 }

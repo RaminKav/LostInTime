@@ -99,6 +99,7 @@ impl Plugin for UIPlugin {
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
+            .init_resource::<AchievementsPagination>()
             .insert_resource(NewRecipeTextTimer::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -237,6 +238,10 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
                     cleanup_achievements_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                    update_achievements_page_display
+                        .run_if(in_state(UIState::Achievements)),
+                    update_achievements_navigation_buttons
+                        .run_if(in_state(UIState::Achievements)),
                 )
                     .in_set(OnUpdate(GameState::MainMenu)),
             )
@@ -252,6 +257,10 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
                     cleanup_achievements_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
+                    update_achievements_page_display
+                        .run_if(in_state(UIState::Achievements)),
+                    update_achievements_navigation_buttons
+                        .run_if(in_state(UIState::Achievements)),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

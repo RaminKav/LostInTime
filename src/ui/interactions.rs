@@ -1193,6 +1193,8 @@ pub fn handle_cursor_main_menu_buttons(
                         MenuButton::Start
                             | MenuButton::Options
                             | MenuButton::Achievements
+                            | MenuButton::AchievementsPrev
+                            | MenuButton::AchievementsNext
                             | MenuButton::Quit
                             | MenuButton::Back
                             | MenuButton::Begin

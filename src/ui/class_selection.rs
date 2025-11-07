@@ -23,10 +23,7 @@ use crate::{
         skills::SkillClass,
         ClassUnlockData, UnlockCurrency, UnlockedClasses,
     },
-    ui::{
-        spawn_back_button, spawn_back_button_texture_only, BackButton, MenuButton, UIElement,
-        UIState,
-    },
+    ui::{spawn_back_button, spawn_back_button_texture_only, MenuButton, UIElement, UIState},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
 };
 
@@ -702,16 +699,14 @@ pub fn handle_class_selection(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut param_set: ParamSet<(
-        Query<(
-            Entity,
-            Option<&mut Interactable>,
-            Option<&mut PlayerSelectSlot>,
-            Option<&mut PetSelectSlot>,
-            Option<&GlobalTransform>,
-        )>,
-        Query<(Entity, &mut Interactable), With<BackButton>>,
+    mut class_options: Query<(
+        Entity,
+        Option<&mut Interactable>,
+        Option<&mut PlayerSelectSlot>,
+        Option<&mut PetSelectSlot>,
+        Option<&GlobalTransform>,
     )>,
+
     mut commands: Commands,
     mut selection_state: ResMut<ClassSelectionState>,
     unlocked_classes: Res<UnlockedClasses>,
@@ -727,7 +722,6 @@ pub fn handle_class_selection(
     hover_state.hovered_class = None;
     hover_state.slot_position = Vec3::ZERO;
 
-    let mut class_options = param_set.p0();
     for (entity, interactable_opt, mut class_option, mut pet_option, global_transform) in
         class_options.iter_mut()
     {

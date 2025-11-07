@@ -83,8 +83,8 @@ pub fn handle_pet_spawner_interaction(
                         pet_type.clone(),
                         PetState::default(),
                         YSort(0.001),
-                        Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
-                        Transform::from_xyz(player_pos.x + 40.0, player_pos.y - 40.0, 1.0),
+                        // Collider::capsule(Vec2::new(0., -6.), Vec2::new(0., -6.), 5.0),
+                        Transform::from_translation(spawner_t.translation()),
                         Name::new(format!("{:?} Pet", pet_type)),
                     ));
 

@@ -105,7 +105,7 @@ impl PetState {
                     .expect("Weapon with no RangedAttack Projectile!")
                     .0
                     .clone();
-                self.min_target_distance = obj.is_ranged_weapon().then(|| 100.0).unwrap_or(25.0);
+                self.min_target_distance = obj.is_ranged_weapon().then(|| 85.0).unwrap_or(25.0);
             }
             None => {
                 self.attack_cooldown = Timer::from_seconds(10., TimerMode::Repeating);

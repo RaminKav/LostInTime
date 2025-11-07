@@ -28,6 +28,7 @@ use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::world_helpers;
 use crate::world::world_helpers::tile_pos_to_world_pos;
+use itertools::Itertools;
 use rand::seq::IteratorRandom;
 
 use crate::world::TileMapPosition;
@@ -145,9 +146,18 @@ impl ObjectAction {
                 });
             }
             ObjectAction::DungeonExit => {
+                let current_era: usize = game
+                    .era
+                    .visited_eras
+                    .iter()
+                    .filter(|e| e != &&Era::DungeonMain)
+                    .map(|e| e.index())
+                    .sorted()
+                    .last()
+                    .expect(" No previous era found when exiting dungeon");
                 item_action_param.dim_event.send(DimensionSpawnEvent {
                     swap_to_dim_now: true,
-                    new_era: Some(game.era.current_era.get_assosiated_era_from_dungeon_era()),
+                    new_era: Some(Era::from_index(current_era)),
                 });
             }
             ObjectAction::Chest => {

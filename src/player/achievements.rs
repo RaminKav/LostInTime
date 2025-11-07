@@ -69,16 +69,16 @@ impl Achievement {
             Achievement::MushlingSlayer => "Mushling Slayer".to_string(),
             Achievement::Chaotic => "Chaotic".to_string(),
             Achievement::DungeonCrawler => "Dungeon Crawler".to_string(),
-            Achievement::FindSpear => "Arms: Spear".to_string(),
-            Achievement::FindClaw => "Arms: Claw".to_string(),
-            Achievement::FindGun => "Arms: Gun".to_string(),
-            Achievement::FindFireStaff => "Arms: Fire Staff".to_string(),
-            Achievement::FindIceStaff => "Arms: Ice Staff".to_string(),
-            Achievement::FindBasicStaff => "Arms: Basic Staff".to_string(),
-            Achievement::FindMagicWhip => "Arms: Magic Whip".to_string(),
-            Achievement::FindDagger => "Arms: Dagger".to_string(),
-            Achievement::FindBow => "Arms: Bow".to_string(),
-            Achievement::FindBlowdart => "Arms: Blowdart".to_string(),
+            Achievement::FindSpear => "Find Spear".to_string(),
+            Achievement::FindClaw => "Find Claw".to_string(),
+            Achievement::FindGun => "Find Gun".to_string(),
+            Achievement::FindFireStaff => "Find Fire Staff".to_string(),
+            Achievement::FindIceStaff => "Find Ice Staff".to_string(),
+            Achievement::FindBasicStaff => "Find Basic Staff".to_string(),
+            Achievement::FindMagicWhip => "Find Magic Whip".to_string(),
+            Achievement::FindDagger => "Find Dagger".to_string(),
+            Achievement::FindBow => "Find Bow".to_string(),
+            Achievement::FindBlowdart => "Find Blowdart".to_string(),
         }
     }
     pub fn get_desc(&self) -> String {
@@ -88,9 +88,7 @@ impl Achievement {
             Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
             Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
             Achievement::Bouncy => "Bounce on 100 pink petals.".to_string(),
-            Achievement::Bouncy2 => {
-                "Chain three pink petal bounces without touching the ground.".to_string()
-            }
+            Achievement::Bouncy2 => "Chain three pink petal bounces.".to_string(),
             Achievement::Act1 => "Defeat the Act 1 boss.".to_string(),
             Achievement::Act2 => "Defeat the Act 2 boss.".to_string(),
             Achievement::Act3 => "Defeat the Act 3 boss.".to_string(),
@@ -98,7 +96,7 @@ impl Achievement {
             Achievement::StingflySlayer => "Eliminate 100 Stingflies.".to_string(),
             Achievement::MushlingSlayer => "Eliminate 100 Red Mushlings.".to_string(),
             Achievement::Chaotic => "Reach 20 total Chaos.".to_string(),
-            Achievement::DungeonCrawler => "Find the key and clear the dungeon.".to_string(),
+            Achievement::DungeonCrawler => "Find the key & clear the dungeon.".to_string(),
             Achievement::FindSpear => "Find a Spear.".to_string(),
             Achievement::FindClaw => "Find a Claw.".to_string(),
             Achievement::FindGun => "Find a Gun.".to_string(),

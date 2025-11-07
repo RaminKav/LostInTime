@@ -331,7 +331,9 @@ pub fn handle_on_hit_upgrades(
                 });
             }
         }
-        if rng.gen_bool(skills.calculate_freeze_chance()) {
+        if main_hand.get_obj() == WorldObject::IceStaff
+            || rng.gen_bool(skills.calculate_freeze_chance())
+        {
             try_add_slow_stacks(
                 hit_e,
                 &mut commands,

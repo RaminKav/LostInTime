@@ -6,6 +6,7 @@ use std::{
 use bevy::ecs::system::SystemParam;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::Collider;
+use strum::IntoEnumIterator;
 
 use crate::{
     ai::pathfinding::PathfindingCache,
@@ -19,11 +20,12 @@ use crate::{
     item::CraftingTracker,
     night::NightTracker,
     player::{
-        achievements::Achievements,
+        achievements::{Achievement, Achievements},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
         unlocks::{UnlockCurrency, UnlockedClasses},
     },
     ui::{
+        achievements_ui::{AchievementsPagination, ACHIEVEMENTS_PER_PAGE},
         class_selection::{
             persist_class_unlock_state, ClassSelectionState, ClassUnlockConfirmState,
             ClassUnlockHoverState, PlayerSelectSlot,
@@ -63,6 +65,7 @@ pub struct MenuButtonExtras<'w, 's> {
     hover_state: ResMut<'w, ClassUnlockHoverState>,
     achievements: Option<Res<'w, Achievements>>,
     class_slots: Query<'w, 's, &'static mut PlayerSelectSlot>,
+    pagination_state: ResMut<'w, AchievementsPagination>,
     screen_res: Res<'w, ScreenResolution>,
 }
 
@@ -79,6 +82,8 @@ pub enum MenuButton {
     Begin,
     ClassUnlockYes,
     ClassUnlockNo,
+    AchievementsPrev,
+    AchievementsNext,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -169,6 +174,29 @@ pub fn handle_menu_button_click_events(
                     continue;
                 }
                 next_ui_state.set(UIState::Achievements);
+                extras.pagination_state.page = 0;
+            }
+            MenuButton::AchievementsPrev => {
+                let total_achievements = Achievement::iter().count();
+                let total_pages =
+                    (total_achievements + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE;
+                if total_pages == 0 {
+                    continue;
+                }
+                if extras.pagination_state.page > 0 {
+                    extras.pagination_state.page -= 1;
+                }
+            }
+            MenuButton::AchievementsNext => {
+                let total_achievements = Achievement::iter().count();
+                let total_pages =
+                    (total_achievements + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE;
+                if total_pages == 0 {
+                    continue;
+                }
+                if extras.pagination_state.page + 1 < total_pages {
+                    extras.pagination_state.page += 1;
+                }
             }
             MenuButton::Quit => {
                 if info_modal_open {
