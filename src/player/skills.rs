@@ -999,8 +999,11 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare)
                     .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::IncreaseProjectilCount, HeirloomRarity::Rare)
-                    .set_repeatable(),
+                HeirloomChoiceState::new(
+                    Heirloom::IncreaseProjectilCount,
+                    HeirloomRarity::Legendary,
+                )
+                .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary)

@@ -418,7 +418,8 @@ pub fn handle_menu_button_click_events(
     }
 }
 pub fn spawn_menu_button(
-    pos: Vec3,
+    button_pos: Vec3,
+    text_offset: Vec3,
     text: &str,
     button_type: MenuButton,
     size: Vec2,
@@ -434,7 +435,7 @@ pub fn spawn_menu_button(
                     custom_size: Some(size),
                     ..Default::default()
                 },
-                transform: Transform::from_translation(pos),
+                transform: Transform::from_translation(button_pos),
                 ..Default::default()
             },
             Interactable::default(),
@@ -456,9 +457,9 @@ pub fn spawn_menu_button(
                     color: WHITE,
                 },
             ),
-            text_anchor: Anchor::Center,
+            text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(0., -1., 1.),
+                translation: text_offset,
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -478,7 +479,8 @@ pub fn spawn_menu_text_buttons(
     // Start Button
     spawn_menu_button(
         Vec3::new(42., -10.5, 1.),
-        "Start",
+        Vec3::new(-19., -1., 1.),
+        "Start ",
         MenuButton::Start,
         Vec2::new(48., 22.),
         &mut commands,
@@ -489,6 +491,7 @@ pub fn spawn_menu_text_buttons(
     // Achievements Button
     spawn_menu_button(
         Vec3::new(8., -34.5, 1.),
+        Vec3::new(-50., -1., 1.),
         "Achievements",
         MenuButton::Achievements,
         Vec2::new(118., 22.),
@@ -499,6 +502,7 @@ pub fn spawn_menu_text_buttons(
     // Options Button
     spawn_menu_button(
         Vec3::new(-8., -58., 1.),
+        Vec3::new(-26., -1., 1.),
         "Options",
         MenuButton::Options,
         Vec2::new(68., 22.),
@@ -510,6 +514,7 @@ pub fn spawn_menu_text_buttons(
     // Quit Button
     spawn_menu_button(
         Vec3::new(-39.5, -81., 1.),
+        Vec3::new(-14., -1., 1.),
         "Quit",
         MenuButton::Quit,
         Vec2::new(40., 22.),

@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::{fs::File, io::BufReader};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
     chaos::ChaosTracker,
-    client::{analytics::AnalyticsData, handle_append_run_data_after_death},
+    client::{analytics::AnalyticsData, handle_append_run_data_after_death, GameData},
+    datafiles,
     enemy::Mob,
     item::WorldObject,
     player::UnlockCurrency,
@@ -141,12 +143,34 @@ impl Achievements {
     }
 }
 
+fn persist_achievements_state(achievements: &Achievements) {
+    let path = datafiles::game_data();
+    let mut game_data = if let Ok(file) = File::open(&path) {
+        let reader = BufReader::new(file);
+        serde_json::from_reader::<_, GameData>(reader).unwrap_or_default()
+    } else {
+        GameData::default()
+    };
+
+    game_data.achievements = achievements.clone();
+
+    match File::create(&path) {
+        Ok(file) => {
+            if let Err(err) = serde_json::to_writer(file, &game_data) {
+                error!("Failed to persist achievements to game_data.json: {err:?}");
+            }
+        }
+        Err(err) => error!("Failed to create game_data.json while saving achievements: {err:?}"),
+    }
+}
+
 fn try_unlock(
     achievements: &mut Achievements,
     achievement: Achievement,
     achievement_events: &mut EventWriter<AchievementUnlockedEvent>,
 ) -> bool {
     if achievements.unlock(achievement) {
+        persist_achievements_state(achievements);
         achievement_events.send(AchievementUnlockedEvent {
             achievement,
             reward_currency: achievement.reward_currency(),
@@ -294,23 +318,37 @@ pub fn track_bounce_achievements(
     mut achievements: ResMut<Achievements>,
     mut achievement_events: EventWriter<AchievementUnlockedEvent>,
 ) {
+    const MIN_BOUNCE_INTERVAL_SECS: f64 = 0.2;
+    const CONSECUTIVE_INTERVAL_SECS: f64 = 0.38;
+
     let mut unlocked_bouncy = false;
     let mut unlocked_bouncy2 = false;
 
-    for event in bounce_events.iter() {
-        tracker.total_pink_bounces = tracker.total_pink_bounces.saturating_add(1);
-
+    for _event in bounce_events.iter() {
         let now = time.elapsed_seconds_f64();
-        tracker.consecutive_pink_bounces = if let Some(last) = tracker.last_bounce_time {
-            info!("Time since last bounce: {}", now - last);
-            if now - last <= 3.0 {
-                tracker.consecutive_pink_bounces.saturating_add(1)
-            } else {
-                1
+
+        if let Some(last) = tracker.last_bounce_time {
+            let delta = now - last;
+            if delta > CONSECUTIVE_INTERVAL_SECS {
+                tracker.last_bounce_time = None;
+                tracker.consecutive_pink_bounces = 0;
             }
-        } else {
-            1
-        };
+        }
+
+        let should_count = tracker
+            .last_bounce_time
+            .map_or(true, |last| now - last >= MIN_BOUNCE_INTERVAL_SECS);
+        if !should_count {
+            continue;
+        }
+
+        if let Some(last) = tracker.last_bounce_time {
+            let delta = now - last;
+            info!("Time since last bounce: {}", delta);
+        }
+
+        tracker.total_pink_bounces = tracker.total_pink_bounces.saturating_add(1);
+        tracker.consecutive_pink_bounces = tracker.consecutive_pink_bounces.saturating_add(1);
         tracker.last_bounce_time = Some(now);
 
         if !unlocked_bouncy && tracker.total_pink_bounces >= 100 {
