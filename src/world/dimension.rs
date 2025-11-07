@@ -215,6 +215,8 @@ impl DimensionPlugin {
                     .get(new_era)
                     .cloned()
                     .unwrap_or(WorldObjectCache::default());
+
+                game.era.visited_eras.push(new_era.clone());
                 commands.insert_resource(new_world_cache);
                 proto_commands.apply(format!("Era{}WorldGenerationParams", new_era.index() + 1));
             } else {

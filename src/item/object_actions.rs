@@ -6,6 +6,7 @@ use super::heirloom_shrine::HeirloomShrineState;
 use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
+use crate::assets::SpriteAnchor;
 use crate::attributes::ItemRarity;
 use crate::chaos::IncreaseChaosEvent;
 use crate::colors::RED;
@@ -477,6 +478,10 @@ impl ObjectAction {
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+
+                // let proto_ref: &ProtoParam =
+                //     unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
+                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
             }
             ObjectAction::ArmorShrine => {
                 // Screen Shake
@@ -508,6 +513,8 @@ impl ObjectAction {
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+
+                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
             }
             ObjectAction::AccessoryShrine => {
                 // Screen Shake
@@ -539,6 +546,8 @@ impl ObjectAction {
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+
+                mark_other_dungeon_shrines_completed(commands, game, proto_param, e);
             }
             ObjectAction::IncreaseChaos(amount) => {
                 item_action_param
@@ -637,5 +646,47 @@ impl TouchTriggerObjectAction {
             }
             _ => {}
         }
+    }
+}
+
+fn mark_other_dungeon_shrines_completed(
+    commands: &mut Commands,
+    game: &mut GameParam,
+    proto_param: &ProtoParam,
+    activated_entity: Entity,
+) {
+    let mut shrine_updates: Vec<(Entity, WorldObject, TileMapPosition)> = Vec::new();
+
+    for (entity, transform, _size, obj) in game.world_object_query.iter() {
+        if entity == activated_entity {
+            continue;
+        }
+
+        let done_object = match obj {
+            WorldObject::WeaponShrine => Some(WorldObject::WeaponShrineDone),
+            WorldObject::ArmorShrine => Some(WorldObject::ArmorShrineDone),
+            WorldObject::AccessoryShrine => Some(WorldObject::AccessoryShrineDone),
+            _ => None,
+        };
+
+        if let Some(done_obj) = done_object {
+            let anchor = proto_param
+                .get_component::<SpriteAnchor, _>(done_obj)
+                .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+            let tile_pos = world_pos_to_tile_pos(transform.translation().truncate() - anchor.0);
+
+            shrine_updates.push((entity, done_obj, tile_pos));
+        }
+    }
+
+    for (entity, done_obj, tile_pos) in shrine_updates {
+        commands
+            .entity(entity)
+            .insert(done_obj)
+            .insert(AsepriteAnimation::from(CombatShrineAnim::tags::DONE))
+            .remove::<ObjectAction>()
+            .remove::<InteractionGuideTrigger>();
+
+        game.add_object_to_chunk_cache(tile_pos, done_obj);
     }
 }
