@@ -69,18 +69,24 @@ impl Plugin for SchematicPlugin {
             // .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
             .add_systems(
                 (
-                    handle_new_scene_entities_parent_chunk.before(handle_placing_world_object),
                     save_schematic_scene,
                     load_schematic,
                     handle_new_loot_chest_spawn.after(CustomFlush),
                     clear_schematic_entities,
                     mark_new_world_obj_as_schematic,
-                    attempt_to_spawn_schematic_in_chunk,
-                    give_chunks_schematic_spawners
-                        .after(GenerationPlugin::generate_and_cache_objects),
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            );
+            )
+            .add_systems((
+                handle_new_scene_entities_parent_chunk
+                    .before(handle_placing_world_object)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                attempt_to_spawn_schematic_in_chunk
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                give_chunks_schematic_spawners
+                    .after(GenerationPlugin::generate_and_cache_objects)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            ));
     }
 }
 fn mark_new_world_obj_as_schematic(
@@ -286,6 +292,7 @@ pub fn handle_new_scene_entities_parent_chunk(
                             }
                         }
                     }
+                    info!("SPAWNED SCHEMATIC FOR {:?} AT POS {:?}", obj, pos);
                     place_item_event.send(PlaceItemEvent {
                         obj: *obj,
                         pos,
