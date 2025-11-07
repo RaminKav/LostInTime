@@ -40,9 +40,9 @@ use crate::{
     player::{
         class_rank::ClassRankSystem,
         levels::PlayerLevel,
-        skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
+        skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills, SkillClass},
         stats::{PlayerStats, SkillPoints},
-        Player, TimeFragmentCurrency,
+        Player, TimeFragmentCurrency, UnlockCurrency, UnlockedClasses,
     },
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer},
@@ -209,6 +209,10 @@ pub struct GameData {
     pub class_ranks: ClassRankSystem,
     pub high_scores: HighScores,
     pub achievements: Achievements,
+    #[serde(default)]
+    pub unlock_currency: u32,
+    #[serde(default)]
+    pub unlocked_classes: Vec<SkillClass>,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -222,6 +226,8 @@ pub fn handle_append_run_data_after_death(
     player_class: Option<Res<PlayerClass>>,
     run_score: Option<Res<RunScore>>,
     achievements: ResMut<Achievements>,
+    unlock_currency: Option<Res<UnlockCurrency>>,
+    unlocked_classes: Option<Res<UnlockedClasses>>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
@@ -339,6 +345,13 @@ pub fn handle_append_run_data_after_death(
 
         commands.insert_resource(game_data.clone().class_ranks);
         commands.insert_resource(game_data.clone().high_scores);
+
+        if let Some(currency) = unlock_currency.as_ref() {
+            game_data.unlock_currency = currency.amount;
+        }
+        if let Some(classes) = unlocked_classes.as_ref() {
+            game_data.unlocked_classes = classes.to_vec();
+        }
 
         let game_data_path = datafiles::game_data();
 

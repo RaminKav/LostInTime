@@ -61,11 +61,14 @@ pub fn handle_pet_spawner_interaction(
             };
 
             if let Some(achievements) = item_action_param.achievements.as_mut() {
-                if achievements.unlock(achievement) {
+                if achievements.unlock(achievement.clone()) {
                     // Achievement was newly unlocked, send event
                     item_action_param
                         .achievement_events
-                        .send(AchievementUnlockedEvent { achievement });
+                        .send(AchievementUnlockedEvent {
+                            achievement: achievement.clone(),
+                            reward_currency: achievement.reward_currency(),
+                        });
                 }
             }
 

@@ -31,6 +31,10 @@ use crate::pets::state::Pet;
 use crate::player::mage_skills::IceExplosion;
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
+use crate::player::{
+    get_default_unlocked_classes, ClassUnlockConfig, ClassUnlockData, UnlockCurrency,
+    UnlockedClasses,
+};
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::Portal;
@@ -333,6 +337,7 @@ impl GameAssetsPlugin {
         graphics_desc: Res<Assets<GraphicsDesc>>,
         recipes_desc: Res<Assets<RecipeListProto>>,
         class_pet_desc: Res<Assets<ClassPetData>>,
+        class_unlocks_assets: Res<Assets<ClassUnlockConfig>>,
         mut commands: Commands,
     ) {
         //let image_handle = assets.load("bevy_survival_sprites.png");
@@ -361,22 +366,43 @@ impl GameAssetsPlugin {
                     commands.insert_resource(game_data.class_ranks);
                     commands.insert_resource(game_data.high_scores);
                     commands.insert_resource(game_data.achievements);
+                    commands.insert_resource(UnlockCurrency {
+                        amount: game_data.unlock_currency,
+                    });
+                    let mut unlocked = UnlockedClasses::new(game_data.unlocked_classes);
+                    unlocked.ensure_defaults(&get_default_unlocked_classes());
+                    commands.insert_resource(unlocked);
                     info!("Loaded class ranks from game data (loading state)");
                 }
                 Err(err) => {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
                     commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+                    commands.insert_resource(UnlockCurrency::default());
+                    let mut unlocked = UnlockedClasses::default();
+                    unlocked.ensure_defaults(&get_default_unlocked_classes());
+                    commands.insert_resource(unlocked);
                 }
             }
         } else {
             commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
+            commands.insert_resource(UnlockCurrency::default());
+            let mut unlocked = UnlockedClasses::default();
+            unlocked.ensure_defaults(&get_default_unlocked_classes());
+            commands.insert_resource(unlocked);
         }
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
         let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
         let class_pet_desc_handle: Handle<ClassPetData> = sprite_sheet.class_desc.clone();
+        let class_unlock_desc_handle: Handle<ClassUnlockConfig> =
+            sprite_sheet.class_unlocks.clone();
         let sprite_desc = graphics_desc.get(&sprite_desc_handle).unwrap();
         let recipes_desc: &RecipeListProto = recipes_desc.get(&recipes_desc_handle).unwrap();
         let class_pet_data = class_pet_desc.get(&class_pet_desc_handle).unwrap();
+        if let Some(config) = class_unlocks_assets.get(&class_unlock_desc_handle) {
+            commands.insert_resource(ClassUnlockData::from_config(config));
+        } else {
+            commands.insert_resource(ClassUnlockData::default());
+        }
         let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),

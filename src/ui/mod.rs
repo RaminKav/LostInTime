@@ -8,6 +8,7 @@ pub mod item_chest;
 pub mod scrapper_ui;
 pub mod screen_effects;
 use class_selection::*;
+use class_selection::{ClassUnlockConfirmState, ClassUnlockHoverState};
 use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
@@ -28,6 +29,7 @@ pub use skill_choice_ui::*;
 mod active_skill_shrine_ui;
 mod interactions;
 mod inventory_ui;
+mod achievement_banner;
 pub mod minimap;
 mod player_hud;
 mod skill_choice_ui;
@@ -54,6 +56,7 @@ mod achievements_ui;
 pub use achievements_ui::*;
 use loading_screen::*;
 use crate::run_once_per_run;
+use crate::ui::achievement_banner::{debug_trigger_achievement_banner, handle_achievement_banner_events, update_achievement_banners};
 use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
@@ -94,6 +97,8 @@ impl Plugin for UIPlugin {
             .init_resource::<options_ui::AudioSettings>()
             .insert_resource(InventoryState::default())
             .insert_resource(ClassSelectionState::default())
+            .init_resource::<ClassUnlockHoverState>()
+            .init_resource::<ClassUnlockConfirmState>()
             .insert_resource(NewRecipeTextTimer::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -353,7 +358,11 @@ impl Plugin for UIPlugin {
                 handle_slot_deselection.run_if(in_state(UIState::ClassSelection)),
                 update_preview_sprites.run_if(in_state(UIState::ClassSelection)),
                 update_slot_visuals.run_if(in_state(UIState::ClassSelection)),
+                update_class_option_icons.run_if(in_state(UIState::ClassSelection)),
                 update_info_card.run_if(in_state(UIState::ClassSelection)),
+                update_unlock_currency_text.run_if(in_state(UIState::ClassSelection)),
+                update_class_unlock_panel.run_if(in_state(UIState::ClassSelection)),
+                update_class_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
             ))
             .add_system(init_goal_state.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
             .add_system(display_goal_text.run_if(resource_added::<GoalState>()).in_schedule(OnEnter(GameState::Main)))
@@ -366,8 +375,17 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
-            .add_system(handle_cursor_main_menu_buttons)
-           
+            .add_system(handle_cursor_main_menu_buttons);
+ 
+            app.add_systems((
+                debug_trigger_achievement_banner,
+                handle_achievement_banner_events,
+                update_achievement_banners
+            )
+                    .in_set(OnUpdate(GameState::Main)),
+            );
+
+        app
             .add_system(update_currency_text.run_if(in_state(GameState::Main)))
             .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
             .add_system(apply_system_buffers.in_set(CustomFlush));

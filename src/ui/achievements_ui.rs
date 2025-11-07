@@ -33,26 +33,26 @@ pub fn setup_achievements_ui(
     commands.entity(overlay).insert(AchievementsUI);
 
     // Title
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Achievements",
-                TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 20.0,
-                    color: crate::colors::YELLOW_2,
-                },
-            )
-            .with_alignment(TextAlignment::Center),
-            text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 80., 1.)),
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        AchievementsUI,
-        UIState::Achievements,
-        Name::new("Achievements Title"),
-    ));
+    // commands.spawn((
+    //     Text2dBundle {
+    //         text: Text::from_section(
+    //             "Achievements",
+    //             TextStyle {
+    //                 font: asset_server.load("fonts/alagard.ttf"),
+    //                 font_size: 30.0,
+    //                 color: crate::colors::YELLOW_2,
+    //             },
+    //         )
+    //         .with_alignment(TextAlignment::Center),
+    //         text_anchor: bevy::sprite::Anchor::Center,
+    //         transform: Transform::from_translation(Vec3::new(0., 80., 11.)),
+    //         ..Default::default()
+    //     },
+    //     RenderLayers::from_layers(&[3]),
+    //     AchievementsUI,
+    //     UIState::Achievements,
+    //     Name::new("Achievements Title"),
+    // ));
     let achievements_bg = commands
         .spawn(SpriteBundle {
             texture: graphics
@@ -77,7 +77,7 @@ pub fn setup_achievements_ui(
 
     // List all achievements
     let all_achievements: Vec<Achievement> = Achievement::iter().collect();
-    let start_y = 93.5;
+    let start_y = 92.5;
     let row_spacing = 23.0;
 
     for (i, achievement) in all_achievements.iter().enumerate() {
@@ -95,20 +95,33 @@ pub fn setup_achievements_ui(
             crate::colors::LIGHT_BROWN
         };
 
-        let achievement_name_text = spawn_text(
-            &mut commands,
-            &asset_server,
-            Vec3::new(-139., y_pos, 1.),
-            text_color,
-            achievement.get_name(),
-            bevy::sprite::Anchor::CenterLeft,
-            1.,
-            3,
-        );
+        let achievement_name_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        achievement.get_name(),
+                        TextStyle {
+                            font: asset_server.load("fonts/alagard.ttf"),
+                            font_size: 15.0,
+                            color: text_color,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: bevy::sprite::Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-147., y_pos, 1.)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                Name::new("Achievements desc"),
+            ))
+            .id();
+
         let achievement_desc_text = spawn_text(
             &mut commands,
             &asset_server,
-            Vec3::new(-60., y_pos, 1.),
+            Vec3::new(-21., y_pos, 1.),
             desc_text_color,
             achievement.get_desc(),
             bevy::sprite::Anchor::CenterLeft,

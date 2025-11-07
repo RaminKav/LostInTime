@@ -3,6 +3,7 @@ use std::{
     process::exit,
 };
 
+use bevy::ecs::system::SystemParam;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::Collider;
 
@@ -17,8 +18,18 @@ use crate::{
     datafiles,
     item::CraftingTracker,
     night::NightTracker,
-    player::skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
-    ui::{class_selection::ClassSelectionState, ChestContainer, FurnaceContainer, UIState},
+    player::{
+        achievements::Achievements,
+        skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
+        unlocks::{UnlockCurrency, UnlockedClasses},
+    },
+    ui::{
+        class_selection::{
+            persist_class_unlock_state, ClassSelectionState, ClassUnlockConfirmState,
+            ClassUnlockHoverState, PlayerSelectSlot,
+        },
+        ChestContainer, FurnaceContainer, UIState,
+    },
     world::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
@@ -27,6 +38,33 @@ use crate::{
 };
 
 use super::{scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement};
+
+#[derive(SystemParam)]
+pub struct MenuButtonExtras<'w, 's> {
+    info_modal: Query<'w, 's, Entity, With<InfoModal>>,
+    world_entities: Query<
+        'w,
+        's,
+        Entity,
+        (
+            Or<(With<Visibility>, With<ActiveDimension>, With<Collider>)>,
+            Without<DoNotDespawnOnGameOver>,
+        ),
+    >,
+    analytics_data: Option<ResMut<'w, AnalyticsData>>,
+    skills: Query<'w, 's, &'static PlayerSkills>,
+    night_tracker: Option<Res<'w, NightTracker>>,
+    seed: Option<Res<'w, GenerationSeed>>,
+    scrapper_event: EventWriter<'w, ScrapperEvent>,
+    selection_state: ResMut<'w, ClassSelectionState>,
+    confirm_state: ResMut<'w, ClassUnlockConfirmState>,
+    unlock_currency: Option<ResMut<'w, UnlockCurrency>>,
+    unlocked_classes: Option<ResMut<'w, UnlockedClasses>>,
+    hover_state: ResMut<'w, ClassUnlockHoverState>,
+    achievements: Option<Res<'w, Achievements>>,
+    class_slots: Query<'w, 's, &'static mut PlayerSelectSlot>,
+    screen_res: Res<'w, ScreenResolution>,
+}
 
 #[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
@@ -39,6 +77,8 @@ pub enum MenuButton {
     Scrapper,
     Back,
     Begin,
+    ClassUnlockYes,
+    ClassUnlockNo,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -106,57 +146,44 @@ pub fn handle_menu_button_click_events(
     mut next_state: ResMut<NextState<GameState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
-    info_modal: Query<Entity, With<InfoModal>>,
-    everything: Query<
-        Entity,
-        (
-            Or<(With<Visibility>, With<ActiveDimension>, With<Collider>)>,
-            Without<DoNotDespawnOnGameOver>,
-        ),
-    >,
-    mut analytics_data: Option<ResMut<AnalyticsData>>,
-    skills: Query<&PlayerSkills>,
-    night_tracker: Option<Res<NightTracker>>,
-    seed: Option<Res<GenerationSeed>>,
-    mut scrapper_event: EventWriter<ScrapperEvent>,
-    selection_state: ResMut<ClassSelectionState>,
-    res: Res<crate::ScreenResolution>,
+    mut extras: MenuButtonExtras,
 ) {
     for event in event_reader.iter() {
+        let info_modal_open = extras.info_modal.iter().next().is_some();
         match event.button {
             MenuButton::Start => {
-                if info_modal.iter().count() != 0 {
+                if info_modal_open {
                     continue;
                 }
                 // Show class selection UI instead of starting game immediately
                 next_ui_state.set(UIState::ClassSelection);
             }
             MenuButton::Options => {
-                if info_modal.iter().count() != 0 {
+                if info_modal_open {
                     continue;
                 }
                 next_ui_state.set(UIState::Options);
             }
             MenuButton::Achievements => {
-                if info_modal.iter().count() != 0 {
+                if info_modal_open {
                     continue;
                 }
                 next_ui_state.set(UIState::Achievements);
             }
             MenuButton::Quit => {
-                if info_modal.iter().count() != 0 {
+                if info_modal_open {
                     continue;
                 }
                 info!("Quit button pressed, quitting!");
                 exit(0);
             }
             MenuButton::InfoOK => {
-                for e in info_modal.iter() {
+                for e in extras.info_modal.iter() {
                     commands.entity(e).despawn_recursive();
                 }
             }
             MenuButton::Scrapper => {
-                scrapper_event.send_default();
+                extras.scrapper_event.send_default();
             }
             MenuButton::Back => {
                 next_ui_state.set(crate::ui::UIState::Closed);
@@ -164,14 +191,19 @@ pub fn handle_menu_button_click_events(
             MenuButton::Begin => {
                 // Confirm button clicked
                 // Check if class is selected (pet is optional)
-                if let Some(class) = &selection_state.selected_class {
+                if let Some(class) = &extras.selection_state.selected_class {
                     // Close the class selection UI and transition to loading state
                     next_ui_state.set(UIState::Closed);
                     next_state.set(crate::GameState::Initializing);
                     // Add PlayerClass component to the game
                     commands.insert_resource(PlayerClass {
                         class: class.clone(),
-                        pets: selection_state.selected_pet.iter().cloned().collect(),
+                        pets: extras
+                            .selection_state
+                            .selected_pet
+                            .iter()
+                            .cloned()
+                            .collect(),
                     });
 
                     // Initialize game resources
@@ -190,7 +222,7 @@ pub fn handle_menu_button_click_events(
                             sprite: Sprite {
                                 color: Color::rgba(0., 0., 0., 0.),
                                 custom_size: Some(Vec2::new(
-                                    res.game_width + 10.,
+                                    extras.screen_res.game_width + 10.,
                                     crate::GAME_HEIGHT + 20.,
                                 )),
                                 ..default()
@@ -215,12 +247,90 @@ pub fn handle_menu_button_click_events(
                     info!("Please select a class before confirming");
                 }
             }
+            MenuButton::ClassUnlockNo => {
+                if extras.confirm_state.active {
+                    extras.confirm_state.active = false;
+                    extras.confirm_state.class = None;
+                    extras.confirm_state.cost = 0;
+                    extras.confirm_state.anchor_position = Vec3::ZERO;
+                }
+            }
+            MenuButton::ClassUnlockYes => {
+                if extras.confirm_state.active {
+                    if let Some(class) = extras.confirm_state.class.clone() {
+                        let cost = extras.confirm_state.cost;
+                        let mut unlocked_class = false;
+
+                        match (
+                            extras.unlock_currency.as_mut(),
+                            extras.unlocked_classes.as_mut(),
+                        ) {
+                            (Some(currency_res), Some(unlocked_res)) => {
+                                let currency = currency_res.as_mut();
+                                let unlocked = unlocked_res.as_mut();
+
+                                if currency.spend(cost) {
+                                    if unlocked.insert(class.clone()) {
+                                        unlocked_class = true;
+                                    }
+                                } else {
+                                    warn!(
+                                        "Attempted to unlock {:?} without enough currency (cost: {}, owned: {})",
+                                        class,
+                                        cost,
+                                        currency.amount
+                                    );
+                                }
+                            }
+                            _ => {
+                                warn!(
+                                    "Unlock resources unavailable when attempting to unlock {:?}",
+                                    class
+                                );
+                            }
+                        }
+
+                        if unlocked_class {
+                            for mut slot in extras.class_slots.iter_mut() {
+                                if slot.class == class {
+                                    slot.is_locked = false;
+                                }
+                            }
+
+                            extras.selection_state.selected_class = Some(class.clone());
+                            extras.hover_state.hovered_class = None;
+                            extras.hover_state.slot_position = Vec3::ZERO;
+
+                            if let (Some(currency_res), Some(unlocked_res)) = (
+                                extras.unlock_currency.as_ref(),
+                                extras.unlocked_classes.as_ref(),
+                            ) {
+                                let currency_ref = currency_res.as_ref();
+                                let unlocked_ref = unlocked_res.as_ref();
+                                persist_class_unlock_state(
+                                    Some(currency_ref),
+                                    unlocked_ref,
+                                    extras.achievements.as_ref().map(|a| a.as_ref()),
+                                );
+                            }
+                        }
+                    }
+                    extras.confirm_state.active = false;
+                    extras.confirm_state.class = None;
+                    extras.confirm_state.cost = 0;
+                    extras.confirm_state.anchor_position = Vec3::ZERO;
+                }
+            }
             MenuButton::GameOverOK => {
-                let analytics_data = analytics_data.as_mut().unwrap();
+                let Some(analytics_data_res) = extras.analytics_data.as_mut() else {
+                    continue;
+                };
+                let analytics_data = analytics_data_res.as_mut();
 
                 //set end of game analytics data
-                let night_tracker = night_tracker.as_ref().unwrap();
-                analytics_data.skills = skills
+                let night_tracker = extras.night_tracker.as_ref().unwrap();
+                analytics_data.skills = extras
+                    .skills
                     .iter()
                     .next()
                     .unwrap()
@@ -236,7 +346,10 @@ pub fn handle_menu_button_click_events(
                 if let Ok(()) = create_dir_all(analytics_dir) {
                     let analytics_file = {
                         let mut file = datafiles::analytics_dir();
-                        file.push(format!("analytics_{}.json", seed.as_ref().unwrap().seed));
+                        file.push(format!(
+                            "analytics_{}.json",
+                            extras.seed.as_ref().unwrap().seed
+                        ));
                         file
                     };
                     let file = File::create(analytics_file)
@@ -255,7 +368,7 @@ pub fn handle_menu_button_click_events(
                     connect_server(analytics_data.clone());
                 }
                 info!("Despawning everything, Sending to main menu");
-                for e in everything.iter() {
+                for e in extras.world_entities.iter() {
                     commands.entity(e).despawn();
                 }
                 let _ = fs::remove_file(datafiles::save_file());
@@ -381,7 +494,7 @@ pub fn spawn_menu_text_buttons(
 #[derive(Component)]
 pub struct OptionsUI;
 
-pub fn handle_enter_options_ui(
+pub fn _handle_enter_options_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,

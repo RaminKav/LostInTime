@@ -1196,6 +1196,8 @@ pub fn handle_cursor_main_menu_buttons(
                             | MenuButton::Quit
                             | MenuButton::Back
                             | MenuButton::Begin
+                            | MenuButton::ClassUnlockYes
+                            | MenuButton::ClassUnlockNo
                     ) {
                         commands
                             .entity(e)

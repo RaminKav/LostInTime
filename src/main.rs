@@ -113,6 +113,7 @@ use world::{
 use world::{dimension::EraManager, WorldGeneration};
 
 use crate::assets::{ClassPetData, SpriteAnchor};
+use crate::player::ClassUnlockConfig;
 use lazy_static::lazy_static;
 
 use logs_wheel::LogFileInitializer;
@@ -201,6 +202,9 @@ fn main() {
         )
         .add_plugin(RonAssetPlugin::<GraphicsDesc>::new(&["desc.ron"]))
         .add_plugin(RonAssetPlugin::<ClassPetData>::new(&["class.ron"]))
+        .add_plugin(RonAssetPlugin::<ClassUnlockConfig>::new(&[
+            "class_unlocks.ron",
+        ]))
         .add_plugin(RonAssetPlugin::<RecipeListProto>::new(&["ron"]))
         .insert_resource(Msaa::Off)
         .insert_resource(FixedTime::new_from_secs(TIME_STEP))
@@ -348,6 +352,8 @@ pub struct ImageAssets {
     pub class_desc: Handle<ClassPetData>,
     #[asset(path = "recipes/recipes.ron")]
     pub recipes: Handle<RecipeListProto>,
+    #[asset(path = "data/class_unlocks.class_unlocks.ron")]
+    pub class_unlocks: Handle<ClassUnlockConfig>,
 }
 
 #[derive(Component)]

@@ -31,11 +31,13 @@ pub mod melee_skills;
 pub mod rogue_skills;
 pub mod score;
 pub mod skills;
+pub mod unlocks;
 pub use achievements::*;
 pub use class_rank::*;
 pub use currency::*;
 use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
 pub use score::*;
+pub use unlocks::*;
 pub mod stats;
 use crate::{
     ai::{follow, idle, leap_attack},

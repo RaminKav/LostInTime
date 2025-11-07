@@ -121,6 +121,7 @@ pub struct PlayerShadow {
     pub owner: Entity,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct BounceEvent;
 /// System to update bounce effect and apply to player position
 pub fn update_bounce_effect(
@@ -209,7 +210,7 @@ pub fn bounce_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
-    events: EventReader<BounceEvent>,
+    mut bounce_events: EventReader<BounceEvent>,
 ) {
     let (player_e, transform, bounce_opt, speed, hunger) = player_query.single_mut();
 
@@ -242,8 +243,13 @@ pub fn bounce_player(
             d = d.normalize();
         }
 
-        // Trigger bounce on Space key (or your preferred input)
-        if events.len() != 0 && d.length() > 0.0 {
+        let mut received_bounce_trigger = false;
+        for _event in bounce_events.iter() {
+            received_bounce_trigger = true;
+        }
+
+        // Trigger bounce when we have at least one bounce event this frame and movement input
+        if received_bounce_trigger && d.length() > 0.0 {
             let start_pos = Vec2::new(transform.translation.x, transform.translation.y);
             let direction = d.normalize();
             let s = PLAYER_MOVE_SPEED
