@@ -25,6 +25,7 @@ use crate::player::{
     score::{HighScores, RunScore},
     Achievements,
 };
+use crate::player::unlocks::UnlockUpgrades;
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
@@ -213,6 +214,8 @@ pub struct GameData {
     pub unlock_currency: u32,
     #[serde(default)]
     pub unlocked_classes: Vec<SkillClass>,
+    #[serde(default)]
+    pub unlock_upgrades: UnlockUpgrades,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -228,6 +231,7 @@ pub fn handle_append_run_data_after_death(
     achievements: ResMut<Achievements>,
     unlock_currency: Option<Res<UnlockCurrency>>,
     unlocked_classes: Option<Res<UnlockedClasses>>,
+    unlock_upgrades: Option<Res<UnlockUpgrades>>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
@@ -351,6 +355,9 @@ pub fn handle_append_run_data_after_death(
         }
         if let Some(classes) = unlocked_classes.as_ref() {
             game_data.unlocked_classes = classes.to_vec();
+        }
+        if let Some(upgrades) = unlock_upgrades.as_ref() {
+            game_data.unlock_upgrades = upgrades.as_ref().clone();
         }
 
         let game_data_path = datafiles::game_data();

@@ -5,6 +5,7 @@ use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::ProtoCommands;
 use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use strum_macros::{Display, EnumIter};
 
 use crate::{
@@ -917,16 +918,16 @@ impl HeirloomChoiceState {
 #[derive(Resource, Clone, Serialize, Deserialize)]
 pub struct HeirloomChoiceQueue {
     pub queue: Vec<[HeirloomChoiceState; 3]>,
-    pub rerolls: [bool; 3],
     pub pool: Vec<HeirloomChoiceState>,
     pub active_heirloom_limbo: Option<ActiveSkillChoiceState>,
+    #[serde(default)]
+    pub banned: HashSet<Heirloom>,
 }
 
 impl Default for HeirloomChoiceQueue {
     fn default() -> Self {
         Self {
             queue: Default::default(),
-            rerolls: [true; 3],
             active_heirloom_limbo: None,
             pool: vec![
                 HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common)
@@ -1017,6 +1018,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon)
                     .set_repeatable(),
             ],
+            banned: HashSet::default(),
         }
     }
 }
@@ -1024,7 +1026,6 @@ impl HeirloomChoiceQueue {
     pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
         //only push if queue is empty
         if self.queue.is_empty() {
-            self.rerolls = [true; 3];
             let mut new_skills: [HeirloomChoiceState; 3] = Default::default();
             let mut add_back_to_pool: Vec<HeirloomChoiceState> = vec![];
             for i in 0..3 {
@@ -1039,7 +1040,10 @@ impl HeirloomChoiceQueue {
                     self.pool.retain(|x| x != &new_skills[i]);
                 }
             }
-            for skill in add_back_to_pool.iter() {
+            for skill in add_back_to_pool
+                .iter()
+                .filter(|skill| !self.banned.contains(&skill.heirloom))
+            {
                 self.pool.push(skill.clone());
             }
 
@@ -1054,7 +1058,7 @@ impl HeirloomChoiceQueue {
     ) -> Option<HeirloomChoiceState> {
         self.pool
             .iter()
-            .filter(|x| x.rarity == rarity && filter(x))
+            .filter(|x| x.rarity == rarity && filter(x) && !self.banned.contains(&x.heirloom))
             .choose(rng)
             .cloned()
     }
@@ -1116,21 +1120,41 @@ impl HeirloomChoiceQueue {
         }
     }
     pub fn handle_reroll_slot(&mut self, slot: usize, rng: &mut rand::rngs::ThreadRng) {
-        if self.rerolls[slot] {
-            self.rerolls[slot] = false;
-            let old_skill = self.queue[0][slot].clone();
-            let rarity = HeirloomChoiceQueue::gen_rarity(rng);
-            //TODO: consolidate this code with the main skill picking area?
-            if let Some(picked_skill) =
-                self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
-            {
-                if picked_skill.is_one_time_heirloom {
-                    self.pool.retain(|x| x != &picked_skill);
-                }
-                self.pool.push(old_skill);
-                self.queue[0][slot] = picked_skill;
+        if self.queue.is_empty() {
+            return;
+        }
+        let old_skill = self.queue[0][slot].clone();
+        let rarity = HeirloomChoiceQueue::gen_rarity(rng);
+        if let Some(picked_skill) =
+            self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
+        {
+            if picked_skill.is_one_time_heirloom {
+                self.pool.retain(|x| x != &picked_skill);
+            }
+            self.pool.push(old_skill);
+            self.queue[0][slot] = picked_skill;
+        }
+    }
+
+    pub fn banish_slot(&mut self, slot: usize) -> Option<HeirloomChoiceState> {
+        if self.queue.is_empty() {
+            return None;
+        }
+        let choices = self.queue.remove(0);
+        let banned_choice = choices[slot].clone();
+        self.banned.insert(banned_choice.heirloom.clone());
+        self.pool.retain(|x| x.heirloom != banned_choice.heirloom);
+
+        for (index, choice) in choices.into_iter().enumerate() {
+            if index == slot {
+                continue;
+            }
+            if !self.banned.contains(&choice.heirloom) {
+                self.pool.push(choice);
             }
         }
+
+        Some(banned_choice)
     }
 }
 

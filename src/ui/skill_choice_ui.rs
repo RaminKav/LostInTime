@@ -6,6 +6,7 @@ use crate::{
     assets::Graphics,
     colors::{BLACK, WHITE},
     player::skills::{HeirloomChoiceQueue, HeirloomChoiceState},
+    player::unlocks::RunUnlockState,
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
@@ -29,6 +30,18 @@ pub struct SkillTitleText;
 #[derive(Component)]
 pub struct RerollDice(pub usize);
 
+#[derive(Component)]
+pub struct BanishButton(pub usize);
+
+#[derive(Component)]
+pub struct BanishButtonLabel;
+
+#[derive(Component)]
+pub struct RerollCountText;
+
+#[derive(Component)]
+pub struct BanishCountText;
+
 aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
 
 pub fn setup_skill_choice_ui(
@@ -38,6 +51,7 @@ pub fn setup_skill_choice_ui(
     choices_queue: Res<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     res: Res<ScreenResolution>,
+    run_unlocks: Res<RunUnlockState>,
 ) {
     if choices_queue.queue.is_empty() {
         next_ui_state.set(UIState::Closed);
@@ -98,37 +112,146 @@ pub fn setup_skill_choice_ui(
     );
 
     for i in -1i32..2 {
-        if !choices_queue.rerolls[(i + 1) as usize] {
-            continue;
+        let slot_index = (i + 1) as usize;
+        let enabled = run_unlocks.rerolls_remaining > 0;
+        let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5, -70., 10.);
+        let mut reroll_entity = commands.spawn(SpriteBundle {
+            texture: graphics
+                .get_ui_element_texture(UIElement::RerollDice)
+                .clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(21., 22.)),
+                color: if enabled {
+                    Color::WHITE
+                } else {
+                    Color::rgb(0.55, 0.55, 0.55)
+                },
+                ..Default::default()
+            },
+            transform: Transform {
+                translation,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        reroll_entity
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIElement::RerollDice)
+            .insert(UIState::Skills)
+            .insert(RerollDice(slot_index))
+            .insert(Name::new(format!("REROLL BUTTON {slot_index}")));
+        if enabled {
+            reroll_entity.insert(Interactable::default());
         }
-        // reroll dice icon
-        commands
-            .spawn(SpriteBundle {
+    }
+
+    let banish_enabled = run_unlocks.banishes_remaining > 0;
+    if banish_enabled {
+        for i in -1i32..2 {
+            let slot_index = (i + 1) as usize;
+            let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -96., 10.);
+            let mut banish_button = commands.spawn(SpriteBundle {
                 texture: graphics
-                    .get_ui_element_texture(UIElement::RerollDice)
+                    .get_ui_element_texture(UIElement::BackButton)
                     .clone(),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(21., 22.)),
+                    custom_size: Some(Vec2::new(48., 18.)),
+                    color: if banish_enabled {
+                        Color::WHITE
+                    } else {
+                        Color::rgb(0.5, 0.5, 0.5)
+                    },
                     ..Default::default()
                 },
                 transform: Transform {
-                    translation: Vec3::new(
-                        i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5,
-                        -70.,
-                        10.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
+                    translation,
+                    scale: Vec3::new(0.85, 0.85, 1.),
                     ..Default::default()
                 },
                 ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(UIElement::RerollDice)
-            .insert(Interactable::default())
-            .insert(UIState::Skills)
-            .insert(RerollDice((i + 1) as usize))
-            .insert(Name::new("DICE"));
+            });
+            let banish_entity = banish_button.id();
+            banish_button
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(UIState::Skills)
+                .insert(UIElement::BackButton)
+                .insert(BanishButton(slot_index))
+                .insert(Name::new(format!("BANISH BUTTON {slot_index}")));
+            if banish_enabled {
+                banish_button.insert(Interactable::default());
+            }
+
+            commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            "Banish ",
+                            TextStyle {
+                                font: asset_server.load("fonts/4x5.ttf"),
+                                font_size: 5.0,
+                                color: if banish_enabled {
+                                    WHITE
+                                } else {
+                                    Color::rgb(0.7, 0.7, 0.7)
+                                },
+                            },
+                        )
+                        .with_alignment(TextAlignment::Center),
+                        text_anchor: Anchor::Center,
+                        transform: Transform::from_translation(Vec3::new(1.4, -0.7, 1.)),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    UIState::Skills,
+                    BanishButtonLabel,
+                    Name::new(format!("BANISH BUTTON TEXT {slot_index}")),
+                ))
+                .set_parent(banish_entity);
+        }
     }
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                format!("Rerolls: {}", run_unlocks.rerolls_remaining),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(-80.5, -110., 15.)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        UIState::Skills,
+        RerollCountText,
+        Name::new("Reroll Count Text"),
+    ));
+
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                format!("Banishes: {}", run_unlocks.banishes_remaining),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: WHITE,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(80., -110., 15.)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        UIState::Skills,
+        BanishCountText,
+        Name::new("Banish Count Text"),
+    ));
 }
 
 pub fn tick_skill_choice_interaction_lock_timers(
@@ -357,4 +480,54 @@ pub fn spawn_skill_choice_flash(
         .insert(VisibilityBundle::default())
         .insert(RerollDice(slot))
         .insert(DoneAnimation);
+}
+
+pub fn update_skill_choice_button_states(
+    run_unlocks: Res<RunUnlockState>,
+    mut reroll_buttons: Query<&mut Sprite, (With<RerollDice>, Without<BanishButton>)>,
+    mut banish_buttons: Query<&mut Sprite, (With<BanishButton>, Without<RerollDice>)>,
+    mut banish_labels: Query<&mut Text, With<BanishButtonLabel>>,
+) {
+    if !run_unlocks.is_changed() {
+        return;
+    }
+
+    let reroll_color = if run_unlocks.rerolls_remaining > 0 {
+        Color::WHITE
+    } else {
+        Color::rgb(0.55, 0.55, 0.55)
+    };
+    for mut sprite in reroll_buttons.iter_mut() {
+        sprite.color = reroll_color;
+    }
+
+    let (banish_color, label_color) = if run_unlocks.banishes_remaining > 0 {
+        (Color::WHITE, WHITE)
+    } else {
+        (Color::rgb(0.5, 0.5, 0.5), Color::rgb(0.7, 0.7, 0.7))
+    };
+    for mut sprite in banish_buttons.iter_mut() {
+        sprite.color = banish_color;
+    }
+    for mut text in banish_labels.iter_mut() {
+        text.sections[0].style.color = label_color;
+    }
+}
+
+pub fn update_skill_choice_count_text(
+    run_unlocks: Res<RunUnlockState>,
+    mut reroll_texts: Query<&mut Text, (With<RerollCountText>, Without<BanishCountText>)>,
+    mut banish_texts: Query<&mut Text, (With<BanishCountText>, Without<RerollCountText>)>,
+) {
+    if !run_unlocks.is_changed() {
+        return;
+    }
+
+    for mut text in reroll_texts.iter_mut() {
+        text.sections[0].value = format!("Rerolls: {}", run_unlocks.rerolls_remaining);
+    }
+
+    for mut text in banish_texts.iter_mut() {
+        text.sections[0].value = format!("Banishes: {}", run_unlocks.banishes_remaining);
+    }
 }

@@ -40,10 +40,14 @@ impl Plugin for CollisionPlugion {
                 check_mob_to_player_collisions,
                 check_projectile_hit_mob_collisions,
                 check_projectile_hit_player_collisions,
-                check_item_drop_collisions.after(CustomFlush),
                 check_object_trigger_collisions.after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
+        )
+        .add_system(
+            check_item_drop_collisions
+                .after(CustomFlush)
+                .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
         );
     }
 }
@@ -410,7 +414,7 @@ pub fn check_item_drop_collisions(
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
     resolution: Res<ScreenResolution>,
 ) {
-    if !game.player().is_moving {
+    if !game.player().is_moving && !inv.single().is_empty() {
         return;
     }
     let player_e = player.single();

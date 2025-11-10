@@ -1,8 +1,6 @@
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
-use std::fs::File;
-use std::io::BufReader;
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -10,9 +8,7 @@ use crate::{
     assets::Graphics,
     attributes::ItemAttributes,
     audio::{AudioSoundEffect, SoundSpawner},
-    client::GameData,
     colors::{DARK_WOOD_BROWN, GREY, WHITE},
-    datafiles,
     inputs::CursorPos,
     inventory::ItemStack,
     item::ItemDisplayMetaData,
@@ -21,6 +17,7 @@ use crate::{
         class_rank::ClassRankSystem,
         score::HighScores,
         skills::SkillClass,
+        unlocks::{persist_unlock_data, UnlockUpgrades},
         ClassUnlockData, UnlockCurrency, UnlockedClasses,
     },
     ui::{spawn_back_button, spawn_back_button_texture_only, MenuButton, UIElement, UIState},
@@ -1035,29 +1032,14 @@ pub fn persist_class_unlock_state(
     unlock_currency: Option<&UnlockCurrency>,
     unlocked_classes: &UnlockedClasses,
     achievements: Option<&Achievements>,
+    unlock_upgrades: Option<&UnlockUpgrades>,
 ) {
-    let path = datafiles::game_data();
-    let mut game_data = if let Ok(file) = File::open(&path) {
-        let reader = BufReader::new(file);
-        serde_json::from_reader::<_, GameData>(reader).unwrap_or_default()
-    } else {
-        GameData::default()
-    };
-
-    if let Some(achievements) = achievements {
-        game_data.achievements = achievements.clone();
-    }
-    game_data.unlock_currency = unlock_currency.as_ref().map_or(0, |c| c.amount);
-    game_data.unlocked_classes = unlocked_classes.to_vec();
-
-    match File::create(&path) {
-        Ok(file) => {
-            if let Err(err) = serde_json::to_writer(file, &game_data) {
-                error!("Failed to write game_data.json: {err:?}");
-            }
-        }
-        Err(err) => error!("Failed to create game_data.json: {err:?}"),
-    }
+    persist_unlock_data(
+        unlock_currency,
+        Some(unlocked_classes),
+        achievements,
+        unlock_upgrades,
+    );
 }
 
 fn spawn_player_preview(

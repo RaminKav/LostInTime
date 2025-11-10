@@ -14,7 +14,7 @@ use crate::{
     audio::UpdateBGMTrackEvent,
     chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
-    colors::{overwrite_alpha, BLACK, WHITE},
+    colors::{overwrite_alpha, WHITE},
     container::ContainerRegistry,
     datafiles,
     item::CraftingTracker,
@@ -22,7 +22,7 @@ use crate::{
     player::{
         achievements::{Achievement, Achievements},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
-        unlocks::{UnlockCurrency, UnlockedClasses},
+        unlocks::{RunUnlockState, UnlockCurrency, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
         achievements_ui::{AchievementsPagination, ACHIEVEMENTS_PER_PAGE},
@@ -39,7 +39,7 @@ use crate::{
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
 };
 
-use super::{scrapper_ui::ScrapperEvent, ui_helpers::spawn_ui_overlay, Interactable, UIElement};
+use super::{scrapper_ui::ScrapperEvent, Interactable, UIElement};
 
 #[derive(SystemParam)]
 pub struct MenuButtonExtras<'w, 's> {
@@ -62,17 +62,19 @@ pub struct MenuButtonExtras<'w, 's> {
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
     unlock_currency: Option<ResMut<'w, UnlockCurrency>>,
     unlocked_classes: Option<ResMut<'w, UnlockedClasses>>,
+    unlock_upgrades: Res<'w, UnlockUpgrades>,
     hover_state: ResMut<'w, ClassUnlockHoverState>,
     achievements: Option<Res<'w, Achievements>>,
     class_slots: Query<'w, 's, &'static mut PlayerSelectSlot>,
     pagination_state: ResMut<'w, AchievementsPagination>,
+    run_unlock_state: ResMut<'w, RunUnlockState>,
     screen_res: Res<'w, ScreenResolution>,
 }
 
 #[derive(Component, Clone, Eq, PartialEq)]
 pub enum MenuButton {
     Start,
-    Options,
+    Unlocks,
     Achievements,
     Quit,
     InfoOK,
@@ -163,11 +165,11 @@ pub fn handle_menu_button_click_events(
                 // Show class selection UI instead of starting game immediately
                 next_ui_state.set(UIState::ClassSelection);
             }
-            MenuButton::Options => {
+            MenuButton::Unlocks => {
                 if info_modal_open {
                     continue;
                 }
-                next_ui_state.set(UIState::Options);
+                next_ui_state.set(UIState::Unlocks);
             }
             MenuButton::Achievements => {
                 if info_modal_open {
@@ -238,11 +240,15 @@ pub fn handle_menu_button_click_events(
                     commands.init_resource::<crate::Game>();
                     commands.init_resource::<NightTracker>();
                     commands.init_resource::<ChaosTracker>();
-                    commands.init_resource::<HeirloomChoiceQueue>();
+                    commands.insert_resource(HeirloomChoiceQueue::default());
                     commands.init_resource::<ContainerRegistry>();
                     commands.init_resource::<PathfindingCache>();
                     commands.init_resource::<CraftingTracker>();
                     commands.init_resource::<EraManager>();
+
+                    extras
+                        .run_unlock_state
+                        .reset_for_run(&*extras.unlock_upgrades);
 
                     // Start the game with fade-in overlay
                     commands
@@ -339,6 +345,7 @@ pub fn handle_menu_button_click_events(
                                     Some(currency_ref),
                                     unlocked_ref,
                                     extras.achievements.as_ref().map(|a| a.as_ref()),
+                                    Some(&*extras.unlock_upgrades),
                                 );
                             }
                         }
@@ -499,12 +506,12 @@ pub fn spawn_menu_text_buttons(
         &graphics,
         &asset_server,
     );
-    // Options Button
+    // Unlocks Button
     spawn_menu_button(
         Vec3::new(-8., -58., 1.),
-        Vec3::new(-26., -1., 1.),
-        "Options",
-        MenuButton::Options,
+        Vec3::new(-29., -1.5, 1.),
+        "Unlocks",
+        MenuButton::Unlocks,
         Vec2::new(68., 22.),
         &mut commands,
         &graphics,
@@ -522,124 +529,6 @@ pub fn spawn_menu_text_buttons(
         &graphics,
         &asset_server,
     );
-}
-
-#[derive(Component)]
-pub struct OptionsUI;
-
-pub fn _handle_enter_options_ui(
-    mut commands: Commands,
-    graphics: Res<Graphics>,
-    asset_server: Res<AssetServer>,
-    res: Res<ScreenResolution>,
-) {
-    let (size, texture, t_offset) = (
-        crate::ui::OPTIONS_UI_SIZE,
-        graphics.get_ui_element_texture(UIElement::Options),
-        Vec2::new(0., 0.),
-    );
-
-    let overlay = spawn_ui_overlay(
-        &mut commands,
-        Vec2::new(res.game_width + 10., GAME_HEIGHT + 20.),
-        0.95,
-        9.,
-    );
-
-    let stats_e = commands
-        .spawn(SpriteBundle {
-            texture,
-            sprite: Sprite {
-                custom_size: Some(size),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(t_offset.x, t_offset.y, 10.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(OptionsUI)
-        .insert(Name::new("STATS UI"))
-        .insert(UIState::Options)
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
-
-    for i in 0..4 {
-        let translation = Vec3::new(6., (-i as f32 * 21.) + 10., 1.);
-        let mut slot_entity = commands.spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::StatsButton),
-            transform: Transform {
-                translation,
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(16., 16.)),
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        slot_entity
-            .set_parent(stats_e)
-            .insert(Interactable::default())
-            .insert(UIElement::StatsButton)
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("STATS BUTTON"));
-
-        let mut text = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Update",
-                    TextStyle {
-                        font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                        font_size: 8.0,
-                        color: BLACK,
-                    },
-                ),
-                text_anchor: Anchor::CenterLeft,
-                transform: Transform {
-                    translation: Vec3::new(23., (-i as f32 * 21.) + 10., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            Name::new("STATS TEXT"),
-            RenderLayers::from_layers(&[3]),
-        ));
-        text.set_parent(stats_e)
-            .insert(RenderLayers::from_layers(&[3]));
-    }
-
-    // sp remaining text
-    let mut sp_text = commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                "Update",
-                TextStyle {
-                    font: asset_server.load("fonts/Kitchen Sink.ttf"),
-                    font_size: 8.0,
-                    color: BLACK,
-                },
-            ),
-            text_anchor: Anchor::CenterLeft,
-            transform: Transform {
-                translation: Vec3::new(29., 43., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        },
-        Name::new("SP TEXT"),
-        RenderLayers::from_layers(&[3]),
-    ));
-    sp_text
-        .set_parent(stats_e)
-        .insert(RenderLayers::from_layers(&[3]));
-
-    commands.entity(stats_e).push_children(&[overlay]);
 }
 
 pub fn tick_game_start_overlay(

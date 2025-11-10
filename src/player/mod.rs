@@ -15,6 +15,7 @@ use melee_skills::{
     handle_second_split_attack, handle_spear, handle_spear_gravity, tick_parried_timer,
     ParrySuccessEvent,
 };
+use rand::seq::SliceRandom;
 use rogue_skills::{
     handle_add_combo_counter, handle_dodge_crit, handle_enemy_death_sprint_reset, handle_lunge,
     handle_lunge_cooldown, handle_sprint_timer, handle_sprinting_cooldown, handle_toggle_sprinting,
@@ -392,8 +393,10 @@ fn give_player_starting_items(
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     proto: ProtoParam,
+    mut game: GameParam,
     player_class: Option<Res<PlayerClass>>,
     class_ranks: Option<Res<ClassRankSystem>>,
+    run_state: ResMut<RunUnlockState>,
 ) {
     // if let Ok(save_file) = File::open(datafiles::save_file()) {
     //     let reader = BufReader::new(save_file);
@@ -417,10 +420,11 @@ fn give_player_starting_items(
     };
 
     // Spawn the starting weapon and mark it for rarity override
+    let player_pos = game.player().position.truncate();
     if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
         starting_weapon,
         &proto,
-        Vec2::ZERO,
+        player_pos,
         1,
         Some(1), // Use default level, we'll override rarity instead
     ) {
@@ -428,6 +432,7 @@ fn give_player_starting_items(
         commands.entity(weapon_entity).insert(StartingWeapon {
             rarity: weapon_rarity,
         });
+        force_player_autopick(&mut game);
     }
 
     for pet in player_class
@@ -443,6 +448,46 @@ fn give_player_starting_items(
             Name::new("Pet"),
         ));
     }
+    if !run_state.pending_rewards {
+        return;
+    }
+
+    let mut rng = rand::thread_rng();
+    let food_options = [
+        WorldObject::RedMushroomBlock,
+        WorldObject::BrownMushroomBlock,
+        WorldObject::Apple,
+    ];
+
+    let player_pos = game.player().position.truncate();
+
+    let mut upgrade_rewards = vec![];
+
+    for _ in 0..run_state.pending_food {
+        upgrade_rewards.push(
+            *food_options
+                .choose(&mut rng)
+                .unwrap_or(&WorldObject::RedMushroomBlock),
+        );
+    }
+
+    for _ in 0..run_state.pending_tomes {
+        upgrade_rewards.push(WorldObject::UpgradeTome);
+    }
+
+    for _ in 0..run_state.pending_orbs {
+        upgrade_rewards.push(WorldObject::OrbOfTransformation);
+    }
+    upgrade_rewards.iter().for_each(|obj| {
+        spawn_reward_drop(&mut proto_commands, &proto, player_pos, *obj, 1);
+    });
+
+    force_player_autopick(&mut game);
+
+    // run_state.pending_food = 0;
+    // run_state.pending_tomes = 0;
+    // run_state.pending_orbs = 0;
+    // run_state.pending_rewards = false;
     // proto_commands.spawn_item_from_proto(WorldObject::Spear, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Hammer, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Dagger, &proto, Vec2::ZERO, 1, Some(1));
@@ -514,4 +559,24 @@ fn give_player_starting_items(
     // proto_commands.spawn_item_from_proto(WorldObject::StoneWallBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::ChestBlock, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::ScrapperBlock, &proto, Vec2::ZERO, 64, None);
+}
+
+pub fn spawn_reward_drop(
+    proto_commands: &mut ProtoCommands,
+    proto: &ProtoParam,
+    pos: Vec2,
+    obj: WorldObject,
+    count: usize,
+) -> bool {
+    proto_commands
+        .spawn_item_from_proto(obj, proto, pos, count, None)
+        .is_some()
+}
+
+pub fn force_player_autopick(game: &mut GameParam) {
+    if game.player().is_moving {
+        return;
+    }
+
+    game.player_mut().is_moving = true;
 }

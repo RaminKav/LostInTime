@@ -38,6 +38,14 @@ pub struct Inventory {
     // pub crafting_result_item: Container,
 }
 impl Inventory {
+    pub fn is_empty(&self) -> bool {
+        self.items
+            .items
+            .iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .is_empty()
+    }
     pub fn get_items_from_slot_type(&self, slot_type: InventorySlotType) -> &Container {
         match slot_type {
             InventorySlotType::Equipment => &self.equipment_items,

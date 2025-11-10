@@ -21,6 +21,7 @@ use crate::{
         levels::PlayerLevel,
         skills::{HeirloomChoiceQueue, PlayerSkills},
         stats::StatType,
+        unlocks::RunUnlockState,
     },
     proto::proto_param::ProtoParam,
     ui::{
@@ -36,7 +37,7 @@ use crate::{
 
 use super::{
     crafting_ui::CraftingContainer, scrapper_ui::ScrapperContainer, spawn_item_stack_icon,
-    spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, ChestContainer,
+    spawn_skill_choice_flash, stats_ui::StatsButtonState, ui_helpers, BanishButton, ChestContainer,
     EssenceOption, InfoModal, InventorySlotState, MenuButton, MenuButtonClickEvent, RerollDice,
     ShowInvPlayerStatsEvent, SkillChoiceUI, SubmitEssenceChoice, ToolTipUpdateEvent,
     TooltipTeardownEvent, UIContainersParam, UIState, SKILLS_CHOICE_UI_SIZE,
@@ -932,14 +933,19 @@ pub fn handle_cursor_reroll_dice_buttons(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    mut run_unlocks: ResMut<RunUnlockState>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
     for (e, mut interactable, state) in reroll_dice.iter_mut() {
+        let rerolls_available = run_unlocks.rerolls_remaining > 0;
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
+                    if !rerolls_available {
+                        continue;
+                    }
                     interactable.change(Interaction::Hovering);
                     let ui_element = UIElement::RerollDiceHover;
                     commands
@@ -948,8 +954,14 @@ pub fn handle_cursor_reroll_dice_buttons(
                         .insert(graphics.get_ui_element_texture(ui_element));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed {
-                        commands.entity(e).despawn_recursive();
+                    if left_mouse_pressed && rerolls_available {
+                        run_unlocks.rerolls_remaining =
+                            run_unlocks.rerolls_remaining.saturating_sub(1);
+                        interactable.change(Interaction::None);
+                        commands
+                            .entity(e)
+                            .insert(UIElement::RerollDice)
+                            .insert(graphics.get_ui_element_texture(UIElement::RerollDice));
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillReRoll, 0.4));
 
                         spawn_skill_choice_flash(
@@ -977,6 +989,68 @@ pub fn handle_cursor_reroll_dice_buttons(
                     .entity(e)
                     .insert(ui_element.clone())
                     .insert(graphics.get_ui_element_texture(ui_element));
+            }
+        }
+    }
+}
+
+pub fn handle_cursor_banish_buttons(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut banish_buttons: Query<
+        (Entity, &mut Interactable, &BanishButton),
+        Without<InventorySlotState>,
+    >,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    mut run_unlocks: ResMut<RunUnlockState>,
+    mut skill_queue: ResMut<HeirloomChoiceQueue>,
+    mut next_ui_state: ResMut<NextState<UIState>>,
+    skill_ui: Query<Entity, With<SkillChoiceUI>>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, mut interactable, banish) in banish_buttons.iter_mut() {
+        let banishes_available = run_unlocks.banishes_remaining > 0;
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    if !banishes_available {
+                        continue;
+                    }
+                    interactable.change(Interaction::Hovering);
+                    let ui_element = UIElement::BackButtonHover;
+                    commands
+                        .entity(e)
+                        .insert(ui_element.clone())
+                        .insert(graphics.get_ui_element_texture(ui_element));
+                }
+                Interaction::Hovering => {
+                    if left_mouse_pressed && banishes_available {
+                        run_unlocks.banishes_remaining =
+                            run_unlocks.banishes_remaining.saturating_sub(1);
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
+
+                        if skill_queue.banish_slot(banish.0).is_some() {
+                            for entity in skill_ui.iter() {
+                                commands.entity(entity).despawn_recursive();
+                            }
+                            next_ui_state.set(UIState::Closed);
+                        }
+                    }
+                }
+                _ => (),
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    commands
+                        .entity(e)
+                        .insert(UIElement::BackButton)
+                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                }
             }
         }
     }
@@ -1161,7 +1235,7 @@ pub fn handle_cursor_main_menu_buttons(
     curr_ui_state: Res<State<UIState>>,
 ) {
     let menu_open = curr_ui_state.0 == UIState::ClassSelection
-        || curr_ui_state.0 == UIState::Options
+        || curr_ui_state.0 == UIState::Unlocks
         || curr_ui_state.0 == UIState::Achievements;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
@@ -1175,7 +1249,7 @@ pub fn handle_cursor_main_menu_buttons(
                 menu_button,
                 MenuButton::Start
                     | MenuButton::Achievements
-                    | MenuButton::Options
+                    | MenuButton::Unlocks
                     | MenuButton::Quit
             )
         {
@@ -1191,7 +1265,7 @@ pub fn handle_cursor_main_menu_buttons(
                     if matches!(
                         menu_button,
                         MenuButton::Start
-                            | MenuButton::Options
+                            | MenuButton::Unlocks
                             | MenuButton::Achievements
                             | MenuButton::AchievementsPrev
                             | MenuButton::AchievementsNext

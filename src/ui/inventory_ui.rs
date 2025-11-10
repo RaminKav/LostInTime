@@ -32,7 +32,7 @@ pub enum UIState {
     Crafting,
     Furnace,
     Essence,
-    Options,
+    Unlocks,
     Achievements,
     Scrapper,
     ClassSelection,

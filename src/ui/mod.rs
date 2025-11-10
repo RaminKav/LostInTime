@@ -50,8 +50,8 @@ mod main_menu;
 pub use main_menu::*;
 mod essence_ui;
 pub use essence_ui::*;
-mod options_ui;
-pub use options_ui::*;
+mod unlocks_ui;
+pub use unlocks_ui::*;
 mod achievements_ui;
 pub use achievements_ui::*;
 use loading_screen::*;
@@ -66,7 +66,7 @@ use crate::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
         heirloom_shrine::handle_heirloom_shrine_ui_setup,
         item_actions::ActionSuccessEvent,
-    }, night::NightTracker, player::RunScore, CustomFlush, Game, GameState, DEBUG
+    }, night::NightTracker, player::RunScore, player::unlocks::{RunUnlockState}, CustomFlush, Game, GameState, DEBUG
 };
 
 use self::{
@@ -81,7 +81,6 @@ use self::{
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(218., 145.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
-pub const OPTIONS_UI_SIZE: Vec2 = Vec2::new(79., 104.);
 pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(107., 151.);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
@@ -94,11 +93,11 @@ pub struct UIPlugin;
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
         app.add_state::<UIState>()
-            .init_resource::<options_ui::AudioSettings>()
             .insert_resource(InventoryState::default())
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
+            .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
             .insert_resource(NewRecipeTextTimer::new(0.8))
             .insert_resource(TooltipsManager {
@@ -228,11 +227,14 @@ impl Plugin for UIPlugin {
             .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
             .add_systems(
                 (
-                    setup_options_ui
+                    setup_unlocks_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
-                    cleanup_options_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
+                    cleanup_unlocks_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
+                    handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
+                    update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
+                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -247,11 +249,14 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
-                    setup_options_ui
+                    setup_unlocks_ui
                         .before(CustomFlush)
-                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
-                    cleanup_options_ui
-                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
+                    cleanup_unlocks_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
+                    handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
+                    update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
+                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -354,6 +359,9 @@ impl Plugin for UIPlugin {
                     shuffle_items.run_if(in_state(UIState::ItemChest)),
                     handle_skill_reroll_after_flash.run_if(in_state(UIState::Skills)),
                     handle_cursor_reroll_dice_buttons.run_if(in_state(UIState::Skills)),
+                    handle_cursor_banish_buttons.run_if(in_state(UIState::Skills)),
+                    update_skill_choice_button_states.run_if(in_state(UIState::Skills)),
+                    update_skill_choice_count_text.run_if(in_state(UIState::Skills)),
                     handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )

@@ -33,7 +33,7 @@ use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
     get_default_unlocked_classes, ClassUnlockConfig, ClassUnlockData, UnlockCurrency,
-    UnlockedClasses,
+    UnlockUpgrades, UnlockedClasses,
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
@@ -372,6 +372,7 @@ impl GameAssetsPlugin {
                     let mut unlocked = UnlockedClasses::new(game_data.unlocked_classes);
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
+                    commands.insert_resource(game_data.unlock_upgrades.clone());
                     info!("Loaded class ranks from game data (loading state)");
                 }
                 Err(err) => {
@@ -381,6 +382,7 @@ impl GameAssetsPlugin {
                     let mut unlocked = UnlockedClasses::default();
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
+                    commands.insert_resource(UnlockUpgrades::default());
                 }
             }
         } else {
@@ -389,6 +391,7 @@ impl GameAssetsPlugin {
             let mut unlocked = UnlockedClasses::default();
             unlocked.ensure_defaults(&get_default_unlocked_classes());
             commands.insert_resource(unlocked);
+            commands.insert_resource(UnlockUpgrades::default());
         }
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
         let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
