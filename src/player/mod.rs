@@ -173,6 +173,7 @@ impl Plugin for PlayerPlugin {
                     handle_parry_success,
                     score::track_mob_kills,
                     score::track_item_destruction,
+                    handle_mob_death_out_of_run_currency,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

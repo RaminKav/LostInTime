@@ -31,6 +31,7 @@ pub enum Achievement {
     MushlingSlayer,
     Chaotic,
     DungeonCrawler,
+    FindHammer,
     FindSpear,
     FindClaw,
     FindGun,
@@ -72,6 +73,7 @@ impl Achievement {
             Achievement::Chaotic => "Chaotic".to_string(),
             Achievement::DungeonCrawler => "Dungeon Crawler".to_string(),
             Achievement::FindSpear => "Find Spear".to_string(),
+            Achievement::FindHammer => "Find Hammer".to_string(),
             Achievement::FindClaw => "Find Claw".to_string(),
             Achievement::FindGun => "Find Gun".to_string(),
             Achievement::FindFireStaff => "Find Fire Staff".to_string(),
@@ -100,6 +102,7 @@ impl Achievement {
             Achievement::Chaotic => "Reach 20 total Chaos.".to_string(),
             Achievement::DungeonCrawler => "Find the key & clear the dungeon.".to_string(),
             Achievement::FindSpear => "Find a Spear.".to_string(),
+            Achievement::FindHammer => "Find a Hammer.".to_string(),
             Achievement::FindClaw => "Find a Claw.".to_string(),
             Achievement::FindGun => "Find a Gun.".to_string(),
             Achievement::FindFireStaff => "Find a Fire Staff.".to_string(),
@@ -116,6 +119,7 @@ impl Achievement {
         match self {
             Achievement::FindSpear
             | Achievement::FindClaw
+            | Achievement::FindHammer
             | Achievement::FindGun
             | Achievement::FindFireStaff
             | Achievement::FindIceStaff
@@ -240,6 +244,7 @@ pub fn check_achievements(
         check_item_collected(WorldObject::BasicStaff, Achievement::FindBasicStaff);
         check_item_collected(WorldObject::MagicWhip, Achievement::FindMagicWhip);
         check_item_collected(WorldObject::Dagger, Achievement::FindDagger);
+        check_item_collected(WorldObject::Hammer, Achievement::FindHammer);
         check_item_collected(WorldObject::WoodBow, Achievement::FindBow);
         check_item_collected(WorldObject::Blowdart, Achievement::FindBlowdart);
 
@@ -412,7 +417,7 @@ impl Achievement {
 pub fn get_default_unlocked_classes() -> Vec<crate::player::skills::SkillClass> {
     vec![
         crate::player::skills::SkillClass::Warrior,
-        crate::player::skills::SkillClass::Paladin,
+        crate::player::skills::SkillClass::FireMage,
     ]
 }
 

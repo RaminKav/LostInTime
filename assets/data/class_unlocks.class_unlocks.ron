@@ -5,7 +5,7 @@
       cost: 0,
     ),
     Paladin: (
-      achievements: [DungeonCrawler],
+      achievements: [DungeonCrawler, FindHammer],
       cost: 20,
     ),
     Knight: (
@@ -20,13 +20,13 @@
       achievements: [Chaotic, FindGun],
       cost: 25,
     ),
-    FireMage: (
-      achievements: [StingflySlayer, FindFireStaff],
-      cost: 25,
-    ),
     IceMage: (
       achievements: [FairyPet, FindIceStaff],
       cost: 25,
+    ),
+    FireMage: (
+      achievements: [],
+      cost: 0,
     ),
     Wizard: (
       achievements: [Act2, FindBasicStaff],

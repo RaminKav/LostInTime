@@ -232,7 +232,6 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
                     cleanup_unlocks_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
-                    handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
                     setup_achievements_ui

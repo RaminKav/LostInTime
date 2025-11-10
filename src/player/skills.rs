@@ -30,15 +30,15 @@ use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 pub enum SkillClass {
     None,
 
-    Warrior, //spear
+    Warrior, //Sword
     Paladin, //hammer
-    Knight,  //sword
+    Knight,  //Spear
 
     Thief,      //claw
     Gunslinger, //gun
 
-    FireMage, //fire staff
     IceMage,  //ice staff
+    FireMage, //fire staff
     Wizard,   //lightning
     Druid,    // whip
 
@@ -810,7 +810,7 @@ impl Heirloom {
             &Heirloom::DaggerCombo => {
                 commands.entity(entity).insert(ComboCounter {
                     counter: 0,
-                    reset_timer: Timer::from_seconds(2., TimerMode::Once),
+                    reset_timer: Timer::from_seconds(1., TimerMode::Once),
                 });
             }
 

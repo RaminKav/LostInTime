@@ -32,8 +32,8 @@ use crate::player::mage_skills::IceExplosion;
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
-    get_default_unlocked_classes, ClassUnlockConfig, ClassUnlockData, UnlockCurrency,
-    UnlockUpgrades, UnlockedClasses,
+    get_default_unlocked_classes, Achievements, ClassUnlockConfig, ClassUnlockData, HighScores,
+    UnlockCurrency, UnlockUpgrades, UnlockedClasses,
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
@@ -379,6 +379,8 @@ impl GameAssetsPlugin {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
                     commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
                     commands.insert_resource(UnlockCurrency::default());
+                    commands.insert_resource(HighScores::default());
+                    commands.insert_resource(Achievements::default());
                     let mut unlocked = UnlockedClasses::default();
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
@@ -388,6 +390,8 @@ impl GameAssetsPlugin {
         } else {
             commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
             commands.insert_resource(UnlockCurrency::default());
+            commands.insert_resource(HighScores::default());
+            commands.insert_resource(Achievements::default());
             let mut unlocked = UnlockedClasses::default();
             unlocked.ensure_defaults(&get_default_unlocked_classes());
             commands.insert_resource(unlocked);

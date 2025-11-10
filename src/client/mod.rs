@@ -20,12 +20,12 @@ pub mod analytics;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
+use crate::player::unlocks::UnlockUpgrades;
 use crate::player::{
     check_first_run_achievement,
     score::{HighScores, RunScore},
     Achievements,
 };
-use crate::player::unlocks::UnlockUpgrades;
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
@@ -292,11 +292,7 @@ pub fn handle_append_run_data_after_death(
         if let Some(class) = &player_class {
             // Get mobs killed from run score (if available)
             let mobs_killed = run_score.as_ref().map(|rs| rs.mobs_killed).unwrap_or(0);
-            let run_experience = calculate_class_experience(
-                night.days,
-                time_fragments.total_collected_time_fragments_this_run,
-                mobs_killed,
-            );
+            let run_experience = calculate_class_experience(night.days, mobs_killed);
             let rank_increased = game_data
                 .class_ranks
                 .add_class_experience(&class.class, run_experience);
@@ -644,19 +640,12 @@ pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
 }
 
 /// Calculate class experience based on run performance
-fn calculate_class_experience(
-    days_survived: u8,
-    time_fragments_collected: i32,
-    mobs_killed: u32,
-) -> u32 {
-    // Primary experience from mobs killed (10 per mob)
-    let mob_exp = mobs_killed * 10;
+fn calculate_class_experience(days_survived: u8, mobs_killed: u32) -> u32 {
+    // Primary experience from mobs killed (10 per mob) //
+    let mob_exp = mobs_killed * 5;
 
     // Secondary experience from days survived (50 per day)
     let days_exp = days_survived as u32 * 50;
 
-    // Bonus experience from time fragments (1 per fragment)
-    let fragments_exp = time_fragments_collected.max(0) as u32 * 20;
-
-    mob_exp + days_exp + fragments_exp
+    mob_exp + days_exp
 }

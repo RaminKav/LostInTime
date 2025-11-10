@@ -1,8 +1,11 @@
 use bevy::prelude::*;
+use rand::Rng;
 
-use crate::{    
+use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
-    GameState
+    combat::EnemyDeathEvent,
+    player::UnlockCurrency,
+    GameState,
 };
 
 #[derive(Component, Default, Debug)]
@@ -46,6 +49,18 @@ pub fn handle_modify_time_fragments(
                 time_fragments.total_collected_time_fragments_all_time += event.delta as u128;
             }
             commands.spawn(SoundSpawner::new(AudioSoundEffect::CurrencyPickup, 0.75));
+        }
+    }
+}
+
+pub fn handle_mob_death_out_of_run_currency(
+    mut death_events: EventReader<EnemyDeathEvent>,
+    mut currency: ResMut<UnlockCurrency>,
+) {
+    for _ in death_events.iter() {
+        if rand::thread_rng().gen_bool(0.02) {
+            info!("CURRENCY GAINED!");
+            currency.add(1);
         }
     }
 }
