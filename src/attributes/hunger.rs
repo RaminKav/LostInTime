@@ -6,7 +6,7 @@ use crate::{
     animations::AttackEvent,
     item::item_actions::ActionSuccessEvent,
     player::{
-        skills::{PlayerSkills, Heirloom},
+        skills::{Heirloom, PlayerSkills},
         Player,
     },
     Game,

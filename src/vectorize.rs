@@ -51,10 +51,7 @@ pub mod vectorize_inner {
     {
         let deserialized: Vec<Vec<(K, V)>> = serde::Deserialize::deserialize(des)?;
 
-        let result: Vec<HashMap<K, V>> = deserialized
-            .into_iter()
-            .map(HashMap::from_iter)
-            .collect();
+        let result: Vec<HashMap<K, V>> = deserialized.into_iter().map(HashMap::from_iter).collect();
 
         Ok(result)
     }

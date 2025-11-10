@@ -2,9 +2,9 @@ pub mod chest_ui;
 pub mod class_selection;
 pub mod crafting_ui;
 pub mod damage_numbers;
-mod loading_screen;
 pub mod guide_hud;
 pub mod item_chest;
+mod loading_screen;
 pub mod scrapper_ui;
 pub mod screen_effects;
 use class_selection::*;
@@ -13,7 +13,7 @@ use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
-use damage_numbers::{NewRecipeTextTimer};
+use damage_numbers::NewRecipeTextTimer;
 use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
     handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
@@ -26,10 +26,10 @@ pub mod key_input_guide;
 use key_input_guide::*;
 pub mod furnace_ui;
 pub use skill_choice_ui::*;
+mod achievement_banner;
 mod active_skill_shrine_ui;
 mod interactions;
 mod inventory_ui;
-mod achievement_banner;
 pub mod minimap;
 mod player_hud;
 mod skill_choice_ui;
@@ -53,20 +53,28 @@ pub use essence_ui::*;
 mod unlocks_ui;
 pub use unlocks_ui::*;
 mod achievements_ui;
-pub use achievements_ui::*;
-use loading_screen::*;
 use crate::run_once_per_run;
-use crate::ui::achievement_banner::{debug_trigger_achievement_banner, handle_achievement_banner_events, update_achievement_banners};
+use crate::ui::achievement_banner::{
+    debug_trigger_achievement_banner, handle_achievement_banner_events, update_achievement_banners,
+};
 use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
+pub use achievements_ui::*;
+use loading_screen::*;
 
 use crate::{
-    attributes::clamp_health, client::{is_not_paused, load_state, ClientState}, handle_hits, item::{
+    attributes::clamp_health,
+    client::{is_not_paused, load_state, ClientState},
+    handle_hits,
+    item::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
-        heirloom_shrine::handle_heirloom_shrine_ui_setup,
-        item_actions::ActionSuccessEvent,
-    }, night::NightTracker, player::RunScore, player::unlocks::{RunUnlockState}, CustomFlush, Game, GameState, DEBUG
+        heirloom_shrine::handle_heirloom_shrine_ui_setup, item_actions::ActionSuccessEvent,
+    },
+    night::NightTracker,
+    player::unlocks::RunUnlockState,
+    player::RunScore,
+    CustomFlush, Game, GameState, DEBUG,
 };
 
 use self::{
@@ -293,7 +301,7 @@ impl Plugin for UIPlugin {
                     setup_item_chest_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
-                    
+
                     handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
                     handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
@@ -392,17 +400,17 @@ impl Plugin for UIPlugin {
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
             .add_system(handle_cursor_main_menu_buttons);
- 
-            app.add_systems((
+
+        app.add_systems(
+            (
                 debug_trigger_achievement_banner,
                 handle_achievement_banner_events,
-                update_achievement_banners
+                update_achievement_banners,
             )
-                    .in_set(OnUpdate(GameState::Main)),
-            );
+                .in_set(OnUpdate(GameState::Main)),
+        );
 
-        app
-            .add_system(update_currency_text.run_if(in_state(GameState::Main)))
+        app.add_system(update_currency_text.run_if(in_state(GameState::Main)))
             .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

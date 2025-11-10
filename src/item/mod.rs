@@ -453,6 +453,7 @@ pub enum WorldObject {
     Dodge,
     TooltipInspect,
     TimePortal,
+    ReaperSoul,
 
     Scrapper,
     ScrapperBlock,

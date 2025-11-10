@@ -18,7 +18,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkill, ActiveSkillUsedEvent, Player, PlayerSkills, Heirloom};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 

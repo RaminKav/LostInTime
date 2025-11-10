@@ -393,6 +393,10 @@ pub enum Heirloom {
     FrailStacks, // skull
     SlowStacks,  // sea shell
 
+    AntFarm,    // ant terrarium
+    StoneTooth, // orbiting stone
+    Reaper,     // soul harvest
+
     // Chaos
     ChaosBoost,   // chaos totem item
     PoisonStacks, // grandma's recipe
@@ -433,6 +437,9 @@ impl Heirloom {
             Heirloom::WaveAttack => "Hero Sword".to_string(),
             Heirloom::FrailStacks => "Skull".to_string(),
             Heirloom::SlowStacks => "Sea Shell".to_string(),
+            Heirloom::AntFarm => "Ant Farm".to_string(),
+            Heirloom::StoneTooth => "Stone Tooth".to_string(),
+            Heirloom::Reaper => "Reaper".to_string(),
             Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
             Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
             Heirloom::TeleportShock => "Shock Step".to_string(),
@@ -537,6 +544,24 @@ impl Heirloom {
                 "a Slow stack to".to_string(),
                 "enemies, reducing".to_string(),
                 "speed by 15%.".to_string(),
+            ],
+            Heirloom::AntFarm => vec![
+                "Spawn ants that".to_string(),
+                "rush towards".to_string(),
+                "enemies, dealing".to_string(),
+                "damage.".to_string(),
+            ],
+            Heirloom::StoneTooth => vec![
+                "Spawn rocks that".to_string(),
+                "orbit you and deal".to_string(),
+                "damage to enemies".to_string(),
+                "they hit.".to_string(),
+            ],
+            Heirloom::Reaper => vec![
+                "Soul fragments".to_string(),
+                "chase enemies".to_string(),
+                "after each kill,".to_string(),
+                "damaging them.".to_string(),
             ],
             Heirloom::PoisonStacks => vec![
                 "Your Attacks have".to_string(),
@@ -813,6 +838,21 @@ impl Heirloom {
                     reset_timer: Timer::from_seconds(1., TimerMode::Once),
                 });
             }
+            Heirloom::AntFarm => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::AntFarmState::default());
+            }
+            Heirloom::StoneTooth => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::StoneToothState::default());
+            }
+            Heirloom::Reaper => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::ReaperState::default());
+            }
 
             _ => {}
         }
@@ -982,6 +1022,8 @@ impl Default for HeirloomChoiceQueue {
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon)
                     .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Legendary)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare)
@@ -1014,6 +1056,10 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon)
+                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary)
                     .set_repeatable(),
                 HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon)
                     .set_repeatable(),

@@ -10,6 +10,10 @@ use bevy_rapier2d::{
         KinematicCharacterControllerOutput, PhysicsSet, QueryFilterFlags, RigidBody,
     },
 };
+use combat_heirlooms::{
+    handle_ant_farm_state, handle_reaper_soul_spawns, update_ant_farm_ants, update_reaper_souls,
+    update_stone_tooth,
+};
 use melee_skills::{
     handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
     handle_second_split_attack, handle_spear, handle_spear_gravity, tick_parried_timer,
@@ -25,6 +29,7 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 pub mod achievements;
 pub mod class_rank;
+pub mod combat_heirlooms;
 pub mod currency;
 pub mod levels;
 pub mod mage_skills;
@@ -158,6 +163,16 @@ impl Plugin for PlayerPlugin {
                     handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
                     handle_on_hit_skills.after(handle_hits),
                     handle_dodge_crit,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    handle_ant_farm_state.run_if(is_not_paused),
+                    update_ant_farm_ants.run_if(is_not_paused),
+                    update_stone_tooth.run_if(is_not_paused),
+                    handle_reaper_soul_spawns.run_if(is_not_paused),
+                    update_reaper_souls.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

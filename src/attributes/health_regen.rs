@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 
 use crate::player::{
-    skills::{PlayerSkills, Heirloom},
+    skills::{Heirloom, PlayerSkills},
     Player,
 };
 

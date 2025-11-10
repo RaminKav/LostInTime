@@ -7,7 +7,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
-        skills::{PlayerSkills, Heirloom},
+        skills::{Heirloom, PlayerSkills},
         Player,
     },
     GameParam,

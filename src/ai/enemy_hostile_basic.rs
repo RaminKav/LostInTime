@@ -18,7 +18,7 @@ use crate::{
     night::NightTracker,
     player::{
         melee_skills::Parried,
-        skills::{PlayerSkills, Heirloom},
+        skills::{Heirloom, PlayerSkills},
     },
     status_effects::Slow,
     world::TILE_SIZE,
