@@ -1,18 +1,21 @@
 use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
+use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
     combat::{EnemyDeathEvent, HitEvent},
+    custom_commands::CommandsExt,
     enemy::Mob,
     item::WorldObject,
     player::{
         skills::{Heirloom, PlayerSkills},
         Player,
     },
+    proto::proto_param::ProtoParam,
     world::y_sort::YSort,
     GameParam,
 };
@@ -578,6 +581,34 @@ pub fn handle_reaper_soul_spawns(
                 Name::new("ReaperSoul"),
             ));
         }
+    }
+}
+
+pub fn handle_mana_orb_drops(
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+    mut death_events: EventReader<EnemyDeathEvent>,
+    game: GameParam,
+) {
+    let mut rng = rand::thread_rng();
+    for event in death_events.iter() {
+        let Some(main_hand) = game.player().main_hand_slot.clone() else {
+            continue;
+        };
+        if !main_hand.get_obj().is_magic_weapon() {
+            continue;
+        }
+        if !rng.gen_bool(0.30) {
+            continue;
+        }
+        let offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
+        proto_commands.spawn_item_from_proto(
+            WorldObject::ManaOrb,
+            &proto,
+            event.enemy_pos + offset,
+            1,
+            None,
+        );
     }
 }
 

@@ -1,0 +1,16 @@
+(
+  name: "ManaOrb",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": ManaOrb,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: ManaOrb,
+        metadata: (
+            name: "Mana Orb",
+            desc: ["Restores mana when collected."],
+        ),
+        rarity: Common,
+        count: 1,
+  ),
+  }
+)

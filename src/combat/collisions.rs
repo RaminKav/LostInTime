@@ -1,6 +1,8 @@
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
-    attributes::{Attack, Defence, Dodge, InvincibilityCooldown, Thorns},
+    attributes::{
+        modifiers::ModifyManaEvent, Attack, Defence, Dodge, InvincibilityCooldown, Thorns,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
@@ -29,6 +31,9 @@ use super::{
     try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
     StatusEffectEvent,
 };
+
+const MANA_ORB_RESTORE: i32 = 5;
+
 pub struct CollisionPlugion;
 
 impl Plugin for CollisionPlugion {
@@ -412,6 +417,7 @@ pub fn check_item_drop_collisions(
     mut game: GameParam,
     mut inv: Query<&mut Inventory>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
     resolution: Res<ScreenResolution>,
 ) {
     if !game.player().is_moving && !inv.single().is_empty() {
@@ -466,6 +472,14 @@ pub fn check_item_drop_collisions(
                     item_stack.clone(),
                     true,
                 ));
+                continue;
+            } else if obj == WorldObject::ManaOrb {
+                modify_mana_event.send(ModifyManaEvent(MANA_ORB_RESTORE));
+                analytics.send(AnalyticsUpdateEvent {
+                    update_type: AnalyticsTrigger::ItemCollected(obj),
+                });
+                commands.entity(e2).despawn_recursive();
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
                 continue;
             }
             // ...and the entity is an item stack...

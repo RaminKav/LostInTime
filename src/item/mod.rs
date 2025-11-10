@@ -449,6 +449,7 @@ pub enum WorldObject {
     DirtPath,
     TimeGate,
     TimeFragment,
+    ManaOrb,
     InventoryBag,
     Dodge,
     TooltipInspect,

@@ -670,6 +670,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        ManaOrb: WorldObjectData(
+            texture_pos: (8., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Feather: WorldObjectData(
             texture_pos: (9., 3.),
             size: (16., 16.),

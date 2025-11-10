@@ -17,7 +17,7 @@ use crate::{
 #[derive(Component)]
 pub struct AchievementsUI;
 
-pub const ACHIEVEMENTS_PER_PAGE: usize = 8;
+pub const ACHIEVEMENTS_PER_PAGE: usize = 10;
 
 #[derive(Resource, Default)]
 pub struct AchievementsPagination {
@@ -117,9 +117,9 @@ pub fn setup_achievements_ui(
     } else {
         (all_achievements.len() + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE
     };
-    let start_y = 92.5;
-    let row_spacing = 23.0;
-    let font_handle = asset_server.load("fonts/alagard.ttf");
+    let start_y = 93.5;
+    let row_spacing = 19.0;
+    let font_handle = asset_server.load("fonts/4x5.ttf");
 
     for row_index in 0..ACHIEVEMENTS_PER_PAGE {
         let y_pos = start_y - (row_index as f32 * row_spacing);
@@ -165,13 +165,13 @@ pub fn setup_achievements_ui(
                 name_text,
                 TextStyle {
                     font: font_handle.clone(),
-                    font_size: 15.0,
+                    font_size: 5.0,
                     color: text_color,
                 },
             )
-            .with_alignment(TextAlignment::Center),
+            .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(-147., y_pos, 1.)),
+            transform: Transform::from_translation(Vec3::new(-148., y_pos, 1.)),
             visibility: if maybe_achievement.is_some() {
                 Visibility::Visible
             } else {
@@ -195,7 +195,7 @@ pub fn setup_achievements_ui(
         let desc_entity = spawn_text(
             &mut commands,
             &asset_server,
-            Vec3::new(-21., y_pos, 1.),
+            Vec3::new(-70., y_pos, 1.),
             desc_color,
             desc_text,
             bevy::sprite::Anchor::CenterLeft,
@@ -295,7 +295,7 @@ pub fn setup_achievements_ui(
             text: Text::from_section(
                 "Prev",
                 TextStyle {
-                    font: font_handle.clone(),
+                    font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
                     color: crate::colors::WHITE,
                 },
@@ -330,7 +330,7 @@ pub fn setup_achievements_ui(
             text: Text::from_section(
                 "Next",
                 TextStyle {
-                    font: font_handle.clone(),
+                    font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
                     color: crate::colors::WHITE,
                 },
