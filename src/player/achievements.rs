@@ -35,7 +35,6 @@ pub enum Achievement {
     FindSpear,
     FindClaw,
     FindGun,
-    FindFireStaff,
     FindIceStaff,
     FindBasicStaff,
     FindMagicWhip,
@@ -76,7 +75,6 @@ impl Achievement {
             Achievement::FindHammer => "Find Hammer".to_string(),
             Achievement::FindClaw => "Find Claw".to_string(),
             Achievement::FindGun => "Find Gun".to_string(),
-            Achievement::FindFireStaff => "Find Fire Staff".to_string(),
             Achievement::FindIceStaff => "Find Ice Staff".to_string(),
             Achievement::FindBasicStaff => "Find Basic Staff".to_string(),
             Achievement::FindMagicWhip => "Find Magic Whip".to_string(),
@@ -105,7 +103,6 @@ impl Achievement {
             Achievement::FindHammer => "Find a Hammer.".to_string(),
             Achievement::FindClaw => "Find a Claw.".to_string(),
             Achievement::FindGun => "Find a Gun.".to_string(),
-            Achievement::FindFireStaff => "Find a Fire Staff.".to_string(),
             Achievement::FindIceStaff => "Find an Ice Staff.".to_string(),
             Achievement::FindBasicStaff => "Find a Basic Staff.".to_string(),
             Achievement::FindMagicWhip => "Find a Magic Whip.".to_string(),
@@ -121,7 +118,6 @@ impl Achievement {
             | Achievement::FindClaw
             | Achievement::FindHammer
             | Achievement::FindGun
-            | Achievement::FindFireStaff
             | Achievement::FindIceStaff
             | Achievement::FindBasicStaff
             | Achievement::FindMagicWhip
@@ -239,7 +235,6 @@ pub fn check_achievements(
         check_item_collected(WorldObject::Spear, Achievement::FindSpear);
         check_item_collected(WorldObject::Claw, Achievement::FindClaw);
         check_item_collected(WorldObject::Gun, Achievement::FindGun);
-        check_item_collected(WorldObject::FireStaff, Achievement::FindFireStaff);
         check_item_collected(WorldObject::IceStaff, Achievement::FindIceStaff);
         check_item_collected(WorldObject::BasicStaff, Achievement::FindBasicStaff);
         check_item_collected(WorldObject::MagicWhip, Achievement::FindMagicWhip);

@@ -11,8 +11,8 @@ use bevy_rapier2d::{
     },
 };
 use combat_heirlooms::{
-    handle_ant_farm_state, handle_mana_orb_drops, handle_reaper_soul_spawns, update_ant_farm_ants,
-    update_reaper_souls, update_stone_tooth,
+    break_crates_with_roll, handle_ant_farm_state, handle_mana_orb_drops,
+    handle_reaper_soul_spawns, update_ant_farm_ants, update_reaper_souls, update_stone_tooth,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
@@ -174,6 +174,7 @@ impl Plugin for PlayerPlugin {
                     handle_mana_orb_drops.run_if(is_not_paused),
                     handle_reaper_soul_spawns.run_if(is_not_paused),
                     update_reaper_souls.run_if(is_not_paused),
+                    break_crates_with_roll.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

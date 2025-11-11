@@ -18,7 +18,7 @@ use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
     handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
 };
-use screen_effects::ScreenEffectMaterial;
+use screen_effects::{handle_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
 mod enemy_health_bar;
 mod fps_text;
@@ -157,10 +157,16 @@ impl Plugin for UIPlugin {
                     setup_xp_bar_ui.after(load_state).run_if(run_once_per_run()),
                     setup_bars_ui.after(load_state).run_if(run_once_per_run()),
                     setup_currency_ui.run_if(run_once_per_run()),
-                    setup_clock_hud.run_if(run_once_per_run())
+                    setup_clock_hud.run_if(run_once_per_run()),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
+            .add_system(
+                setup_screen_effects
+                    .in_set(OnUpdate(GameState::Main))
+                    .before(handle_screen_effects),
+            )
+            .add_system(handle_screen_effects.in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
                     create_enemy_health_bar,

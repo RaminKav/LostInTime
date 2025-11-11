@@ -2,12 +2,13 @@ use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
+use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
-    assets::Graphics,
+    assets::{Graphics, SpriteAnchor},
     attributes::{CurrentHealth, MaxHealth},
-    combat::{EnemyDeathEvent, HitEvent},
+    combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
     enemy::Mob,
     item::WorldObject,
@@ -16,7 +17,7 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
-    world::y_sort::YSort,
+    world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition},
     GameParam,
 };
 
@@ -687,5 +688,52 @@ pub fn update_reaper_souls(
             });
             commands.entity(entity).despawn_recursive();
         }
+    }
+}
+
+pub fn break_crates_with_roll(
+    game: GameParam,
+    rapier_context: Res<RapierContext>,
+    crate_query: Query<(Entity, &GlobalTransform, &WorldObject)>,
+    mut obj_break_events: EventWriter<ObjBreakEvent>,
+    mut broken_this_frame: Local<HashSet<Entity>>,
+) {
+    broken_this_frame.clear();
+
+    let player_entity = game.game.player;
+
+    let player_state = game.player();
+    if !player_state.is_dashing {
+        return;
+    }
+
+    let mut to_break: Vec<(Entity, WorldObject, TileMapPosition)> = Vec::new();
+    for (first, second, _) in rapier_context.intersections_with(player_entity) {
+        let other = if first == player_entity {
+            second
+        } else {
+            first
+        };
+        if broken_this_frame.contains(&other) {
+            continue;
+        }
+        if let Ok((crate_entity, transform, obj)) = crate_query.get(other) {
+            if !matches!(obj, WorldObject::Crate | WorldObject::Crate2) {
+                continue;
+            }
+
+            let pos = world_pos_to_tile_pos(transform.translation().truncate());
+            to_break.push((crate_entity, *obj, pos));
+            broken_this_frame.insert(crate_entity);
+        }
+    }
+
+    for (entity, obj, tile_pos) in to_break {
+        obj_break_events.send(ObjBreakEvent {
+            entity,
+            obj,
+            pos: tile_pos,
+            give_drops_and_xp: true,
+        });
     }
 }

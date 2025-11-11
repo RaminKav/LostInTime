@@ -16,7 +16,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyIcon, CurrencyText,
-        Interactable, MenuButton, UIElement, UIState,
+        Interactable, MenuButton, UIState,
     },
     world::y_sort::YSort,
     GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
@@ -111,7 +111,6 @@ pub fn handle_game_over_fadeout(
             Name::new("INFO OK TEXT"),
             RenderLayers::from_layers(&[3]),
             Interactable::default(),
-            UIElement::MenuButton,
             GameOverText,
             MenuButton::GameOverOK,
             Sprite {

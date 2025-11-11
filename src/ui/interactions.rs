@@ -1255,32 +1255,31 @@ pub fn handle_cursor_main_menu_buttons(
         {
             continue;
         }
+        let uses_sprite = matches!(
+            menu_button,
+            MenuButton::Start
+                | MenuButton::Unlocks
+                | MenuButton::Achievements
+                | MenuButton::AchievementsPrev
+                | MenuButton::AchievementsNext
+                | MenuButton::Quit
+                | MenuButton::Back
+                | MenuButton::Begin
+                | MenuButton::ClassUnlockYes
+                | MenuButton::ClassUnlockNo
+        );
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.25));
 
-                    // Use sprite hover for main menu buttons (Start, Options, Achievements, Quit)
-                    if matches!(
-                        menu_button,
-                        MenuButton::Start
-                            | MenuButton::Unlocks
-                            | MenuButton::Achievements
-                            | MenuButton::AchievementsPrev
-                            | MenuButton::AchievementsNext
-                            | MenuButton::Quit
-                            | MenuButton::Back
-                            | MenuButton::Begin
-                            | MenuButton::ClassUnlockYes
-                            | MenuButton::ClassUnlockNo
-                    ) {
+                    if uses_sprite {
                         commands
                             .entity(e)
                             .insert(UIElement::BackButtonHover)
                             .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
                     } else {
-                        // Old text color change for other buttons (InfoOK, GameOverOK, Scrapper)
                         let color = if menu_button == &MenuButton::GameOverOK
                             || menu_button == &MenuButton::InfoOK
                             || menu_button == &MenuButton::Scrapper
@@ -1311,10 +1310,18 @@ pub fn handle_cursor_main_menu_buttons(
                 };
                 interactable.change(Interaction::None);
 
-                commands
-                    .entity(e)
-                    .insert(UIElement::BackButton)
-                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                if uses_sprite {
+                    commands
+                        .entity(e)
+                        .insert(UIElement::BackButton)
+                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                } else {
+                    if let Ok(mut text_comp) = text.get_mut(e) {
+                        text_comp.sections[0].style.color = Color::WHITE;
+                    }
+                    commands.entity(e).remove::<UIElement>();
+                    commands.entity(e).remove::<Handle<Image>>();
+                }
             }
         }
     }
