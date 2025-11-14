@@ -1,5 +1,3 @@
-use std::{fs::File, io::BufReader};
-
 use bevy::{prelude::*, transform::TransformSystem};
 
 use bevy_proto::prelude::ProtoCommands;
@@ -56,10 +54,10 @@ use crate::{
         CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
         MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
-    client::{is_not_paused, GameData},
+    client::is_not_paused,
     container::Container,
     custom_commands::CommandsExt,
-    datafiles, handle_hits,
+    handle_hits,
     inputs::{move_camera_with_player, player_move_inputs, FacingDirection, MovementVector},
     inventory::{Inventory, INVENTORY_SIZE},
     item::{ActiveMainHandState, WorldObject},
@@ -137,9 +135,11 @@ impl Limb {
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(AchievementsPlugin)
+            .init_resource::<CoinCurrency>()
+            .init_resource::<TimeFragmentCurrency>()
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<MovePlayerEvent>()
-                    .add_event::<ModifyTimeFragmentsEvent>()
+                    .add_event::<ModifyCurencyEvent>()
                     .add_event::<ActiveSkillUsedEvent>()
                     .add_event::<ParrySuccessEvent>();
             })
@@ -201,13 +201,14 @@ impl Plugin for PlayerPlugin {
                     .after(leap_attack)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems((handle_modify_time_fragments,))
+            .add_systems((handle_modify_currency,))
             .add_systems(
                 (handle_echo_after_heal
                     .after(handle_modify_health_event)
                     .before(handle_add_damage_numbers_after_hit),)
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(reset_time_fragment_counters.in_schedule(OnEnter(GameState::Main)))
             .add_system(
                 give_player_starting_items
                     .run_if(run_once_per_run())
@@ -266,29 +267,6 @@ fn spawn_player(
     mut exp_sync_event: EventWriter<FlashExpBarEvent>,
     proto: ProtoParam,
 ) {
-    // total currency counter
-    let game_data_file_path = datafiles::game_data();
-    let mut total_currency_all_time = 0;
-    if let Ok(game_file) = File::open(game_data_file_path.clone()) {
-        let reader = BufReader::new(game_file);
-
-        // Read the JSON contents of the file as an instance of `GameData`.
-        match serde_json::from_reader::<_, GameData>(reader) {
-            Ok(data) => total_currency_all_time = data.time_fragments,
-            Err(err) => {
-                let new_file = File::create(game_data_file_path)
-                    .expect("Could not create game data file for serialization");
-                if let Err(result) = serde_json::to_writer(new_file, "") {
-                    error!("Failed to save game data after death: {result:?}");
-                } else {
-                    info!("UPDATED GAME DATA...");
-                }
-                error!("Failed to load data from game_data.json file to get currency {err:?}")
-            }
-        }
-    };
-    info!("total currency all time start: {total_currency_all_time}");
-
     let cape_stack = proto.get_item_data(WorldObject::GreyCape).unwrap();
     let p = commands
         .spawn((
@@ -358,7 +336,6 @@ fn spawn_player(
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
-        .insert(TimeFragmentCurrency::new(0, 0, total_currency_all_time))
         .insert(Sensor)
         .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
@@ -534,7 +511,7 @@ fn give_player_starting_items(
     //     64,
     //     None,
     // );
-    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
+    proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(
     //     WorldObject::OrbOfTransformation,
     //     &proto,
@@ -542,7 +519,9 @@ fn give_player_starting_items(
     //     64,
     //     None,
     // );
-    // proto_commands.spawn_item_from_proto(WorldObject::Ring, &proto, Vec2::ZERO, 1, Some(3));
+    proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
+    proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
+    proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
     // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);
     // proto_commands.spawn_item_from_proto(WorldObject::Log, &proto, Vec2::ZERO, 64,None);

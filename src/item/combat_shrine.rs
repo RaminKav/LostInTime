@@ -67,12 +67,20 @@ pub fn handle_combat_shrine_activate_animation(
                             .entity(mob)
                             .insert(CombatAlignment::Hostile)
                             .insert(LootTable {
-                                drops: vec![Loot {
-                                    item: WorldObject::TimeFragment,
-                                    min: 1,
-                                    max: 1,
-                                    rate: 0.2,
-                                }],
+                                drops: vec![
+                                    Loot {
+                                        item: WorldObject::Coin,
+                                        min: 1,
+                                        max: 1,
+                                        rate: 0.2,
+                                    },
+                                    Loot {
+                                        item: WorldObject::TimeFragment,
+                                        min: 1,
+                                        max: 1,
+                                        rate: 0.02,
+                                    },
+                                ],
                             })
                             .insert(CombatShrineMob { parent_shrine: e });
                     }

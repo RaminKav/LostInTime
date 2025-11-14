@@ -366,7 +366,7 @@ fn handle_spawn_projectiles_after_delay(
                     } else {
                         1.
                     };
-                let player_att = game.player_stats.single().0 .0 * mana_full_bonus as i32;
+                let player_att = (game.player_stats.single().0 .0 as f32 * mana_full_bonus) as i32;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
                 commands.entity(p).insert(Attack(computed_dmg));
             }

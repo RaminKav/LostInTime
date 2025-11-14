@@ -11,14 +11,15 @@ use crate::{
     colors::{DARK_WOOD_BROWN, GREY, WHITE},
     inputs::CursorPos,
     inventory::ItemStack,
-    item::ItemDisplayMetaData,
+    item::{ItemDisplayMetaData, WorldObject},
     player::{
         achievements::{is_pet_unlocked, Achievements},
         class_rank::ClassRankSystem,
+        currency::TimeFragmentCurrency,
         score::HighScores,
         skills::SkillClass,
         unlocks::{persist_unlock_data, UnlockUpgrades},
-        ClassUnlockData, UnlockCurrency, UnlockedClasses,
+        ClassUnlockData, UnlockedClasses,
     },
     ui::{spawn_back_button, spawn_back_button_texture_only, MenuButton, UIElement, UIState},
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
@@ -136,7 +137,7 @@ pub fn setup_class_selection_ui(
     high_scores: Option<Res<HighScores>>,
     achievements: Option<Res<Achievements>>,
     unlocked_classes: Res<UnlockedClasses>,
-    unlock_currency: Option<Res<UnlockCurrency>>,
+    unlock_currency: Option<Res<TimeFragmentCurrency>>,
     _class_unlocks: Option<Res<ClassUnlockData>>,
 ) {
     let overlay = spawn_ui_overlay(
@@ -146,13 +147,16 @@ pub fn setup_class_selection_ui(
         9.,
     );
 
-    commands
+    let currency_text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
                     format!(
-                        "Currency: {}",
-                        unlock_currency.as_ref().map(|c| c.amount).unwrap_or(0)
+                        "{}",
+                        unlock_currency
+                            .as_ref()
+                            .map(|c| c.time_fragments.max(0))
+                            .unwrap_or(0)
                     ),
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
@@ -161,8 +165,8 @@ pub fn setup_class_selection_ui(
                     },
                 )
                 .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform::from_translation(Vec3::new(-190., 115., 11.)),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(-170., 100., 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -171,7 +175,18 @@ pub fn setup_class_selection_ui(
             ClassUnlockCurrencyText,
             Name::new("CLASS UNLOCK CURRENCY TEXT"),
         ))
-        .set_parent(overlay);
+        .set_parent(overlay)
+        .id();
+    let currency_stack = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
+        &asset_server,
+        Vec2::new(-9., 1.),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands.entity(currency_stack).set_parent(currency_text);
 
     spawn_class_unlock_info_ui(&mut commands, &asset_server);
     spawn_class_unlock_confirm_ui(&mut commands, &graphics, &asset_server);
@@ -403,7 +418,7 @@ pub fn setup_class_selection_ui(
 
     // Confirm button
     let confirm_button =
-        spawn_back_button_texture_only(Vec3::new(80., -90., 11.), &mut commands, &graphics);
+        spawn_back_button_texture_only(Vec3::new(80.5, -90., 11.), &mut commands, &graphics);
 
     commands
         .entity(confirm_button)
@@ -418,14 +433,14 @@ pub fn setup_class_selection_ui(
             text: Text::from_section(
                 "BEGIN",
                 TextStyle {
-                    font: asset_server.load("fonts/alagard.ttf"),
-                    font_size: 15.0,
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
                     color: WHITE,
                 },
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0.5, -1., 1.),
+                translation: Vec3::new(0.5, -0.5, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -709,7 +724,7 @@ pub fn handle_class_selection(
     unlocked_classes: Res<UnlockedClasses>,
     achievements: Option<Res<Achievements>>,
     class_unlocks: Option<Res<ClassUnlockData>>,
-    unlock_currency: Option<Res<UnlockCurrency>>,
+    unlock_currency: Option<Res<TimeFragmentCurrency>>,
     mut hover_state: ResMut<ClassUnlockHoverState>,
     mut confirm_state: ResMut<ClassUnlockConfirmState>,
 ) {
@@ -750,7 +765,7 @@ pub fn handle_class_selection(
                             if !is_locked {
                                 slot.is_hovered = true;
                                 commands
-                                    .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.15));
+                                    .spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                             }
                         }
                         Interaction::Hovering => {
@@ -793,7 +808,7 @@ pub fn handle_class_selection(
                         Interaction::None => {
                             interactable.change(Interaction::Hovering);
                             pet_state.is_hovered = true;
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.15));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                         }
                         Interaction::Hovering => {
                             if left_mouse_pressed {
@@ -867,7 +882,7 @@ pub fn update_class_unlock_panel(
     achievements: Option<Res<Achievements>>,
     class_unlocks: Option<Res<ClassUnlockData>>,
     unlocked_classes: Res<UnlockedClasses>,
-    unlock_currency: Option<Res<UnlockCurrency>>,
+    unlock_currency: Option<Res<TimeFragmentCurrency>>,
     graphics: Res<Graphics>,
     mut panel_query: Query<(&mut Visibility, &mut Transform), With<ClassUnlockInfoPanel>>,
     mut text_query: Query<(&ClassUnlockInfoTextKind, &mut Text), With<ClassUnlockInfoText>>,
@@ -956,7 +971,7 @@ pub fn update_class_unlock_panel(
 }
 
 pub fn update_unlock_currency_text(
-    unlock_currency: Option<Res<UnlockCurrency>>,
+    unlock_currency: Option<Res<TimeFragmentCurrency>>,
     mut query: Query<&mut Text, With<ClassUnlockCurrencyText>>,
 ) {
     let Some(unlock_currency) = unlock_currency else {
@@ -968,7 +983,7 @@ pub fn update_unlock_currency_text(
     }
 
     for mut text in query.iter_mut() {
-        text.sections[0].value = format!("Currency: {}", unlock_currency.amount);
+        text.sections[0].value = format!("{}", unlock_currency.time_fragments.max(0));
     }
 }
 
@@ -1029,13 +1044,13 @@ pub fn update_class_unlock_confirm_panel(
 }
 
 pub fn persist_class_unlock_state(
-    unlock_currency: Option<&UnlockCurrency>,
+    time_fragment_currency: Option<&TimeFragmentCurrency>,
     unlocked_classes: &UnlockedClasses,
     achievements: Option<&Achievements>,
     unlock_upgrades: Option<&UnlockUpgrades>,
 ) {
     persist_unlock_data(
-        unlock_currency,
+        time_fragment_currency,
         Some(unlocked_classes),
         achievements,
         unlock_upgrades,

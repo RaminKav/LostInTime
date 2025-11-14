@@ -4,11 +4,11 @@ use rand::Rng;
 use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     combat::EnemyDeathEvent,
-    player::UnlockCurrency,
+    item::WorldObject,
     GameState,
 };
 
-#[derive(Component, Default, Debug)]
+#[derive(Resource, Debug)]
 pub struct TimeFragmentCurrency {
     pub time_fragments: i32,
     pub total_collected_time_fragments_all_time: u128,
@@ -24,30 +24,61 @@ impl TimeFragmentCurrency {
             bounce_timer: Timer::from_seconds(0.5, TimerMode::Once),
         }
     }
+
+    pub fn can_spend(&self, amount: u32) -> bool {
+        self.time_fragments as i64 >= amount as i64
+    }
+
+    pub fn spend(&mut self, amount: u32) -> bool {
+        if self.can_spend(amount) {
+            self.time_fragments -= amount as i32;
+            true
+        } else {
+            false
+        }
+    }
 }
 
-pub struct ModifyTimeFragmentsEvent {
+impl Default for TimeFragmentCurrency {
+    fn default() -> Self {
+        TimeFragmentCurrency::new(0, 0, 0)
+    }
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct CoinCurrency {
+    pub coins: u32,
+    pub bounce_timer: Timer,
+}
+
+pub struct ModifyCurencyEvent {
     pub delta: i32,
+    pub obj: WorldObject,
 }
 
-pub fn handle_modify_time_fragments(
-    mut time_fragments: Query<&mut TimeFragmentCurrency>,
-    mut events: EventReader<ModifyTimeFragmentsEvent>,
+pub fn handle_modify_currency(
+    mut time_fragments: ResMut<TimeFragmentCurrency>,
+    mut events: EventReader<ModifyCurencyEvent>,
     state: Res<State<GameState>>,
     mut commands: Commands,
+    mut coins: ResMut<CoinCurrency>,
 ) {
-    let Ok(mut time_fragments) = time_fragments.get_single_mut() else {
-        return;
-    };
     for event in events.iter() {
-        time_fragments.time_fragments = (time_fragments.time_fragments + event.delta).max(0);
+        if event.obj == WorldObject::TimeFragment {
+            time_fragments.time_fragments = (time_fragments.time_fragments + event.delta).max(0);
+        } else if event.obj == WorldObject::Coin {
+            coins.coins = coins.coins.saturating_add(event.delta as u32);
+        }
 
         if event.delta > 0 {
-            if state.0 == GameState::Main {
-                time_fragments.total_collected_time_fragments_this_run += event.delta;
-            } else if state.0 == GameState::GameOver {
-                time_fragments.total_collected_time_fragments_all_time += event.delta as u128;
+            if event.obj == WorldObject::TimeFragment {
+                if state.0 == GameState::Main {
+                    time_fragments.total_collected_time_fragments_this_run += event.delta;
+                } else if state.0 == GameState::GameOver {
+                    time_fragments.total_collected_time_fragments_all_time += event.delta as u128;
+                }
             }
+
             commands.spawn(SoundSpawner::new(AudioSoundEffect::CurrencyPickup, 0.75));
         }
     }
@@ -55,12 +86,17 @@ pub fn handle_modify_time_fragments(
 
 pub fn handle_mob_death_out_of_run_currency(
     mut death_events: EventReader<EnemyDeathEvent>,
-    mut currency: ResMut<UnlockCurrency>,
+    mut currency: ResMut<TimeFragmentCurrency>,
 ) {
     for _ in death_events.iter() {
         if rand::thread_rng().gen_bool(0.02) {
             info!("CURRENCY GAINED!");
-            currency.add(1);
+            currency.time_fragments = currency.time_fragments.saturating_add(1);
         }
     }
+}
+
+pub fn reset_time_fragment_counters(mut currency: ResMut<TimeFragmentCurrency>) {
+    currency.total_collected_time_fragments_this_run = 0;
+    currency.bounce_timer.reset();
 }

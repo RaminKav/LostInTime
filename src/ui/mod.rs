@@ -13,7 +13,7 @@ use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
 use bevy::sprite::Material2dPlugin;
-use damage_numbers::NewRecipeTextTimer;
+use damage_numbers::FloatingTextQueue;
 use scrapper_ui::{
     add_inv_to_new_scrapper_objs, change_ui_state_to_scrapper_when_resource_added,
     handle_scrap_items_in_scrapper, setup_scrapper_slots_ui, ScrapperContainer, ScrapperEvent,
@@ -81,7 +81,7 @@ use self::{
     crafting_ui::{change_ui_state_to_crafting_when_resource_added, CraftingContainer},
     damage_numbers::{
         add_previous_health, handle_add_damage_numbers_after_hit, handle_add_dodge_text,
-        tick_damage_numbers, DodgeEvent,
+        handle_queued_floating_texts, tick_damage_numbers, DodgeEvent,
     },
     minimap::MinimapPlugin,
     tile_hover::spawn_tile_hover_on_cursor_move,
@@ -89,7 +89,7 @@ use self::{
 
 pub const INVENTORY_UI_SIZE: Vec2 = Vec2::new(218., 145.);
 pub const SKILLS_CHOICE_UI_SIZE: Vec2 = Vec2::new(96., 120.);
-pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(107., 151.);
+pub const ESSENCE_UI_SIZE: Vec2 = Vec2::new(157., 130.5);
 pub const TOOLTIP_UI_SIZE: Vec2 = Vec2::new(93., 120.5);
 pub const CHEST_INVENTORY_UI_SIZE: Vec2 = Vec2::new(127., 142.);
 pub const CRAFTING_INVENTORY_UI_SIZE: Vec2 = Vec2::new(171., 166.);
@@ -107,7 +107,7 @@ impl Plugin for UIPlugin {
             .init_resource::<ClassUnlockConfirmState>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
-            .insert_resource(NewRecipeTextTimer::new(0.8))
+            .insert_resource(FloatingTextQueue::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
             })
@@ -177,6 +177,7 @@ impl Plugin for UIPlugin {
                     add_ui_icon_for_elite_mobs,
                     handle_add_dodge_text,
                     tick_damage_numbers,
+                    handle_queued_floating_texts,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -267,9 +268,7 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Unlocks))),
                     cleanup_unlocks_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
-                    handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
-                    update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
-                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
+                   
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -282,6 +281,9 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
+                    update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
+                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks))))
             .add_system(
                 handle_tooltip_teardown
                     .in_base_set(CoreSet::PreUpdate)

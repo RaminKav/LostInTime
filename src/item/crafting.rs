@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use super::EquipmentType;
 use crate::{
-    assets::Graphics,
     attributes::{
         attribute_helpers::{
             levelup_item_stats, reroll_item_bonus_attributes, spawn_rarity_animation,
@@ -13,18 +12,17 @@ use crate::{
         ItemRarity,
     },
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
-    colors::YELLOW,
+    colors::WHITE,
     container::Container,
-    inventory::{Inventory, InventoryItemStack, ItemStack},
+    inventory::{Inventory, InventoryItemStack},
     item::WorldObject,
     juice::ShakeEffect,
     player::{levels::PlayerLevel, Player},
     proto::proto_param::ProtoParam,
     ui::{
         crafting_ui::CraftingContainerType,
-        damage_numbers::{spawn_floating_text_with_shadow, NewRecipeTextTimer},
-        handle_hovering, spawn_item_stack_icon, InventorySlotState, InventoryState,
-        ToolTipUpdateEvent,
+        damage_numbers::{FloatingTextQueue, QueueFloatingText},
+        handle_hovering, InventorySlotState, InventoryState, ToolTipUpdateEvent,
     },
     GameState, TextureCamera,
 };
@@ -36,6 +34,9 @@ impl Plugin for CraftingPlugin {
             .add_event::<CraftedItemEvent>()
             .add_systems(
                 (
+                    initialize_all_recipes,
+                    process_queued_floating_texts
+                        .before(crate::ui::damage_numbers::handle_queued_floating_texts),
                     handle_crafting_update_when_inv_changes,
                     handle_crafted_item,
                     handle_inv_changed_update_crafting_tracker,
@@ -43,6 +44,94 @@ impl Plugin for CraftingPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
+    }
+}
+
+/// Initialize all recipes in the crafting_type_map so they're available from the start
+pub fn initialize_all_recipes(recipes: Res<Recipes>, mut craft_tracker: ResMut<CraftingTracker>) {
+    if !craft_tracker.crafting_type_map.is_empty() {
+        return; // Already initialized
+    }
+    for (result, recipe) in recipes.crafting_list.iter() {
+        craft_tracker
+            .crafting_type_map
+            .entry(recipe.1.clone())
+            .or_insert(vec![])
+            .push(*result);
+    }
+}
+
+/// Process queued items and spawn marker entities for floating text
+/// This runs every frame to ensure queued items are processed even if inventory doesn't change
+/// If a marker entity already exists for the same object type, update its count instead of creating a new one
+pub fn process_queued_floating_texts(
+    mut text_timer: ResMut<FloatingTextQueue>,
+    player: Query<&GlobalTransform, With<Player>>,
+    mut commands: Commands,
+    mut existing_markers: Query<(Entity, &mut QueueFloatingText)>,
+    proto: ProtoParam,
+) {
+    if text_timer.queue.is_empty() {
+        return;
+    }
+
+    let Ok(player_t) = player.get_single() else {
+        return;
+    };
+
+    let base_pos = player_t.translation() + Vec3::new(0., 15., 10.);
+
+    // Group items by object type and sum their counts
+    let mut grouped_items: HashMap<WorldObject, usize> = HashMap::new();
+    let mut indices_to_remove = Vec::new();
+
+    for (idx, (obj, count)) in text_timer.queue.iter().enumerate() {
+        *grouped_items.entry(*obj).or_insert(0) += count;
+        indices_to_remove.push(idx);
+    }
+
+    // Process each unique object type
+    for (obj, total_count) in grouped_items {
+        let item_data = proto.get_item_data(obj);
+        let item_rarity = if let Some(data) = item_data {
+            data.rarity.clone()
+        } else {
+            ItemRarity::Common
+        };
+        let text_color = if item_rarity == ItemRarity::Common {
+            WHITE
+        } else {
+            item_rarity.get_color()
+        };
+
+        // Check if there's already a marker entity for this object type
+        let mut found_existing = false;
+        for (_, mut marker) in existing_markers.iter_mut() {
+            if marker.obj == obj {
+                // Add the queue's count to the marker's existing count
+                // and reset timer to give more time for additional items
+                marker.count += total_count;
+                marker.delay_timer.reset();
+                found_existing = true;
+                break;
+            }
+        }
+
+        if !found_existing {
+            // Spawn new marker entity - handle_queued_floating_texts will process it after 0.2s delay
+            commands.spawn(QueueFloatingText {
+                obj,
+                count: total_count,
+                pos: base_pos,
+                color: text_color,
+                delay_timer: Timer::from_seconds(0.25, TimerMode::Once),
+            });
+        }
+    }
+
+    // Remove all processed items from queue (in reverse order to maintain indices)
+    for &idx in indices_to_remove.iter().rev() {
+        text_timer.queue.remove(idx);
     }
 }
 
@@ -289,38 +378,10 @@ pub fn handle_inv_changed_update_crafting_tracker(
     recipes: Res<Recipes>,
     proto: ProtoParam,
     player: Query<(&GlobalTransform, &PlayerLevel), With<Player>>,
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    graphics: Res<Graphics>,
-    mut text_timer: ResMut<NewRecipeTextTimer>,
-    time: Res<Time>,
 ) {
     let (player_t, player_level) = player.single();
-    // queue processing
-    if !text_timer.timer.finished() {
-        text_timer.timer.tick(time.delta());
-    } else if !text_timer.queue.is_empty() {
-        let shadow = spawn_floating_text_with_shadow(
-            &mut commands,
-            &asset_server,
-            player_t.translation() + Vec3::new(0., 15., 10.),
-            YELLOW,
-            "New Recipe!".to_string(),
-        );
-        let icon = spawn_item_stack_icon(
-            &mut commands,
-            &graphics,
-            &ItemStack::crate_icon_stack(text_timer.queue.pop().expect("queue is not empty")),
-            &asset_server,
-            Vec2::new(30., 2.),
-            Vec2::new(0., 0.),
-            0,
-        );
-        commands.entity(icon).set_parent(shadow);
-        text_timer.timer.reset();
-    }
 
-    // detect new items in inventory and add to queue
+    // detect new items in inventory
     if inv.get_single().is_err() {
         return;
     }
@@ -328,29 +389,6 @@ pub fn handle_inv_changed_update_crafting_tracker(
     for slot in inv.items.items.iter() {
         if let Some(item) = slot {
             let new_obj = item.item_stack.obj_type;
-
-            for (result, recipe) in recipes.crafting_list.iter() {
-                if craft_tracker.discovered_recipes.contains(result)
-                    || (!craft_tracker.discovered_crafting_types.contains(&recipe.1)
-                        && recipe.1 != CraftingContainerType::Inventory)
-                {
-                    continue;
-                }
-
-                for ingredient in recipe.0.iter() {
-                    if ingredient.item == new_obj {
-                        craft_tracker.discovered_recipes.push(*result);
-                        craft_tracker
-                            .crafting_type_map
-                            .entry(recipe.1.clone())
-                            .or_insert(vec![])
-                            .push(*result);
-                        text_timer.queue.push(*result);
-                        debug!("pushed to recipe queue {:?}", text_timer.queue);
-                        continue;
-                    }
-                }
-            }
             if !craft_tracker.discovered_objects.contains(&new_obj) {
                 craft_tracker.discovered_objects.push(new_obj);
             }

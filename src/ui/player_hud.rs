@@ -21,7 +21,7 @@ use crate::{
     player::{
         levels::PlayerLevel,
         skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
-        Player, RunScore, TimeFragmentCurrency,
+        CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
 };
@@ -43,6 +43,14 @@ pub struct XPBarText;
 #[derive(Component)]
 pub struct CurrencyText;
 #[derive(Component)]
+pub struct TimeFragmentText;
+#[derive(Component)]
+pub struct TimeFragmentIcon;
+#[derive(Component)]
+pub struct CoinIcon;
+#[derive(Component)]
+pub struct CoinText;
+#[derive(Component)]
 pub struct ScoreText;
 
 #[derive(Component)]
@@ -61,8 +69,6 @@ pub struct BarFlashTimer {
     pub flash_color: Color,
     pub color: Color,
 }
-#[derive(Component)]
-pub struct CurrencyIcon;
 #[derive(Default)]
 pub struct FlashExpBarEvent {
     pub amount: u32,
@@ -274,17 +280,18 @@ pub fn setup_xp_bar_ui(
 }
 pub fn setup_currency_ui(
     mut commands: Commands,
-    currency: Query<&TimeFragmentCurrency>,
+    currency: Res<TimeFragmentCurrency>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
+    coins: Res<CoinCurrency>,
 ) {
-    let time_fragments = currency.single();
+    let time_fragments = currency.as_ref();
     let text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    format!("{:}", time_fragments.time_fragments),
+                    format!("{:}", time_fragments.time_fragments.max(0)),
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
@@ -305,9 +312,68 @@ pub fn setup_currency_ui(
             },
             Name::new("TIME FRAGMENTS TEXT"),
             CurrencyText,
+            TimeFragmentText,
             RenderLayers::from_layers(&[3]),
         ))
         .id();
+    let stack = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
+        &asset_server,
+        Vec2::new(-9.5, 1.),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands
+        .entity(stack)
+        .insert(TimeFragmentIcon)
+        .set_parent(text);
+
+    let coin_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("{:}", coins.coins),
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: BLACK,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(
+                        -res.game_width / 2. + 50.5,
+                        GAME_HEIGHT / 2. - 43.5,
+                        6.,
+                    ),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("COIN TEXT"),
+            CurrencyText,
+            CoinText,
+            RenderLayers::from_layers(&[3]),
+        ))
+        .id();
+    let coin_stack = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::Coin),
+        &asset_server,
+        Vec2::new(-9.5, 0.5),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands
+        .entity(coin_stack)
+        .insert(CoinIcon)
+        .set_parent(coin_text);
+
+    // SCORE TEXT
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -320,7 +386,7 @@ pub fn setup_currency_ui(
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2. + 36., GAME_HEIGHT / 2. - 43.5, 6.),
+                translation: Vec3::new(-res.game_width / 2. + 64., GAME_HEIGHT / 2. - 43.5, 6.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -330,17 +396,6 @@ pub fn setup_currency_ui(
         ScoreText,
         RenderLayers::from_layers(&[3]),
     ));
-
-    let stack = spawn_item_stack_icon(
-        &mut commands,
-        &graphics,
-        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
-        &asset_server,
-        Vec2::new(-10., 1.),
-        Vec2::new(0., 0.),
-        3,
-    );
-    commands.entity(stack).insert(CurrencyIcon).set_parent(text);
 
     // INVENTORY ICON
     let bag_icon = spawn_item_stack_icon(
@@ -367,29 +422,36 @@ pub fn setup_currency_ui(
 }
 
 pub fn update_currency_text(
-    currency: Query<&TimeFragmentCurrency, Changed<TimeFragmentCurrency>>,
-    mut text_query: Query<&mut Text, With<CurrencyText>>,
-    icon: Query<Entity, With<CurrencyIcon>>,
+    time_fragments: Res<TimeFragmentCurrency>,
+    coins: Res<CoinCurrency>,
+    mut time_fragment_text_query: Query<&mut Text, (With<TimeFragmentText>, Without<CoinText>)>,
+    mut coin_text_query: Query<&mut Text, (With<CoinText>, Without<TimeFragmentText>)>,
+    time_fragment_icon: Query<Entity, (With<TimeFragmentIcon>, Without<CoinIcon>)>,
+    coin_icon: Query<Entity, (With<CoinIcon>, Without<TimeFragmentIcon>)>,
     mut commands: Commands,
     game_state: Res<State<GameState>>,
 ) {
-    for time_fragments in currency.iter() {
+    if time_fragments.is_changed() {
         if game_state.0 != GameState::GameOver {
-            // Only try to insert bounce effect if currency icon exists (might not be spawned yet)
-            if let Ok(icon_e) = icon.get_single() {
+            if let Ok(icon_e) = time_fragment_icon.get_single() {
                 commands.entity(icon_e).insert(BounceOnHit::new());
             }
         }
-        // handles different text for two different UI elements, game end count and normal in-game
-        for mut text in text_query.iter_mut() {
-            text.sections[0].value = format!(
-                "{:}",
-                if game_state.0 == GameState::GameOver {
-                    time_fragments.total_collected_time_fragments_all_time
-                } else {
-                    time_fragments.time_fragments as u128
-                }
-            );
+
+        for mut text in time_fragment_text_query.iter_mut() {
+            text.sections[0].value = format!("{}", time_fragments.time_fragments.max(0));
+        }
+    }
+
+    if coins.is_changed() {
+        if game_state.0 != GameState::GameOver {
+            if let Ok(icon_e) = coin_icon.get_single() {
+                commands.entity(icon_e).insert(BounceOnHit::new());
+            }
+        }
+
+        for mut text in coin_text_query.iter_mut() {
+            text.sections[0].value = format!("{}", coins.coins);
         }
     }
 }

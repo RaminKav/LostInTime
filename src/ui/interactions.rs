@@ -1272,7 +1272,7 @@ pub fn handle_cursor_main_menu_buttons(
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.25));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
 
                     if uses_sprite {
                         commands

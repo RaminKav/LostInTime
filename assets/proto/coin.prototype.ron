@@ -1,0 +1,16 @@
+(
+  name: "Coin",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": Coin,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: Coin,
+        metadata: (
+            name: "Coin",
+            desc: [""]
+        ),
+        rarity: Common,
+        count: 1
+  ),
+  }
+)

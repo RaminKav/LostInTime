@@ -9,7 +9,7 @@ use crate::{
     colors::WHITE,
     inventory::ItemStack,
     item::WorldObject,
-    player::ModifyTimeFragmentsEvent,
+    player::ModifyCurencyEvent,
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_text,
 };
@@ -37,7 +37,7 @@ pub fn handle_move_animations(
     )>,
     mut commands: Commands,
     mut child_text_query: Query<&mut Text>,
-    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
+    mut currency_event: EventWriter<ModifyCurencyEvent>,
 ) {
     for (e, mut transform, mut move_anim, mut sprite, child_option) in query.iter_mut() {
         if !move_anim.startup_delay.tick(time.delta()).finished() {
@@ -60,9 +60,12 @@ pub fn handle_move_animations(
             move_anim.velocity = new_velocity;
         }
         if move_anim.fade_factor.is_none() && curr_distance >= distance {
-            if move_anim.item_stack.obj_type == WorldObject::TimeFragment {
-                currency_event.send(ModifyTimeFragmentsEvent {
+            if move_anim.item_stack.obj_type == WorldObject::TimeFragment
+                || move_anim.item_stack.obj_type == WorldObject::Coin
+            {
+                currency_event.send(ModifyCurencyEvent {
                     delta: move_anim.item_stack.count as i32,
+                    obj: move_anim.item_stack.obj_type,
                 });
             }
             if move_anim.despawn_when_done {

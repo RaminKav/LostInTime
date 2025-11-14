@@ -4,12 +4,14 @@ use std::{fs::File, io::BufReader};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
+    audio::{AudioSoundEffect, SoundSpawner},
     chaos::ChaosTracker,
     client::{analytics::AnalyticsData, handle_append_run_data_after_death, GameData},
     datafiles,
     enemy::Mob,
     item::WorldObject,
-    player::UnlockCurrency,
+    player::unlocks::persist_unlock_data,
+    player::TimeFragmentCurrency,
     world::dimension::Era,
     world::portal::BossKillTracker,
     BounceEvent, GameState,
@@ -114,6 +116,20 @@ impl Achievement {
 
     pub fn reward_currency(&self) -> u32 {
         match self {
+            Achievement::DungeonCrawler => 5,
+            Achievement::FirstRunComplete => 2,
+            Achievement::Kill100FurDevils => 5,
+            Achievement::SlimePet => 5,
+            Achievement::FairyPet => 7,
+            Achievement::Bouncy => 5,
+            Achievement::Bouncy2 => 3,
+            Achievement::Act1 => 10,
+            Achievement::Act2 => 15,
+            Achievement::Act3 => 20,
+            Achievement::BushlingSlayer1 => 7,
+            Achievement::StingflySlayer => 10,
+            Achievement::MushlingSlayer => 10,
+            Achievement::Chaotic => 25,
             Achievement::FindSpear
             | Achievement::FindClaw
             | Achievement::FindHammer
@@ -123,7 +139,7 @@ impl Achievement {
             | Achievement::FindMagicWhip
             | Achievement::FindDagger
             | Achievement::FindBow
-            | Achievement::FindBlowdart => 10,
+            | Achievement::FindBlowdart => 3,
             _ => 0,
         }
     }
@@ -370,14 +386,23 @@ pub fn track_bounce_achievements(
 }
 
 pub fn handle_achievement_rewards(
-    mut achievement_events: EventReader<AchievementUnlockedEvent>,
-    mut currency: Option<ResMut<UnlockCurrency>>,
+    mut commands: Commands,
+    mut events: EventReader<AchievementUnlockedEvent>,
+    currency: Option<ResMut<TimeFragmentCurrency>>,
 ) {
     if let Some(mut currency_res) = currency {
-        for event in achievement_events.iter() {
+        let mut changed = false;
+        for event in events.iter() {
             if event.reward_currency > 0 {
-                currency_res.add(event.reward_currency);
+                currency_res.time_fragments = currency_res
+                    .time_fragments
+                    .saturating_add(event.reward_currency as i32);
+                changed = true;
             }
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
+        }
+        if changed {
+            persist_unlock_data(Some(&*currency_res), None, None, None);
         }
     }
 }

@@ -32,8 +32,8 @@ use crate::player::mage_skills::IceExplosion;
 use crate::player::skills::SkillClass;
 use crate::player::skills::{ActiveSkill, Heirloom};
 use crate::player::{
-    get_default_unlocked_classes, Achievements, ClassUnlockConfig, ClassUnlockData, HighScores,
-    UnlockCurrency, UnlockUpgrades, UnlockedClasses,
+    get_default_unlocked_classes, Achievements, ClassUnlockConfig, ClassUnlockData, CoinCurrency,
+    TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses,
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
@@ -365,38 +365,38 @@ impl GameAssetsPlugin {
                 Ok(game_data) => {
                     commands.insert_resource(game_data.class_ranks);
                     commands.insert_resource(game_data.high_scores);
-                    commands.insert_resource(game_data.achievements);
-                    commands.insert_resource(UnlockCurrency {
-                        amount: game_data.unlock_currency,
-                    });
-                    let mut unlocked = UnlockedClasses::new(game_data.unlocked_classes);
+                    commands.insert_resource(game_data.achievements.clone());
+                    let mut unlocked = UnlockedClasses::new(game_data.unlocked_classes.clone());
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
                     commands.insert_resource(game_data.unlock_upgrades.clone());
-                    info!("Loaded class ranks from game data (loading state)");
+                    commands.insert_resource(TimeFragmentCurrency::new(
+                        (game_data.time_fragments.min(i32::MAX as u128)) as i32,
+                        0,
+                        game_data.time_fragments,
+                    ));
                 }
                 Err(err) => {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
                     commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
-                    commands.insert_resource(UnlockCurrency::default());
-                    commands.insert_resource(HighScores::default());
-                    commands.insert_resource(Achievements::default());
+                    commands.insert_resource(UnlockUpgrades::default());
                     let mut unlocked = UnlockedClasses::default();
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
-                    commands.insert_resource(UnlockUpgrades::default());
+                    commands.insert_resource(Achievements::default());
+                    commands.insert_resource(TimeFragmentCurrency::default());
                 }
             }
         } else {
             commands.insert_resource(crate::player::class_rank::ClassRankSystem::new());
-            commands.insert_resource(UnlockCurrency::default());
-            commands.insert_resource(HighScores::default());
-            commands.insert_resource(Achievements::default());
+            commands.insert_resource(UnlockUpgrades::default());
             let mut unlocked = UnlockedClasses::default();
             unlocked.ensure_defaults(&get_default_unlocked_classes());
             commands.insert_resource(unlocked);
-            commands.insert_resource(UnlockUpgrades::default());
+            commands.insert_resource(Achievements::default());
+            commands.insert_resource(TimeFragmentCurrency::default());
         }
+        commands.insert_resource(CoinCurrency::default());
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();
         let recipes_desc_handle: Handle<RecipeListProto> = sprite_sheet.recipes.clone();
         let class_pet_desc_handle: Handle<ClassPetData> = sprite_sheet.class_desc.clone();

@@ -1,7 +1,7 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_aseprite::aseprite;
 use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
 
 use crate::{
@@ -299,7 +299,7 @@ pub fn handle_anim_events(
     query: Query<Entity, With<ItemChest>>,
     graphics: Res<Graphics>,
     proto: ProtoParam,
-    mut game: GameParam,
+    game: GameParam,
     asset_server: Res<AssetServer>,
 ) {
     for event in events.iter() {
@@ -313,7 +313,9 @@ pub fn handle_anim_events(
                         .collect_vec();
                     let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
                     let mut stack = proto.get_item_data(pick_new_item.clone()).unwrap().clone();
-                    stack.metadata.level = Some(game.get_player_level());
+                    let max_item_level = (game.get_player_level() - 2).max(1);
+                    let level = rng.gen_range(1..=max_item_level);
+                    stack.metadata.level = Some(level);
 
                     item_chest_state.picked_item = Some(
                         create_new_random_item_stack_with_attributes(&stack, &proto, &mut commands),

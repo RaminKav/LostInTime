@@ -67,7 +67,13 @@
             (
                 item: TimeFragment,
                 min: 2,
-                max: 5,
+                max: 4,
+                rate: 1.
+            ),
+            (
+                item: Coin,
+                min: 8,
+                max: 13,
                 rate: 1.
             ),
             ]

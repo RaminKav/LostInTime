@@ -21,8 +21,9 @@ use crate::{
     night::NightTracker,
     player::{
         achievements::{Achievement, Achievements},
+        currency::TimeFragmentCurrency,
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills},
-        unlocks::{RunUnlockState, UnlockCurrency, UnlockUpgrades, UnlockedClasses},
+        unlocks::{RunUnlockState, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
         achievements_ui::{AchievementsPagination, ACHIEVEMENTS_PER_PAGE},
@@ -60,7 +61,7 @@ pub struct MenuButtonExtras<'w, 's> {
     scrapper_event: EventWriter<'w, ScrapperEvent>,
     selection_state: ResMut<'w, ClassSelectionState>,
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
-    unlock_currency: Option<ResMut<'w, UnlockCurrency>>,
+    time_fragment_currency: Option<ResMut<'w, TimeFragmentCurrency>>,
     unlocked_classes: Option<ResMut<'w, UnlockedClasses>>,
     unlock_upgrades: Res<'w, UnlockUpgrades>,
     hover_state: ResMut<'w, ClassUnlockHoverState>,
@@ -296,7 +297,7 @@ pub fn handle_menu_button_click_events(
                         let mut unlocked_class = false;
 
                         match (
-                            extras.unlock_currency.as_mut(),
+                            extras.time_fragment_currency.as_mut(),
                             extras.unlocked_classes.as_mut(),
                         ) {
                             (Some(currency_res), Some(unlocked_res)) => {
@@ -312,7 +313,7 @@ pub fn handle_menu_button_click_events(
                                         "Attempted to unlock {:?} without enough currency (cost: {}, owned: {})",
                                         class,
                                         cost,
-                                        currency.amount
+                                        currency.time_fragments
                                     );
                                 }
                             }
@@ -336,7 +337,7 @@ pub fn handle_menu_button_click_events(
                             extras.hover_state.slot_position = Vec3::ZERO;
 
                             if let (Some(currency_res), Some(unlocked_res)) = (
-                                extras.unlock_currency.as_ref(),
+                                extras.time_fragment_currency.as_ref(),
                                 extras.unlocked_classes.as_ref(),
                             ) {
                                 let currency_ref = currency_res.as_ref();

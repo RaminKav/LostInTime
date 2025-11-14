@@ -16,7 +16,7 @@ use crate::inventory::Inventory;
 use crate::item::dungeon_shrine::NUM_DUNGEON_SHRINE_MOBS;
 use crate::juice::ShakeEffect;
 use crate::player::skills::{ActiveSkill, ActiveSkillChoiceState, HeirloomRarity};
-use crate::player::ModifyTimeFragmentsEvent;
+use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::crafting_ui::{CraftingContainer, CraftingContainerType};
 use crate::ui::damage_numbers::{
@@ -75,7 +75,8 @@ pub enum ObjectAction {
 pub enum ObjectActionCost {
     #[default]
     None,
-    TimeFragment(i32),
+    CoinCost(i32),
+    TimeFragmentCost(i32),
     Item(WorldObject, usize),
 }
 
@@ -104,11 +105,23 @@ impl ObjectAction {
             proto_param.get_component::<ObjectActionCost, _>(obj);
         if let Some(cost) = maybe_cost {
             match cost {
-                ObjectActionCost::TimeFragment(cost) => {
-                    if game.get_time_fragments() >= *cost {
-                        item_action_param
-                            .currency_event
-                            .send(ModifyTimeFragmentsEvent { delta: -cost });
+                ObjectActionCost::CoinCost(cost) => {
+                    if game.get_coins() as i32 >= *cost {
+                        item_action_param.currency_event.send(ModifyCurencyEvent {
+                            delta: -cost,
+                            obj: WorldObject::Coin,
+                        });
+                    } else {
+                        //TODO: SCREEN SHAKE
+                        return;
+                    }
+                }
+                ObjectActionCost::TimeFragmentCost(cost) => {
+                    if game.get_time_fragments() as i32 >= *cost {
+                        item_action_param.currency_event.send(ModifyCurencyEvent {
+                            delta: -cost,
+                            obj: WorldObject::TimeFragment,
+                        });
                     } else {
                         //TODO: SCREEN SHAKE
                         return;
@@ -182,45 +195,6 @@ impl ObjectAction {
                 });
             }
             ObjectAction::Crafting(crafting_type) => {
-                if !item_action_param
-                    .crafting_tracker
-                    .discovered_crafting_types
-                    .contains(crafting_type)
-                {
-                    for item in item_action_param
-                        .crafting_tracker
-                        .discovered_objects
-                        .clone()
-                    {
-                        for (result, recipe) in item_action_param.recipes.crafting_list.iter() {
-                            if recipe.1 != *crafting_type {
-                                continue;
-                            }
-                            if item_action_param
-                                .crafting_tracker
-                                .discovered_recipes
-                                .contains(result)
-                            {
-                                continue;
-                            }
-                            for ingredient in recipe.0.iter() {
-                                if ingredient.item == item {
-                                    item_action_param
-                                        .crafting_tracker
-                                        .discovered_recipes
-                                        .push(*result);
-                                    item_action_param
-                                        .crafting_tracker
-                                        .crafting_type_map
-                                        .entry(recipe.1.clone())
-                                        .or_insert(vec![])
-                                        .push(*result);
-                                }
-                            }
-                        }
-                    }
-                }
-
                 let items = if let Some(crafting_items) = item_action_param
                     .crafting_tracker
                     .crafting_type_map
@@ -567,10 +541,10 @@ impl ObjectAction {
                 let proto_ref: &ProtoParam =
                     unsafe { &*(proto_param as *mut ProtoParam as *const ProtoParam) };
                 proto_param.proto_commands.spawn_item_from_proto(
-                    WorldObject::TimeFragment,
+                    WorldObject::Coin,
                     proto_ref,
                     spawn_pos,
-                    1,
+                    10,
                     None,
                 );
 

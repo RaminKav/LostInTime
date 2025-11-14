@@ -6,7 +6,7 @@ use bevy_rapier2d::prelude::RapierContext;
 use rand::Rng;
 
 use crate::{
-    assets::{Graphics, SpriteAnchor},
+    assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
@@ -596,9 +596,7 @@ pub fn handle_mana_orb_drops(
         let Some(main_hand) = game.player().main_hand_slot.clone() else {
             continue;
         };
-        if !main_hand.get_obj().is_magic_weapon() {
-            continue;
-        }
+
         if !rng.gen_bool(0.30) {
             continue;
         }

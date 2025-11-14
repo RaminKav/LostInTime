@@ -15,8 +15,8 @@ use crate::{
     player::{Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     ui::{
-        damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyIcon, CurrencyText,
-        Interactable, MenuButton, UIState,
+        damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyText, Interactable, MenuButton,
+        TimeFragmentIcon, UIState,
     },
     world::y_sort::YSort,
     GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
@@ -156,7 +156,7 @@ pub fn tick_game_over_overlay(
     mut tip_check: Local<bool>,
     graphics: Res<Graphics>,
     res: Res<ScreenResolution>,
-    time_fragments: Query<&TimeFragmentCurrency>,
+    time_fragments: Res<TimeFragmentCurrency>,
 ) {
     if query.iter().count() == 0 {
         *tip_check = false;
@@ -196,7 +196,7 @@ pub fn tick_game_over_overlay(
             );
 
             // total currency counter
-            let time_fragments = time_fragments.single();
+            let time_fragments = time_fragments.as_ref();
             let currency_this_run = time_fragments.total_collected_time_fragments_this_run as u32;
             let game_data_file_path = datafiles::game_data();
             let mut total_currency = 0;
@@ -233,7 +233,10 @@ pub fn tick_game_over_overlay(
                 Vec2::new(0., 0.),
                 3,
             );
-            commands.entity(stack).insert(CurrencyIcon).set_parent(text);
+            commands
+                .entity(stack)
+                .insert(TimeFragmentIcon)
+                .set_parent(text);
 
             commands.spawn(GameEndTimeFragmentSpawner {
                 timer: Timer::from_seconds(0.05, TimerMode::Once),

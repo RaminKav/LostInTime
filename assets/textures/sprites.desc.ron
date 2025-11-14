@@ -750,6 +750,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Coin: WorldObjectData(
+            texture_pos: (8., 14.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         ChaosTotem: WorldObjectData(
             texture_pos: (9., 14.),
             size: (16., 16.),

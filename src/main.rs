@@ -92,7 +92,7 @@ use player::{
     levels::PlayerLevel,
     rogue_skills::ComboCounter,
     skills::{Heirloom, PlayerSkills},
-    Player, PlayerPlugin, PlayerState, TimeFragmentCurrency,
+    Player, PlayerPlugin, PlayerState,
 };
 use proto::{proto_param::ProtoParam, ProtoPlugin};
 
@@ -372,17 +372,8 @@ pub struct GameParam<'w, 's> {
     pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
 
     //TODO: remove this to use Bevy_Save
-    pub player_query: Query<
-        'w,
-        's,
-        (
-            Entity,
-            &'static TimeFragmentCurrency,
-            &'static PlayerSkills,
-            &'static mut PlayerLevel,
-        ),
-        With<Player>,
-    >,
+    pub player_query:
+        Query<'w, 's, (Entity, &'static PlayerSkills, &'static mut PlayerLevel), With<Player>>,
     pub player_stats: Query<
         'w,
         's,
@@ -421,6 +412,8 @@ pub struct GameParam<'w, 's> {
     pub wall_data_query: Query<'w, 's, (Entity, &'static mut WallTextureData)>,
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
+    pub coins: ResMut<'w, crate::player::currency::CoinCurrency>,
+    pub time_fragments: ResMut<'w, crate::player::currency::TimeFragmentCurrency>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -431,19 +424,22 @@ impl<'w, 's> GameParam<'w, 's> {
         self.game.player_state.clone()
     }
     pub fn get_player_level(&self) -> u8 {
-        self.player_query.single().3.level
+        self.player_query.single().2.level
     }
     pub fn get_player_level_mut(&mut self) -> Mut<PlayerLevel> {
-        self.player_query.single_mut().3
+        self.player_query.single_mut().2
     }
     pub fn get_player_skills(&self) -> PlayerSkills {
-        self.player_query.single().2.clone()
+        self.player_query.single().1.clone()
     }
     pub fn player_mut(&mut self) -> &mut PlayerState {
         &mut self.game.player_state
     }
     pub fn get_time_fragments(&self) -> i32 {
-        self.player_query.single().1.time_fragments
+        self.time_fragments.time_fragments
+    }
+    pub fn get_coins(&self) -> u32 {
+        self.coins.coins
     }
     pub fn get_chunk_entity(&self, chunk_pos: IVec2) -> Option<Entity> {
         for (e, chunk) in self.chunk_query.iter() {
@@ -637,10 +633,10 @@ impl<'w, 's> GameParam<'w, 's> {
         }
     }
     pub fn has_skill(&self, skill: Heirloom) -> bool {
-        self.player_query.single().2.has(skill)
+        self.player_query.single().1.has(skill)
     }
     pub fn skill_count(&self, skill: Heirloom) -> i32 {
-        self.player_query.single().2.get_count(skill)
+        self.player_query.single().1.get_count(skill)
     }
 }
 

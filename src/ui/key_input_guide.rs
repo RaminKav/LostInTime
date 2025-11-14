@@ -29,7 +29,7 @@ pub fn add_guide_to_unique_objs(
                     text: Some("Summon".to_string()),
                     activation_distance: 32.,
                     icon_stack: Some(
-                        ItemStack::crate_icon_stack(WorldObject::TimeFragment).copy_with_count(10),
+                        ItemStack::crate_icon_stack(WorldObject::Coin).copy_with_count(50),
                     ),
                 });
             }
@@ -54,7 +54,7 @@ pub fn add_guide_to_unique_objs(
                     key: Some("F".to_string()),
                     text: Some("Fight".to_string()),
                     activation_distance: 32.,
-                    icon_stack: None,
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::ChestBlock)),
                 });
             }
             WorldObject::WeaponShrine => {
@@ -94,7 +94,7 @@ pub fn add_guide_to_unique_objs(
                     key: Some("F".to_string()),
                     text: Some("Purchase".to_string()),
                     activation_distance: 32.,
-                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::Coin)),
                 });
             }
             WorldObject::ActiveSkillShrine => {
@@ -102,13 +102,13 @@ pub fn add_guide_to_unique_objs(
                     key: Some("F".to_string()),
                     text: Some("Get Skill".to_string()),
                     activation_distance: 32.,
-                    icon_stack: Some(ItemStack::crate_icon_stack(WorldObject::TimeFragment)),
+                    icon_stack: None,
                 });
             }
             WorldObject::HeirloomShrine => {
                 commands.entity(e).insert(InteractionGuideTrigger {
                     key: Some("F".to_string()),
-                    text: Some("Get Skill".to_string()),
+                    text: Some("Talk ".to_string()),
                     activation_distance: 32.,
                     icon_stack: None,
                 });

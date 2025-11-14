@@ -6,12 +6,16 @@ use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
     inputs::CursorPos,
-    player::achievements::Achievements,
-    player::unlocks::{
-        persist_unlock_data, UnlockCurrency, UnlockUpgradeKind, UnlockUpgrades, UnlockedClasses,
+    inventory::ItemStack,
+    item::WorldObject,
+    player::{
+        achievements::Achievements,
+        currency::TimeFragmentCurrency,
+        unlocks::{persist_unlock_data, UnlockUpgradeKind, UnlockUpgrades, UnlockedClasses},
     },
     ui::{
-        interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
+        interactions::Interaction, spawn_back_button, spawn_item_stack_icon, ui_helpers,
+        Interactable, UIElement, UIState,
     },
     ScreenResolution,
 };
@@ -97,17 +101,17 @@ pub fn handle_unlocks_clicks(
     mut buttons: Query<(Entity, &mut Interactable, &UnlockPurchaseButton)>,
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut currency: ResMut<UnlockCurrency>,
+    mut currency: ResMut<TimeFragmentCurrency>,
     mut upgrades: ResMut<UnlockUpgrades>,
     unlocked_classes: Res<UnlockedClasses>,
     achievements: Res<Achievements>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
-    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, button) in buttons.iter_mut() {
         let cost = upgrades.next_cost(button.kind);
-        let affordable = currency.amount >= cost;
+        let affordable = currency.time_fragments.max(0) as u32 >= cost;
         match hit_test {
             Some(hit) if hit.0 == entity => match interactable.current() {
                 Interaction::None => {
@@ -115,16 +119,17 @@ pub fn handle_unlocks_clicks(
                         continue;
                     }
                     interactable.change(Interaction::Hovering);
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
                     commands
                         .entity(entity)
                         .insert(UIElement::BackButtonHover)
                         .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
                 }
                 Interaction::Hovering => {
-                    if left_mouse_pressed && affordable {
+                    if left_mouse_released && affordable {
                         if currency.spend(cost) {
                             upgrades.increment(button.kind);
-                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
+                            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
 
                             persist_unlock_data(
                                 Some(&*currency),
@@ -143,20 +148,22 @@ pub fn handle_unlocks_clicks(
                 _ => {}
             },
             _ => {
-                if matches!(interactable.current(), Interaction::Hovering) {
-                    interactable.change(Interaction::None);
-                    commands
-                        .entity(entity)
-                        .insert(UIElement::BackButton)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
-                }
+                // reset hovering states if we stop hovering
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+                commands
+                    .entity(entity)
+                    .insert(UIElement::BackButton)
+                    .insert(graphics.get_ui_element_texture(UIElement::BackButton));
             }
         }
     }
 }
 
 pub fn update_unlocks_currency_text(
-    currency: Res<UnlockCurrency>,
+    currency: Res<TimeFragmentCurrency>,
     mut query: Query<&mut Text, With<UnlocksCurrencyText>>,
 ) {
     if !currency.is_changed() {
@@ -164,12 +171,12 @@ pub fn update_unlocks_currency_text(
     }
 
     for mut text in query.iter_mut() {
-        text.sections[0].value = format!("Currency: {}", currency.amount);
+        text.sections[0].value = format!("{}", currency.time_fragments.max(0));
     }
 }
 
 pub fn refresh_unlock_button_states(
-    currency: Res<UnlockCurrency>,
+    currency: Res<TimeFragmentCurrency>,
     upgrades: Res<UnlockUpgrades>,
     mut buttons: Query<(&UnlockPurchaseButton, &mut Sprite, &Children)>,
     mut text_queries: ParamSet<(
@@ -184,7 +191,7 @@ pub fn refresh_unlock_button_states(
 
     for (button, mut sprite, children) in buttons.iter_mut() {
         let cost = upgrades.next_cost(button.kind);
-        let affordable = currency.amount >= cost;
+        let affordable = currency.time_fragments.max(0) as u32 >= cost;
         sprite.color = if affordable {
             Color::WHITE
         } else {
@@ -231,7 +238,7 @@ pub fn setup_unlocks_ui(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
-    currency: Res<UnlockCurrency>,
+    currency: Res<TimeFragmentCurrency>,
     upgrades: Res<UnlockUpgrades>,
 ) {
     let overlay = ui_helpers::spawn_ui_overlay(
@@ -240,7 +247,10 @@ pub fn setup_unlocks_ui(
         1.,
         10.,
     );
-    commands.entity(overlay).insert(UnlocksUI);
+    commands
+        .entity(overlay)
+        .insert(UnlocksUI)
+        .insert(UIState::Unlocks);
 
     // Title
     commands.spawn((
@@ -264,26 +274,38 @@ pub fn setup_unlocks_ui(
     ));
 
     // Currency text
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                format!("Currency: {}", currency.amount),
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 10.0,
-                    color: crate::colors::WHITE,
-                },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(-140., 70.5, 11.)),
-            ..Default::default()
-        },
-        RenderLayers::from_layers(&[3]),
-        UnlocksUI,
-        UnlocksCurrencyText,
-        Name::new("Unlocks Currency Text"),
-    ));
+    let currency_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("{}", currency.time_fragments.max(0)),
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 10.0,
+                        color: crate::colors::WHITE,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: bevy::sprite::Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(-120., 70.5, 11.)),
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UnlocksUI,
+            UnlocksCurrencyText,
+            Name::new("Unlocks Currency Text"),
+        ))
+        .id();
+    let currency_stack = spawn_item_stack_icon(
+        &mut commands,
+        &graphics,
+        &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
+        &asset_server,
+        Vec2::new(-9., 1.5),
+        Vec2::new(0., 0.),
+        3,
+    );
+    commands.entity(currency_stack).set_parent(currency_text);
 
     let start_y = 48.5;
     let row_spacing = -30.0;
@@ -394,10 +416,11 @@ fn spawn_unlock_row(
                 .get_ui_element_texture(UIElement::BackButton)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(74., 20.)),
+                custom_size: Some(Vec2::new(53., 20.)),
                 ..Default::default()
             },
             transform: Transform::from_translation(button_pos),
+            visibility: Visibility::Visible,
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
@@ -418,14 +441,14 @@ fn spawn_unlock_row(
                 text: Text::from_section(
                     "Purchase",
                     TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
                         color: crate::colors::WHITE,
                     },
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

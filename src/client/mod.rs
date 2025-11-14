@@ -20,12 +20,6 @@ pub mod analytics;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
-use crate::player::unlocks::UnlockUpgrades;
-use crate::player::{
-    check_first_run_achievement,
-    score::{HighScores, RunScore},
-    Achievements,
-};
 use crate::{
     animations::ui_animaitons::MoveUIAnimation,
     attributes::{hunger::Hunger, CurrentHealth},
@@ -39,11 +33,16 @@ use crate::{
     },
     night::NightTracker,
     player::{
+        achievements::Achievements,
+        check_first_run_achievement,
         class_rank::ClassRankSystem,
+        currency::TimeFragmentCurrency,
         levels::PlayerLevel,
+        score::{HighScores, RunScore},
         skills::{HeirloomChoiceQueue, PlayerClass, PlayerSkills, SkillClass},
         stats::{PlayerStats, SkillPoints},
-        Player, TimeFragmentCurrency, UnlockCurrency, UnlockedClasses,
+        unlocks::{UnlockUpgrades, UnlockedClasses},
+        Player,
     },
     proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer},
@@ -56,9 +55,11 @@ use crate::{
         dungeon::Dungeon,
         generation::WorldObjectCache,
         world_helpers::world_pos_to_tile_pos,
-        TileMapPosition, WallTextureData, WorldGeneration,
+        y_sort::YSort,
+        WallTextureData, WorldGeneration,
     },
-    CustomFlush, GameParam, GameState, MainCamera, RawPosition, TextureCamera, UICamera, YSort,
+    CustomFlush, GameParam, GameState, MainCamera, RawPosition, TextureCamera, TileMapPosition,
+    UICamera,
 };
 
 #[derive(Component, Reflect, Default)]
@@ -211,8 +212,6 @@ pub struct GameData {
     pub high_scores: HighScores,
     pub achievements: Achievements,
     #[serde(default)]
-    pub unlock_currency: u32,
-    #[serde(default)]
     pub unlocked_classes: Vec<SkillClass>,
     #[serde(default)]
     pub unlock_upgrades: UnlockUpgrades,
@@ -225,11 +224,10 @@ pub fn handle_append_run_data_after_death(
     mut analytics_data: ResMut<AnalyticsData>,
     all_time_fragments: Query<Entity, With<MoveUIAnimation>>,
     mut commands: Commands,
-    time_fragments: Query<&TimeFragmentCurrency>,
+    time_fragments: Res<TimeFragmentCurrency>,
     player_class: Option<Res<PlayerClass>>,
     run_score: Option<Res<RunScore>>,
     achievements: ResMut<Achievements>,
-    unlock_currency: Option<Res<UnlockCurrency>>,
     unlocked_classes: Option<Res<UnlockedClasses>>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
 ) {
@@ -264,8 +262,8 @@ pub fn handle_append_run_data_after_death(
         if game_data.longest_run < night.days {
             game_data.longest_run = night.days;
         }
-        let time_fragments = time_fragments.single();
-        game_data.time_fragments += time_fragments.total_collected_time_fragments_this_run as u128;
+        let currency = time_fragments.as_ref();
+        game_data.time_fragments = currency.time_fragments.max(0) as u128;
         let inv = inv.single();
         for item in inv.items.items.clone().iter().flatten() {
             if item.slot < 6 {
@@ -346,9 +344,6 @@ pub fn handle_append_run_data_after_death(
         commands.insert_resource(game_data.clone().class_ranks);
         commands.insert_resource(game_data.clone().high_scores);
 
-        if let Some(currency) = unlock_currency.as_ref() {
-            game_data.unlock_currency = currency.amount;
-        }
         if let Some(classes) = unlocked_classes.as_ref() {
             game_data.unlocked_classes = classes.to_vec();
         }
@@ -400,7 +395,6 @@ pub fn save_state(
             &Hunger,
             &Inventory,
             &PlayerSkills,
-            &TimeFragmentCurrency,
         ),
         With<Player>,
     >,
@@ -425,10 +419,10 @@ pub fn save_state(
     }
     timer.timer.reset();
     //PlayerData
-    let (player_txfm, stats, hp, hunger, inv, skills, currency) = player_data.single();
+    let (player_txfm, stats, hp, hunger, inv, skills) = player_data.single();
     save_data.player_transform = player_txfm.translation().xy();
     save_data.player_stats = stats.clone();
-    save_data.player_level = game.player_query.single().3.clone();
+    save_data.player_level = game.player_query.single().2.clone();
     save_data.current_health = *hp;
     save_data.player_hunger = hunger.current;
     save_data.inventory = inv.clone();
@@ -438,8 +432,8 @@ pub fn save_state(
     save_data.player_skills = skills.clone();
     save_data.player_skill_queue = skills_queue.clone();
     save_data.currency = (
-        currency.time_fragments,
-        currency.total_collected_time_fragments_this_run,
+        game.time_fragments.time_fragments,
+        game.time_fragments.total_collected_time_fragments_this_run,
     );
 
     save_data.placed_objs = vec![game.world_obj_cache.objects.clone()];

@@ -4,33 +4,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufReader;
 
-use super::achievements::{Achievement, Achievements};
+use super::{
+    achievements::{Achievement, Achievements},
+    currency::TimeFragmentCurrency,
+};
 use crate::datafiles;
 use crate::player::skills::SkillClass;
-
-#[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
-pub struct UnlockCurrency {
-    pub amount: u32,
-}
-
-impl UnlockCurrency {
-    pub fn add(&mut self, value: u32) {
-        self.amount = self.amount.saturating_add(value);
-    }
-
-    pub fn can_spend(&self, value: u32) -> bool {
-        self.amount >= value
-    }
-
-    pub fn spend(&mut self, value: u32) -> bool {
-        if self.can_spend(value) {
-            self.amount -= value;
-            true
-        } else {
-            false
-        }
-    }
-}
 
 #[derive(Resource, Debug, Clone, Default)]
 pub struct UnlockedClasses {
@@ -214,7 +193,7 @@ impl RunUnlockState {
 }
 
 pub fn persist_unlock_data(
-    unlock_currency: Option<&UnlockCurrency>,
+    time_fragment_currency: Option<&TimeFragmentCurrency>,
     unlocked_classes: Option<&UnlockedClasses>,
     achievements: Option<&Achievements>,
     unlock_upgrades: Option<&UnlockUpgrades>,
@@ -230,8 +209,8 @@ pub fn persist_unlock_data(
     if let Some(achievements) = achievements {
         game_data.achievements = achievements.clone();
     }
-    if let Some(currency) = unlock_currency {
-        game_data.unlock_currency = currency.amount;
+    if let Some(currency) = time_fragment_currency {
+        game_data.time_fragments = currency.time_fragments as u128;
     }
     if let Some(classes) = unlocked_classes {
         game_data.unlocked_classes = classes.to_vec();

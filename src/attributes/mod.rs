@@ -1022,6 +1022,7 @@ impl ItemAttributes {
             ("mana_regen", self.mana_regen.value),
             ("durability", self.durability.value),
             ("max_durability", self.max_durability.value),
+            ("size", self.size.value),
         ]
         .iter()
         .filter(|(name, val)| *val > 0 && !filter.contains(name))
@@ -1059,6 +1060,8 @@ impl ItemAttributes {
             "projectile_size" => self.size.value += modifier.delta,
             "loot_rate" => self.loot_rate.value += modifier.delta,
             "mana" => self.mana.value += modifier.delta,
+            "size" => self.size.value += modifier.delta,
+            "xp_rate" => self.xp_rate.value += modifier.delta,
             "mana_regen" => self.mana_regen.value += modifier.delta,
             "durability" => self.durability.value += modifier.delta,
             "max_durability" => self.max_durability.value += modifier.delta,

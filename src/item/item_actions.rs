@@ -12,7 +12,7 @@ use crate::{
     inventory::Inventory,
     juice::UseItemEvent,
     night::NightTracker,
-    player::{stats::SkillPoints, ModifyTimeFragmentsEvent, MovePlayerEvent},
+    player::{stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
         item_chest::{ItemChestAnimState, ItemChestState},
@@ -138,7 +138,7 @@ pub struct ItemActionParam<'w, 's> {
     pub move_player_event: EventWriter<'w, MovePlayerEvent>,
     pub bounce_event: EventWriter<'w, BounceEvent>,
     pub use_item_event: EventWriter<'w, UseItemEvent>,
-    pub currency_event: EventWriter<'w, ModifyTimeFragmentsEvent>,
+    pub currency_event: EventWriter<'w, ModifyCurencyEvent>,
     pub modify_health_event: EventWriter<'w, ModifyHealthEvent>,
     pub increase_chaos_event: EventWriter<'w, IncreaseChaosEvent>,
     pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
@@ -194,7 +194,7 @@ impl ItemActions {
                 }
                 ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => {
                     // Apply attack speed buff to player
-                    if let Ok((player_entity, _, _, _)) = game.player_query.get_single() {
+                    if let Ok((player_entity, _, _)) = game.player_query.get_single() {
                         commands
                             .entity(player_entity)
                             .insert(AttackSpeedBuff::new(*duration, *multiplier));
@@ -203,7 +203,7 @@ impl ItemActions {
                 }
                 ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => {
                     // Apply movement speed buff to player
-                    if let Ok((player_entity, _, _, _)) = game.player_query.get_single() {
+                    if let Ok((player_entity, _, _)) = game.player_query.get_single() {
                         commands
                             .entity(player_entity)
                             .insert(MovementSpeedBuff::new(*duration, *multiplier));

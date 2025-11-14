@@ -6,7 +6,7 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::Mob,
     juice::{FlashEffect, ShakeEffect},
-    player::{ModifyTimeFragmentsEvent, TimeFragmentCurrency},
+    player::{ModifyCurencyEvent, Player},
     proto::proto_param::ProtoParam,
     world::{dungeon::Dungeon, world_helpers::tile_pos_to_world_pos},
     GameParam, TextureCamera,
@@ -24,17 +24,17 @@ pub struct DelayedSpawn {
 pub fn handle_pay_shrine_cost(
     mut commands: Commands,
     key_input: ResMut<Input<KeyCode>>,
-    player_query: Query<(&GlobalTransform, &TimeFragmentCurrency)>,
+    player_query: Query<&GlobalTransform, With<Player>>,
     game: GameParam,
     mut game_camera: Query<Entity, With<TextureCamera>>,
-    mut currency_event: EventWriter<ModifyTimeFragmentsEvent>,
+    mut currency_event: EventWriter<ModifyCurencyEvent>,
     dungeon_check: Query<&Dungeon>,
 ) {
     if dungeon_check.get_single().is_ok() {
         return;
     }
     if key_input.just_pressed(KeyCode::F) {
-        let (player_t, currency) = player_query.single();
+        let player_t = player_query.single();
         let Some(shrine) = game
             .world_obj_cache
             .unique_objs
@@ -44,10 +44,11 @@ pub fn handle_pay_shrine_cost(
         };
         let shrine_pos = tile_pos_to_world_pos(*shrine, false);
 
-        if shrine_pos.distance(player_t.translation().truncate()) < 32.
-            && currency.time_fragments >= 10
-        {
-            currency_event.send(ModifyTimeFragmentsEvent { delta: -10 });
+        if shrine_pos.distance(player_t.translation().truncate()) < 32. && game.get_coins() >= 50 {
+            currency_event.send(ModifyCurencyEvent {
+                delta: -50,
+                obj: WorldObject::Coin,
+            });
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, shrine_pos);
             commands.insert_resource(DelayedSpawn {
                 timer: Timer::from_seconds(3., TimerMode::Once),

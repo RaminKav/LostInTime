@@ -4,13 +4,16 @@ use bevy::render::view::RenderLayers;
 use bevy::sprite::Anchor;
 use strum::IntoEnumIterator;
 
+use super::{
+    damage_numbers::spawn_text, spawn_back_button, spawn_back_button_texture_only,
+    spawn_item_stack_icon, ui_helpers, Interactable, Interaction, MenuButton, UIElement, UIState,
+};
+
 use crate::{
     assets::Graphics,
+    inventory::ItemStack,
+    item::WorldObject,
     player::achievements::{Achievement, Achievements},
-    ui::{
-        damage_numbers::spawn_text, spawn_back_button, spawn_back_button_texture_only, ui_helpers,
-        Interactable, Interaction, MenuButton, UIElement, UIState,
-    },
     ScreenResolution,
 };
 
@@ -42,10 +45,44 @@ pub struct AchievementCheckbox;
 pub struct AchievementCrossout;
 
 #[derive(Component)]
+pub struct AchievementRewardRoot;
+
+#[derive(Component)]
 pub struct AchievementsPrevButton;
 
 #[derive(Component)]
 pub struct AchievementsNextButton;
+
+fn refresh_reward_icon(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    root: Entity,
+    reward: Option<u32>,
+) {
+    commands.entity(root).despawn_descendants();
+
+    match reward {
+        Some(amount) if amount > 0 => {
+            commands.entity(root).insert(Visibility::Visible);
+            let mut stack = ItemStack::crate_icon_stack(WorldObject::TimeFragment);
+            stack.count = amount as usize;
+            let icon = spawn_item_stack_icon(
+                commands,
+                graphics,
+                &stack,
+                asset_server,
+                Vec2::ZERO,
+                Vec2::new(-4., 0.),
+                3,
+            );
+            commands.entity(icon).set_parent(root);
+        }
+        _ => {
+            commands.entity(root).insert(Visibility::Hidden);
+        }
+    }
+}
 
 pub fn setup_achievements_ui(
     mut commands: Commands,
@@ -218,6 +255,33 @@ pub fn setup_achievements_ui(
         commands.entity(desc_entity).set_parent(achievements_bg);
         commands.entity(name_entity).set_parent(achievements_bg);
 
+        let reward_root = commands
+            .spawn((
+                SpatialBundle {
+                    transform: Transform::from_translation(Vec3::new(140., y_pos, 1.)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                AchievementRow { index: row_index },
+                AchievementRewardRoot,
+                Name::new("Achievement Reward Root"),
+            ))
+            .id();
+        commands.entity(reward_root).set_parent(achievements_bg);
+
+        let reward_amount = maybe_achievement
+            .copied()
+            .map(|achievement| achievement.reward_currency());
+        refresh_reward_icon(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            reward_root,
+            reward_amount,
+        );
+
         let checkbox_entity = commands
             .spawn((
                 SpriteBundle {
@@ -367,14 +431,17 @@ pub fn cleanup_achievements_ui(
 }
 
 pub fn update_achievements_page_display(
+    mut commands: Commands,
     achievements: Res<Achievements>,
     pagination: Res<AchievementsPagination>,
     graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
     mut param_set: ParamSet<(
         Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementNameText>>,
         Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementDescText>>,
         Query<(&AchievementRow, &mut Handle<Image>, &mut Visibility), With<AchievementCheckbox>>,
         Query<(&AchievementRow, &mut Visibility), With<AchievementCrossout>>,
+        Query<(Entity, &AchievementRow), With<AchievementRewardRoot>>,
     )>,
 ) {
     if !pagination.is_changed() && !achievements.is_changed() {
@@ -460,13 +527,33 @@ pub fn update_achievements_page_display(
         let mut crossout_query = param_set.p3();
         for (row, mut visibility) in crossout_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
-                Some((_, unlocked)) if unlocked => {
-                    *visibility = Visibility::Visible;
+                Some((_achievement, unlocked)) => {
+                    *visibility = if unlocked {
+                        Visibility::Visible
+                    } else {
+                        Visibility::Hidden
+                    };
                 }
-                _ => {
+                None => {
                     *visibility = Visibility::Hidden;
                 }
             }
+        }
+    }
+
+    {
+        let reward_query = param_set.p4();
+        for (entity, row) in reward_query.iter() {
+            let reward_amount = row_states
+                .get(row.index)
+                .and_then(|state| state.map(|(achievement, _)| achievement.reward_currency()));
+            refresh_reward_icon(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                entity,
+                reward_amount,
+            );
         }
     }
 }

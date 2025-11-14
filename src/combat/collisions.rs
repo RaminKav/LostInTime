@@ -1,3 +1,8 @@
+use super::{
+    try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
+    StatusEffectEvent,
+};
+use crate::ui::damage_numbers::FloatingTextQueue;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
     attributes::{
@@ -26,12 +31,6 @@ use crate::{
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
-
-use super::{
-    try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
-    StatusEffectEvent,
-};
-
 const MANA_ORB_RESTORE: i32 = 5;
 
 pub struct CollisionPlugion;
@@ -418,6 +417,7 @@ pub fn check_item_drop_collisions(
     mut inv: Query<&mut Inventory>,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut text_timer: ResMut<FloatingTextQueue>,
     resolution: Res<ScreenResolution>,
 ) {
     if !game.player().is_moving && !inv.single().is_empty() {
@@ -433,15 +433,16 @@ pub fn check_item_drop_collisions(
             }
             let item_stack = items_query.get(e2).unwrap().clone();
             let obj = item_stack.obj_type;
-            if obj == WorldObject::TimeFragment {
+            if obj == WorldObject::TimeFragment || obj == WorldObject::Coin {
                 commands.spawn(UIIconMover::new(
                     Vec3::new(0., 0., 9.),
                     Vec3::new(
                         -resolution.game_width / 2. + 15.,
-                        resolution.game_height / 2. - 50.,
+                        resolution.game_height / 2. - 50.
+                            + if obj == WorldObject::Coin { -12. } else { 0. },
                         9.,
                     ),
-                    WorldObject::TimeFragment,
+                    obj,
                     0.,
                     800.,
                     None,
@@ -453,25 +454,7 @@ pub fn check_item_drop_collisions(
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
-                commands.spawn(UIIconMover::new(
-                    Vec3::new(
-                        -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 10.,
-                        9.,
-                    ),
-                    Vec3::new(
-                        -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 10.,
-                        9.,
-                    ),
-                    obj,
-                    100.,
-                    100.,
-                    Some(0.15),
-                    true,
-                    item_stack.clone(),
-                    true,
-                ));
+                text_timer.add_item(obj);
                 continue;
             } else if obj == WorldObject::ManaOrb {
                 modify_mana_event.send(ModifyManaEvent(MANA_ORB_RESTORE));
@@ -491,30 +474,17 @@ pub fn check_item_drop_collisions(
             {
                 return;
             }
-            if obj != WorldObject::TimeFragment {
-                commands.spawn(UIIconMover::new(
-                    Vec3::new(
-                        -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 10.,
-                        9.,
-                    ),
-                    Vec3::new(
-                        -resolution.game_width / 2. + 65.,
-                        -resolution.game_height / 2. + 10.,
-                        9.,
-                    ),
-                    obj,
-                    100.,
-                    100.,
-                    Some(0.15),
-                    true,
-                    item_stack.clone(),
-                    true,
-                ));
-            }
             // ...and inventory has room, add it to the player's inventory
 
             item_stack.add_to_inventory(&mut inv.single_mut().items, &mut game.inv_slot_query);
+
+            // Add item to notification queue (exclude currency items that have special handling)
+            if obj != WorldObject::TimeFragment
+                && obj != WorldObject::Coin
+                && obj != WorldObject::ManaOrb
+            {
+                text_timer.add_item(obj);
+            }
 
             commands.entity(e2).despawn_recursive();
             analytics.send(AnalyticsUpdateEvent {
