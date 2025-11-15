@@ -212,6 +212,7 @@ fn handle_ranged_attack_event(
         if !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && !proj_event.projectile.is_staff_proj()
+            && !proj_event.is_followup_proj
         {
             if let Some(main_hand) = game.player().main_hand_slot.clone() {
                 let held_e = main_hand.entity;
