@@ -136,6 +136,7 @@ impl Plugin for ClientPlugin {
                     .after(add_analytics_resource_on_start)
                     .in_schedule(OnExit(GameState::MainMenu)),
             )
+            .add_system(load_game_data_for_ui.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems(
                 (
                     save_state.run_if(resource_exists::<AnalyticsData>()),
@@ -215,6 +216,8 @@ pub struct GameData {
     pub unlocked_classes: Vec<SkillClass>,
     #[serde(default)]
     pub unlock_upgrades: UnlockUpgrades,
+    #[serde(default)]
+    pub cumulative_analytics: Option<AnalyticsData>,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -341,8 +344,33 @@ pub fn handle_append_run_data_after_death(
             }
         }
 
-        commands.insert_resource(game_data.clone().class_ranks);
-        commands.insert_resource(game_data.clone().high_scores);
+        // Merge analytics data into cumulative analytics
+        if let Some(ref mut cumulative) = game_data.cumulative_analytics {
+            // Merge mobs_killed
+            for (mob, count) in analytics_data.mobs_killed.iter() {
+                *cumulative.mobs_killed.entry(mob.clone()).or_insert(0) += count;
+            }
+            // Merge items_collected
+            for (item, count) in analytics_data.items_collected.iter() {
+                *cumulative.items_collected.entry(item.clone()).or_insert(0) += count;
+            }
+            // Update other cumulative stats
+            cumulative.total_recipes_crafted += analytics_data.total_recipes_crafted;
+            cumulative.total_damage_taken += analytics_data.total_damage_taken;
+            cumulative.total_damage_dealt += analytics_data.total_damage_dealt;
+            cumulative.total_objects_broken += analytics_data.total_objects_broken;
+            cumulative.total_objects_placed += analytics_data.total_objects_placed;
+            cumulative.total_items_consumed += analytics_data.total_items_consumed;
+            cumulative.nights_survived += analytics_data.nights_survived;
+        } else {
+            // Initialize cumulative analytics with current run data
+            game_data.cumulative_analytics = Some(analytics_data.clone());
+        }
+
+        let class_ranks = game_data.class_ranks.clone();
+        let high_scores = game_data.high_scores.clone();
+        commands.insert_resource(class_ranks);
+        commands.insert_resource(high_scores);
 
         if let Some(classes) = unlocked_classes.as_ref() {
             game_data.unlocked_classes = classes.to_vec();
@@ -627,6 +655,27 @@ pub fn load_state(
     });
 
     info!("DONE LOADING GAME DATA");
+}
+
+/// Load GameData when entering main menu so UI can access cumulative_analytics
+pub fn load_game_data_for_ui(mut commands: Commands) {
+    let game_data_file_path = datafiles::game_data();
+    if let Ok(file_file) = File::open(game_data_file_path) {
+        let reader = BufReader::new(file_file);
+        match serde_json::from_reader::<_, GameData>(reader) {
+            Ok(game_data) => {
+                // Insert GameData as a resource so achievements UI can access cumulative_analytics
+                commands.insert_resource(game_data);
+            }
+            Err(_) => {
+                // Insert default GameData if file can't be read
+                commands.insert_resource(GameData::default());
+            }
+        }
+    } else {
+        // Insert default GameData if file doesn't exist
+        commands.insert_resource(GameData::default());
+    }
 }
 
 pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {

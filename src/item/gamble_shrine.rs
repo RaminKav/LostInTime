@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::ProtoCommands;
-use rand::seq::IteratorRandom;
+use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     assets::{Graphics, SpriteAnchor},
@@ -53,13 +53,21 @@ pub fn handle_gamble_shrine_rewards(
                     // WorldObject::WoodSword,
                     // WorldObject::WoodSword,
                     WorldObject::ChestBlock,
+                    WorldObject::ChestBlock,
+                    WorldObject::Coin,
                 ];
                 // give rewards
+                let picked_drop = *drop_list.iter().choose(&mut rand::thread_rng()).unwrap();
+                let mut rng = rand::thread_rng();
+                let count = match picked_drop {
+                    WorldObject::Coin => rng.gen_range(34..53),
+                    _ => 1,
+                };
                 proto_commands.spawn_item_from_proto(
-                    *drop_list.iter().choose(&mut rand::thread_rng()).unwrap(),
+                    picked_drop,
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
-                    1,
+                    count,
                     Some(game.get_player_level()),
                 );
                 commands

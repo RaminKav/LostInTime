@@ -10,6 +10,7 @@ use super::{
 };
 
 use crate::{
+    animations::enemy_sprites::spawn_attack_warning_aseprite,
     assets::Graphics,
     inventory::ItemStack,
     item::WorldObject,
@@ -46,6 +47,18 @@ pub struct AchievementCrossout;
 
 #[derive(Component)]
 pub struct AchievementRewardRoot;
+
+#[derive(Component)]
+pub struct AchievementProgressText;
+
+#[derive(Component)]
+pub struct AchievementProgressBar;
+
+#[derive(Component)]
+pub struct AchievementProgressBarBg;
+
+#[derive(Component)]
+pub struct AchievementWarningAnimation;
 
 #[derive(Component)]
 pub struct AchievementsPrevButton;
@@ -165,26 +178,31 @@ pub fn setup_achievements_ui(
 
         let (name_text, desc_text, text_color, desc_color, checkbox_texture, crossout_visible) =
             if let Some(achievement) = maybe_achievement {
-                let is_unlocked = achievements.has(*achievement);
+                let is_completed = achievements.is_completed(*achievement);
+                let is_claimed = achievements.is_claimed(*achievement);
                 (
                     achievement.get_name(),
                     achievement.get_desc(),
-                    if is_unlocked {
-                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    if is_claimed {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0) // Gray for claimed
+                    } else if is_completed {
+                        crate::colors::LIGHT_GREEN // Green for completed
                     } else {
-                        crate::colors::LIGHT_BROWN
+                        crate::colors::LIGHT_BROWN // Normal color
                     },
-                    if is_unlocked {
-                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    if is_claimed {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0) // Gray for claimed
+                    } else if is_completed {
+                        crate::colors::LIGHT_GREEN // Green for completed
                     } else {
-                        crate::colors::BLACK
+                        crate::colors::BLACK // Normal color
                     },
-                    if is_unlocked {
+                    if is_claimed {
                         UIElement::CheckBoxSelected
                     } else {
                         UIElement::CheckBox
                     },
-                    is_unlocked,
+                    is_claimed, // Only show crossout for claimed
                 )
             } else {
                 (
@@ -216,6 +234,33 @@ pub fn setup_achievements_ui(
             },
             ..Default::default()
         };
+
+        // Create a clickable area for the row
+        let row_clickable = commands
+            .spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(289., 19.)),
+                        color: Color::rgba(0., 0., 0., 0.1), // Almost transparent but still hittable
+                        ..Default::default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(0., y_pos, 0.5)),
+                    visibility: if maybe_achievement.is_some() {
+                        Visibility::Visible
+                    } else {
+                        Visibility::Hidden
+                    },
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                AchievementRow { index: row_index },
+                Interactable::default(),
+                Name::new("Achievement Row Clickable"),
+            ))
+            .id();
+        commands.entity(row_clickable).set_parent(achievements_bg);
 
         let name_entity = commands
             .spawn((
@@ -282,6 +327,81 @@ pub fn setup_achievements_ui(
             reward_amount,
         );
 
+        // Progress text
+        let progress_text_entity = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "",
+                        TextStyle {
+                            font: font_handle.clone(),
+                            font_size: 5.0,
+                            color: crate::colors::BLACK,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Right),
+                    text_anchor: bevy::sprite::Anchor::CenterRight,
+                    transform: Transform::from_translation(Vec3::new(132., y_pos, 1.)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                AchievementRow { index: row_index },
+                AchievementProgressText,
+                Name::new("Achievement Progress Text"),
+            ))
+            .id();
+        commands
+            .entity(progress_text_entity)
+            .set_parent(achievements_bg);
+
+        // Progress bar background
+        let progress_bar_bg = commands
+            .spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(0., 2.)),
+                        color: Color::rgba(0.3, 0.3, 0.3, 1.0),
+                        ..Default::default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(120., y_pos - 6., 1.)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                AchievementRow { index: row_index },
+                AchievementProgressBarBg,
+                Name::new("Achievement Progress Bar BG"),
+            ))
+            .id();
+        commands.entity(progress_bar_bg).set_parent(achievements_bg);
+
+        // Progress bar fill
+        let progress_bar_fill = commands
+            .spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(0., 2.)),
+                        color: crate::colors::LIGHT_GREEN,
+                        ..Default::default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(120., y_pos - 6., 1.1)),
+                    ..Default::default()
+                },
+                RenderLayers::from_layers(&[3]),
+                AchievementsUI,
+                UIState::Achievements,
+                AchievementRow { index: row_index },
+                AchievementProgressBar,
+                Name::new("Achievement Progress Bar Fill"),
+            ))
+            .id();
+        commands
+            .entity(progress_bar_fill)
+            .set_parent(achievements_bg);
+
         let checkbox_entity = commands
             .spawn((
                 SpriteBundle {
@@ -307,6 +427,37 @@ pub fn setup_achievements_ui(
             .id();
 
         commands.entity(checkbox_entity).set_parent(name_entity);
+
+        // Spawn warning animation for completed but not claimed achievements
+        if let Some(achievement) = maybe_achievement {
+            let is_completed = achievements.is_completed(*achievement);
+            let is_claimed = achievements.is_claimed(*achievement);
+            if is_completed && !is_claimed {
+                // Spawn warning animation on the far left, left of the checkbox
+                // Checkbox is at -8.5 relative to name_entity, name_entity is at -148
+                // So checkbox is at ~-156.5, we'll put warning at ~-165
+                info!(
+                    "SPAWNED WARNING ANIMATION FOR ACHIEVEMENT ROW {}",
+                    row_index
+                );
+                let warning_pos = Vec3::new(-165., y_pos, 20.5);
+                let warning_entity = spawn_attack_warning_aseprite(
+                    &mut commands,
+                    &asset_server,
+                    warning_pos,
+                    achievements_bg,
+                    999999.0, // Very long duration so it persists
+                );
+                commands.entity(warning_entity).insert((
+                    AchievementsUI,
+                    UIState::Achievements,
+                    AchievementRow { index: row_index },
+                    AchievementWarningAnimation,
+                    RenderLayers::from_layers(&[3]),
+                    Name::new("Achievement Warning Animation"),
+                ));
+            }
+        }
 
         let crossout_visibility = if crossout_visible {
             Visibility::Visible
@@ -436,28 +587,73 @@ pub fn update_achievements_page_display(
     pagination: Res<AchievementsPagination>,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    analytics: Option<Res<crate::client::analytics::AnalyticsData>>,
+    bounce_tracker: Option<Res<crate::player::achievements::BounceAchievementTracker>>,
+    chaos_tracker: Option<Res<crate::chaos::ChaosTracker>>,
+    game_data: Option<Res<crate::client::GameData>>,
+    achievements_bg_query: Query<Entity, (With<AchievementsUI>, With<UIState>)>,
+    warning_animations: Query<(Entity, &AchievementRow), With<AchievementWarningAnimation>>,
     mut param_set: ParamSet<(
         Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementNameText>>,
         Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementDescText>>,
         Query<(&AchievementRow, &mut Handle<Image>, &mut Visibility), With<AchievementCheckbox>>,
         Query<(&AchievementRow, &mut Visibility), With<AchievementCrossout>>,
         Query<(Entity, &AchievementRow), With<AchievementRewardRoot>>,
+        Query<(&AchievementRow, &mut Text, &mut Visibility), With<AchievementProgressText>>,
+        Query<
+            (
+                &AchievementRow,
+                &mut Sprite,
+                &mut Transform,
+                &mut Visibility,
+            ),
+            With<AchievementProgressBar>,
+        >,
+        Query<(&AchievementRow, &mut Sprite), With<AchievementProgressBarBg>>,
     )>,
 ) {
-    if !pagination.is_changed() && !achievements.is_changed() {
-        return;
-    }
+    // Always run to ensure progress displays are updated
+    // The early return was preventing the system from running when entities were first created
+    // We'll let it run every frame when in achievements UI to ensure progress is always up to date
 
     let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
-    all_achievements.sort_by_key(|achievement| !achievements.has(*achievement));
+    // Sort achievements by priority:
+    // 1. Completed and claimed (highest priority)
+    // 2. Completed but not claimed (second priority - these need attention!)
+    // 3. Unlocked but not completed (third priority)
+    // 4. Locked (lowest priority)
+    all_achievements.sort_by_key(|achievement| {
+        let is_completed = achievements.is_completed(*achievement);
+        let is_claimed = achievements.is_claimed(*achievement);
+        let is_unlocked = achievements.has(*achievement);
+
+        (
+            !is_completed || !is_claimed, // False (0) for completed+claimed, True (1) for others
+            !is_completed,                // False (0) for completed, True (1) for not completed
+            !is_unlocked,                 // False (0) for unlocked, True (1) for locked
+        )
+    });
     let start_index = pagination.page * ACHIEVEMENTS_PER_PAGE;
 
     let mut row_states = Vec::with_capacity(ACHIEVEMENTS_PER_PAGE);
+
     for offset in 0..ACHIEVEMENTS_PER_PAGE {
         let maybe_achievement = all_achievements.get(start_index + offset).copied();
         row_states.push(maybe_achievement.map(|achievement| {
-            let unlocked = achievements.has(achievement);
-            (achievement, unlocked)
+            let is_completed = achievements.is_completed(achievement);
+            let is_claimed = achievements.is_claimed(achievement);
+            // Try to get analytics from current run first, then from cumulative analytics in GameData
+            let analytics_for_progress = analytics.as_deref().or_else(|| {
+                game_data
+                    .as_ref()
+                    .and_then(|gd| gd.cumulative_analytics.as_ref())
+            });
+            let progress = achievement.get_progress(
+                analytics_for_progress,
+                bounce_tracker.as_deref(),
+                chaos_tracker.as_deref(),
+            );
+            (achievement, is_completed, is_claimed, progress)
         }));
     }
 
@@ -465,18 +661,20 @@ pub fn update_achievements_page_display(
         let mut name_query = param_set.p0();
         for (row, mut text, mut visibility) in name_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
-                Some((achievement, unlocked)) => {
+                Some((achievement, is_completed, is_claimed, _)) => {
                     text.sections[0].value = achievement.get_name();
-                    text.sections[0].style.color = if unlocked {
-                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    text.sections[0].style.color = if is_claimed {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0) // Gray for claimed
+                    } else if is_completed {
+                        crate::colors::LIGHT_GREEN // Green for completed
                     } else {
-                        crate::colors::LIGHT_BROWN
+                        crate::colors::LIGHT_BROWN // Normal color
                     };
                     *visibility = Visibility::Visible;
                 }
                 None => {
-                    text.sections[0].value.clear();
-                    *visibility = Visibility::Hidden;
+                    text.sections[0].value = String::new();
+                    *visibility = Visibility::Visible; // Keep visible but empty
                 }
             }
         }
@@ -486,12 +684,14 @@ pub fn update_achievements_page_display(
         let mut desc_query = param_set.p1();
         for (row, mut text, mut visibility) in desc_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
-                Some((achievement, unlocked)) => {
+                Some((achievement, is_completed, is_claimed, _)) => {
                     text.sections[0].value = achievement.get_desc();
-                    text.sections[0].style.color = if unlocked {
-                        Color::rgba(0.5, 0.5, 0.5, 1.0)
+                    text.sections[0].style.color = if is_claimed {
+                        Color::rgba(0.5, 0.5, 0.5, 1.0) // Gray for claimed
+                    } else if is_completed {
+                        crate::colors::LIGHT_GREEN // Green for completed
                     } else {
-                        crate::colors::BLACK
+                        crate::colors::BLACK // Normal color
                     };
                     *visibility = Visibility::Visible;
                 }
@@ -507,8 +707,8 @@ pub fn update_achievements_page_display(
         let mut checkbox_query = param_set.p2();
         for (row, mut texture, mut visibility) in checkbox_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
-                Some((_, unlocked)) => {
-                    let checkbox_type = if unlocked {
+                Some((_, _, is_claimed, _)) => {
+                    let checkbox_type = if is_claimed {
                         UIElement::CheckBoxSelected
                     } else {
                         UIElement::CheckBox
@@ -527,8 +727,8 @@ pub fn update_achievements_page_display(
         let mut crossout_query = param_set.p3();
         for (row, mut visibility) in crossout_query.iter_mut() {
             match row_states.get(row.index).and_then(|state| *state) {
-                Some((_achievement, unlocked)) => {
-                    *visibility = if unlocked {
+                Some((_, _, is_claimed, _)) => {
+                    *visibility = if is_claimed {
                         Visibility::Visible
                     } else {
                         Visibility::Hidden
@@ -544,9 +744,16 @@ pub fn update_achievements_page_display(
     {
         let reward_query = param_set.p4();
         for (entity, row) in reward_query.iter() {
-            let reward_amount = row_states
-                .get(row.index)
-                .and_then(|state| state.map(|(achievement, _)| achievement.reward_currency()));
+            let reward_amount = row_states.get(row.index).and_then(|state| {
+                state.and_then(|(achievement, _, is_claimed, _)| {
+                    // Hide reward if achievement is claimed
+                    if is_claimed {
+                        None
+                    } else {
+                        Some(achievement.reward_currency())
+                    }
+                })
+            });
             refresh_reward_icon(
                 &mut commands,
                 &graphics,
@@ -554,6 +761,179 @@ pub fn update_achievements_page_display(
                 entity,
                 reward_amount,
             );
+        }
+    }
+
+    {
+        let mut progress_text_query = param_set.p5();
+        for (row, mut text, mut visibility) in progress_text_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((_, _, is_claimed, Some((current, target)))) => {
+                    if is_claimed {
+                        // Hide progress text when claimed
+                        text.sections[0].value = String::new();
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        text.sections[0].value = format!("{}/{}", current, target);
+                        *visibility = Visibility::Visible;
+                    }
+                }
+                Some((_, _, is_claimed, None)) => {
+                    if is_claimed {
+                        // Hide progress text when claimed
+                        text.sections[0].value = String::new();
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        text.sections[0].value = String::new();
+                        *visibility = Visibility::Visible; // Keep visible but empty
+                    }
+                }
+                None => {
+                    text.sections[0].value = String::new();
+                    *visibility = Visibility::Visible; // Keep visible but empty
+                }
+            }
+        }
+    }
+
+    {
+        let mut progress_bar_query = param_set.p6();
+        for (row, mut sprite, mut transform, mut visibility) in progress_bar_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((_, _, is_claimed, Some((current, target)))) => {
+                    if is_claimed {
+                        // Hide progress bar when claimed
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                        transform.translation.x = 120.0;
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        let progress = (current as f32 / target as f32).min(1.0);
+                        let bar_width = 24.0 * progress;
+                        sprite.custom_size = Some(Vec2::new(bar_width, 2.));
+                        transform.translation.x = 120.0 - (24.0 - bar_width) / 2.0; // Align left edge with background
+                        *visibility = Visibility::Visible;
+                    }
+                }
+                Some((_, _, is_claimed, None)) => {
+                    if is_claimed {
+                        // Hide progress bar when claimed
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                        transform.translation.x = 120.0;
+                        *visibility = Visibility::Hidden;
+                    } else {
+                        // Set to 0 width instead of hiding
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                        transform.translation.x = 120.0;
+                        *visibility = Visibility::Visible; // Keep visible but 0 width
+                    }
+                }
+                None => {
+                    // Set to 0 width instead of hiding
+                    sprite.custom_size = Some(Vec2::new(0., 2.));
+                    transform.translation.x = 120.0;
+                    *visibility = Visibility::Visible; // Keep visible but 0 width
+                }
+            }
+        }
+    }
+
+    {
+        let mut progress_bar_bg_query = param_set.p7();
+        for (row, mut sprite) in progress_bar_bg_query.iter_mut() {
+            match row_states.get(row.index).and_then(|state| *state) {
+                Some((_, _, is_claimed, Some(_))) => {
+                    if is_claimed {
+                        // Hide progress bar background when claimed
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                    } else {
+                        // Show full width background when there's progress
+                        sprite.custom_size = Some(Vec2::new(24., 2.));
+                    }
+                }
+                Some((_, _, is_claimed, None)) => {
+                    if is_claimed {
+                        // Hide progress bar background when claimed
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                    } else {
+                        // Keep at 0 width when no progress
+                        sprite.custom_size = Some(Vec2::new(0., 2.));
+                    }
+                }
+                None => {
+                    // Keep at 0 width when no progress
+                    sprite.custom_size = Some(Vec2::new(0., 2.));
+                }
+            }
+        }
+    }
+
+    {
+        // Update warning animations - spawn/despawn based on completion/claim status
+        let existing_warnings: Vec<(Entity, usize)> = warning_animations
+            .iter()
+            .map(|(entity, row)| (entity, row.index))
+            .collect();
+
+        // Get achievements_bg entity for parenting
+        let achievements_bg = achievements_bg_query.iter().next();
+
+        // Constants for positioning
+        const START_Y: f32 = 93.5;
+        const ROW_SPACING: f32 = 19.0;
+
+        // Despawn warnings for rows that no longer need them
+        for (entity, row_index) in existing_warnings.iter() {
+            let should_have_warning = row_states
+                .get(*row_index)
+                .and_then(|state| state.as_ref())
+                .map(|(_, is_completed, is_claimed, _)| *is_completed && !*is_claimed)
+                .unwrap_or(false);
+
+            if !should_have_warning {
+                info!(
+                    "Despawning warning animation for achievement row {}",
+                    row_index
+                );
+                commands.entity(*entity).despawn_recursive();
+            }
+        }
+
+        // Spawn warnings for rows that need them but don't have them
+        if let Some(bg_entity) = achievements_bg {
+            let existing_indices: Vec<usize> =
+                existing_warnings.iter().map(|(_, idx)| *idx).collect();
+            for (row_index, row_state) in row_states.iter().enumerate() {
+                if existing_indices.contains(&row_index) {
+                    continue; // Already has warning
+                }
+
+                if let Some((_, is_completed, is_claimed, _)) = row_state {
+                    if *is_completed && !*is_claimed {
+                        // Spawn warning animation
+                        info!(
+                            "Spawning warning animation for achievement row {}",
+                            row_index
+                        );
+                        let y_pos = START_Y - (row_index as f32 * ROW_SPACING);
+                        let warning_pos = Vec3::new(-165., y_pos, 20.5);
+                        let warning_entity = spawn_attack_warning_aseprite(
+                            &mut commands,
+                            &asset_server,
+                            warning_pos,
+                            bg_entity,
+                            999999.0, // Very long duration so it persists
+                        );
+                        commands.entity(warning_entity).insert((
+                            AchievementsUI,
+                            UIState::Achievements,
+                            AchievementRow { index: row_index },
+                            AchievementWarningAnimation,
+                            RenderLayers::from_layers(&[3]),
+                            Name::new("Achievement Warning Animation"),
+                        ));
+                    }
+                }
+            }
         }
     }
 }
@@ -598,6 +978,81 @@ pub fn update_achievements_navigation_buttons(
                 *visibility = Visibility::Hidden;
                 if matches!(interactable.current(), Interaction::Hovering) {
                     interactable.change(Interaction::None);
+                }
+            }
+        }
+    }
+}
+
+pub fn handle_achievement_row_clicks(
+    cursor_pos: Res<crate::inputs::CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut achievements: ResMut<Achievements>,
+    mut currency: ResMut<crate::player::TimeFragmentCurrency>,
+    mut commands: Commands,
+    achievement_rows: Query<(Entity, &AchievementRow), With<Interactable>>,
+    pagination: Res<AchievementsPagination>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    if !left_mouse_released {
+        return;
+    }
+    info!("CLICKED MOUSE - Checking achievement rows");
+
+    // Get all achievements sorted using the same logic as update_achievements_page_display
+    let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
+    // Sort achievements by priority (same as in update_achievements_page_display):
+    // 1. Completed and claimed (highest priority)
+    // 2. Completed but not claimed (second priority - these need attention!)
+    // 3. Unlocked but not completed (third priority)
+    // 4. Locked (lowest priority)
+    all_achievements.sort_by_key(|achievement| {
+        let is_completed = achievements.is_completed(*achievement);
+        let is_claimed = achievements.is_claimed(*achievement);
+        let is_unlocked = achievements.has(*achievement);
+
+        (
+            !is_completed || !is_claimed, // False (0) for completed+claimed, True (1) for others
+            !is_completed,                // False (0) for completed, True (1) for not completed
+            !is_unlocked,                 // False (0) for unlocked, True (1) for locked
+        )
+    });
+
+    for (entity, row) in achievement_rows.iter() {
+        if let Some(hit) = hit_test {
+            if hit.0 == entity {
+                let achievement_index = pagination.page * ACHIEVEMENTS_PER_PAGE + row.index;
+                info!("Clicked achievement row index: {}", achievement_index);
+                if let Some(achievement) = all_achievements.get(achievement_index).copied() {
+                    // Check if this achievement is completed but not claimed
+                    if achievements.is_completed(achievement) {
+                        // Claim the reward
+                        if achievements.claim(achievement) {
+                            // Persist achievements state immediately
+                            crate::player::achievements::persist_achievements_state(&*achievements);
+
+                            let reward = achievement.reward_currency();
+                            if reward > 0 {
+                                currency.time_fragments =
+                                    currency.time_fragments.saturating_add(reward as i32);
+                                crate::player::unlocks::persist_unlock_data(
+                                    Some(&*currency),
+                                    None,
+                                    None,
+                                    None,
+                                );
+                            }
+                            commands.spawn(crate::audio::SoundSpawner::new(
+                                crate::audio::AudioSoundEffect::ButtonClick,
+                                0.2,
+                            ));
+                            // Refresh the UI
+                            return;
+                        }
+                    }
                 }
             }
         }

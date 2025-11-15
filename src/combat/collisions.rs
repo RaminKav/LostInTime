@@ -2,6 +2,7 @@ use super::{
     try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
     StatusEffectEvent,
 };
+use crate::client::is_not_paused;
 use crate::ui::damage_numbers::FloatingTextQueue;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -39,12 +40,14 @@ impl Plugin for CollisionPlugion {
     fn build(&self, app: &mut App) {
         app.add_systems(
             (
-                check_melee_hit_collisions,
-                check_boss_to_objects_collisions,
-                check_mob_to_player_collisions,
-                check_projectile_hit_mob_collisions,
-                check_projectile_hit_player_collisions,
-                check_object_trigger_collisions.after(CustomFlush),
+                check_melee_hit_collisions.run_if(is_not_paused),
+                check_boss_to_objects_collisions.run_if(is_not_paused),
+                check_mob_to_player_collisions.run_if(is_not_paused),
+                check_projectile_hit_mob_collisions.run_if(is_not_paused),
+                check_projectile_hit_player_collisions.run_if(is_not_paused),
+                check_object_trigger_collisions
+                    .run_if(is_not_paused)
+                    .after(CustomFlush),
             )
                 .in_set(OnUpdate(GameState::Main)),
         )

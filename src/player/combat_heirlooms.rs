@@ -593,9 +593,14 @@ pub fn handle_mana_orb_drops(
 ) {
     let mut rng = rand::thread_rng();
     for event in death_events.iter() {
-        let Some(main_hand) = game.player().main_hand_slot.clone() else {
+        let has_mana_item = game.inv_slot_query.iter().any(|slot| {
+            slot.obj_type
+                .map(|obj| obj.is_magic_weapon())
+                .unwrap_or(false)
+        });
+        if !has_mana_item {
             continue;
-        };
+        }
 
         if !rng.gen_bool(0.30) {
             continue;

@@ -4,13 +4,11 @@ use std::{fs::File, io::BufReader};
 use strum_macros::{Display, EnumIter};
 
 use crate::{
-    audio::{AudioSoundEffect, SoundSpawner},
     chaos::ChaosTracker,
     client::{analytics::AnalyticsData, handle_append_run_data_after_death, GameData},
     datafiles,
     enemy::Mob,
     item::WorldObject,
-    player::unlocks::persist_unlock_data,
     player::TimeFragmentCurrency,
     world::dimension::Era,
     world::portal::BossKillTracker,
@@ -47,7 +45,19 @@ pub enum Achievement {
 
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Achievements {
-    pub unlocked: Vec<Achievement>,
+    pub unlocked: Vec<Achievement>, // Kept for backwards compatibility, maps to claimed
+    pub completed: Vec<Achievement>, // Completed but not yet claimed
+    pub claimed: Vec<Achievement>,  // Completed and claimed
+}
+
+impl Achievements {
+    pub fn new() -> Self {
+        Self {
+            unlocked: Vec::new(),
+            completed: Vec::new(),
+            claimed: Vec::new(),
+        }
+    }
 }
 
 #[derive(Resource, Default, Debug, Clone)]
@@ -143,23 +153,151 @@ impl Achievement {
             _ => 0,
         }
     }
+
+    /// Get progress for this achievement (current, target)
+    /// Returns None if this achievement doesn't have progress tracking
+    pub fn get_progress(
+        &self,
+        analytics: Option<&crate::client::analytics::AnalyticsData>,
+        bounce_tracker: Option<&BounceAchievementTracker>,
+        chaos_tracker: Option<&crate::chaos::ChaosTracker>,
+    ) -> Option<(u32, u32)> {
+        match self {
+            // Achievements that need analytics
+            Achievement::Kill100FurDevils => {
+                if let Some(analytics_data) = analytics {
+                    info!(
+                        "Getting progress for achievement: {:?} {:?}",
+                        self, analytics_data.mobs_killed
+                    );
+
+                    Some((
+                        analytics_data
+                            .mobs_killed
+                            .get(&Mob::FurDevil)
+                            .copied()
+                            .unwrap_or(0),
+                        1000,
+                    ))
+                } else {
+                    Some((0, 1000))
+                }
+            }
+            Achievement::BushlingSlayer1 => {
+                if let Some(analytics_data) = analytics {
+                    Some((
+                        analytics_data
+                            .mobs_killed
+                            .get(&Mob::Bushling)
+                            .copied()
+                            .unwrap_or(0),
+                        1000,
+                    ))
+                } else {
+                    Some((0, 1000))
+                }
+            }
+            Achievement::StingflySlayer => {
+                if let Some(analytics_data) = analytics {
+                    Some((
+                        analytics_data
+                            .mobs_killed
+                            .get(&Mob::StingFly)
+                            .copied()
+                            .unwrap_or(0),
+                        1000,
+                    ))
+                } else {
+                    Some((0, 1000))
+                }
+            }
+            Achievement::MushlingSlayer => {
+                if let Some(analytics_data) = analytics {
+                    Some((
+                        analytics_data
+                            .mobs_killed
+                            .get(&Mob::RedMushling)
+                            .copied()
+                            .unwrap_or(0),
+                        1000,
+                    ))
+                } else {
+                    Some((0, 1000))
+                }
+            }
+            // Achievements that don't need analytics
+            Achievement::Bouncy => {
+                if let Some(bounce) = bounce_tracker {
+                    Some((bounce.total_pink_bounces, 100))
+                } else {
+                    Some((0, 100))
+                }
+            }
+            Achievement::Bouncy2 => {
+                if let Some(bounce) = bounce_tracker {
+                    Some((bounce.consecutive_pink_bounces, 3))
+                } else {
+                    Some((0, 3))
+                }
+            }
+            _ => None, // No progress tracking for other achievements
+        }
+    }
 }
 
 impl Achievements {
     pub fn has(&self, achievement: Achievement) -> bool {
-        self.unlocked.contains(&achievement)
+        // Check if claimed (backwards compatibility)
+        self.claimed.contains(&achievement) || self.unlocked.contains(&achievement)
     }
 
+    pub fn is_completed(&self, achievement: Achievement) -> bool {
+        self.completed.contains(&achievement)
+    }
+
+    pub fn is_claimed(&self, achievement: Achievement) -> bool {
+        self.claimed.contains(&achievement) || self.unlocked.contains(&achievement)
+    }
+
+    pub fn has_unclaimed_completed(&self) -> bool {
+        !self.completed.is_empty()
+    }
+
+    pub fn complete(&mut self, achievement: Achievement) -> bool {
+        // Only complete if not already completed or claimed
+        if !self.is_completed(achievement) && !self.is_claimed(achievement) {
+            self.completed.push(achievement);
+            return true;
+        }
+        false
+    }
+
+    pub fn claim(&mut self, achievement: Achievement) -> bool {
+        // Move from completed to claimed
+        if let Some(pos) = self.completed.iter().position(|&a| a == achievement) {
+            self.completed.remove(pos);
+            if !self.claimed.contains(&achievement) {
+                self.claimed.push(achievement);
+            }
+            return true;
+        }
+        false
+    }
+
+    // Legacy method for backwards compatibility
     pub fn unlock(&mut self, achievement: Achievement) -> bool {
         if !self.has(achievement) {
             self.unlocked.push(achievement);
+            if !self.claimed.contains(&achievement) {
+                self.claimed.push(achievement);
+            }
             return true;
         }
         false
     }
 }
 
-fn persist_achievements_state(achievements: &Achievements) {
+pub fn persist_achievements_state(achievements: &Achievements) {
     let path = datafiles::game_data();
     let mut game_data = if let Ok(file) = File::open(&path) {
         let reader = BufReader::new(file);
@@ -185,13 +323,13 @@ fn try_unlock(
     achievement: Achievement,
     achievement_events: &mut EventWriter<AchievementUnlockedEvent>,
 ) -> bool {
-    if achievements.unlock(achievement) {
+    if achievements.complete(achievement) {
         persist_achievements_state(achievements);
         achievement_events.send(AchievementUnlockedEvent {
             achievement,
             reward_currency: achievement.reward_currency(),
         });
-        info!("Achievement unlocked: {:?}", achievement);
+        info!("Achievement completed: {:?}", achievement);
         true
     } else {
         false
@@ -385,26 +523,14 @@ pub fn track_bounce_achievements(
     }
 }
 
+// Removed - rewards are now claimed when player clicks on achievement row
+// This function is kept for backwards compatibility but does nothing
 pub fn handle_achievement_rewards(
-    mut commands: Commands,
-    mut events: EventReader<AchievementUnlockedEvent>,
-    currency: Option<ResMut<TimeFragmentCurrency>>,
+    mut _commands: Commands,
+    mut _events: EventReader<AchievementUnlockedEvent>,
+    _currency: Option<ResMut<TimeFragmentCurrency>>,
 ) {
-    if let Some(mut currency_res) = currency {
-        let mut changed = false;
-        for event in events.iter() {
-            if event.reward_currency > 0 {
-                currency_res.time_fragments = currency_res
-                    .time_fragments
-                    .saturating_add(event.reward_currency as i32);
-                changed = true;
-            }
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
-        }
-        if changed {
-            persist_unlock_data(Some(&*currency_res), None, None, None);
-        }
-    }
+    // Rewards are now claimed when player clicks on achievement row in UI
 }
 
 pub struct AchievementUnlockedEvent {

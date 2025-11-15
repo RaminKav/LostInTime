@@ -7,6 +7,7 @@ use seldom_state::{
 
 use crate::{
     ai::{FollowState, HurtByPlayer, IdleState, LineOfSight, NightTimeAggro},
+    animations::enemy_sprites::spawn_attack_warning_aseprite,
     attributes::Attack,
     inputs::FacingDirection,
     Game,
@@ -224,5 +225,95 @@ impl BoolTrigger for MushkingSummoned {
             }
         }
         false
+    }
+}
+
+#[derive(Component)]
+pub struct MushlingRushWarning;
+
+pub fn handle_mushling_rush_warnings(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mushlings: Query<(Entity, &Mob, Option<&FollowState>, Option<&GasAttackState>)>,
+    mushking_exists: Query<&Mob>,
+    existing_warnings: Query<(Entity, &Parent), With<MushlingRushWarning>>,
+) {
+    // Check if mushking exists
+    let mushking_active = mushking_exists.iter().any(|mob| mob == &Mob::RedMushking);
+
+    // Build map of existing warnings by parent mushling entity
+    let mut warnings_by_mushling: std::collections::HashMap<Entity, Entity> =
+        std::collections::HashMap::new();
+    for (warning_entity, parent) in existing_warnings.iter() {
+        warnings_by_mushling.insert(parent.get(), warning_entity);
+    }
+
+    // Track which mushlings should have warnings
+    let mut should_have_warning: std::collections::HashSet<Entity> =
+        std::collections::HashSet::new();
+
+    // Check each mushling
+    for (entity, mob, follow_state, gas_attack_state) in mushlings.iter() {
+        if mob != &Mob::RedMushling {
+            continue;
+        }
+
+        // Check if mushling is in rush state:
+        // 1. Has FollowState while MushkingSummoned is active
+        // 2. Has GasAttackState with speed_up_anim: true
+        let in_rush_state = if mushking_active {
+            if let Some(gas_state) = gas_attack_state {
+                gas_state.speed_up_anim
+            } else if follow_state.is_some() {
+                true // In FollowState while mushking is active
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if in_rush_state {
+            should_have_warning.insert(entity);
+        }
+    }
+
+    // Despawn warnings for mushlings that no longer need them
+    for (mushling_entity, warning_entity) in warnings_by_mushling.iter() {
+        if !should_have_warning.contains(mushling_entity) {
+            commands.entity(*warning_entity).despawn_recursive();
+        }
+    }
+
+    // Spawn warnings for mushlings that need them but don't have them
+    for (entity, mob, follow_state, gas_attack_state) in mushlings.iter() {
+        if mob != &Mob::RedMushling {
+            continue;
+        }
+
+        let in_rush_state = if mushking_active {
+            if let Some(gas_state) = gas_attack_state {
+                gas_state.speed_up_anim
+            } else if follow_state.is_some() {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if in_rush_state && !warnings_by_mushling.contains_key(&entity) {
+            // Spawn warning animation above the mushling
+            let warning_pos = Vec3::new(0., 12., 10.);
+            let warning_entity = spawn_attack_warning_aseprite(
+                &mut commands,
+                &asset_server,
+                warning_pos,
+                entity,
+                999999.0, // Very long duration so it persists
+            );
+            commands.entity(warning_entity).insert(MushlingRushWarning);
+        }
     }
 }

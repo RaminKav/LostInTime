@@ -363,17 +363,25 @@ impl GameAssetsPlugin {
             let reader = BufReader::new(file_file);
             match serde_json::from_reader::<_, GameData>(reader) {
                 Ok(game_data) => {
-                    commands.insert_resource(game_data.class_ranks);
-                    commands.insert_resource(game_data.high_scores);
-                    commands.insert_resource(game_data.achievements.clone());
-                    let mut unlocked = UnlockedClasses::new(game_data.unlocked_classes.clone());
+                    let class_ranks = game_data.class_ranks.clone();
+                    let high_scores = game_data.high_scores.clone();
+                    let achievements = game_data.achievements.clone();
+                    let unlock_upgrades = game_data.unlock_upgrades.clone();
+                    let unlocked_classes_vec = game_data.unlocked_classes.clone();
+                    let time_fragments = game_data.time_fragments;
+                    commands.insert_resource(class_ranks);
+                    commands.insert_resource(high_scores);
+                    commands.insert_resource(achievements);
+                    // Store GameData as a resource so achievements UI can access cumulative analytics
+                    commands.insert_resource(game_data);
+                    let mut unlocked = UnlockedClasses::new(unlocked_classes_vec);
                     unlocked.ensure_defaults(&get_default_unlocked_classes());
                     commands.insert_resource(unlocked);
-                    commands.insert_resource(game_data.unlock_upgrades.clone());
+                    commands.insert_resource(unlock_upgrades);
                     commands.insert_resource(TimeFragmentCurrency::new(
-                        (game_data.time_fragments.min(i32::MAX as u128)) as i32,
+                        (time_fragments.min(i32::MAX as u128)) as i32,
                         0,
-                        game_data.time_fragments,
+                        time_fragments,
                     ));
                 }
                 Err(err) => {

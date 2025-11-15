@@ -7,6 +7,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::Collider;
 use strum::IntoEnumIterator;
+use strum_macros::Display;
 
 use crate::{
     ai::pathfinding::PathfindingCache,
@@ -72,7 +73,7 @@ pub struct MenuButtonExtras<'w, 's> {
     screen_res: Res<'w, ScreenResolution>,
 }
 
-#[derive(Component, Clone, Eq, PartialEq)]
+#[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
 pub enum MenuButton {
     Start,
     Unlocks,
@@ -97,6 +98,12 @@ pub struct MenuButtonClickEvent {
 
 #[derive(Component)]
 pub struct MainMenu;
+
+#[derive(Component)]
+pub struct AchievementsButton;
+
+#[derive(Component)]
+pub struct AchievementsNotificationIcon;
 
 #[derive(Component)]
 pub struct GameStartFadein(pub Timer);
@@ -497,7 +504,7 @@ pub fn spawn_menu_text_buttons(
     );
 
     // Achievements Button
-    spawn_menu_button(
+    let achievements_button = spawn_menu_button(
         Vec3::new(8., -34.5, 1.),
         Vec3::new(-50., -1., 1.),
         "Achievements",
@@ -507,6 +514,9 @@ pub fn spawn_menu_text_buttons(
         &graphics,
         &asset_server,
     );
+    commands
+        .entity(achievements_button)
+        .insert(AchievementsButton);
     // Unlocks Button
     spawn_menu_button(
         Vec3::new(-8., -58., 1.),
@@ -604,4 +614,42 @@ pub fn spawn_back_button(
         .insert(RenderLayers::from_layers(&[3]))
         .set_parent(back_button_e);
     back_button_e
+}
+
+pub fn update_achievements_notification_icon(
+    achievements: Res<Achievements>,
+    achievements_button: Query<Entity, With<AchievementsButton>>,
+    notification_icon: Query<Entity, With<AchievementsNotificationIcon>>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    let Ok(button_entity) = achievements_button.get_single() else {
+        return;
+    };
+
+    let has_unclaimed = achievements.has_unclaimed_completed();
+
+    // Check if notification icon exists
+    if let Ok(icon_entity) = notification_icon.get_single() {
+        // Update visibility
+        commands.entity(icon_entity).insert(if has_unclaimed {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        });
+    } else if has_unclaimed {
+        // Spawn notification icon if it doesn't exist and we need it
+        use crate::animations::enemy_sprites::spawn_attack_warning_aseprite;
+        let icon = spawn_attack_warning_aseprite(
+            &mut commands,
+            &asset_server,
+            Vec3::new(55., -1., 1.), // Position relative to button
+            button_entity,
+            999999.0, // Very long duration
+        );
+        commands
+            .entity(icon)
+            .insert(AchievementsNotificationIcon)
+            .insert(RenderLayers::from_layers(&[3]));
+    }
 }

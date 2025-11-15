@@ -255,7 +255,12 @@ impl Plugin for UIPlugin {
                     cleanup_achievements_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
                     update_achievements_page_display
-                        .run_if(in_state(UIState::Achievements)),
+                        .after(CustomFlush)
+                        .run_if(in_state(UIState::Achievements).and_then(
+                            state_changed::<UIState>()
+                                .or_else(resource_changed::<AchievementsPagination>())
+                                .or_else(resource_changed::<crate::player::achievements::Achievements>())
+                        )),
                     update_achievements_navigation_buttons
                         .run_if(in_state(UIState::Achievements)),
                 )
@@ -275,15 +280,24 @@ impl Plugin for UIPlugin {
                     cleanup_achievements_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Achievements)))),
                     update_achievements_page_display
-                        .run_if(in_state(UIState::Achievements)),
+                        .after(CustomFlush)
+                        .run_if(in_state(UIState::Achievements).and_then(
+                            state_changed::<UIState>()
+                                .or_else(resource_changed::<AchievementsPagination>())
+                                .or_else(resource_changed::<crate::player::achievements::Achievements>())
+                        )),
                     update_achievements_navigation_buttons
                         .run_if(in_state(UIState::Achievements)),
+                    
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems((handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
-                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks))))
+                    refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
+                    handle_achievement_row_clicks
+                        .run_if(in_state(UIState::Achievements)))
+                )
             .add_system(
                 handle_tooltip_teardown
                     .in_base_set(CoreSet::PreUpdate)
@@ -346,7 +360,12 @@ impl Plugin for UIPlugin {
             )
             .add_systems((setup_class_selection_ui
                 .before(CustomFlush)
-                .run_if(state_changed::<UIState>().and_then(in_state(UIState::ClassSelection))),))
+                .run_if(state_changed::<UIState>().and_then(in_state(UIState::ClassSelection))),
+                update_class_unlock_warnings
+                    .run_if(in_state(UIState::ClassSelection).and_then(
+                        resource_changed::<crate::player::achievements::Achievements>()
+                            .or_else(resource_changed::<crate::player::UnlockedClasses>())
+                    )),))
             .add_systems(
                 (
                     handle_anim_events.run_if(in_state(UIState::ItemChest)),
@@ -407,7 +426,8 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(handle_hovering.run_if(ui_hover_interactions_condition))
-            .add_system(handle_cursor_main_menu_buttons);
+            .add_system(handle_cursor_main_menu_buttons)
+            .add_system(update_achievements_notification_icon.run_if(in_state(GameState::MainMenu)));
 
         app.add_systems(
             (

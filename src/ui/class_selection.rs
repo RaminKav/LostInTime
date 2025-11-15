@@ -4,7 +4,9 @@ use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use strum::IntoEnumIterator;
 
 use crate::{
-    animations::player_sprite::PlayerSpriteHandles,
+    animations::{
+        enemy_sprites::spawn_attack_warning_aseprite, player_sprite::PlayerSpriteHandles,
+    },
     assets::Graphics,
     attributes::ItemAttributes,
     audio::{AudioSoundEffect, SoundSpawner},
@@ -113,6 +115,9 @@ pub struct ClassPreviewSprite;
 #[derive(Component)]
 pub struct PetPreviewSprite;
 
+#[derive(Component)]
+pub struct ClassUnlockWarningAnimation;
+
 #[derive(Resource)]
 pub struct ClassSelectionState {
     pub selected_class: Option<SkillClass>,
@@ -189,7 +194,7 @@ pub fn setup_class_selection_ui(
     commands.entity(currency_stack).set_parent(currency_text);
 
     spawn_class_unlock_info_ui(&mut commands, &asset_server);
-    spawn_class_unlock_confirm_ui(&mut commands, &graphics, &asset_server);
+    spawn_class_unlock_confirm_ui(&mut commands, &asset_server);
 
     // Title
     let title_text = commands
@@ -330,6 +335,42 @@ pub fn setup_class_selection_ui(
         ));
 
         icon_entity_commands.set_parent(icon_slot);
+
+        // Spawn warning animation for locked classes that have all achievements met
+        if !class_unlocked {
+            if let (Some(unlock_data), Some(achievements_res)) =
+                (_class_unlocks.as_ref(), achievements.as_ref())
+            {
+                if let Some(entry) = unlock_data.entry(class) {
+                    let requirements_met = entry
+                        .achievements
+                        .iter()
+                        .all(|req| achievements_res.has(*req));
+                    if requirements_met {
+                        // Spawn warning animation above and center of the slot
+                        let warning_y = 50. + y_offset + 11.; // 15 pixels above the slot center
+                        let warning_pos = Vec3::new(x_offset, warning_y, 20.5);
+                        let warning_entity = spawn_attack_warning_aseprite(
+                            &mut commands,
+                            &asset_server,
+                            warning_pos,
+                            overlay,
+                            999999.0, // Very long duration so it persists
+                        );
+                        commands.entity(warning_entity).insert((
+                            ClassSelectionUI,
+                            UIState::ClassSelection,
+                            ClassUnlockWarningAnimation,
+                            ClassIcon {
+                                class: class.clone(),
+                            },
+                            RenderLayers::from_layers(&[3]),
+                            Name::new("Class Unlock Warning Animation"),
+                        ));
+                    }
+                }
+            }
+        }
     }
 
     for (i, pet) in Pet::iter().enumerate() {
@@ -476,6 +517,52 @@ pub fn setup_class_selection_ui(
     // No pet preview by default - wait for player selection
 }
 
+pub fn update_class_unlock_warnings(
+    mut commands: Commands,
+    achievements: Option<Res<Achievements>>,
+    class_unlocks: Option<Res<ClassUnlockData>>,
+    unlocked_classes: Res<UnlockedClasses>,
+    existing_warnings: Query<(Entity, &ClassIcon), With<ClassUnlockWarningAnimation>>,
+    overlay_query: Query<Entity, (With<ClassSelectionUI>, With<UIState>)>,
+) {
+    // Get overlay entity for parenting
+    let overlay = overlay_query.iter().next();
+    if overlay.is_none() {
+        return;
+    }
+
+    // Get existing warnings by class
+    let existing_warnings_by_class: std::collections::HashMap<SkillClass, Entity> =
+        existing_warnings
+            .iter()
+            .map(|(entity, icon)| (icon.class.clone(), entity))
+            .collect();
+
+    // Despawn warnings for classes that no longer need them (unlocked or requirements not met)
+    for (class, entity) in existing_warnings_by_class.iter() {
+        let should_have_warning = if unlocked_classes.contains(class) {
+            false // Class is unlocked, no warning needed
+        } else if let (Some(unlock_data), Some(achievements_res)) =
+            (class_unlocks.as_ref(), achievements.as_ref())
+        {
+            if let Some(entry) = unlock_data.entry(class) {
+                entry
+                    .achievements
+                    .iter()
+                    .all(|req| achievements_res.has(*req))
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if !should_have_warning {
+            commands.entity(*entity).despawn_recursive();
+        }
+    }
+}
+
 fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServer) {
     let panel_entity = commands
         .spawn((
@@ -561,11 +648,7 @@ fn spawn_class_unlock_info_ui(commands: &mut Commands, asset_server: &AssetServe
     }
 }
 
-fn spawn_class_unlock_confirm_ui(
-    commands: &mut Commands,
-    graphics: &Graphics,
-    asset_server: &AssetServer,
-) {
+fn spawn_class_unlock_confirm_ui(commands: &mut Commands, asset_server: &AssetServer) {
     let panel_entity = commands
         .spawn((
             SpriteBundle {
@@ -613,98 +696,7 @@ fn spawn_class_unlock_confirm_ui(
 
     commands.entity(text_entity).set_parent(panel_entity);
 
-    let yes_button = commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(48., 18.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
-                visibility: Visibility::Hidden,
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassUnlockConfirmButton::Yes,
-            Interactable::default(),
-            MenuButton::ClassUnlockYes,
-            UIState::ClassSelection,
-            ClassSelectionUI,
-            Name::new("CLASS UNLOCK YES BUTTON"),
-        ))
-        .id();
-
-    let no_button = commands
-        .spawn((
-            SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(48., 18.)),
-                    ..Default::default()
-                },
-                transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
-                visibility: Visibility::Hidden,
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            ClassUnlockConfirmButton::No,
-            Interactable::default(),
-            MenuButton::ClassUnlockNo,
-            UIState::ClassSelection,
-            ClassSelectionUI,
-            Name::new("CLASS UNLOCK NO BUTTON"),
-        ))
-        .id();
-
-    commands.entity(yes_button).set_parent(panel_entity);
-    commands.entity(no_button).set_parent(panel_entity);
-
-    let button_font = asset_server.load("fonts/alagard.ttf");
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Yes",
-                    TextStyle {
-                        font: button_font.clone(),
-                        font_size: 15.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            UIState::ClassSelection,
-            ClassSelectionUI,
-        ))
-        .set_parent(yes_button);
-
-    commands
-        .spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "No",
-                    TextStyle {
-                        font: button_font,
-                        font_size: 15.0,
-                        color: Color::WHITE,
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
-                text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
-                ..Default::default()
-            },
-            RenderLayers::from_layers(&[3]),
-            UIState::ClassSelection,
-            ClassSelectionUI,
-        ))
-        .set_parent(no_button);
+    // Don't spawn buttons here - they'll be spawned/despawned dynamically in update_class_unlock_confirm_panel
 }
 
 pub fn handle_class_selection(
@@ -990,56 +982,144 @@ pub fn update_unlock_currency_text(
 pub fn update_class_unlock_confirm_panel(
     confirm_state: Res<ClassUnlockConfirmState>,
     graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    mut commands: Commands,
     mut param_set: ParamSet<(
-        Query<&mut Visibility, With<ClassUnlockConfirmPanel>>,
-        Query<(
-            &ClassUnlockConfirmButton,
-            &mut Visibility,
-            &mut Interactable,
-        )>,
+        Query<Entity, With<ClassUnlockConfirmPanel>>,
+        Query<Entity, With<ClassUnlockConfirmButton>>,
     )>,
     mut text_query: Query<&mut Text, With<ClassUnlockConfirmText>>,
+    mut panel_vis_query: Query<&mut Visibility, With<ClassUnlockConfirmPanel>>,
 ) {
     let active = confirm_state.active;
 
-    {
-        let mut panel_query = param_set.p0();
-        if let Ok(mut panel_vis) = panel_query.get_single_mut() {
-            if !active {
-                *panel_vis = Visibility::Hidden;
-            } else {
-                *panel_vis = Visibility::Visible;
-            }
-        }
+    // Update panel visibility
+    if let Ok(mut panel_vis) = panel_vis_query.get_single_mut() {
+        *panel_vis = if active {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
     }
 
-    let mut button_query = param_set.p1();
+    // Get panel entity for parenting buttons
+    let panel_entity = param_set.p0().get_single().ok();
+
+    // Despawn buttons when not active
     if !active {
-        for (_, mut vis, mut interactable) in button_query.iter_mut() {
-            *vis = Visibility::Hidden;
-            if matches!(interactable.current(), Interaction::Hovering) {
-                interactable.change(Interaction::None);
-            }
+        let button_query = param_set.p1();
+        for button_entity in button_query.iter() {
+            commands.entity(button_entity).despawn_recursive();
         }
         return;
     }
 
+    // Check if buttons already exist
+    let button_query = param_set.p1();
+    let button_count = button_query.iter().count();
+
+    // Spawn buttons if they don't exist
+    if button_count == 0 {
+        if let Some(panel) = panel_entity {
+            let button_font = asset_server.load("fonts/alagard.ttf");
+
+            let yes_button = commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(48., 18.)),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(28., -20., 1.)),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    ClassUnlockConfirmButton::Yes,
+                    Interactable::default(),
+                    MenuButton::ClassUnlockYes,
+                    UIState::ClassSelection,
+                    ClassSelectionUI,
+                    Name::new("CLASS UNLOCK YES BUTTON"),
+                ))
+                .id();
+
+            let no_button = commands
+                .spawn((
+                    SpriteBundle {
+                        texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(48., 18.)),
+                            ..Default::default()
+                        },
+                        transform: Transform::from_translation(Vec3::new(-30., -20., 1.)),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    ClassUnlockConfirmButton::No,
+                    Interactable::default(),
+                    MenuButton::ClassUnlockNo,
+                    UIState::ClassSelection,
+                    ClassSelectionUI,
+                    Name::new("CLASS UNLOCK NO BUTTON"),
+                ))
+                .id();
+
+            commands.entity(yes_button).set_parent(panel);
+            commands.entity(no_button).set_parent(panel);
+
+            // Add button text
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "Yes",
+                        TextStyle {
+                            font: button_font.clone(),
+                            font_size: 15.0,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(yes_button);
+
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        "No",
+                        TextStyle {
+                            font: button_font,
+                            font_size: 15.0,
+                            color: WHITE,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(0., -1., 1.)),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .set_parent(no_button);
+        }
+    }
+
+    // Update text
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(class) = confirm_state.class.clone() {
             let class_data = graphics.get_class_data(class.clone());
             let cost = confirm_state.cost;
             text.sections[0].value = if cost > 0 {
-                format!("Unlock {}\n\n{} currency?", class_data.name, cost)
+                format!("Unlock {}\n\n\n{} currency?", class_data.name, cost)
             } else {
                 format!("Unlock {} for free?", class_data.name)
             };
         } else {
             text.sections[0].value.clear();
         }
-    }
-
-    for (_, mut vis, _) in button_query.iter_mut() {
-        *vis = Visibility::Visible;
     }
 }
 

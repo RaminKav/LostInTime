@@ -57,6 +57,7 @@ impl Plugin for EnemyPlugin {
                     handle_new_red_mushking_state_machine,
                     handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
+                    red_mushling::handle_mushling_rush_warnings,
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
