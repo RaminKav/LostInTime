@@ -269,7 +269,7 @@ impl ItemActions {
                 ItemAction::ItemChest => {
                     commands.insert_resource(ItemChestState {
                         shuffle_timer: Timer::from_seconds(0.06, TimerMode::Once),
-                        shuffle_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
+                        shuffle_duration_timer: Timer::from_seconds(1.5, TimerMode::Once),
                         picked_item: None,
                         current_entity: None,
                         current_item: None,

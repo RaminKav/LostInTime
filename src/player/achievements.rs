@@ -88,7 +88,7 @@ impl Achievement {
     pub fn get_desc(&self) -> String {
         match self {
             Achievement::FirstRunComplete => "Complete your first run.".to_string(),
-            Achievement::Kill100FurDevils => "Defeat 100 Fur Devils.".to_string(),
+            Achievement::Kill100FurDevils => "Defeat 1000 Fur Devils.".to_string(),
             Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
             Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
             Achievement::Bouncy => "Bounce on 100 pink petals.".to_string(),
@@ -96,9 +96,9 @@ impl Achievement {
             Achievement::Act1 => "Defeat the Act 1 boss.".to_string(),
             Achievement::Act2 => "Defeat the Act 2 boss.".to_string(),
             Achievement::Act3 => "Defeat the Act 3 boss.".to_string(),
-            Achievement::BushlingSlayer1 => "Eliminate 100 Bushlings.".to_string(),
-            Achievement::StingflySlayer => "Eliminate 100 Stingflies.".to_string(),
-            Achievement::MushlingSlayer => "Eliminate 100 Red Mushlings.".to_string(),
+            Achievement::BushlingSlayer1 => "Eliminate 1000 Bushlings.".to_string(),
+            Achievement::StingflySlayer => "Eliminate 1000 Stingflies.".to_string(),
+            Achievement::MushlingSlayer => "Eliminate 1000 Red Mushlings.".to_string(),
             Achievement::Chaotic => "Reach 20 total Chaos.".to_string(),
             Achievement::DungeonCrawler => "Find the key & clear the dungeon.".to_string(),
             Achievement::FindSpear => "Find a Spear.".to_string(),
@@ -233,10 +233,10 @@ pub fn check_achievements(
             }
         };
 
-        check_mob_kill(Mob::FurDevil, 100, Achievement::Kill100FurDevils);
-        check_mob_kill(Mob::Bushling, 100, Achievement::BushlingSlayer1);
-        check_mob_kill(Mob::StingFly, 100, Achievement::StingflySlayer);
-        check_mob_kill(Mob::RedMushling, 100, Achievement::MushlingSlayer);
+        check_mob_kill(Mob::FurDevil, 1000, Achievement::Kill100FurDevils);
+        check_mob_kill(Mob::Bushling, 1000, Achievement::BushlingSlayer1);
+        check_mob_kill(Mob::StingFly, 1000, Achievement::StingflySlayer);
+        check_mob_kill(Mob::RedMushling, 1000, Achievement::MushlingSlayer);
 
         let mut check_item_collected = |object: WorldObject, achievement: Achievement| {
             if analytics_data
