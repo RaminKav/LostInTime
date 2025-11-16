@@ -10,17 +10,19 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: MeleePowerIcon,
+            active_skill: Parry,
         ),
         Paladin: (
             name: "Paladin",
             weapon_description: [
-                "Slow & powerful area\n\nattack. Applies Frail on hit."
+                "Slow & powerful area\n\nattack. Applies Frail."
             ],
             stat_description: [
                 "+5 Health per Level."
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
+            active_skill: Parry,
         ),
         Knight: (
             name: "Knight",
@@ -32,6 +34,7 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: DefenceIcon,
+            active_skill: ParrySpear,
         ),
 
         Rogue: (
@@ -44,6 +47,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: SpeedIcon,
+            active_skill: SprintLunge,
         ),
         Archer: (
             name: "Archer", 
@@ -55,6 +59,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
+            active_skill: Sprint,
         ),
         Kid: (
             name: "Kid", 
@@ -66,6 +71,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: DodgeChanceIcon,
+            active_skill: Sprint,
         ),
 
         Wizard: (
@@ -78,6 +84,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: MPRegenIcon,
+            active_skill: Teleport,
         ),
         IceMage: (
             name: "Ice Mage",
@@ -89,6 +96,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
+            active_skill: Teleport,
         ),
         FireMage: (
             name: "Fire Mage",
@@ -100,6 +108,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
+            active_skill: Teleport,
         ),
         Druid: (
             name: "Druid",
@@ -111,6 +120,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: HPRegenIcon,
+            active_skill: Teleport,
         ),
 
         Thief: (
@@ -123,6 +133,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: CritChanceIcon,
+            active_skill: Sprint,
         ),
         Gunslinger: (
             name: "Gunslinger",
@@ -134,6 +145,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
+            active_skill: Sprint,
         ),
     },
     pets: {

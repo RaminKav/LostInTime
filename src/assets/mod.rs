@@ -80,6 +80,7 @@ pub struct ClassData {
     pub stat_description: Vec<String>,
     pub class_icon: UIElement,
     pub skill_icon: UIElement,
+    pub active_skill: crate::player::skills::ActiveSkill,
 }
 
 /// Data structure for pet information loaded from RON

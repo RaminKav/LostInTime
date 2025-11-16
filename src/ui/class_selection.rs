@@ -209,7 +209,7 @@ pub fn setup_class_selection_ui(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0., 90., 10.),
+                translation: Vec3::new(0., 102., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -246,7 +246,7 @@ pub fn setup_class_selection_ui(
                 .get_ui_element_texture(UIElement::PlayerSelect)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(370.5, 142.)),
+                custom_size: Some(Vec2::new(370.5, 178.)),
                 ..Default::default()
             },
             transform: Transform {
@@ -281,7 +281,7 @@ pub fn setup_class_selection_ui(
                         ..Default::default()
                     },
                     transform: Transform {
-                        translation: Vec3::new(x_offset, 50. + y_offset, 11.),
+                        translation: Vec3::new(x_offset, 70. + y_offset, 11.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -390,7 +390,7 @@ pub fn setup_class_selection_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(x_offset, -49., 11.),
+                translation: Vec3::new(x_offset, -29., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -459,7 +459,7 @@ pub fn setup_class_selection_ui(
 
     // Confirm button
     let confirm_button =
-        spawn_back_button_texture_only(Vec3::new(80.5, -90., 11.), &mut commands, &graphics);
+        spawn_back_button_texture_only(Vec3::new(-50.5, -74., 11.), &mut commands, &graphics);
 
     commands
         .entity(confirm_button)
@@ -492,7 +492,7 @@ pub fn setup_class_selection_ui(
 
     // Back Button (parent sprite + child text)
     let back_button_e = spawn_back_button(
-        Vec3::new(-152.5, -90., 11.),
+        Vec3::new(-152.5, -74., 11.),
         &mut commands,
         &graphics,
         &asset_server,
@@ -1147,6 +1147,10 @@ fn spawn_player_preview(
     high_scores: Option<&Res<HighScores>>,
 ) -> Entity {
     let ICONS_X_OFFSET = 22.;
+    let ICONS_Y_OFFSET = -2.;
+    let ICON_Y_SPACING = -23.;
+    let TEXT_Y_OFFSET = 7.;
+    let TITLE_Y_OFFSET = 15.;
     let DESC_TEXT_X = ICONS_X_OFFSET + 12.;
     let (aseprite_path, animation_tag) = selected_class.get_anim_data(&sprite_handles);
 
@@ -1176,7 +1180,7 @@ fn spawn_player_preview(
             Name::new("PLAYER PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(28., 35., 12.),
+            translation: Vec3::new(28., 55., 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))
@@ -1195,7 +1199,7 @@ fn spawn_player_preview(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(62., 16., 1.),
+                translation: Vec3::new(62., TITLE_Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1219,7 +1223,7 @@ fn spawn_player_preview(
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(-19., 16., 1.),
+                translation: Vec3::new(-19., TITLE_Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1247,7 +1251,7 @@ fn spawn_player_preview(
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(103., 16., 1.),
+                translation: Vec3::new(103., TITLE_Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1296,7 +1300,7 @@ fn spawn_player_preview(
         graphics,
         &weapon_item_stack,
         asset_server,
-        Vec2::new(ICONS_X_OFFSET, 2.),
+        Vec2::new(ICONS_X_OFFSET, ICONS_Y_OFFSET),
         Vec2::ZERO,
         3,
     );
@@ -1326,25 +1330,6 @@ fn spawn_player_preview(
     // Set the weapon as a child of the player container
     commands.entity(weapon_sprite).set_parent(player_container);
 
-    // power icon
-    let _icon_slot = commands
-        .spawn(SpriteBundle {
-            texture: power_icon,
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(ICONS_X_OFFSET, -18., 11.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("POWER ICON"))
-        .set_parent(player_container)
-        .id();
     // Spawn weapon description text
     let _weapon_description_text = commands
         .spawn(Text2dBundle {
@@ -1359,7 +1344,7 @@ fn spawn_player_preview(
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, 7., 1.),
+                translation: Vec3::new(DESC_TEXT_X, ICONS_Y_OFFSET + TEXT_Y_OFFSET, 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1370,8 +1355,28 @@ fn spawn_player_preview(
         .set_parent(player_container)
         .id();
 
+    // power icon
+    let _power_icon_slot = commands
+        .spawn(SpriteBundle {
+            texture: power_icon,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(18., 18.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING, 11.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("POWER ICON"))
+        .set_parent(player_container)
+        .id();
+
     // Spawn stat description text
-    let _stat_description_text = commands
+    let _power_description_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
                 stat_description,
@@ -1384,7 +1389,11 @@ fn spawn_player_preview(
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, -14., 1.),
+                translation: Vec3::new(
+                    DESC_TEXT_X,
+                    ICONS_Y_OFFSET + ICON_Y_SPACING + TEXT_Y_OFFSET,
+                    1.,
+                ),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1392,6 +1401,60 @@ fn spawn_player_preview(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("STAT DESCRIPTION"))
+        .set_parent(player_container)
+        .id();
+
+    // Spawn active skill icon and description
+    let active_skill = &class_data.active_skill;
+    let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
+    let active_skill_desc = active_skill.get_desc().join("\n\n");
+
+    // Active skill icon
+    let _active_skill_icon = commands
+        .spawn(SpriteBundle {
+            texture: active_skill_icon,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(18., 18.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING * 2., 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("ACTIVE SKILL ICON"))
+        .set_parent(player_container)
+        .id();
+
+    // Active skill description text
+    let _active_skill_description_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                active_skill_desc,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(
+                    DESC_TEXT_X,
+                    ICONS_Y_OFFSET + ICON_Y_SPACING * 2. + TEXT_Y_OFFSET,
+                    1.,
+                ),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("ACTIVE SKILL DESCRIPTION"))
         .set_parent(player_container)
         .id();
 

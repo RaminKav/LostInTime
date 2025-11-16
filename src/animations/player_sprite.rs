@@ -259,15 +259,33 @@ pub fn preload_player_sprites(mut commands: Commands, asset_server: Res<AssetSer
 }
 
 pub fn change_player_class_visuals(
-    mut player: Query<Entity, (Without<PlayerClass>, With<Player>)>,
+    mut player: Query<
+        (Entity, &mut crate::player::skills::PlayerSkills),
+        (Without<PlayerClass>, With<crate::Player>),
+    >,
     mut commands: Commands,
     mut att_event: EventWriter<AttributeChangeEvent>,
     player_class: Res<PlayerClass>,
     sprite_handles: Res<PlayerSpriteHandles>,
+    graphics: Res<crate::assets::Graphics>,
 ) {
-    for e in player.iter_mut() {
+    for (e, mut player_skills) in player.iter_mut() {
         let class = &player_class.class;
         let (handle, anim) = class.get_anim_data(&sprite_handles);
+
+        // Get class data to access active skill
+        let class_data = graphics.get_class_data(class.clone());
+        let active_skill = &class_data.active_skill;
+
+        // Update active skill slot 2 with the class's unique active skill
+        player_skills.active_skill_slot_2 =
+            Some(crate::player::skills::ActiveSkillChoiceState::new(
+                active_skill.clone(),
+                crate::player::skills::HeirloomRarity::Common,
+            ));
+
+        // Add skill components for the active skill
+        active_skill.add_skill_components(e, &mut commands);
 
         //att update event
         commands

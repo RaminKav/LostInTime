@@ -218,20 +218,18 @@ impl ActiveSkill {
         match self {
             ActiveSkill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
             ActiveSkill::Parry => vec![
-                "Active: Parry".to_string(),
-                "enemy attacks,".to_string(),
-                "ignore damage, and".to_string(),
-                "stun attackers if".to_string(),
-                "timed successfully.".to_string(),
+                "Active: Time successfully".to_string(),
+                "to Parry attacks ignore".to_string(),
+                "damage and stunning.".to_string(),
             ],
             ActiveSkill::ParrySpear => vec![
-                "Active: Spear Attack".to_string(),
-                "that pulls enemies".to_string(),
-                "towards the impact.".to_string(),
+                "Active: Spear Attack that".to_string(),
+                "pulls, enemies towards ".to_string(),
+                "the impact.".to_string(),
             ],
             ActiveSkill::Sprint => vec![
-                "Active: Hold Sprint".to_string(),
-                "to move 60% faster.".to_string(),
+                "Active: Hold Sprint to".to_string(),
+                "move 60% faster.".to_string(),
             ],
             ActiveSkill::SprintLunge => vec![
                 "Active: dash through".to_string(),
@@ -239,10 +237,8 @@ impl ActiveSkill {
                 "lunge attack.".to_string(),
             ],
             ActiveSkill::Teleport => vec![
-                "Active: Teleport a".to_string(),
-                "short distance to".to_string(),
-                "dodge attacks or".to_string(),
-                "move around quickly.".to_string(),
+                "Active: Teleport a short".to_string(),
+                "distance.".to_string(),
             ],
         }
     }
