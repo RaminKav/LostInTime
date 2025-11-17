@@ -13,48 +13,6 @@ pub struct EnemyHealthBar;
 
 const BAR_SIZE: f32 = 25.;
 
-pub fn create_enemy_health_bar(
-    mut commands: Commands,
-    mut query: Query<(Entity, &Mob), (Added<Mob>, With<MaxHealth>)>,
-) {
-    for (entity, mob) in query.iter_mut() {
-        if !mob.is_boss() {
-            continue;
-        }
-        let bar_frame = commands
-            .spawn(SpriteBundle {
-                transform: Transform {
-                    translation: Vec3::new(0., 10., 1.),
-                    scale: Vec3::new(BAR_SIZE, 2., -1.),
-                    ..default()
-                },
-                sprite: Sprite {
-                    color: YELLOW,
-                    ..default()
-                },
-                visibility: Visibility::Visible,
-                ..default()
-            })
-            .id();
-        let bar = commands
-            .spawn(SpriteBundle {
-                transform: Transform {
-                    translation: Vec3::new(0., 10., 3.),
-                    scale: Vec3::new(BAR_SIZE, 2., 1.),
-                    ..default()
-                },
-                visibility: Visibility::Visible,
-                sprite: Sprite {
-                    color: RED,
-                    ..default()
-                },
-                ..default()
-            })
-            .insert(EnemyHealthBar)
-            .id();
-        commands.entity(entity).add_child(bar).add_child(bar_frame);
-    }
-}
 pub fn handle_enemy_health_bar_change(
     mut query: Query<(&Children, &MaxHealth, &CurrentHealth), (With<Mob>, Changed<CurrentHealth>)>,
     mut query2: Query<&mut Transform, With<EnemyHealthBar>>,

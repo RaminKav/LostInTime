@@ -20,6 +20,7 @@ use scrapper_ui::{
 };
 use screen_effects::{handle_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
+mod boss_health_bar;
 mod enemy_health_bar;
 mod fps_text;
 pub mod key_input_guide;
@@ -169,7 +170,6 @@ impl Plugin for UIPlugin {
             .add_system(handle_screen_effects.in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
-                    create_enemy_health_bar,
                     add_previous_health,
                     handle_flash_bars,
                     update_xp_bar,
@@ -178,6 +178,9 @@ impl Plugin for UIPlugin {
                     handle_add_dodge_text,
                     tick_damage_numbers,
                     handle_queued_floating_texts,
+                    boss_health_bar::spawn_boss_health_bar,
+                    boss_health_bar::update_boss_health_bar,
+                    boss_health_bar::cleanup_boss_health_bar_on_despawn,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

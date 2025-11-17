@@ -135,6 +135,12 @@ impl Mob {
             _ => false,
         }
     }
+    pub fn get_boss_name(&self) -> Option<&'static str> {
+        match self {
+            Mob::RedMushking => Some("Red Mushking"),
+            _ => None,
+        }
+    }
 }
 #[derive(
     Component, Default, Deserialize, Debug, Clone, Schematic, Reflect, FromReflect, PartialEq, Eq,
