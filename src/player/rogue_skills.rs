@@ -18,7 +18,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
+use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -38,31 +38,20 @@ pub struct LungeState {
 
 #[derive(Debug, Component)]
 pub struct Sprinting;
+// Sprint is now activated via ActiveSkillUsedEvent in skill_heirlooms.rs
+// This function is kept for compatibility but no longer handles toggle/release
 pub fn handle_toggle_sprinting(
     mut sprint_query: Query<
         (Entity, &mut SprintState, &PlayerSkills, Option<&Sprinting>),
         With<SprintState>,
     >,
-    key_inputs: Res<Input<KeyCode>>,
-    mut commands: Commands,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+    _key_inputs: Res<Input<KeyCode>>,
+    _commands: Commands,
 ) {
-    for (e, sprint_state, skills, was_sprinting) in sprint_query.iter_mut() {
-        if let Some(sprint_slot) = skills.has_active_skill(ActiveSkill::Sprint) {
-            if key_inputs.just_pressed(get_active_skill_keybind(sprint_slot))
-                && sprint_state.sprint_cooldown_timer.finished()
-            {
-                commands.entity(e).insert(Sprinting);
-            } else if key_inputs.just_released(get_active_skill_keybind(sprint_slot)) {
-                if was_sprinting.is_some() {
-                    active_skill_event.send(ActiveSkillUsedEvent {
-                        slot: sprint_slot,
-                        cooldown: sprint_state.sprint_cooldown_timer.duration().as_secs_f32(),
-                    });
-                    commands.entity(e).remove::<Sprinting>();
-                }
-            }
-        }
+    // Sprint is now a button press ability, activated via ActiveSkillUsedEvent
+    // No longer handles toggle/release logic
+    for (_e, _sprint_state, _skills, _was_sprinting) in sprint_query.iter_mut() {
+        // Sprint activation is handled in skill_heirlooms.rs::handle_active_skill_event
     }
 }
 pub fn handle_sprint_timer(
@@ -84,7 +73,6 @@ pub fn handle_sprint_timer(
     mut attack_event: EventWriter<AttackEvent>,
     cursor_pos: Res<CursorPos>,
     mut commands: Commands,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
         if !sprint.startup_timer.finished() {
@@ -116,10 +104,6 @@ pub fn handle_sprint_timer(
                 .tick(time.delta())
                 .just_finished()
             {
-                active_skill_event.send(ActiveSkillUsedEvent {
-                    slot: skills.has_active_skill(ActiveSkill::Sprint).unwrap(),
-                    cooldown: sprint.sprint_cooldown_timer.duration().as_secs_f32(),
-                });
                 commands.entity(e).remove::<Sprinting>();
             }
 
@@ -140,7 +124,6 @@ pub fn handle_lunge(
     )>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
@@ -148,10 +131,6 @@ pub fn handle_lunge(
                 && lunge_state.lunge_cooldown_timer.finished()
             {
                 lunge_state.lunge_cooldown_timer.reset();
-                active_skill_event.send(ActiveSkillUsedEvent {
-                    slot: lunge_slot,
-                    cooldown: lunge_state.lunge_cooldown_timer.duration().as_secs_f32(),
-                });
 
                 // LUNGE
                 commands.entity(e).insert(PlayerAnimation::Lunge);
@@ -245,16 +224,12 @@ pub fn handle_enemy_death_sprint_reset(
     mut enemy_death_events: EventReader<EnemyDeathEvent>,
     mut lunge_query: Query<&mut LungeState>,
     skills: Query<&PlayerSkills>,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     for _ in enemy_death_events.iter() {
         if skills.single().has(Heirloom::SprintKillReset) {
-            if let Some(lunge_slot) = skills.single().has_active_skill(ActiveSkill::SprintLunge) {
+            if let Some(_lunge_slot) = skills.single().has_active_skill(ActiveSkill::SprintLunge) {
                 for mut sprint in lunge_query.iter_mut() {
-                    active_skill_event.send(ActiveSkillUsedEvent {
-                        slot: lunge_slot,
-                        cooldown: 0.,
-                    });
+                    // Central dispatcher now sends events; here we simply reset local cooldowns
                     sprint.lunge_cooldown_timer.tick(Duration::from_secs(99));
                 }
             }

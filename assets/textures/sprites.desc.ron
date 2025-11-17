@@ -1181,6 +1181,36 @@
             size: (16., 16.),
             anchor: None,
         ),
+        SkillCDReduction: WorldObjectData(
+            texture_pos: (10., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillEcho: WorldObjectData(
+            texture_pos: (9., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillPower: WorldObjectData(
+            texture_pos: (14., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillChargeIncrease: WorldObjectData(
+            texture_pos: (15., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LoadedDice: WorldObjectData(
+            texture_pos: (11., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CreditCard: WorldObjectData(
+            texture_pos: (12., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

@@ -57,7 +57,7 @@ pub fn handle_item_abilitiy_on_attack(
                 from_enemy: false,
                 is_followup_proj: true,
                 mana_cost: None,
-                dmg_override: Some(dmg.0 / 3),
+                dmg_override: Some(dmg.0),
                 pos_override: None,
                 spawn_delay: 0.1,
             });

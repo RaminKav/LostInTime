@@ -172,10 +172,7 @@ pub fn handle_parry(
             parry_state.parry_timer.reset();
             parry_state.active = true;
             parry_state.parry_timer.tick(time.delta());
-            active_skill_event.send(ActiveSkillUsedEvent {
-                slot: parry_slot,
-                cooldown: parry_state.cooldown_timer.duration().as_secs_f32(),
-            });
+            // ActiveSkillUsedEvent dispatched centrally
         }
     }
     parry_state.cooldown_timer.tick(time.delta());
@@ -223,10 +220,7 @@ pub fn handle_spear(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.5));
             commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.5).with_delay(0.32));
 
-            active_skill_event.send(ActiveSkillUsedEvent {
-                slot: spear_slot,
-                cooldown: spear_state.cooldown_timer.duration().as_secs_f32(),
-            });
+            // ActiveSkillUsedEvent dispatched centrally
         }
     }
     if spear_state.spear_timer.percent() != 0. {

@@ -163,6 +163,8 @@ pub struct ItemActionParam<'w, 's> {
     pub achievements: Option<ResMut<'w, crate::player::achievements::Achievements>>,
     pub player_class: Option<ResMut<'w, crate::player::skills::PlayerClass>>,
     pub achievement_events: EventWriter<'w, crate::player::achievements::AchievementUnlockedEvent>,
+    pub player_skills:
+        Query<'w, 's, &'static crate::player::skills::PlayerSkills, With<crate::player::Player>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

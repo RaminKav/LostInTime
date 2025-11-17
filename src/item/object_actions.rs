@@ -31,6 +31,7 @@ use crate::world::world_helpers;
 use crate::world::world_helpers::tile_pos_to_world_pos;
 use itertools::Itertools;
 use rand::seq::IteratorRandom;
+use strum::IntoEnumIterator;
 
 use crate::world::TileMapPosition;
 use crate::{
@@ -376,18 +377,41 @@ impl ObjectAction {
                 // Generate a random active skill choice
                 let mut rng = rand::thread_rng();
 
-                // Get all active skills from ActiveSkill enum
-                let active_skills: Vec<ActiveSkill> = vec![
-                    // ActiveSkill::Roll,
-                    ActiveSkill::Parry,
-                    ActiveSkill::ParrySpear,
-                    ActiveSkill::Sprint,
-                    ActiveSkill::SprintLunge,
-                    ActiveSkill::Teleport,
-                ];
+                // Get player's current skills to exclude them
+                let player_current_skills: Vec<ActiveSkill> = item_action_param
+                    .player_skills
+                    .get_single()
+                    .ok()
+                    .map(|skills| {
+                        let mut current = Vec::new();
+                        if let Some(slot1) = &skills.active_skill_slot_1 {
+                            current.push(slot1.active_skill.clone());
+                        }
+                        if let Some(slot2) = &skills.active_skill_slot_2 {
+                            current.push(slot2.active_skill.clone());
+                        }
+                        current
+                    })
+                    .unwrap_or_default();
+
+                // Get all active skills from ActiveSkill enum, excluding Roll and skills the player already has
+                let active_skills: Vec<ActiveSkill> = ActiveSkill::iter()
+                    .filter(|skill| {
+                        *skill != ActiveSkill::Roll && !player_current_skills.contains(skill)
+                    })
+                    .collect();
+
+                // If no skills available (player has all skills), fall back to all skills except Roll
+                let available_skills = if active_skills.is_empty() {
+                    ActiveSkill::iter()
+                        .filter(|skill| *skill != ActiveSkill::Roll)
+                        .collect()
+                } else {
+                    active_skills
+                };
 
                 // Pick a random active skill
-                let chosen_active_skill = active_skills.iter().choose(&mut rng).unwrap();
+                let chosen_active_skill = available_skills.iter().choose(&mut rng).unwrap();
 
                 let skill_choice = ActiveSkillChoiceState::new(
                     chosen_active_skill.clone(),

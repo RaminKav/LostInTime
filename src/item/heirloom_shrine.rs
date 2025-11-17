@@ -70,6 +70,7 @@ pub fn handle_heirloom_shrine_completion(
 pub fn handle_heirloom_shrine_ui_setup(
     mut skills_queue: ResMut<HeirloomChoiceQueue>,
     shrine_query: Query<&HeirloomShrineState>,
+    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
 ) {
     // Check if there are any shrines that just got activated (is_used = false)
     let shrine_just_activated = shrine_query.iter().any(|shrine| !shrine.is_used);
@@ -77,6 +78,7 @@ pub fn handle_heirloom_shrine_ui_setup(
     if shrine_just_activated {
         // Generate 3 random heirlooms (only if queue is empty per add_new_skills_after_levelup logic)
         let mut rng = rand::thread_rng();
-        skills_queue.add_new_skills_after_levelup(&mut rng);
+        let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
+        skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus);
     }
 }

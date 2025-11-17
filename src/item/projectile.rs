@@ -68,6 +68,10 @@ pub enum Projectile {
     Bullet,
     HammerProjectile,
     Dart,
+    FireRing,
+    Buckshot,
+    Smoke,
+    IceWall,
 }
 
 impl Projectile {
@@ -95,6 +99,8 @@ impl Projectile {
             Projectile::Arc => true,
             Projectile::Echo => true,
             Projectile::IceExplosionAOE => true,
+            Projectile::FireRing => true,
+            Projectile::IceWall => true,
             _ => false,
         }
     }
@@ -369,6 +375,10 @@ fn handle_spawn_projectiles_after_delay(
                     };
                 let player_att = (game.player_stats.single().0 .0 as f32 * mana_full_bonus) as i32;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
+                info!(
+                    "Spawned projectile {:?} with dmg {}",
+                    proj.proj, computed_dmg
+                );
                 commands.entity(p).insert(Attack(computed_dmg));
             }
             commands.entity(e).despawn_recursive();

@@ -22,7 +22,7 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skill: Parry,
+            active_skill: Heal,
         ),
         Knight: (
             name: "Knight",
@@ -59,7 +59,7 @@
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
-            active_skill: Sprint,
+            active_skill: Rapidfire,
         ),
         Kid: (
             name: "Kid", 
@@ -96,7 +96,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skill: Teleport,
+            active_skill: IceWall,
         ),
         FireMage: (
             name: "Fire Mage",
@@ -108,7 +108,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skill: Teleport,
+            active_skill: FirePillar,
         ),
         Druid: (
             name: "Druid",
@@ -120,7 +120,7 @@
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: HPRegenIcon,
-            active_skill: Teleport,
+            active_skill: DruidTree,
         ),
 
         Thief: (
@@ -133,7 +133,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skill: Sprint,
+            active_skill: Stealth,
         ),
         Gunslinger: (
             name: "Gunslinger",
@@ -145,7 +145,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
-            active_skill: Sprint,
+            active_skill: Buckshot,
         ),
     },
     pets: {

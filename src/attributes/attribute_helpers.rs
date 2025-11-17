@@ -23,6 +23,7 @@ pub fn create_new_random_item_stack_with_attributes(
     stack: &ItemStack,
     proto: &ProtoParam,
     commands: &mut Commands,
+    loot_bonus: i32,
 ) -> ItemStack {
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
         let mut stack = stack.clone();
@@ -39,7 +40,7 @@ pub fn create_new_random_item_stack_with_attributes(
         .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
         .unwrap();
 
-    let rarity = get_rarity_rng(rand::thread_rng());
+    let rarity = get_rarity_rng(rand::thread_rng(), loot_bonus);
 
     build_item_stack_with_parsed_attributes(
         stack,
@@ -86,13 +87,28 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     new_stack
 }
 
-pub fn get_rarity_rng(mut rng: ThreadRng) -> ItemRarity {
+pub fn get_rarity_rng(mut rng: ThreadRng, loot_bonus: i32) -> ItemRarity {
+    // Base probabilities: Common 48%, Uncommon 36%, Rare 12%, Legendary 4%
+    // Loot bonus increases higher rarity chances
+    // Formula: each point of loot increases higher rarity chances by shifting thresholds
+    // Each point of loot: +0.5% legendary, +0.4% rare, +0.3% uncommon, -1.2% common
+    // Since we roll 0-24 (25 values), each 1% = 0.25 threshold points
+
+    let loot_bonus_f = loot_bonus as f32;
+    // Calculate adjusted thresholds (higher threshold = more chance for that rarity)
+    // Legendary: base 1 (4%), increases by 0.5% per loot = +0.125 threshold per loot
+    let legendary_threshold = (1.0 + loot_bonus_f * 0.125).min(25.0) as i32;
+    // Rare: base 4 (12%), increases by 0.4% per loot = +0.1 threshold per loot
+    let rare_threshold = (4.0 + loot_bonus_f * 0.1).min(25.0) as i32;
+    // Uncommon: base 13 (36%), increases by 0.3% per loot = +0.075 threshold per loot
+    let uncommon_threshold = (13.0 + loot_bonus_f * 0.075).min(25.0) as i32;
+
     let rarity_rng = rng.gen_range(0..25);
-    if rarity_rng == 0 {
+    if rarity_rng < legendary_threshold {
         ItemRarity::Legendary
-    } else if rarity_rng < 4 {
+    } else if rarity_rng < rare_threshold {
         ItemRarity::Rare
-    } else if rarity_rng < 13 {
+    } else if rarity_rng < uncommon_threshold {
         ItemRarity::Uncommon
     } else {
         ItemRarity::Common

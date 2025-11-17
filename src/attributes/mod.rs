@@ -704,7 +704,7 @@ impl ItemAttributes {
         if self.loot_rate.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{}% Loot",
+                    "{}{}% Luck",
                     if is_positive(self.loot_rate.value) {
                         "+"
                     } else {
@@ -913,7 +913,7 @@ impl ItemAttributes {
         tooltips.push(("Speed:          ".to_string(), format!("{}", self.speed)));
 
         tooltips.push(("XP: ".to_string(), format!("{}", self.xp_rate)));
-        tooltips.push(("Loot: ".to_string(), format!("{}", self.loot_rate)));
+        tooltips.push(("Luck: ".to_string(), format!("{}", self.loot_rate)));
 
         tooltips
     }
@@ -991,7 +991,9 @@ impl ItemAttributes {
                 },
         ));
         entity.insert(XpRateBonus(self.xp_rate.value));
-        entity.insert(LootRateBonus(self.loot_rate.value));
+        entity.insert(LootRateBonus(
+            self.loot_rate.value + skills.get_count(Heirloom::LoadedDice) * 10,
+        ));
         entity.insert(ManaRegen(
             self.mana_regen.value + skills.get_count(Heirloom::MPRegen) * 5,
         ));
@@ -1809,10 +1811,11 @@ fn handle_new_items_raw_attributes(
         new_items.iter()
     {
         // Use override rarity for starting weapons, random for others
+        // Note: loot_bonus not available here, using 0 as fallback
         let rarity = if let Some(starting_weapon) = starting_weapon {
             starting_weapon.rarity.clone()
         } else {
-            get_rarity_rng(rand::thread_rng())
+            get_rarity_rng(rand::thread_rng(), 0)
         };
         add_item_glows(&mut commands, &graphics, e, rarity.clone());
 

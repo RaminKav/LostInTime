@@ -26,6 +26,7 @@ pub fn handle_new_loot_chest_spawn(
     proto_param: ProtoParam,
     mut commands: Commands,
     player_level: Query<&PlayerLevel>,
+    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -164,11 +165,13 @@ pub fn handle_new_loot_chest_spawn(
             while !found_slot {
                 let picked_slot = rng.gen_range(0..inventory.items.items.len());
                 if inventory.items.items[picked_slot].is_none() {
+                    let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
                     inventory.items.items[picked_slot] = Some(InventoryItemStack::new(
                         create_new_random_item_stack_with_attributes(
                             loot,
                             &proto_param,
                             &mut commands,
+                            loot_bonus,
                         ),
                         picked_slot,
                     ));

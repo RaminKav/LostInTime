@@ -34,6 +34,7 @@ pub mod mage_skills;
 pub mod melee_skills;
 pub mod rogue_skills;
 pub mod score;
+pub mod skill_heirlooms;
 pub mod skills;
 pub mod unlocks;
 pub use achievements::*;
@@ -156,7 +157,9 @@ impl Plugin for PlayerPlugin {
                     handle_level_up,
                     handle_toggle_sprinting,
                     spawn_particles_when_leveling,
-                    handle_teleport.run_if(is_not_paused),
+                    handle_teleport
+                        .run_if(is_not_paused)
+                        .before(skill_heirlooms::handle_active_skill_event),
                     hide_particles_when_inv_open,
                     tick_just_teleported.run_if(is_not_paused),
                     tick_teleport_timer.run_if(is_not_paused),
@@ -175,6 +178,9 @@ impl Plugin for PlayerPlugin {
                     handle_reaper_soul_spawns.run_if(is_not_paused),
                     update_reaper_souls.run_if(is_not_paused),
                     break_crates_with_roll.run_if(is_not_paused),
+                    skill_heirlooms::handle_druid_tree_taunt
+                        .run_if(is_not_paused)
+                        .before(crate::ai::follow),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -183,6 +189,11 @@ impl Plugin for PlayerPlugin {
                     handle_lunge.after(player_move_inputs).run_if(is_not_paused),
                     tick_combo_counter.run_if(is_not_paused),
                     handle_add_combo_counter,
+                    skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
+                    skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
+                    skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
+                    skill_heirlooms::update_stealth_color.run_if(is_not_paused),
+                    skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
                     pause_combo_anim_when_done,
                     handle_parry.run_if(is_not_paused),
                     handle_spear.after(player_move_inputs).run_if(is_not_paused),
@@ -190,8 +201,13 @@ impl Plugin for PlayerPlugin {
                     handle_parry_success,
                     score::track_mob_kills,
                     score::track_item_destruction,
-                    handle_mob_death_out_of_run_currency,
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(handle_mob_death_out_of_run_currency.in_set(OnUpdate(GameState::Main)))
+            .add_system(
+                skill_heirlooms::initialize_skill_charge_tracker
+                    .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(

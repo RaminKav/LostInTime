@@ -1,7 +1,7 @@
-use std::{cmp::min, f32::consts::PI, time::Duration};
+use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite};
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
@@ -10,7 +10,6 @@ use crate::{
     attributes::Attack,
     audio::{AudioSoundEffect, SoundSpawner},
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
-    get_active_skill_keybind,
     inputs::MovementVector,
     item::{projectile::Projectile, WorldObject},
     proto::proto_param::ProtoParam,
@@ -29,8 +28,6 @@ pub struct JustTeleported;
 pub struct TeleportState {
     pub just_teleported_timer: Timer,
     pub cooldown_timer: Timer,
-    pub count: u32,
-    pub max_count: u32,
     pub timer: Timer,
     pub second_explosion_timer: Timer,
 }
@@ -42,6 +39,7 @@ pub struct TeleportShockDmg;
 pub struct IceExplosionDmg;
 
 pub fn handle_teleport(
+    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
     mut move_player: EventWriter<MovePlayerEvent>,
     mut player: Query<
         (
@@ -56,42 +54,49 @@ pub fn handle_teleport(
         ),
         (With<Player>, With<TeleportState>),
     >,
-    key_input: ResMut<Input<KeyCode>>,
     game: GameParam,
     proto_param: ProtoParam,
     mut commands: Commands,
     time: Res<Time>,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
 ) {
     let Ok((e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc, mut teleport_state)) =
         player.get_single_mut()
     else {
         return;
     };
+
+    // Check if we received a teleport activation event
+    // The cooldown check is already done in dispatch_active_skill_events, so we just need to check animation timer
+    let mut should_activate = false;
     if let Some(teleport_slot) = skills.has_active_skill(ActiveSkill::Teleport) {
-        if teleport_state.count > 0
-            && key_input.just_pressed(get_active_skill_keybind(teleport_slot))
-            && (teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1.)
-        {
-            active_skill_event.send(ActiveSkillUsedEvent {
-                slot: teleport_slot,
-                cooldown: teleport_state.cooldown_timer.duration().as_secs_f32(),
-            });
-            commands.entity(e).insert(PlayerAnimation::Teleport);
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.25));
-            teleport_state.count -= 1;
-            teleport_state.timer.reset();
-            teleport_state.timer.tick(time.delta());
-            teleport_state.second_explosion_timer.reset();
-            teleport_state.second_explosion_timer.tick(time.delta());
+        for ev in active_skill_events.iter() {
+            if ev.slot == teleport_slot {
+                // Only check if animation timer is ready (to prevent spamming)
+                if teleport_state.timer.percent() == 0. || teleport_state.timer.percent() >= 1. {
+                    should_activate = true;
+                    break;
+                }
+            }
         }
+    }
+
+    if should_activate {
+        commands.entity(e).insert(PlayerAnimation::Teleport);
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.25));
+        // Cooldown is managed by handle_active_skill_event, so we don't set it here
+        teleport_state.timer.reset();
+        teleport_state.timer.tick(time.delta());
+        teleport_state.second_explosion_timer.reset();
+        teleport_state.second_explosion_timer.tick(time.delta());
     }
 
     let player_pos = player_pos.translation();
     if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
-        let distance = direction * 2.5 * TILE_SIZE.x;
+        let power_mult = skills.skill_power_multiplier();
+        let base_distance = 2.5 * TILE_SIZE.x;
+        let distance = direction * base_distance * power_mult;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
         if let Some(tile_data) = game.get_tile_data(pos) {
             if tile_data.block_type.contains(&WorldObject::WaterTile) {
@@ -104,24 +109,23 @@ pub fn handle_teleport(
             }
         }
 
-        if skills.has(Heirloom::TeleportShock) {
-            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-            let shock_e = spawn_temp_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::new(
-                    player_pos.x + (distance.x / 2.),
-                    player_pos.y + (distance.y / 2.),
-                    0.,
-                ))
-                .with_rotation(Quat::from_rotation_z(angle)),
-                0.5,
-                dmg.0 / 5,
-                Collider::cuboid(8., 1.5 * TILE_SIZE.x),
-                Projectile::TeleportShock,
-            );
-            commands.entity(shock_e).insert(TeleportShockDmg);
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.3));
-        }
+        let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
+        let shock_dmg = (dmg.0 as f32 / 3.0 * power_mult) as i32;
+        let shock_e = spawn_temp_collider(
+            &mut commands,
+            Transform::from_translation(Vec3::new(
+                player_pos.x + (distance.x / 2.),
+                player_pos.y + (distance.y / 2.),
+                0.,
+            ))
+            .with_rotation(Quat::from_rotation_z(angle)),
+            0.5,
+            shock_dmg,
+            Collider::cuboid(8., 1.5 * TILE_SIZE.x),
+            Projectile::TeleportShock,
+        );
+        commands.entity(shock_e).insert(TeleportShockDmg);
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::TeleportShock, 0.2));
 
         if skills.has(Heirloom::TeleportManaRegen) {
             commands.entity(e).insert(JustTeleported);
@@ -159,31 +163,11 @@ pub fn tick_just_teleported(
     }
 }
 
-pub fn tick_teleport_timer(
-    time: Res<Time>,
-    mut player_q: Query<(&PlayerSkills, &mut TeleportState)>,
-) {
-    if let Ok((skills, mut teleport_state)) = player_q.get_single_mut() {
-        if teleport_state.count < teleport_state.max_count {
-            let d = time.delta();
-            teleport_state
-                .cooldown_timer
-                .tick(if skills.has(Heirloom::TeleportCooldown) {
-                    Duration::new(
-                        (d.as_secs() as f32 * 0.75) as u64,
-                        (d.subsec_nanos() as f32 * 0.75) as u32,
-                    )
-                } else {
-                    d
-                });
-        }
-
-        if teleport_state.cooldown_timer.finished()
-            && teleport_state.count < teleport_state.max_count
-        {
-            teleport_state.count = min(teleport_state.max_count, teleport_state.count + 1);
-            teleport_state.cooldown_timer.reset();
-        }
+// Teleport now uses SkillChargeTracker instead of count/max_count
+// This function is kept for compatibility but no longer regenerates charges
+pub fn tick_teleport_timer(time: Res<Time>, mut player_q: Query<&mut TeleportState, With<Player>>) {
+    for mut teleport_state in player_q.iter_mut() {
+        teleport_state.cooldown_timer.tick(time.delta());
     }
 }
 

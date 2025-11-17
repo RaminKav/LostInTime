@@ -13,7 +13,10 @@ use crate::client::is_not_paused;
 use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
-use crate::player::skills::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, PlayerSkills};
+use crate::player::skills::{
+    ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState, HealSkillState,
+    Heirloom, IceWallSkillState, PlayerSkills, SkillChargeTracker,
+};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use bevy::input::mouse::MouseWheel;
@@ -49,6 +52,10 @@ use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::world_pos_to_tile_pos;
 
+use crate::player::mage_skills::TeleportState;
+use crate::player::melee_skills::{ParryState, SpearState};
+use crate::player::rogue_skills::{LungeState, SprintState};
+use crate::player::skills::{FirePillarState, RapidfireState, StealthState};
 use crate::{
     bounce_player, get_active_skill_keybind, update_bounce_effect, update_shadow, BounceEffect,
     BounceEvent, Game, GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
@@ -91,6 +98,7 @@ impl Plugin for InputsPlugin {
                     player_move_inputs.run_if(is_not_paused),
                     turn_player.run_if(is_not_paused),
                     mouse_click_system.run_if(is_not_paused).after(CustomFlush),
+                    dispatch_active_skill_events.run_if(is_not_paused),
                     handle_hotbar_key_input,
                     tick_dash_timer.run_if(is_not_paused),
                     handle_open_essence_ui,
@@ -407,6 +415,120 @@ pub fn player_move_inputs(
         }
     } else if curr_anim.is_walking() {
         commands.entity(player_e).insert(PlayerAnimation::Idle);
+    }
+}
+
+pub fn dispatch_active_skill_events(
+    mut ev: EventWriter<ActiveSkillUsedEvent>,
+    key_input: Res<Input<KeyCode>>,
+    player_q: Query<
+        (
+            &PlayerSkills,
+            Option<&SprintState>,
+            Option<&LungeState>,
+            Option<&TeleportState>,
+            Option<&ParryState>,
+            Option<&SpearState>,
+            Option<&StealthState>,
+            Option<&RapidfireState>,
+            Option<&FirePillarState>,
+            Option<&HealSkillState>,
+            Option<&BuckshotSkillState>,
+            Option<&IceWallSkillState>,
+            Option<&DruidTreeSkillState>,
+        ),
+        With<Player>,
+    >,
+    charge_tracker: Query<&SkillChargeTracker, With<Player>>,
+) {
+    let Ok((
+        skills,
+        sprint_state,
+        lunge_state,
+        teleport_state,
+        parry_state,
+        spear_state,
+        stealth_state,
+        rapid_state,
+        pillar_state,
+        heal_state,
+        buckshot_state,
+        icewall_state,
+        druidtree_state,
+    )) = player_q.get_single()
+    else {
+        return;
+    };
+    // For each slot (0 = first active slot, 1 = second active slot)
+    for slot in 0..=1 {
+        if key_input.just_pressed(get_active_skill_keybind(slot)) {
+            if let Some(skill) = skills.get_active_skill_in_slot(slot) {
+                // Determine base cooldown from skill definition
+                // And gate dispatch by cooldown state if present
+                let base_cooldown = skill.get_base_cooldown();
+
+                // For slot 1 (class skill), check charges first
+                if slot == 1 {
+                    if let Some(charge_tracker) = charge_tracker.get_single().ok() {
+                        // If we have charges available, allow activation regardless of cooldown
+                        if charge_tracker.current_charges > 0 {
+                            ev.send(ActiveSkillUsedEvent {
+                                slot,
+                                cooldown: base_cooldown,
+                            });
+                            continue;
+                        }
+                    }
+                }
+
+                // Otherwise, check cooldown as normal
+                let on_cooldown = match skill {
+                    ActiveSkill::Roll => true, // handled in player_move_inputs
+                    ActiveSkill::Sprint => sprint_state
+                        .map(|s| !s.sprint_cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::SprintLunge => lunge_state
+                        .map(|s| !s.lunge_cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Teleport => teleport_state
+                        .map(|t| !t.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Parry => parry_state
+                        .map(|p| !p.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::ParrySpear => spear_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Stealth => stealth_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Rapidfire => rapid_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::FirePillar => pillar_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Heal => heal_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Buckshot => buckshot_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::IceWall => icewall_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::DruidTree => druidtree_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                };
+                if !on_cooldown && base_cooldown > 0.0 {
+                    ev.send(ActiveSkillUsedEvent {
+                        slot,
+                        cooldown: base_cooldown,
+                    });
+                }
+            }
+        }
     }
 }
 pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {

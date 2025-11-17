@@ -271,17 +271,8 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         } else if skills.active_skill_slot_2.is_none() {
                             skills.active_skill_slot_2 = Some(picked_skill.clone());
                         } else {
-                            // Both slots full - put skill in overwrite resource and show overwrite UI
-                            commands.insert_resource(
-                                crate::item::active_skill_shrine::ActiveSkillShrineOverwrite {
-                                    skill_choice: picked_skill.clone(),
-                                    shrine_entity: shrine_selection.shrine_entity,
-                                },
-                            );
-                            // Switch to ActiveSkills UI state to show overwrite options
-                            next_ui_state.set(UIState::ActiveSkills);
-                            // Keep the selection resource so we can mark the shrine as used later
-                            return; // Don't close UI yet, wait for slot selection
+                            // Both slots full - automatically swap the second active skill slot (slot 2, which is not Roll)
+                            skills.active_skill_slot_2 = Some(picked_skill.clone());
                         }
 
                         // Add skill components

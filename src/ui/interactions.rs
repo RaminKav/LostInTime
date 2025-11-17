@@ -654,6 +654,7 @@ pub fn handle_interaction_clicks(
     mut container_param: UIContainersParam,
     proto: ProtoParam,
     ui_state: Res<State<UIState>>,
+    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
 ) {
     // get cursor resource from inputs
     // do a ray cast and get results
@@ -714,10 +715,12 @@ pub fn handle_interaction_clicks(
                                 };
 
                                 if state.r#type.is_crafting() {
+                                    let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
                                     let new_stack = create_new_random_item_stack_with_attributes(
                                         item_icon.2,
                                         &proto,
                                         &mut commands,
+                                        loot_bonus,
                                     );
                                     commands.entity(item_icon.0).insert(new_stack);
                                     container_param.crafted_event.send(CraftedItemEvent {

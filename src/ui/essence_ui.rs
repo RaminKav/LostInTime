@@ -255,6 +255,7 @@ pub fn handle_populate_essence_shop_on_new_spawn(
     proto_param: ProtoParam,
     mut commands: Commands,
     game: GameParam,
+    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
 ) {
     for (entity, mut shop) in new_spawns.iter_mut() {
         let mut shop_choices = vec![];
@@ -271,8 +272,9 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 .clone();
             stack.metadata.level = Some(game.get_player_level());
 
+            let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
             let random_item_stack =
-                create_new_random_item_stack_with_attributes(&stack, &proto_param, &mut commands);
+                create_new_random_item_stack_with_attributes(&stack, &proto_param, &mut commands, loot_bonus);
             let rarity_cost_inc = match random_item_stack.rarity {
                 ItemRarity::Common => 1.,
                 ItemRarity::Uncommon => 1.2,

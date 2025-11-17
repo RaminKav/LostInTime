@@ -440,6 +440,7 @@ impl Plugin for UIPlugin {
 
         app.add_system(update_currency_text.run_if(in_state(GameState::Main)))
             .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
+            .add_system(player_hud::update_skill_charge_text.run_if(in_state(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }

@@ -301,6 +301,7 @@ pub fn handle_anim_events(
     proto: ProtoParam,
     game: GameParam,
     asset_server: Res<AssetServer>,
+    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
 ) {
     for event in events.iter() {
         match event.state {
@@ -313,13 +314,21 @@ pub fn handle_anim_events(
                         .collect_vec();
                     let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
                     let mut stack = proto.get_item_data(pick_new_item.clone()).unwrap().clone();
-                    let max_item_level = (game.get_player_level() - 2).max(1);
+                    let max_item_level = (game.get_player_level() as i32 - 2).max(1) as u8;
                     let level = rng.gen_range(1..=max_item_level);
                     stack.metadata.level = Some(level);
 
-                    item_chest_state.picked_item = Some(
-                        create_new_random_item_stack_with_attributes(&stack, &proto, &mut commands),
-                    );
+                    let loot_bonus = player_atts
+                        .get_single()
+                        .map(|a| a.loot_rate.value)
+                        .unwrap_or(0);
+                    item_chest_state.picked_item =
+                        Some(create_new_random_item_stack_with_attributes(
+                            &stack,
+                            &proto,
+                            &mut commands,
+                            loot_bonus,
+                        ));
                 }
                 // handle opening animation
                 item_chest_state.state = ItemChestAnimState::Opening;

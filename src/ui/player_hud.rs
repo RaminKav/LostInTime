@@ -20,7 +20,9 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
+        skills::{
+            ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills, SkillChargeTracker,
+        },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -60,6 +62,9 @@ pub struct ClockText;
 
 #[derive(Component)]
 pub struct ActiveSkillIcon;
+
+#[derive(Component)]
+pub struct SkillChargeText;
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
@@ -583,6 +588,7 @@ pub fn handle_update_player_skills(
     prev_active_skill_icons: Query<Entity, With<ActiveSkillIcon>>,
     existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
+    existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -713,6 +719,17 @@ pub fn handle_update_player_skills(
         // );
 
         // Active Skill Icons
+        // Preserve cooldown overlay state before despawning
+        let mut preserved_cooldowns: Vec<(usize, f32, f32)> = Vec::new(); // (index, elapsed, duration)
+        for (_, overlay) in existing_cooldown_overlays.iter() {
+            let elapsed = overlay.timer.elapsed().as_secs_f32();
+            let duration = overlay.timer.duration().as_secs_f32();
+            if duration > 0.0 && elapsed < duration {
+                // Only preserve if there's an active cooldown
+                preserved_cooldowns.push((overlay.index, elapsed, duration));
+            }
+        }
+
         prev_active_skill_icons.for_each(|e| {
             commands.entity(e).despawn_recursive();
         });
@@ -780,7 +797,85 @@ pub fn handle_update_player_skills(
                     .insert(Name::new("HUD ICON!!"))
                     .set_parent(icon_bg);
             }
-            spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
+
+            // Preserve cooldown state if it exists for this slot
+            if let Some((_, elapsed, original_duration)) =
+                preserved_cooldowns.iter().find(|(idx, _, _)| *idx == i)
+            {
+                // Apply cooldown multiplier to get the new remaining time
+                let multiplier = new_skills.skill_cooldown_multiplier();
+                // Calculate what percentage of the original cooldown was elapsed
+                let progress_percent = if *original_duration > 0.0 {
+                    *elapsed / *original_duration
+                } else {
+                    0.0
+                };
+                // Calculate the new duration and elapsed time based on the multiplier
+                // The multiplier reduces the total cooldown, so we scale both duration and elapsed proportionally
+                let new_duration = *original_duration * multiplier;
+                let new_elapsed = new_duration * progress_percent;
+
+                spawn_skill_cooldown_overlay_with_elapsed(
+                    icon_bg,
+                    &mut commands,
+                    new_duration,
+                    new_elapsed,
+                    i,
+                );
+            } else {
+                spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
+            }
+
+            // For slot 1 (class skill), add charge count text if charges > 1
+            if i == 1 {
+                // Query for charge tracker to get current charges
+                // We'll update this in a separate system that runs after this
+                let charge_text = commands
+                    .spawn(Text2dBundle {
+                        text: Text::from_section(
+                            "",
+                            TextStyle {
+                                font: asset_server.load("fonts/4x5.ttf"),
+                                font_size: 10.0,
+                                color: WHITE,
+                            },
+                        ),
+                        text_anchor: Anchor::Center,
+                        transform: Transform {
+                            translation: Vec3::new(1., -6., 4.), // Center bottom of icon
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    })
+                    .insert(RenderLayers::from_layers(&[3]))
+                    .insert(SkillChargeText)
+                    .insert(Name::new("SKILL CHARGE TEXT"))
+                    .set_parent(icon_bg)
+                    .id();
+            }
+        }
+    }
+}
+
+/// Updates skill charge text display for slot 1
+pub fn update_skill_charge_text(
+    charge_trackers: Query<&crate::player::skills::SkillChargeTracker, With<Player>>,
+    mut charge_texts: Query<&mut Text, With<SkillChargeText>>,
+) {
+    if let Ok(tracker) = charge_trackers.get_single() {
+        for mut text in charge_texts.iter_mut() {
+            // Only show text if charges > 1
+            if tracker.current_charges > 1 {
+                text.sections[0].value = format!("{}", tracker.current_charges);
+            } else {
+                text.sections[0].value = String::new();
+            }
+        }
+    } else {
+        // No tracker, hide text
+        for mut text in charge_texts.iter_mut() {
+            text.sections[0].value = String::new();
         }
     }
 }
@@ -910,11 +1005,35 @@ pub fn spawn_skill_cooldown_overlay(
     duration: f32,
     index: usize,
 ) -> Entity {
+    spawn_skill_cooldown_overlay_with_elapsed(parent, commands, duration, 0.0, index)
+}
+
+pub fn spawn_skill_cooldown_overlay_with_elapsed(
+    parent: Entity,
+    commands: &mut Commands,
+    duration: f32,
+    elapsed: f32,
+    index: usize,
+) -> Entity {
+    use bevy::utils::Duration;
+    let mut timer = Timer::from_seconds(duration, TimerMode::Once);
+    // Tick the timer to the preserved elapsed time to maintain visual state
+    if elapsed > 0.0 && duration > 0.0 {
+        timer.tick(Duration::from_secs_f32(elapsed));
+    }
+
+    // Calculate initial overlay size based on timer progress
+    let initial_size = if duration > 0.0 {
+        16.0 * (1.0 - timer.percent())
+    } else {
+        0.0
+    };
+
     commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(1., 1., 1., 0.45),
-                custom_size: Some(Vec2::new(16., 0.)),
+                custom_size: Some(Vec2::new(16., initial_size)),
                 anchor: Anchor::BottomCenter,
                 ..default()
             },
@@ -925,10 +1044,7 @@ pub fn spawn_skill_cooldown_overlay(
             },
             ..default()
         })
-        .insert(SkillCooldownOverlay {
-            timer: Timer::from_seconds(duration, TimerMode::Once),
-            index,
-        })
+        .insert(SkillCooldownOverlay { timer, index })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("overlay"))
         .set_parent(parent)
@@ -937,11 +1053,40 @@ pub fn spawn_skill_cooldown_overlay(
 
 pub fn tick_skill_cooldown_overlays(
     mut overlays: Query<(&mut Sprite, &mut SkillCooldownOverlay), With<SkillCooldownOverlay>>,
+    charge_trackers: Query<&SkillChargeTracker, With<Player>>,
     time: Res<Time>,
 ) {
-    for (mut overlay, mut timer) in overlays.iter_mut() {
+    // For slot 1, check if we should use charge tracker's cooldown instead
+    let charge_tracker_opt = charge_trackers.get_single().ok();
+
+    for (mut sprite, mut timer) in overlays.iter_mut() {
+        // For slot 1 (index 1), if we have a charge tracker and charges < max, use charge tracker's cooldown
+        if timer.index == 1 {
+            if let Some(tracker) = charge_tracker_opt {
+                if tracker.current_charges < tracker.max_charges {
+                    // Use charge tracker's cooldown timer
+                    let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
+                    let duration = tracker.cooldown_timer.duration().as_secs_f32();
+                    if duration > 0.0 {
+                        let percent = if duration > 0.0 {
+                            elapsed / duration
+                        } else {
+                            1.0
+                        };
+                        sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
+                        continue;
+                    }
+                } else {
+                    // We have max charges, hide the overlay
+                    sprite.custom_size = Some(Vec2::new(16., 0.));
+                    continue;
+                }
+            }
+        }
+
+        // Default behavior: tick the overlay's own timer
         timer.timer.tick(time.delta());
-        overlay.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
+        sprite.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
         if timer.timer.just_finished() {
             // commands.spawn(SoundSpawner::new(AudioSoundEffect::SkillCooldown, 0.03));
         }
@@ -951,10 +1096,28 @@ pub fn tick_skill_cooldown_overlays(
 pub fn handle_active_skill_event(
     mut active_skill_used: EventReader<ActiveSkillUsedEvent>,
     mut overlays: Query<&mut SkillCooldownOverlay>,
+    charge_trackers: Query<&SkillChargeTracker, With<Player>>,
 ) {
     for e in active_skill_used.iter() {
         for mut overlay in overlays.iter_mut() {
             if overlay.index == e.slot {
+                // For slot 1, check if we should use charge tracker's cooldown
+                if e.slot == 1 {
+                    if let Ok(tracker) = charge_trackers.get_single() {
+                        // If we have charges available, don't update the overlay (charge tracker handles it)
+                        // Only update if we're at 0 charges and starting the skill cooldown
+                        if tracker.current_charges == 0 {
+                            overlay.timer.reset();
+                            overlay
+                                .timer
+                                .set_duration(Duration::from_secs_f32(e.cooldown));
+                        }
+                        // Otherwise, the charge tracker's cooldown will be shown by tick_skill_cooldown_overlays
+                        continue;
+                    }
+                }
+
+                // For other slots or if no charge tracker, use normal behavior
                 overlay.timer.reset();
                 overlay
                     .timer

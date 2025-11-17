@@ -200,6 +200,66 @@ pub enum ActiveSkill {
     Sprint,
     SprintLunge,
     Teleport,
+    Stealth,
+    Rapidfire,
+    FirePillar,
+    Heal,
+    Buckshot,
+    IceWall,
+    DruidTree,
+}
+
+impl ActiveSkill {
+    /// Returns the base cooldown in seconds for this skill
+    pub fn get_base_cooldown(&self) -> f32 {
+        match self {
+            ActiveSkill::Roll => 0.0, // Handled separately in player_move_inputs
+            ActiveSkill::Parry => 1.2,
+            ActiveSkill::ParrySpear => 20.,
+            ActiveSkill::Sprint => 14.0,
+            ActiveSkill::SprintLunge => 12.0,
+            ActiveSkill::Teleport => 1.5,
+            ActiveSkill::Stealth => 14.0,
+            ActiveSkill::Rapidfire => 12.0,
+            ActiveSkill::FirePillar => 20.0,
+            ActiveSkill::Heal => 60.0,
+            ActiveSkill::Buckshot => 8.0,
+            ActiveSkill::IceWall => 16.0,
+            ActiveSkill::DruidTree => 20.0,
+        }
+    }
+}
+
+#[derive(Component, Clone)]
+pub struct StealthState {
+    pub duration: Timer,
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct RapidfireState {
+    pub duration: Timer,
+    pub cooldown_timer: Timer,
+    pub attack_speed_bonus: f32,
+}
+#[derive(Component, Clone)]
+pub struct FirePillarState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct HealSkillState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct BuckshotSkillState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct IceWallSkillState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct DruidTreeSkillState {
+    pub cooldown_timer: Timer,
 }
 
 impl ActiveSkill {
@@ -211,6 +271,13 @@ impl ActiveSkill {
             ActiveSkill::Sprint => "Sprint".to_string(),
             ActiveSkill::SprintLunge => "Lunge".to_string(),
             ActiveSkill::Teleport => "Teleport".to_string(),
+            ActiveSkill::Stealth => "Stealth".to_string(),
+            ActiveSkill::Rapidfire => "Rapidfire".to_string(),
+            ActiveSkill::FirePillar => "Fire Pillar".to_string(),
+            ActiveSkill::Heal => "Heal".to_string(),
+            ActiveSkill::Buckshot => "Buckshot".to_string(),
+            ActiveSkill::IceWall => "Ice Wall".to_string(),
+            ActiveSkill::DruidTree => "Druid Tree".to_string(),
         }
     }
 
@@ -239,6 +306,35 @@ impl ActiveSkill {
             ActiveSkill::Teleport => vec![
                 "Active: Teleport a short".to_string(),
                 "distance.".to_string(),
+            ],
+            ActiveSkill::Stealth => vec![
+                "Active: Enter stealth".to_string(),
+                "for 2 seconds, dodging".to_string(),
+                "all damage.".to_string(),
+            ],
+            ActiveSkill::Rapidfire => vec![
+                "Active: +60% attack".to_string(),
+                "speed for 3 seconds.".to_string(),
+            ],
+            ActiveSkill::FirePillar => {
+                vec!["Active: Summon a ring".to_string(), "of fire.".to_string()]
+            }
+            ActiveSkill::Heal => vec![
+                "Active: Heal yourself".to_string(),
+                "for a moderate".to_string(),
+                "amount.".to_string(),
+            ],
+            ActiveSkill::Buckshot => vec![
+                "Active: Fire a shotgun".to_string(),
+                "and bounce back.".to_string(),
+            ],
+            ActiveSkill::IceWall => {
+                vec!["Active: Summon an".to_string(), "ice pillar.".to_string()]
+            }
+            ActiveSkill::DruidTree => vec![
+                "Active: Summon a".to_string(),
+                "tree dummy that".to_string(),
+                "taunts enemies.".to_string(),
             ],
         }
     }
@@ -276,8 +372,6 @@ impl ActiveSkill {
                         cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
                             .tick(Duration::from_secs(99))
                             .clone(),
-                        count: 1,
-                        max_count: 1,
                         timer: Timer::from_seconds(0.17, TimerMode::Once),
                         second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                     });
@@ -303,6 +397,65 @@ impl ActiveSkill {
                             .clone(),
                         spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
                     });
+            }
+            ActiveSkill::Stealth => {
+                let cooldown = ActiveSkill::Stealth.get_base_cooldown();
+                commands.entity(entity).insert(StealthState {
+                    duration: Timer::from_seconds(2.0, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::Rapidfire => {
+                let cooldown = ActiveSkill::Rapidfire.get_base_cooldown();
+                commands.entity(entity).insert(RapidfireState {
+                    duration: Timer::from_seconds(3.0, TimerMode::Once),
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                    attack_speed_bonus: 0.6,
+                });
+            }
+            ActiveSkill::FirePillar => {
+                let cooldown = ActiveSkill::FirePillar.get_base_cooldown();
+                commands.entity(entity).insert(FirePillarState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::Heal => {
+                let cooldown = ActiveSkill::Heal.get_base_cooldown();
+                commands.entity(entity).insert(HealSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::Buckshot => {
+                let cooldown = ActiveSkill::Buckshot.get_base_cooldown();
+                commands.entity(entity).insert(BuckshotSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::IceWall => {
+                let cooldown = ActiveSkill::IceWall.get_base_cooldown();
+                commands.entity(entity).insert(IceWallSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::DruidTree => {
+                let cooldown = ActiveSkill::DruidTree.get_base_cooldown();
+                commands.entity(entity).insert(DruidTreeSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
             }
             ActiveSkill::Roll => {}
         }
@@ -332,19 +485,21 @@ pub enum Heirloom {
     // Passives
     #[default]
     CritChance, //tusk
-    CritDamage,  //flint
-    Health,      //red mushroom
-    Shield,      // CD
-    Thorns,      //bushling scale
-    Lifesteal,   // rose
-    Speed,       // feather
-    AttackSpeed, // soda can
-    DodgeChance, // leather
-    Defence,     // coal
-    Attack,      // anvil
-    Gigantify,   // sappling
-    Chest,       // loot bag
-    XPGain,      //memory chip
+    CritDamage,       //flint
+    SkillCDReduction, // placeholder
+    LoadedDice,       // increases luck by 10
+    Health,           //red mushroom
+    Shield,           // CD
+    Thorns,           //bushling scale
+    Lifesteal,        // rose
+    Speed,            // feather
+    AttackSpeed,      // soda can
+    DodgeChance,      // leather
+    Defence,          // coal
+    Attack,           // anvil
+    Gigantify,        // sappling
+    Chest,            // loot bag
+    XPGain,           //memory chip
 
     DaggerCombo,         // dagger
     HPRegen,             // red book
@@ -382,7 +537,9 @@ pub enum Heirloom {
     //melee
     HealEcho,        // chalice
     FullStomach,     //jam
+    SkillEcho,       // placeholder
     ReinforcedArmor, // Scale
+    SkillPower,      // placeholder - increases skill effectiveness
 
     // On-Attack Triggers
     WaveAttack,  // hero sword
@@ -394,9 +551,11 @@ pub enum Heirloom {
     Reaper,     // soul harvest
 
     // Chaos
-    ChaosBoost,   // chaos totem item
-    PoisonStacks, // grandma's recipe
-    LethalBlow,   // red purple mushroom
+    ChaosBoost,          // chaos totem item
+    PoisonStacks,        // grandma's recipe
+    LethalBlow,          // red purple mushroom
+    SkillChargeIncrease, // placeholder
+    CreditCard,          // gain coin on every skill use
 
     TeleportShock,
     TeleportCooldown,
@@ -420,6 +579,8 @@ impl Heirloom {
         match self {
             Heirloom::CritChance => "Tusk".to_string(),
             Heirloom::CritDamage => "Flint".to_string(),
+            Heirloom::SkillCDReduction => "Stanley".to_string(),
+            Heirloom::LoadedDice => "Loaded Dice".to_string(),
             Heirloom::Health => "Weird Mushroom".to_string(),
             Heirloom::Shield => "CDz".to_string(),
             Heirloom::Speed => "Feather".to_string(),
@@ -438,6 +599,9 @@ impl Heirloom {
             Heirloom::Reaper => "Reaper".to_string(),
             Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
             Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
+            Heirloom::SkillEcho => "Dragon Eye".to_string(),
+            Heirloom::SkillChargeIncrease => "Paintbrush".to_string(),
+            Heirloom::SkillPower => "Blue Scroll".to_string(),
             Heirloom::TeleportShock => "Shock Step".to_string(),
             Heirloom::TeleportCooldown => "Teleport Faster!".to_string(),
             Heirloom::TeleportCount => "Multi-port".to_string(),
@@ -448,6 +612,7 @@ impl Heirloom {
             Heirloom::BowArrowSpeed => "Thread".to_string(),
             Heirloom::Gigantify => "Sappling".to_string(),
             Heirloom::XPGain => "Microchip".to_string(),
+            Heirloom::CreditCard => "Credit Card".to_string(),
 
             Heirloom::IceStaffAoE => "Frozen Tear".to_string(),
             Heirloom::SprintFaster => "Faster Sprint".to_string(),
@@ -497,6 +662,12 @@ impl Heirloom {
                 "Gain +15% Critical".to_string(),
                 "Damage, permanently".to_string(),
             ],
+            Heirloom::SkillCDReduction => {
+                vec!["Reduce skill".to_string(), "cooldowns by 15%.".to_string()]
+            }
+            Heirloom::LoadedDice => {
+                vec!["Gain +10 Luck,".to_string(), "permanently.".to_string()]
+            }
             Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
             Heirloom::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
@@ -509,6 +680,11 @@ impl Heirloom {
                 "Speed, permanently. ".to_string(),
             ],
             Heirloom::XPGain => vec!["Gain +10% XP".to_string(), "permanently. ".to_string()],
+            Heirloom::CreditCard => vec![
+                "Gain 1 Coin when".to_string(),
+                "you use your active".to_string(),
+                "skill.".to_string(),
+            ],
             Heirloom::DodgeChance => vec![
                 "Gain +10% Dodge".to_string(),
                 "Chance,".to_string(),
@@ -559,6 +735,9 @@ impl Heirloom {
                 "after each kill,".to_string(),
                 "damaging them.".to_string(),
             ],
+            Heirloom::SkillEcho => {
+                vec!["Using a skill".to_string(), "summons an echo.".to_string()]
+            }
             Heirloom::PoisonStacks => vec![
                 "Your Attacks have".to_string(),
                 "a chance to apply".to_string(),
@@ -572,6 +751,14 @@ impl Heirloom {
                 "execute enemies ".to_string(),
                 "below 20% health.".to_string(),
             ],
+            Heirloom::SkillChargeIncrease => vec![
+                "Gain +1 extra".to_string(),
+                "charge of your".to_string(),
+                "active class skill.".to_string(),
+            ],
+            Heirloom::SkillPower => {
+                vec!["Skills gain +15%".to_string(), "effectivness.".to_string()]
+            }
             Heirloom::TeleportShock => vec![
                 "Teleporting through".to_string(),
                 "enemies damages".to_string(),
@@ -817,13 +1004,11 @@ impl Heirloom {
                 commands.entity(entity).insert(ArrowSpeedUpgrade(1.25));
             }
             &Heirloom::TeleportCount => {
+                // TeleportCount heirloom is deprecated - use SkillChargeIncrease instead
+                // This is kept for compatibility but TeleportState now uses SkillChargeTracker
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    count: skills.get_count(Heirloom::TeleportCount) as u32,
-                    max_count: 2,
+                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     timer: Timer::from_seconds(0.27, TimerMode::Once),
                     second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
                 });
@@ -885,6 +1070,16 @@ pub struct ActiveSkillUsedEvent {
     pub cooldown: f32,
 }
 
+/// Tracks skill charges for slot 1 (class skill, not Roll)
+/// Charges allow immediate skill activation without waiting for cooldown
+#[derive(Component, Clone, Debug)]
+pub struct SkillChargeTracker {
+    pub current_charges: u32,
+    pub max_charges: u32,
+    pub cooldown_timer: Timer,
+    pub base_cooldown: f32,
+}
+
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
     #[default]
@@ -933,7 +1128,7 @@ impl HeirloomChoiceState {
             heirloom,
             child_heirlooms: Default::default(),
             clashing_heirlooms: Default::default(),
-            is_one_time_heirloom: true,
+            is_one_time_heirloom: false,
             rarity,
         }
     }
@@ -966,112 +1161,80 @@ impl Default for HeirloomChoiceQueue {
             queue: Default::default(),
             active_heirloom_limbo: None,
             pool: vec![
-                HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Gigantify, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::HPRegen, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::XPGain, HeirloomRarity::Common).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Health, HeirloomRarity::Common).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Shield, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare).set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::FrozenMPRegen, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::IceStaffFloor, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::PoisonStacks, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare)
-                    .set_repeatable(),
+                HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Gigantify, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::HPRegen, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::XPGain, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::Health, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Shield, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::IceStaffFloor, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::PoisonStacks, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(
                     Heirloom::IncreaseProjectilCount,
                     HeirloomRarity::Legendary,
-                )
-                .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary)
-                    .set_repeatable(),
-                HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon)
-                    .set_repeatable(),
+                ),
+                HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
         }
     }
 }
 impl HeirloomChoiceQueue {
-    pub fn add_new_skills_after_levelup(&mut self, rng: &mut rand::rngs::ThreadRng) {
+    pub fn add_new_skills_after_levelup(
+        &mut self,
+        rng: &mut rand::rngs::ThreadRng,
+        loot_bonus: i32,
+    ) {
         //only push if queue is empty
         if self.queue.is_empty() {
             let mut new_skills: [HeirloomChoiceState; 3] = Default::default();
             let mut add_back_to_pool: Vec<HeirloomChoiceState> = vec![];
             for i in 0..3 {
-                let rarity = HeirloomChoiceQueue::gen_rarity(rng);
+                let rarity = HeirloomChoiceQueue::gen_rarity(rng, loot_bonus);
                 if let Some(picked_skill) = self
                     .get_skill_of_rarity(rarity.clone(), rng, &|s| !new_skills.clone().contains(s))
                 {
@@ -1104,12 +1267,31 @@ impl HeirloomChoiceQueue {
             .choose(rng)
             .cloned()
     }
-    pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng) -> HeirloomRarity {
-        match rng.gen_range(0..100) {
-            0..=60 => HeirloomRarity::Common,
-            61..=83 => HeirloomRarity::Uncommon,
-            84..=96 => HeirloomRarity::Rare,
-            _ => HeirloomRarity::Legendary,
+    pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng, loot_bonus: i32) -> HeirloomRarity {
+        // Base probabilities: Common 61%, Uncommon 23%, Rare 13%, Legendary 3%
+        // Loot bonus increases higher rarity chances
+        // Formula: each point of loot increases higher rarity chances by shifting thresholds
+        // Each point of loot: +0.1% legendary, +0.2% rare, +0.1% uncommon, -1.0% common
+        // Since we roll 0-99 (100 values), each 1% = 1.0 threshold point
+
+        let loot_bonus_f = loot_bonus as f32;
+        // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
+        // Legendary: base 97 (3%), increases by 0.3% per loot = -0.3 threshold per loot
+        let legendary_threshold = (97.0 - loot_bonus_f * 0.1).max(0.0) as i32;
+        // Rare: base 84 (13%), increases by 0.4% per loot = -0.4 threshold per loot
+        let rare_threshold = (84.0 - loot_bonus_f * 0.2).max(0.0) as i32;
+        // Uncommon: base 61 (23%), increases by 0.3% per loot = -0.3 threshold per loot
+        let uncommon_threshold = (61.0 - loot_bonus_f * 0.1).max(0.0) as i32;
+        let roll = rng.gen_range(0..100);
+
+        if roll >= legendary_threshold {
+            HeirloomRarity::Legendary
+        } else if roll >= rare_threshold {
+            HeirloomRarity::Rare
+        } else if roll >= uncommon_threshold {
+            HeirloomRarity::Uncommon
+        } else {
+            HeirloomRarity::Common
         }
     }
 
@@ -1158,15 +1340,21 @@ impl HeirloomChoiceQueue {
 
         //repopulate the queue after each skill selection, if there are skills missing
         if player_skills.heirlooms.len() < player_level as usize - 1 {
-            self.add_new_skills_after_levelup(&mut rand::thread_rng());
+            // Note: loot_bonus should be passed from call site, using 0 as fallback
+            self.add_new_skills_after_levelup(&mut rand::thread_rng(), 0);
         }
     }
-    pub fn handle_reroll_slot(&mut self, slot: usize, rng: &mut rand::rngs::ThreadRng) {
+    pub fn handle_reroll_slot(
+        &mut self,
+        slot: usize,
+        rng: &mut rand::rngs::ThreadRng,
+        loot_bonus: i32,
+    ) {
         if self.queue.is_empty() {
             return;
         }
         let old_skill = self.queue[0][slot].clone();
-        let rarity = HeirloomChoiceQueue::gen_rarity(rng);
+        let rarity = HeirloomChoiceQueue::gen_rarity(rng, loot_bonus);
         if let Some(picked_skill) =
             self.get_skill_of_rarity(rarity.clone(), rng, &|s| !self.queue[0].contains(s))
         {
@@ -1230,6 +1418,19 @@ impl PlayerSkills {
     pub fn has(&self, heirloom: Heirloom) -> bool {
         self.heirlooms.iter().any(|h| h.heirloom == heirloom)
     }
+    pub fn skill_cooldown_multiplier(&self) -> f32 {
+        // 10% multiplicative reduction per item: 0.9^count
+        let count = self.get_count(Heirloom::SkillCDReduction).max(0) as i32;
+        (0..count).fold(1.0f32, |acc, _| acc * 0.85)
+    }
+    pub fn skill_extra_charges(&self) -> u32 {
+        self.get_count(Heirloom::SkillChargeIncrease).max(0) as u32
+    }
+    pub fn skill_power_multiplier(&self) -> f32 {
+        // 15% additive increase per item: 1.0 + 0.15 * count
+        let count = self.get_count(Heirloom::SkillPower).max(0) as f32;
+        1.0 + (0.15 * count)
+    }
     pub fn calculate_freeze_chance(&self) -> f64 {
         let mut chance = 0.0;
         let freeze_skills = vec![
@@ -1285,6 +1486,19 @@ impl PlayerSkills {
             .iter()
             .find(|h| h.heirloom == heirloom)
             .map(|h| h.rarity.clone())
+    }
+    pub fn get_active_skill_in_slot(&self, slot: usize) -> Option<ActiveSkill> {
+        match slot {
+            0 => self
+                .active_skill_slot_1
+                .as_ref()
+                .map(|s| s.active_skill.clone()),
+            1 => self
+                .active_skill_slot_2
+                .as_ref()
+                .map(|s| s.active_skill.clone()),
+            _ => None,
+        }
     }
     pub fn insert_active_skill(&mut self, skill: ActiveSkillChoiceState, slot: usize) {
         match slot {

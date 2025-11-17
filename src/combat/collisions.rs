@@ -21,6 +21,7 @@ use crate::{
         },
         Equipment, MainHand, WorldObject,
     },
+    player::skill_heirlooms::Stealthed,
     player::{
         mage_skills::IceExplosionDmg,
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
@@ -258,6 +259,7 @@ fn check_projectile_hit_mob_collisions(
             if nearby_mobs.get(*e2).is_ok() {
                 if proj.clone() == Projectile::IceShard
                     || proj.clone() == Projectile::IceExplosionAOE
+                    || proj.clone() == Projectile::FireRing
                 {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
                 } else if proj.clone() == Projectile::Electricity {
@@ -283,6 +285,7 @@ fn check_projectile_hit_player_collisions(
             Option<&mut ParryState>,
             Option<&InvincibilityCooldown>,
             Option<&Attack>,
+            Option<&Stealthed>,
         ),
         (
             Or<(With<Player>, With<WorldObject>)>,
@@ -354,7 +357,12 @@ fn check_projectile_hit_player_collisions(
             }
             state.hit_entities.push(*e2);
             let mut hit_successful = true;
-            let (_, mut parry_option, i_frames, p_attack) = allowed_targets.get_mut(*e2).unwrap();
+            let (_, mut parry_option, i_frames, p_attack, stealth_opt) =
+                allowed_targets.get_mut(*e2).unwrap();
+            // Ignore projectile hits if stealthed
+            if stealth_opt.is_some() {
+                continue;
+            }
             if let Some(ref mut parry) = parry_option {
                 if parry.active && !parry.success {
                     parry_events.send(ParrySuccessEvent(*e1));
@@ -540,6 +548,7 @@ fn check_mob_to_player_collisions(
             &Dodge,
             &InvincibilityCooldown,
             Option<&mut ParryState>,
+            Option<&Stealthed>,
         ),
         With<Player>,
     >,
@@ -553,7 +562,7 @@ fn check_mob_to_player_collisions(
     in_i_frame: Query<&InvincibilityTimer>,
     mut parry_events: EventWriter<ParrySuccessEvent>,
 ) {
-    let (player_e, player_txfm, thorns, defence, dodge, i_frames, mut parry_option) =
+    let (player_e, player_txfm, thorns, defence, dodge, i_frames, mut parry_option, stealth_opt) =
         player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
@@ -579,6 +588,10 @@ fn check_mob_to_player_collisions(
             let delta = player_txfm.translation - mob_txfm.translation;
             hit_this_frame = true;
 
+            // Ignore hits when stealthed
+            if stealth_opt.is_some() {
+                continue;
+            }
             let mut rng = rand::thread_rng();
             if rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100) && !in_i_frame.contains(e1) {
                 dodge_event.send(DodgeEvent { entity: e1 });
