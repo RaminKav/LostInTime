@@ -61,6 +61,8 @@ impl Plugin for EnemyPlugin {
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
+                    red_mushking::tick_aoe_attack_timer,
+                    red_mushking::handle_aoe_attack,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

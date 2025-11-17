@@ -314,6 +314,7 @@ impl ActiveSkill {
             ],
             ActiveSkill::Rapidfire => vec![
                 "Active: +60% attack".to_string(),
+                "speed and unlimited ammo".to_string(),
                 "speed for 3 seconds.".to_string(),
             ],
             ActiveSkill::FirePillar => {
@@ -409,12 +410,15 @@ impl ActiveSkill {
             }
             ActiveSkill::Rapidfire => {
                 let cooldown = ActiveSkill::Rapidfire.get_base_cooldown();
+                // Pre-tick the duration timer so it starts finished (buff not active)
+                let mut duration = Timer::from_seconds(3.0, TimerMode::Once);
+                duration.tick(Duration::from_secs(99));
                 commands.entity(entity).insert(RapidfireState {
-                    duration: Timer::from_seconds(3.0, TimerMode::Once),
+                    duration,
                     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),
-                    attack_speed_bonus: 0.6,
+                    attack_speed_bonus: 1.6,
                 });
             }
             ActiveSkill::FirePillar => {

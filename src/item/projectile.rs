@@ -13,7 +13,7 @@ use crate::{
     enemy::Mob,
     player::{
         mage_skills::JustTeleported,
-        skills::{Heirloom, PlayerSkills},
+        skills::{Heirloom, PlayerSkills, RapidfireState},
         Player,
     },
     proto::proto_param::ProtoParam,
@@ -72,6 +72,9 @@ pub enum Projectile {
     Buckshot,
     Smoke,
     IceWall,
+    PoisonCloud,
+    HealHearts,
+    AttackSpeed,
 }
 
 impl Projectile {
@@ -189,6 +192,7 @@ fn handle_ranged_attack_event(
         ),
         With<Player>,
     >,
+    rapidfire_state: Query<&RapidfireState, With<Player>>,
     transforms: Query<&GlobalTransform>,
     game: GameParam,
     mut commands: Commands,
@@ -215,10 +219,17 @@ fn handle_ranged_attack_event(
             continue;
         }
         // Ammo gate for non-staff player shots
+        // Skip ammo consumption if Rapidfire is active (duration hasn't finished)
+        let is_rapidfire_active = rapidfire_state
+            .get_single()
+            .map(|r| !r.duration.finished())
+            .unwrap_or(false);
         if !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && !proj_event.projectile.is_staff_proj()
             && !proj_event.is_followup_proj
+            && !is_rapidfire_active
+        // Don't consume ammo during Rapidfire
         {
             if let Some(main_hand) = game.player().main_hand_slot.clone() {
                 let held_e = main_hand.entity;

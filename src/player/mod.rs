@@ -194,6 +194,12 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
+                    skill_heirlooms::apply_rapid_fire_speed_buff.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
                     pause_combo_anim_when_done,
                     handle_parry.run_if(is_not_paused),
                     handle_spear.after(player_move_inputs).run_if(is_not_paused),

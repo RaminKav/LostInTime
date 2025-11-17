@@ -1,0 +1,13 @@
+(
+  name: "PoisonCloud",
+  templates: ["projectile.prototype.ron"],
+  schematics: {
+        "survival_rogue_like::item::projectile::Projectile": PoisonCloud,
+        "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -16., x2: 0., y2: -16., r: 16.),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false),
+        "survival_rogue_like::animations::DoneAnimation": (),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/poisoncloudsmall.png", size: (x: 64., y: 64.), cols: 14, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.04),
+  }
+)
+

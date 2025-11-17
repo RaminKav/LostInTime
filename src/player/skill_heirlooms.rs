@@ -6,13 +6,12 @@ use rand::Rng;
 
 use crate::{
     ai::FollowState,
-    attributes::{Attack, CurrentHealth, MaxHealth},
+    attributes::{Attack, AttackCooldown, CurrentHealth, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
     custom_commands::CommandsExt,
     enemy::Mob,
     inputs::{CursorPos, FacingDirection},
     item::{
-        potion_buffs::AttackSpeedBuff,
         projectile::{Projectile, RangedAttackEvent},
         WorldObject,
     },
@@ -34,11 +33,6 @@ use crate::{
 // Temporary marker components for active effects
 #[derive(Component)]
 pub struct Stealthed;
-#[derive(Component)]
-pub struct RapidfireBuff {
-    pub attack_speed_bonus: f32,
-    pub timer: Timer,
-}
 
 pub fn handle_active_skill_event(
     mut events: EventReader<ActiveSkillUsedEvent>,
@@ -219,16 +213,28 @@ pub fn handle_active_skill_event(
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         let power_mult = skills.skill_power_multiplier();
-                        let mut dur = Timer::from_seconds(3.0 * power_mult, TimerMode::Once);
-                        dur.tick(time.delta());
-                        commands
-                            .entity(player_e)
-                            .insert(RapidfireState {
-                                duration: dur,
-                                cooldown_timer: cd,
-                                attack_speed_bonus: 1.6,
-                            })
-                            .insert(AttackSpeedBuff::new(3.0 * power_mult, 1.6));
+                        let dur = Timer::from_seconds(3.0 * power_mult, TimerMode::Once);
+                        info!("dur: {:?}", dur);
+                        commands.entity(player_e).insert(RapidfireState {
+                            duration: dur,
+                            cooldown_timer: cd,
+                            attack_speed_bonus: 1.6,
+                        });
+
+                        // Spawn cosmetic attack speed effect on top of player
+                        let player_pos = player_txfm.translation().truncate();
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::AttackSpeed,
+                            direction: Vec2::ZERO, // Doesn't move
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(0), // Cosmetic only, no damage
+                            pos_override: Some(player_pos + Vec2::new(0., 32.)),
+                            spawn_delay: 0.0,
+                        });
+
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::FirePillar => {
@@ -303,6 +309,21 @@ pub fn handle_active_skill_event(
                         let power_mult = skills.skill_power_multiplier();
                         let heal_amount = (max_health.0 as f32 * 0.3 * power_mult) as i32;
                         health.0 = (health.0 + heal_amount).min(max_health.0);
+
+                        // Spawn cosmetic heal hearts effect on top of player
+                        let player_pos = player_txfm.translation().truncate();
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::HealHearts,
+                            direction: Vec2::ZERO, // Doesn't move
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(0), // Cosmetic only, no damage
+                            pos_override: Some(player_pos + Vec2::new(0., 16.)),
+                            spawn_delay: 0.0,
+                        });
+
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Buckshot => {
@@ -626,7 +647,8 @@ pub fn tick_stealth_and_buffs(
     mut commands: Commands,
     time: Res<Time>,
     mut stealth: Query<(Entity, &mut StealthState), With<Stealthed>>,
-    mut rapid: Query<(Entity, &mut RapidfireBuff)>,
+    mut rapid: Query<(Entity, &mut RapidfireState)>,
+    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
     for (e, mut s) in stealth.iter_mut() {
         s.duration.tick(time.delta());
@@ -634,10 +656,14 @@ pub fn tick_stealth_and_buffs(
             commands.entity(e).remove::<Stealthed>();
         }
     }
+    // Tick RapidfireState duration timer
     for (e, mut r) in rapid.iter_mut() {
-        r.timer.tick(time.delta());
-        if r.timer.finished() {
-            commands.entity(e).remove::<RapidfireBuff>();
+        r.duration.tick(time.delta());
+        if r.duration.finished() {
+            info!("Removing RapidfireState from entity {:?}", e);
+            commands.entity(e).remove::<RapidfireState>();
+            // Trigger attribute recalculation to reset AttackCooldown
+            attribute_event.send_default();
         }
     }
 }
@@ -668,7 +694,8 @@ pub fn tick_skill_cooldowns(
     }
     for (e, mut r) in rapid_cd.iter_mut() {
         r.cooldown_timer.tick(time.delta());
-        if r.cooldown_timer.finished() && r.duration.percent() == 0.0 {
+        // Remove RapidfireState when both cooldown is finished AND duration has expired
+        if r.cooldown_timer.finished() && r.duration.finished() {
             commands.entity(e).remove::<RapidfireState>();
         }
     }
@@ -862,6 +889,24 @@ pub fn initialize_skill_charge_tracker(
                     .entity(player_e)
                     .remove::<crate::player::skills::SkillChargeTracker>();
             }
+        }
+    }
+}
+
+/// System to apply attack speed buff to player's attack cooldown
+pub fn apply_rapid_fire_speed_buff(
+    mut player_query: Query<(&mut AttackCooldown, &RapidfireState), With<Player>>,
+) {
+    for (mut attack_cooldown, buff) in player_query.iter_mut() {
+        // Only apply if duration is active (not finished and timer has been started)
+        // A timer that's pre-ticked to finished will have percent() == 1.0, so we check for that
+        if buff.duration.finished() || buff.duration.percent() >= 1.0 {
+            continue;
+        }
+        // Safety check: ensure cooldown is valid before division
+        if attack_cooldown.0 > 0.0 && attack_cooldown.0.is_finite() && buff.attack_speed_bonus > 0.0
+        {
+            attack_cooldown.0 = attack_cooldown.0 / buff.attack_speed_bonus;
         }
     }
 }
