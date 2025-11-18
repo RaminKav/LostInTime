@@ -358,11 +358,14 @@ impl ActiveSkill {
                 commands
                     .entity(entity)
                     .insert(crate::player::rogue_skills::SprintState {
-                        startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
+                        startup_timer: Timer::from_seconds(0.0, TimerMode::Once),
                         sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
-                        sprint_cooldown_timer: Timer::from_seconds(6., TimerMode::Once)
-                            .tick(Duration::from_secs(99))
-                            .clone(),
+                        sprint_cooldown_timer: Timer::from_seconds(
+                            ActiveSkill::Sprint.get_base_cooldown(),
+                            TimerMode::Once,
+                        )
+                        .tick(Duration::from_secs(99))
+                        .clone(),
                         speed_bonus: 1.6,
                     });
             }

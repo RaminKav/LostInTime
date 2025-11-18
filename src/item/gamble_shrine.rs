@@ -49,13 +49,7 @@ pub fn handle_gamble_shrine_rewards(
                 *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
                 commands.entity(e).remove::<GambleShrine>();
 
-                let drop_list = [
-                    // WorldObject::WoodSword,
-                    // WorldObject::WoodSword,
-                    WorldObject::ChestBlock,
-                    WorldObject::ChestBlock,
-                    WorldObject::Coin,
-                ];
+                let drop_list = [WorldObject::ChestBlock, WorldObject::Coin];
                 // give rewards
                 let picked_drop = *drop_list.iter().choose(&mut rand::thread_rng()).unwrap();
                 let mut rng = rand::thread_rng();

@@ -77,7 +77,7 @@ pub fn handle_sprint_timer(
     for (e, mut sprint, mut kcc, mut mv, anim, skills, attack_cooldown_option) in query.iter_mut() {
         if !sprint.startup_timer.finished() {
             sprint.startup_timer.tick(time.delta());
-            sprint.sprint_cooldown_timer.reset();
+            // Don't reset cooldown timer during startup - let it tick normally
         } else {
             if anim != &PlayerAnimation::Run && !anim.is_one_time_anim() {
                 commands.entity(e).insert(PlayerAnimation::Run);
@@ -194,7 +194,8 @@ pub fn handle_sprinting_cooldown(
     for (e, mut sprint, anim) in query.iter_mut() {
         sprint.startup_timer.reset();
         sprint.sprint_duration_timer.reset();
-        sprint.sprint_cooldown_timer.tick(time.delta());
+        // Cooldown is now ticked in tick_skill_cooldowns, so we don't tick it here
+        // This prevents double-ticking and ensures cooldown ticks even while sprinting
         if anim.is_sprinting() {
             commands.entity(e).insert(PlayerAnimation::Walk);
         }

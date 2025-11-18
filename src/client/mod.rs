@@ -1,4 +1,7 @@
-use std::{fs::File, io::BufReader};
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter},
+};
 
 use bevy::{
     math::Vec3Swizzles,
@@ -675,6 +678,31 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
     } else {
         // Insert default GameData if file doesn't exist
         commands.insert_resource(GameData::default());
+    }
+}
+
+/// Persists time fragments to game_data.json immediately when they are spent
+/// This prevents save-scumming by closing and restarting the game
+pub fn persist_time_fragments(time_fragments: i32) {
+    let path = datafiles::game_data();
+    let mut game_data = if let Ok(file) = File::open(&path) {
+        let reader = BufReader::new(file);
+        serde_json::from_reader::<_, GameData>(reader).unwrap_or_default()
+    } else {
+        GameData::default()
+    };
+
+    // Update time fragments (ensure it doesn't go negative)
+    game_data.time_fragments = time_fragments.max(0) as u128;
+
+    match File::create(&path) {
+        Ok(file) => {
+            let writer = BufWriter::new(file);
+            if let Err(err) = serde_json::to_writer(writer, &game_data) {
+                error!("Failed to persist time fragments to game_data.json: {err:?}");
+            }
+        }
+        Err(err) => error!("Failed to create game_data.json while saving time fragments: {err:?}"),
     }
 }
 

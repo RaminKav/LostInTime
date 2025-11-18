@@ -3,6 +3,7 @@ use rand::Rng;
 
 use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
+    client::persist_time_fragments,
     combat::EnemyDeathEvent,
     item::WorldObject,
     GameState,
@@ -66,6 +67,12 @@ pub fn handle_modify_currency(
     for event in events.iter() {
         if event.obj == WorldObject::TimeFragment {
             time_fragments.time_fragments = (time_fragments.time_fragments + event.delta).max(0);
+
+            // Persist time fragments immediately when they are spent (delta < 0)
+            // This prevents save-scumming by closing and restarting the game
+            if event.delta < 0 {
+                persist_time_fragments(time_fragments.time_fragments);
+            }
         } else if event.obj == WorldObject::Coin {
             coins.coins = coins.coins.saturating_add(event.delta as u32);
         }

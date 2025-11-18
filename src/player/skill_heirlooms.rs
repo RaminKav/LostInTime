@@ -443,7 +443,7 @@ pub fn handle_active_skill_event(
                         // Placeholder: spawn ice explosion at cursor for now
                         let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 2.) as i32; // ice wall does double base dmg
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
 
                         ranged_attack_events.send(RangedAttackEvent {
@@ -584,7 +584,7 @@ pub fn handle_active_skill_event(
                             commands.entity(player_e).remove::<SprintState>();
                         }
                         commands.entity(player_e).insert(SprintState {
-                            startup_timer: Timer::from_seconds(0.17, TimerMode::Once),
+                            startup_timer: Timer::from_seconds(0.0, TimerMode::Once),
                             sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
                             sprint_cooldown_timer: cd,
                             speed_bonus: 1.6,
@@ -734,6 +734,7 @@ pub fn tick_skill_cooldowns(
     mut icewall_cd: Query<(Entity, &mut IceWallSkillState)>,
     mut druidtree_cd: Query<(Entity, &mut DruidTreeSkillState)>,
     mut shout_cd: Query<(Entity, &mut ShoutSkillState)>,
+    mut sprint_cd: Query<(Entity, &mut SprintState)>,
     mut dummy_query: Query<(Entity, &mut DruidTreeDummy)>,
 ) {
     for (e, mut s) in stealth_cd.iter_mut() {
@@ -784,6 +785,10 @@ pub fn tick_skill_cooldowns(
         if s.cooldown_timer.finished() {
             commands.entity(e).remove::<ShoutSkillState>();
         }
+    }
+    // Tick Sprint cooldown - this ensures it ticks even while sprinting
+    for (_e, mut sprint) in sprint_cd.iter_mut() {
+        sprint.sprint_cooldown_timer.tick(time.delta());
     }
     // Despawn druid tree dummy after duration
     for (e, mut dummy) in dummy_query.iter_mut() {
