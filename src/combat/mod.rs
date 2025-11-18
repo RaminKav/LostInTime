@@ -366,7 +366,7 @@ pub fn handle_hits(
 
                 // Shout projectile has much higher knockback
                 let shout_knockback_bonus = if hit.hit_with_projectile == Some(Projectile::Shout) {
-                    600.
+                    800.
                 } else {
                     0.
                 };

@@ -217,7 +217,7 @@ pub fn setup_xp_bar_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: YELLOW,
-                custom_size: Some(Vec2::new(111., 1.)),
+                custom_size: Some(Vec2::new(0., 1.)), // Initialize to 0 width (0 XP at start)
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
@@ -259,7 +259,7 @@ pub fn setup_xp_bar_ui(
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    "",
+                    "1",
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
