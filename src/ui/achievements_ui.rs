@@ -86,7 +86,7 @@ fn refresh_reward_icon(
                 &stack,
                 asset_server,
                 Vec2::ZERO,
-                Vec2::new(-4., 0.),
+                Vec2::new(0., 0.),
                 3,
             );
             commands.entity(icon).set_parent(root);

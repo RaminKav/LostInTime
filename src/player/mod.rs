@@ -195,6 +195,9 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
                     skill_heirlooms::apply_rapid_fire_speed_buff.run_if(is_not_paused),
+                    skill_heirlooms::reduce_skill_cooldown_on_crit
+                        .after(handle_hits)
+                        .run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

@@ -55,7 +55,7 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 use crate::player::mage_skills::TeleportState;
 use crate::player::melee_skills::{ParryState, SpearState};
 use crate::player::rogue_skills::{LungeState, SprintState};
-use crate::player::skills::{FirePillarState, RapidfireState, StealthState};
+use crate::player::skills::{FirePillarState, RapidfireState, ShoutSkillState, StealthState};
 use crate::{
     bounce_player, get_active_skill_keybind, update_bounce_effect, update_shadow, BounceEffect,
     BounceEvent, Game, GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
@@ -436,6 +436,7 @@ pub fn dispatch_active_skill_events(
             Option<&BuckshotSkillState>,
             Option<&IceWallSkillState>,
             Option<&DruidTreeSkillState>,
+            Option<&ShoutSkillState>,
         ),
         With<Player>,
     >,
@@ -455,6 +456,7 @@ pub fn dispatch_active_skill_events(
         buckshot_state,
         icewall_state,
         druidtree_state,
+        shout_state,
     )) = player_q.get_single()
     else {
         return;
@@ -518,6 +520,9 @@ pub fn dispatch_active_skill_events(
                         .map(|s| !s.cooldown_timer.finished())
                         .unwrap_or(false),
                     ActiveSkill::DruidTree => druidtree_state
+                        .map(|s| !s.cooldown_timer.finished())
+                        .unwrap_or(false),
+                    ActiveSkill::Shout => shout_state
                         .map(|s| !s.cooldown_timer.finished())
                         .unwrap_or(false),
                 };

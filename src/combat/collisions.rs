@@ -21,6 +21,7 @@ use crate::{
         },
         Equipment, MainHand, WorldObject,
     },
+    player::rogue_skills::LungeState,
     player::skill_heirlooms::Stealthed,
     player::{
         mage_skills::IceExplosionDmg,
@@ -165,6 +166,7 @@ fn check_projectile_hit_mob_collisions(
         ),
         Without<EnemyProjectile>,
     >,
+    proj_transforms: Query<&GlobalTransform, Without<EnemyProjectile>>,
     mut children: Query<&Parent>,
     mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
@@ -230,13 +232,13 @@ fn check_projectile_hit_mob_collisions(
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }
             let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();
+            let enemy_pos = hit_txfm.translation().truncate();
             if let Some(_) = spear_att {
                 for (mob_e, mob_txfm) in nearby_mobs.iter() {
-                    let delta =
-                        mob_txfm.translation().truncate() - hit_txfm.translation().truncate();
+                    let delta = mob_txfm.translation().truncate() - enemy_pos;
                     if delta.length() <= 70. {
                         commands.entity(mob_e).insert(SpearGravity {
-                            target: hit_txfm.translation().truncate(),
+                            target: enemy_pos,
                             timer: Timer::from_seconds(0.5, TimerMode::Once),
                         });
                     }
@@ -245,11 +247,29 @@ fn check_projectile_hit_mob_collisions(
             if ice_aoe.is_some() {
                 try_add_slow_stacks(*e2, &mut commands, &mut status_event, slow.as_deref_mut());
             }
+
+            // Calculate knockback direction
+            // For Shout (AoE), calculate direction from projectile position to enemy
+            // For other projectiles, use the projectile's direction
+            let knockback_dir = if *proj == Projectile::Shout {
+                // Get projectile position - use the projectile entity we already have
+                let proj_pos = proj_transforms
+                    .get(proj_entity)
+                    .map(|t| t.translation().truncate())
+                    .unwrap_or(enemy_pos);
+
+                // Direction from projectile to enemy
+                let delta = enemy_pos - proj_pos;
+                delta.normalize_or_zero()
+            } else {
+                state.direction
+            };
+
             hit_event.send(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
                 damage: damage as i32,
-                dir: state.direction,
+                dir: knockback_dir,
                 hit_with_melee: None,
                 hit_with_projectile: Some(proj.clone()),
                 ignore_tool: false,
@@ -292,6 +312,7 @@ fn check_projectile_hit_player_collisions(
             (Without<Projectile>, Without<MainHand>, Without<ItemStack>),
         ),
     >,
+    lunge_states: Query<&LungeState, With<Player>>,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
     mut projectiles: Query<
@@ -362,6 +383,14 @@ fn check_projectile_hit_player_collisions(
             // Ignore projectile hits if stealthed
             if stealth_opt.is_some() {
                 continue;
+            }
+            // Ignore projectile hits if lunging (lunge duration is active)
+            // Check if lunge has started (percent > 0) but not finished (percent < 1.0)
+            if let Ok(lunge_state) = lunge_states.get(*e2) {
+                let lunge_percent = lunge_state.lunge_duration.percent();
+                if lunge_percent > 0.0 && lunge_percent < 1.0 {
+                    continue;
+                }
             }
             if let Some(ref mut parry) = parry_option {
                 if parry.active && !parry.success {
@@ -549,6 +578,7 @@ fn check_mob_to_player_collisions(
             &InvincibilityCooldown,
             Option<&mut ParryState>,
             Option<&Stealthed>,
+            Option<&LungeState>,
         ),
         With<Player>,
     >,
@@ -562,8 +592,17 @@ fn check_mob_to_player_collisions(
     in_i_frame: Query<&InvincibilityTimer>,
     mut parry_events: EventWriter<ParrySuccessEvent>,
 ) {
-    let (player_e, player_txfm, thorns, defence, dodge, i_frames, mut parry_option, stealth_opt) =
-        player.single_mut();
+    let (
+        player_e,
+        player_txfm,
+        thorns,
+        defence,
+        dodge,
+        i_frames,
+        mut parry_option,
+        stealth_opt,
+        lunge_opt,
+    ) = player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
@@ -591,6 +630,14 @@ fn check_mob_to_player_collisions(
             // Ignore hits when stealthed
             if stealth_opt.is_some() {
                 continue;
+            }
+            // Ignore hits when lunging (lunge duration is active)
+            // Check if lunge has started (percent > 0) but not finished (percent < 1.0)
+            if let Some(lunge_state) = lunge_opt {
+                let lunge_percent = lunge_state.lunge_duration.percent();
+                if lunge_percent > 0.0 && lunge_percent < 1.0 {
+                    continue;
+                }
             }
             let mut rng = rand::thread_rng();
             if rng.gen_ratio(dodge.0.try_into().unwrap_or(0), 100) && !in_i_frame.contains(e1) {

@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::ProtoCommands;
-use rand::{seq::IteratorRandom, Rng};
+use rand::{seq::IteratorRandom, seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use strum_macros::{Display, EnumIter};
@@ -207,6 +207,7 @@ pub enum ActiveSkill {
     Buckshot,
     IceWall,
     DruidTree,
+    Shout,
 }
 
 impl ActiveSkill {
@@ -215,17 +216,18 @@ impl ActiveSkill {
         match self {
             ActiveSkill::Roll => 0.0, // Handled separately in player_move_inputs
             ActiveSkill::Parry => 1.2,
-            ActiveSkill::ParrySpear => 20.,
-            ActiveSkill::Sprint => 14.0,
-            ActiveSkill::SprintLunge => 12.0,
+            ActiveSkill::ParrySpear => 14.,
+            ActiveSkill::Sprint => 12.0,
+            ActiveSkill::SprintLunge => 3.0,
             ActiveSkill::Teleport => 1.5,
-            ActiveSkill::Stealth => 14.0,
-            ActiveSkill::Rapidfire => 12.0,
-            ActiveSkill::FirePillar => 20.0,
+            ActiveSkill::Stealth => 11.0,
+            ActiveSkill::Rapidfire => 10.0,
+            ActiveSkill::FirePillar => 14.0,
             ActiveSkill::Heal => 60.0,
-            ActiveSkill::Buckshot => 8.0,
-            ActiveSkill::IceWall => 16.0,
-            ActiveSkill::DruidTree => 20.0,
+            ActiveSkill::Buckshot => 6.0,
+            ActiveSkill::IceWall => 10.0,
+            ActiveSkill::DruidTree => 14.0,
+            ActiveSkill::Shout => 7.0,
         }
     }
 }
@@ -261,6 +263,10 @@ pub struct IceWallSkillState {
 pub struct DruidTreeSkillState {
     pub cooldown_timer: Timer,
 }
+#[derive(Component, Clone)]
+pub struct ShoutSkillState {
+    pub cooldown_timer: Timer,
+}
 
 impl ActiveSkill {
     pub fn get_title(&self) -> String {
@@ -278,6 +284,7 @@ impl ActiveSkill {
             ActiveSkill::Buckshot => "Buckshot".to_string(),
             ActiveSkill::IceWall => "Ice Wall".to_string(),
             ActiveSkill::DruidTree => "Druid Tree".to_string(),
+            ActiveSkill::Shout => "Shout".to_string(),
         }
     }
 
@@ -337,6 +344,11 @@ impl ActiveSkill {
                 "tree dummy that".to_string(),
                 "taunts enemies.".to_string(),
             ],
+            ActiveSkill::Shout => vec![
+                "Active: Release an AoE".to_string(),
+                "burst of damage".to_string(),
+                "around you.".to_string(),
+            ],
         }
     }
 
@@ -358,11 +370,14 @@ impl ActiveSkill {
                 commands
                     .entity(entity)
                     .insert(crate::player::rogue_skills::LungeState {
-                        lunge_cooldown_timer: Timer::from_seconds(4., TimerMode::Once)
-                            .tick(Duration::from_secs(99))
-                            .clone(),
-                        lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
-                        lunge_speed: 3.9,
+                        lunge_cooldown_timer: Timer::from_seconds(
+                            ActiveSkill::SprintLunge.get_base_cooldown(),
+                            TimerMode::Once,
+                        )
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                        lunge_duration: Timer::from_seconds(0.42, TimerMode::Once),
+                        lunge_speed: 9.5,
                     });
             }
             ActiveSkill::Teleport => {
@@ -461,6 +476,14 @@ impl ActiveSkill {
                         .clone(),
                 });
             }
+            ActiveSkill::Shout => {
+                let cooldown = ActiveSkill::Shout.get_base_cooldown();
+                commands.entity(entity).insert(ShoutSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
             ActiveSkill::Roll => {}
         }
     }
@@ -539,11 +562,12 @@ pub enum Heirloom {
     ViralVenum,     //poison sceptor
 
     //melee
-    HealEcho,        // chalice
-    FullStomach,     //jam
-    SkillEcho,       // placeholder
-    ReinforcedArmor, // Scale
-    SkillPower,      // placeholder - increases skill effectiveness
+    HealEcho,                   // chalice
+    FullStomach,                //jam
+    SkillEcho,                  // placeholder
+    ReinforcedArmor,            // Scale
+    SkillPower,                 // placeholder - increases skill effectiveness
+    CritSkillCooldownReduction, // reduces class skill cooldown on crit
 
     // On-Attack Triggers
     WaveAttack,  // hero sword
@@ -606,6 +630,7 @@ impl Heirloom {
             Heirloom::SkillEcho => "Dragon Eye".to_string(),
             Heirloom::SkillChargeIncrease => "Paintbrush".to_string(),
             Heirloom::SkillPower => "Blue Scroll".to_string(),
+            Heirloom::CritSkillCooldownReduction => "Bob's Bell".to_string(),
             Heirloom::TeleportShock => "Shock Step".to_string(),
             Heirloom::TeleportCooldown => "Teleport Faster!".to_string(),
             Heirloom::TeleportCount => "Multi-port".to_string(),
@@ -763,6 +788,12 @@ impl Heirloom {
             Heirloom::SkillPower => {
                 vec!["Skills gain +15%".to_string(), "effectivness.".to_string()]
             }
+            Heirloom::CritSkillCooldownReduction => vec![
+                "Landing a critical".to_string(),
+                "hit reduces your".to_string(),
+                "active skill cooldown".to_string(),
+                "by 0.1 seconds.".to_string(),
+            ],
             Heirloom::TeleportShock => vec![
                 "Teleporting through".to_string(),
                 "enemies damages".to_string(),
@@ -1221,6 +1252,10 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),
+                HeirloomChoiceState::new(
+                    Heirloom::CritSkillCooldownReduction,
+                    HeirloomRarity::Rare,
+                ),
                 HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
@@ -1239,9 +1274,11 @@ impl HeirloomChoiceQueue {
             let mut add_back_to_pool: Vec<HeirloomChoiceState> = vec![];
             for i in 0..3 {
                 let rarity = HeirloomChoiceQueue::gen_rarity(rng, loot_bonus);
-                if let Some(picked_skill) = self
-                    .get_skill_of_rarity(rarity.clone(), rng, &|s| !new_skills.clone().contains(s))
-                {
+                if let Some(picked_skill) = self.get_skill_of_rarity(rarity.clone(), rng, &|s| {
+                    // Only check slots that have been explicitly set (0..i)
+                    // This avoids the issue where Default::default() initializes all slots with CritChance
+                    !new_skills[0..i].iter().any(|existing| existing == s)
+                }) {
                     if !picked_skill.is_one_time_heirloom {
                         add_back_to_pool.push(picked_skill.clone());
                     }
@@ -1265,11 +1302,20 @@ impl HeirloomChoiceQueue {
         rng: &mut rand::rngs::ThreadRng,
         filter: &dyn Fn(&HeirloomChoiceState) -> bool,
     ) -> Option<HeirloomChoiceState> {
-        self.pool
+        let filtered: Vec<_> = self
+            .pool
             .iter()
-            .filter(|x| x.rarity == rarity && filter(x) && !self.banned.contains(&x.heirloom))
-            .choose(rng)
-            .cloned()
+            .filter(|x| {
+                let matches_rarity = x.rarity == rarity;
+                let passes_filter = filter(x);
+                let not_banned = !self.banned.contains(&x.heirloom);
+                matches_rarity && passes_filter && not_banned
+            })
+            .collect();
+        // Convert back to owned values for choose
+        let owned_filtered: Vec<HeirloomChoiceState> =
+            filtered.iter().map(|x| (*x).clone()).collect();
+        owned_filtered.as_slice().choose(rng).cloned()
     }
     pub fn gen_rarity(rng: &mut rand::rngs::ThreadRng, loot_bonus: i32) -> HeirloomRarity {
         // Base probabilities: Common 61%, Uncommon 23%, Rare 13%, Legendary 3%

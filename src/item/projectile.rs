@@ -75,6 +75,7 @@ pub enum Projectile {
     PoisonCloud,
     HealHearts,
     AttackSpeed,
+    Shout,
 }
 
 impl Projectile {
@@ -104,6 +105,7 @@ impl Projectile {
             Projectile::IceExplosionAOE => true,
             Projectile::FireRing => true,
             Projectile::IceWall => true,
+            Projectile::Shout => true,
             _ => false,
         }
     }

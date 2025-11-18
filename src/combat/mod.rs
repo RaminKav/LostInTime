@@ -363,6 +363,14 @@ pub fn handle_hits(
                 } else {
                     0.
                 };
+
+                // Shout projectile has much higher knockback
+                let shout_knockback_bonus = if hit.hit_with_projectile == Some(Projectile::Shout) {
+                    600.
+                } else {
+                    0.
+                };
+
                 commands.entity(hit.hit_entity).insert(HitAnimationTracker {
                     timer: Timer::from_seconds(
                         //TODO: once we create builders for creatures, add this as a default to all creatures that can be hit
@@ -375,7 +383,7 @@ pub fn handle_hits(
                         if is_player {
                             400.
                         } else {
-                            mob_kb
+                            mob_kb + shout_knockback_bonus
                         }
                     },
                     dir: hit.dir,

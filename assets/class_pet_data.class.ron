@@ -10,7 +10,7 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: MeleePowerIcon,
-            active_skill: Parry,
+            active_skill: Shout,
         ),
         Paladin: (
             name: "Paladin",

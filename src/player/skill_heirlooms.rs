@@ -8,6 +8,7 @@ use crate::{
     ai::FollowState,
     attributes::{Attack, AttackCooldown, CurrentHealth, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
+    combat::HitEvent,
     custom_commands::CommandsExt,
     enemy::Mob,
     inputs::{CursorPos, FacingDirection},
@@ -22,7 +23,7 @@ use crate::{
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState,
             FirePillarState, HealSkillState, Heirloom, IceWallSkillState, PlayerSkills,
-            RapidfireState, SkillChargeTracker, StealthState,
+            RapidfireState, ShoutSkillState, SkillChargeTracker, StealthState,
         },
         Player,
     },
@@ -49,6 +50,7 @@ pub fn handle_active_skill_event(
             Option<&BuckshotSkillState>,
             Option<&IceWallSkillState>,
             Option<&DruidTreeSkillState>,
+            Option<&ShoutSkillState>,
             Option<&Attack>,
             &mut CurrentHealth,
             &MaxHealth,
@@ -80,6 +82,7 @@ pub fn handle_active_skill_event(
             buckshot_state,
             icewall_state,
             druidtree_state,
+            shout_state,
             attack_opt,
             mut health,
             max_health,
@@ -506,6 +509,52 @@ pub fn handle_active_skill_event(
 
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
+                    ActiveSkill::Shout => {
+                        if should_start_cooldown {
+                            if let Some(s) = shout_state {
+                                if !s.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            // If using a charge, remove any existing skill state to prevent blocking
+                            if shout_state.is_some() {
+                                commands.entity(player_e).remove::<ShoutSkillState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(
+                            ev.cooldown * skills.skill_cooldown_multiplier(),
+                            TimerMode::Once,
+                        );
+                        if !should_start_cooldown {
+                            // If using a charge, don't start cooldown yet - set timer to finished
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        // Don't tick the timer here - let tick_skill_cooldowns handle it
+                        commands
+                            .entity(player_e)
+                            .insert(ShoutSkillState { cooldown_timer: cd });
+
+                        // Spawn Shout projectile at player position (AoE burst around player)
+                        let player_pos = player_txfm.translation().truncate();
+                        let power_mult = skills.skill_power_multiplier();
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::Shout,
+                            direction: Vec2::ZERO, // AoE doesn't need direction
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: Some(player_pos),
+                            spawn_delay: 0.0,
+                        });
+
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
+                    }
                     ActiveSkill::Sprint => {
                         if should_start_cooldown {
                             if let Some(s) = sprint_state {
@@ -622,8 +671,8 @@ pub fn handle_active_skill_event(
                         }
                         commands.entity(player_e).insert(LungeState {
                             lunge_cooldown_timer: cd,
-                            lunge_duration: Timer::from_seconds(0.69, TimerMode::Once),
-                            lunge_speed: 3.9,
+                            lunge_duration: Timer::from_seconds(0.42, TimerMode::Once),
+                            lunge_speed: 9.5,
                         });
                     }
                     _ => {}
@@ -684,6 +733,7 @@ pub fn tick_skill_cooldowns(
     mut buckshot_cd: Query<(Entity, &mut BuckshotSkillState)>,
     mut icewall_cd: Query<(Entity, &mut IceWallSkillState)>,
     mut druidtree_cd: Query<(Entity, &mut DruidTreeSkillState)>,
+    mut shout_cd: Query<(Entity, &mut ShoutSkillState)>,
     mut dummy_query: Query<(Entity, &mut DruidTreeDummy)>,
 ) {
     for (e, mut s) in stealth_cd.iter_mut() {
@@ -727,6 +777,12 @@ pub fn tick_skill_cooldowns(
         d.cooldown_timer.tick(time.delta());
         if d.cooldown_timer.finished() {
             commands.entity(e).remove::<DruidTreeSkillState>();
+        }
+    }
+    for (e, mut s) in shout_cd.iter_mut() {
+        s.cooldown_timer.tick(time.delta());
+        if s.cooldown_timer.finished() {
+            commands.entity(e).remove::<ShoutSkillState>();
         }
     }
     // Despawn druid tree dummy after duration
@@ -907,6 +963,160 @@ pub fn apply_rapid_fire_speed_buff(
         if attack_cooldown.0 > 0.0 && attack_cooldown.0.is_finite() && buff.attack_speed_bonus > 0.0
         {
             attack_cooldown.0 = attack_cooldown.0 / buff.attack_speed_bonus;
+        }
+    }
+}
+
+/// Reduces class skill cooldown when player lands a crit
+/// Reduces by 0.1s per stack of CritSkillCooldownReduction heirloom
+pub fn reduce_skill_cooldown_on_crit(
+    mut hit_events: EventReader<HitEvent>,
+    mut players: Query<
+        (
+            &PlayerSkills,
+            Option<&mut StealthState>,
+            Option<&mut RapidfireState>,
+            Option<&mut FirePillarState>,
+            Option<&mut HealSkillState>,
+            Option<&mut BuckshotSkillState>,
+            Option<&mut IceWallSkillState>,
+            Option<&mut DruidTreeSkillState>,
+            Option<&mut ShoutSkillState>,
+            Option<&mut SkillChargeTracker>,
+        ),
+        With<Player>,
+    >,
+    mut sprint_states: Query<&mut SprintState, With<Player>>,
+    mut spear_states: Query<&mut SpearState, With<Player>>,
+    mut lunge_states: Query<&mut LungeState, With<Player>>,
+    mut teleport_states: Query<&mut TeleportState, With<Player>>,
+) {
+    for hit in hit_events.iter() {
+        // Only process crits from player attacks (not from mobs hitting player)
+        if !hit.was_crit || hit.hit_by_mob.is_some() {
+            continue;
+        }
+
+        for (
+            skills,
+            stealth_state,
+            rapid_state,
+            pillar_state,
+            heal_state,
+            buckshot_state,
+            icewall_state,
+            druidtree_state,
+            shout_state,
+            charge_tracker,
+        ) in players.iter_mut()
+        {
+            let heirloom_count = skills.get_count(Heirloom::CritSkillCooldownReduction);
+            if heirloom_count == 0 {
+                continue;
+            }
+
+            let reduction = 0.1 * heirloom_count as f32;
+
+            // Reduce cooldown for skill state components
+            // Instead of creating a new timer, tick the existing timer forward by the reduction amount
+            // This preserves the original duration for the HUD UI
+            if let Some(mut state) = stealth_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = rapid_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = pillar_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = heal_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = buckshot_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = icewall_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = druidtree_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Some(mut state) = shout_state {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+
+            // Reduce cooldown for legacy skills
+            if let Ok(mut state) = sprint_states.get_single_mut() {
+                if !state.sprint_cooldown_timer.finished() {
+                    state
+                        .sprint_cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Ok(mut state) = spear_states.get_single_mut() {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Ok(mut state) = lunge_states.get_single_mut() {
+                if !state.lunge_cooldown_timer.finished() {
+                    state
+                        .lunge_cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Ok(mut state) = teleport_states.get_single_mut() {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+
+            // Reduce cooldown for SkillChargeTracker (slot 1)
+            if let Some(mut tracker) = charge_tracker {
+                if tracker.current_charges < tracker.max_charges {
+                    if !tracker.cooldown_timer.finished() {
+                        tracker
+                            .cooldown_timer
+                            .tick(Duration::from_secs_f32(reduction));
+                    }
+                }
+            }
         }
     }
 }

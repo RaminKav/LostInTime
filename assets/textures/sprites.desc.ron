@@ -1211,6 +1211,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        CritSkillCooldownReduction: WorldObjectData(
+            texture_pos: (13., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

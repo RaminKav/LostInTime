@@ -303,10 +303,10 @@ pub fn setup_currency_ui(
                         color: BLACK,
                     },
                 ),
-                text_anchor: Anchor::Center,
+                text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(
-                        -res.game_width / 2. + 20.5,
+                        -res.game_width / 2. + 16.5,
                         GAME_HEIGHT / 2. - 43.5,
                         6.,
                     ),
@@ -326,7 +326,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
-        Vec2::new(-9.5, 1.),
+        Vec2::new(-6.5, 1.),
         Vec2::new(0., 0.),
         3,
     );
