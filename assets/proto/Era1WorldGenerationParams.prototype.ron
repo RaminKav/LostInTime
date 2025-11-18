@@ -62,8 +62,8 @@
         CombatShrine: 0.15,
         GambleShrine: 0.15,
         // ActiveSkillShrine: 0.1,
-        HeirloomShrine: 0.13,
-        BlacksmithMerchant: 0.15,
+        HeirloomShrine: 0.15,
+        BlacksmithMerchant: 0.13,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

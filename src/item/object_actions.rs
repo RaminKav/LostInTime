@@ -397,21 +397,14 @@ impl ObjectAction {
                 // Get all active skills from ActiveSkill enum, excluding Roll and skills the player already has
                 let active_skills: Vec<ActiveSkill> = ActiveSkill::iter()
                     .filter(|skill| {
-                        *skill != ActiveSkill::Roll && !player_current_skills.contains(skill)
+                        *skill != ActiveSkill::Roll
+                            && *skill != ActiveSkill::Parry
+                            && !player_current_skills.contains(skill)
                     })
                     .collect();
 
-                // If no skills available (player has all skills), fall back to all skills except Roll
-                let available_skills = if active_skills.is_empty() {
-                    ActiveSkill::iter()
-                        .filter(|skill| *skill != ActiveSkill::Roll)
-                        .collect()
-                } else {
-                    active_skills
-                };
-
                 // Pick a random active skill
-                let chosen_active_skill = available_skills.iter().choose(&mut rng).unwrap();
+                let chosen_active_skill = active_skills.iter().choose(&mut rng).unwrap();
 
                 let skill_choice = ActiveSkillChoiceState::new(
                     chosen_active_skill.clone(),
