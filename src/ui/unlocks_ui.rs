@@ -125,6 +125,11 @@ pub fn handle_unlocks_clicks(
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
     for (entity, mut interactable, button) in buttons.iter_mut() {
+        // Skip if unlock is maxed
+        if upgrades.is_maxed(button.kind) {
+            continue;
+        }
+
         let cost = upgrades.next_cost(button.kind);
         let affordable = currency.time_fragments.max(0) as u32 >= cost;
         match hit_test {
@@ -205,6 +210,23 @@ pub fn refresh_unlock_button_states(
     }
 
     for (button, mut sprite, children) in buttons.iter_mut() {
+        // Hide button if unlock is maxed
+        let is_maxed = upgrades.is_maxed(button.kind);
+        if is_maxed {
+            // Hide the button sprite
+            sprite.color = Color::NONE;
+            // Also hide the button label text
+            {
+                let mut labels = text_queries.p0();
+                for child in children.iter() {
+                    if let Ok(mut text) = labels.get_mut(*child) {
+                        text.sections[0].style.color = Color::NONE;
+                    }
+                }
+            }
+            continue;
+        }
+
         let cost = upgrades.next_cost(button.kind);
         let affordable = currency.time_fragments.max(0) as u32 >= cost;
         sprite.color = if affordable {
@@ -230,7 +252,12 @@ pub fn refresh_unlock_button_states(
     {
         let mut cost_texts = text_queries.p1();
         for (cost, mut text) in cost_texts.iter_mut() {
-            text.sections[0].value = format!("Cost: {}", upgrades.next_cost(cost.kind));
+            let is_maxed = upgrades.is_maxed(cost.kind);
+            if is_maxed {
+                text.sections[0].value = "Maxed".to_string();
+            } else {
+                text.sections[0].value = format!("Cost: {}", upgrades.next_cost(cost.kind));
+            }
         }
     }
 
@@ -425,6 +452,8 @@ fn spawn_unlock_row(
         Name::new(format!("Unlock Row Cost {}", kind.display_name())),
     ));
 
+    // Only show purchase button if unlock is not maxed
+    let is_maxed = upgrades.is_maxed(kind);
     let button_entity = commands
         .spawn(SpriteBundle {
             texture: graphics
@@ -435,7 +464,11 @@ fn spawn_unlock_row(
                 ..Default::default()
             },
             transform: Transform::from_translation(button_pos),
-            visibility: Visibility::Visible,
+            visibility: if is_maxed {
+                Visibility::Hidden
+            } else {
+                Visibility::Visible
+            },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))

@@ -64,7 +64,7 @@ pub fn track_mob_kills(
     chaos: Res<ChaosTracker>,
 ) {
     for _death in death_events.iter() {
-        run_score.add_mob_kill(chaos.chaos_level.trunc() as u32);
+        run_score.add_mob_kill(1 + chaos.get_chaos().trunc() as u32);
     }
 }
 

@@ -224,6 +224,15 @@ impl UnlockUpgrades {
     pub fn orb_count(&self) -> u32 {
         self.orb_tier
     }
+
+    /// Check if an unlock is maxed out (cannot be purchased further)
+    pub fn is_maxed(&self, kind: UnlockUpgradeKind) -> bool {
+        match kind {
+            UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 3,
+            UnlockUpgradeKind::ThirdActiveSkillSlot => self.third_active_skill_slot_unlocked,
+            _ => false, // Other unlocks have no max (infinite tiers)
+        }
+    }
 }
 
 #[derive(Resource, Debug, Clone, Default)]
