@@ -4,7 +4,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
-    client::is_not_paused,
+    client::{is_not_paused, GameOverEvent},
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     night::{NewDayEvent, NightTracker},
@@ -13,7 +13,7 @@ use crate::{
     run_once_per_run,
     world::{
         chunk::Chunk,
-        dimension::ActiveDimension,
+        dimension::{ActiveDimension, DimensionSpawnEvent},
         dungeon::Dungeon,
         world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
         TileMapPosition, CHUNK_SIZE, TILE_SIZE,
@@ -36,7 +36,9 @@ impl Plugin for SpawnerPlugin {
                     // handle_add_fairy_spawners,
                     test_mob_count,
                     spawn_one_time_enemies_at_day,
+                    spawn_stone_golem_timer.run_if(is_not_paused),
                     reduce_chunk_mob_count_on_mob_death,
+                    reset_stone_golem_timer_on_game_over,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -303,6 +305,111 @@ fn spawn_one_time_enemies_at_day(
         *day_tracker += 1;
     }
 }
+/// Resource to track Stone Golem spawn timer
+#[derive(Resource)]
+pub struct StoneGolemSpawnTimer {
+    pub timer: Timer,
+}
+
+impl Default for StoneGolemSpawnTimer {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(240.0, TimerMode::Repeating), // 4 minutes
+        }
+    }
+}
+
+/// System to spawn Stone Golem every 4 minutes in main eras (not dungeons)
+fn spawn_stone_golem_timer(
+    time: Res<Time>,
+    mut timer: Local<Option<StoneGolemSpawnTimer>>,
+    mut proto_commands: ProtoCommands,
+    prototypes: Prototypes,
+    proto_param: ProtoParam,
+    player_query: Query<&GlobalTransform, With<Player>>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+    dimension_spawn_events: EventReader<DimensionSpawnEvent>,
+    game: GameParam,
+    existing_golems: Query<&Mob>,
+) {
+    // Check if in dungeon - don't spawn in dungeons
+    if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
+
+    // Initialize timer if needed
+    if timer.is_none() {
+        *timer = Some(StoneGolemSpawnTimer::default());
+    }
+
+    // Reset timer when changing eras/dimensions
+    if !dimension_spawn_events.is_empty() {
+        if let Some(ref mut t) = *timer {
+            t.timer.reset();
+            info!("Stone Golem spawn timer reset due to dimension change");
+        }
+    }
+
+    let Some(ref mut golem_timer) = *timer else {
+        return;
+    };
+
+    // Tick the timer
+    golem_timer.timer.tick(time.delta());
+
+    // Spawn golem when timer finishes
+    if golem_timer.timer.just_finished() {
+        // Don't spawn if a Stone Golem already exists
+        let golem_exists = existing_golems.iter().any(|m| m == &Mob::StoneGolem);
+        if golem_exists {
+            info!("Stone Golem already exists, skipping spawn");
+            return;
+        }
+
+        // Find a spawn position near the player
+        if let Ok(player_txfm) = player_query.get_single() {
+            let player_pos = player_txfm.translation().truncate();
+            let mut rng = rand::thread_rng();
+            let mut pos = player_pos;
+            let mut attempts = 20;
+            let spawn_distance = TILE_SIZE.x * 12.0; // Spawn 12 tiles away
+
+            while attempts > 0 {
+                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                let offset = Vec2::new(angle.cos(), angle.sin()) * spawn_distance;
+                pos = player_pos + offset;
+
+                if can_spawn_mob_here(pos, &game, &proto_param, false) {
+                    break;
+                }
+                attempts -= 1;
+            }
+
+            if attempts > 0 {
+                proto_commands.spawn_from_proto(Mob::StoneGolem, &prototypes, pos);
+                info!("Spawned Stone Golem at {:?}", pos);
+            } else {
+                info!("Failed to find valid spawn location for Stone Golem");
+            }
+        }
+    }
+}
+
+/// Reset Stone Golem spawn timer when player dies/game over
+fn reset_stone_golem_timer_on_game_over(
+    mut timer: Local<Option<StoneGolemSpawnTimer>>,
+    game_over_events: EventReader<GameOverEvent>,
+) {
+    if !game_over_events.is_empty() {
+        if let Some(ref mut t) = *timer {
+            t.timer.reset();
+            info!("Stone Golem spawn timer reset due to game over");
+        }
+        // Clear the timer so it reinitializes on next run
+        *timer = None;
+    }
+}
+
 fn tick_spawner_timers(
     time: Res<Time>,
     mut spawners: Query<(Entity, &mut GlobalSpawners)>,

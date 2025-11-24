@@ -249,14 +249,17 @@ pub fn try_add_slow_stacks(
             });
         }
     } else {
-        commands.entity(hit_e).insert(Slow {
-            num_stacks: 1,
-            timer: Timer::from_seconds(1.7, TimerMode::Repeating),
-        });
-        status_event.send(StatusEffectEvent {
-            entity: hit_e,
-            effect: StatusEffect::Slow,
-            num_stacks: 1,
-        });
+        // Check if entity still exists before inserting Slow
+        if let Some(mut hit_entity_commands) = commands.get_entity(hit_e) {
+            hit_entity_commands.insert(Slow {
+                num_stacks: 1,
+                timer: Timer::from_seconds(1.7, TimerMode::Repeating),
+            });
+            status_event.send(StatusEffectEvent {
+                entity: hit_e,
+                effect: StatusEffect::Slow,
+                num_stacks: 1,
+            });
+        }
     }
 }

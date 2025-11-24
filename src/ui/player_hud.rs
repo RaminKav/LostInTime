@@ -439,7 +439,10 @@ pub fn update_currency_text(
     if time_fragments.is_changed() {
         if game_state.0 != GameState::GameOver {
             if let Ok(icon_e) = time_fragment_icon.get_single() {
-                commands.entity(icon_e).insert(BounceOnHit::new());
+                // Check if entity still exists before inserting components
+                if let Some(mut entity_commands) = commands.get_entity(icon_e) {
+                    entity_commands.insert(BounceOnHit::new());
+                }
             }
         }
 
@@ -451,7 +454,10 @@ pub fn update_currency_text(
     if coins.is_changed() {
         if game_state.0 != GameState::GameOver {
             if let Ok(icon_e) = coin_icon.get_single() {
-                commands.entity(icon_e).insert(BounceOnHit::new());
+                // Check if entity still exists before inserting components
+                if let Some(mut entity_commands) = commands.get_entity(icon_e) {
+                    entity_commands.insert(BounceOnHit::new());
+                }
             }
         }
 

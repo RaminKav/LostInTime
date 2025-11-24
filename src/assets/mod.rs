@@ -153,6 +153,7 @@ impl Plugin for GameAssetsPlugin {
                 portal_ase: None,
                 class_pet_data: None,
                 ice_explosion_ase: None,
+                stone_pillar_ase: None,
             })
             .add_system(
                 Self::update_graphics
@@ -223,6 +224,7 @@ pub struct Graphics {
     pub portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
     pub ice_explosion_ase: Option<Handle<Aseprite>>,
+    pub stone_pillar_ase: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -554,52 +556,63 @@ impl GameAssetsPlugin {
             heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
             ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
+            stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
             class_pet_data: Some(class_pet_data.clone()),
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type
-    pub fn update_graphics(
-        mut to_update_query: Query<
-            (
-                Entity,
-                &mut TextureAtlasSprite,
-                &Handle<TextureAtlas>,
-                &WorldObject,
-                Option<&ItemStack>,
-            ),
-            (Changed<WorldObject>, Without<Wall>, Without<Equipment>),
-        >,
-        mut commands: Commands,
-        graphics: Res<Graphics>,
-        texture_atlases: Res<Assets<TextureAtlas>>,
+    pub fn update_graphics(// mut to_update_query: Query<
+        //     (
+        //         Entity,
+        //         &mut TextureAtlasSprite,
+        //         &Handle<TextureAtlas>,
+        //         &WorldObject,
+        //         Option<&ItemStack>,
+        //     ),
+        //     (
+        //         Changed<WorldObject>,
+        //         Without<Wall>,
+        //         Without<Equipment>,
+        //         Without<crate::combat::MarkedForDeath>,
+        //         Without<crate::item::projectile::Projectile>,
+        //     ),
+        // >,
+        // mut commands: Commands,
+        // graphics: Res<Graphics>,
+        // texture_atlases: Res<Assets<TextureAtlas>>,
     ) {
-        let item_map = &&graphics.spritesheet_map;
-        if let Some(item_map) = item_map {
-            for (e, mut sprite, spritesheet, world_object, maybe_stack) in
-                to_update_query.iter_mut()
-            {
-                if let Some(texture_atlas) = texture_atlases.get(spritesheet) {
-                    if texture_atlas.textures.len() < 100 {
-                        continue;
-                    }
-                }
-                let has_icon = graphics.icons.as_ref().unwrap().get(world_object);
-                let new_sprite = if let Some(icon) = has_icon {
-                    icon
-                } else {
-                    item_map
-                        .get(world_object)
-                        .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
-                };
-                commands
-                    .entity(e)
-                    .insert(graphics.texture_atlas.as_ref().unwrap().clone());
-                sprite.clone_from(new_sprite);
-                if let Some(stack) = maybe_stack {
-                    add_item_glows(&mut commands, &graphics, e, stack.rarity.clone());
-                }
-            }
-        }
+        return;
+        //     let item_map = &&graphics.spritesheet_map;
+        //     if let Some(item_map) = item_map {
+        //         for (e, mut sprite, spritesheet, world_object, maybe_stack) in
+        //             to_update_query.iter_mut()
+        //         {
+        //             if let Some(texture_atlas) = texture_atlases.get(spritesheet) {
+        //                 if texture_atlas.textures.len() < 100 {
+        //                     continue;
+        //                 }
+        //             }
+        //             let has_icon = graphics.icons.as_ref().unwrap().get(world_object);
+        //             let new_sprite = if let Some(icon) = has_icon {
+        //                 icon
+        //             } else {
+        //                 item_map
+        //                     .get(world_object)
+        //                     .unwrap_or_else(|| panic!("No graphic for object {world_object:?}"))
+        //             };
+
+        //             // Check if entity still exists before inserting components
+        //             let Some(mut entity_commands) = commands.get_entity(e) else {
+        //                 continue; // Entity was despawned, skip it
+        //             };
+
+        //             entity_commands.insert(graphics.texture_atlas.as_ref().unwrap().clone());
+        //             sprite.clone_from(new_sprite);
+        //             if let Some(stack) = maybe_stack {
+        //                 add_item_glows(&mut commands, &graphics, e, stack.rarity.clone());
+        //             }
+        //         }
+        //     }
     }
 }
 

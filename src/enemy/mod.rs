@@ -18,7 +18,7 @@ use crate::{
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
     chaos::ChaosTracker,
-    colors::{BLACK, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
+    colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::NightTracker,
@@ -37,10 +37,12 @@ pub mod red_mushking;
 pub mod red_mushling;
 pub mod spawn_helpers;
 pub mod spawner;
+pub mod stone_golem;
 use self::spawner::SpawnerPlugin;
 use fairy::*;
 use red_mushking::*;
 use red_mushling::*;
+// use stone_golem::*;
 
 pub struct EnemyPlugin;
 
@@ -55,6 +57,7 @@ impl Plugin for EnemyPlugin {
                 (
                     handle_new_red_mushling_state_machine,
                     handle_new_red_mushking_state_machine,
+                    stone_golem::handle_new_stone_golem_state_machine,
                     handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
                     red_mushling::handle_mushling_rush_warnings,
@@ -63,6 +66,10 @@ impl Plugin for EnemyPlugin {
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
                     red_mushking::tick_aoe_attack_timer,
                     red_mushking::handle_aoe_attack,
+                    stone_golem::tick_spike_attack_timer,
+                    stone_golem::handle_spike_attack,
+                    stone_golem::update_stone_golem_walk_animation,
+                    stone_golem::handle_stone_golem_death,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -100,6 +107,7 @@ pub enum Mob {
     Fairy,
     RedMushling,
     RedMushking,
+    StoneGolem,
 }
 
 impl Mob {
@@ -115,6 +123,7 @@ impl Mob {
             Mob::RedMushling => RED,
             Mob::RedMushking => RED,
             Mob::Hog => LIGHT_BROWN,
+            Mob::StoneGolem => GREY,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -128,18 +137,21 @@ impl Mob {
             Mob::FurDevil => 50.,
             Mob::RedMushling => 0.,
             Mob::RedMushking => 0.,
+            Mob::StoneGolem => 0.,
             Mob::Hog => 50.,
         }
     }
     pub fn is_boss(&self) -> bool {
         match self {
             Mob::RedMushking => true,
+            Mob::StoneGolem => true,
             _ => false,
         }
     }
     pub fn get_boss_name(&self) -> Option<&'static str> {
         match self {
             Mob::RedMushking => Some("Red Mushking"),
+            Mob::StoneGolem => Some("Blake Boulder"),
             _ => None,
         }
     }
@@ -441,7 +453,7 @@ fn juice_up_spawned_mobs_per_day(
     let chaos_from_heirlooms = player_skills.single().get_count(Heirloom::ChaosBoost) as f32 * 1.5; // Each ChaosBoost heirloom adds 0.5 to chaos
     let chaos_from_era = era_manager.current_era.get_chaos_modifier();
     let total_chaos = chaos_from_totem + chaos_from_heirlooms + chaos_from_era;
-    for (e, mut hp, mut att, mut exp, mob) in elites.iter_mut() {
+    for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
         // 1.5 per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1.5 * night_tracker.days as f32
             + (player_level.single().level as f32 * 0.2)

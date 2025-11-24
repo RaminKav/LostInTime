@@ -59,8 +59,14 @@ pub fn track_boss_kills(
 ) {
     for death_event in death_events.iter() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
-            if mob.is_boss() {
+            // Only RedMushking counts for Era::Main (Act1 achievement)
+            // StoneGolem is a boss but doesn't count for era completion
+            if mob == &Mob::RedMushking {
                 // Mark the current era's boss as killed
+                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                info!("Boss killed in era {:?}", era_manager.current_era);
+            } else if mob.is_boss() && mob != &Mob::StoneGolem {
+                // Other bosses (for future eras) still count
                 boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
                 info!("Boss killed in era {:?}", era_manager.current_era);
             }

@@ -9,7 +9,7 @@ use crate::{
     assets::Graphics,
     attributes::Attack,
     audio::{AudioSoundEffect, SoundSpawner},
-    combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
+    combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider, DeferredComponent},
     inputs::MovementVector,
     item::{projectile::Projectile, WorldObject},
     proto::proto_param::ProtoParam,
@@ -177,9 +177,10 @@ pub fn spawn_ice_explosion_hitbox(
     pos: Vec3,
     dmg: i32,
 ) {
-    let mut anim = AsepriteAnimation::from(IceExplosion::tags::ICE_EXPLOSION);
-    anim.current_frame = 0;
-    let c = spawn_one_time_aseprite_collider(
+    let anim = AsepriteAnimation::from(IceExplosion::tags::ICE_EXPLOSION);
+    
+    // Queue deferred spawn - actual entity will be created in PreUpdate
+    spawn_deferred_aseprite_collider(
         commands,
         Transform::from_translation(pos),
         10.5,
@@ -189,8 +190,7 @@ pub fn spawn_ice_explosion_hitbox(
         anim,
         false,
         Projectile::IceExplosionAOE,
+        vec![DeferredComponent::IceExplosionDmg],
     );
-
-    commands.entity(c).insert(IceExplosionDmg);
-    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+    // Sound is now handled by the caller to batch multiple explosions
 }

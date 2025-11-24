@@ -113,7 +113,7 @@ pub fn handle_spawn_inv_item_tooltip(
     essence: Query<Entity, With<EssenceUI>>,
     cur_inv_state: Res<State<UIState>>,
     recipes: Res<Recipes>,
-    item_stacks: Query<(Entity, &ItemStack)>,
+    item_stacks: Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
     proto: ProtoParam,
     old_tooltips: Query<Entity, With<ItemOrRecipeTooltip>>,
 ) {
@@ -390,10 +390,13 @@ pub fn handle_spawn_inv_item_tooltip(
                     });
                 commands.entity(tooltip).add_child(icon_e);
 
-                // bounce
+                // bounce - only bounce actual inventory items, not tooltip ingredient icons
                 for (e, stack) in item_stacks.iter() {
                     if stack.obj_type == ingredient_world_obj[i - 3] {
-                        commands.entity(e).insert(BounceOnHit::new());
+                        // Check if entity still exists before inserting components
+                        if let Some(mut entity_commands) = commands.get_entity(e) {
+                            entity_commands.insert(BounceOnHit::new());
+                        }
                     }
                 }
             }

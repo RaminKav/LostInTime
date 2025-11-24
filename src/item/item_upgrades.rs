@@ -48,6 +48,13 @@ pub struct ArrowSpeedUpgrade(pub f32);
 #[reflect(Component, Schematic)]
 pub struct VenomOnHitUpgrade;
 
+// Local state for throttling ice explosions per frame
+#[derive(Default)]
+pub struct IceExplosionThrottle {
+    count: u8,
+    sound_played: bool,
+}
+
 pub fn handle_delayed_ranged_attack(
     wep_query: Query<&RangedAttack, With<MainHand>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
@@ -177,7 +184,12 @@ pub fn handle_on_hit_upgrades(
     asset_server: Res<AssetServer>,
     player_att: Query<&ItemAttributes, With<Player>>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
 ) {
+    // Reset counters at start of frame
+    throttle.count = 0;
+    throttle.sound_played = false;
+
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
     }
@@ -241,12 +253,25 @@ pub fn handle_on_hit_upgrades(
             && skills.has(Heirloom::IceStaffAoE)
             && rng.gen_bool(skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.1)
         {
-            spawn_ice_explosion_hitbox(
-                &mut commands,
-                &game.graphics,
-                hit_entity_txfm.translation(),
-                hit.damage / 4,
-            );
+            // Throttle explosions per frame to prevent lag when hitting many enemies
+            const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
+            if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
+                throttle.count += 1;
+                spawn_ice_explosion_hitbox(
+                    &mut commands,
+                    &game.graphics,
+                    hit_entity_txfm.translation(),
+                    hit.damage / 4,
+                );
+                // Only play sound once per frame to avoid audio spam
+                if !throttle.sound_played {
+                    throttle.sound_played = true;
+                    commands.spawn(crate::audio::SoundSpawner::new(
+                        crate::audio::AudioSoundEffect::IceExplosion,
+                        0.4,
+                    ));
+                }
+            }
         }
         if skills.has(Heirloom::IceStaffFloor)
             && rng.gen_bool(skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1)

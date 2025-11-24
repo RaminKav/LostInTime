@@ -105,14 +105,20 @@ pub fn handle_shrine_rewards(
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
             shrine.num_mobs_left -= 1;
-            let drop_list = [WorldObject::ChestBlock];
+            let drop_list = [WorldObject::ChestBlock, WorldObject::Coin];
             if shrine.num_mobs_left == 0 {
                 // give rewards
+                let mut rng = rand::thread_rng();
+                let picked_drop = *drop_list.iter().choose(&mut rng).unwrap();
+                let count = match picked_drop {
+                    WorldObject::Coin => rng.gen_range(34..53),
+                    _ => 1,
+                };
                 proto_commands.spawn_item_from_proto(
-                    *drop_list.iter().choose(&mut rand::thread_rng()).unwrap(),
+                    picked_drop,
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -26.), // offset so it doesn't spawn on the shrine
-                    1,
+                    count,
                     Some(game.get_player_level()),
                 );
                 commands
@@ -140,9 +146,13 @@ pub fn add_shrine_visuals_on_spawn(
     graphics: Res<Graphics>,
 ) {
     for (e, obj, t) in new_shrines.iter() {
+        // Safety check: ensure entity still exists before inserting components
+        let Some(mut entity_commands) = commands.get_entity(e) else {
+            continue;
+        };
+
         if obj == &WorldObject::CombatShrine {
-            commands
-                .entity(e)
+            entity_commands
                 .insert(AsepriteBundle {
                     transform: *t,
                     animation: AsepriteAnimation::from(CombatShrineAnim::tags::IDLE),
@@ -151,8 +161,7 @@ pub fn add_shrine_visuals_on_spawn(
                 })
                 .insert(Name::new("COMBAT"));
         } else if obj == &WorldObject::CombatShrineDone {
-            commands
-                .entity(e)
+            entity_commands
                 .insert(AsepriteBundle {
                     transform: *t,
                     animation: AsepriteAnimation::from(CombatShrineAnim::tags::DONE),

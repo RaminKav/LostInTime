@@ -394,9 +394,14 @@ pub fn summon_attack(
 }
 pub fn handle_death(
     mut commands: Commands,
-    mut death: Query<(Entity, &mut AsepriteAnimation), With<DeathState>>,
+    mut death: Query<(Entity, &mut AsepriteAnimation, &super::Mob), With<DeathState>>,
 ) {
-    for (entity, mut anim) in death.iter_mut() {
+    for (entity, mut anim, mob) in death.iter_mut() {
+        // Only handle RedMushking death animations
+        if mob != &super::Mob::RedMushking {
+            continue;
+        }
+
         if anim.current_frame() < 43 {
             *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_START);
         }
@@ -420,11 +425,12 @@ pub fn new_follow(
         Option<&EnemyAttackCooldown>,
         &mut AsepriteAnimation,
         &mut KinematicCharacterController,
+        Option<&Mob>,
     )>,
     added: Query<Entity, Added<FollowState>>,
     time: Res<Time>,
 ) {
-    for (entity, follow, att_cooldown, mut anim, mut mover) in follows.iter_mut() {
+    for (entity, follow, att_cooldown, mut anim, mut mover, mob_option) in follows.iter_mut() {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
             return;
         }
@@ -439,7 +445,9 @@ pub fn new_follow(
         mover.translation = Some(delta * follow.speed * PLAYER_MOVE_SPEED * time.delta_seconds());
 
         if added.get(entity).is_ok() {
-            *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
+            if let Some(Mob::RedMushking) = mob_option {
+                *anim = AsepriteAnimation::from(RedMushking::tags::WALK);
+            }
         }
     }
 }

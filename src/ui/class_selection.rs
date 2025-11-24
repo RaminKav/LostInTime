@@ -1488,7 +1488,7 @@ fn spawn_pet_preview(
             Name::new("PET PREVIEW CONTAINER"),
         ))
         .insert(SpatialBundle::from_transform(Transform {
-            translation: Vec3::new(28., -26., 12.),
+            translation: Vec3::new(28., -46., 12.),
             scale: Vec3::new(1., 1., 1.),
             ..Default::default()
         }))

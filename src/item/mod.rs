@@ -916,9 +916,7 @@ impl Plugin for ItemsPlugin {
                     handle_frail_stack_ticks.run_if(is_not_paused),
                     handle_slow_stack_ticks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
-                    handle_on_hit_upgrades
-                        .after(handle_hits)
-                        .run_if(is_not_paused),
+                    handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),

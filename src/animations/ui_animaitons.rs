@@ -148,8 +148,12 @@ pub fn handle_ui_time_fragments(
         } else {
             non_text_movers_this_frame += 1.;
         }
-        let icon_e = commands
-            .entity(e)
+
+        // Check if entity still exists before inserting components
+        let Some(mut entity_commands) = commands.get_entity(e) else {
+            continue; // Entity was despawned, skip it
+        };
+        let icon_e = entity_commands
             .insert(SpriteSheetBundle {
                 sprite: graphics
                     .spritesheet_map

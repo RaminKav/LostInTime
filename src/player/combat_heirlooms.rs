@@ -616,6 +616,58 @@ pub fn handle_mana_orb_drops(
     }
 }
 
+/// Drop mana orbs at 30% chance when player attacks a boss with a staff in hotbar
+pub fn handle_boss_hit_mana_orb_drops(
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+    mut hit_events: EventReader<HitEvent>,
+    game: GameParam,
+    mobs: Query<(&Mob, &GlobalTransform)>,
+) {
+    let mut rng = rand::thread_rng();
+
+    for hit in hit_events.iter() {
+        // Check if hit entity is a boss
+        let Ok((mob, boss_transform)) = mobs.get(hit.hit_entity) else {
+            continue;
+        };
+
+        if !mob.is_boss() {
+            continue;
+        }
+
+        // Check if player has a staff in hotbar
+        let has_staff = game.inv_slot_query.iter().any(|slot| {
+            slot.obj_type
+                .map(|obj| obj.is_magic_weapon())
+                .unwrap_or(false)
+        });
+
+        if !has_staff {
+            continue;
+        }
+
+        // 30% chance to drop mana orb
+        if !rng.gen_bool(0.30) {
+            continue;
+        }
+
+        // Spawn mana orb within 32px of boss location
+        let boss_pos = boss_transform.translation().truncate();
+        let angle = rng.gen_range(0.0..TAU);
+        let distance = rng.gen_range(0.0..32.0);
+        let offset = Vec2::new(angle.cos(), angle.sin()) * distance;
+
+        proto_commands.spawn_item_from_proto(
+            WorldObject::ManaOrb,
+            &proto,
+            boss_pos + offset,
+            1,
+            None,
+        );
+    }
+}
+
 pub fn update_reaper_souls(
     mut commands: Commands,
     time: Res<Time>,

@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use bevy_proto::prelude::ProtoCommands;
-use combat_helpers::tick_despawn_timer;
+use combat_helpers::{handle_deferred_aseprite_spawns, tick_despawn_timer};
 use rand::Rng;
 pub mod status_effects;
 use status_effects::*;
@@ -24,7 +24,8 @@ use crate::{
     },
     custom_commands::CommandsExt,
     enemy::{
-        red_mushking::{DeathState, ReturnToShrineState, SummonAttackState},
+        red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
+        stone_golem::SpikeAttackState,
         Mob, MobLevel,
     },
     item::{
@@ -102,6 +103,12 @@ impl Plugin for CombatPlugin {
         })
         .add_event::<ObjBreakEvent>()
         .add_plugin(CollisionPlugion)
+        // Process deferred Aseprite spawns in PreUpdate to ensure frame 0 initialization
+        .add_system(
+            handle_deferred_aseprite_spawns
+                .in_base_set(CoreSet::PreUpdate)
+                .run_if(in_state(GameState::Main)),
+        )
         .add_systems(
             (
                 handle_hits,
@@ -452,9 +459,29 @@ pub fn cleanup_marked_for_death_entities(
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     neaby_mobs: Query<(Entity, &GlobalTransform), (With<Mob>, Without<MarkedForDeath>)>,
     mut status_event: EventWriter<StatusEffectEvent>,
+    spike_attack_states: Query<&SpikeAttackState>,
+    aoe_attack_states: Query<&AoEAttackState>,
 ) {
     for (e, mob, slow_option, poison_option, mob_pos) in dead_query.iter() {
         if mob.is_boss() {
+            // Clean up preview entities before removing attack states
+            // StoneGolem spike attack preview
+            if let Ok(spike_state) = spike_attack_states.get(e) {
+                if let Some(preview_entity) = spike_state.preview_entity {
+                    commands.entity(preview_entity).despawn_recursive();
+                }
+            }
+
+            // RedMushking AoE attack previews
+            if let Ok(aoe_state) = aoe_attack_states.get(e) {
+                if let Some(preview_entity) = aoe_state.preview_entity {
+                    commands.entity(preview_entity).despawn_recursive();
+                }
+                if let Some(second_preview_entity) = aoe_state.second_preview_entity {
+                    commands.entity(second_preview_entity).despawn_recursive();
+                }
+            }
+
             commands
                 .entity(e)
                 .insert(DeathState)
@@ -462,6 +489,8 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<SummonAttackState>()
                 .remove::<LeapAttackState>()
                 .remove::<ReturnToShrineState>()
+                .remove::<AoEAttackState>() // Remove RedMushking's AoE attack state
+                .remove::<SpikeAttackState>() // Remove StoneGolem's attack state
                 .remove::<MarkedForDeath>();
         } else {
             let (skills, attack, mana_regen) = player.single();

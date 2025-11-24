@@ -9,8 +9,9 @@ use bevy_rapier2d::{
     },
 };
 use combat_heirlooms::{
-    break_crates_with_roll, handle_ant_farm_state, handle_mana_orb_drops,
-    handle_reaper_soul_spawns, update_ant_farm_ants, update_reaper_souls, update_stone_tooth,
+    break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
+    handle_mana_orb_drops, handle_reaper_soul_spawns, update_ant_farm_ants, update_reaper_souls,
+    update_stone_tooth,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
@@ -175,6 +176,7 @@ impl Plugin for PlayerPlugin {
                     update_ant_farm_ants.run_if(is_not_paused),
                     update_stone_tooth.run_if(is_not_paused),
                     handle_mana_orb_drops.run_if(is_not_paused),
+                    handle_boss_hit_mana_orb_drops.run_if(is_not_paused),
                     handle_reaper_soul_spawns.run_if(is_not_paused),
                     update_reaper_souls.run_if(is_not_paused),
                     break_crates_with_roll.run_if(is_not_paused),
@@ -234,6 +236,7 @@ impl Plugin for PlayerPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(reset_time_fragment_counters.in_schedule(OnEnter(GameState::Main)))
+            .add_system(reset_coin_counters.in_schedule(OnEnter(GameState::Main)))
             .add_system(
                 give_player_starting_items
                     .run_if(run_once_per_run())

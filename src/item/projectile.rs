@@ -76,6 +76,7 @@ pub enum Projectile {
     HealHearts,
     AttackSpeed,
     Shout,
+    GolemSpike,
 }
 
 impl Projectile {
@@ -213,10 +214,12 @@ fn handle_ranged_attack_event(
             teleported_option,
         ) = player_query.single();
         // if proj is from the player, check if the player is on cooldown
+        // Skip this check for skill projectiles (they have their own cooldown system)
         if !proj_event.from_enemy
             && proj_event.from_entity.is_none()
             && player_cooldown.is_some()
             && !proj_event.is_followup_proj
+            && !proj_event.projectile.is_skill_projectile()
         {
             continue;
         }
@@ -266,7 +269,11 @@ fn handle_ranged_attack_event(
             game.player().position.truncate()
         };
 
-        let size = proj_size.get_multiplier();
+        let size = if proj_event.projectile.is_anchored_to_player_pos() {
+            proj_size.get_multiplier()
+        } else {
+            1.
+        };
         commands.spawn(ProjectileSpawnMarker {
             timer: Timer::from_seconds(proj_event.spawn_delay, TimerMode::Once),
             proj: proj_event.projectile.clone(),
@@ -351,7 +358,10 @@ fn handle_spawn_projectiles_after_delay(
             if let Some(p) = p {
                 if proj.proj.is_anchored_to_player_pos() && !proj.is_followup_proj {
                     let entity = proj.from_entity.unwrap_or(player.single());
-                    commands.entity(entity).add_child(p);
+                    // Check if parent entity still exists before adding child
+                    if let Some(mut entity_commands) = commands.get_entity(entity) {
+                        entity_commands.add_child(p);
+                    }
                 }
                 // AUDIO
                 if proj.proj == Projectile::Fireball {

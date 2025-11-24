@@ -251,7 +251,10 @@ pub fn shuffle_items(
         && !item_chest_state.shuffle_duration_timer.finished()
     {
         if let Some(current_entity) = item_chest_state.current_entity {
-            commands.entity(current_entity).despawn();
+            // Safety check: only despawn if entity still exists
+            if commands.get_entity(current_entity).is_some() {
+                commands.entity(current_entity).despawn();
+            }
         }
         let mut rng = rand::thread_rng();
         let filtered_items = WorldObject::iter()

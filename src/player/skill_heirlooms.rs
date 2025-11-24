@@ -178,7 +178,7 @@ pub fn handle_active_skill_event(
                             .insert(Stealthed);
 
                         // Spawn cosmetic smoke effect on top of player
-                        let player_pos = player_txfm.translation().truncate();
+                        let _player_pos = player_txfm.translation().truncate();
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::Smoke,
                             direction: Vec2::ZERO, // Smoke doesn't move
@@ -187,7 +187,7 @@ pub fn handle_active_skill_event(
                             from_entity: Some(player_e),
                             is_followup_proj: false,
                             dmg_override: Some(0), // Cosmetic only, no damage
-                            pos_override: Some(player_pos),
+                            pos_override: None,
                             spawn_delay: 0.0,
                         });
 
@@ -549,7 +549,7 @@ pub fn handle_active_skill_event(
                             from_entity: Some(player_e),
                             is_followup_proj: false,
                             dmg_override: Some(dmg),
-                            pos_override: Some(player_pos),
+                            pos_override: None,
                             spawn_delay: 0.0,
                         });
 

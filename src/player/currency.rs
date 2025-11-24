@@ -74,7 +74,7 @@ pub fn handle_modify_currency(
                 persist_time_fragments(time_fragments.time_fragments);
             }
         } else if event.obj == WorldObject::Coin {
-            coins.coins = coins.coins.saturating_add(event.delta as u32);
+            coins.coins = (coins.coins as i32 + event.delta).max(0) as u32;
         }
 
         if event.delta > 0 {
@@ -106,4 +106,9 @@ pub fn handle_mob_death_out_of_run_currency(
 pub fn reset_time_fragment_counters(mut currency: ResMut<TimeFragmentCurrency>) {
     currency.total_collected_time_fragments_this_run = 0;
     currency.bounce_timer.reset();
+}
+
+pub fn reset_coin_counters(mut coins: ResMut<CoinCurrency>) {
+    coins.coins = 0;
+    coins.bounce_timer.reset();
 }

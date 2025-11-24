@@ -1650,7 +1650,10 @@ pub fn add_current_health_with_max_health(
     mut health: Query<(Entity, &MaxHealth), (Changed<MaxHealth>, Without<CurrentHealth>)>,
 ) {
     for (entity, max_health) in health.iter_mut() {
-        commands.entity(entity).insert(CurrentHealth(max_health.0));
+        // Check if entity still exists before inserting components
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.insert(CurrentHealth(max_health.0));
+        }
     }
 }
 /// Adds a current shield component to all entities with a max shield component
@@ -1660,7 +1663,10 @@ pub fn add_current_shield_with_max_shield(
 ) {
     for (entity, max_shield) in shield.iter_mut() {
         info!("Adding CurrentShield component with value {}", max_shield.0);
-        commands.entity(entity).insert(CurrentShield(max_shield.0));
+        // Check if entity still exists before inserting components
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.insert(CurrentShield(max_shield.0));
+        }
     }
 }
 
@@ -1878,6 +1884,11 @@ pub fn add_item_glows(
     new_item_e: Entity,
     rarity: ItemRarity,
 ) -> Option<Entity> {
+    // Check if parent entity exists before trying to set parent
+    if commands.get_entity(new_item_e).is_none() {
+        return None;
+    }
+
     rarity.get_item_glow().map(|glow| {
         commands
             .spawn(SpriteBundle {

@@ -84,7 +84,10 @@ pub fn add_previous_health(
     query: Query<(Entity, &MaxHealth), (Added<MaxHealth>, Without<PreviousHealth>)>,
 ) {
     for (entity, max_health) in query.iter() {
-        commands.entity(entity).insert(PreviousHealth(max_health.0));
+        // Check if entity still exists before inserting components
+        if let Some(mut entity_commands) = commands.get_entity(entity) {
+            entity_commands.insert(PreviousHealth(max_health.0));
+        }
     }
 }
 // a function that adds damage numbers to the screen in response to a [HitEvent].

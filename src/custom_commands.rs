@@ -5,7 +5,7 @@ use crate::{
     inventory::ItemStack,
     item::{
         projectile::{ArcProjectileData, Projectile},
-        EquipmentType, ItemDrop, Wall,
+        EquipmentType, ItemDrop, Wall, WorldObject,
     },
     player::mage_skills::Electricity,
     proto::proto_param::ProtoParam,
@@ -66,7 +66,11 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         level: Option<u8>,
     ) -> Option<Entity> {
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
-            let mut spawned_entity_commands = self.commands().entity(spawned_entity);
+            // Check entity exists immediately after spawn (can be picked up instantly)
+            let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity)
+            else {
+                return None; // Entity was already despawned
+            };
 
             if let Some(proto_data) = params.get_item_data(obj.clone()) {
                 // modify the item stack count
@@ -83,6 +87,19 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                     }
                 }
             }
+
+            // Fix item graphics immediately - replace proto atlas with shared game atlas
+            // This ensures items have correct graphics from spawn, not relying on update_graphics
+            if let Some(sprite_map) = &params.graphics.spritesheet_map {
+                if let Some(obj_type) = params.get_component::<WorldObject, _>(obj.clone()) {
+                    if let Some(sprite) = sprite_map.get(obj_type) {
+                        spawned_entity_commands
+                            .insert(params.graphics.texture_atlas.as_ref().unwrap().clone())
+                            .insert(sprite.clone());
+                    }
+                }
+            }
+
             return Some(spawned_entity);
         }
         None
@@ -97,8 +114,13 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         asset_server: &AssetServer,
         scale_up: f32,
     ) -> Option<Entity> {
+        let obj_type = <T as Into<&str>>::into(obj.clone()).to_owned(); // Get obj_type for logging
         if let Some(spawned_entity) = self.spawn_from_proto(obj.clone(), &params.prototypes, pos) {
-            let mut spawned_entity_commands = self.commands().entity(spawned_entity);
+            // Check entity exists immediately after spawn (projectiles can despawn quickly)
+            let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity)
+            else {
+                return None; // Entity was already despawned
+            };
 
             let Some(proj_state) = params.get_projectile_state(obj.clone()) else {
                 return None;
@@ -137,6 +159,18 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 .insert(Name::new("Projectile"))
                 .insert(ActiveCollisionTypes::all())
                 .remove::<ItemStack>();
+
+            // Fix projectile graphics immediately - replace proto atlas with shared game atlas
+            // This is needed because projectiles are excluded from update_graphics to prevent crashes
+            if let Some(sprite_map) = &params.graphics.spritesheet_map {
+                if let Some(obj_type) = params.get_component::<WorldObject, _>(obj.clone()) {
+                    if let Some(sprite) = sprite_map.get(obj_type) {
+                        spawned_entity_commands
+                            .insert(params.graphics.texture_atlas.as_ref().unwrap().clone())
+                            .insert(sprite.clone());
+                    }
+                }
+            }
             if let Some(arc_data) = params.get_component::<ArcProjectileData, _>(obj.clone()) {
                 spawned_entity_commands.with_children(|parent| {
                     let angle = arc_data.col_points[0];
@@ -184,12 +218,17 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         pos: Vec2,
     ) -> Option<Entity> {
         let p = <T as Into<&str>>::into(mob).to_owned();
+        let p_clone = p.clone(); // Clone for logging
         if !prototypes.is_ready(&p) {
             print!("Prototype {} is not ready", p);
             return None;
         }
         let spawned_entity = self.spawn(p).id();
-        let mut spawned_entity_commands = self.commands().entity(spawned_entity);
+        // Check entity exists immediately after spawn
+        let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity) else {
+            return None; // Entity was already despawned
+        };
+
         spawned_entity_commands
             .insert(Transform::from_translation(pos.extend(0.)))
             .insert(ActiveEvents::COLLISION_EVENTS);
@@ -209,8 +248,11 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
             return None;
         }
         //TODO: add parent to spawned entity
-        let spawned_entity = self.spawn(p).id();
-        let mut spawned_entity_commands = self.commands().entity(spawned_entity);
+        let spawned_entity = self.spawn(p.clone()).id();
+        // Check entity exists immediately after spawn
+        let Some(mut spawned_entity_commands) = self.commands().get_entity(spawned_entity) else {
+            return None; // Entity was already despawned
+        };
         let relative_tile_pos = world_pos_to_chunk_relative_tile_pos(pos);
         let should_center = proto_param
             .get_component::<SpriteSize, _>(obj.clone())
@@ -228,7 +270,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
         }
         if let Some(_wall) = proto_param.get_component::<Wall, _>(obj.clone()) {
             let sprite_data = proto_param
-                .get_component::<WallTextureData, _>(obj)
+                .get_component::<WallTextureData, _>(obj.clone())
                 .unwrap();
             spawned_entity_commands
                 .insert(
@@ -245,6 +287,24 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 });
             if is_dirty {
                 spawned_entity_commands.insert(Dirty);
+            }
+        } else {
+            // Fix world object graphics immediately - replace proto atlas with shared game atlas
+            // This ensures world objects have correct graphics from spawn
+            if let Some(sprite_map) = &proto_param.graphics.spritesheet_map {
+                if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
+                    if obj_type != &WorldObject::CombatShrine
+                        && obj_type != &WorldObject::CombatShrineDone
+                    {
+                        if let Some(sprite) = sprite_map.get(obj_type) {
+                            spawned_entity_commands
+                                .insert(
+                                    proto_param.graphics.texture_atlas.as_ref().unwrap().clone(),
+                                )
+                                .insert(sprite.clone());
+                        }
+                    }
+                }
             }
         }
 
