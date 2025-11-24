@@ -663,6 +663,19 @@ impl WorldObject {
             _ => false,
         }
     }
+    pub fn is_breakable_by_projectile(&self) -> bool {
+        match self {
+            WorldObject::Crate => true,
+            WorldObject::Crate2 => true,
+            WorldObject::Pebble => true,
+            WorldObject::BerryBush => true,
+            WorldObject::DeadSapling => true,
+            WorldObject::Era2BerryBush => true,
+            WorldObject::Era2DeadBranch => true,
+            WorldObject::Era2Pebble => true,
+            _ => false,
+        }
+    }
     pub fn is_ranged_weapon(&self) -> bool {
         match self {
             WorldObject::WoodBow => true,

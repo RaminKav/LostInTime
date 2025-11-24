@@ -157,38 +157,214 @@ impl Plugin for ProtoPlugin {
             .register_type_data::<RangeInclusive<i32>, ReflectDeserialize>()
             .add_plugin(bevy_proto::prelude::ProtoPlugin::new())
             .add_system(apply_system_buffers.in_set(CustomFlush))
-            .add_system(Self::load_prototypes.in_set(OnUpdate(GameState::LoadingProtos)))
+            .add_system(Self::load_base_templates.in_schedule(OnEnter(GameState::LoadingProtos)))
             .add_system(
-                Self::check_proto_ready
-                    .run_if(resource_exists::<AllProtos>())
-                    .after(Self::load_prototypes)
+                Self::check_base_templates_ready
+                    .run_if(resource_exists::<BaseTemplateHandles>())
                     .in_set(OnUpdate(GameState::LoadingProtos)),
+            )
+            .add_system(
+                Self::load_all_prototypes.in_schedule(OnEnter(GameState::LoadingProtosStage2)),
+            )
+            .add_system(
+                Self::check_all_protos_ready
+                    .run_if(resource_exists::<AllProtos>())
+                    .in_set(OnUpdate(GameState::LoadingProtosStage2)),
             );
     }
 }
 
 #[derive(Resource)]
-struct AllProtos(Vec<HandleUntyped>);
+struct BaseTemplateHandles {
+    handles: Vec<HandleUntyped>,
+    start_time: std::time::Instant,
+    check_count: u32,
+}
+
+#[derive(Resource)]
+struct AllProtos {
+    handles: Vec<HandleUntyped>,
+    start_time: std::time::Instant,
+    check_count: u32,
+    last_not_ready: Option<HandleUntyped>,
+}
 
 impl ProtoPlugin {
-    fn load_prototypes(mut prototypes: PrototypesMut, mut commands: Commands) {
-        info!("Loading prototypes...");
-        let handles = prototypes.load_folder("proto").unwrap();
-        commands.insert_resource(AllProtos(handles));
+    /// Stage 1: Load only base templates that other prototypes depend on
+    fn load_base_templates(mut prototypes: PrototypesMut, mut commands: Commands) {
+        info!("STAGE 1: Loading base template prototypes...");
+
+        // Load base templates that other prototypes depend on
+        let base_templates = vec![
+            "proto/item_drop.prototype.ron",
+            "proto/projectile.prototype.ron",
+            "proto/world_object.prototype.ron",
+            "proto/mob_basic.prototype.ron",
+            "proto/mob_passive.prototype.ron",
+        ];
+
+        let mut handles = Vec::new();
+        for template in base_templates {
+            let handle = prototypes.load(template);
+            handles.push(handle.clone_untyped());
+        }
+
+        info!("Queued {} base templates for loading", handles.len());
+
+        commands.insert_resource(BaseTemplateHandles {
+            handles,
+            start_time: std::time::Instant::now(),
+            check_count: 0,
+        });
     }
-    fn check_proto_ready(
+
+    /// Check if base templates are ready, then proceed to stage 2
+    fn check_base_templates_ready(
         prototypes: Prototypes,
-        handles: Res<AllProtos>,
+        mut handles: ResMut<BaseTemplateHandles>,
         mut next_state: ResMut<NextState<GameState>>,
+        asset_server: Res<AssetServer>,
     ) {
-        for p in &handles.0 {
+        handles.check_count += 1;
+        let elapsed = handles.start_time.elapsed();
+
+        // Log progress every 50 checks
+        if handles.check_count % 50 == 0 {
+            let ready_count = handles
+                .handles
+                .iter()
+                .filter(|h| prototypes.is_ready_handle(*h))
+                .count();
+            info!(
+                "STAGE 1: Waiting for base templates... ({}/{}  ready, {:.1}s elapsed)",
+                ready_count,
+                handles.handles.len(),
+                elapsed.as_secs_f32()
+            );
+        }
+
+        // Check if all base templates are ready
+        for h in &handles.handles {
+            if !prototypes.is_ready_handle(h) {
+                return; // Still waiting
+            }
+        }
+
+        // All base templates are ready!
+        info!(
+            "STAGE 1 COMPLETE: All {} base templates ready in {:.2}s. Proceeding to load all prototypes...",
+            handles.handles.len(),
+            elapsed.as_secs_f32()
+        );
+        next_state.set(GameState::LoadingProtosStage2);
+    }
+
+    /// Stage 2: Load all prototypes (base templates are already loaded and ready)
+    fn load_all_prototypes(mut prototypes: PrototypesMut, mut commands: Commands) {
+        info!("STAGE 2: Loading all prototypes...");
+
+        // Load all prototypes (including base templates again, which is fine)
+        let all_handles = prototypes.load_folder("proto").unwrap();
+
+        commands.insert_resource(AllProtos {
+            handles: all_handles,
+            start_time: std::time::Instant::now(),
+            check_count: 0,
+            last_not_ready: None,
+        });
+    }
+    /// Stage 2: Check if all prototypes are ready
+    fn check_all_protos_ready(
+        prototypes: Prototypes,
+        mut handles: ResMut<AllProtos>,
+        mut next_state: ResMut<NextState<GameState>>,
+        asset_server: Res<AssetServer>,
+    ) {
+        handles.check_count += 1;
+        let elapsed = handles.start_time.elapsed();
+
+        // After 3 seconds, warn about potential dependency issues
+        if elapsed.as_secs() >= 3 && handles.check_count < 100 {
+            warn!(
+                "Prototype loading is taking longer than usual. This may be due to template dependency ordering. Please wait..."
+            );
+        }
+
+        // Timeout after 15 seconds (increased to give bevy_proto more time)
+        if elapsed.as_secs() > 15 {
+            // Get path info for the stuck prototype
+            let path_info = handles.last_not_ready.as_ref().and_then(|h| {
+                asset_server
+                    .get_handle_path(h.clone())
+                    .map(|p| p.path().to_string_lossy().to_string())
+            });
+
+            // Count how many are actually ready
+            let ready_count = handles
+                .handles
+                .iter()
+                .filter(|h| prototypes.is_ready_handle(*h))
+                .count();
+
+            error!(
+                "Prototype loading timed out after {} seconds.\nLast proto not ready: {:?}\nPath: {:?}\n\nThis is likely a bevy_proto dependency ordering issue.\nReady: {}/{} prototypes",
+                elapsed.as_secs(),
+                handles.last_not_ready,
+                path_info,
+                ready_count,
+                handles.handles.len()
+            );
+            warn!("Proceeding to main menu anyway - some features may not work correctly.");
+            next_state.set(GameState::MainMenu);
+            return;
+        }
+
+        // Log progress every 100 checks (roughly every 1.5 seconds)
+        if handles.check_count % 100 == 0 {
+            let path_info = handles.last_not_ready.as_ref().and_then(|h| {
+                asset_server
+                    .get_handle_path(h.clone())
+                    .map(|p| p.path().to_string_lossy().to_string())
+            });
+
+            // Count how many are ready
+            let ready_count = handles
+                .handles
+                .iter()
+                .filter(|h| prototypes.is_ready_handle(*h))
+                .count();
+
+            info!(
+                "Still loading... ({} checks, {:.1}s) - {}/{} ready, waiting for: {:?}",
+                handles.check_count,
+                elapsed.as_secs_f32(),
+                ready_count,
+                handles.handles.len(),
+                path_info
+            );
+        }
+
+        for p in &handles.handles {
             if !prototypes.is_ready_handle(p) {
-                println!("Proto not ready yet {p:?}",);
+                // Only update if it's a different proto than last time
+                if handles.last_not_ready.as_ref() != Some(p) {
+                    let path_info = asset_server
+                        .get_handle_path(p.clone())
+                        .map(|p| p.path().to_string_lossy().to_string())
+                        .unwrap_or_else(|| "Unknown path".to_string());
+                    info!("Waiting for prototype: {}", path_info);
+                }
+                handles.last_not_ready = Some(p.clone());
                 return;
             }
         }
-        let num = handles.0.len();
-        info!("All {num} prototypes ready. Moving to main menu!");
+
+        let num = handles.handles.len();
+        info!(
+            "All {num} prototypes ready in {:.2}s after {} checks. Moving to main menu!",
+            elapsed.as_secs_f32(),
+            handles.check_count
+        );
         next_state.set(GameState::MainMenu);
     }
 }

@@ -330,6 +330,7 @@ pub enum GameState {
     #[default]
     Loading,
     LoadingProtos,
+    LoadingProtosStage2, // Waits for base templates before loading everything
     MainMenu,
     Initializing, // New state for game initialization with loading screen
     Main,

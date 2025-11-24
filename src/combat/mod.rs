@@ -268,8 +268,11 @@ pub fn handle_hits(
                 hit.damage
             };
             if let Some(obj) = obj_option {
+                // Allow projectile damage only on breakable objects
                 if hit.hit_with_projectile.is_some() && hit.hit_by_mob.is_none() {
-                    continue;
+                    if !obj.is_breakable_by_projectile() {
+                        continue;
+                    }
                 }
                 let anchor = proto_param
                     .get_component::<SpriteAnchor, _>(*obj)
