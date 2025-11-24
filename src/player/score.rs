@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::item::WorldObject;
+use crate::{chaos::ChaosTracker, item::WorldObject};
 
 /// Tracks the current run's score and statistics
 #[derive(Resource, Debug, Clone, Serialize, Deserialize, Default)]
@@ -20,9 +20,9 @@ impl RunScore {
         }
     }
 
-    pub fn add_mob_kill(&mut self) {
+    pub fn add_mob_kill(&mut self, chaos_level: u32) {
         self.mobs_killed += 1;
-        self.score += 1;
+        self.score += 1 * chaos_level;
     }
 
     pub fn add_obj_destroyed(&mut self) {
@@ -61,9 +61,10 @@ pub struct StartingWeapon {
 pub fn track_mob_kills(
     mut run_score: ResMut<RunScore>,
     mut death_events: bevy::ecs::event::EventReader<crate::combat::EnemyDeathEvent>,
+    chaos: Res<ChaosTracker>,
 ) {
     for _death in death_events.iter() {
-        run_score.add_mob_kill();
+        run_score.add_mob_kill(chaos.chaos_level.trunc() as u32);
     }
 }
 

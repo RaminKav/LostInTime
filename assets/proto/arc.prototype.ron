@@ -4,9 +4,9 @@
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": Arc,
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 250., direction: (x: 0., y: 0.), hit_entities: [], spawn_offset: (x: -40., y: -40.), despawn_on_hit: false),
-        "survival_rogue_like::proto::ColliderCapsulProto": (x1: -1., y1: 40., x2: -1., y2: -20., r: 9.),
+        "survival_rogue_like::proto::ColliderCapsulProto": (x1: -1., y1: 20., x2: -1., y2: -10., r: 9.),
         "survival_rogue_like::animations::DoneAnimation": (),
-        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/arc.png", size: (x: 96., y: 48.), cols: 6, rows: 1),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/arc_small.png", size: (x: 48., y: 24.), cols: 6, rows: 1),
         "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.07),
   }
 )

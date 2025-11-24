@@ -24,7 +24,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::{ExperienceReward, PlayerLevel},
-        skills::{Heirloom, PlayerSkills},
+        skills::PlayerSkills,
     },
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
@@ -446,13 +446,8 @@ fn juice_up_spawned_mobs_per_day(
     mut commands: Commands,
     era_manager: Res<EraManager>,
 ) {
-    // Get chaos from tracker (defaults to 0.0 if not present)
-    let chaos_from_totem = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
-
-    // Get chaos boost from heirlooms
-    let chaos_from_heirlooms = player_skills.single().get_count(Heirloom::ChaosBoost) as f32 * 1.5; // Each ChaosBoost heirloom adds 0.5 to chaos
-    let chaos_from_era = era_manager.current_era.get_chaos_modifier();
-    let total_chaos = chaos_from_totem + chaos_from_heirlooms + chaos_from_era;
+    // Get total chaos from tracker (all sources now increment the tracker)
+    let total_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
     for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
         // 1.5 per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1.5 * night_tracker.days as f32

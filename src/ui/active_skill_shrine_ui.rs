@@ -236,6 +236,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     graphics: Res<Graphics>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
+    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -265,11 +266,28 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         let (player_e, mut skills, _t) = player_skills.single_mut();
                         let picked_skill = shrine_ui.skill_choice.clone();
 
-                        // Check if player has open slots
-                        if skills.active_skill_slot_1.is_none() {
+                        // Check if player has open slots (check slot 3 first if unlocked)
+                        let has_slot_3_unlocked = unlock_upgrades
+                            .as_ref()
+                            .map(|u| u.third_active_skill_slot_unlocked)
+                            .unwrap_or(false);
+                        
+                        if has_slot_3_unlocked && skills.active_skill_slot_3.is_none() {
+                            // Auto-assign to slot 3 if unlocked and empty
+                            skills.active_skill_slot_3 = Some(picked_skill.clone());
+                        } else if skills.active_skill_slot_1.is_none() {
                             skills.active_skill_slot_1 = Some(picked_skill.clone());
                         } else if skills.active_skill_slot_2.is_none() {
                             skills.active_skill_slot_2 = Some(picked_skill.clone());
+                        } else if has_slot_3_unlocked {
+                            // Slot 3 is full, show overwrite UI
+                            commands.insert_resource(crate::item::active_skill_shrine::ActiveSkillShrineOverwrite {
+                                skill_choice: picked_skill.clone(),
+                                shrine_entity: shrine_selection.shrine_entity,
+                            });
+                            commands.remove_resource::<ActiveSkillShrineSelection>();
+                            next_ui_state.set(UIState::ActiveSkills);
+                            return;
                         } else {
                             // Both slots full - automatically swap the second active skill slot (slot 2, which is not Roll)
                             skills.active_skill_slot_2 = Some(picked_skill.clone());
@@ -322,12 +340,20 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     shrine_overwrite: Res<ActiveSkillShrineOverwrite>,
     res: Res<ScreenResolution>,
     skills: Query<&PlayerSkills>,
+    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     let skills = skills.single();
-    let choices = vec![
+    let mut choices = vec![
         skills.active_skill_slot_1.clone(),
         skills.active_skill_slot_2.clone(),
     ];
+    
+    // Add slot 3 if unlocked
+    if let Some(upgrades) = unlock_upgrades.as_ref() {
+        if upgrades.third_active_skill_slot_unlocked {
+            choices.push(skills.active_skill_slot_3.clone());
+        }
+    }
     let t_offset = Vec2::new(4., 4.);
 
     // title bar
@@ -579,6 +605,13 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                             }
                             1 => {
                                 skills.active_skill_slot_2 = Some(new_skill.clone());
+                                // Add skill components
+                                new_skill
+                                    .active_skill
+                                    .add_skill_components(player_e, &mut commands);
+                            }
+                            2 => {
+                                skills.active_skill_slot_3 = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill
                                     .active_skill

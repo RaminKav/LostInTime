@@ -29,7 +29,23 @@ impl Plugin for ChaosPlugin {
         app.register_type::<ChaosTracker>()
             .init_resource::<ChaosTracker>()
             .add_event::<IncreaseChaosEvent>()
-            .add_system(handle_increase_chaos_event);
+            .add_system(handle_increase_chaos_event)
+            .add_system(initialize_chaos_from_era.in_schedule(OnEnter(crate::GameState::Main)));
+    }
+}
+
+/// Initialize chaos from the starting era when entering Main game state for the first time
+/// This only runs if chaos_level is 0.0 (fresh start, not a loaded save)
+fn initialize_chaos_from_era(
+    mut chaos_tracker: ResMut<ChaosTracker>,
+    era_manager: Res<crate::world::dimension::EraManager>,
+) {
+    let era_chaos = era_manager.current_era.get_chaos_modifier();
+    
+    // Initialize era chaos if tracker is empty (fresh start, not a loaded save)
+    // If chaos_level > 0, it means we loaded from a save and chaos is already correct
+    if chaos_tracker.chaos_level == 0.0 && era_chaos > 0.0 {
+        chaos_tracker.add_chaos(era_chaos);
     }
 }
 

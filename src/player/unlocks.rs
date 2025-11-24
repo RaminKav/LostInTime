@@ -84,6 +84,8 @@ pub enum UnlockUpgradeKind {
     StartFood,
     StartTome,
     StartOrb,
+    StartingTools,
+    ThirdActiveSkillSlot,
 }
 
 impl UnlockUpgradeKind {
@@ -94,6 +96,8 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartFood => "Start with Food",
             UnlockUpgradeKind::StartTome => "Start with Tomes",
             UnlockUpgradeKind::StartOrb => "Start with Orbs",
+            UnlockUpgradeKind::StartingTools => "Starting Tools",
+            UnlockUpgradeKind::ThirdActiveSkillSlot => "Third Active Skill Slot",
         }
     }
 }
@@ -105,6 +109,8 @@ pub struct UnlockUpgrades {
     pub food_tier: u32,
     pub tome_tier: u32,
     pub orb_tier: u32,
+    pub starting_tools_tier: u32,
+    pub third_active_skill_slot_unlocked: bool,
 }
 
 impl UnlockUpgrades {
@@ -115,6 +121,8 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartFood => 8,
             UnlockUpgradeKind::StartTome => 10,
             UnlockUpgradeKind::StartOrb => 10,
+            UnlockUpgradeKind::StartingTools => 30, // Tier 1: WoodAxe, Tier 2: Pickaxe, Tier 3: SalvageBin
+            UnlockUpgradeKind::ThirdActiveSkillSlot => 100, // Will be set separately
         }
     }
 
@@ -125,6 +133,14 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartFood => self.food_tier,
             UnlockUpgradeKind::StartTome => self.tome_tier,
             UnlockUpgradeKind::StartOrb => self.orb_tier,
+            UnlockUpgradeKind::StartingTools => self.starting_tools_tier,
+            UnlockUpgradeKind::ThirdActiveSkillSlot => {
+                if self.third_active_skill_slot_unlocked {
+                    1
+                } else {
+                    0
+                }
+            }
         }
     }
 
@@ -135,14 +151,58 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartFood => self.food_tier = self.food_tier.saturating_add(1),
             UnlockUpgradeKind::StartTome => self.tome_tier = self.tome_tier.saturating_add(1),
             UnlockUpgradeKind::StartOrb => self.orb_tier = self.orb_tier.saturating_add(1),
+            UnlockUpgradeKind::StartingTools => {
+                // Cap at tier 3 (SalvageBin)
+                self.starting_tools_tier = (self.starting_tools_tier + 1).min(3);
+            }
+            UnlockUpgradeKind::ThirdActiveSkillSlot => self.third_active_skill_slot_unlocked = true,
         }
     }
 
+    pub fn is_unlocked(&self, kind: UnlockUpgradeKind) -> bool {
+        match kind {
+            UnlockUpgradeKind::ThirdActiveSkillSlot => self.third_active_skill_slot_unlocked,
+            _ => self.tier(kind) > 0,
+        }
+    }
+
+    pub fn has_wood_axe(&self) -> bool {
+        self.starting_tools_tier >= 1
+    }
+
+    pub fn has_pickaxe(&self) -> bool {
+        self.starting_tools_tier >= 2
+    }
+
+    pub fn has_salvage_bin(&self) -> bool {
+        self.starting_tools_tier >= 3
+    }
+
     pub fn next_cost(&self, kind: UnlockUpgradeKind) -> u32 {
-        let base = Self::base_cost(kind) as f32;
-        let tier = self.tier(kind) as i32;
-        let scaled = base * UNLOCK_COST_SCALE.powi(tier);
-        scaled.round().max(1.) as u32
+        match kind {
+            UnlockUpgradeKind::StartingTools => {
+                let tier = self.starting_tools_tier;
+                match tier {
+                    0 => 30,  // Tier 1: WoodAxe
+                    1 => 100, // Tier 2: Pickaxe (70 more)
+                    2 => 200, // Tier 3: SalvageBin (100 more)
+                    _ => 0,   // Max tier reached
+                }
+            }
+            UnlockUpgradeKind::ThirdActiveSkillSlot => {
+                if self.third_active_skill_slot_unlocked {
+                    0
+                } else {
+                    100 // Will be set separately
+                }
+            }
+            _ => {
+                let base = Self::base_cost(kind) as f32;
+                let tier = self.tier(kind) as i32;
+                let scaled = base * UNLOCK_COST_SCALE.powi(tier);
+                scaled.round().max(1.) as u32
+            }
+        }
     }
 
     pub fn reroll_total(&self) -> u32 {

@@ -1452,6 +1452,7 @@ pub struct PlayerSkills {
     pub heirlooms: Vec<HeirloomWithRarity>,
     pub active_skill_slot_1: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_2: Option<ActiveSkillChoiceState>,
+    pub active_skill_slot_3: Option<ActiveSkillChoiceState>,
 }
 
 impl Default for PlayerSkills {
@@ -1463,6 +1464,7 @@ impl Default for PlayerSkills {
                 HeirloomRarity::Common,
             )),
             active_skill_slot_2: None,
+            active_skill_slot_3: None,
         }
     }
 }
@@ -1526,6 +1528,13 @@ impl PlayerSkills {
         {
             return Some(1);
         }
+        if self
+            .active_skill_slot_3
+            .as_ref()
+            .is_some_and(|s| s.active_skill == active_skill)
+        {
+            return Some(2);
+        }
         None
     }
     pub fn get_count(&self, heirloom: Heirloom) -> i32 {
@@ -1548,6 +1557,10 @@ impl PlayerSkills {
                 .map(|s| s.active_skill.clone()),
             1 => self
                 .active_skill_slot_2
+                .as_ref()
+                .map(|s| s.active_skill.clone()),
+            2 => self
+                .active_skill_slot_3
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
             _ => None,

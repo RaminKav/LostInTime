@@ -167,31 +167,32 @@ pub fn setup_inv_ui(
         .id();
 
     inv_state.inv_size = size;
-
-    let upgrade_button = commands
-        .spawn(SpriteBundle {
-            texture: graphics
-                .get_ui_element_texture(UIElement::UpgradeButton)
-                .clone(),
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(13., 13.)),
+    if cur_inv_state.0 != UIState::Scrapper {
+        let upgrade_button = commands
+            .spawn(SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(UIElement::UpgradeButton)
+                    .clone(),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(13., 13.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec3::new(95., 44., 10.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(95., 44., 10.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(UIElement::UpgradeButton)
-        .insert(Interactable::default())
-        .insert(UIState::Inventory)
-        .insert(UpgradeButton)
-        .insert(Name::new("UPGRADE BUTTON"))
-        .id();
-    commands.entity(inv).push_children(&[upgrade_button]);
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(UIElement::UpgradeButton)
+            .insert(Interactable::default())
+            .insert(UIState::Inventory)
+            .insert(UpgradeButton)
+            .insert(Name::new("UPGRADE BUTTON"))
+            .id();
+        commands.entity(inv).push_children(&[upgrade_button]);
+    }
     stats_event.send(ShowInvPlayerStatsEvent {
         stat: None,
         ignore_timer: true,
@@ -282,20 +283,22 @@ pub fn setup_inv_slots_ui(
             );
         }
     }
-    if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
-        for (slot_index, item) in furnace_items.items.iter().enumerate() {
-            spawn_inv_slot(
-                &mut commands,
-                &inv_state,
-                &graphics,
-                slot_index,
-                Interaction::None,
-                &inv_state_res,
-                &inv_query,
-                &asset_server,
-                InventorySlotType::Furnace,
-                item.to_owned(),
-            );
+    if inv_state.0 != UIState::Scrapper {
+        if let Some(furnace_items) = inv.single_mut().furnace_items.clone().into() {
+            for (slot_index, item) in furnace_items.items.iter().enumerate() {
+                spawn_inv_slot(
+                    &mut commands,
+                    &inv_state,
+                    &graphics,
+                    slot_index,
+                    Interaction::None,
+                    &inv_state_res,
+                    &inv_query,
+                    &asset_server,
+                    InventorySlotType::Furnace,
+                    item.to_owned(),
+                );
+            }
         }
     }
 }

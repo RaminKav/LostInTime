@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Scrapper,
   "survival_rogue_like::item::object_actions::ObjectAction": Scrapper,
   "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8),
-  "survival_rogue_like::attributes::MaxHealth": (50),
+  "survival_rogue_like::attributes::MaxHealth": (5),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
                 item: ScrapperBlock,

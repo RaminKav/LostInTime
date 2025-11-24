@@ -92,8 +92,8 @@ pub fn handle_active_skill_event(
             // Credit Card
             let credit_card_count = skills.get_count(Heirloom::CreditCard);
             for _ in 0..credit_card_count {
-                if ev.slot != 1 {
-                    continue; // only trigger on class skill
+                if ev.slot != 1 && ev.slot != 2 {
+                    continue; // only trigger on class skills (slots 1 and 2)
                 }
                 //spawn a coin for each
                 let mut rng = rand::thread_rng();
@@ -114,15 +114,16 @@ pub fn handle_active_skill_event(
             let lunge_state = lunge_states.get(player_e).ok();
             let teleport_state = teleport_states.get_mut(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
-            let slot_skill = if ev.slot == 0 {
-                skills.active_skill_slot_1.as_ref()
-            } else {
-                skills.active_skill_slot_2.as_ref()
+            let slot_skill = match ev.slot {
+                0 => skills.active_skill_slot_1.as_ref(),
+                1 => skills.active_skill_slot_2.as_ref(),
+                2 => skills.active_skill_slot_3.as_ref(),
+                _ => None,
             };
             if let Some(active) = slot_skill {
-                // For slot 1 (class skill), handle charge consumption
+                // For slot 1 and 2 (class skills), handle charge consumption
                 let mut should_start_cooldown = true;
-                if ev.slot == 1 {
+                if ev.slot == 1 || ev.slot == 2 {
                     if let Ok(mut tracker) = charge_tracker.get_mut(player_e) {
                         if tracker.current_charges > 0 {
                             // Consume a charge

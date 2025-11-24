@@ -390,6 +390,9 @@ impl ObjectAction {
                         if let Some(slot2) = &skills.active_skill_slot_2 {
                             current.push(slot2.active_skill.clone());
                         }
+                        if let Some(slot3) = &skills.active_skill_slot_3 {
+                            current.push(slot3.active_skill.clone());
+                        }
                         current
                     })
                     .unwrap_or_default();

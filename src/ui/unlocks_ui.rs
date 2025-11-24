@@ -44,12 +44,14 @@ pub struct UnlockButtonLabel;
 #[derive(Component)]
 pub struct UnlocksCurrencyText;
 
-const UNLOCK_ROWS: [UnlockUpgradeKind; 5] = [
+const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
     UnlockUpgradeKind::StartFood,
     UnlockUpgradeKind::StartTome,
     UnlockUpgradeKind::StartOrb,
+    UnlockUpgradeKind::StartingTools,
+    UnlockUpgradeKind::ThirdActiveSkillSlot,
 ];
 
 fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
@@ -89,6 +91,19 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
             } else {
                 let phrase = if count == 1 { "orb" } else { "orbs" };
                 format!("Tier {}: Start with {} {}", tier, count, phrase)
+            }
+        }
+        UnlockUpgradeKind::StartingTools => match tier {
+            0 => "Tier 1: Start with Wood Axe".to_string(),
+            1 => "Tier 2: Start with Wood Axe and Pickaxe".to_string(),
+            2 => "Tier 3: Start with Wood Axe, Pickaxe, and Salvage Bin".to_string(),
+            _ => format!("Unlocked: Start with Wood Axe, Pickaxe, and Salvage Bin",),
+        },
+        UnlockUpgradeKind::ThirdActiveSkillSlot => {
+            if upgrades.third_active_skill_slot_unlocked {
+                "Unlocked: Gain a third active skill slot.".to_string()
+            } else {
+                "Gain a third active skill slot.".to_string()
             }
         }
     }
@@ -265,7 +280,7 @@ pub fn setup_unlocks_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: bevy::sprite::Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(0., 90., 11.)),
+            transform: Transform::from_translation(Vec3::new(0., 104., 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -287,7 +302,7 @@ pub fn setup_unlocks_ui(
                 )
                 .with_alignment(TextAlignment::Left),
                 text_anchor: bevy::sprite::Anchor::CenterLeft,
-                transform: Transform::from_translation(Vec3::new(-120., 70.5, 11.)),
+                transform: Transform::from_translation(Vec3::new(-160., 104.5, 11.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),
@@ -307,8 +322,8 @@ pub fn setup_unlocks_ui(
     );
     commands.entity(currency_stack).set_parent(currency_text);
 
-    let start_y = 48.5;
-    let row_spacing = -30.0;
+    let start_y = 86.5;
+    let row_spacing = -27.0;
 
     for (index, kind) in UNLOCK_ROWS.iter().enumerate() {
         let y = start_y + row_spacing * index as f32;
@@ -318,14 +333,14 @@ pub fn setup_unlocks_ui(
             &asset_server,
             *kind,
             Vec3::new(-140., y, 11.),
-            Vec3::new(110., y - 6., 11.),
+            Vec3::new(110.5, y - 6.5, 11.),
             upgrades.as_ref(),
         );
     }
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(0., -96., 11.),
+        Vec3::new(0., -108., 11.),
         &mut commands,
         &graphics,
         &asset_server,
@@ -350,7 +365,7 @@ fn spawn_unlock_row(
                 TextStyle {
                     font: asset_server.load("fonts/alagard.ttf"),
                     font_size: 15.0,
-                    color: crate::colors::WHITE,
+                    color: crate::colors::DARK_WOOD_BROWN,
                 },
             )
             .with_alignment(TextAlignment::Left),
@@ -364,7 +379,7 @@ fn spawn_unlock_row(
         Name::new(title_name),
     ));
 
-    let info_text_pos = Vec3::new(info_pos.x, info_pos.y - 12., info_pos.z);
+    let info_text_pos = Vec3::new(info_pos.x, info_pos.y - 11., info_pos.z);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -448,7 +463,7 @@ fn spawn_unlock_row(
                 )
                 .with_alignment(TextAlignment::Center),
                 text_anchor: Anchor::Center,
-                transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                transform: Transform::from_translation(Vec3::new(0.5, 0.5, 1.)),
                 ..Default::default()
             },
             RenderLayers::from_layers(&[3]),

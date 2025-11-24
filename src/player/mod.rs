@@ -420,6 +420,7 @@ fn give_player_starting_items(
     player_class: Option<Res<PlayerClass>>,
     class_ranks: Option<Res<ClassRankSystem>>,
     run_state: ResMut<RunUnlockState>,
+    unlock_upgrades: Option<Res<UnlockUpgrades>>,
 ) {
     // if let Ok(save_file) = File::open(datafiles::save_file()) {
     //     let reader = BufReader::new(save_file);
@@ -471,6 +472,38 @@ fn give_player_starting_items(
             Name::new("Pet"),
         ));
     }
+
+    // Give starting tools based on unlocks (always, regardless of pending rewards)
+    let player_pos = game.player().position.truncate();
+    if let Some(upgrades) = unlock_upgrades.as_ref() {
+        if upgrades.has_wood_axe() {
+            proto_commands.spawn_item_from_proto(WorldObject::WoodAxe, &proto, player_pos, 1, None);
+        }
+
+        if upgrades.has_pickaxe() {
+            proto_commands.spawn_item_from_proto(
+                WorldObject::WoodPickaxe,
+                &proto,
+                player_pos,
+                1,
+                None,
+            );
+        }
+
+        if upgrades.has_salvage_bin() {
+            proto_commands.spawn_item_from_proto(
+                WorldObject::ScrapperBlock,
+                &proto,
+                player_pos,
+                1,
+                None,
+            );
+        }
+
+        force_player_autopick(&mut game);
+    }
+
+    // Handle pending rewards (food, tomes, orbs)
     if !run_state.pending_rewards {
         return;
     }
@@ -493,7 +526,6 @@ fn give_player_starting_items(
                 .unwrap_or(&WorldObject::RedMushroomBlock),
         );
     }
-
     for _ in 0..run_state.pending_tomes {
         upgrade_rewards.push(WorldObject::UpgradeTome);
     }
@@ -539,7 +571,7 @@ fn give_player_starting_items(
     //     64,
     //     None,
     // );
-    proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
+    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(
     //     WorldObject::OrbOfTransformation,
     //     &proto,

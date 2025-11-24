@@ -19,7 +19,7 @@ use crate::{
     pets::state::UpdatePetWeaponEvent,
     player::{
         levels::PlayerLevel,
-        skills::{HeirloomChoiceQueue, PlayerSkills},
+        skills::{Heirloom, HeirloomChoiceQueue, PlayerSkills},
         stats::StatType,
         unlocks::RunUnlockState,
     },
@@ -715,7 +715,10 @@ pub fn handle_interaction_clicks(
                                 };
 
                                 if state.r#type.is_crafting() {
-                                    let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
+                                    let loot_bonus = player_atts
+                                        .get_single()
+                                        .map(|a| a.loot_rate.value)
+                                        .unwrap_or(0);
                                     let new_stack = create_new_random_item_stack_with_attributes(
                                         item_icon.2,
                                         &proto,
@@ -827,6 +830,7 @@ pub fn handle_cursor_skills_buttons(
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
     mut shrine_query: Query<&mut HeirloomShrineState>,
+    mut chaos_tracker: ResMut<crate::chaos::ChaosTracker>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -867,6 +871,11 @@ pub fn handle_cursor_skills_buttons(
                                 &mut commands,
                                 skills.clone(),
                             );
+
+                            // Add chaos if ChaosBoost heirloom was picked
+                            if picked_skill.heirloom == Heirloom::ChaosBoost {
+                                chaos_tracker.add_chaos(1.5);
+                            }
 
                             // Mark heirloom shrine as used if this was from a shrine
                             for mut shrine in shrine_query.iter_mut() {

@@ -461,77 +461,92 @@ pub fn dispatch_active_skill_events(
     else {
         return;
     };
-    // For each slot (0 = first active slot, 1 = second active slot)
-    for slot in 0..=1 {
-        if key_input.just_pressed(get_active_skill_keybind(slot)) {
-            if let Some(skill) = skills.get_active_skill_in_slot(slot) {
-                // Determine base cooldown from skill definition
-                // And gate dispatch by cooldown state if present
-                let base_cooldown = skill.get_base_cooldown();
+    // Check which key was pressed, prioritizing higher slots (2, 1, 0)
+    // Only handle ONE key per frame to prevent multiple slots from triggering
+    // Check all keys first, then handle only the highest priority one
+    let q_pressed = key_input.just_pressed(KeyCode::Q);
+    let shift_pressed = key_input.just_pressed(KeyCode::LShift);
+    let space_pressed = key_input.just_pressed(KeyCode::Space);
 
-                // For slot 1 (class skill), check charges first
-                if slot == 1 {
-                    if let Some(charge_tracker) = charge_tracker.get_single().ok() {
-                        // If we have charges available, allow activation regardless of cooldown
-                        if charge_tracker.current_charges > 0 {
-                            ev.send(ActiveSkillUsedEvent {
-                                slot,
-                                cooldown: base_cooldown,
-                            });
-                            continue;
-                        }
+    // Determine which slot to handle based on priority (2 > 1 > 0)
+    let pressed_slot = if q_pressed {
+        Some(2)
+    } else if shift_pressed {
+        Some(1)
+    } else if space_pressed {
+        Some(0)
+    } else {
+        None
+    };
+
+    if let Some(slot) = pressed_slot {
+        if let Some(skill) = skills.get_active_skill_in_slot(slot) {
+            // Determine base cooldown from skill definition
+            // And gate dispatch by cooldown state if present
+            let base_cooldown = skill.get_base_cooldown();
+
+            // For slot 1 and 2 (class skills), check charges first
+            if slot != 0 {
+                if let Some(charge_tracker) = charge_tracker.get_single().ok() {
+                    // If we have charges available, allow activation regardless of cooldown
+                    if charge_tracker.current_charges > 0 {
+                        ev.send(ActiveSkillUsedEvent {
+                            slot,
+                            cooldown: base_cooldown,
+                        });
+                        return; // Exit early after handling this key press
                     }
                 }
+            }
 
-                // Otherwise, check cooldown as normal
-                let on_cooldown = match skill {
-                    ActiveSkill::Roll => true, // handled in player_move_inputs
-                    ActiveSkill::Sprint => sprint_state
-                        .map(|s| !s.sprint_cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::SprintLunge => lunge_state
-                        .map(|s| !s.lunge_cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Teleport => teleport_state
-                        .map(|t| !t.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Parry => parry_state
-                        .map(|p| !p.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::ParrySpear => spear_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Stealth => stealth_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Rapidfire => rapid_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::FirePillar => pillar_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Heal => heal_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Buckshot => buckshot_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::IceWall => icewall_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::DruidTree => druidtree_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                    ActiveSkill::Shout => shout_state
-                        .map(|s| !s.cooldown_timer.finished())
-                        .unwrap_or(false),
-                };
-                if !on_cooldown && base_cooldown > 0.0 {
-                    ev.send(ActiveSkillUsedEvent {
-                        slot,
-                        cooldown: base_cooldown,
-                    });
-                }
+            // Otherwise, check cooldown as normal
+            let on_cooldown = match skill {
+                ActiveSkill::Roll => true, // handled in player_move_inputs
+                ActiveSkill::Sprint => sprint_state
+                    .map(|s| !s.sprint_cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::SprintLunge => lunge_state
+                    .map(|s| !s.lunge_cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Teleport => teleport_state
+                    .map(|t| !t.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Parry => parry_state
+                    .map(|p| !p.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::ParrySpear => spear_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Stealth => stealth_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Rapidfire => rapid_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::FirePillar => pillar_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Heal => heal_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Buckshot => buckshot_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::IceWall => icewall_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::DruidTree => druidtree_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Shout => shout_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+            };
+            if !on_cooldown && base_cooldown > 0.0 {
+                ev.send(ActiveSkillUsedEvent {
+                    slot,
+                    cooldown: base_cooldown,
+                });
             }
         }
     }

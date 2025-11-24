@@ -153,6 +153,7 @@ impl DimensionPlugin {
         mut chunk_wall_cache: Query<&mut ChunkWallCache>,
         mut next_state: ResMut<NextState<GameState>>,
         mut night: ResMut<NightTracker>,
+        mut chaos_tracker: ResMut<crate::chaos::ChaosTracker>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -205,6 +206,12 @@ impl DimensionPlugin {
                     for mut chunk_wall_cache in chunk_wall_cache.iter_mut() {
                         chunk_wall_cache.walls.clear();
                     }
+                }
+                if !curr_era.is_dungeon() && !new_era.is_dungeon() {
+                    let old_era_chaos = curr_era.get_chaos_modifier();
+                    let new_era_chaos = new_era.get_chaos_modifier();
+                    // Update chaos tracker: remove old era's chaos, add new era's chaos
+                    chaos_tracker.add_chaos(new_era_chaos - old_era_chaos);
                 }
                 game.era.current_era = new_era.clone();
 

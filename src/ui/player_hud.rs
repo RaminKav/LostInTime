@@ -595,6 +595,7 @@ pub fn handle_update_player_skills(
     existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
+    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -739,13 +740,21 @@ pub fn handle_update_player_skills(
         prev_active_skill_icons.for_each(|e| {
             commands.entity(e).despawn_recursive();
         });
-        for (i, active_skill_option) in vec![
+
+        // Build list of active skill slots to display
+        let mut active_skill_slots = vec![
             new_skills.active_skill_slot_1.clone(),
             new_skills.active_skill_slot_2.clone(),
-        ]
-        .iter()
-        .enumerate()
-        {
+        ];
+
+        // Add third slot if unlocked
+        if let Some(upgrades) = unlock_upgrades.as_ref() {
+            if upgrades.third_active_skill_slot_unlocked {
+                active_skill_slots.push(new_skills.active_skill_slot_3.clone());
+            }
+        }
+
+        for (i, active_skill_option) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
                 .spawn(SpriteBundle {
                     texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
@@ -769,14 +778,23 @@ pub fn handle_update_player_skills(
                 .id();
             commands
                 .spawn(SpriteBundle {
-                    texture: asset_server.load(if i == 0 {
-                        "textures/SpaceKey.png"
-                    } else {
-                        "textures/ShiftKey.png"
+                    texture: asset_server.load(match i {
+                        0 => "textures/SpaceKey.png",
+                        1 => "textures/ShiftKey.png",
+                        2 => "textures/QKey.png",
+                        _ => "textures/ShiftKey.png", // fallback
                     }),
                     transform: Transform::from_translation(Vec3::new(0., 13., 2. + i as f32)),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(if i == 0 { 30. } else { 26. }, 10.)),
+                        custom_size: Some(Vec2::new(
+                            match i {
+                                0 => 30., // Space key
+                                1 => 26., // Shift key (original size)
+                                2 => 10., // Q key (same size as EKey)
+                                _ => 26., // fallback
+                            },
+                            10.,
+                        )),
                         ..Default::default()
                     },
                     ..Default::default()
