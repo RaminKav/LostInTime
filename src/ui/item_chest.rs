@@ -304,7 +304,7 @@ pub fn handle_anim_events(
     proto: ProtoParam,
     game: GameParam,
     asset_server: Res<AssetServer>,
-    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
+    player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
 ) {
     for event in events.iter() {
         match event.state {
@@ -321,10 +321,7 @@ pub fn handle_anim_events(
                     let level = rng.gen_range(1..=max_item_level);
                     stack.metadata.level = Some(level);
 
-                    let loot_bonus = player_atts
-                        .get_single()
-                        .map(|a| a.loot_rate.value)
-                        .unwrap_or(0);
+                    let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
                     item_chest_state.picked_item =
                         Some(create_new_random_item_stack_with_attributes(
                             &stack,

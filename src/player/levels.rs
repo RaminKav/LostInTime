@@ -64,7 +64,7 @@ pub fn handle_level_up(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut next_inv_state: ResMut<NextState<UIState>>,
-    player_atts: Query<&crate::attributes::ItemAttributes, With<crate::player::Player>>,
+    player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
 ) {
     for (mut player_level, mut sp, player_t) in player.iter_mut() {
         if player_level.level == player_level.next_level {
@@ -72,7 +72,7 @@ pub fn handle_level_up(
 
             sp.count += 1;
             let mut rng = rand::thread_rng();
-            let loot_bonus = player_atts.get_single().map(|a| a.loot_rate.value).unwrap_or(0);
+            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
             skills_queue.add_new_skills_after_levelup(&mut rng, loot_bonus);
             spawn_floating_text_with_shadow(
                 &mut commands,

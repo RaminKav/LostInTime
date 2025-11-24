@@ -4,7 +4,7 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use crate::{
     animations::DoneAnimation,
     assets::Graphics,
-    attributes::ItemAttributes,
+    attributes::{ItemAttributes, LootRateBonus},
     colors::{BLACK, WHITE},
     player::{
         skills::{HeirloomChoiceQueue, HeirloomChoiceState},
@@ -414,7 +414,7 @@ pub fn toggle_skills_visibility(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    player_atts: Query<&ItemAttributes, With<Player>>,
+    player_atts: Query<&LootRateBonus, With<Player>>,
 ) {
     if curr_ui_state.0 == UIState::ActiveSkills {
         return;
@@ -430,10 +430,7 @@ pub fn toggle_skills_visibility(
         }
 
         let mut rng = rand::thread_rng();
-        let loot_bonus = player_atts
-            .get_single()
-            .map(|a| a.loot_rate.value)
-            .unwrap_or(0);
+        let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
         queue.add_new_skills_after_levelup(&mut rng, loot_bonus);
         spawn_skill_choice_entities(
             &graphics,
@@ -451,14 +448,11 @@ pub fn handle_skill_reroll_after_flash(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    player_atts: Query<&ItemAttributes, With<Player>>,
+    player_atts: Query<&LootRateBonus, With<Player>>,
 ) {
-    let loot_bonus = player_atts
-        .get_single()
-        .map(|a| a.loot_rate.value)
-        .unwrap_or(0);
     for (e, slot, anim) in flashes.iter() {
         if anim.current_frame() == 3 {
+            let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
             commands.entity(e).remove::<RerollDice>();
             skill_queue.handle_reroll_slot(slot.0, &mut rand::thread_rng(), loot_bonus);
             for e in old_skill_entities.iter() {
