@@ -11,7 +11,6 @@ use crate::{
     colors::LIGHT_RED,
     combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
     enemy::Mob,
-    get_active_skill_keybind,
     inputs::{CursorPos, MovementVector},
     item::{projectile::Projectile, WorldObject},
     status_effects::Frail,
@@ -156,14 +155,14 @@ pub fn handle_parry(
     key_input: ResMut<Input<KeyCode>>,
     mut commands: Commands,
     time: Res<Time>,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     let Ok((e, skills, curr_anim, mut parry_state)) = player.get_single_mut() else {
         return;
     };
 
     if let Some(parry_slot) = skills.has_active_skill(ActiveSkill::Parry) {
-        if key_input.just_pressed(get_active_skill_keybind(parry_slot))
+        if key_input.just_pressed(keybinds.get_active_skill_key(parry_slot))
             && parry_state.cooldown_timer.finished()
             && !curr_anim.is_parrying()
         {
@@ -202,7 +201,7 @@ pub fn handle_spear(
     mut commands: Commands,
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
-    mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     let Ok((e, player_pos, skills, dmg, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
@@ -211,7 +210,7 @@ pub fn handle_spear(
     };
 
     if let Some(spear_slot) = skills.has_active_skill(ActiveSkill::ParrySpear) {
-        if key_input.just_pressed(get_active_skill_keybind(spear_slot))
+        if key_input.just_pressed(keybinds.get_active_skill_key(spear_slot))
             && spear_state.cooldown_timer.finished()
         {
             spear_state.cooldown_timer.reset();

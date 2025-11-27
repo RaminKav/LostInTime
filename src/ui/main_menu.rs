@@ -77,6 +77,7 @@ pub struct MenuButtonExtras<'w, 's> {
 pub enum MenuButton {
     Start,
     Unlocks,
+    Options,
     Achievements,
     Quit,
     InfoOK,
@@ -178,6 +179,12 @@ pub fn handle_menu_button_click_events(
                     continue;
                 }
                 next_ui_state.set(UIState::Unlocks);
+            }
+            MenuButton::Options => {
+                if info_modal_open {
+                    continue;
+                }
+                next_ui_state.set(UIState::Options);
             }
             MenuButton::Achievements => {
                 if info_modal_open {
@@ -441,11 +448,12 @@ pub fn spawn_menu_button(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
+    ui_element: UIElement,
 ) -> Entity {
     let button_e = commands
         .spawn((
             SpriteBundle {
-                texture: graphics.get_ui_element_texture(UIElement::BackButton),
+                texture: graphics.get_ui_element_texture(ui_element.clone()),
                 sprite: Sprite {
                     custom_size: Some(size),
                     ..Default::default()
@@ -454,7 +462,7 @@ pub fn spawn_menu_button(
                 ..Default::default()
             },
             Interactable::default(),
-            UIElement::BackButton,
+            ui_element,
             button_type,
             RenderLayers::from_layers(&[3]),
             Name::new(format!("Menu Button: {}", text)),
@@ -493,26 +501,28 @@ pub fn spawn_menu_text_buttons(
 ) {
     // Start Button
     spawn_menu_button(
-        Vec3::new(42., -10.5, 1.),
+        Vec3::new(42., -10., 1.),
         Vec3::new(-19., -1., 1.),
         "Start ",
         MenuButton::Start,
-        Vec2::new(48., 22.),
+        Vec2::new(60., 18.),
         &mut commands,
         &graphics,
         &asset_server,
+        UIElement::MenuButton,
     );
 
     // Achievements Button
     let achievements_button = spawn_menu_button(
         Vec3::new(8., -34.5, 1.),
-        Vec3::new(-50., -1., 1.),
+        Vec3::new(-50., -0., 1.),
         "Achievements",
         MenuButton::Achievements,
-        Vec2::new(118., 22.),
+        Vec2::new(118., 18.),
         &mut commands,
         &graphics,
         &asset_server,
+        UIElement::AchievementsButton,
     );
     commands
         .entity(achievements_button)
@@ -520,25 +530,39 @@ pub fn spawn_menu_text_buttons(
     // Unlocks Button
     spawn_menu_button(
         Vec3::new(-8., -58., 1.),
-        Vec3::new(-29., -1.5, 1.),
+        Vec3::new(-29., -0.5, 1.),
         "Unlocks",
         MenuButton::Unlocks,
-        Vec2::new(68., 22.),
+        Vec2::new(84., 18.),
         &mut commands,
         &graphics,
         &asset_server,
+        UIElement::UnlocksButton,
+    );
+    // Options Button
+    spawn_menu_button(
+        Vec3::new(100., -81., 1.),
+        Vec3::new(-27., 0.0, 1.),
+        "Options",
+        MenuButton::Options,
+        Vec2::new(60., 18.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+        UIElement::MenuButton,
     );
 
     // Quit Button
     spawn_menu_button(
         Vec3::new(-39.5, -81., 1.),
-        Vec3::new(-14., -1., 1.),
+        Vec3::new(-14., -0., 1.),
         "Quit",
         MenuButton::Quit,
-        Vec2::new(40., 22.),
+        Vec2::new(60., 18.),
         &mut commands,
         &graphics,
         &asset_server,
+        UIElement::MenuButton,
     );
 }
 
@@ -568,7 +592,7 @@ pub fn spawn_back_button_texture_only(
             SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::BackButton),
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(53., 20.)),
+                    custom_size: Some(Vec2::new(53., 18.)),
                     ..Default::default()
                 },
                 transform: Transform::from_translation(pos),

@@ -221,6 +221,8 @@ pub struct GameData {
     pub unlock_upgrades: UnlockUpgrades,
     #[serde(default)]
     pub cumulative_analytics: Option<AnalyticsData>,
+    #[serde(default)]
+    pub keybindings: Option<crate::keybinds::KeyBindings>,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,

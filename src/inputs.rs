@@ -57,9 +57,8 @@ use crate::player::melee_skills::{ParryState, SpearState};
 use crate::player::rogue_skills::{LungeState, SprintState};
 use crate::player::skills::{FirePillarState, RapidfireState, ShoutSkillState, StealthState};
 use crate::{
-    bounce_player, get_active_skill_keybind, update_bounce_effect, update_shadow, BounceEffect,
-    BounceEvent, Game, GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED,
-    TIME_STEP,
+    bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
+    GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -268,6 +267,7 @@ pub fn player_move_inputs(
     mut audio_timer: Local<Timer>,
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
     mut ammo_query: Query<&mut Ammo>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -319,7 +319,7 @@ pub fn player_move_inputs(
     //TODO: move this tick to animations.rs
     if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
         if player.player_dash_cooldown.finished()
-            && key_input.pressed(get_active_skill_keybind(roll_slot))
+            && key_input.pressed(keybinds.get_active_skill_key(roll_slot))
         {
             player.is_dashing = true;
             active_skill_event.send(ActiveSkillUsedEvent {
@@ -440,7 +440,9 @@ pub fn dispatch_active_skill_events(
         ),
         With<Player>,
     >,
-    charge_tracker: Query<&SkillChargeTracker, With<Player>>,
+    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     let Ok((
         skills,
@@ -464,16 +466,20 @@ pub fn dispatch_active_skill_events(
     // Check which key was pressed, prioritizing higher slots (2, 1, 0)
     // Only handle ONE key per frame to prevent multiple slots from triggering
     // Check all keys first, then handle only the highest priority one
-    let q_pressed = key_input.just_pressed(KeyCode::Q);
-    let shift_pressed = key_input.just_pressed(KeyCode::LShift);
-    let space_pressed = key_input.just_pressed(KeyCode::Space);
+    let slot_2_key = keybinds.get_active_skill_key(2);
+    let slot_1_key = keybinds.get_active_skill_key(1);
+    let slot_0_key = keybinds.get_active_skill_key(0);
+
+    let slot_2_pressed = key_input.just_pressed(slot_2_key);
+    let slot_1_pressed = key_input.just_pressed(slot_1_key);
+    let slot_0_pressed = key_input.just_pressed(slot_0_key);
 
     // Determine which slot to handle based on priority (2 > 1 > 0)
-    let pressed_slot = if q_pressed {
+    let pressed_slot = if slot_2_pressed {
         Some(2)
-    } else if shift_pressed {
+    } else if slot_1_pressed {
         Some(1)
-    } else if space_pressed {
+    } else if slot_0_pressed {
         Some(0)
     } else {
         None
@@ -486,10 +492,21 @@ pub fn dispatch_active_skill_events(
             let base_cooldown = skill.get_base_cooldown();
 
             // For slot 1 and 2 (class skills), check charges first
-            if slot != 0 {
-                if let Some(charge_tracker) = charge_tracker.get_single().ok() {
+            if slot == 1 {
+                if let Ok(tracker) = slot1_trackers.get_single() {
                     // If we have charges available, allow activation regardless of cooldown
-                    if charge_tracker.current_charges > 0 {
+                    if tracker.0.current_charges > 0 {
+                        ev.send(ActiveSkillUsedEvent {
+                            slot,
+                            cooldown: base_cooldown,
+                        });
+                        return; // Exit early after handling this key press
+                    }
+                }
+            } else if slot == 2 {
+                if let Ok(tracker) = slot2_trackers.get_single() {
+                    // If we have charges available, allow activation regardless of cooldown
+                    if tracker.0.current_charges > 0 {
                         ev.send(ActiveSkillUsedEvent {
                             slot,
                             cooldown: base_cooldown,
@@ -568,9 +585,47 @@ pub fn close_container(
     key_input: ResMut<Input<KeyCode>>,
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_state: Res<State<UIState>>,
+    game_state: Res<State<GameState>>,
 ) {
-    if key_input.just_pressed(KeyCode::Escape) && curr_state.0 != UIState::ItemChest {
-        next_inv_state.set(UIState::Closed);
+    if key_input.just_pressed(KeyCode::Escape) {
+        // During gameplay (GameState::Main), toggle between closed and options
+        if game_state.0 == GameState::Main {
+            match curr_state.0 {
+                UIState::Closed => {
+                    // Open options menu
+                    next_inv_state.set(UIState::Options);
+                }
+                UIState::Options => {
+                    // Close options menu, resume game
+                    next_inv_state.set(UIState::Closed);
+                }
+                // Don't close important selection UIs with ESC
+                UIState::ItemChest
+                | UIState::Skills
+                | UIState::ActiveSkills
+                | UIState::ActiveSkillShrine => {
+                    // Player must make a choice, can't accidentally close
+                }
+                _ => {
+                    // Close any other UI
+                    next_inv_state.set(UIState::Closed);
+                }
+            }
+        } else {
+            // In main menu or other game states, just close UI
+            // But still don't close important selection UIs
+            match curr_state.0 {
+                UIState::ItemChest
+                | UIState::Skills
+                | UIState::ActiveSkills
+                | UIState::ActiveSkillShrine => {
+                    // Don't close
+                }
+                _ => {
+                    next_inv_state.set(UIState::Closed);
+                }
+            }
+        }
     }
 }
 pub fn toggle_inventory(
@@ -584,10 +639,7 @@ pub fn toggle_inventory(
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
-    if key_input.just_pressed(KeyCode::I)
-        || key_input.just_pressed(KeyCode::Tab)
-        || key_input.just_pressed(KeyCode::E)
-    {
+    if key_input.just_pressed(KeyCode::I) || key_input.just_pressed(KeyCode::Tab) {
         next_ui_state.set(UIState::Inventory);
     }
 

@@ -460,7 +460,7 @@ fn spawn_unlock_row(
                 .get_ui_element_texture(UIElement::BackButton)
                 .clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(53., 20.)),
+                custom_size: Some(Vec2::new(53., 18.)),
                 ..Default::default()
             },
             transform: Transform::from_translation(button_pos),

@@ -493,7 +493,7 @@ pub fn setup_achievements_ui(
     }
 
     let prev_button =
-        spawn_back_button_texture_only(Vec3::new(-90., -108., 1.), &mut commands, &graphics);
+        spawn_back_button_texture_only(Vec3::new(-90.5, -108., 1.), &mut commands, &graphics);
     commands
         .entity(prev_button)
         .insert((
@@ -524,7 +524,7 @@ pub fn setup_achievements_ui(
         .set_parent(prev_button);
 
     let next_button =
-        spawn_back_button_texture_only(Vec3::new(90., -108., 1.), &mut commands, &graphics);
+        spawn_back_button_texture_only(Vec3::new(90.5, -108., 1.), &mut commands, &graphics);
     commands
         .entity(next_button)
         .insert((

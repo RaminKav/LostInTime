@@ -1110,13 +1110,22 @@ pub struct ActiveSkillUsedEvent {
 
 /// Tracks skill charges for slot 1 (class skill, not Roll)
 /// Charges allow immediate skill activation without waiting for cooldown
-#[derive(Component, Clone, Debug)]
+/// This is the shared data structure used by both slot trackers
+#[derive(Clone, Debug)]
 pub struct SkillChargeTracker {
     pub current_charges: u32,
     pub max_charges: u32,
     pub cooldown_timer: Timer,
     pub base_cooldown: f32,
 }
+
+/// Charge tracker for slot 1 (active_skill_slot_2)
+#[derive(Component, Clone, Debug)]
+pub struct Slot1ChargeTracker(pub SkillChargeTracker);
+
+/// Charge tracker for slot 2 (active_skill_slot_3)
+#[derive(Component, Clone, Debug)]
+pub struct Slot2ChargeTracker(pub SkillChargeTracker);
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {

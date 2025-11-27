@@ -33,6 +33,7 @@ pub enum UIState {
     Furnace,
     Essence,
     Unlocks,
+    Options,
     Achievements,
     Scrapper,
     ClassSelection,

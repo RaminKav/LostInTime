@@ -7,7 +7,6 @@ use crate::{
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     enemy::Mob,
-    get_active_skill_keybind,
     inputs::{CursorPos, FacingDirection, MovementVector},
     item::projectile::Projectile,
     ui::damage_numbers::{spawn_text, DodgeEvent},
@@ -124,10 +123,11 @@ pub fn handle_lunge(
     )>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
-            if key_inputs.just_pressed(get_active_skill_keybind(lunge_slot))
+            if key_inputs.just_pressed(keybinds.get_active_skill_key(lunge_slot))
                 && lunge_state.lunge_cooldown_timer.finished()
             {
                 lunge_state.lunge_cooldown_timer.reset();

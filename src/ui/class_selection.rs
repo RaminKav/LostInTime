@@ -474,8 +474,8 @@ pub fn setup_class_selection_ui(
             text: Text::from_section(
                 "BEGIN",
                 TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
                     color: WHITE,
                 },
             ),

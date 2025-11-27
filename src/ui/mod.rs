@@ -53,6 +53,8 @@ mod essence_ui;
 pub use essence_ui::*;
 mod unlocks_ui;
 pub use unlocks_ui::*;
+mod options_ui;
+pub use options_ui::*;
 mod achievements_ui;
 use crate::run_once_per_run;
 use crate::ui::achievement_banner::{
@@ -108,6 +110,7 @@ impl Plugin for UIPlugin {
             .init_resource::<ClassUnlockConfirmState>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
+            .insert_resource(crate::keybinds::KeyBindings::load())
             .insert_resource(FloatingTextQueue::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -252,6 +255,13 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
+                    
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+                    cleanup_options_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                    
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -277,6 +287,12 @@ impl Plugin for UIPlugin {
                     cleanup_unlocks_ui
                         .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Unlocks)))),
                    
+                    setup_options_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::Options))),
+                    cleanup_options_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::Options)))),
+                   
                     setup_achievements_ui
                         .before(CustomFlush)
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::Achievements))),
@@ -295,11 +311,16 @@ impl Plugin for UIPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_systems((handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
+            .add_systems((
+                    handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
                     update_unlocks_currency_text.run_if(in_state(UIState::Unlocks)),
                     refresh_unlock_button_states.run_if(in_state(UIState::Unlocks)),
-                    handle_achievement_row_clicks
-                        .run_if(in_state(UIState::Achievements)))
+                    handle_options_clicks.run_if(in_state(UIState::Options)),
+                    handle_key_rebind_input.run_if(in_state(UIState::Options)),
+                    update_keybind_text
+                        .run_if(in_state(UIState::Options))
+                        .after(handle_key_rebind_input),
+                    handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
                 )
             .add_system(
                 handle_tooltip_teardown
@@ -333,6 +354,10 @@ impl Plugin for UIPlugin {
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                update_active_skill_keybind_text
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(

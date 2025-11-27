@@ -64,7 +64,40 @@ pub struct ClockText;
 pub struct ActiveSkillIcon;
 
 #[derive(Component)]
-pub struct SkillChargeText;
+pub struct ActiveSkillKeybindText {
+    pub slot: usize,
+}
+
+#[derive(Component)]
+pub struct ActiveSkillKeyBackground {
+    pub slot: usize,
+}
+
+/// Helper function to determine key size and UI element based on KeyCode
+fn get_key_size_and_element(key: KeyCode) -> (UIElement, f32) {
+    match key {
+        // Large keys (Space, Enter, etc.)
+        KeyCode::Space => (UIElement::LargeKey, 30.0),
+        KeyCode::Return => (UIElement::LargeKey, 30.0),
+        KeyCode::Escape => (UIElement::LargeKey, 30.0),
+
+        // Medium keys (Shift, Ctrl, Alt, Tab, Caps, etc.)
+        KeyCode::LShift | KeyCode::RShift => (UIElement::MediumKey, 26.0),
+        KeyCode::LControl | KeyCode::RControl => (UIElement::MediumKey, 26.0),
+        KeyCode::LAlt | KeyCode::RAlt => (UIElement::MediumKey, 26.0),
+        KeyCode::Tab => (UIElement::MediumKey, 26.0),
+        KeyCode::Capital => (UIElement::MediumKey, 26.0),
+        KeyCode::Back => (UIElement::MediumKey, 26.0),
+
+        // Small keys (all single character keys, numbers, etc.)
+        _ => (UIElement::SmallKey, 10.0),
+    }
+}
+
+#[derive(Component)]
+pub struct SkillChargeText {
+    pub slot: usize, // Which skill slot this text is for (1 or 2)
+}
 
 const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
 
@@ -596,6 +629,7 @@ pub fn handle_update_player_skills(
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
     unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -764,7 +798,7 @@ pub fn handle_update_player_skills(
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            -res.game_width / 2. + 18. + i as f32 * 30.,
+                            -res.game_width / 2. + 18. + i as f32 * 31.,
                             -GAME_HEIGHT / 2. + 14.,
                             1.,
                         ),
@@ -776,31 +810,45 @@ pub fn handle_update_player_skills(
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(ActiveSkillIcon)
                 .id();
-            commands
+            // Get the actual keybind for this slot
+            let keybind = keybinds.get_active_skill_key(i);
+            let (key_element, key_width) = get_key_size_and_element(keybind);
+
+            // Spawn generic key background
+            let key_bg = commands
                 .spawn(SpriteBundle {
-                    texture: asset_server.load(match i {
-                        0 => "textures/SpaceKey.png",
-                        1 => "textures/ShiftKey.png",
-                        2 => "textures/QKey.png",
-                        _ => "textures/ShiftKey.png", // fallback
-                    }),
+                    texture: graphics.get_ui_element_texture(key_element),
                     transform: Transform::from_translation(Vec3::new(0., 13., 2. + i as f32)),
                     sprite: Sprite {
-                        custom_size: Some(Vec2::new(
-                            match i {
-                                0 => 30., // Space key
-                                1 => 26., // Shift key (original size)
-                                2 => 10., // Q key (same size as EKey)
-                                _ => 26., // fallback
-                            },
-                            10.,
-                        )),
+                        custom_size: Some(Vec2::new(key_width, 10.)),
                         ..Default::default()
                     },
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(icon_bg);
+                .insert(ActiveSkillKeyBackground { slot: i })
+                .set_parent(icon_bg)
+                .id();
+
+            // Spawn keybind text as child of key background
+            commands
+                .spawn(Text2dBundle {
+                    text: Text::from_section(
+                        crate::keybinds::get_key_display_name(keybind),
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: crate::colors::DARK_WOOD_BROWN,
+                        },
+                    )
+                    .with_alignment(TextAlignment::Center),
+                    text_anchor: bevy::sprite::Anchor::Center,
+                    transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(ActiveSkillKeybindText { slot: i })
+                .set_parent(key_bg);
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
@@ -850,11 +898,11 @@ pub fn handle_update_player_skills(
                 spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
             }
 
-            // For slot 1 (class skill), add charge count text if charges > 1
-            if i == 1 {
+            // For slots 1 and 2 (class skills), add charge count text (both share the charge system)
+            if i == 1 || i == 2 {
                 // Query for charge tracker to get current charges
                 // We'll update this in a separate system that runs after this
-                let charge_text = commands
+                let _charge_text = commands
                     .spawn(Text2dBundle {
                         text: Text::from_section(
                             "",
@@ -873,7 +921,7 @@ pub fn handle_update_player_skills(
                         ..default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(SkillChargeText)
+                    .insert(SkillChargeText { slot: i })
                     .insert(Name::new("SKILL CHARGE TEXT"))
                     .set_parent(icon_bg)
                     .id();
@@ -884,21 +932,27 @@ pub fn handle_update_player_skills(
 
 /// Updates skill charge text display for slot 1
 pub fn update_skill_charge_text(
-    charge_trackers: Query<&crate::player::skills::SkillChargeTracker, With<Player>>,
-    mut charge_texts: Query<&mut Text, With<SkillChargeText>>,
+    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    mut charge_texts: Query<(&SkillChargeText, &mut Text)>,
 ) {
-    if let Ok(tracker) = charge_trackers.get_single() {
-        for mut text in charge_texts.iter_mut() {
-            // Only show text if charges > 1
-            if tracker.current_charges > 1 {
+    for (charge_text, mut text) in charge_texts.iter_mut() {
+        // Get the tracker for this text's slot
+        let tracker_opt = match charge_text.slot {
+            1 => slot1_trackers.get_single().ok().map(|t| &t.0),
+            2 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            _ => None,
+        };
+
+        if let Some(tracker) = tracker_opt {
+            // Only show text if max charges > 1
+            if tracker.max_charges > 1 {
                 text.sections[0].value = format!("{}", tracker.current_charges);
             } else {
                 text.sections[0].value = String::new();
             }
-        }
-    } else {
-        // No tracker, hide text
-        for mut text in charge_texts.iter_mut() {
+        } else {
+            // No tracker for this slot, hide text
             text.sections[0].value = String::new();
         }
     }
@@ -1077,42 +1131,38 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
 
 pub fn tick_skill_cooldown_overlays(
     mut overlays: Query<(&mut Sprite, &mut SkillCooldownOverlay), With<SkillCooldownOverlay>>,
-    charge_trackers: Query<&SkillChargeTracker, With<Player>>,
+    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
     time: Res<Time>,
 ) {
-    // For slot 1, check if we should use charge tracker's cooldown instead
-    let charge_tracker_opt = charge_trackers.get_single().ok();
-
     for (mut sprite, mut timer) in overlays.iter_mut() {
-        // For slot 1 (index 1), if we have a charge tracker and charges < max, use charge tracker's cooldown
-        if timer.index == 1 {
-            if let Some(tracker) = charge_tracker_opt {
-                if tracker.current_charges < tracker.max_charges {
-                    // Use charge tracker's cooldown timer
-                    let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
-                    let duration = tracker.cooldown_timer.duration().as_secs_f32();
-                    if duration > 0.0 {
-                        let percent = if duration > 0.0 {
-                            elapsed / duration
-                        } else {
-                            1.0
-                        };
-                        sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
-                        continue;
-                    }
-                } else {
-                    // We have max charges, hide the overlay
-                    sprite.custom_size = Some(Vec2::new(16., 0.));
-                    continue;
-                }
-            }
-        }
+        // Each slot uses its own independent charge tracker
+        let tracker_opt = match timer.index {
+            1 => slot1_trackers.get_single().ok().map(|t| &t.0),
+            2 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            _ => None,
+        };
 
-        // Default behavior: tick the overlay's own timer
-        timer.timer.tick(time.delta());
-        sprite.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
-        if timer.timer.just_finished() {
-            // commands.spawn(SoundSpawner::new(AudioSoundEffect::SkillCooldown, 0.03));
+        if let Some(tracker) = tracker_opt {
+            // This slot uses charge-based cooldown
+            if tracker.current_charges < tracker.max_charges {
+                // Show charge regeneration timer
+                let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
+                let duration = tracker.cooldown_timer.duration().as_secs_f32();
+                let percent = if duration > 0.0 {
+                    elapsed / duration
+                } else {
+                    1.0
+                };
+                sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
+            } else {
+                // Have max charges, hide overlay
+                sprite.custom_size = Some(Vec2::new(16., 0.));
+            }
+        } else {
+            // Use overlay's own independent timer (no charge system for this slot)
+            timer.timer.tick(time.delta());
+            sprite.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
         }
     }
 }
@@ -1120,33 +1170,56 @@ pub fn tick_skill_cooldown_overlays(
 pub fn handle_active_skill_event(
     mut active_skill_used: EventReader<ActiveSkillUsedEvent>,
     mut overlays: Query<&mut SkillCooldownOverlay>,
-    charge_trackers: Query<&SkillChargeTracker, With<Player>>,
+    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
 ) {
     for e in active_skill_used.iter() {
+        // Check if this slot has a charge tracker
+        let has_tracker = match e.slot {
+            1 => slot1_trackers.get_single().is_ok(),
+            2 => slot2_trackers.get_single().is_ok(),
+            _ => false,
+        };
+
         for mut overlay in overlays.iter_mut() {
             if overlay.index == e.slot {
-                // For slot 1, check if we should use charge tracker's cooldown
-                if e.slot == 1 {
-                    if let Ok(tracker) = charge_trackers.get_single() {
-                        // If we have charges available, don't update the overlay (charge tracker handles it)
-                        // Only update if we're at 0 charges and starting the skill cooldown
-                        if tracker.current_charges == 0 {
-                            overlay.timer.reset();
-                            overlay
-                                .timer
-                                .set_duration(Duration::from_secs_f32(e.cooldown));
-                        }
-                        // Otherwise, the charge tracker's cooldown will be shown by tick_skill_cooldown_overlays
-                        continue;
-                    }
+                if has_tracker {
+                    // Charge tracker handles the cooldown, don't update overlay timer
+                    // The charge regeneration timer is shown by tick_skill_cooldown_overlays
+                    continue;
                 }
 
-                // For other slots or if no charge tracker, use normal behavior
+                // Standard cooldown behavior for slots without charge trackers
                 overlay.timer.reset();
                 overlay
                     .timer
                     .set_duration(Duration::from_secs_f32(e.cooldown));
             }
         }
+    }
+}
+
+pub fn update_active_skill_keybind_text(
+    keybinds: Res<crate::keybinds::KeyBindings>,
+    mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
+    mut key_backgrounds: Query<(&ActiveSkillKeyBackground, &mut Handle<Image>, &mut Sprite)>,
+    graphics: Res<Graphics>,
+) {
+    if !keybinds.is_changed() {
+        return;
+    }
+
+    // Update text
+    for (keybind_text, mut text) in texts.iter_mut() {
+        let key = keybinds.get_active_skill_key(keybind_text.slot);
+        text.sections[0].value = crate::keybinds::get_key_display_name(key);
+    }
+
+    // Update key background size and texture
+    for (key_bg, mut texture, mut sprite) in key_backgrounds.iter_mut() {
+        let key = keybinds.get_active_skill_key(key_bg.slot);
+        let (key_element, key_width) = get_key_size_and_element(key);
+        *texture = graphics.get_ui_element_texture(key_element);
+        sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }
 }

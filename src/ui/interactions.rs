@@ -71,6 +71,13 @@ pub enum UIElement {
     TileHover,
     BlockedTileHover,
     MenuButton,
+    AchievementsButton,
+    UnlocksButton,
+    OptionsButton,
+    MenuButtonHover,
+    AchievementsButtonHover,
+    UnlocksButtonHover,
+    OptionsButtonHover,
     MainMenu,
     Essence,
     EssenceButton,
@@ -133,6 +140,51 @@ pub enum UIElement {
     CheckBox,
     CheckBoxSelected,
     AchievementCrossOut,
+    SmallKey,
+    MediumKey,
+    LargeKey,
+    XLKey,
+    XLKeyHover,
+}
+impl UIElement {
+    pub fn get_hover_state(&self) -> Option<UIElement> {
+        match self {
+            UIElement::InventorySlot => Some(UIElement::InventorySlotHover),
+            UIElement::StatsButton => Some(UIElement::StatsButtonHover),
+            UIElement::EssenceButton => Some(UIElement::EssenceButtonHover),
+            UIElement::SkillChoiceMelee => Some(UIElement::SkillChoiceMeleeHover),
+            UIElement::SkillChoiceRogue => Some(UIElement::SkillChoiceRogueHover),
+            UIElement::SkillChoiceMagic => Some(UIElement::SkillChoiceMagicHover),
+            UIElement::RerollDice => Some(UIElement::RerollDiceHover),
+            UIElement::UpgradeButton => Some(UIElement::UpgradeButtonHover),
+            UIElement::BackButton => Some(UIElement::BackButtonHover),
+            UIElement::XLKey => Some(UIElement::XLKeyHover),
+            UIElement::MenuButton => Some(UIElement::MenuButtonHover),
+            UIElement::AchievementsButton => Some(UIElement::AchievementsButtonHover),
+            UIElement::UnlocksButton => Some(UIElement::UnlocksButtonHover),
+            UIElement::OptionsButton => Some(UIElement::OptionsButtonHover),
+            _ => None,
+        }
+    }
+    pub fn get_normal_state(&self) -> Option<UIElement> {
+        match self {
+            UIElement::InventorySlotHover => Some(UIElement::InventorySlot),
+            UIElement::StatsButtonHover => Some(UIElement::StatsButton),
+            UIElement::EssenceButtonHover => Some(UIElement::EssenceButton),
+            UIElement::SkillChoiceMeleeHover => Some(UIElement::SkillChoiceMelee),
+            UIElement::SkillChoiceRogueHover => Some(UIElement::SkillChoiceRogue),
+            UIElement::SkillChoiceMagicHover => Some(UIElement::SkillChoiceMagic),
+            UIElement::RerollDiceHover => Some(UIElement::RerollDice),
+            UIElement::UpgradeButtonHover => Some(UIElement::UpgradeButton),
+            UIElement::BackButtonHover => Some(UIElement::BackButton),
+            UIElement::XLKeyHover => Some(UIElement::XLKey),
+            UIElement::MenuButtonHover => Some(UIElement::MenuButton),
+            UIElement::AchievementsButtonHover => Some(UIElement::AchievementsButton),
+            UIElement::UnlocksButtonHover => Some(UIElement::UnlocksButton),
+            UIElement::OptionsButtonHover => Some(UIElement::OptionsButton),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Component, Debug, Clone)]
@@ -1236,7 +1288,10 @@ pub fn handle_cursor_main_menu_buttons(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut menu_buttons: Query<(Entity, &mut Interactable, &MenuButton), Without<InventorySlotState>>,
+    mut menu_buttons: Query<
+        (Entity, &mut Interactable, &MenuButton, &UIElement),
+        Without<InventorySlotState>,
+    >,
     mut text: Query<&mut Text, With<MenuButton>>,
     mut send_menu_button_event: EventWriter<MenuButtonClickEvent>,
     mut commands: Commands,
@@ -1246,11 +1301,12 @@ pub fn handle_cursor_main_menu_buttons(
 ) {
     let menu_open = curr_ui_state.0 == UIState::ClassSelection
         || curr_ui_state.0 == UIState::Unlocks
+        || curr_ui_state.0 == UIState::Options
         || curr_ui_state.0 == UIState::Achievements;
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_released(MouseButton::Left);
 
-    for (e, mut interactable, menu_button) in menu_buttons.iter_mut() {
+    for (e, mut interactable, menu_button, ui_element) in menu_buttons.iter_mut() {
         if !info_check.is_empty() && menu_button != &MenuButton::InfoOK {
             continue;
         }
@@ -1260,6 +1316,7 @@ pub fn handle_cursor_main_menu_buttons(
                 MenuButton::Start
                     | MenuButton::Achievements
                     | MenuButton::Unlocks
+                    | MenuButton::Options
                     | MenuButton::Quit
             )
         {
@@ -1269,6 +1326,7 @@ pub fn handle_cursor_main_menu_buttons(
             menu_button,
             MenuButton::Start
                 | MenuButton::Unlocks
+                | MenuButton::Options
                 | MenuButton::Achievements
                 | MenuButton::AchievementsPrev
                 | MenuButton::AchievementsNext
@@ -1283,12 +1341,14 @@ pub fn handle_cursor_main_menu_buttons(
                 Interaction::None => {
                     interactable.change(Interaction::Hovering);
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonHover, 0.05));
-
                     if uses_sprite {
+                        let Some(ui_element_hover) = ui_element.get_hover_state() else {
+                            continue;
+                        };
                         commands
                             .entity(e)
-                            .insert(UIElement::BackButtonHover)
-                            .insert(graphics.get_ui_element_texture(UIElement::BackButtonHover));
+                            .insert(ui_element_hover.clone())
+                            .insert(graphics.get_ui_element_texture(ui_element_hover));
                     } else {
                         let color = if menu_button == &MenuButton::GameOverOK
                             || menu_button == &MenuButton::InfoOK
@@ -1323,8 +1383,10 @@ pub fn handle_cursor_main_menu_buttons(
                 if uses_sprite {
                     commands
                         .entity(e)
-                        .insert(UIElement::BackButton)
-                        .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+                        .insert(ui_element.clone().get_normal_state().unwrap())
+                        .insert(graphics.get_ui_element_texture(
+                            ui_element.clone().get_normal_state().unwrap(),
+                        ));
                 } else {
                     if let Ok(mut text_comp) = text.get_mut(e) {
                         text_comp.sections[0].style.color = Color::WHITE;
