@@ -20,6 +20,7 @@ use bevy_proto::prelude::ProtoCommands;
 use bevy_save::prelude::*;
 use rand::Rng;
 pub mod analytics;
+pub mod leaderboard;
 use analytics::*;
 use serde::{Deserialize, Serialize};
 
@@ -140,6 +141,11 @@ impl Plugin for ClientPlugin {
                     .in_schedule(OnExit(GameState::MainMenu)),
             )
             .add_system(load_game_data_for_ui.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(
+                crate::ui::check_show_name_entry_popup
+                    .after(load_game_data_for_ui)
+                    .in_schedule(OnEnter(GameState::MainMenu)),
+            )
             .add_systems(
                 (
                     save_state.run_if(resource_exists::<AnalyticsData>()),
@@ -223,6 +229,8 @@ pub struct GameData {
     pub cumulative_analytics: Option<AnalyticsData>,
     #[serde(default)]
     pub keybindings: Option<crate::keybinds::KeyBindings>,
+    #[serde(default)]
+    pub player_name: Option<String>,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,

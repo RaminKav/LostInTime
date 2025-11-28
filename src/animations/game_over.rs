@@ -16,7 +16,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyText, Interactable, MenuButton,
-        TimeFragmentIcon, UIState,
+        TimeFragmentIcon, UIElement, UIState,
     },
     world::y_sort::YSort,
     GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
@@ -45,6 +45,7 @@ pub fn handle_game_over_fadeout(
         With<Player>,
     >,
     asset_server: Res<AssetServer>,
+    graphics: Res<Graphics>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     resolution: Res<ScreenResolution>,
 ) {
@@ -90,34 +91,48 @@ pub fn handle_game_over_fadeout(
             GameOverText,
             RenderLayers::from_layers(&[3]),
         ));
-        // OK BUTTON
-        commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    "Try Again",
-                    TextStyle {
-                        font: asset_server.load("fonts/alagard.ttf"),
-                        font_size: 15.0,
-                        color: WHITE.with_a(0.),
+        // OK BUTTON - spawn like main menu buttons
+        let button_entity = commands
+            .spawn((
+                SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::UnlocksButton),
+                    sprite: Sprite {
+                        color: Color::rgba(1.0, 1.0, 1.0, 0.0), // Start transparent
+                        custom_size: Some(Vec2::new(84., 18.)),
+                        ..Default::default()
                     },
-                ),
-                transform: Transform {
-                    translation: Vec3::new(0., -100.5, 23.),
-                    scale: Vec3::new(1., 1., 1.),
+                    transform: Transform::from_translation(Vec3::new(0., -99., 23.)),
                     ..Default::default()
                 },
-                ..default()
-            },
-            Name::new("INFO OK TEXT"),
-            RenderLayers::from_layers(&[3]),
-            Interactable::default(),
-            GameOverText,
-            MenuButton::GameOverOK,
-            Sprite {
-                custom_size: Some(Vec2::new(70., 13.)),
-                ..default()
-            },
-        ));
+                Interactable::default(),
+                UIElement::UnlocksButton,
+                MenuButton::GameOverOK,
+                GameOverText,
+                RenderLayers::from_layers(&[3]),
+                Name::new("Game Over OK Button"),
+            ))
+            .id();
+
+        // Button text as child
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "Try Again",
+                        TextStyle {
+                            font: asset_server.load("fonts/alagard.ttf"),
+                            font_size: 15.0,
+                            color: WHITE.with_a(0.),
+                        },
+                    ),
+                    transform: Transform::from_translation(Vec3::new(0., 0., 1.)),
+                    ..default()
+                },
+                GameOverText,
+                RenderLayers::from_layers(&[3]),
+                Name::new("Game Over OK Text"),
+            ))
+            .set_parent(button_entity);
         next_state.0 = Some(GameState::GameOver);
         // move player to UI camera to be above the fade out overlay
         commands
@@ -153,6 +168,7 @@ pub fn tick_game_over_overlay(
     mut query: Query<(Entity, &mut GameOverFadeout, &mut Sprite), Without<GameOverText>>,
     asset_server: Res<AssetServer>,
     mut game_over_text: Query<&mut Text, With<GameOverText>>,
+    mut game_over_sprites: Query<&mut Sprite, (With<GameOverText>, Without<GameOverFadeout>)>,
     mut tip_check: Local<bool>,
     graphics: Res<Graphics>,
     res: Res<ScreenResolution>,
@@ -249,12 +265,16 @@ pub fn tick_game_over_overlay(
         let alpha = f32::min(1., timer.0.percent() * 5.);
         sprite.color = overwrite_alpha(sprite.color, alpha);
         if alpha >= 0.45 {
-            // update text alpha
+            let text_alpha = f32::min(1., timer.0.percent() * 2.);
+
+            // Update text alpha
             game_over_text.iter_mut().for_each(|mut s| {
-                s.sections[0].style.color = overwrite_alpha(
-                    s.sections[0].style.color,
-                    f32::min(1., timer.0.percent() * 2.),
-                );
+                s.sections[0].style.color = overwrite_alpha(s.sections[0].style.color, text_alpha);
+            });
+
+            // Update button sprite alpha
+            game_over_sprites.iter_mut().for_each(|mut s| {
+                s.color = overwrite_alpha(s.color, text_alpha);
             });
         }
     }

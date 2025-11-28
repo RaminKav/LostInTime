@@ -37,6 +37,7 @@ pub enum UIState {
     Achievements,
     Scrapper,
     ClassSelection,
+    EnterName,
 }
 impl UIState {
     pub fn is_inv_open(&self) -> bool {

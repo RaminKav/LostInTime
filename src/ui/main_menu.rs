@@ -163,9 +163,16 @@ pub fn handle_menu_button_click_events(
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
     mut extras: MenuButtonExtras,
+    current_ui_state: Res<State<UIState>>,
 ) {
     for event in event_reader.iter() {
         let info_modal_open = extras.info_modal.iter().next().is_some();
+
+        // Block all menu interactions when name entry popup is open
+        if current_ui_state.0 == UIState::EnterName {
+            continue;
+        }
+
         match event.button {
             MenuButton::Start => {
                 if info_modal_open {
@@ -419,7 +426,9 @@ pub fn handle_menu_button_click_events(
                 }
                 info!("Despawning everything, Sending to main menu");
                 for e in extras.world_entities.iter() {
-                    commands.entity(e).despawn();
+                    if let Some(entity_commands) = commands.get_entity(e) {
+                        entity_commands.despawn_recursive();
+                    }
                 }
                 let _ = fs::remove_file(datafiles::save_file());
                 next_state.0 = Some(GameState::MainMenu);

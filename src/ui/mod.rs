@@ -55,6 +55,10 @@ mod unlocks_ui;
 pub use unlocks_ui::*;
 mod options_ui;
 pub use options_ui::*;
+mod leaderboard_ui;
+pub use leaderboard_ui::*;
+mod name_entry_ui;
+pub use name_entry_ui::*;
 mod achievements_ui;
 use crate::run_once_per_run;
 use crate::ui::achievement_banner::{
@@ -111,6 +115,8 @@ impl Plugin for UIPlugin {
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
             .insert_resource(crate::keybinds::KeyBindings::load())
+            .init_resource::<CurrentNameInput>()
+            .init_resource::<CursorBlinkTimer>()
             .insert_resource(FloatingTextQueue::new(0.8))
             .insert_resource(TooltipsManager {
                 timer: Timer::from_seconds(0.7, TimerMode::Once),
@@ -138,6 +144,9 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Initializing)),
             )
             .add_system(spawn_fps_text.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
+            .add_system(setup_leaderboard_ui.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
+            .add_system(update_leaderboard_display.run_if(in_state(GameState::MainMenu)))
             .add_systems((
                 setup_inv_ui
                     .before(CustomFlush)
@@ -310,6 +319,24 @@ impl Plugin for UIPlugin {
                     
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    setup_name_entry_ui
+                        .before(CustomFlush)
+                        .run_if(state_changed::<UIState>().and_then(in_state(UIState::EnterName))),
+                    cleanup_name_entry_ui
+                        .run_if(state_changed::<UIState>().and_then(not(in_state(UIState::EnterName)))),
+                    handle_name_entry_input
+                        .run_if(in_state(UIState::EnterName)),
+                    update_name_entry_text
+                        .run_if(in_state(UIState::EnterName)),
+                    update_cursor_blink
+                        .run_if(in_state(UIState::EnterName)),
+                    handle_name_entry_ok_button
+                        .run_if(in_state(UIState::EnterName)),
+                )
+                    .in_set(OnUpdate(GameState::MainMenu)),
             )
             .add_systems((
                     handle_unlocks_clicks.run_if(in_state(UIState::Unlocks)),
