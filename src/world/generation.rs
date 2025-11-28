@@ -80,7 +80,7 @@ impl Plugin for GenerationPlugin {
             )
             .add_system(
                 Self::generate_and_cache_objects
-                    .before(ChunkPlugin::despawn_outofrange_chunks)
+                    .before(ChunkPlugin::mark_outofrange_chunks_for_despawn)
                     .before(CustomFlush)
                     .run_if(resource_exists::<GenerationSeed>().and_then(
                         in_state(GameState::Main).or_else(in_state(GameState::Initializing)),

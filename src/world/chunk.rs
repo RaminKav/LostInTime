@@ -63,8 +63,13 @@ impl Plugin for ChunkPlugin {
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
-                Self::despawn_outofrange_chunks
+                Self::mark_outofrange_chunks_for_despawn
                     .in_base_set(CoreSet::PostUpdate)
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                Self::despawn_pending_chunks
+                    .in_base_set(CoreSet::Last)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
@@ -82,6 +87,14 @@ pub struct TileSpriteData {
     pub tile_bit_index: u8,
     pub texture_offset: u8,
 }
+
+/// Marker component to defer chunk despawn by a few frames
+/// This prevents race conditions with pipelined rendering
+#[derive(Component)]
+pub struct PendingDespawn {
+    pub frames_remaining: u8,
+}
+
 #[derive(Clone)]
 pub struct SpawnChunkEvent {
     pub chunk_pos: IVec2,
@@ -450,11 +463,12 @@ impl ChunkPlugin {
         info!("END STARTUP CHUNK GENERATION!!");
     }
     //TODO: change despawning systems to use playe rpos instead??
-    pub fn despawn_outofrange_chunks(
+    /// Mark out-of-range chunks for despawn (deferred to prevent render extraction race condition)
+    pub fn mark_outofrange_chunks_for_despawn(
         game: GameParam,
         player_query: Query<&Transform, (With<Player>, With<YSort>)>,
         mut commands: Commands,
-        chunk_query: Query<(&Transform, &Children), With<Chunk>>,
+        chunk_query: Query<(&Transform, &Children), (With<Chunk>, Without<PendingDespawn>)>,
         containers: Query<(
             &GlobalTransform,
             Option<&FurnaceContainer>,
@@ -482,7 +496,7 @@ impl ChunkPlugin {
                     && game.get_chunk_entity(chunk_pos).is_some()
                     && game.is_chunk_generated(chunk_pos)
                 {
-                    debug!("            despawning chunk {x:?},{y:?}");
+                    debug!("            marking chunk {x:?},{y:?} for despawn");
 
                     // add all containers in this chunk into the registry so their contents are safe
                     for child in children.iter() {
@@ -507,9 +521,38 @@ impl ChunkPlugin {
                             }
                         }
                     }
+                    // Mark for deferred despawn (2 frames delay for render extraction)
                     commands
                         .entity(game.get_chunk_entity(chunk_pos).unwrap())
-                        .despawn_recursive();
+                        .insert(PendingDespawn {
+                            frames_remaining: 2,
+                        });
+                }
+            }
+        }
+    }
+
+    /// Despawn chunks that have been marked for despawn after the delay
+    pub fn despawn_pending_chunks(
+        mut commands: Commands,
+        mut pending_chunks: Query<(Entity, &mut PendingDespawn)>,
+        game: GameParam,
+        chunk_query: Query<&Transform, With<Chunk>>,
+    ) {
+        for (chunk_entity, mut pending) in pending_chunks.iter_mut() {
+            pending.frames_remaining = pending.frames_remaining.saturating_sub(1);
+
+            if pending.frames_remaining == 0 {
+                // Get chunk position for cleanup
+                if let Ok(chunk_transform) = chunk_query.get(chunk_entity) {
+                    let chunk_pos = chunk_transform.translation.xy();
+                    let x = (chunk_pos.x / (CHUNK_SIZE as f32 * TILE_SIZE.x)).floor() as i32;
+                    let y = (chunk_pos.y / (CHUNK_SIZE as f32 * TILE_SIZE.y)).floor() as i32;
+                    let chunk_pos = IVec2::new(x, y);
+
+                    debug!("            despawning chunk {x:?},{y:?} (deferred)");
+                    commands.entity(chunk_entity).despawn_recursive();
+                    // Note: chunk entity removal from game tracking happens via despawn observer
                 }
             }
         }
