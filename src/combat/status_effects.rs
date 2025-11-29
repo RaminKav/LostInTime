@@ -176,6 +176,7 @@ pub fn handle_burning_ticks(
                     was_crit: false,
                     hit_by_mob: None,
                     ignore_tool: false,
+                    from_heirloom_effect: true, // Burning is a status effect, shouldn't chain heirlooms
                 });
                 burning.tick_timer.reset();
             }

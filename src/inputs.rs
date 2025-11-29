@@ -980,6 +980,7 @@ pub fn mouse_click_system(
                 hit_with_projectile: None,
                 ignore_tool: false,
                 hit_by_mob: None,
+                from_heirloom_effect: false,
                 was_crit: false,
             });
         }

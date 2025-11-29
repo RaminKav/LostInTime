@@ -330,6 +330,7 @@ pub fn update_ant_farm_ants(
                 hit_by_pet: None,
                 was_crit: false,
                 ignore_tool: true,
+                from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -504,6 +505,7 @@ pub fn update_stone_tooth(
                     hit_by_pet: None,
                     was_crit: false,
                     ignore_tool: true,
+                    from_heirloom_effect: true, // Stone heirloom effect shouldn't chain
                 });
                 stone.active = false;
                 *visibility = Visibility::Hidden;
@@ -740,6 +742,7 @@ pub fn update_reaper_souls(
                 hit_by_pet: None,
                 was_crit: false,
                 ignore_tool: true,
+                from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
             });
             commands.entity(entity).despawn_recursive();
         }

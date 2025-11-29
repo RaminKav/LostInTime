@@ -88,6 +88,7 @@ pub fn handle_second_split_attack(
             was_crit,
             hit_by_mob: None,
             ignore_tool: false,
+            from_heirloom_effect: false, // Split attack is a player skill, should trigger heirlooms
         });
         commands.entity(e).remove::<SecondHitDelay>();
     }

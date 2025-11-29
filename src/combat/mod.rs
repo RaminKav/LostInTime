@@ -59,10 +59,15 @@ pub struct HitEvent {
     pub hit_by_pet: Option<Entity>,
     pub was_crit: bool,
     pub ignore_tool: bool,
+    /// If true, this damage came from a heirloom effect (explosion, etc) and should not trigger other heirloom effects
+    pub from_heirloom_effect: bool,
 }
 
 #[derive(Component, Debug, Clone)]
 pub struct MarkedForDeath;
+
+#[derive(Component, Debug, Clone)]
+pub struct KilledByHeirloomEffect;
 #[derive(Debug, Clone)]
 
 pub struct EnemyDeathEvent {
@@ -405,6 +410,12 @@ pub fn handle_hits(
                 }
                 if hit_health.0 <= 0 && game.player_query.single().0 != e {
                     commands.entity(e).insert(MarkedForDeath);
+
+                    // Mark if killed by heirloom effect to prevent chaining
+                    if hit.from_heirloom_effect {
+                        commands.entity(e).insert(KilledByHeirloomEffect);
+                    }
+
                     enemy_death_events.send(EnemyDeathEvent {
                         entity: e,
                         enemy_pos: t.translation().truncate(),
@@ -453,6 +464,7 @@ pub fn cleanup_marked_for_death_entities(
             Option<&Slow>,
             Option<&Burning>,
             &GlobalTransform,
+            Option<&KilledByHeirloomEffect>,
         ),
         With<MarkedForDeath>,
     >,
@@ -465,7 +477,7 @@ pub fn cleanup_marked_for_death_entities(
     spike_attack_states: Query<&SpikeAttackState>,
     aoe_attack_states: Query<&AoEAttackState>,
 ) {
-    for (e, mob, slow_option, poison_option, mob_pos) in dead_query.iter() {
+    for (e, mob, slow_option, poison_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
         if mob.is_boss() {
             // Clean up preview entities before removing attack states
             // StoneGolem spike attack preview
@@ -497,38 +509,46 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<MarkedForDeath>();
         } else {
             let (skills, attack, mana_regen) = player.single();
-            if let Some(_) = slow_option {
-                if skills.has(Heirloom::FrozenAoE) {
-                    spawn_ice_explosion_hitbox(
-                        &mut commands,
-                        &graphics,
-                        mob_pos.translation(),
-                        attack.0 / 4,
-                    );
+
+            // Only trigger heirloom on-kill effects if the kill wasn't from a heirloom effect
+            // This prevents chaining (e.g., ice explosion killing enemies that trigger more ice explosions)
+            let can_trigger_heirloom_effects = killed_by_heirloom.is_none();
+
+            if can_trigger_heirloom_effects {
+                if let Some(_) = slow_option {
+                    if skills.has(Heirloom::FrozenAoE) {
+                        spawn_ice_explosion_hitbox(
+                            &mut commands,
+                            &graphics,
+                            mob_pos.translation(),
+                            attack.0 / 4,
+                        );
+                    }
+                    if skills.has(Heirloom::FrozenMPRegen) {
+                        modify_mana_event.send(ModifyManaEvent(
+                            mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
+                        ));
+                    }
                 }
-                if skills.has(Heirloom::FrozenMPRegen) {
-                    modify_mana_event.send(ModifyManaEvent(
-                        mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
-                    ));
-                }
-            }
-            if let Some(p) = poison_option {
-                if skills.has(Heirloom::ViralVenum) {
-                    for (mob_e, txfm) in neaby_mobs.iter() {
-                        if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x {
-                            commands.entity(mob_e).insert(Burning {
-                                stacks: p.stacks,
-                                duration_timer: Timer::from_seconds(
-                                    p.duration_timer.duration().as_secs_f32(),
-                                    TimerMode::Once,
-                                ),
-                                tick_timer: p.tick_timer.clone(),
-                            });
-                            status_event.send(StatusEffectEvent {
-                                entity: mob_e,
-                                effect: StatusEffect::Poison,
-                                num_stacks: p.stacks as i32,
-                            });
+                if let Some(p) = poison_option {
+                    if skills.has(Heirloom::ViralVenum) {
+                        for (mob_e, txfm) in neaby_mobs.iter() {
+                            if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x
+                            {
+                                commands.entity(mob_e).insert(Burning {
+                                    stacks: p.stacks,
+                                    duration_timer: Timer::from_seconds(
+                                        p.duration_timer.duration().as_secs_f32(),
+                                        TimerMode::Once,
+                                    ),
+                                    tick_timer: p.tick_timer.clone(),
+                                });
+                                status_event.send(StatusEffectEvent {
+                                    entity: mob_e,
+                                    effect: StatusEffect::Poison,
+                                    num_stacks: p.stacks as i32,
+                                });
+                            }
                         }
                     }
                 }

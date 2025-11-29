@@ -140,6 +140,7 @@ fn check_melee_hit_collisions(
                 was_crit,
                 hit_by_mob: None,
                 ignore_tool: false,
+                from_heirloom_effect: false,
             });
 
             commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
@@ -265,6 +266,13 @@ fn check_projectile_hit_mob_collisions(
                 state.direction
             };
 
+            // Check if this projectile is from a heirloom on-kill effect
+            let is_from_heirloom = matches!(
+                proj,
+                Projectile::IceExplosionAOE  // FrozenAoE heirloom
+                // Add other heirloom effect projectiles here if needed
+            );
+            
             hit_event.send(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
@@ -275,6 +283,7 @@ fn check_projectile_hit_mob_collisions(
                 ignore_tool: false,
                 hit_by_mob: None,
                 was_crit,
+                from_heirloom_effect: is_from_heirloom,
             });
             if nearby_mobs.get(*e2).is_ok() {
                 if proj.clone() == Projectile::IceShard
@@ -431,6 +440,7 @@ fn check_projectile_hit_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: Some(enemy_proj.mob.clone()),
                     was_crit: false,
+                    from_heirloom_effect: false,
                 });
             }
             if state.despawn_on_hit {
@@ -682,6 +692,7 @@ fn check_mob_to_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
+                    from_heirloom_effect: false,
                 });
             }
             // hit back to attacker if we have Thorns
@@ -696,6 +707,7 @@ fn check_mob_to_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: None,
                     was_crit: false,
+                    from_heirloom_effect: false,
                 });
             }
         }
@@ -743,6 +755,7 @@ fn check_boss_to_objects_collisions(
                     ignore_tool: true,
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
+                    from_heirloom_effect: false,
                 });
             }
         }
