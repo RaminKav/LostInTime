@@ -72,7 +72,7 @@ use loading_screen::*;
 
 use crate::{
     attributes::clamp_health,
-    client::{is_not_paused, load_state, ClientState},
+    client::{is_not_paused, leaderboard::auto_fetch_leaderboard_on_menu, load_state, ClientState},
     handle_hits,
     item::{
         active_skill_shrine::ActiveSkillShrineOverwrite,
@@ -144,9 +144,33 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Initializing)),
             )
             .add_system(spawn_fps_text.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
-            .add_system(setup_leaderboard_ui.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(
+                setup_leaderboard_ui
+                    .in_schedule(OnEnter(GameState::MainMenu))
+                    .after(auto_fetch_leaderboard_on_menu)  // Ensure fetch happens first
+            )
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
-            .add_system(update_leaderboard_display.run_if(in_state(GameState::MainMenu)))
+            .add_systems((
+                // Clean up leaderboard when entering other UI states to avoid duplicates
+                cleanup_leaderboard_ui
+                    .run_if(in_state(GameState::MainMenu)
+                        .and_then(state_changed::<UIState>())
+                        .and_then(not(in_state(UIState::Closed)))),
+                // Recreate leaderboard when returning to main menu view (but not on initial entry)
+                setup_leaderboard_ui
+                    .after(cleanup_leaderboard_ui)
+                    .run_if(in_state(GameState::MainMenu)
+                        .and_then(state_changed::<UIState>())
+                        .and_then(in_state(UIState::Closed))),
+            ))
+            .add_systems((
+                update_leaderboard_display
+                    .run_if(in_state(GameState::MainMenu))
+                    .run_if(in_state(UIState::Closed)),
+                ensure_leaderboard_entries
+                    .run_if(in_state(GameState::MainMenu))
+                    .run_if(in_state(UIState::Closed)),
+            ))
             .add_systems((
                 setup_inv_ui
                     .before(CustomFlush)

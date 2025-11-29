@@ -2,6 +2,8 @@
 
 REST API server for the Lost in Time game leaderboard system.
 
+**🚀 Ready to deploy to Shuttle.rs!** See [SHUTTLE_QUICKSTART.md](SHUTTLE_QUICKSTART.md) for a 5-minute deployment guide.
+
 ## Tech Stack
 
 - **Axum**: Web framework
@@ -131,24 +133,29 @@ cargo test
 
 ## Deployment
 
-### Option 1: Shuttle.rs (Recommended)
+### Shuttle.rs (Recommended) 🚀
 
-Already using Shuttle for analytics, can add this as another service.
+**Quick Start**: See **[SHUTTLE_QUICKSTART.md](SHUTTLE_QUICKSTART.md)** for a 5-minute deployment guide.
 
-```bash
-cargo shuttle deploy
-```
-
-### Option 2: Fly.io
+Already configured and ready to deploy! Just run:
 
 ```bash
-fly launch
-fly deploy
+cargo install cargo-shuttle  # One-time install
+cargo shuttle login           # One-time login
+cargo shuttle deploy          # Deploy!
 ```
 
-### Option 3: Railway
+Shuttle automatically provides:
+- ✅ PostgreSQL database (provisioned automatically)
+- ✅ HTTPS with SSL certificate
+- ✅ Migrations run on deployment
+- ✅ URL: `https://lost-in-time-leaderboard.shuttleapp.rs`
 
-Connect your GitHub repo, Railway will auto-deploy on push.
+**Full deployment guide**: [DEPLOYMENT.md](DEPLOYMENT.md)
+
+### Alternative: Fly.io / Railway
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for other hosting options.
 
 ## Database Maintenance
 

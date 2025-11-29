@@ -14,6 +14,7 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{
     handle_game_over_fadeout, handle_spawn_collected_time_fragments, tick_game_over_overlay,
+    update_game_over_rank_text,
 };
 use player_sprite::{
     change_player_class_visuals, cleanup_one_time_animations,
@@ -123,6 +124,7 @@ impl Plugin for AnimationsPlugin {
             .add_systems((
                 tick_game_over_overlay,
                 handle_spawn_collected_time_fragments,
+                update_game_over_rank_text,
                 handle_move_animations,
                 handle_ui_time_fragments,
             ));

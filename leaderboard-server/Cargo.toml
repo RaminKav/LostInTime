@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# Shuttle.rs
+shuttle-axum = "0.47.0"
+shuttle-runtime = "0.47.0"
+shuttle-shared-db = { version = "0.47.0", features = ["postgres", "sqlx"] }
+
 # Web framework
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }

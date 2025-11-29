@@ -6,42 +6,19 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use sqlx::postgres::PgPoolOptions;
-use std::time::Duration;
+use shuttle_axum::ShuttleAxum;
+use sqlx::PgPool;
 use tower_http::cors::{Any, CorsLayer};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "leaderboard_server=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
-    // Load environment variables from .env file (if present)
-    dotenv::dotenv().ok();
-
-    // Get database URL from environment
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://localhost/leaderboard".to_string());
-
-    tracing::info!("Connecting to database...");
-
-    // Create database connection pool
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .acquire_timeout(Duration::from_secs(3))
-        .connect(&database_url)
-        .await?;
-
-    tracing::info!("Running migrations...");
-
+#[shuttle_runtime::main]
+async fn main(
+    #[shuttle_shared_db::Postgres] pool: PgPool,
+) -> ShuttleAxum {
     // Run migrations
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
 
     tracing::info!("Migrations complete");
 
@@ -59,19 +36,6 @@ async fn main() -> anyhow::Result<()> {
         .layer(cors)
         .with_state(pool);
 
-    // Get port from environment or use default
-    let port = std::env::var("PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(3000);
-
-    let addr = format!("0.0.0.0:{}", port);
-    tracing::info!("Starting server on {}", addr);
-
-    // Start server
-    let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
-
-    Ok(())
+    Ok(app.into())
 }
 

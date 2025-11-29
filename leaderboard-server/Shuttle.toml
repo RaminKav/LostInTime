@@ -1,0 +1,9 @@
+[build]
+# Shuttle will use this to configure the deployment
+
+[deploy]
+# The name of your deployed service (must be unique on Shuttle)
+# Change this to your desired project name
+name = "lost-in-time-leaderboard"
+
+

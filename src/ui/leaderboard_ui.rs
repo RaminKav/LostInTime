@@ -23,11 +23,26 @@ pub struct LeaderboardEntryText;
 /// Setup the leaderboard UI panel (compact version for main menu)
 pub fn setup_leaderboard_ui(
     mut commands: Commands,
-    graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
     cache: Res<LeaderboardCache>,
+    existing_query: Query<(), With<LeaderboardUI>>,
 ) {
+    info!("=== SETUP_LEADERBOARD_UI CALLED ===");
+
+    // Don't setup if UI already exists
+    if !existing_query.is_empty() {
+        info!("Leaderboard UI already exists, skipping setup");
+        return;
+    }
+
+    info!(
+        "Cache state - is_loading: {}, entries: {}, has_error: {}",
+        cache.is_loading,
+        cache.entries.len(),
+        cache.last_error.is_some()
+    );
+
     let panel_width = 90.0;
     let panel_height = 75.0;
 
@@ -78,10 +93,6 @@ pub fn setup_leaderboard_ui(
         Name::new("Leaderboard Title"),
     ));
 
-    let text_x = panel_x - panel_width / 2. + 5.;
-    let start_y = panel_y + panel_height / 2. - 18.;
-    let row_spacing = -12.0;
-
     // Spawn entry text entities (will be updated by update system)
     spawn_leaderboard_entries(
         &mut commands,
@@ -104,12 +115,21 @@ fn spawn_leaderboard_entries(
     panel_width: f32,
     panel_height: f32,
 ) {
+    info!(
+        "spawn_leaderboard_entries - is_loading: {}, entries: {}, error: {}",
+        cache.is_loading,
+        cache.entries.len(),
+        cache.last_error.is_some()
+    );
+
     let text_x = panel_x - panel_width / 2. + 5.;
     let start_y = panel_y + panel_height / 2. - 18.5;
     let row_spacing = -12.0;
 
     // Loading or entries
     if cache.is_loading {
+        info!("Spawning LOADING text");
+
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -132,6 +152,7 @@ fn spawn_leaderboard_entries(
             Name::new("Loading Text"),
         ));
     } else if let Some(_error) = &cache.last_error {
+        info!("Spawning ERROR text");
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -154,6 +175,7 @@ fn spawn_leaderboard_entries(
             Name::new("Error Text"),
         ));
     } else if cache.entries.is_empty() {
+        info!("Spawning NO SCORES text");
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -177,6 +199,10 @@ fn spawn_leaderboard_entries(
         ));
     } else {
         // Display entries (only top 5)
+        info!(
+            "Spawning {} leaderboard entries",
+            cache.entries.len().min(5)
+        );
         for (i, entry) in cache.entries.iter().enumerate().take(5) {
             let y = start_y + row_spacing * i as f32;
 
@@ -289,7 +315,6 @@ pub fn update_leaderboard_display(
     mut commands: Commands,
     cache: Res<LeaderboardCache>,
     asset_server: Res<AssetServer>,
-    resolution: Res<ScreenResolution>,
     entry_query: Query<Entity, With<LeaderboardEntryText>>,
     panel_query: Query<
         &Transform,
@@ -329,8 +354,57 @@ pub fn update_leaderboard_display(
     }
 }
 
+/// Ensure leaderboard entries exist when UI is present but entries are missing
+pub fn ensure_leaderboard_entries(
+    mut commands: Commands,
+    cache: Res<LeaderboardCache>,
+    asset_server: Res<AssetServer>,
+    panel_query: Query<&Transform, (With<LeaderboardUI>, Without<Text>)>,
+    entry_query: Query<(), With<LeaderboardEntryText>>,
+) {
+    // Only run if we have the panel but no entries
+    if panel_query.is_empty() {
+        return;
+    }
+
+    if !entry_query.is_empty() {
+        return;
+    }
+
+    // We have a panel but no entries - spawn them
+    if let Ok(panel_transform) = panel_query.get_single() {
+        info!(
+            "Ensuring leaderboard entries exist (is_loading: {}, entries: {})",
+            cache.is_loading,
+            cache.entries.len()
+        );
+
+        let panel_width = 90.0;
+        let panel_height = 75.0;
+        let panel_x = panel_transform.translation.x;
+        let panel_y = panel_transform.translation.y;
+
+        spawn_leaderboard_entries(
+            &mut commands,
+            &asset_server,
+            &cache,
+            panel_x,
+            panel_y,
+            panel_width,
+            panel_height,
+        );
+    }
+}
+
 /// Cleanup leaderboard UI when exiting the main menu
 pub fn cleanup_leaderboard_ui(mut commands: Commands, query: Query<Entity, With<LeaderboardUI>>) {
+    let count = query.iter().count();
+    if count > 0 {
+        info!(
+            "=== CLEANUP_LEADERBOARD_UI despawning {} entities ===",
+            count
+        );
+    }
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }

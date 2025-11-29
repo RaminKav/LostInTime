@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+When using text fonts, if it is the 4x5 font, make sure the font size is always intervals of 5.0, with most of the time defaulting to 5.0. The other font type is intervals of 15.0, defaulting to 15.0 most of the time.

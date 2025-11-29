@@ -6,3 +6,5 @@ notes.md
 .direnv
 /logs
 /analytics
+.shuttle*
+Secrets*.toml

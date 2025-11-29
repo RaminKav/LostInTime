@@ -288,6 +288,7 @@ pub fn handle_name_entry_ok_button(
     current_input: Res<CurrentNameInput>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
+    mut game_data: ResMut<GameData>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
@@ -304,7 +305,7 @@ pub fn handle_name_entry_ok_button(
                         // Save the name and close the UI
                         let name = current_input.text.trim().to_string();
                         if !name.is_empty() {
-                            save_player_name(&name);
+                            save_player_name(&name, &mut game_data);
                             next_ui_state.set(UIState::Closed);
                             commands
                                 .spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.1));
@@ -320,8 +321,8 @@ pub fn handle_name_entry_ok_button(
     }
 }
 
-/// Save player name to game_data.json
-fn save_player_name(name: &str) {
+/// Save player name to game_data.json and update the resource
+fn save_player_name(name: &str, game_data_resource: &mut GameData) {
     let game_data_file_path = datafiles::game_data();
 
     // Load existing game data or create new
@@ -334,6 +335,10 @@ fn save_player_name(name: &str) {
 
     // Update player name
     game_data.player_name = Some(name.to_string());
+    
+    // ALSO update the in-memory resource so it's available immediately
+    game_data_resource.player_name = Some(name.to_string());
+    info!("Updated GameData resource with player name: {}", name);
 
     // Save back to file
     if let Ok(file) = File::create(&game_data_file_path) {
@@ -341,7 +346,7 @@ fn save_player_name(name: &str) {
         if let Err(e) = serde_json::to_writer_pretty(writer, &game_data) {
             error!("Failed to save player name: {:?}", e);
         } else {
-            info!("Player name saved: {}", name);
+            info!("Player name saved to file: {}", name);
         }
     }
 }

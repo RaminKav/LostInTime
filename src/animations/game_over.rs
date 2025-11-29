@@ -6,13 +6,13 @@ use rand::seq::IteratorRandom;
 
 use crate::{
     assets::Graphics,
-    client::{GameData, GameOverEvent},
+    client::{leaderboard::LastSubmittedScore, GameData, GameOverEvent},
     colors::{overwrite_alpha, WHITE},
     datafiles,
     inputs::FacingDirection,
     inventory::ItemStack,
     item::WorldObject,
-    player::{Player, TimeFragmentCurrency},
+    player::{score::RunScore, Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     ui::{
         damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyText, Interactable, MenuButton,
@@ -29,6 +29,17 @@ use super::{
 
 #[derive(Component)]
 pub struct GameOverFadeout(Timer);
+
+/// Helper function to format rank with ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+fn format_rank(rank: i64) -> String {
+    let suffix = match rank % 10 {
+        1 if rank % 100 != 11 => "st",
+        2 if rank % 100 != 12 => "nd",
+        3 if rank % 100 != 13 => "rd",
+        _ => "th",
+    };
+    format!("#{}{} Worldwide", rank, suffix)
+}
 
 pub fn handle_game_over_fadeout(
     mut commands: Commands,
@@ -48,6 +59,8 @@ pub fn handle_game_over_fadeout(
     graphics: Res<Graphics>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     resolution: Res<ScreenResolution>,
+    run_score: Res<RunScore>,
+    last_submitted: Res<LastSubmittedScore>,
 ) {
     if !game_over_events.is_empty() {
         let (player_e, dir, mut player_t, mut sprite, mut anim) = player.single_mut();
@@ -82,7 +95,7 @@ pub fn handle_game_over_fadeout(
                     },
                 ),
                 transform: Transform {
-                    translation: Vec3::new(0., 80., 21.),
+                    translation: Vec3::new(0., 100., 21.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -91,6 +104,60 @@ pub fn handle_game_over_fadeout(
             GameOverText,
             RenderLayers::from_layers(&[3]),
         ));
+
+        // RANK TEXT - spawn as "Submitting..." initially, will be updated by a system
+        let rank_text = if let Some(rank) = last_submitted.rank {
+            format_rank(rank)
+        } else {
+            "Submitting to leaderboard...".to_string()
+        };
+
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    rank_text,
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE.with_a(0.),
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., 64., 21.), // Moved 30px higher
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            GameOverText,
+            GameOverRankText, // Special marker for updating
+            RenderLayers::from_layers(&[3]),
+            Name::new("Rank Text"),
+        ));
+
+        // SCORE TEXT - always show current run's score
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Score: {}", run_score.score),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE.with_a(0.),
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., 48., 21.), // Moved 30px higher
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            GameOverText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Score Text"),
+        ));
+
         // OK BUTTON - spawn like main menu buttons
         let button_entity = commands
             .spawn((
@@ -155,6 +222,9 @@ pub fn handle_game_over_fadeout(
 }
 #[derive(Component)]
 pub struct GameOverText;
+
+#[derive(Component)]
+pub struct GameOverRankText;
 
 #[derive(Resource)]
 pub struct GameOverUITracker {
@@ -342,6 +412,24 @@ pub fn handle_spawn_collected_time_fragments(
                     commands.entity(e).despawn_recursive();
                 }
             }
+        }
+    }
+}
+
+/// System to update the rank text on game over screen when rank becomes available
+pub fn update_game_over_rank_text(
+    last_submitted: Res<LastSubmittedScore>,
+    mut rank_text_query: Query<&mut Text, With<GameOverRankText>>,
+) {
+    // Only update if the rank changed
+    if !last_submitted.is_changed() {
+        return;
+    }
+
+    if let Ok(mut text) = rank_text_query.get_single_mut() {
+        if let Some(rank) = last_submitted.rank {
+            // Update the text to show the actual rank
+            text.sections[0].value = format_rank(rank);
         }
     }
 }

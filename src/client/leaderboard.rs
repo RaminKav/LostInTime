@@ -13,7 +13,17 @@ use crate::{
 };
 
 /// Configuration for leaderboard server
-const LEADERBOARD_API_URL: &str = "http://localhost:3000/api/leaderboard";
+/// Uses localhost in debug builds, production URL in release builds
+#[cfg(debug_assertions)]
+const LEADERBOARD_API_URL: &str =
+    "https://lost-in-time-leaderboard-d1sc.shuttle.app/api/leaderboard"; // Temporarily using production to test
+
+#[cfg(not(debug_assertions))]
+const LEADERBOARD_API_URL: &str =
+    "https://lost-in-time-leaderboard-d1sc.shuttle.app/api/leaderboard";
+
+// Alternative: Use environment variable with fallback
+// const LEADERBOARD_API_URL: &str = env!("LEADERBOARD_URL", "http://localhost:3000/api/leaderboard");
 
 /// Request to submit a score
 #[derive(Debug, Serialize)]
@@ -61,6 +71,14 @@ pub struct LeaderboardCache {
     pub last_updated: Option<DateTime<Utc>>,
     pub is_loading: bool,
     pub last_error: Option<String>,
+}
+
+/// Resource to track the last submitted score and rank for display on game over screen
+#[derive(Resource, Default)]
+pub struct LastSubmittedScore {
+    pub score: i32,
+    pub rank: Option<i64>,
+    pub is_personal_best: bool,
 }
 
 /// Event to trigger score submission
@@ -177,12 +195,16 @@ pub fn handle_fetch_leaderboard_event(
     let thread_pool = AsyncComputeTaskPool::get();
 
     for event in events.iter() {
+        info!("=== HANDLE_FETCH_LEADERBOARD_EVENT processing event ===");
         cache.is_loading = true;
 
         let limit = event.limit;
         let class_filter = event.class_filter.clone();
 
-        info!("Fetching leaderboard (limit: {})", limit);
+        info!(
+            "Fetching leaderboard (limit: {}), spawning async task",
+            limit
+        );
 
         // Spawn async task
         let task =
@@ -236,7 +258,11 @@ pub fn poll_fetch_tasks(
 }
 
 /// System to poll submit tasks
-pub fn poll_submit_tasks(mut commands: Commands, mut tasks: Query<(Entity, &mut SubmitScoreTask)>) {
+pub fn poll_submit_tasks(
+    mut commands: Commands,
+    mut tasks: Query<(Entity, &mut SubmitScoreTask)>,
+    mut last_submitted: ResMut<LastSubmittedScore>,
+) {
     for (entity, mut task) in &mut tasks {
         if let Some(result) = future::block_on(future::poll_once(&mut task.0)) {
             match result {
@@ -245,6 +271,9 @@ pub fn poll_submit_tasks(mut commands: Commands, mut tasks: Query<(Entity, &mut 
                         "Score submitted! Rank: {:?}, Personal Best: {}",
                         response.rank, response.is_personal_best
                     );
+                    // Store the rank for display on game over screen
+                    last_submitted.rank = response.rank;
+                    last_submitted.is_personal_best = response.is_personal_best;
                 }
                 Err(e) => {
                     warn!("Failed to submit score: {}", e);
@@ -261,21 +290,21 @@ pub fn poll_submit_tasks(mut commands: Commands, mut tasks: Query<(Entity, &mut 
 /// Auto-fetch leaderboard when entering main menu
 pub fn auto_fetch_leaderboard_on_menu(
     mut events: EventWriter<FetchLeaderboardEvent>,
-    mut has_fetched: Local<bool>,
+    mut cache: ResMut<LeaderboardCache>,
 ) {
-    // Only fetch once per menu entry
-    if !*has_fetched {
-        *has_fetched = true;
-        events.send(FetchLeaderboardEvent {
-            limit: 5,
-            class_filter: None,
-        });
-    }
-}
+    info!("=== AUTO_FETCH_LEADERBOARD_ON_MENU CALLED ===");
+    info!("Setting cache.is_loading = true");
 
-/// Reset the fetch flag when exiting main menu
-pub fn reset_fetch_flag_on_menu_exit(mut has_fetched: Local<bool>) {
-    *has_fetched = false;
+    // Mark as loading immediately so UI shows loading state
+    cache.is_loading = true;
+
+    // Fetch every time we enter the main menu
+    events.send(FetchLeaderboardEvent {
+        limit: 5,
+        class_filter: None,
+    });
+
+    info!("Sent FetchLeaderboardEvent");
 }
 
 /// Auto-submit score on game over
@@ -287,6 +316,7 @@ pub fn auto_submit_score_on_game_over(
     chaos: Res<crate::chaos::ChaosTracker>,
     class: Res<PlayerClass>,
     graphics: Res<Graphics>,
+    mut last_submitted: ResMut<LastSubmittedScore>,
 ) {
     for _ in game_over_events.iter() {
         // Get player name from game data or use default
@@ -294,11 +324,25 @@ pub fn auto_submit_score_on_game_over(
             .player_name
             .clone()
             .unwrap_or_else(|| "Player".to_string());
+
+        info!(
+            "Submitting score for player: {} (from GameData resource)",
+            player_name
+        );
+
         let class_name = graphics.get_class_data(class.class.clone()).name.clone();
+
+        let score = run_score.score as i32;
+
+        // Store the score being submitted (rank will be updated when response arrives)
+        last_submitted.score = score;
+        last_submitted.rank = None; // Clear previous rank
+        last_submitted.is_personal_best = false;
+
         submit_events.send(SubmitScoreEvent {
             user_id: game_data.user_id.to_string(),
             player_name: player_name.clone(),
-            score: run_score.score as i32,
+            score,
             class: class_name.clone(),
             chaos_level: chaos.get_chaos().trunc() as i32,
             mobs_killed: run_score.mobs_killed as i32,
@@ -315,6 +359,7 @@ impl Plugin for LeaderboardPlugin {
         app.add_event::<SubmitScoreEvent>()
             .add_event::<FetchLeaderboardEvent>()
             .init_resource::<LeaderboardCache>()
+            .init_resource::<LastSubmittedScore>()
             .add_systems((
                 handle_submit_score_event,
                 handle_fetch_leaderboard_event,
@@ -322,7 +367,6 @@ impl Plugin for LeaderboardPlugin {
                 poll_submit_tasks.run_if(has_submit_tasks),
             ))
             .add_system(auto_submit_score_on_game_over.in_set(OnUpdate(GameState::Main)))
-            .add_system(auto_fetch_leaderboard_on_menu.run_if(in_state(GameState::MainMenu)))
-            .add_system(reset_fetch_flag_on_menu_exit.in_schedule(OnExit(GameState::MainMenu)));
+            .add_system(auto_fetch_leaderboard_on_menu.in_schedule(OnEnter(GameState::MainMenu)));
     }
 }

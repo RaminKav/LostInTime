@@ -165,25 +165,53 @@ impl GenerationPlugin {
 
         //TODO: make these come from proto, use frequencies?
         let TREES = world_generation_params.forest_params.tree_weights.clone();
-        // let spawn_ring_offset = if chunk_pos == IVec2::new(0, 0)
-        //     || chunk_pos == IVec2::new(0, -1)
-        //     || chunk_pos == IVec2::new(-1, 0)
-        //     || chunk_pos == IVec2::new(-1, -1)
-        // {
-        //     6
-        // } else {
-        //     0
-        // };
+
+        // Safety check: ensure we have valid tree weights
+        if TREES.is_empty() {
+            error!("No tree weights defined for forest generation!");
+            return vec![];
+        }
+
+        // Log tree weights for debugging
+        let total_weight: f32 = TREES.values().sum();
+        if total_weight <= 0.0 || !total_weight.is_finite() {
+            error!(
+                "Invalid tree weights! Total: {}, Weights: {:?}",
+                total_weight, TREES
+            );
+            return vec![];
+        }
+
         let num_clusters = if rng.gen_ratio(1, 2) { 3 } else { 2 };
         let mut trees: Vec<(TileMapPosition, WorldObject)> = vec![];
         for _ in 0..num_clusters {
-            let mut picked_trees = TREES
-                .iter()
-                .collect_vec()
-                .choose_multiple_weighted(&mut rng.clone(), 2, |item| *item.1 as f64)
-                .unwrap()
-                .map(|x| x.0)
-                .collect_vec();
+            let trees_vec = TREES.iter().collect_vec();
+
+            // Choose trees (min of 2 or available count)
+            let num_to_pick = usize::min(2, trees_vec.len());
+
+            let picked_trees_result =
+                trees_vec.choose_multiple_weighted(&mut rng.clone(), num_to_pick, |item| {
+                    let weight = *item.1 as f64;
+                    if !weight.is_finite() || weight < 0.0 {
+                        error!("Invalid tree weight for {:?}: {}", item.0, weight);
+                        return 0.0; // Return 0 for invalid weights
+                    }
+                    weight
+                });
+
+            let mut picked_trees = match picked_trees_result {
+                Ok(iter) => iter.map(|x| x.0).collect_vec(),
+                Err(e) => {
+                    error!("Failed to pick trees: {:?}, TREES: {:?}", e, TREES);
+                    // Fallback: just pick the first tree
+                    if let Some(first) = trees_vec.first() {
+                        vec![first.0]
+                    } else {
+                        continue;
+                    }
+                }
+            };
             if picked_trees.contains(&&WorldObject::RedTree) {
                 picked_trees = vec![&WorldObject::RedTree];
             }

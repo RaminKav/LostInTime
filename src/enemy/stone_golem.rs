@@ -28,7 +28,7 @@ aseprite!(pub StonePillar, "textures/stonegolem/StonePillar.ase");
 // Constants
 const SPIKE_ATTACK_COUNT: usize = 5;
 const SPIKE_ATTACK_INTERVAL: f32 = 0.15;
-const SPIKE_WARNING_DELAY: f32 = 0.45; // Time between warning and damage
+const SPIKE_WARNING_DELAY: f32 = 0.47; // Time between warning and damage
 const SPIKE_DAMAGE: i32 = 25;
 const SPIKE_DURATION: f32 = 10.0; // How long the spike hitbox lasts
 
@@ -81,7 +81,7 @@ pub fn handle_new_stone_golem_state_machine(
         animation.play();
 
         let mut rng = rand::thread_rng();
-        let initial_timer = rng.gen_range(1.0..3.0);
+        let initial_timer = rng.gen_range(3.0..5.0);
         info!("NEW STONE GOLEM @@@@@@@");
         e_cmds
             .insert(AsepriteBundle {
