@@ -69,5 +69,8 @@ opt-level = 3
 codegen-units = 1
 lto = "thin"
 
+[patch.crates-io]
+bevy_ecs = { path = "patches/bevy_ecs-0.10.1" }
+
 [build-dependencies]
 embed-resource = "2.4.3"
