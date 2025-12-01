@@ -35,11 +35,10 @@ bevy_aseprite = { git = "https://github.com/RaminKav/bevy_aseprite.git", branch 
 rand_chacha = "0.3.1"
 pathfinding = "4.10.0"
 tungstenite = { version = "0.23.0", features = ['native-tls-vendored'] }
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 webbrowser = "1.0.1"
 bevy_hanabi = { version = "0.6", default-features = false, features = ["2d"] }
 chrono = { version = "0.4.38", features = ["serde"] }
-openssl = { version = "0.10.66", features = ["vendored"] }
 logs-wheel = "0.3.1"
 tracing-subscriber = "0.3.18"
 tracing = "0.1.40"
