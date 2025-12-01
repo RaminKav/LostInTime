@@ -161,7 +161,8 @@ pub fn setup_name_entry_ui(
         Name::new("Input Field Inner"),
     ));
 
-    // Input text with cursor (starts with just cursor)
+    // Input text with cursor (using two sections so cursor follows text)
+    let font_handle = asset_server.load("fonts/4x5.ttf");
     commands.spawn((
         Text2dBundle {
             text: Text {
@@ -169,7 +170,7 @@ pub fn setup_name_entry_ui(
                     TextSection {
                         value: "".to_string(),
                         style: TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
+                            font: font_handle.clone(),
                             font_size: 5.0,
                             color: DARK_WOOD_BROWN,
                         },
@@ -177,7 +178,7 @@ pub fn setup_name_entry_ui(
                     TextSection {
                         value: "|".to_string(),
                         style: TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
+                            font: font_handle,
                             font_size: 5.0,
                             color: DARK_WOOD_BROWN,
                         },
@@ -267,14 +268,51 @@ pub fn handle_name_entry_input(
 }
 
 /// Update the displayed text in the input field
+/// We rebuild the entire Text to ensure Bevy's change detection picks it up
 pub fn update_name_entry_text(
     current_input: Res<CurrentNameInput>,
     mut text_query: Query<&mut Text, With<NameEntryInput>>,
+    asset_server: Res<AssetServer>,
 ) {
-    if current_input.is_changed() {
-        for mut text in text_query.iter_mut() {
-            // Section 0 is the user input, Section 1 is the cursor
-            text.sections[0].value = current_input.text.clone();
+    // Defensive: Check if query is empty to avoid race condition
+    if text_query.is_empty() {
+        return;
+    }
+
+    for mut text in text_query.iter_mut() {
+        let new_value = current_input.text.clone();
+        // Only update if different to avoid unnecessary work
+        if text.sections[0].value != new_value {
+            // Rebuild the entire Text to force change detection
+            let font_handle = asset_server.load("fonts/4x5.ttf");
+            let cursor_value = text
+                .sections
+                .get(1)
+                .map(|s| s.value.clone())
+                .unwrap_or_else(|| "|".to_string());
+
+            *text = Text {
+                sections: vec![
+                    TextSection {
+                        value: new_value,
+                        style: TextStyle {
+                            font: font_handle.clone(),
+                            font_size: 5.0,
+                            color: DARK_WOOD_BROWN,
+                        },
+                    },
+                    TextSection {
+                        value: cursor_value,
+                        style: TextStyle {
+                            font: font_handle,
+                            font_size: 5.0,
+                            color: DARK_WOOD_BROWN,
+                        },
+                    },
+                ],
+                alignment: TextAlignment::Left,
+                ..Default::default()
+            };
         }
     }
 }
@@ -335,7 +373,7 @@ fn save_player_name(name: &str, game_data_resource: &mut GameData) {
 
     // Update player name
     game_data.player_name = Some(name.to_string());
-    
+
     // ALSO update the in-memory resource so it's available immediately
     game_data_resource.player_name = Some(name.to_string());
     info!("Updated GameData resource with player name: {}", name);
@@ -380,22 +418,54 @@ pub fn check_show_name_entry_popup(
 }
 
 /// Update cursor blink animation
+/// We rebuild the entire Text to ensure Bevy's change detection picks it up
 pub fn update_cursor_blink(
     time: Res<Time>,
     mut blink_timer: ResMut<CursorBlinkTimer>,
     mut text_query: Query<&mut Text, With<CursorBlink>>,
+    asset_server: Res<AssetServer>,
 ) {
+    // Defensive: Check if query is empty to avoid race condition
+    if text_query.is_empty() {
+        return;
+    }
+
     blink_timer.timer.tick(time.delta());
 
     if blink_timer.timer.just_finished() {
         for mut text in text_query.iter_mut() {
-            // Section 1 is the cursor - toggle its visibility
             if text.sections.len() > 1 {
-                let current = &text.sections[1].value;
-                text.sections[1].value = if current == "|" {
+                let user_text = text.sections[0].value.clone();
+                let current_cursor = &text.sections[1].value;
+                let new_cursor = if current_cursor == "|" {
                     "".to_string()
                 } else {
                     "|".to_string()
+                };
+
+                // Rebuild the entire Text to force change detection
+                let font_handle = asset_server.load("fonts/4x5.ttf");
+                *text = Text {
+                    sections: vec![
+                        TextSection {
+                            value: user_text,
+                            style: TextStyle {
+                                font: font_handle.clone(),
+                                font_size: 5.0,
+                                color: DARK_WOOD_BROWN,
+                            },
+                        },
+                        TextSection {
+                            value: new_cursor,
+                            style: TextStyle {
+                                font: font_handle,
+                                font_size: 5.0,
+                                color: DARK_WOOD_BROWN,
+                            },
+                        },
+                    ],
+                    alignment: TextAlignment::Left,
+                    ..Default::default()
                 };
             }
         }
@@ -407,9 +477,12 @@ pub fn cleanup_name_entry_ui(
     mut commands: Commands,
     query: Query<Entity, With<NameEntryUI>>,
     mut current_input: ResMut<CurrentNameInput>,
+    mut blink_timer: ResMut<CursorBlinkTimer>,
 ) {
     for entity in query.iter() {
         commands.entity(entity).despawn_recursive();
     }
     current_input.text.clear();
+    // Reset blink timer for next time
+    blink_timer.timer.reset();
 }
