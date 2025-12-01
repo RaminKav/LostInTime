@@ -34,6 +34,7 @@ use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
 use active_skill_shrine::{
     add_active_skill_shrine_visuals_on_spawn, handle_active_skill_shrine_completion,
+    handle_active_skill_shrine_esc,
 };
 use bevy::prelude::*;
 use bevy::reflect::TypeUuid;
@@ -943,6 +944,7 @@ impl Plugin for ItemsPlugin {
                 (
                     add_active_skill_shrine_visuals_on_spawn,
                     handle_active_skill_shrine_completion,
+                    handle_active_skill_shrine_esc,
                     handle_dungeon_shrine_rewards,
                     add_dungeon_shrine_visuals_on_spawn,
                     handle_dungeon_shrine_activation,

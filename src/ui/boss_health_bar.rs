@@ -21,6 +21,7 @@ pub struct BossNameText;
 const BOSS_BAR_WIDTH: f32 = 120.0;
 const BOSS_BAR_HEIGHT: f32 = 6.0;
 const BOSS_BAR_Y_OFFSET: f32 = GAME_HEIGHT / 2.0 - 40.0; // Top center half of screen
+const BOSS_BAR_SPACING: f32 = 22.0; // Vertical spacing between multiple boss bars
 
 /// Spawns the boss health bar UI when a boss spawns
 pub fn spawn_boss_health_bar(
@@ -29,7 +30,7 @@ pub fn spawn_boss_health_bar(
     bosses: Query<(Entity, &Mob, &MaxHealth), (Added<Mob>, With<MaxHealth>)>,
     boss_health: Query<&CurrentHealth, With<Mob>>,
     existing_bars: Query<
-        Entity,
+        &BossEntity,
         Or<(
             With<BossHealthBar>,
             With<BossHealthBarFrame>,
@@ -42,10 +43,15 @@ pub fn spawn_boss_health_bar(
             continue;
         }
 
-        // Despawn any existing boss health bar first
-        for existing_bar in existing_bars.iter() {
-            commands.entity(existing_bar).despawn_recursive();
-        }
+        // Count how many boss health bars already exist to determine offset
+        let existing_boss_count = existing_bars
+            .iter()
+            .map(|be| be.0)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+
+        // Calculate vertical offset based on number of existing boss bars
+        let y_offset = BOSS_BAR_Y_OFFSET - (existing_boss_count as f32 * BOSS_BAR_SPACING);
 
         let boss_name = format!("{}", mob.get_boss_name().unwrap_or("BOSS"));
 
@@ -72,7 +78,7 @@ pub fn spawn_boss_health_bar(
                     ),
                     text_anchor: Anchor::Center,
                     transform: Transform {
-                        translation: Vec3::new(0., BOSS_BAR_Y_OFFSET + 12.0, 10.),
+                        translation: Vec3::new(0., y_offset + 12.0, 10.),
                         ..Default::default()
                     },
                     ..default()
@@ -94,7 +100,7 @@ pub fn spawn_boss_health_bar(
                         ..default()
                     },
                     transform: Transform {
-                        translation: Vec3::new(0., BOSS_BAR_Y_OFFSET, 9.),
+                        translation: Vec3::new(0., y_offset, 9.),
                         ..Default::default()
                     },
                     visibility: Visibility::Visible,
@@ -117,7 +123,7 @@ pub fn spawn_boss_health_bar(
                         ..default()
                     },
                     transform: Transform {
-                        translation: Vec3::new(-BOSS_BAR_WIDTH / 2.0, BOSS_BAR_Y_OFFSET, 10.),
+                        translation: Vec3::new(-BOSS_BAR_WIDTH / 2.0, y_offset, 10.),
                         scale: Vec3::new(health_percent, 1.0, 1.0),
                         ..Default::default()
                     },

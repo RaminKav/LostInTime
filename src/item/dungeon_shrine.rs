@@ -12,7 +12,7 @@ use crate::{
         combat_shrine::CombatShrineAnim, object_actions::ObjectAction, LootTable, PlaceItemEvent,
     },
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     GameParam,
 };
 
@@ -29,6 +29,7 @@ pub struct DungeonShrine {
     pub num_mobs_left: usize,
     pub is_cleared: bool,
     pub is_activated: bool,
+    pub tile_pos: TileMapPosition,
 }
 
 #[derive(Component, Clone, Debug)]
@@ -171,11 +172,9 @@ pub fn handle_dungeon_shrine_rewards(
                     .insert(done_object)
                     .remove::<ObjectAction>();
 
-                let anchor = proto
-                    .get_component::<SpriteAnchor, _>(done_object)
-                    .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+                // Use the stored tile position instead of recalculating
                 game.add_object_to_chunk_cache(
-                    world_pos_to_tile_pos(t.translation().truncate() - anchor.0),
+                    shrine.tile_pos,
                     done_object,
                 );
 

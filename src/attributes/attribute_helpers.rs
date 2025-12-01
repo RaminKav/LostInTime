@@ -24,6 +24,7 @@ pub fn create_new_random_item_stack_with_attributes(
     proto: &ProtoParam,
     commands: &mut Commands,
     loot_bonus: i32,
+    play_audio: bool,
 ) -> ItemStack {
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
         let mut stack = stack.clone();
@@ -50,6 +51,7 @@ pub fn create_new_random_item_stack_with_attributes(
         eqp_type,
         stack.metadata.level,
         commands,
+        play_audio,
     )
 }
 
@@ -61,7 +63,7 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     };
 
     let mut rng = rand::thread_rng();
-    let rarity_rng = rng.gen_range(0..=6);
+    let rarity_rng = rng.gen_range(0..=4);
     let rarity = if rarity_rng <= 0 {
         stack.rarity.get_next_rarity()
     } else {
@@ -123,6 +125,7 @@ pub fn build_item_stack_with_parsed_attributes(
     equip_type: &EquipmentType,
     level_option: Option<u8>,
     commands: &mut Commands,
+    play_audio: bool,
 ) -> ItemStack {
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
         raw_bonus_att.into_item_attributes(rarity.clone(), equip_type)
@@ -148,13 +151,13 @@ pub fn build_item_stack_with_parsed_attributes(
     let mut new_stack = stack.copy_with_attributes(&final_att);
     new_stack.metadata.level = Some(level);
     new_stack.rarity = rarity.clone();
-    if rarity == ItemRarity::Legendary {
+    if play_audio && rarity == ItemRarity::Legendary {
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5).with_delay(0.55));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2).with_delay(2.3));
     }
-    if rarity == ItemRarity::Rare {
+    if play_audio && rarity == ItemRarity::Rare {
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4));
@@ -190,10 +193,10 @@ pub fn levelup_item_stats(
             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
                 if !skip_main_attributes {
                     modifiers.push(("health".to_owned(), 2));
-                    modifiers.push(("armor".to_owned(), 1));
+                    modifiers.push(("defence".to_owned(), 1));
                 }
                 filter.push("health");
-                filter.push("armor");
+                filter.push("defence");
             }
             for _ in 0..num_upgrades {
                 if let Some(bonus_mod) = stack

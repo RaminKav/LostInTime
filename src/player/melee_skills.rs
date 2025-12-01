@@ -9,7 +9,7 @@ use crate::{
     attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen},
     audio::{AudioSoundEffect, SoundSpawner},
     colors::LIGHT_RED,
-    combat_helpers::{spawn_one_time_aseprite_collider, spawn_temp_collider},
+    combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider},
     enemy::Mob,
     inputs::{CursorPos, MovementVector},
     item::{projectile::Projectile, WorldObject},
@@ -304,18 +304,23 @@ pub fn spawn_echo_hitbox(
     player: Entity,
     dmg: i32,
 ) {
-    let hitbox_e = spawn_one_time_aseprite_collider(
+    // Use default animation to ensure it starts at frame 0
+    let anim = AsepriteAnimation::default();
+
+    // Queue deferred spawn with parent - actual entity will be created in PreUpdate and parented
+    spawn_deferred_aseprite_collider(
         commands,
         Transform::from_translation(Vec3::ZERO),
         10.5,
         dmg,
         Collider::capsule(Vec2::ZERO, Vec2::ZERO, 26.),
         asset_server.load::<Aseprite, _>(Echo::PATH),
-        AsepriteAnimation::from(Echo::tags::ECHO),
+        anim,
         false,
         Projectile::Echo,
+        vec![],       // No extra components needed
+        Some(player), // Parent to player entity
     );
-    commands.entity(hitbox_e).set_parent(player);
 }
 
 pub fn handle_spear_gravity(

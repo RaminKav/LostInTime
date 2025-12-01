@@ -235,8 +235,16 @@ impl Plugin for PlayerPlugin {
                     .before(handle_add_damage_numbers_after_hit),)
                     .in_set(OnUpdate(GameState::Main)),
             )
-            .add_system(reset_time_fragment_counters.in_schedule(OnEnter(GameState::Main)))
-            .add_system(reset_coin_counters.in_schedule(OnEnter(GameState::Main)))
+            .add_system(
+                reset_time_fragment_counters
+                    .run_if(run_once_per_run())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
+                reset_coin_counters
+                    .run_if(run_once_per_run())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
             .add_system(
                 give_player_starting_items
                     .run_if(run_once_per_run())

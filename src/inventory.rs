@@ -2,8 +2,8 @@ use core::panic;
 use std::cmp::min;
 
 use crate::{
-    animations::{AnimationPosTracker, AnimationTimer},
-    attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity},
+    animations::{AnimationPosTracker, AnimationTimer, DoneAnimation},
+    attributes::{add_item_glows, AttributeModifier, ItemAttributes, ItemRarity, RarityGlows},
     container::Container,
     inputs::FacingDirection,
     item::{
@@ -19,6 +19,7 @@ use crate::{
 use rand::Rng;
 
 use bevy::prelude::*;
+use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 
 use crate::item::ammo::Ammo;
 use bevy_proto::prelude::*;

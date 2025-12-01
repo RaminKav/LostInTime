@@ -9,7 +9,7 @@ use crate::{
     enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
     item::{object_actions::ObjectAction, LootTable},
     proto::proto_param::ProtoParam,
-    world::{world_helpers::world_pos_to_tile_pos, TILE_SIZE},
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     GameParam,
 };
 
@@ -23,6 +23,7 @@ pub struct CombatShrineMob {
 #[derive(Component)]
 pub struct CombatShrine {
     pub num_mobs_left: usize,
+    pub tile_pos: TileMapPosition,
 }
 
 pub struct CombatShrineMobDeathEvent(pub Entity);
@@ -126,11 +127,9 @@ pub fn handle_shrine_rewards(
                     .insert(WorldObject::CombatShrineDone)
                     .remove::<ObjectAction>();
                 *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
-                let anchor = proto
-                    .get_component::<SpriteAnchor, _>(WorldObject::CombatShrine)
-                    .unwrap_or(&SpriteAnchor(Vec2::ZERO));
+                // Use the stored tile position instead of recalculating
                 game.add_object_to_chunk_cache(
-                    world_pos_to_tile_pos(t.translation().truncate() - anchor.0),
+                    shrine.tile_pos,
                     WorldObject::CombatShrineDone,
                 );
             }

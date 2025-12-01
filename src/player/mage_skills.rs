@@ -177,8 +177,9 @@ pub fn spawn_ice_explosion_hitbox(
     pos: Vec3,
     dmg: i32,
 ) {
-    let anim = AsepriteAnimation::from(IceExplosion::tags::ICE_EXPLOSION);
-    
+    // Use default animation to ensure it starts at frame 0
+    let anim = AsepriteAnimation::default();
+
     // Queue deferred spawn - actual entity will be created in PreUpdate
     spawn_deferred_aseprite_collider(
         commands,
@@ -191,6 +192,7 @@ pub fn spawn_ice_explosion_hitbox(
         false,
         Projectile::IceExplosionAOE,
         vec![DeferredComponent::IceExplosionDmg],
+        None, // No parent
     );
     // Sound is now handled by the caller to batch multiple explosions
 }

@@ -1117,7 +1117,7 @@
             anchor: None,
         ),
         FrozenMPRegen: WorldObjectData(
-            texture_pos: (11., 19.),
+            texture_pos: (10., 19.),
             size: (16., 16.),
             anchor: None,
         ),

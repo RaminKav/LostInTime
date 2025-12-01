@@ -269,6 +269,135 @@ pub fn tick_skill_choice_interaction_lock_timers(
         skill_ui.interaction_lock_timer.tick(time.delta());
     }
 }
+/// Helper function to spawn a single heirloom tooltip card
+/// Returns the entity ID of the card
+pub fn spawn_heirloom_tooltip_card(
+    graphics: &Graphics,
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    heirloom: crate::player::skills::Heirloom,
+    rarity: crate::player::skills::HeirloomRarity,
+    position: Vec3,
+    parent: Option<Entity>,
+) -> Entity {
+    use crate::attributes::ItemGlow;
+
+    let size = SKILLS_CHOICE_UI_SIZE;
+    let ui_element = heirloom.get_ui_element(rarity.clone());
+    let card_e = commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(ui_element.clone()),
+            sprite: Sprite {
+                custom_size: Some(size),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: position,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(ui_element)
+        .insert(UIState::Essence)
+        .insert(Name::new("HEIRLOOM TOOLTIP CARD"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+
+    // icon
+    let skill_icon = commands
+        .spawn(SpriteSheetBundle {
+            sprite: graphics.get_heirloom_icon(heirloom.clone()),
+            texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+            transform: Transform {
+                translation: Vec2::new(0., 25.).extend(4.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("HEIRLOOM ICON"))
+        .set_parent(card_e)
+        .id();
+
+    // Add rarity-based background if not common
+    if let Some(glow) = rarity.get_item_glow() {
+        commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_item_glow(glow),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(32., 32.)),
+                    ..Default::default()
+                },
+                transform: Transform {
+                    translation: Vec2::new(0., 0.).extend(-1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .set_parent(skill_icon);
+    }
+
+    // title
+    let mut text_title = commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                heirloom.get_title(),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: WHITE,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(0.5, 50.5, 1.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        },
+        Name::new("Heirloom Title"),
+        RenderLayers::from_layers(&[3]),
+    ));
+    text_title.set_parent(card_e);
+
+    // description
+    for (j, desc) in heirloom.get_desc().iter().enumerate() {
+        let mut text_desc = commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    desc,
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: WHITE,
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0.5, -(j as f32 * 9.) + 0.5, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("Heirloom Desc"),
+            RenderLayers::from_layers(&[3]),
+        ));
+        text_desc.set_parent(card_e);
+    }
+
+    if let Some(parent_e) = parent {
+        commands.entity(card_e).set_parent(parent_e);
+    }
+
+    card_e
+}
+
 pub fn spawn_skill_choice_entities(
     graphics: &Graphics,
     commands: &mut Commands,

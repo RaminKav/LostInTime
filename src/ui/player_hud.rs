@@ -20,9 +20,7 @@ use crate::{
     night::NightTracker,
     player::{
         levels::PlayerLevel,
-        skills::{
-            ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills, SkillChargeTracker,
-        },
+        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -379,13 +377,9 @@ pub fn setup_currency_ui(
                         color: BLACK,
                     },
                 ),
-                text_anchor: Anchor::Center,
+                text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 50.5,
-                        GAME_HEIGHT / 2. - 43.5,
-                        6.,
-                    ),
+                    translation: Vec3::new(-res.game_width / 2. + 46., GAME_HEIGHT / 2. - 43.5, 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -402,7 +396,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::Coin),
         &asset_server,
-        Vec2::new(-9.5, 0.5),
+        Vec2::new(-6., 0.5),
         Vec2::new(0., 0.),
         3,
     );
@@ -696,9 +690,16 @@ pub fn handle_update_player_skills(
 
             // Spawn all icons in one consolidated loop
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
+                const MAX_ICONS_PER_ROW: usize = 14;
+                const ICON_SPACING: f32 = 16.;
+                const ROW_SPACING: f32 = 16.;
+
+                let row = i / MAX_ICONS_PER_ROW;
+                let col = i % MAX_ICONS_PER_ROW;
+
                 let offset = Vec2::new(
-                    i as f32 * 16. + (-res.game_width) / 2. + 98.,
-                    (GAME_HEIGHT - 15.) / 2. - 12.5,
+                    col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
+                    (GAME_HEIGHT - 15.) / 2. - 0.5 - (row as f32 * ROW_SPACING),
                 );
 
                 // Create the main icon

@@ -20,7 +20,7 @@ use scrapper_ui::{
 };
 use screen_effects::{handle_screen_effects, setup_screen_effects, ScreenEffectMaterial};
 pub use ui_container_param::*;
-mod boss_health_bar;
+pub mod boss_health_bar;
 mod enemy_health_bar;
 mod fps_text;
 pub mod key_input_guide;
@@ -409,6 +409,10 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 update_active_skill_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_essence_heirloom_tooltip
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(

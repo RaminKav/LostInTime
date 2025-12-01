@@ -8,3 +8,4 @@ notes.md
 /analytics
 .shuttle*
 Secrets*.toml
+*.log

@@ -94,7 +94,7 @@ impl ObjectAction {
     pub fn run_action(
         &self,
         e: Entity,
-        _obj_pos: TileMapPosition,
+        obj_pos: TileMapPosition,
         obj: WorldObject,
         game: &mut GameParam,
         item_action_param: &mut ItemActionParam,
@@ -161,6 +161,7 @@ impl ObjectAction {
                 });
             }
             ObjectAction::DungeonExit => {
+                // Find the most recent non-dungeon era, defaulting to Era::Main if none found
                 let current_era: usize = game
                     .era
                     .visited_eras
@@ -169,7 +170,7 @@ impl ObjectAction {
                     .map(|e| e.index())
                     .sorted()
                     .last()
-                    .expect(" No previous era found when exiting dungeon");
+                    .unwrap_or(0); // Default to Era::Main (index 0) if no previous era
                 item_action_param.dim_event.send(DimensionSpawnEvent {
                     swap_to_dim_now: true,
                     new_era: Some(Era::from_index(current_era)),
@@ -329,6 +330,7 @@ impl ObjectAction {
                     .entity(e)
                     .insert(CombatShrine {
                         num_mobs_left: num_spawns_left,
+                        tile_pos: obj_pos,
                     })
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
@@ -360,14 +362,20 @@ impl ObjectAction {
                 if rng.gen_bool(0.35) {
                     commands
                         .entity(e)
-                        .insert(GambleShrine { success: true })
+                        .insert(GambleShrine {
+                            success: true,
+                            tile_pos: obj_pos,
+                        })
                         .insert(AsepriteAnimation::from(
                             GambleShrineAnim::tags::ACTIVATE_SUCCESS,
                         ));
                 } else {
                     commands
                         .entity(e)
-                        .insert(GambleShrine { success: false })
+                        .insert(GambleShrine {
+                            success: false,
+                            tile_pos: obj_pos,
+                        })
                         .insert(AsepriteAnimation::from(
                             GambleShrineAnim::tags::ACTIVATE_FAIL,
                         ));
@@ -425,7 +433,10 @@ impl ObjectAction {
                     .entity(e)
                     .remove::<ObjectAction>()
                     .remove::<InteractionGuideTrigger>()
-                    .insert(ActiveSkillShrineState { is_used: false });
+                    .insert(ActiveSkillShrineState {
+                        is_used: false,
+                        tile_pos: obj_pos,
+                    });
 
                 // Open active skill shrine selection UI
                 item_action_param
@@ -438,7 +449,10 @@ impl ObjectAction {
                     .entity(e)
                     .remove::<ObjectAction>()
                     .remove::<InteractionGuideTrigger>()
-                    .insert(HeirloomShrineState { is_used: false });
+                    .insert(HeirloomShrineState {
+                        is_used: false,
+                        tile_pos: obj_pos,
+                    });
 
                 // Open skills choice UI - will be populated by handle_heirloom_shrine_interaction
                 item_action_param.next_inv_state.set(UIState::Skills);
@@ -468,6 +482,7 @@ impl ObjectAction {
                         num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
                         is_cleared: false,
                         is_activated: false,
+                        tile_pos: obj_pos,
                     })
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
@@ -503,6 +518,7 @@ impl ObjectAction {
                         num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
                         is_cleared: false,
                         is_activated: false,
+                        tile_pos: obj_pos,
                     })
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
@@ -536,6 +552,7 @@ impl ObjectAction {
                         num_mobs_left: NUM_DUNGEON_SHRINE_MOBS,
                         is_cleared: false,
                         is_activated: false,
+                        tile_pos: obj_pos,
                     })
                     .insert(AsepriteAnimation::from(CombatShrineAnim::tags::ACTIVATE))
                     .remove::<InteractionGuideTrigger>()
@@ -547,13 +564,29 @@ impl ObjectAction {
                 item_action_param
                     .increase_chaos_event
                     .send(IncreaseChaosEvent { amount: *amount });
-                let pos = tile_pos_to_world_pos(_obj_pos, true);
-                info!("{pos:?} {_obj_pos:?}");
+                let pos = tile_pos_to_world_pos(obj_pos, true);
+                info!("{pos:?} {obj_pos:?}");
+
+                // Update sprite to the "Done" variant
+                let done_sprite = game
+                    .graphics
+                    .spritesheet_map
+                    .as_ref()
+                    .unwrap()
+                    .get(&WorldObject::ChaosTotemDone)
+                    .unwrap()
+                    .clone();
+
                 commands
                     .entity(e)
                     .insert(WorldObject::ChaosTotemDone)
+                    .insert(done_sprite)
                     .remove::<InteractionGuideTrigger>()
                     .remove::<ObjectAction>();
+
+                // Update the world object cache so the totem stays "Done" when chunk respawns
+                game.add_object_to_chunk_cache(obj_pos, WorldObject::ChaosTotemDone);
+
                 let spawn_pos = pos + Vec2::new(0., -18.);
                 // We need both mutable proto_commands and immutable proto_param.
                 // Since spawn_item_from_proto only reads from proto_param, we can safely

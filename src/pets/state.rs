@@ -223,9 +223,23 @@ pub fn test_spawn_pet(mut commands: Commands, _proto: ProtoParam, keys: Res<Inpu
 pub fn configure_pet_on_spawn(
     mut commands: Commands,
     new_pets: Query<(Entity, &Pet), Added<Pet>>,
+    existing_pets: Query<&PetState>,
     mut events: EventWriter<UpdatePetWeaponEvent>,
 ) {
     for (pet_entity, pet) in new_pets.iter() {
+        // Determine which hotbar slot to use based on number of existing pets
+        // First pet uses slot 5 (6th slot), second pet uses slot 4 (5th slot)
+        let num_existing_pets = existing_pets.iter().count();
+        let hot_bar_slot = match num_existing_pets {
+            0 => 5, // First pet: 6th slot
+            1 => 4, // Second pet: 5th slot
+            _ => {
+                // If somehow there are more than 2 pets, default to slot 5
+                warn!("More than 2 pets detected! Defaulting to slot 5.");
+                5
+            }
+        };
+        
         let pet_state = PetState {
             max_distance_from_player: 16. * 9.,
             max_target_distance: 16. * 9.,
@@ -236,7 +250,7 @@ pub fn configure_pet_on_spawn(
             current_target: None,
             attack_cooldown: Timer::from_seconds(10.0, TimerMode::Repeating),
             projectile: Projectile::None,
-            hot_bar_slot: 5,
+            hot_bar_slot,
             is_following_player: false,
         };
 

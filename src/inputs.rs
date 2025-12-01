@@ -15,7 +15,7 @@ use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState, HealSkillState,
-    Heirloom, IceWallSkillState, PlayerSkills, SkillChargeTracker,
+    Heirloom, IceWallSkillState, PlayerSkills,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -600,11 +600,12 @@ pub fn close_container(
                     next_inv_state.set(UIState::Closed);
                 }
                 // Don't close important selection UIs with ESC
-                UIState::ItemChest
-                | UIState::Skills
-                | UIState::ActiveSkills
-                | UIState::ActiveSkillShrine => {
+                UIState::ItemChest | UIState::Skills => {
                     // Player must make a choice, can't accidentally close
+                }
+                UIState::ActiveSkills | UIState::ActiveSkillShrine => {
+                    // Allow closing active skill selection with ESC
+                    next_inv_state.set(UIState::Closed);
                 }
                 _ => {
                     // Close any other UI
@@ -615,11 +616,12 @@ pub fn close_container(
             // In main menu or other game states, just close UI
             // But still don't close important selection UIs
             match curr_state.0 {
-                UIState::ItemChest
-                | UIState::Skills
-                | UIState::ActiveSkills
-                | UIState::ActiveSkillShrine => {
+                UIState::ItemChest | UIState::Skills => {
                     // Don't close
+                }
+                UIState::ActiveSkills | UIState::ActiveSkillShrine => {
+                    // Allow closing active skill selection with ESC
+                    next_inv_state.set(UIState::Closed);
                 }
                 _ => {
                     next_inv_state.set(UIState::Closed);

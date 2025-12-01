@@ -1541,22 +1541,32 @@ impl Plugin for AttributesPlugin {
     }
 }
 
+#[derive(Component)]
+pub struct GameOverSent;
+
 pub fn clamp_health(
+    mut commands: Commands,
     mut health: Query<
         (
+            Entity,
             &mut CurrentHealth,
             &MaxHealth,
             &mut CurrentShield,
             &MaxShield,
+            Option<&GameOverSent>,
         ),
         With<Player>,
     >,
     mut game_over_event: EventWriter<GameOverEvent>,
 ) {
-    for (mut h, max_h, mut s, max_s) in health.iter_mut() {
+    for (entity, mut h, max_h, mut s, max_s, game_over_sent) in health.iter_mut() {
         if h.0 <= 0 {
             h.0 = 0;
-            game_over_event.send_default();
+            // Only send game over event once
+            if game_over_sent.is_none() {
+                game_over_event.send_default();
+                commands.entity(entity).insert(GameOverSent);
+            }
         } else if h.0 > max_h.0 {
             h.0 = max_h.0;
         }
@@ -1833,6 +1843,7 @@ fn handle_new_items_raw_attributes(
             eqp_type,
             item_level.map(|l| l.0),
             &mut commands,
+            false,
         );
 
         if new_stack.rarity.clone() == ItemRarity::Rare {
@@ -1888,7 +1899,7 @@ pub fn add_item_glows(
     if commands.get_entity(new_item_e).is_none() {
         return None;
     }
-
+    info!("Adding item glows for rarity: {:?}", rarity);
     rarity.get_item_glow().map(|glow| {
         commands
             .spawn(SpriteBundle {

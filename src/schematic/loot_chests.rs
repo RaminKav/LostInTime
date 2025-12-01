@@ -172,6 +172,7 @@ pub fn handle_new_loot_chest_spawn(
                             &proto_param,
                             &mut commands,
                             loot_bonus,
+                            false,
                         ),
                         picked_slot,
                     ));

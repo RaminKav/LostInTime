@@ -10,7 +10,7 @@
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
     "survival_rogue_like::enemy::FollowSpeed": (0.5),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: -14., y1: -14., x2: 14., y2: -14., r: 14.),
-    "survival_rogue_like::attributes::MaxHealth": (1000),
+    "survival_rogue_like::attributes::MaxHealth": (900),
     "survival_rogue_like::attributes::Attack": (20),
     "survival_rogue_like::player::levels::ExperienceReward": (300),
     "survival_rogue_like::enemy::MobLevel": (1),

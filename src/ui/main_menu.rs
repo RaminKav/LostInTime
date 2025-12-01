@@ -124,10 +124,7 @@ pub fn display_main_menu(
             ..Default::default()
         },
         sprite: Sprite {
-            custom_size: Some(Vec2::new(
-                res.game_width / ZOOM_SCALE,
-                GAME_HEIGHT / ZOOM_SCALE,
-            )),
+            custom_size: Some(Vec2::new(res.game_width, GAME_HEIGHT)),
             ..Default::default()
         },
         ..Default::default()
@@ -510,7 +507,7 @@ pub fn spawn_menu_text_buttons(
 ) {
     // Start Button
     spawn_menu_button(
-        Vec3::new(42., -10., 1.),
+        Vec3::new(22., -38., 1.),
         Vec3::new(-19., -1., 1.),
         "Start ",
         MenuButton::Start,
@@ -521,9 +518,22 @@ pub fn spawn_menu_text_buttons(
         UIElement::MenuButton,
     );
 
+    // Unlocks Button
+    spawn_menu_button(
+        Vec3::new(-14., -62.5, 1.),
+        Vec3::new(-29., -0.5, 1.),
+        "Unlocks",
+        MenuButton::Unlocks,
+        Vec2::new(84., 18.),
+        &mut commands,
+        &graphics,
+        &asset_server,
+        UIElement::UnlocksButton,
+    );
+
     // Achievements Button
     let achievements_button = spawn_menu_button(
-        Vec3::new(8., -34.5, 1.),
+        Vec3::new(-22., -86., 1.),
         Vec3::new(-50., -0., 1.),
         "Achievements",
         MenuButton::Achievements,
@@ -536,21 +546,10 @@ pub fn spawn_menu_text_buttons(
     commands
         .entity(achievements_button)
         .insert(AchievementsButton);
-    // Unlocks Button
-    spawn_menu_button(
-        Vec3::new(-8., -58., 1.),
-        Vec3::new(-29., -0.5, 1.),
-        "Unlocks",
-        MenuButton::Unlocks,
-        Vec2::new(84., 18.),
-        &mut commands,
-        &graphics,
-        &asset_server,
-        UIElement::UnlocksButton,
-    );
+
     // Options Button
     spawn_menu_button(
-        Vec3::new(100., -81., 1.),
+        Vec3::new(140., -109., 1.),
         Vec3::new(-27., 0.0, 1.),
         "Options",
         MenuButton::Options,
@@ -563,7 +562,7 @@ pub fn spawn_menu_text_buttons(
 
     // Quit Button
     spawn_menu_button(
-        Vec3::new(-39.5, -81., 1.),
+        Vec3::new(-79.5, -109., 1.),
         Vec3::new(-14., -0., 1.),
         "Quit",
         MenuButton::Quit,

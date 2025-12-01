@@ -269,10 +269,10 @@ fn check_projectile_hit_mob_collisions(
             // Check if this projectile is from a heirloom on-kill effect
             let is_from_heirloom = matches!(
                 proj,
-                Projectile::IceExplosionAOE  // FrozenAoE heirloom
-                // Add other heirloom effect projectiles here if needed
+                Projectile::IceExplosionAOE // FrozenAoE heirloom
+                                            // Add other heirloom effect projectiles here if needed
             );
-            
+
             hit_event.send(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
                 hit_entity: *e2,
@@ -315,6 +315,7 @@ fn check_projectile_hit_player_collisions(
             Option<&InvincibilityCooldown>,
             Option<&Attack>,
             Option<&Stealthed>,
+            Option<&Defence>,
         ),
         (
             Or<(With<Player>, With<WorldObject>)>,
@@ -387,7 +388,7 @@ fn check_projectile_hit_player_collisions(
             }
             state.hit_entities.push(*e2);
             let mut hit_successful = true;
-            let (_, mut parry_option, i_frames, p_attack, stealth_opt) =
+            let (_, mut parry_option, i_frames, p_attack, stealth_opt, defence_opt) =
                 allowed_targets.get_mut(*e2).unwrap();
             // Ignore projectile hits if stealthed
             if stealth_opt.is_some() {
@@ -430,10 +431,18 @@ fn check_projectile_hit_player_collisions(
                 }
             }
             if hit_successful {
+                // Apply defense reduction if the target is a player with defense stat
+                let final_damage = if let Some(defence) = defence_opt {
+                    // Same formula as mob-to-player collisions: damage * (0.99 ^ defense)
+                    f32::round(att.0 as f32 * (0.99_f32.powi(defence.0))) as i32
+                } else {
+                    att.0
+                };
+
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: *e2,
-                    damage: att.0,
+                    damage: final_damage,
                     dir: state.direction,
                     hit_with_melee: None,
                     hit_with_projectile: Some(proj.clone()),

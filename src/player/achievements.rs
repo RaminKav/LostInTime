@@ -60,10 +60,12 @@ impl Achievements {
     }
 }
 
-#[derive(Resource, Default, Debug, Clone)]
+#[derive(Resource, Default, Debug, Clone, Serialize, Deserialize)]
 pub struct BounceAchievementTracker {
     pub total_pink_bounces: u32,
+    #[serde(skip)] // Don't persist this as it's only relevant within a single run
     pub consecutive_pink_bounces: u32,
+    #[serde(skip)] // Don't persist this as it's only relevant within a single run
     pub last_bounce_time: Option<f64>,
 }
 impl Achievement {
@@ -361,8 +363,16 @@ pub fn check_achievements(
     chaos_tracker: Option<Res<ChaosTracker>>,
     boss_kill_tracker: Option<Res<BossKillTracker>>,
     mut achievement_events: EventWriter<AchievementUnlockedEvent>,
+    game_data: Option<Res<crate::client::GameData>>,
 ) {
-    if let Some(analytics_data) = analytics.as_ref() {
+    // Use cumulative analytics from GameData if available, otherwise use current run analytics
+    let analytics_data = if let Some(game_data_res) = game_data.as_ref() {
+        game_data_res.cumulative_analytics.as_ref()
+    } else {
+        analytics.as_ref().map(|a| a.as_ref())
+    };
+
+    if let Some(analytics_data) = analytics_data {
         let mut check_mob_kill = |mob: Mob, threshold: u32, achievement: Achievement| {
             if let Some(kills) = analytics_data.mobs_killed.get(&mob) {
                 if *kills >= threshold {

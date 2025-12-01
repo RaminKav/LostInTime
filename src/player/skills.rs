@@ -1145,6 +1145,16 @@ impl HeirloomRarity {
             HeirloomRarity::Legendary => Some(ItemGlow::Red),
         }
     }
+
+    pub fn get_color(&self) -> Color {
+        use crate::colors::{LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, UNCOMMON_GREEN};
+        match self {
+            HeirloomRarity::Common => LIGHT_GREY,
+            HeirloomRarity::Uncommon => UNCOMMON_GREEN,
+            HeirloomRarity::Rare => LIGHT_BLUE,
+            HeirloomRarity::Legendary => LIGHT_RED,
+        }
+    }
 }
 #[derive(Clone, Eq, PartialEq, Default, Debug, Serialize, Deserialize)]
 pub struct HeirloomChoiceState {

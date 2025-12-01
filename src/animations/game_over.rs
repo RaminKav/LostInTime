@@ -15,17 +15,17 @@ use crate::{
     player::{score::RunScore, Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     ui::{
-        damage_numbers::spawn_text, spawn_item_stack_icon, CurrencyText, Interactable, MenuButton,
-        TimeFragmentIcon, UIElement, UIState,
+        boss_health_bar::{BossHealthBar, BossHealthBarFrame, BossNameText},
+        damage_numbers::spawn_text,
+        key_input_guide::InteractGuide,
+        spawn_item_stack_icon, CurrencyText, Interactable, MenuButton, TimeFragmentIcon, UIElement,
+        UIState,
     },
     world::y_sort::YSort,
     GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
 };
 
-use super::{
-    player_sprite::PlayerDeadAseprite,
-    ui_animaitons::{MoveUIAnimation, UIIconMover},
-};
+use super::ui_animaitons::{MoveUIAnimation, UIIconMover};
 
 #[derive(Component)]
 pub struct GameOverFadeout(Timer);
@@ -61,8 +61,25 @@ pub fn handle_game_over_fadeout(
     resolution: Res<ScreenResolution>,
     run_score: Res<RunScore>,
     last_submitted: Res<LastSubmittedScore>,
+    // Cleanup queries
+    boss_health_bars: Query<
+        Entity,
+        Or<(
+            With<BossHealthBar>,
+            With<BossHealthBarFrame>,
+            With<BossNameText>,
+        )>,
+    >,
+    guide_hud: Query<Entity, With<InteractGuide>>,
 ) {
     if !game_over_events.is_empty() {
+        // Clean up boss health bars and guide HUD
+        for entity in boss_health_bars.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
+        for entity in guide_hud.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
         let (player_e, dir, mut player_t, mut sprite, mut anim) = player.single_mut();
         next_ui_state.set(UIState::Closed);
         // BLACK OVERLAY
@@ -209,14 +226,30 @@ pub fn handle_game_over_fadeout(
             .insert(RenderLayers::from_layers(&[3]));
         player_t.translation = Vec3::new(0., 0., 100.);
 
-        // set player to death sprite
+        // Tint player sprite red instead of swapping to death sprite
         anim.pause();
-        commands
-            .entity(player_e)
-            .remove::<TextureAtlasSprite>()
-            .insert(asset_server.load::<Aseprite, _>(PlayerDeadAseprite::PATH));
+        sprite.color = Color::rgba(1.0, 0.2, 0.2, 1.0); // Brighter red tint, fully opaque
         if dir == &FacingDirection::Left {
             sprite.flip_x = true;
+        }
+
+        // Add a marker component to ensure color persists
+        commands.entity(player_e).insert(GameOverPlayerTint);
+    }
+}
+
+/// Marker component for the game over player tint
+#[derive(Component)]
+pub struct GameOverPlayerTint;
+
+/// System to ensure player stays red during game over
+pub fn maintain_player_red_tint(
+    mut player: Query<&mut TextureAtlasSprite, (With<Player>, With<GameOverPlayerTint>)>,
+) {
+    if let Ok(mut sprite) = player.get_single_mut() {
+        // Keep the sprite red
+        if sprite.color != Color::rgba(1.0, 0.2, 0.2, 1.0) {
+            sprite.color = Color::rgba(1.0, 0.2, 0.2, 1.0);
         }
     }
 }
@@ -257,16 +290,14 @@ pub fn tick_game_over_overlay(
                 "If your hunger bar is empty, you will move slower and lose health over time.",
                 "Press Shift while inspecting an item to view the range\n\n     of possible values for each stat line.",
                 "You can drop an item by dragging it out of your inventory.",
-                "The forest is dense. Craft an Axe as soon as you can.",
                 "Elite mobs are much tougher, but they give more exp and drop more loot.",
-                "At night, enemies will hunt you down. Be prepared!",
-                "Build a Crafting table as soon as possible to unlock important recipes.",
+                "At night, enemies will spawn much faster. Be prepared!",
                 "Item colors correspond to rarity:\n\n     Common (Grey), Uncommon (green), Rare (blue), Legendary (Red).",
-                "Press Shift + Left Click to quickly move items\n\n     between your hotbar, inventory, and chests.",
-                "Exploring the dense forest can be dangerous, especially at night!\n\n     You have more room to fight in clearings.",
+                "Press Shift + Left Click to quickly move items\n\n     between your hotbar and inventory.",
                 "Enemies drop higher level gear the higher level you are!\n\n      Higher level gear have better base stats.",
-                "Press ESC to manually save your game! Otherwise it will save every 10.",
-                "Inventory, Crafting, and Chest menus pause the game."
+                "Rolling through Crates instantly breaks them!",
+                "Increasing Chaos is dangerous, but grants more score!",
+                "Enemies drop mana orbs if you have a magic item!"
               ];
 
             let picked_tip = tips.iter().choose(&mut rand::thread_rng()).unwrap();

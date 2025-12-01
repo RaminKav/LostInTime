@@ -160,8 +160,20 @@ pub fn setup_achievements_ui(
         .id();
 
     // List all achievements (paginated)
+    // Sort order: Completed (unclaimed) -> Unfinished -> Claimed
     let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
-    all_achievements.sort_by_key(|achievement| !achievements.has(*achievement));
+    all_achievements.sort_by_key(|achievement| {
+        let is_completed = achievements.is_completed(*achievement);
+        let is_claimed = achievements.is_claimed(*achievement);
+        
+        if is_completed && !is_claimed {
+            0 // Completed and ready to claim - highest priority
+        } else if !is_completed && !is_claimed {
+            1 // Unfinished - medium priority
+        } else {
+            2 // Claimed - lowest priority
+        }
+    });
     let total_pages = if all_achievements.is_empty() {
         0
     } else {
@@ -618,20 +630,20 @@ pub fn update_achievements_page_display(
 
     let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
     // Sort achievements by priority:
-    // 1. Completed and claimed (highest priority)
-    // 2. Completed but not claimed (second priority - these need attention!)
-    // 3. Unlocked but not completed (third priority)
-    // 4. Locked (lowest priority)
+    // 0. Completed but not claimed (highest priority - these need attention!)
+    // 1. Not completed (second priority)
+    // 2. Completed and claimed (lowest priority)
     all_achievements.sort_by_key(|achievement| {
         let is_completed = achievements.is_completed(*achievement);
         let is_claimed = achievements.is_claimed(*achievement);
-        let is_unlocked = achievements.has(*achievement);
-
-        (
-            !is_completed || !is_claimed, // False (0) for completed+claimed, True (1) for others
-            !is_completed,                // False (0) for completed, True (1) for not completed
-            !is_unlocked,                 // False (0) for unlocked, True (1) for locked
-        )
+        
+        if is_completed && !is_claimed {
+            0 // Completed and ready to claim
+        } else if !is_completed && !is_claimed {
+            1 // Unfinished
+        } else {
+            2 // Claimed
+        }
     });
     let start_index = pagination.page * ACHIEVEMENTS_PER_PAGE;
 
@@ -1004,21 +1016,21 @@ pub fn handle_achievement_row_clicks(
 
     // Get all achievements sorted using the same logic as update_achievements_page_display
     let mut all_achievements: Vec<Achievement> = Achievement::iter().collect();
-    // Sort achievements by priority (same as in update_achievements_page_display):
-    // 1. Completed and claimed (highest priority)
-    // 2. Completed but not claimed (second priority - these need attention!)
-    // 3. Unlocked but not completed (third priority)
-    // 4. Locked (lowest priority)
+    // Sort achievements by priority (same as in setup_achievements_ui):
+    // 0. Completed but not claimed (highest priority - these need attention!)
+    // 1. Not completed (second priority)
+    // 2. Completed and claimed (lowest priority)
     all_achievements.sort_by_key(|achievement| {
         let is_completed = achievements.is_completed(*achievement);
         let is_claimed = achievements.is_claimed(*achievement);
-        let is_unlocked = achievements.has(*achievement);
-
-        (
-            !is_completed || !is_claimed, // False (0) for completed+claimed, True (1) for others
-            !is_completed,                // False (0) for completed, True (1) for not completed
-            !is_unlocked,                 // False (0) for unlocked, True (1) for locked
-        )
+        
+        if is_completed && !is_claimed {
+            0 // Completed and ready to claim
+        } else if !is_completed && !is_claimed {
+            1 // Unfinished
+        } else {
+            2 // Claimed
+        }
     });
 
     for (entity, row) in achievement_rows.iter() {

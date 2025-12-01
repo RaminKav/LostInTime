@@ -680,12 +680,10 @@ pub fn update_reaper_souls(
 ) {
     let mob_snapshots = gather_live_mobs(&mobs);
 
+    // If no mobs exist, despawn all souls immediately
     if mob_snapshots.is_empty() {
-        for (entity, _, mut soul) in souls.iter_mut() {
-            soul.lifetime.tick(time.delta());
-            if soul.lifetime.finished() {
-                commands.entity(entity).despawn_recursive();
-            }
+        for (entity, _, _) in souls.iter() {
+            commands.entity(entity).despawn_recursive();
         }
         return;
     }
@@ -703,8 +701,9 @@ pub fn update_reaper_souls(
         let target_snapshot =
             pick_target(soul.target, soul_pos, &mut claimed_targets, &mob_snapshots);
 
+        // If no target can be found, despawn the soul
         let Some(snapshot) = target_snapshot else {
-            soul.target = None;
+            commands.entity(entity).despawn_recursive();
             continue;
         };
 

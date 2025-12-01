@@ -551,7 +551,10 @@ impl ChunkPlugin {
                     let chunk_pos = IVec2::new(x, y);
 
                     debug!("            despawning chunk {x:?},{y:?} (deferred)");
-                    commands.entity(chunk_entity).despawn_recursive();
+                    // Use safe entity access to prevent race conditions with render extraction
+                    if let Some(entity_commands) = commands.get_entity(chunk_entity) {
+                        entity_commands.despawn_recursive();
+                    }
                     // Note: chunk entity removal from game tracking happens via despawn observer
                 }
             }

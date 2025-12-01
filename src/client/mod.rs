@@ -231,6 +231,8 @@ pub struct GameData {
     pub keybindings: Option<crate::keybinds::KeyBindings>,
     #[serde(default)]
     pub player_name: Option<String>,
+    #[serde(default)]
+    pub bounce_tracker: crate::player::achievements::BounceAchievementTracker,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -246,6 +248,7 @@ pub fn handle_append_run_data_after_death(
     achievements: ResMut<Achievements>,
     unlocked_classes: Option<Res<UnlockedClasses>>,
     unlock_upgrades: Option<Res<UnlockUpgrades>>,
+    bounce_tracker: Res<crate::player::achievements::BounceAchievementTracker>,
 ) {
     for _ in game_over.iter() {
         info!("GAME OVER! Storing run data in game_data.json...");
@@ -391,6 +394,9 @@ pub fn handle_append_run_data_after_death(
         if let Some(upgrades) = unlock_upgrades.as_ref() {
             game_data.unlock_upgrades = upgrades.as_ref().clone();
         }
+
+        // Save bounce tracker
+        game_data.bounce_tracker = bounce_tracker.clone();
 
         let game_data_path = datafiles::game_data();
 
@@ -677,6 +683,8 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
         let reader = BufReader::new(file_file);
         match serde_json::from_reader::<_, GameData>(reader) {
             Ok(game_data) => {
+                // Insert bounce tracker as a resource
+                commands.insert_resource(game_data.bounce_tracker.clone());
                 // Insert GameData as a resource so achievements UI can access cumulative_analytics
                 commands.insert_resource(game_data);
             }
@@ -723,10 +731,10 @@ pub fn is_not_paused(state: Res<State<ClientState>>) -> bool {
 /// Calculate class experience based on run performance
 fn calculate_class_experience(days_survived: u8, mobs_killed: u32) -> u32 {
     // Primary experience from mobs killed (10 per mob) //
-    let mob_exp = mobs_killed * 5;
+    let mob_exp = mobs_killed * 2;
 
     // Secondary experience from days survived (50 per day)
-    let days_exp = days_survived as u32 * 50;
+    let days_exp = days_survived as u32 * 75;
 
     mob_exp + days_exp
 }

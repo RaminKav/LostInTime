@@ -328,6 +328,7 @@ pub fn handle_anim_events(
                             &proto,
                             &mut commands,
                             loot_bonus,
+                            true,
                         ));
                 }
                 // handle opening animation

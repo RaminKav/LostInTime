@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, utils::HashMap};
 use rand::seq::IteratorRandom;
 use strum_macros::Display;
 
@@ -24,11 +24,17 @@ pub struct BGMPicker {
     pub current_handle: Option<Handle<AudioSink>>,
 }
 
+/// Resource to track sound cooldowns to prevent spam
+#[derive(Resource, Default)]
+pub struct SoundCooldowns {
+    pub cooldowns: HashMap<AudioSoundEffect, Timer>,
+}
+
 pub struct UpdateBGMTrackEvent {
     pub asset_path: String,
 }
 
-#[derive(Component, Display)]
+#[derive(Component, Display, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AudioSoundEffect {
     IceStaffCast,
     IceStaffHit,
@@ -102,9 +108,11 @@ impl Plugin for AudioPlugin {
             current_track: "sounds/bgm_day.ogg".to_owned(),
             current_handle: None,
         })
+        .init_resource::<SoundCooldowns>()
         .add_event::<UpdateBGMTrackEvent>()
         .add_system(bgm_audio)
         .add_system(handle_sound_spawners)
+        .add_system(tick_sound_cooldowns)
         .add_systems(
             (
                 sword_swing_sound.after(handle_attack_cooldowns),
@@ -116,12 +124,31 @@ impl Plugin for AudioPlugin {
         );
     }
 }
+/// Tick all sound cooldowns
+pub fn tick_sound_cooldowns(time: Res<Time>, mut cooldowns: ResMut<SoundCooldowns>) {
+    for timer in cooldowns.cooldowns.values_mut() {
+        timer.tick(time.delta());
+    }
+}
+
+/// Get the cooldown duration for a specific sound effect (in seconds)
+fn get_sound_cooldown_duration(sound: &AudioSoundEffect) -> Option<f32> {
+    match sound {
+        AudioSoundEffect::DefaultEnemyHit => Some(0.05), // 50ms between hit sounds
+        AudioSoundEffect::PlayerHit => Some(0.1),        // 100ms between player hit sounds
+        AudioSoundEffect::IceStaffHit => Some(0.05),
+        AudioSoundEffect::LightningStaffHit => Some(0.05),
+        _ => None, // No cooldown for other sounds
+    }
+}
+
 pub fn handle_sound_spawners(
     mut sounds: Query<(Entity, &mut SoundSpawner)>,
     asset_server: Res<AssetServer>,
     audio: Res<Audio>,
     time: Res<Time>,
     mut commands: Commands,
+    mut cooldowns: ResMut<SoundCooldowns>,
 ) {
     for (e, mut sound) in sounds.iter_mut() {
         let mut play_sound = false;
@@ -133,7 +160,29 @@ pub fn handle_sound_spawners(
         } else {
             play_sound = true;
         }
+
+        // Check cooldown if applicable
         if play_sound {
+            if let Some(cooldown_duration) = get_sound_cooldown_duration(&sound.sound) {
+                let can_play = cooldowns
+                    .cooldowns
+                    .get(&sound.sound)
+                    .map(|timer| timer.finished())
+                    .unwrap_or(true);
+
+                if !can_play {
+                    // Sound is on cooldown, skip it
+                    commands.entity(e).despawn();
+                    continue;
+                }
+
+                // Set cooldown for this sound
+                cooldowns.cooldowns.insert(
+                    sound.sound,
+                    Timer::from_seconds(cooldown_duration, TimerMode::Once),
+                );
+            }
+
             let sound_handle = asset_server.load(format!("sounds/{}.ogg", sound.sound));
             audio.play_with_settings(
                 sound_handle.clone(),

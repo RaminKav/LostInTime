@@ -7,6 +7,7 @@ pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
+use crate::attributes::add_item_glows;
 
 pub mod combat_helpers;
 use crate::{
@@ -169,6 +170,7 @@ fn handle_enemy_death(
     mut proto_commands: ProtoCommands,
     loot_bonus: Query<&LootRateBonus>,
     mut commands: Commands,
+    graphics: Res<Graphics>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
@@ -186,13 +188,17 @@ fn handle_enemy_death(
                 let mut rng = rand::thread_rng();
                 let d = if mob.is_boss() { 30. } else { 10. };
                 let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                proto_commands.spawn_item_from_proto(
+                let drop_e = proto_commands.spawn_item_from_proto(
                     drop.obj_type,
                     &proto_param,
                     death_event.enemy_pos + drop_offset,
                     drop.count,
                     Some(player_level.level),
                 );
+
+                if let Some(drop_e) = drop_e {
+                    add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
+                }
             }
         }
         //give player xp

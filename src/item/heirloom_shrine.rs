@@ -2,8 +2,12 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
-    assets::Graphics, item::object_actions::ObjectAction, player::skills::HeirloomChoiceQueue,
+    assets::Graphics,
+    item::object_actions::ObjectAction,
+    player::skills::HeirloomChoiceQueue,
     ui::key_input_guide::InteractionGuideTrigger,
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
+    GameParam,
 };
 
 use super::WorldObject;
@@ -11,6 +15,7 @@ use super::WorldObject;
 #[derive(Component)]
 pub struct HeirloomShrineState {
     pub is_used: bool,
+    pub tile_pos: TileMapPosition,
 }
 
 // TODO: Create proper aseprite asset for heirloom shrine
@@ -53,6 +58,7 @@ pub fn add_heirloom_shrine_visuals_on_spawn(
 pub fn handle_heirloom_shrine_completion(
     shrines: Query<(Entity, &HeirloomShrineState)>,
     mut commands: Commands,
+    mut game: GameParam,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -62,6 +68,10 @@ pub fn handle_heirloom_shrine_completion(
                 .remove::<ObjectAction>()
                 .remove::<InteractionGuideTrigger>()
                 .remove::<HeirloomShrineState>();
+
+            // Update the world object cache using the stored tile position
+            // This ensures we update the exact same tile that was originally cached
+            game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::HeirloomShrineDone);
         }
     }
 }

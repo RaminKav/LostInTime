@@ -10,7 +10,7 @@ use crate::{
     item::object_actions::ObjectAction,
     proto::proto_param::ProtoParam,
     ui::{key_input_guide::InteractionGuideTrigger, BlacksmithMerchant, EssenceShopChoices},
-    world::world_helpers::world_pos_to_tile_pos,
+    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     GameParam,
 };
 
@@ -24,6 +24,7 @@ pub struct CombatShrineMob {
 #[derive(Component)]
 pub struct GambleShrine {
     pub success: bool,
+    pub tile_pos: TileMapPosition,
 }
 
 pub struct GambleShrineEvent {
@@ -68,13 +69,8 @@ pub fn handle_gamble_shrine_rewards(
                     .entity(e)
                     .insert(WorldObject::GambleShrineDone)
                     .remove::<ObjectAction>();
-                let anchor = proto
-                    .get_component::<SpriteAnchor, _>(WorldObject::GambleShrine)
-                    .unwrap_or(&SpriteAnchor(Vec2::ZERO));
-                game.add_object_to_chunk_cache(
-                    world_pos_to_tile_pos(t.translation().truncate() - anchor.0),
-                    WorldObject::GambleShrineDone,
-                );
+                // Use the stored tile position instead of recalculating
+                game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::GambleShrineDone);
             }
         } else if anim.current_frame() == 92 {
             *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);

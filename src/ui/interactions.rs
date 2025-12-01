@@ -537,12 +537,8 @@ pub fn handle_hovering(
                     .entity(e)
                     .insert(graphics.get_ui_element_texture(UIElement::EssenceButtonHover));
 
-                let essence = essence_option.expect("essence buttons have essence state");
-                tooltip_update_events.send(ToolTipUpdateEvent {
-                    item_stack: essence.item.clone(),
-                    is_recipe: false,
-                    show_range: shift_key_pressed,
-                });
+                // Skip tooltip for heirlooms - the name is already displayed in the UI
+                // let _essence = essence_option.expect("essence buttons have essence state");
             }
         }
         if let Interaction::Hovering = interactable.previous() {
@@ -774,6 +770,7 @@ pub fn handle_interaction_clicks(
                                         &proto,
                                         &mut commands,
                                         loot_bonus,
+                                        false,
                                     );
                                     commands.entity(item_icon.0).insert(new_stack);
                                     container_param.crafted_event.send(CraftedItemEvent {

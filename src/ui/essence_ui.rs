@@ -1,20 +1,24 @@
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_aseprite::aseprite;
-use bevy_proto::backend::schematics::{ReflectSchematic, Schematic};
-use itertools::Itertools;
-use rand::seq::SliceRandom;
+use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
 
 use crate::{
     assets::Graphics,
-    attributes::{attribute_helpers::create_new_random_item_stack_with_attributes, ItemRarity},
+    attributes::AttributeChangeEvent,
     inventory::ItemStack,
     item::WorldObject,
-    player::{ModifyCurencyEvent, Player, TimeFragmentCurrency},
+    player::{
+        currency::{CoinCurrency, TimeFragmentCurrency},
+        skills::{Heirloom, HeirloomRarity, HeirloomWithRarity, PlayerSkills},
+        ModifyCurencyEvent, Player,
+    },
     proto::proto_param::ProtoParam,
     ui::key_input_guide::InteractionGuideTrigger,
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
+
+use super::skill_choice_ui::spawn_heirloom_tooltip_card;
 
 use super::{
     spawn_item_stack_icon, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
@@ -24,17 +28,24 @@ use super::{
 #[derive(Component)]
 pub struct EssenceUI;
 
-#[derive(Component, Clone, Debug, Resource, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Component)]
+pub struct EssenceTooltipCard;
+
+#[derive(Component, Clone, Debug, Resource, Default)]
 pub struct EssenceOption {
-    pub item: ItemStack,
+    pub heirloom: Heirloom,
+    pub rarity: HeirloomRarity,
     pub time_fragment_cost: u32,
     pub coin_cost: u32,
 }
 
 impl EssenceOption {
-    fn get_obj(&self) -> WorldObject {
-        self.item.obj_type
+    fn get_heirloom(&self) -> Heirloom {
+        self.heirloom.clone()
+    }
+
+    fn get_rarity(&self) -> HeirloomRarity {
+        self.rarity.clone()
     }
 }
 #[derive(Debug)]
@@ -42,13 +53,69 @@ pub struct SubmitEssenceChoice {
     pub choice: EssenceOption,
 }
 
-#[derive(Resource, Component, Clone, Reflect, FromReflect, Schematic, Default)]
-#[reflect(Component, Schematic)]
+#[derive(Resource, Component, Clone, Default)]
 pub struct EssenceShopChoices {
     pub choices: Vec<EssenceOption>,
     pub owner_entity: Option<Entity>,
 }
 aseprite!(pub BlacksmithMerchant, "textures/blacksmith.ase");
+
+/// System to handle spawning/despawning tooltip cards when hovering over heirlooms
+pub fn handle_essence_heirloom_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    essence_options: Query<(&EssenceOption, &super::interactions::Interactable)>,
+    existing_tooltips: Query<Entity, With<EssenceTooltipCard>>,
+    mut last_hovered: Local<Option<Heirloom>>,
+) {
+    use super::interactions::Interaction;
+
+    // Find the currently hovered heirloom
+    let currently_hovered = essence_options
+        .iter()
+        .find(|(_, interactable)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(option, _)| option.get_heirloom());
+
+    // Only update if the hover state changed
+    if *last_hovered == currently_hovered {
+        return;
+    }
+
+    // Despawn all existing tooltips
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    // Spawn new tooltip if hovering
+    if let Some(hovered_heirloom) = &currently_hovered {
+        // Find the essence option to get the rarity
+        for (essence_option, interactable) in essence_options.iter() {
+            if matches!(interactable.current(), Interaction::Hovering)
+                && essence_option.get_heirloom() == *hovered_heirloom
+            {
+                let tooltip_e = spawn_heirloom_tooltip_card(
+                    &graphics,
+                    &mut commands,
+                    &asset_server,
+                    essence_option.get_heirloom(),
+                    essence_option.get_rarity(),
+                    Vec3::new(-130., 0., 15.), // Left side of the essence shop
+                    None,
+                );
+
+                commands
+                    .entity(tooltip_e)
+                    .insert(EssenceTooltipCard)
+                    .insert(UIState::Essence);
+
+                break;
+            }
+        }
+    }
+
+    *last_hovered = currently_hovered;
+}
 
 pub fn setup_essence_ui(
     mut commands: Commands,
@@ -117,27 +184,34 @@ pub fn setup_essence_ui(
             .set_parent(essence_ui_e)
             .id();
 
-        // icon
-        let icon = spawn_item_stack_icon(
-            &mut commands,
-            &graphics,
-            &essence_option.item,
-            &asset_server,
-            Vec2::ZERO,
-            Vec2::new(0., 0.),
-            3,
-        );
+        // icon - use the same method as player_hud.rs
+        let icon = commands
+            .spawn(SpriteSheetBundle {
+                sprite: graphics.get_heirloom_icon(essence_option.get_heirloom()),
+                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                transform: Transform {
+                    translation: Vec3::new(0., 0., 1.),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .id();
         commands.entity(icon).set_parent(slot_entity);
 
-        let name = commands
+        // Get heirloom name and rarity color
+        let heirloom_name = essence_option.get_heirloom().get_title();
+        let rarity_color = essence_option.get_rarity().get_color();
+
+        let _name = commands
             .spawn((
                 Text2dBundle {
                     text: Text::from_section(
-                        format!("{}", essence_option.item.metadata.name),
+                        heirloom_name,
                         TextStyle {
                             font: asset_server.load("fonts/4x5.ttf"),
                             font_size: 5.0,
-                            color: essence_option.item.rarity.get_color(),
+                            color: rarity_color,
                         },
                     )
                     .with_alignment(TextAlignment::Left),
@@ -146,7 +220,7 @@ pub fn setup_essence_ui(
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
-                Name::new("Unlocks Item Name"),
+                Name::new("Heirloom Name"),
             ))
             .set_parent(essence_ui_e)
             .id();
@@ -210,14 +284,15 @@ pub fn handle_submit_essence_choice(
     mut next_inv_state: ResMut<NextState<UIState>>,
     essence_ui: Query<Entity, With<EssenceUI>>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
-    mut game_param: GameParam,
-    player_t: Query<&GlobalTransform, With<Player>>,
+    mut attribute_event: EventWriter<AttributeChangeEvent>,
+    time_fragments: Res<TimeFragmentCurrency>,
+    coins: Res<CoinCurrency>,
+    mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     shop: Res<EssenceShopChoices>,
 ) {
     for choice in ev.iter() {
-        let time_fragments = game_param.get_time_fragments();
-        if time_fragments >= choice.choice.time_fragment_cost as i32
-            && game_param.get_coins() >= choice.choice.coin_cost
+        if time_fragments.time_fragments >= choice.choice.time_fragment_cost as i32
+            && coins.coins >= choice.choice.coin_cost
         {
             currency_event.send(ModifyCurencyEvent {
                 delta: -(choice.choice.time_fragment_cost as i32),
@@ -228,11 +303,25 @@ pub fn handle_submit_essence_choice(
                 obj: WorldObject::Coin,
             });
 
-            choice.choice.item.spawn_as_drop(
-                &mut commands,
-                &mut game_param,
-                player_t.single().translation().truncate(),
-            );
+            // Add heirloom to player's heirloom pool
+            if let Ok((player_entity, mut player_skills)) = player_query.get_single_mut() {
+                let heirloom_with_rarity = HeirloomWithRarity {
+                    heirloom: choice.choice.heirloom.clone(),
+                    rarity: choice.choice.rarity.clone(),
+                };
+
+                player_skills.heirlooms.push(heirloom_with_rarity.clone());
+
+                // Add skill components to the player entity
+                heirloom_with_rarity.heirloom.add_skill_components(
+                    player_entity,
+                    &mut commands,
+                    player_skills.clone(),
+                );
+
+                // Trigger attribute recalculation
+                attribute_event.send(AttributeChangeEvent);
+            }
 
             next_inv_state.set(UIState::Closed);
             commands.remove_resource::<EssenceShopChoices>();
@@ -252,52 +341,49 @@ pub fn handle_submit_essence_choice(
 
 pub fn handle_populate_essence_shop_on_new_spawn(
     mut new_spawns: Query<(Entity, &mut EssenceShopChoices), Added<EssenceShopChoices>>,
-    proto_param: ProtoParam,
-    mut commands: Commands,
     game: GameParam,
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
+    heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
 ) {
     for (entity, mut shop) in new_spawns.iter_mut() {
         let mut shop_choices = vec![];
         let mut rng = rand::thread_rng();
 
         while shop_choices.len() < 3 {
-            let filtered_items = WorldObject::iter()
-                .filter(|obj| obj.is_weapon() || obj.is_armor() || obj.is_accessory())
-                .collect_vec();
-            let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
-            let mut stack = proto_param
-                .get_item_data(pick_new_item.clone())
-                .unwrap()
-                .clone();
-            stack.metadata.level = Some(game.get_player_level());
-
+            // Determine rarity based on luck/randomness
             let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
-            let random_item_stack = create_new_random_item_stack_with_attributes(
-                &stack,
-                &proto_param,
-                &mut commands,
-                loot_bonus,
-            );
-            let rarity_cost_inc = match random_item_stack.rarity {
-                ItemRarity::Common => 1.,
-                ItemRarity::Uncommon => 1.2,
-                ItemRarity::Rare => 1.6,
-                ItemRarity::Legendary => 2.5,
+            let rarity =
+                crate::player::skills::HeirloomChoiceQueue::gen_rarity(&mut rng, loot_bonus);
+
+            // Pick a heirloom from the pool that matches this rarity
+            let picked_heirloom_choice =
+                heirloom_queue.get_skill_of_rarity(rarity.clone(), &mut rng, &|_| true);
+
+            let Some(heirloom_choice) = picked_heirloom_choice else {
+                // If no heirloom of this rarity is available, try a different rarity
+                continue;
             };
-            let time_frag_cost = if random_item_stack.rarity == ItemRarity::Rare {
-                1
-            } else if random_item_stack.rarity == ItemRarity::Legendary {
-                3
-            } else {
-                0
+
+            // Calculate cost based on rarity
+            let rarity_cost_inc = match heirloom_choice.rarity {
+                HeirloomRarity::Common => 1.,
+                HeirloomRarity::Uncommon => 1.2,
+                HeirloomRarity::Rare => 1.6,
+                HeirloomRarity::Legendary => 2.5,
             };
+            let time_frag_cost = match heirloom_choice.rarity {
+                HeirloomRarity::Rare => 1,
+                HeirloomRarity::Legendary => 3,
+                _ => 0,
+            };
+
+            let base_cost = game.get_player_level() as f32 * 4. + 3.;
+            let random_adjustment = rand::thread_rng().gen_range(2.0..7.0) * rarity_cost_inc * 2.;
 
             shop_choices.push(EssenceOption {
-                item: random_item_stack.clone(),
-                coin_cost: ((random_item_stack.metadata.level.unwrap_or(1) as f32 * 5. + 7.)
-                    * rarity_cost_inc)
-                    .trunc() as u32,
+                heirloom: heirloom_choice.heirloom,
+                rarity: heirloom_choice.rarity,
+                coin_cost: (base_cost * rarity_cost_inc + random_adjustment).trunc() as u32,
                 time_fragment_cost: time_frag_cost,
             });
         }

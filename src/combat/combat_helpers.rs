@@ -26,6 +26,7 @@ pub struct SpawnAsepriteAnimationCollider {
     pub repeating_anim: bool,
     pub projectile: Projectile,
     pub extra_components: Vec<DeferredComponent>,
+    pub parent: Option<Entity>,
 }
 
 /// Enum for extra components that can be added to the spawned entity
@@ -111,6 +112,7 @@ pub fn spawn_deferred_aseprite_collider(
     repeating_anim: bool,
     projectile: Projectile,
     extra_components: Vec<DeferredComponent>,
+    parent: Option<Entity>,
 ) -> Entity {
     commands
         .spawn(SpawnAsepriteAnimationCollider {
@@ -123,6 +125,7 @@ pub fn spawn_deferred_aseprite_collider(
             repeating_anim,
             projectile,
             extra_components,
+            parent,
         })
         .id()
 }
@@ -144,6 +147,7 @@ pub fn handle_deferred_aseprite_spawns(
         let repeating_anim = spawn_data.repeating_anim;
         let projectile = std::mem::replace(&mut spawn_data.projectile, Projectile::None);
         let extra_components = std::mem::take(&mut spawn_data.extra_components);
+        let parent = spawn_data.parent;
 
         // Spawn the actual entity with animation
         let entity = spawn_one_time_aseprite_collider(
@@ -157,6 +161,14 @@ pub fn handle_deferred_aseprite_spawns(
             repeating_anim,
             projectile,
         );
+
+        // Set parent if specified
+        if let Some(parent_entity) = parent {
+            // Use safe entity access to avoid issues if parent doesn't exist
+            if let Some(mut entity_commands) = commands.get_entity(entity) {
+                entity_commands.set_parent(parent_entity);
+            }
+        }
 
         // Add extra components based on the deferred data
         for component in extra_components {

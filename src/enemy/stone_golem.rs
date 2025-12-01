@@ -28,8 +28,8 @@ aseprite!(pub StonePillar, "textures/stonegolem/StonePillar.ase");
 // Constants
 const SPIKE_ATTACK_COUNT: usize = 5;
 const SPIKE_ATTACK_INTERVAL: f32 = 0.15;
-const SPIKE_WARNING_DELAY: f32 = 0.47; // Time between warning and damage
-const SPIKE_DAMAGE: i32 = 25;
+const SPIKE_WARNING_DELAY: f32 = 0.65; // Time between warning and damage
+const SPIKE_DAMAGE: i32 = 20;
 const SPIKE_DURATION: f32 = 10.0; // How long the spike hitbox lasts
 
 #[derive(Component)]
@@ -170,6 +170,7 @@ pub fn spawn_golem_spike_hitbox(
             entity: golem_entity,
             mob: Mob::StoneGolem,
         }],
+        None, // No parent
     );
 }
 
@@ -296,7 +297,7 @@ pub fn handle_spike_attack(
             // Reset Timer
             if let Ok(mut timer) = timers.get_mut(entity) {
                 let mut rng = rand::thread_rng();
-                timer.random_timer = Timer::from_seconds(rng.gen_range(1.0..3.0), TimerMode::Once);
+                timer.random_timer = Timer::from_seconds(rng.gen_range(3.0..5.0), TimerMode::Once);
             }
 
             // Reset Animation to Walk
