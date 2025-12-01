@@ -71,6 +71,7 @@ lto = "thin"
 
 [patch.crates-io]
 bevy_ecs = { path = "patches/bevy_ecs-0.10.1" }
+bevy_ecs_tilemap = { path = "patches/bevy_ecs_tilemap-0.10.0" }
 
 [build-dependencies]
 embed-resource = "2.4.3"

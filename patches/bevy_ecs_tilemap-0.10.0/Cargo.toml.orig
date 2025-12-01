@@ -1,0 +1,63 @@
+[package]
+name = "bevy_ecs_tilemap"
+description = "A tilemap rendering plugin for bevy which is more ECS friendly by having an entity per tile."
+version = "0.10.0"
+authors = ["John Mitchell"]
+homepage = "https://github.com/StarArawn/bevy_ecs_tilemap"
+repository = "https://github.com/StarArawn/bevy_ecs_tilemap"
+license-file = "LICENSE"
+edition = "2021"
+exclude = ["assets/*", "screenshots/*"]
+
+[features]
+default = ["render"]
+atlas = []
+render = []
+
+[dependencies]
+bevy = { version = "0.10", default-features = false, features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "bevy_sprite",
+] }
+log = "0.4"
+regex = "1.5.4"
+
+[dev-dependencies]
+anyhow = { version = "1.0" }
+ldtk_rust = { version = "0.6" }
+rand = "0.8"
+env_logger = "0.9"
+serde_json = { version = "1.0" }
+tiled = { version = "0.10.2", default-features = false }
+
+[dev-dependencies.bevy]
+version = "0.10"
+default-features = false
+features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "png",
+    "ktx2",
+    "bevy_winit",
+    "bevy_text",
+    "bevy_sprite",
+    "filesystem_watcher",
+]
+
+[target.'cfg(unix)'.dev-dependencies.bevy]
+version = "0.10"
+default-features = false
+features = [
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "png",
+    "ktx2",
+    "bevy_winit",
+    "x11",
+    "bevy_text",
+    "bevy_sprite",
+]
