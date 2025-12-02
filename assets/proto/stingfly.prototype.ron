@@ -13,7 +13,7 @@
     "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.08),
     "survival_rogue_like::animations::enemy_sprites::CharacterAnimationSpriteSheetData": (animation_frames: [4,4,4,10,7], anim_offset: 0),
     "survival_rogue_like::attributes::MaxHealth": (16),
-    "survival_rogue_like::attributes::Attack": (15),
+    "survival_rogue_like::attributes::Attack": (13),
     "survival_rogue_like::player::levels::ExperienceReward": (25),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(

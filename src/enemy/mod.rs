@@ -442,20 +442,26 @@ fn juice_up_spawned_mobs_per_day(
     night_tracker: Res<NightTracker>,
     chaos_tracker: Option<Res<ChaosTracker>>,
     player_level: Query<&PlayerLevel>,
-    player_skills: Query<&PlayerSkills>,
     mut commands: Commands,
-    era_manager: Res<EraManager>,
 ) {
     // Get total chaos from tracker (all sources now increment the tracker)
     let total_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
     for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
-        // 1.5 per day, 0.2 per level, 1 per heirloom, 1 per totem,
-        let chaos_factor = 1.5 * night_tracker.days as f32
+        // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
+        let chaos_factor = 1.
+            + night_tracker.days as f32
             + (player_level.single().level as f32 * 0.2)
             + total_chaos;
-        hp.0 = (hp.0 as f32 * (1. + chaos_factor * 0.33)) as i32;
-        att.0 = (att.0 as f32 * (1. + chaos_factor * 0.15)) as i32;
-        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.1)) as u32;
+        info!(
+            "chaos_factor: {} {:?} {:?} {:?}",
+            chaos_factor,
+            night_tracker.days,
+            player_level.single().level,
+            total_chaos
+        );
+        hp.0 = (hp.0 as f32 * (chaos_factor.powf(1.1))) as i32;
+        att.0 = (att.0 as f32 * (chaos_factor.powf(0.55))) as i32;
+        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.125)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }

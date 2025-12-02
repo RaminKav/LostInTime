@@ -113,8 +113,8 @@ impl Era {
     pub fn get_chaos_modifier(&self) -> f32 {
         match self {
             Era::Main => 0.,
-            Era::Second => 3.0,
-            Era::Third => 6.0,
+            Era::Second => 5.0,
+            Era::Third => 10.0,
             Era::DungeonMain => 1.0,
         }
     }
@@ -195,7 +195,12 @@ impl DimensionPlugin {
                         move_player_event.send(MovePlayerEvent { pos });
                     }
                 } else {
-                    night.days = 0;
+                    // Set starting day based on era:
+                    // Era 1 (Main) = day 1, Era 2 (Second) = day 2, Era 3 (Third) = day 3
+                    let era_starting_day = (new_era.index() + 1) as u8;
+                    night.days = era_starting_day;
+                    night.time = 0.;
+                    info!("Era {:?} starting at day {}", new_era, era_starting_day);
                 }
 
                 let curr_era = game.era.current_era.clone();

@@ -92,6 +92,7 @@ pub enum UIElement {
     ScreenIconSlotLarge,
     Options,
     SkillChoice,
+    SkillChoiceHover,
     SkillChoiceMelee,
     SkillChoiceRogue,
     SkillChoiceMagic,

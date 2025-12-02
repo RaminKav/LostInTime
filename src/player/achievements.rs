@@ -365,62 +365,81 @@ pub fn check_achievements(
     mut achievement_events: EventWriter<AchievementUnlockedEvent>,
     game_data: Option<Res<crate::client::GameData>>,
 ) {
-    // Use cumulative analytics from GameData if available, otherwise use current run analytics
-    let analytics_data = if let Some(game_data_res) = game_data.as_ref() {
-        game_data_res.cumulative_analytics.as_ref()
-    } else {
-        analytics.as_ref().map(|a| a.as_ref())
+    // Get both cumulative and current run analytics
+    let cumulative = game_data
+        .as_ref()
+        .and_then(|gd| gd.cumulative_analytics.as_ref());
+    let current_run = analytics.as_ref().map(|a| a.as_ref());
+
+    // Helper to get combined count from both cumulative and current run
+    // Cumulative has totals from previous runs, current_run has this run's stats
+    // We ADD them together to get the true total
+    let get_mob_kills = |mob: &Mob| -> u32 {
+        let cumulative_kills = cumulative
+            .and_then(|c| c.mobs_killed.get(mob))
+            .copied()
+            .unwrap_or(0);
+        let current_kills = current_run
+            .and_then(|c| c.mobs_killed.get(mob))
+            .copied()
+            .unwrap_or(0);
+        // Add current run kills to cumulative total
+        cumulative_kills + current_kills
     };
 
-    if let Some(analytics_data) = analytics_data {
-        let mut check_mob_kill = |mob: Mob, threshold: u32, achievement: Achievement| {
-            if let Some(kills) = analytics_data.mobs_killed.get(&mob) {
-                if *kills >= threshold {
-                    try_unlock(&mut achievements, achievement, &mut achievement_events);
-                }
-            }
-        };
+    let get_item_collected = |object: &WorldObject| -> u32 {
+        let cumulative_count = cumulative
+            .and_then(|c| c.items_collected.get(object))
+            .copied()
+            .unwrap_or(0);
+        let current_count = current_run
+            .and_then(|c| c.items_collected.get(object))
+            .copied()
+            .unwrap_or(0);
+        // Add current run items to cumulative total
+        cumulative_count + current_count
+    };
 
-        check_mob_kill(Mob::FurDevil, 1000, Achievement::Kill100FurDevils);
-        check_mob_kill(Mob::Bushling, 1000, Achievement::BushlingSlayer1);
-        check_mob_kill(Mob::StingFly, 1000, Achievement::StingflySlayer);
-        check_mob_kill(Mob::RedMushling, 1000, Achievement::MushlingSlayer);
+    // Check mob kill achievements
+    let mut check_mob_kill = |mob: Mob, threshold: u32, achievement: Achievement| {
+        if get_mob_kills(&mob) >= threshold {
+            try_unlock(&mut achievements, achievement, &mut achievement_events);
+        }
+    };
 
-        let mut check_item_collected = |object: WorldObject, achievement: Achievement| {
-            if analytics_data
-                .items_collected
-                .get(&object)
-                .map_or(false, |count| *count > 0)
-            {
-                try_unlock(&mut achievements, achievement, &mut achievement_events);
-            }
-        };
+    check_mob_kill(Mob::FurDevil, 1000, Achievement::Kill100FurDevils);
+    check_mob_kill(Mob::Bushling, 1000, Achievement::BushlingSlayer1);
+    check_mob_kill(Mob::StingFly, 1000, Achievement::StingflySlayer);
+    check_mob_kill(Mob::RedMushling, 1000, Achievement::MushlingSlayer);
 
-        check_item_collected(WorldObject::Spear, Achievement::FindSpear);
-        check_item_collected(WorldObject::Claw, Achievement::FindClaw);
-        check_item_collected(WorldObject::Gun, Achievement::FindGun);
-        check_item_collected(WorldObject::IceStaff, Achievement::FindIceStaff);
-        check_item_collected(WorldObject::BasicStaff, Achievement::FindBasicStaff);
-        check_item_collected(WorldObject::MagicWhip, Achievement::FindMagicWhip);
-        check_item_collected(WorldObject::Dagger, Achievement::FindDagger);
-        check_item_collected(WorldObject::Hammer, Achievement::FindHammer);
-        check_item_collected(WorldObject::WoodBow, Achievement::FindBow);
-        check_item_collected(WorldObject::Blowdart, Achievement::FindBlowdart);
+    // Check item collected achievements
+    let mut check_item_collected = |object: WorldObject, achievement: Achievement| {
+        if get_item_collected(&object) > 0 {
+            try_unlock(&mut achievements, achievement, &mut achievement_events);
+        }
+    };
 
-        let found_key = analytics_data
-            .items_collected
-            .get(&WorldObject::Key)
-            .map_or(false, |count| *count > 0);
+    check_item_collected(WorldObject::Spear, Achievement::FindSpear);
+    check_item_collected(WorldObject::Claw, Achievement::FindClaw);
+    check_item_collected(WorldObject::Gun, Achievement::FindGun);
+    check_item_collected(WorldObject::IceStaff, Achievement::FindIceStaff);
+    check_item_collected(WorldObject::BasicStaff, Achievement::FindBasicStaff);
+    check_item_collected(WorldObject::MagicWhip, Achievement::FindMagicWhip);
+    check_item_collected(WorldObject::Dagger, Achievement::FindDagger);
+    check_item_collected(WorldObject::Hammer, Achievement::FindHammer);
+    check_item_collected(WorldObject::WoodBow, Achievement::FindBow);
+    check_item_collected(WorldObject::Blowdart, Achievement::FindBlowdart);
 
-        if found_key {
-            if let Some(boss_kills) = boss_kill_tracker.as_ref() {
-                if boss_kills.is_boss_killed(&Era::DungeonMain) {
-                    try_unlock(
-                        &mut achievements,
-                        Achievement::DungeonCrawler,
-                        &mut achievement_events,
-                    );
-                }
+    // Check dungeon crawler achievement
+    let found_key = get_item_collected(&WorldObject::Key) > 0;
+    if found_key {
+        if let Some(boss_kills) = boss_kill_tracker.as_ref() {
+            if boss_kills.is_boss_killed(&Era::DungeonMain) {
+                try_unlock(
+                    &mut achievements,
+                    Achievement::DungeonCrawler,
+                    &mut achievement_events,
+                );
             }
         }
     }

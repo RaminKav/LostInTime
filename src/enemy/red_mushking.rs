@@ -3,8 +3,12 @@ use crate::{
     enemy::spawn_helpers::can_spawn_mob_here,
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
+    night::InfiniteModeStartedEvent,
     player::levels::ExperienceReward,
-    world::world_helpers::tile_pos_to_world_pos,
+    world::{
+        dimension::{Era, EraManager},
+        world_helpers::tile_pos_to_world_pos,
+    },
     GameParam, TextureCamera,
 };
 use bevy::prelude::*;
@@ -395,6 +399,8 @@ pub fn summon_attack(
 pub fn handle_death(
     mut commands: Commands,
     mut death: Query<(Entity, &mut AsepriteAnimation, &super::Mob), With<DeathState>>,
+    era_manager: Res<EraManager>,
+    mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
 ) {
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
@@ -412,6 +418,11 @@ pub fn handle_death(
             *anim = AsepriteAnimation::from(RedMushking::tags::DEATH_END);
         }
         if anim.current_frame() == 62 {
+            // Check if we're in Era 3 - trigger infinite mode when the main boss dies
+            if era_manager.current_era == Era::Third {
+                info!("Red Mushking defeated in Era 3! Starting INFINITE MODE!");
+                infinite_mode_event.send_default();
+            }
             commands.entity(entity).despawn_recursive();
         }
     }

@@ -79,6 +79,7 @@ use crate::{
         heirloom_shrine::handle_heirloom_shrine_ui_setup, item_actions::ActionSuccessEvent,
     },
     night::NightTracker,
+    player::skills::HeirloomChoiceQueue,
     player::unlocks::RunUnlockState,
     player::RunScore,
     CustomFlush, Game, GameState, DEBUG,
@@ -188,6 +189,13 @@ impl Plugin for UIPlugin {
                     .before(CustomFlush)
                     .run_if(state_changed::<UIState>().and_then(in_state(UIState::Furnace))),
             ))
+            // Check for pending level-up rewards when any menu closes during gameplay
+            .add_system(
+                check_pending_levelup_rewards_on_menu_close
+                    .run_if(in_state(GameState::Main))
+                    .run_if(state_changed::<UIState>())
+                    .run_if(in_state(UIState::Closed))
+            )
             .add_systems(
                 (
                     setup_hotbar_hud.run_if(run_once_per_run()),
@@ -613,5 +621,25 @@ pub fn handle_new_ui_state(
         next_client_state.set(ClientState::Paused);
     } else {
         next_client_state.set(ClientState::Unpaused);
+    }
+}
+
+/// System that checks for pending level-up rewards when closing menus.
+/// If there are pending heirloom choices from level-ups, redirect to the Skills UI instead of closing.
+/// This prevents players from accidentally missing their level-up rewards when they level up
+/// while in another menu.
+pub fn check_pending_levelup_rewards_on_menu_close(
+    heirloom_queue: Res<HeirloomChoiceQueue>,
+    mut next_inv_state: ResMut<NextState<UIState>>,
+) {
+    // This system runs when we just entered UIState::Closed (via run conditions)
+    // Check if there are pending heirloom choices from level-ups
+    if !heirloom_queue.queue.is_empty() {
+        info!(
+            "Detected {} pending level-up rewards! Redirecting to Skills UI.",
+            heirloom_queue.queue.len()
+        );
+        // Override the transition to Closed - go to Skills instead
+        next_inv_state.set(UIState::Skills);
     }
 }

@@ -165,7 +165,7 @@ pub fn setup_achievements_ui(
     all_achievements.sort_by_key(|achievement| {
         let is_completed = achievements.is_completed(*achievement);
         let is_claimed = achievements.is_claimed(*achievement);
-        
+
         if is_completed && !is_claimed {
             0 // Completed and ready to claim - highest priority
         } else if !is_completed && !is_claimed {
@@ -253,7 +253,7 @@ pub fn setup_achievements_ui(
                 SpriteBundle {
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(289., 19.)),
-                        color: Color::rgba(0., 0., 0., 0.1), // Almost transparent but still hittable
+                        color: Color::rgba(0., 0., 0., 0.0), // Almost transparent but still hittable
                         ..Default::default()
                     },
                     transform: Transform::from_translation(Vec3::new(0., y_pos, 0.5)),
@@ -636,7 +636,7 @@ pub fn update_achievements_page_display(
     all_achievements.sort_by_key(|achievement| {
         let is_completed = achievements.is_completed(*achievement);
         let is_claimed = achievements.is_claimed(*achievement);
-        
+
         if is_completed && !is_claimed {
             0 // Completed and ready to claim
         } else if !is_completed && !is_claimed {
@@ -1023,7 +1023,7 @@ pub fn handle_achievement_row_clicks(
     all_achievements.sort_by_key(|achievement| {
         let is_completed = achievements.is_completed(*achievement);
         let is_claimed = achievements.is_claimed(*achievement);
-        
+
         if is_completed && !is_claimed {
             0 // Completed and ready to claim
         } else if !is_completed && !is_claimed {
