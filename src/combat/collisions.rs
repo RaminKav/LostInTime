@@ -34,7 +34,7 @@ use crate::{
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
-const MANA_ORB_RESTORE: i32 = 5;
+const MANA_ORB_RESTORE: i32 = 10;
 
 pub struct CollisionPlugion;
 
