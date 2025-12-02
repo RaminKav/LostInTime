@@ -22,7 +22,7 @@ use super::{
     FollowState,
 };
 
-aseprite!(pub StoneGolem, "textures/stonegolem/stonegolem.ase");
+aseprite!(pub StoneGolem, "textures/stonegolem/StoneGolem.ase");
 aseprite!(pub StonePillar, "textures/stonegolem/StonePillar.ase");
 
 // Constants
