@@ -8,8 +8,8 @@
   "survival_rogue_like::inventory::ItemStack": (
         obj_type: AttackSpeedPotion,
         metadata: (
-            name: "Attack Speed Potion", 
-            desc: ["Increases attack speed", "by 30% for 5 seconds."]
+            name: "Attack Spd Potion", 
+            desc: ["Gain 30% attack", "Speed or 5", "seconds."]
         ),
         rarity: Uncommon,
         count: 1

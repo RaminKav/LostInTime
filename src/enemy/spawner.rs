@@ -4,7 +4,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
-    client::{is_not_paused, GameOverEvent},
+    client::is_not_paused,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
     night::{NewDayEvent, NightTracker},
@@ -24,7 +24,7 @@ use crate::{
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 120;
-pub const ELITE_SPAWN_RATE: f32 = 0.07;
+pub const ELITE_SPAWN_RATE: f32 = 0.06;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
@@ -38,7 +38,7 @@ impl Plugin for SpawnerPlugin {
                     spawn_one_time_enemies_at_day,
                     spawn_stone_golem_timer.run_if(is_not_paused),
                     reduce_chunk_mob_count_on_mob_death,
-                    reset_stone_golem_timer_on_game_over,
+                    reset_stone_golem_timer_on_era_change,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -46,7 +46,10 @@ impl Plugin for SpawnerPlugin {
                 add_spawners_to_new_chunks
                     .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),
-            );
+            )
+            // Initialize Stone Golem timer as a fresh resource when entering Main Menu
+            // This ensures it resets between runs
+            .add_system(initialize_stone_golem_timer.in_schedule(OnEnter(GameState::MainMenu)));
     }
 }
 
@@ -116,17 +119,17 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(25.5, TimerMode::Once),
-            min_days_to_spawn: 2,
-            num_to_spawn: Some(4),
+            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
+            min_days_to_spawn: 3,
+            num_to_spawn: Some(3),
             num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(14.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(20.5, TimerMode::Once),
             min_days_to_spawn: 0,
-            num_to_spawn: Some(5),
+            num_to_spawn: Some(4),
             num_spawned: 0,
         });
         spawners.push(Spawner {
@@ -148,7 +151,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(25.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(4),
             num_spawned: 0,
@@ -156,9 +159,9 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::Bushling,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(20., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 1,
-            num_to_spawn: Some(5),
+            num_to_spawn: Some(4),
             num_spawned: 0,
         });
     }
@@ -319,16 +322,22 @@ impl Default for StoneGolemSpawnTimer {
     }
 }
 
+/// Initialize Stone Golem spawn timer as a fresh resource
+/// Called when entering Main Menu to ensure it resets between runs
+fn initialize_stone_golem_timer(mut commands: Commands) {
+    commands.insert_resource(StoneGolemSpawnTimer::default());
+    info!("Stone Golem spawn timer initialized");
+}
+
 /// System to spawn Stone Golem every 4 minutes in main eras (not dungeons)
 fn spawn_stone_golem_timer(
     time: Res<Time>,
-    mut timer: Local<Option<StoneGolemSpawnTimer>>,
+    golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
     mut proto_commands: ProtoCommands,
     prototypes: Prototypes,
     proto_param: ProtoParam,
     player_query: Query<&GlobalTransform, With<Player>>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
-    dimension_spawn_events: EventReader<DimensionSpawnEvent>,
     game: GameParam,
     existing_golems: Query<&Mob>,
 ) {
@@ -337,20 +346,7 @@ fn spawn_stone_golem_timer(
         return;
     }
 
-    // Initialize timer if needed
-    if timer.is_none() {
-        *timer = Some(StoneGolemSpawnTimer::default());
-    }
-
-    // Reset timer when changing eras/dimensions
-    if !dimension_spawn_events.is_empty() {
-        if let Some(ref mut t) = *timer {
-            t.timer.reset();
-            info!("Stone Golem spawn timer reset due to dimension change");
-        }
-    }
-
-    let Some(ref mut golem_timer) = *timer else {
+    let Some(mut golem_timer) = golem_timer else {
         return;
     };
 
@@ -395,18 +391,16 @@ fn spawn_stone_golem_timer(
     }
 }
 
-/// Reset Stone Golem spawn timer when player dies/game over
-fn reset_stone_golem_timer_on_game_over(
-    mut timer: Local<Option<StoneGolemSpawnTimer>>,
-    game_over_events: EventReader<GameOverEvent>,
+/// Reset Stone Golem spawn timer when changing eras/dimensions
+fn reset_stone_golem_timer_on_era_change(
+    mut golem_timer: Option<ResMut<StoneGolemSpawnTimer>>,
+    dimension_spawn_events: EventReader<DimensionSpawnEvent>,
 ) {
-    if !game_over_events.is_empty() {
-        if let Some(ref mut t) = *timer {
-            t.timer.reset();
-            info!("Stone Golem spawn timer reset due to game over");
+    if !dimension_spawn_events.is_empty() {
+        if let Some(ref mut timer) = golem_timer {
+            timer.timer.reset();
+            info!("Stone Golem spawn timer reset due to era/dimension change");
         }
-        // Clear the timer so it reinitializes on next run
-        *timer = None;
     }
 }
 
@@ -452,7 +446,7 @@ fn tick_spawner_timers(
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
-                spawner.spawn_timer.tick(time.delta());
+                // spawner.spawn_timer.tick(time.delta());
             }
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();

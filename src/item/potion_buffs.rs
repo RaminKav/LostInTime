@@ -34,12 +34,29 @@ impl MovementSpeedBuff {
     }
 }
 
-/// System to apply attack speed buff to player's attack cooldown
-pub fn apply_attack_speed_buff(
-    mut player_query: Query<(&mut AttackCooldown, &AttackSpeedBuff), With<Player>>,
+/// System to trigger attribute recalculation when attack speed buff is added
+pub fn trigger_attribute_update_on_buff_added(
+    added_buffs: Query<(), Added<AttackSpeedBuff>>,
+    mut attribute_event: EventWriter<AttributeChangeEvent>,
 ) {
+    if !added_buffs.is_empty() {
+        attribute_event.send_default();
+    }
+}
+
+/// System to apply attack speed buff AFTER attributes are calculated
+/// This runs after handle_player_item_attribute_change_events
+pub fn apply_attack_speed_buff_to_cooldown(
+    mut player_query: Query<(&mut AttackCooldown, &AttackSpeedBuff), With<Player>>,
+    att_events: EventReader<AttributeChangeEvent>,
+) {
+    // Only apply when attributes were just recalculated
+    if att_events.is_empty() {
+        return;
+    }
+
     for (mut attack_cooldown, buff) in player_query.iter_mut() {
-        // Apply the speed multiplier to the attack cooldown
+        // Apply the speed multiplier to the attack cooldown ONCE after recalculation
         attack_cooldown.0 = attack_cooldown.0 / buff.speed_multiplier;
     }
 }

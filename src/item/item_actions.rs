@@ -68,12 +68,12 @@ impl ItemAction {
                 delta
             )),
             ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => Some(format!(
-                "+{:.0}% Attack Speed for {:.0}s",
+                "+{:.0}% Att Speed for {:.0}s",
                 (multiplier - 1.0) * 100.0,
                 duration
             )),
             ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => Some(format!(
-                "+{:.0}% Movement Speed for {:.0}s",
+                "+{:.0}% Speed for {:.0}s",
                 (multiplier - 1.0) * 100.0,
                 duration
             )),

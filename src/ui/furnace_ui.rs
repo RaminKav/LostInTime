@@ -62,7 +62,7 @@ impl Default for FurnaceState {
                     WorldObject::Pendant,
                 ],
             ],
-            upgrade_timer: Timer::from_seconds(0.3, TimerMode::Once),
+            upgrade_timer: Timer::from_seconds(0.05, TimerMode::Once),
         }
     }
 }
