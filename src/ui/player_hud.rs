@@ -59,6 +59,11 @@ pub struct ClockHUD;
 pub struct ClockText;
 
 #[derive(Component)]
+pub struct EraTimerHUD;
+#[derive(Component)]
+pub struct EraTimerText;
+
+#[derive(Component)]
 pub struct ActiveSkillIcon;
 
 #[derive(Component)]
@@ -1070,6 +1075,115 @@ pub fn handle_update_clock_hud(
     }
     let mut text = clock_text.single_mut();
     text.sections[0].value = format!("{}:00", if hour > 12 { hour - 12 } else { hour });
+}
+
+/// Setup era timer HUD - displays countdown timer for the era
+pub fn setup_era_timer_hud(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    era_timer: Res<crate::night::EraTimer>,
+    res: Res<ScreenResolution>,
+    existing: Query<Entity, With<EraTimerHUD>>,
+) {
+    // Don't spawn if already exists
+    if !existing.is_empty() {
+        return;
+    }
+
+    // Position below the clock HUD
+    // Start with smaller size for timer mode (will expand when ENDLESS)
+    let era_timer_frame = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
+                custom_size: Some(Vec2::new(42., 14.)),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    -res.game_width / 2. + 50.5,
+                    (GAME_HEIGHT - 15.) / 2. - 70.5, // Right of the clock
+                    5.,
+                ),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(Name::new("ERA TIMER HUD"))
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(EraTimerHUD)
+        .id();
+
+    let _timer_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    era_timer.get_display_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: WHITE.with_a(0.),
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., -2., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            EraTimerText,
+            RenderLayers::from_layers(&[3]),
+        ))
+        .set_parent(era_timer_frame);
+}
+
+/// Update era timer HUD text
+pub fn handle_update_era_timer_hud(
+    era_timer: Res<crate::night::EraTimer>,
+    infinite_mode: Res<crate::night::InfiniteMode>,
+    mut timer_text: Query<&mut Text, With<EraTimerText>>,
+    mut timer_bg: Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
+    res: Res<ScreenResolution>,
+) {
+    for mut text in timer_text.iter_mut() {
+        if infinite_mode.active {
+            text.sections[0].value = "ENDLESS".to_string();
+            text.sections[0].style.color = RED;
+        } else {
+            text.sections[0].value = era_timer.get_display_string();
+            // Change color based on time remaining
+            let color = if era_timer.remaining_seconds <= 60.0 {
+                RED // Last minute - red
+            } else if era_timer.remaining_seconds <= 180.0 {
+                YELLOW // Last 3 minutes - yellow
+            } else {
+                WHITE
+            };
+            text.sections[0].style.color = color;
+        }
+    }
+
+    // Update background color and size based on mode
+    for (mut sprite, mut transform) in timer_bg.iter_mut() {
+        if infinite_mode.active {
+            // Bigger size for "ENDLESS" text
+            sprite.custom_size = Some(Vec2::new(68., 16.));
+            sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
+            transform.translation.x = -res.game_width / 2. + 68.5;
+        } else if era_timer.remaining_seconds <= 60.0 {
+            // Normal timer size
+            sprite.custom_size = Some(Vec2::new(42., 14.));
+            // Pulse effect for last minute
+            let pulse = (era_timer.remaining_seconds * 2.0).sin().abs() * 0.3;
+            sprite.color = Color::rgba(0.4 + pulse, 0.1, 0.1, 0.8);
+        } else {
+            // Normal timer size
+            sprite.custom_size = Some(Vec2::new(40., 14.));
+            sprite.color = Color::rgba(0.1, 0.1, 0.1, 0.7);
+            transform.translation.x = -res.game_width / 2. + 50.5;
+        }
+    }
 }
 
 #[derive(Component)]

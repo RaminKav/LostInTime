@@ -203,6 +203,7 @@ impl Plugin for UIPlugin {
                     setup_bars_ui.after(load_state).run_if(run_once_per_run()),
                     setup_currency_ui.run_if(run_once_per_run()),
                     setup_clock_hud.run_if(run_once_per_run()),
+                    setup_era_timer_hud.run_if(run_once_per_run()),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -277,6 +278,9 @@ impl Plugin for UIPlugin {
                     handle_update_clock_hud.run_if(
                         resource_exists::<NightTracker>()
                             .and_then(resource_changed::<NightTracker>()),
+                    ),
+                    handle_update_era_timer_hud.run_if(
+                        resource_exists::<crate::night::EraTimer>(),
                     ),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -421,6 +425,11 @@ impl Plugin for UIPlugin {
             )
             .add_system(
                 handle_essence_heirloom_tooltip
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_item_chest_final_item_hover
+                    .run_if(in_state(UIState::ItemChest))
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(

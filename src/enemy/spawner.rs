@@ -7,7 +7,7 @@ use crate::{
     client::is_not_paused,
     combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
-    night::{NewDayEvent, NightTracker},
+    night::{InfiniteMode, InfiniteModeMob, NewDayEvent, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
     run_once_per_run,
@@ -21,7 +21,7 @@ use crate::{
     GameParam, GameState, DEBUG,
 };
 
-use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
+use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, FollowSpeed, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 120;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
@@ -121,15 +121,15 @@ fn add_spawners_to_new_chunks(
             weight: 100.,
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 3,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(2),
             num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(20.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(18.5, TimerMode::Once),
             min_days_to_spawn: 0,
-            num_to_spawn: Some(4),
+            num_to_spawn: Some(3),
             num_spawned: 0,
         });
         spawners.push(Spawner {
@@ -153,7 +153,7 @@ fn add_spawners_to_new_chunks(
             weight: 100.,
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 2,
-            num_to_spawn: Some(4),
+            num_to_spawn: Some(2),
             num_spawned: 0,
         });
         spawners.push(Spawner {
@@ -161,7 +161,7 @@ fn add_spawners_to_new_chunks(
             weight: 100.,
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 1,
-            num_to_spawn: Some(4),
+            num_to_spawn: Some(3),
             num_spawned: 0,
         });
     }
@@ -204,6 +204,7 @@ fn handle_spawn_mobs(
     player_t: Query<&GlobalTransform, With<Player>>,
     mut spawners: Query<&mut GlobalSpawners>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
     if maybe_dungeon.get_single().is_ok() {
         return;
@@ -256,6 +257,11 @@ fn handle_spawn_mobs(
                         == &CombatAlignment::Passive)
                 {
                     commands.entity(spawned_mob).insert(EliteMob);
+                }
+
+                // Mark mobs spawned during infinite mode for red tint and speed boost
+                if infinite_mode.active {
+                    commands.entity(spawned_mob).insert(InfiniteModeMob);
                 }
             }
         }
@@ -408,6 +414,7 @@ fn tick_spawner_timers(
     time: Res<Time>,
     mut spawners: Query<(Entity, &mut GlobalSpawners)>,
     night_tracker: Res<NightTracker>,
+    infinite_mode: Res<InfiniteMode>,
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
 ) {
@@ -422,7 +429,14 @@ fn tick_spawner_timers(
             .iter()
             .filter(|m| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
             .count() as i32;
-        let max_mobs = BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10;
+
+        // In infinite mode, allow more mobs to spawn
+        let max_mobs = if infinite_mode.active {
+            BASE_MAX_MOBS_TOTAL * 2 + night_tracker.days as i32 * 10
+        } else {
+            BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+        };
+
         if mob_count >= max_mobs {
             info!(
                 "MAX MOBS {:?} {:?} {:?}",
@@ -440,13 +454,13 @@ fn tick_spawner_timers(
             }
 
             spawner.spawn_timer.tick(time.delta());
-            if night_tracker.is_night() {
-                // double spawn rate at night
+
+            // Speed up spawns during night OR infinite mode
+            if night_tracker.is_night() || infinite_mode.active {
+                // 5x spawn rate at night / infinite mode
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
-                spawner.spawn_timer.tick(time.delta());
-                // spawner.spawn_timer.tick(time.delta());
             }
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();

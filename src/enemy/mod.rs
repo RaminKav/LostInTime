@@ -21,7 +21,7 @@ use crate::{
     colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
-    night::NightTracker,
+    night::{InfiniteModeMob, NightTracker},
     player::{
         levels::{ExperienceReward, PlayerLevel},
         skills::PlayerSkills,
@@ -64,6 +64,12 @@ impl Plugin for EnemyPlugin {
                     handle_mob_move_minimap_update,
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
+                    enhance_infinite_mode_mobs.before(add_current_health_with_max_health),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
                     red_mushking::tick_aoe_attack_timer,
                     red_mushking::handle_aoe_attack,
                     stone_golem::tick_spike_attack_timer,
@@ -441,11 +447,16 @@ fn juice_up_spawned_mobs_per_day(
     >,
     night_tracker: Res<NightTracker>,
     chaos_tracker: Option<Res<ChaosTracker>>,
+    infinite_mode: Res<crate::night::InfiniteMode>,
     player_level: Query<&PlayerLevel>,
     mut commands: Commands,
 ) {
     // Get total chaos from tracker (all sources now increment the tracker)
-    let total_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
+    let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
+    // Get infinite mode chaos bonus (only applies during infinite mode, not carried to next era)
+    let infinite_chaos = infinite_mode.get_chaos_bonus() * 1.5;
+    let total_chaos = global_chaos + infinite_chaos;
+
     for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
         // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1.
@@ -453,11 +464,12 @@ fn juice_up_spawned_mobs_per_day(
             + (player_level.single().level as f32 * 0.2)
             + total_chaos;
         info!(
-            "chaos_factor: {} {:?} {:?} {:?}",
+            "chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1})",
             chaos_factor,
             night_tracker.days,
             player_level.single().level,
-            total_chaos
+            global_chaos,
+            infinite_chaos
         );
         hp.0 = (hp.0 as f32 * (chaos_factor.powf(1.1))) as i32;
         att.0 = (att.0 as f32 * (chaos_factor.powf(0.55))) as i32;
@@ -481,4 +493,44 @@ pub struct EnemyMaterial {
     #[texture(1)]
     #[sampler(2)]
     pub source_texture: Option<Handle<Image>>,
+}
+
+/// Enhance mobs spawned during infinite mode with red tint and speed boost based on difficulty level
+fn enhance_infinite_mode_mobs(
+    mut mobs: Query<
+        (Entity, &mut FollowSpeed, Option<&mut TextureAtlasSprite>),
+        Added<InfiniteModeMob>,
+    >,
+    infinite_mode: Res<crate::night::InfiniteMode>,
+    mut commands: Commands,
+) {
+    for (entity, mut follow_speed, maybe_sprite) in mobs.iter_mut() {
+        // Apply speed boost based on current difficulty level (1.0x to 2.5x)
+        let speed_multiplier = infinite_mode.get_speed_multiplier();
+        follow_speed.0 *= speed_multiplier;
+
+        // Apply red tint based on current difficulty level (alpha 0.0 to 1.0)
+        let tint_alpha = infinite_mode.get_tint_alpha();
+        if let Some(mut sprite) = maybe_sprite {
+            // Interpolate from white (1.0, 1.0, 1.0) to red (1.0, 0.5, 0.5) based on tint_alpha
+            let green_blue = 1.0 - (tint_alpha * 0.5); // Goes from 1.0 to 0.5
+            sprite.color = Color::rgba(1.0, green_blue, green_blue, 1.0);
+        }
+
+        // Store the difficulty level this mob was spawned at for reference
+        commands.entity(entity).insert(InfiniteMobTint {
+            difficulty_level: infinite_mode.difficulty_level,
+        });
+
+        debug!(
+            "Enhanced infinite mode mob: speed {:.1}x, tint alpha {:.1} (difficulty {})",
+            speed_multiplier, tint_alpha, infinite_mode.difficulty_level
+        );
+    }
+}
+
+/// Marker component for infinite mode mob tint (stores the difficulty level when spawned)
+#[derive(Component, Debug, Clone)]
+pub struct InfiniteMobTint {
+    pub difficulty_level: u8,
 }

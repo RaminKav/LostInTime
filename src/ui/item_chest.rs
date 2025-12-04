@@ -10,6 +10,7 @@ use crate::{
         attribute_helpers::{create_new_random_item_stack_with_attributes, spawn_rarity_animation},
         ItemRarity,
     },
+    inputs::CursorPos,
     inventory::ItemStack,
     item::WorldObject,
     juice::bounce::BounceOnHit,
@@ -19,7 +20,8 @@ use crate::{
 };
 
 use super::{
-    ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
+    interactions::Interaction, ui_helpers, ui_helpers::spawn_ui_overlay, Interactable,
+    ToolTipUpdateEvent, TooltipTeardownEvent, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 aseprite!(pub SkillChoiceFlash, "ui/SkillChoiceFlash.aseprite");
@@ -45,6 +47,12 @@ pub enum ItemChestAnimState {
 
 #[derive(Component)]
 pub struct ItemChest;
+
+#[derive(Component)]
+pub struct ItemChestUI;
+
+#[derive(Component)]
+pub struct ItemChestFinalItem;
 
 #[derive(Component)]
 pub struct ItemChestButton;
@@ -124,7 +132,7 @@ pub fn setup_item_chest_ui(
         })
         .insert(ui_element)
         .insert(UIState::ItemChest)
-        // .insert(Interactable::default())
+        .insert(ItemChestUI)
         .insert(Name::new("ITEM CHEST"))
         .insert(RenderLayers::from_layers(&[3]))
         .id();
@@ -378,17 +386,18 @@ pub fn handle_anim_events(
                     commands.entity(current_entity).despawn();
                     item_chest_state.current_entity = None;
                 }
-                commands
-                    .spawn(SpriteSheetBundle {
-                        sprite: graphics
-                            .spritesheet_map
-                            .as_ref()
-                            .unwrap()
-                            .get(&item_chest_state.picked_item.clone().unwrap().obj_type)
-                            .unwrap()
-                            .clone(),
-                        texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
+                let picked_item = item_chest_state.picked_item.clone().unwrap();
 
+                // Spawn with SpriteBundle first (for hit detection via pointcast_2d)
+                // then add the TextureAtlasSprite for rendering
+                commands
+                    .spawn(SpriteBundle {
+                        sprite: Sprite {
+                            // Invisible sprite used for hit detection
+                            color: Color::NONE,
+                            custom_size: Some(Vec2::new(32., 32.)),
+                            ..default()
+                        },
                         transform: Transform {
                             translation: Vec3::new(0., 25., 15.),
                             scale: Vec3::new(1., 1., 1.),
@@ -396,9 +405,22 @@ pub fn handle_anim_events(
                         },
                         ..Default::default()
                     })
+                    .insert(
+                        graphics
+                            .spritesheet_map
+                            .as_ref()
+                            .unwrap()
+                            .get(&picked_item.obj_type)
+                            .unwrap()
+                            .clone(),
+                    )
+                    .insert(graphics.texture_atlas.as_ref().unwrap().clone())
                     .insert(UIState::ItemChest)
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(Name::new("Chest Icon!!"));
+                    .insert(ItemChestFinalItem)
+                    .insert(Interactable::default())
+                    .insert(picked_item)
+                    .insert(Name::new("Chest Final Item"));
                 // handle done animation
             }
             ItemChestAnimState::Closed => {
@@ -408,24 +430,41 @@ pub fn handle_anim_events(
         }
     }
 }
-// pub fn spawn_skill_choice_flash(
-//     commands: &mut Commands,
-//     asset_server: &AssetServer,
-//     pos: Vec3,
-//     slot: usize,
-// ) {
-//     commands
-//         .spawn(AsepriteBundle {
-//             animation: AsepriteAnimation::from(SkillChoiceFlash::tags::FLASH),
-//             aseprite: asset_server.load(SkillChoiceFlash::PATH),
-//             transform: Transform {
-//                 translation: pos,
-//                 ..Default::default()
-//             },
-//             ..Default::default()
-//         })
-//         .insert(RenderLayers::from_layers(&[3]))
-//         .insert(VisibilityBundle::default())
-//         .insert(RerollDice(slot))
-//         .insert(DoneAnimation);
-// }
+/// Handle hovering on the final item in the item chest to show tooltip
+pub fn handle_item_chest_final_item_hover(
+    cursor_pos: Res<CursorPos>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut final_items: Query<(Entity, &mut Interactable, &ItemStack), With<ItemChestFinalItem>>,
+    mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
+    mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    for (e, mut interactable, item_stack) in final_items.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => {
+                match interactable.current() {
+                    Interaction::None => {
+                        interactable.change(Interaction::Hovering);
+                        // Send tooltip event
+                        tooltip_update_events.send(ToolTipUpdateEvent {
+                            item_stack: item_stack.clone(),
+                            is_recipe: false,
+                            show_range: false,
+                        });
+                    }
+                    Interaction::Hovering => {
+                        // Already hovering, do nothing
+                    }
+                    _ => {}
+                }
+            }
+            _ => {
+                // Not hovering over this item
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    tooltip_teardown_events.send_default();
+                }
+            }
+        }
+    }
+}

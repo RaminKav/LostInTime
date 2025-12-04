@@ -154,6 +154,8 @@ impl DimensionPlugin {
         mut next_state: ResMut<NextState<GameState>>,
         mut night: ResMut<NightTracker>,
         mut chaos_tracker: ResMut<crate::chaos::ChaosTracker>,
+        mut era_timer: ResMut<crate::night::EraTimer>,
+        mut infinite_mode: ResMut<crate::night::InfiniteMode>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -201,6 +203,12 @@ impl DimensionPlugin {
                     night.days = era_starting_day;
                     night.time = 0.;
                     info!("Era {:?} starting at day {}", new_era, era_starting_day);
+
+                    // Reset era timer and infinite mode for the new era (12 minutes to find the boss and portal)
+                    crate::night::reset_era_timer_and_infinite_mode(
+                        &mut era_timer,
+                        &mut infinite_mode,
+                    );
                 }
 
                 let curr_era = game.era.current_era.clone();

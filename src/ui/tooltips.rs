@@ -17,8 +17,9 @@ use crate::{
 };
 
 use super::{
-    EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
+    item_chest::ItemChestUI, EssenceUI, InventoryUI, UIElement, UIState, CHEST_INVENTORY_UI_SIZE,
     CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
+    SKILLS_CHOICE_UI_SIZE,
 };
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
@@ -111,6 +112,7 @@ pub fn handle_spawn_inv_item_tooltip(
     mut updates: EventReader<ToolTipUpdateEvent>,
     inv: Query<Entity, With<InventoryUI>>,
     essence: Query<Entity, With<EssenceUI>>,
+    item_chest: Query<Entity, With<ItemChestUI>>,
     cur_inv_state: Res<State<UIState>>,
     recipes: Res<Recipes>,
     item_stacks: Query<(Entity, &ItemStack), Without<RecipeIngredientTooltipIcon>>,
@@ -127,6 +129,7 @@ pub fn handle_spawn_inv_item_tooltip(
             UIState::Crafting => CRAFTING_INVENTORY_UI_SIZE,
             UIState::Furnace => FURNACE_INVENTORY_UI_SIZE,
             UIState::Essence => ESSENCE_UI_SIZE,
+            UIState::ItemChest => SKILLS_CHOICE_UI_SIZE,
             _ => continue,
         };
         let raw_base_attributes =
@@ -410,12 +413,13 @@ pub fn handle_spawn_inv_item_tooltip(
             );
             commands.entity(star).set_parent(tooltip);
         }
-        // add tooltip to inventory or essence ui
-        //TODO: maybe we dont need to add as parent here and avoid this
+        // add tooltip to inventory, essence, or item chest ui
         if let Ok(inv) = inv.get_single() {
             commands.entity(inv).add_child(tooltip);
         } else if let Ok(essence) = essence.get_single() {
             commands.entity(essence).add_child(tooltip);
+        } else if let Ok(chest) = item_chest.get_single() {
+            commands.entity(chest).add_child(tooltip);
         }
     }
 }
