@@ -828,6 +828,73 @@ pub fn handle_interaction_clicks(
                         }
 
                         let mut inv = inv.single_mut();
+
+                        // Special handling for furnace slots (part of player inventory)
+                        // These are always visible when inventory is open (except in Scrapper mode)
+                        if ui_state.0.is_inv_open() && ui_state.0 != UIState::Scrapper {
+                            if state.r#type.is_inventory() || state.r#type.is_hotbar() {
+                                // Shift-clicking from inventory/hotbar - check if item should go to furnace
+                                if let Some(item) = &inv.items.items[state.slot_index] {
+                                    let obj_type = item.item_stack.obj_type;
+
+                                    // Check if it's a tome/orb (goes to furnace slot 0)
+                                    let is_tome_or_orb = matches!(
+                                        obj_type,
+                                        crate::item::WorldObject::UpgradeTome
+                                            | crate::item::WorldObject::OrbOfTransformation
+                                    );
+
+                                    if is_tome_or_orb && inv.furnace_items.items[0].is_none() {
+                                        // Move tome/orb to furnace slot 0
+                                        let item_to_move = inv.items.items[state.slot_index].take();
+                                        if let Some(mut moved_item) = item_to_move {
+                                            moved_item.slot = 0;
+                                            inv.furnace_items.items[0] = Some(moved_item);
+                                        }
+                                        continue;
+                                    }
+
+                                    // Check if it's equipment that can go to furnace slot 1
+                                    // Only if there's already a tome/orb in slot 0
+                                    let has_tome_in_slot_0 = inv.furnace_items.items[0].is_some();
+                                    let slot_map =
+                                        &container_param.inv_state.furnace_state.slot_map;
+                                    let is_valid_for_slot_1 =
+                                        slot_map.len() > 1 && slot_map[1].contains(&obj_type);
+
+                                    if has_tome_in_slot_0
+                                        && is_valid_for_slot_1
+                                        && inv.furnace_items.items[1].is_none()
+                                    {
+                                        // Move equipment to furnace slot 1
+                                        let item_to_move = inv.items.items[state.slot_index].take();
+                                        if let Some(mut moved_item) = item_to_move {
+                                            moved_item.slot = 1;
+                                            inv.furnace_items.items[1] = Some(moved_item);
+                                        }
+                                        continue;
+                                    }
+                                }
+                            } else if state.r#type.is_furnace() {
+                                // Moving from furnace slots back to inventory
+                                // Take the item from furnace first to avoid double borrow
+                                let furnace_item = inv.furnace_items.items[state.slot_index].take();
+                                if let Some(mut moved_item) = furnace_item {
+                                    // Find first empty slot in inventory
+                                    if let Some(empty_slot) = inv.items.get_first_empty_slot() {
+                                        moved_item.slot = empty_slot;
+                                        inv.items.items[empty_slot] = Some(moved_item);
+                                    } else {
+                                        // No empty slot, put it back
+                                        inv.furnace_items.items[state.slot_index] =
+                                            Some(moved_item);
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+
+                        // Default behavior for other containers
                         if let Some(active_container) =
                             container_param.get_active_ui_container_mut()
                         {
@@ -1094,6 +1161,11 @@ pub fn handle_cursor_banish_buttons(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.35));
 
                         if skill_queue.banish_slot(banish.0).is_some() {
+                            // Clear the entire queue to prevent the pending levelup check
+                            // from reopening the UI - banishing is a deliberate choice to
+                            // forfeit the current level-up reward
+                            skill_queue.queue.clear();
+
                             for entity in skill_ui.iter() {
                                 commands.entity(entity).despawn_recursive();
                             }

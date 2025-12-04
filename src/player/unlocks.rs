@@ -117,11 +117,11 @@ impl UnlockUpgrades {
     fn base_cost(kind: UnlockUpgradeKind) -> u32 {
         match kind {
             UnlockUpgradeKind::Reroll => 5,
-            UnlockUpgradeKind::Banish => 5,
+            UnlockUpgradeKind::Banish => 20,
             UnlockUpgradeKind::StartFood => 8,
-            UnlockUpgradeKind::StartTome => 10,
-            UnlockUpgradeKind::StartOrb => 10,
-            UnlockUpgradeKind::StartingTools => 30, // Tier 1: WoodAxe, Tier 2: Pickaxe, Tier 3: SalvageBin
+            UnlockUpgradeKind::StartTome => 15,
+            UnlockUpgradeKind::StartOrb => 20,
+            UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe, Tier 3: SalvageBin
             UnlockUpgradeKind::ThirdActiveSkillSlot => 100, // Will be set separately
         }
     }

@@ -132,13 +132,51 @@ pub fn tick_sound_cooldowns(time: Res<Time>, mut cooldowns: ResMut<SoundCooldown
 }
 
 /// Get the cooldown duration for a specific sound effect (in seconds)
+/// Sounds with cooldowns will be rate-limited to prevent audio spam and performance issues
 fn get_sound_cooldown_duration(sound: &AudioSoundEffect) -> Option<f32> {
     match sound {
-        AudioSoundEffect::DefaultEnemyHit => Some(0.05), // 50ms between hit sounds
-        AudioSoundEffect::PlayerHit => Some(0.1),        // 100ms between player hit sounds
-        AudioSoundEffect::IceStaffHit => Some(0.05),
-        AudioSoundEffect::LightningStaffHit => Some(0.05),
-        _ => None, // No cooldown for other sounds
+        // Combat hit sounds - very frequent, short cooldown
+        AudioSoundEffect::DefaultEnemyHit => Some(0.05), // 50ms
+        AudioSoundEffect::IceStaffHit => Some(0.05),     // 50ms
+        AudioSoundEffect::LightningStaffHit => Some(0.05), // 50ms
+        AudioSoundEffect::PlayerHit => Some(0.1),        // 100ms
+
+        // Attack sounds - can be spammed with fast attack speed
+        AudioSoundEffect::IceStaffCast => Some(0.1), // 100ms
+        AudioSoundEffect::LightningStaffCast => Some(0.1), // 100ms
+        AudioSoundEffect::Bow => Some(0.1),          // 100ms
+        AudioSoundEffect::Claw => Some(0.1),         // 100ms
+        AudioSoundEffect::AirWaveAttack => Some(0.15), // 150ms
+
+        // Explosion/AOE sounds - prevent overlapping
+        AudioSoundEffect::IceExplosion => Some(0.15), // 150ms
+
+        // UI sounds - prevent spam on hover/interaction
+        AudioSoundEffect::UISlotHover => Some(0.05), // 50ms
+        AudioSoundEffect::ButtonHover => Some(0.05), // 50ms
+        AudioSoundEffect::UISkillHover => Some(0.05), // 50ms
+
+        // Pickup sounds - frequent in combat
+        AudioSoundEffect::ItemPickup => Some(0.08), // 80ms
+        AudioSoundEffect::CurrencyPickup => Some(0.1), // 100ms
+        AudioSoundEffect::GainExp => Some(0.08),    // 80ms
+
+        // Skill sounds
+        AudioSoundEffect::Teleport => Some(0.2), // 200ms
+        AudioSoundEffect::TeleportShock => Some(0.2), // 200ms
+        AudioSoundEffect::Roll => Some(0.15),    // 150ms
+        AudioSoundEffect::Lunge => Some(0.2),    // 200ms
+        AudioSoundEffect::Spear => Some(0.2),    // 200ms
+        AudioSoundEffect::Parry => Some(0.2),    // 200ms
+
+        // Rare/Legendary drops - no spam possible but add cooldown for safety
+        AudioSoundEffect::RareDrop1 => Some(0.3),
+        AudioSoundEffect::RareDrop2 => Some(0.3),
+        AudioSoundEffect::LegendaryDrop1 => Some(0.3),
+        AudioSoundEffect::LegendaryDrop2 => Some(0.3),
+
+        // Other sounds - no cooldown needed (infrequent or one-time)
+        _ => None,
     }
 }
 

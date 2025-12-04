@@ -57,6 +57,12 @@ pub struct StartingWeapon {
     pub rarity: crate::attributes::ItemRarity,
 }
 
+/// System to reset the run score when starting a new run
+pub fn reset_run_score(mut run_score: ResMut<RunScore>) {
+    info!("Resetting run score from {} to 0", run_score.score);
+    *run_score = RunScore::new();
+}
+
 /// System to track mob kills and update score
 pub fn track_mob_kills(
     mut run_score: ResMut<RunScore>,

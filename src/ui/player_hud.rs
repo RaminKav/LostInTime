@@ -690,7 +690,7 @@ pub fn handle_update_player_skills(
 
             // Spawn all icons in one consolidated loop
             for (i, (heirloom, count)) in ordered_heirlooms.iter().enumerate() {
-                const MAX_ICONS_PER_ROW: usize = 14;
+                const MAX_ICONS_PER_ROW: usize = 18;
                 const ICON_SPACING: f32 = 16.;
                 const ROW_SPACING: f32 = 16.;
 
@@ -699,7 +699,7 @@ pub fn handle_update_player_skills(
 
                 let offset = Vec2::new(
                     col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
-                    (GAME_HEIGHT - 15.) / 2. - 0.5 - (row as f32 * ROW_SPACING),
+                    (GAME_HEIGHT - 15.) / 2. - 2.5 - (row as f32 * ROW_SPACING),
                 );
 
                 // Create the main icon
@@ -1014,8 +1014,8 @@ pub fn setup_clock_hud(
             aseprite: asset_server.load::<Aseprite, _>(Clock::PATH),
             transform: Transform {
                 translation: Vec3::new(
-                    res.game_width / 2. - 17.5,
-                    (GAME_HEIGHT - 15.) / 2. - 76.5,
+                    -res.game_width / 2. + 17.5,
+                    (GAME_HEIGHT - 15.) / 2. - 68.5,
                     6.,
                 ),
                 scale: Vec3::new(1., 1., 1.),

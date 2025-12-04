@@ -246,6 +246,11 @@ impl Plugin for PlayerPlugin {
                     .in_schedule(OnEnter(GameState::Main)),
             )
             .add_system(
+                score::reset_run_score
+                    .run_if(run_once_per_run())
+                    .in_schedule(OnEnter(GameState::Main)),
+            )
+            .add_system(
                 give_player_starting_items
                     .run_if(run_once_per_run())
                     .in_schedule(OnEnter(GameState::Main)),

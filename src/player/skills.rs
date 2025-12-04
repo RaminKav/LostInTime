@@ -1227,7 +1227,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common),
-                HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
+                // HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
@@ -1408,12 +1408,6 @@ impl HeirloomChoiceQueue {
                 count,
                 Some(player_level),
             );
-        }
-
-        //repopulate the queue after each skill selection, if there are skills missing
-        if player_skills.heirlooms.len() < player_level as usize - 1 {
-            // Note: loot_bonus should be passed from call site, using 0 as fallback
-            self.add_new_skills_after_levelup(&mut rand::thread_rng(), 0);
         }
     }
     pub fn handle_reroll_slot(

@@ -900,8 +900,10 @@ pub fn mouse_click_system(
                 proto_param.get_component::<ManaCost, _>(main_hand_option.unwrap());
             let mut rng = rand::thread_rng();
             let trigger_count = if game.has_skill(Heirloom::ChanceToProcExtraAttack)
-                && rng.gen_bool(game.skill_count(Heirloom::ChanceToProcExtraAttack) as f64 * 0.25)
-            {
+                && rng.gen_bool(
+                    (game.skill_count(Heirloom::ChanceToProcExtraAttack) as f64 * 0.25)
+                        .clamp(0., 1.),
+                ) {
                 2
             } else {
                 1

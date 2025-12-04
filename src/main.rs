@@ -17,6 +17,7 @@ use attributes::{
 mod audio;
 mod bounce;
 mod container;
+mod cursor;
 mod datafiles;
 mod keybinds;
 mod panic_handler;
@@ -220,6 +221,7 @@ fn main() {
         .add_plugin(ItemsPlugin)
         .add_plugin(AnimationsPlugin)
         .add_plugin(InputsPlugin)
+        .add_plugin(cursor::CustomCursorPlugin)
         .add_plugin(UIPlugin)
         .add_plugin(NightPlugin)
         .add_plugin(ChaosPlugin)

@@ -154,7 +154,8 @@ pub fn setup_skill_choice_ui(
     if banish_enabled {
         for i in -1i32..2 {
             let slot_index = (i + 1) as usize;
-            let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -96., 10.);
+            let translation =
+                Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -96.5, 10.);
             let mut banish_button = commands.spawn(SpriteBundle {
                 texture: graphics
                     .get_ui_element_texture(UIElement::BackButton)
@@ -170,7 +171,6 @@ pub fn setup_skill_choice_ui(
                 },
                 transform: Transform {
                     translation,
-                    scale: Vec3::new(0.85, 0.85, 1.),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -203,7 +203,7 @@ pub fn setup_skill_choice_ui(
                         )
                         .with_alignment(TextAlignment::Center),
                         text_anchor: Anchor::Center,
-                        transform: Transform::from_translation(Vec3::new(1.4, -0.7, 1.)),
+                        transform: Transform::from_translation(Vec3::new(2., 0., 1.)),
                         ..Default::default()
                     },
                     RenderLayers::from_layers(&[3]),

@@ -251,7 +251,7 @@ pub fn handle_on_hit_upgrades(
         };
         if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
             && skills.has(Heirloom::IceStaffAoE)
-            && rng.gen_bool(skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.1)
+            && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.1).clamp(0., 1.))
         {
             // Throttle explosions per frame to prevent lag when hitting many enemies
             const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
@@ -274,7 +274,7 @@ pub fn handle_on_hit_upgrades(
             }
         }
         if skills.has(Heirloom::IceStaffFloor)
-            && rng.gen_bool(skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1)
+            && rng.gen_bool((skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1).clamp(0., 1.))
         {
             let ice = spawn_one_time_aseprite_collider(
                 &mut commands,
@@ -298,7 +298,7 @@ pub fn handle_on_hit_upgrades(
             continue;
         };
         if (hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart)
-            || rng.gen_bool(skills.calculate_poison_chance())
+            || rng.gen_bool(skills.calculate_poison_chance().clamp(0., 1.))
         {
             if let Some(mut burning) = burning_option {
                 // Increment stacks and reset duration
@@ -330,7 +330,9 @@ pub fn handle_on_hit_upgrades(
         }
         if main_hand.get_obj() == WorldObject::Hammer
             || (skills.has(Heirloom::FrailStacks)
-                && rng.gen_bool(skills.get_count(Heirloom::FrailStacks) as f64 * 0.25))
+                && rng.gen_bool(
+                    (skills.get_count(Heirloom::FrailStacks) as f64 * 0.25).clamp(0.0, 0.99),
+                ))
         {
             if let Some(mut frail_stacks) = frailed_option {
                 if frail_stacks.num_stacks < 3
@@ -357,7 +359,7 @@ pub fn handle_on_hit_upgrades(
             }
         }
         if main_hand.get_obj() == WorldObject::IceStaff
-            || rng.gen_bool(skills.calculate_freeze_chance())
+            || rng.gen_bool(skills.calculate_freeze_chance().clamp(0., 1.))
         {
             try_add_slow_stacks(
                 hit_e,
@@ -368,7 +370,7 @@ pub fn handle_on_hit_upgrades(
         }
 
         if skills.has(Heirloom::Lifesteal)
-            && rng.gen_bool(skills.get_count(Heirloom::Lifesteal) as f64 * 0.1)
+            && rng.gen_bool((skills.get_count(Heirloom::Lifesteal) as f64 * 0.1).clamp(0., 1.))
         {
             modify_health_events.send(ModifyHealthEvent(1));
         }

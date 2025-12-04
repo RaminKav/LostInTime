@@ -34,6 +34,9 @@ use crate::{
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::{CollisionEvent, RapierContext};
 use rand::Rng;
+
+use crate::pets::state::Pet;
+
 const MANA_ORB_RESTORE: i32 = 10;
 
 pub struct CollisionPlugion;
@@ -152,7 +155,13 @@ fn check_projectile_hit_mob_collisions(
     player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
         (Entity, &GlobalTransform),
-        (Without<ItemStack>, Without<MainHand>, Without<Projectile>),
+        (
+            Without<ItemStack>,
+            Without<MainHand>,
+            Without<Projectile>,
+            Without<Pet>,                      // Don't hit pets
+            Without<TouchTriggerObjectAction>, // Don't hit bounce flowers etc.
+        ),
     >,
     mut hit_event: EventWriter<HitEvent>,
     mut collisions: EventReader<CollisionEvent>,
