@@ -595,6 +595,9 @@ impl<'w, 's> GameParam<'w, 's> {
         None
     }
 
+    /// Returns (damage, was_crit, was_overcrit)
+    /// Overcrit happens when crit chance > 100% and a second roll succeeds
+    /// Overcrit does an additional 30% damage on top of crit damage
     pub fn calculate_player_damage(
         &self,
         commands: &mut Commands,
@@ -603,7 +606,7 @@ impl<'w, 's> GameParam<'w, 's> {
         dmg_mult: Option<f32>,
         dmg_bonus: u32,
         attack_override: Option<i32>,
-    ) -> (u32, bool) {
+    ) -> (u32, bool, bool) {
         let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
             self.player_stats.single();
         let mut rng = rand::thread_rng();
@@ -616,22 +619,44 @@ impl<'w, 's> GameParam<'w, 's> {
         };
         // Convert bonus damage percentage to multiplier (e.g., 30% -> 1.3x)
         let bonus_damage_multiplier = 1.0 + (bonus_dmg.0 as f32 / 100.0);
-        if rng.gen_ratio(
-            u32::min(100, crit_chance.0.try_into().unwrap_or(0) + bonus_crit),
-            100,
-        ) || self.player().next_hit_crit
-        {
+
+        let total_crit_chance = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
+
+        // Determine if we crit and if we overcrit
+        let (did_crit, did_overcrit) = if total_crit_chance >= 100 || self.player().next_hit_crit {
+            // Guaranteed crit if >= 100%
+            // Check for overcrit if crit > 100%
+            let overcrit_chance = total_crit_chance.saturating_sub(100);
+            let is_overcrit =
+                overcrit_chance > 0 && rng.gen_ratio(u32::min(100, overcrit_chance), 100);
+            (true, is_overcrit)
+        } else {
+            // Normal crit roll
+            let is_crit = rng.gen_ratio(total_crit_chance, 100);
+            (is_crit, false)
+        };
+
+        if did_crit {
             commands.entity(hit_entity).insert(WasHitWithCrit);
+            if did_overcrit {
+                commands.entity(hit_entity).insert(WasHitWithOvercrit);
+            }
+            // Base crit damage
+            let crit_multiplier = f32::abs((crit_dmg.0 + crit_dmb_bonus) as f32) / 100.;
+            // Overcrit adds an extra 50% on top
+            let overcrit_multiplier = if did_overcrit { 1.5 } else { 1.0 };
             (
                 ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
                     * bonus_damage_multiplier
-                    * (f32::abs((crit_dmg.0 + crit_dmb_bonus) as f32) / 100.))
-                    as u32,
+                    * crit_multiplier
+                    * overcrit_multiplier) as u32,
                 true,
+                did_overcrit,
             )
         } else {
             (
                 ((dmg_mult * (dmg + dmg_bonus as i32) as f32) * bonus_damage_multiplier) as u32,
+                false,
                 false,
             )
         }

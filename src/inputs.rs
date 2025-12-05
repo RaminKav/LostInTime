@@ -973,19 +973,20 @@ pub fn mouse_click_system(
             if *DEBUG {
                 debug!("OBJ: {hit_obj:?}");
             }
+            let (damage, was_crit, was_overcrit) =
+                game.calculate_player_damage(&mut commands, hit_obj, 0, None, 0, None);
             hit_event.send(HitEvent {
                 hit_by_pet: None,
                 hit_entity: hit_obj,
-                damage: game
-                    .calculate_player_damage(&mut commands, hit_obj, 0, None, 0, None)
-                    .0 as i32,
+                damage: damage as i32,
                 dir: Vec2::new(0., 0.),
                 hit_with_melee: main_hand_option,
                 hit_with_projectile: None,
                 ignore_tool: false,
                 hit_by_mob: None,
                 from_heirloom_effect: false,
-                was_crit: false,
+                was_crit,
+                was_overcrit,
             });
         }
     }

@@ -5,6 +5,7 @@ pub const DMG_NUM_RED: Color = Color::rgba(179. / 255., 61. / 255., 61. / 255., 
 pub const DMG_NUM_GREEN: Color = Color::rgba(185. / 255., 185. / 255., 110. / 255., 1.);
 pub const DMG_NUM_PURPLE: Color = Color::rgba(81. / 255., 65. / 255., 104. / 255., 1.);
 pub const DMG_NUM_YELLOW: Color = Color::rgba(231. / 255., 193. / 255., 111. / 255., 1.);
+pub const DMG_NUM_ORANGE: Color = Color::rgba(255. / 255., 140. / 255., 50. / 255., 1.); // Overcrit color
 pub const _GOLD: Color = Color::rgba(201. / 255., 114. / 255., 69. / 255., 1.);
 pub const ORANGE: Color = Color::rgba(201. / 255., 109. / 255., 69. / 255., 1.);
 pub const LIGHT_RED: Color = Color::rgba(202. / 255., 53. / 255., 55. / 255., 1.);

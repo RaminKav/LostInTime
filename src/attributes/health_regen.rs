@@ -16,6 +16,17 @@ use super::{
 #[derive(Component)]
 pub struct HealthRegenTimer(pub Timer);
 
+/// Calculate the multiplicative regen cooldown reduction
+/// Each stack multiplies by 0.75, so it can never reach 0
+/// 1 stack = 0.75x, 2 stacks = 0.5625x, 3 stacks = 0.42x, etc.
+fn get_regen_cooldown_multiplier(stacks: i32) -> f32 {
+    if stacks <= 0 {
+        1.0
+    } else {
+        0.75_f32.powi(stacks)
+    }
+}
+
 pub fn handle_health_regen(
     mut player_regen: Query<
         (&HealthRegen, &mut HealthRegenTimer, &Hunger, &PlayerSkills),
@@ -27,14 +38,14 @@ pub fn handle_health_regen(
     let (health_regen, mut timer, hunger, skills) = player_regen.single_mut();
     let d = time.delta();
 
-    timer.0.tick(if skills.has(Heirloom::HPRegenCooldown) {
-        Duration::new(
-            (d.as_secs() as f32 * 0.75) as u64,
-            (d.subsec_nanos() as f32 * 0.75) as u32,
-        )
-    } else {
-        d
-    });
+    // Multiplicatively reduce regen cooldown per stack (0.75^stacks)
+    let hp_regen_stacks = skills.get_count(Heirloom::HPRegenCooldown);
+    let multiplier = get_regen_cooldown_multiplier(hp_regen_stacks);
+
+    timer.0.tick(Duration::new(
+        (d.as_secs() as f32 * multiplier) as u64,
+        (d.subsec_nanos() as f32 * multiplier) as u32,
+    ));
     if timer.0.just_finished() {
         if hunger.is_starving() {
             return;
@@ -57,14 +68,14 @@ pub fn handle_mana_regen(
     let (mana_regen, mut timer, hunger, skills) = player_regen.single_mut();
     let d = time.delta();
 
-    timer.0.tick(if skills.has(Heirloom::MPRegenCooldown) {
-        Duration::new(
-            (d.as_secs() as f32 * 0.75) as u64,
-            (d.subsec_nanos() as f32 * 0.75) as u32,
-        )
-    } else {
-        d
-    });
+    // Multiplicatively reduce regen cooldown per stack (0.75^stacks)
+    let mp_regen_stacks = skills.get_count(Heirloom::MPRegenCooldown);
+    let multiplier = get_regen_cooldown_multiplier(mp_regen_stacks);
+
+    timer.0.tick(Duration::new(
+        (d.as_secs() as f32 * multiplier) as u64,
+        (d.subsec_nanos() as f32 * multiplier) as u32,
+    ));
     if timer.0.finished() {
         if hunger.is_starving() {
             return;

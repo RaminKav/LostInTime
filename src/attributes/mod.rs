@@ -629,7 +629,7 @@ impl ItemAttributes {
         if self.lifesteal.value != 0 {
             tooltips.push((
                 format!(
-                    "{}{} Lifesteal",
+                    "{}{}% Lifesteal",
                     if is_positive(self.lifesteal.value) {
                         "+"
                     } else {
@@ -971,12 +971,19 @@ impl ItemAttributes {
         entity.insert(Thorns(
             self.thorns.value + skills.get_count(Heirloom::Thorns) * 15,
         ));
-        entity.insert(Dodge(i32::min(
-            80,
-            self.dodge.value
-                + skills.get_count(Heirloom::DodgeChance) * 10
-                + skills.get_count(Heirloom::DodgeCrit) * 10,
-        )));
+        // Calculate raw dodge value from stats and heirlooms
+        let raw_dodge = self.dodge.value
+            + skills.get_count(Heirloom::DodgeChance) * 10
+            + skills.get_count(Heirloom::DodgeCrit) * 10;
+        // Asymptotic formula: approaches 100 but never reaches it
+        // Formula: 100 * raw / (raw + 100)
+        // At raw 100 this gives 50%, at raw 200 gives 66.6%
+        let effective_dodge = if raw_dodge <= 0 {
+            0
+        } else {
+            (100.0 * raw_dodge as f32 / (raw_dodge as f32 + 100.0)) as i32
+        };
+        entity.insert(Dodge(effective_dodge));
         entity.insert(Speed(
             computed_speed + skills.get_count(Heirloom::Speed) * 15,
         ));

@@ -174,6 +174,7 @@ pub fn handle_burning_ticks(
                     hit_with_melee: None,
                     hit_with_projectile: None,
                     was_crit: false,
+                    was_overcrit: false,
                     hit_by_mob: None,
                     ignore_tool: false,
                     from_heirloom_effect: true, // Burning is a status effect, shouldn't chain heirlooms

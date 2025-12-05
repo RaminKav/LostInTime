@@ -161,7 +161,8 @@ fn calculate_percent_damage(
     percent: f32,
 ) -> i32 {
     if is_boss {
-        let (damage, _) = game.calculate_player_damage(commands, target, 0, Some(percent), 0, None);
+        let (damage, _, _) =
+            game.calculate_player_damage(commands, target, 0, Some(percent), 0, None);
         i32::max(1, damage as i32)
     } else {
         ((max_health as f32) * percent).ceil().max(1.0) as i32
@@ -329,6 +330,7 @@ pub fn update_ant_farm_ants(
                 hit_by_mob: None,
                 hit_by_pet: None,
                 was_crit: false,
+                was_overcrit: false,
                 ignore_tool: true,
                 from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
             });
@@ -504,6 +506,7 @@ pub fn update_stone_tooth(
                     hit_by_mob: None,
                     hit_by_pet: None,
                     was_crit: false,
+                    was_overcrit: false,
                     ignore_tool: true,
                     from_heirloom_effect: true, // Stone heirloom effect shouldn't chain
                 });
@@ -740,8 +743,9 @@ pub fn update_reaper_souls(
                 hit_by_mob: None,
                 hit_by_pet: None,
                 was_crit: false,
+                was_overcrit: false,
                 ignore_tool: true,
-                from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
+                from_heirloom_effect: true, // Reaper heirloom effect shouldn't chain
             });
             commands.entity(entity).despawn_recursive();
         }

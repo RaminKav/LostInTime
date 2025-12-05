@@ -59,6 +59,8 @@ pub struct HitEvent {
     pub hit_by_mob: Option<Mob>,
     pub hit_by_pet: Option<Entity>,
     pub was_crit: bool,
+    /// True if crit chance was >100% and second crit roll succeeded (overcrit does 30% extra damage)
+    pub was_overcrit: bool,
     pub ignore_tool: bool,
     /// If true, this damage came from a heirloom effect (explosion, etc) and should not trigger other heirloom effects
     pub from_heirloom_effect: bool,
@@ -87,6 +89,9 @@ pub struct ObjBreakEvent {
 
 #[derive(Component)]
 pub struct WasHitWithCrit;
+
+#[derive(Component)]
+pub struct WasHitWithOvercrit;
 
 #[derive(Component, Debug, Clone)]
 pub struct AttackTimer(pub Timer);

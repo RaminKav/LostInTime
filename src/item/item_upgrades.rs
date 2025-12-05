@@ -369,10 +369,35 @@ pub fn handle_on_hit_upgrades(
             );
         }
 
-        if skills.has(Heirloom::Lifesteal)
-            && rng.gen_bool((skills.get_count(Heirloom::Lifesteal) as f64 * 0.1).clamp(0., 1.))
-        {
-            modify_health_events.send(ModifyHealthEvent(1));
+        // Calculate total lifesteal: base from heirloom (10% per stack) + equipment lifesteal attribute
+        let heirloom_lifesteal = skills.get_count(Heirloom::Lifesteal) * 10; // 10% per stack
+        let equipment_lifesteal = player_attributes.lifesteal.value;
+        let total_lifesteal = heirloom_lifesteal + equipment_lifesteal;
+
+        if total_lifesteal > 0 {
+            // Lifesteal can go over 100%
+            // >= 100% = guaranteed 1 HP heal
+            // For each additional 100% over 100%, guaranteed another HP
+            // Remainder is a random chance for +1 more HP
+            let mut heal_amount = 0;
+            let mut remaining_lifesteal = total_lifesteal;
+
+            // Process full 100% chunks
+            while remaining_lifesteal >= 100 {
+                heal_amount += 1;
+                remaining_lifesteal -= 100;
+            }
+
+            // Random roll for remainder
+            if remaining_lifesteal > 0
+                && rng.gen_bool((remaining_lifesteal as f64 / 100.0).clamp(0.0, 1.0))
+            {
+                heal_amount += 1;
+            }
+
+            if heal_amount > 0 {
+                modify_health_events.send(ModifyHealthEvent(heal_amount));
+            }
         }
     }
 }

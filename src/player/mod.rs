@@ -339,7 +339,7 @@ fn spawn_player(
             Hunger::new(100),
             HungerTracker::new(7., 8),
             InvincibilityCooldown(1.),
-            HealthRegenTimer(Timer::from_seconds(20., TimerMode::Once)),
+            HealthRegenTimer(Timer::from_seconds(10., TimerMode::Once)),
             MovementVector::default(),
             YSort(0.001),
             Name::new("Player"),
@@ -516,6 +516,15 @@ fn give_player_starting_items(
         force_player_autopick(&mut game);
     }
 
+    proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
+    proto_commands.spawn_item_from_proto(
+        WorldObject::OrbOfTransformation,
+        &proto,
+        Vec2::ZERO,
+        64,
+        None,
+    );
+
     // Handle pending rewards (food, tomes, orbs)
     if !run_state.pending_rewards {
         return;
@@ -577,21 +586,6 @@ fn give_player_starting_items(
     // proto_commands.spawn_item_from_proto(WorldObject::ThrowingStar, &proto, Vec2::ZERO, 10,None);
     // proto_commands.spawn_item_from_proto(WorldObject::BridgeBlock, &proto, Vec2::ZERO, 64,None);
     // proto_commands.spawn_item_from_proto(WorldObject::FurnaceBlock, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(
-    //     WorldObject::UpgradeStationBlock,
-    //     &proto,
-    //     Vec2::ZERO,
-    //     64,
-    //     None,
-    // );
-    // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(
-    //     WorldObject::OrbOfTransformation,
-    //     &proto,
-    //     Vec2::ZERO,
-    //     64,
-    //     None,
-    // );
     // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(3));
     // proto_commands.spawn_item_from_proto(WorldObject::RawMeat, &proto, Vec2::ZERO, 64, None);
     // proto_commands.spawn_item_from_proto(WorldObject::WoodPickaxe, &proto, Vec2::ZERO, 1,None);

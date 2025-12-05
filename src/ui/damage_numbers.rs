@@ -4,11 +4,11 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
-    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
+    colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
     inventory::ItemStack,
     item::WorldObject,
     world::{world_helpers, TILE_SIZE},
-    Game, TextureCamera, WasHitWithCrit,
+    Game, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
 };
 
 use super::{spawn_item_stack_icon, UIElement};
@@ -102,6 +102,7 @@ pub fn handle_add_damage_numbers_after_hit(
             &CurrentHealth,
             &mut PreviousHealth,
             Option<&WasHitWithCrit>,
+            Option<&WasHitWithOvercrit>,
         ),
         Changed<CurrentHealth>,
     >,
@@ -110,7 +111,7 @@ pub fn handle_add_damage_numbers_after_hit(
     raw_dmg: Query<(&Attack, &BonusDamage)>,
     game: Res<Game>,
 ) {
-    for (e, changed_health, mut prev_health, crit_option) in changed_health.iter_mut() {
+    for (e, changed_health, mut prev_health, crit_option, overcrit_option) in changed_health.iter_mut() {
         let delta = changed_health.0 - prev_health.0;
         if delta == 0 {
             continue;
@@ -126,6 +127,7 @@ pub fn handle_add_damage_numbers_after_hit(
         let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
+        let is_overcrit = overcrit_option.is_some();
 
         spawn_floating_text_with_shadow(
             &mut commands,
@@ -135,19 +137,28 @@ pub fn handle_add_damage_numbers_after_hit(
                 DMG_NUM_GREEN
             } else if is_player {
                 DMG_NUM_PURPLE
+            } else if is_overcrit {
+                DMG_NUM_ORANGE // Orange for overcrit
             } else if is_crit {
-                DMG_NUM_YELLOW
+                DMG_NUM_YELLOW // Yellow for regular crit
             } else {
                 DMG_NUM_RED
             },
             if delta < 0 {
-                format!("{}{}", delta.abs(), if is_crit { "!" } else { "" })
+                format!(
+                    "{}{}",
+                    delta.abs(),
+                    if is_overcrit { "!!" } else if is_crit { "!" } else { "" }
+                )
             } else {
                 format!("+{}", delta)
             },
         );
         if is_crit {
             commands.entity(e).remove::<WasHitWithCrit>();
+        }
+        if is_overcrit {
+            commands.entity(e).remove::<WasHitWithOvercrit>();
         }
     }
 }

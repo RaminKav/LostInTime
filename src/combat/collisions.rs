@@ -116,7 +116,7 @@ fn check_melee_hit_collisions(
                 continue;
             };
 
-            let (mut damage, was_crit) = game.calculate_player_damage(
+            let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                 &mut commands,
                 hit_entity,
                 (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
@@ -141,6 +141,7 @@ fn check_melee_hit_collisions(
                 hit_with_melee: Some(*weapon_obj),
                 hit_with_projectile: None,
                 was_crit,
+                was_overcrit,
                 hit_by_mob: None,
                 ignore_tool: false,
                 from_heirloom_effect: false,
@@ -236,7 +237,7 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 0
             };
-            let (mut damage, was_crit) =
+            let (mut damage, was_crit, was_overcrit) =
                 game.calculate_player_damage(&mut commands, *e2, crit_bonus, None, 0, Some(att.0));
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
@@ -292,6 +293,7 @@ fn check_projectile_hit_mob_collisions(
                 ignore_tool: false,
                 hit_by_mob: None,
                 was_crit,
+                was_overcrit,
                 from_heirloom_effect: is_from_heirloom,
             });
             if nearby_mobs.get(*e2).is_ok() {
@@ -458,6 +460,7 @@ fn check_projectile_hit_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: Some(enemy_proj.mob.clone()),
                     was_crit: false,
+                    was_overcrit: false,
                     from_heirloom_effect: false,
                 });
             }
@@ -710,6 +713,7 @@ fn check_mob_to_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
+                    was_overcrit: false,
                     from_heirloom_effect: false,
                 });
             }
@@ -725,6 +729,7 @@ fn check_mob_to_player_collisions(
                     ignore_tool: false,
                     hit_by_mob: None,
                     was_crit: false,
+                    was_overcrit: false,
                     from_heirloom_effect: false,
                 });
             }
@@ -773,6 +778,7 @@ fn check_boss_to_objects_collisions(
                     ignore_tool: true,
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
+                    was_overcrit: false,
                     from_heirloom_effect: false,
                 });
             }

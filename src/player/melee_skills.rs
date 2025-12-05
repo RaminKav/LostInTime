@@ -67,7 +67,7 @@ pub fn handle_second_split_attack(
             continue;
         };
 
-        let (damage, was_crit) = game.calculate_player_damage(
+        let (damage, was_crit, was_overcrit) = game.calculate_player_damage(
             &mut commands,
             e,
             (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
@@ -86,6 +86,7 @@ pub fn handle_second_split_attack(
             hit_with_melee: Some(second_hit.weapon_obj),
             hit_with_projectile: None,
             was_crit,
+            was_overcrit,
             hit_by_mob: None,
             ignore_tool: false,
             from_heirloom_effect: false, // Split attack is a player skill, should trigger heirlooms
