@@ -4,7 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": Bushling,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
-    "survival_rogue_like::enemy::FollowSpeed": (0.30),
+    "survival_rogue_like::enemy::FollowSpeed": (0.35),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 38., startup: 0.75, duration: 0.35, cooldown: 1.0, speed: 80.),
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 8.),

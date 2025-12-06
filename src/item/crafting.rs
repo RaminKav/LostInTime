@@ -283,6 +283,7 @@ pub fn handle_furnace_slot_update(
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
     asset_server: Res<AssetServer>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
+    player_skills: Query<&crate::player::skills::PlayerSkills, With<Player>>,
 ) {
     let mut inv = inv.single_mut();
 
@@ -290,31 +291,40 @@ pub fn handle_furnace_slot_update(
         inv_state.furnace_state.upgrade_timer.tick(time.delta());
 
         if inv_state.furnace_state.upgrade_timer.just_finished() {
+            // Check for TomeDoubleUpgrade heirloom
+            let has_tome_double = player_skills
+                .get_single()
+                .map(|s| s.has(crate::player::skills::Heirloom::TomeDoubleUpgrade))
+                .unwrap_or(false);
+
             match inv_state.furnace_state.current_fuel_type {
                 WorldObject::UpgradeTome => {
-                    // Upgrade Stats
-                    let upgraded_stack = levelup_item_stats(
-                        &inv.furnace_items.items[1]
-                            .as_ref()
-                            .unwrap()
-                            .clone()
-                            .item_stack,
-                        1,
-                        &proto,
-                        false,
-                    );
+                    // Upgrade Stats (do it twice if TomeDoubleUpgrade is active)
+                    let upgrade_count = if has_tome_double { 2 } else { 1 };
 
-                    inv.furnace_items.items[1] = Some(InventoryItemStack {
-                        item_stack: upgraded_stack.clone(),
-                        slot: 1,
-                    });
-
-                    // Increase Level
-                    inv.furnace_items.items[1]
+                    let mut current_stack = inv.furnace_items.items[1]
                         .as_ref()
                         .unwrap()
                         .clone()
-                        .modify_level(1, &mut inv.furnace_items);
+                        .item_stack;
+
+                    for _ in 0..upgrade_count {
+                        current_stack = levelup_item_stats(&current_stack, 1, &proto, false);
+                    }
+
+                    inv.furnace_items.items[1] = Some(InventoryItemStack {
+                        item_stack: current_stack.clone(),
+                        slot: 1,
+                    });
+
+                    // Increase Level (also do it multiple times for TomeDoubleUpgrade)
+                    for _ in 0..upgrade_count {
+                        inv.furnace_items.items[1]
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                            .modify_level(1, &mut inv.furnace_items);
+                    }
                 }
                 WorldObject::OrbOfTransformation => {
                     // Reroll Attributes

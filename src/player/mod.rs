@@ -10,13 +10,14 @@ use bevy_rapier2d::{
 };
 use combat_heirlooms::{
     break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
-    handle_mana_orb_drops, handle_reaper_soul_spawns, update_ant_farm_ants, update_reaper_souls,
-    update_stone_tooth,
+    handle_crate_break_damage, handle_death_defiance_freeze, handle_dodge_crit_activation,
+    handle_dodge_crit_next_hit_reset, handle_mana_orb_drops, handle_max_hp_hunt,
+    handle_reaper_soul_spawns, tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants,
+    update_reaper_souls, update_stone_tooth,
 };
 use melee_skills::{
-    handle_echo_after_heal, handle_on_hit_skills, handle_parry, handle_parry_success,
-    handle_second_split_attack, handle_spear, handle_spear_gravity, tick_parried_timer,
-    ParrySuccessEvent,
+    handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
+    handle_spear, handle_spear_gravity, tick_parried_timer, ParrySuccessEvent,
 };
 use rand::seq::SliceRandom;
 use rogue_skills::{
@@ -165,7 +166,6 @@ impl Plugin for PlayerPlugin {
                     tick_just_teleported.run_if(is_not_paused),
                     tick_teleport_timer.run_if(is_not_paused),
                     handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
-                    handle_on_hit_skills.after(handle_hits),
                     handle_dodge_crit,
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -180,9 +180,27 @@ impl Plugin for PlayerPlugin {
                     handle_reaper_soul_spawns.run_if(is_not_paused),
                     update_reaper_souls.run_if(is_not_paused),
                     break_crates_with_roll.run_if(is_not_paused),
+                    // New heirloom systems
+                    handle_max_hp_hunt.run_if(is_not_paused),
+                    tick_stand_still_state.run_if(is_not_paused),
+                    handle_death_defiance_freeze.run_if(is_not_paused),
                     skill_heirlooms::handle_druid_tree_taunt
                         .run_if(is_not_paused)
                         .before(crate::ai::follow),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    handle_crate_break_damage.run_if(is_not_paused),
+                    handle_dodge_crit_activation.run_if(is_not_paused),
+                    tick_dodge_crit_buff.run_if(is_not_paused),
+                    handle_dodge_crit_next_hit_reset
+                        .run_if(is_not_paused)
+                        .after(handle_hits),
+                    skill_heirlooms::handle_crit_heal
+                        .run_if(is_not_paused)
+                        .after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

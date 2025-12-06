@@ -555,7 +555,7 @@ pub fn return_to_shrine(
             &mut CurrentHealth,
             &MaxHealth,
         ),
-        With<ReturnToShrineState>,
+        (With<ReturnToShrineState>, Without<crate::player::Player>),
     >,
     game: GameParam,
     mut transforms: Query<&mut Transform>,

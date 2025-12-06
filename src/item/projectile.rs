@@ -264,7 +264,11 @@ fn handle_ranged_attack_event(
         }
 
         let spawn_transform = if let Some(entity) = proj_event.from_entity {
-            transforms.get(entity).unwrap().translation().truncate()
+            transforms
+                .get(entity)
+                .unwrap_or(&GlobalTransform::default())
+                .translation()
+                .truncate()
         } else {
             game.player().position.truncate()
         };

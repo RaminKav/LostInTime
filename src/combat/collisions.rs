@@ -610,6 +610,7 @@ fn check_mob_to_player_collisions(
             Option<&mut ParryState>,
             Option<&Stealthed>,
             Option<&LungeState>,
+            &Attack, // Player's attack for thorns calculation
         ),
         With<Player>,
     >,
@@ -633,6 +634,7 @@ fn check_mob_to_player_collisions(
         mut parry_option,
         stealth_opt,
         lunge_opt,
+        player_attack,
     ) = player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
@@ -718,11 +720,13 @@ fn check_mob_to_player_collisions(
                 });
             }
             // hit back to attacker if we have Thorns
+            // Thorns deals a percentage of PLAYER's damage back to the attacker
+            // e.g., 100 thorns = 100% of player damage reflected
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e2,
-                    damage: f32::ceil(attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
+                    damage: f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,

@@ -601,8 +601,24 @@ pub enum Heirloom {
     ParryDeflectProj,
     ParryKnockback, // needs art prompt/art
     ParryEcho,
-    //Your echos are stronger
-    // your echos are bigger
+
+    // New scalable heirlooms
+    MaxHPHunt,      // Every 3 kills grants +1 max hp
+    MaxHPDamage,    // +10% dmg per 100 max hp
+    GoldIntoDamage, // +1% damage per 10 coins
+    DeathDefiance,  // Survive death, freeze all enemies
+    RegenLifesteal, // -5 hp regen, +5% lifesteal
+    StandStill,     // Standing still increases damage
+    ThornArmor,     // 20% thorns per 10 defence, +10 defence
+    LifestealCoins, // Lifesteal gives coins, +5% lifesteal
+
+    // Wave 2 heirlooms
+    CoinHeal,          // Picking up coins heals
+    CrateBreakDamage,  // Breaking crates gives damage boost (tracker needed)
+    TomeDoubleUpgrade, // Upgrade tomes work twice
+    CritHeal,          // Crits heal
+    LowHPDamage,       // More damage at low HP
+    ChaosStats,        // +2 chaos, +10 to many stats
 }
 
 impl Heirloom {
@@ -679,6 +695,24 @@ impl Heirloom {
 
             Heirloom::ReinforcedArmor => "Scales".to_string(),
             Heirloom::ChaosBoost => "Cursed Mask".to_string(),
+
+            // New heirlooms
+            Heirloom::MaxHPHunt => "Ripe Tomato".to_string(),
+            Heirloom::MaxHPDamage => "Crusader Shield".to_string(),
+            Heirloom::GoldIntoDamage => "Red Envelope".to_string(),
+            Heirloom::DeathDefiance => "Cooked Cross".to_string(),
+            Heirloom::RegenLifesteal => "Dark Blade".to_string(),
+            Heirloom::StandStill => "Tent".to_string(),
+            Heirloom::ThornArmor => "Spikey Shield".to_string(),
+            Heirloom::LifestealCoins => "Cursed Crown".to_string(),
+
+            // Wave 2 heirlooms
+            Heirloom::CoinHeal => "Lucky Penny".to_string(),
+            Heirloom::CrateBreakDamage => "Sturdy Crate".to_string(),
+            Heirloom::TomeDoubleUpgrade => "Ancient Tome".to_string(),
+            Heirloom::CritHeal => "Vampiric Ring".to_string(),
+            Heirloom::LowHPDamage => "Beer!".to_string(),
+            Heirloom::ChaosStats => "Chaotic Candle".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -705,7 +739,10 @@ impl Heirloom {
             Heirloom::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
             Heirloom::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
-                vec!["Gain +1 Lifesteal,".to_string(), "permanently.".to_string()]
+                vec![
+                    "Gain +2% Lifesteal,".to_string(),
+                    "permanently.".to_string(),
+                ]
             }
             Heirloom::AttackSpeed => vec![
                 "Gain +15% Attack".to_string(),
@@ -970,10 +1007,10 @@ impl Heirloom {
                 "+25% freeze chance.".to_string(),
             ],
             Heirloom::DodgeCrit => vec![
-                "The next attack".to_string(),
-                "after dodging".to_string(),
-                "is a critical hit.".to_string(),
-                "+10% dodge chance.".to_string(),
+                "Dodging grants".to_string(),
+                "+30% atk speed,".to_string(),
+                "+30 speed, next".to_string(),
+                "hit does 2x dmg.".to_string(),
             ],
             Heirloom::PoisonDuration => vec![
                 "Your poison effect".to_string(),
@@ -1014,6 +1051,81 @@ impl Heirloom {
                 "making enemies".to_string(),
                 "stronger and".to_string(),
                 "more rewarding.".to_string(),
+            ],
+
+            // New heirlooms
+            Heirloom::MaxHPHunt => {
+                vec!["Every 3 kills".to_string(), "gain +1 Max HP.".to_string()]
+            }
+            Heirloom::MaxHPDamage => vec![
+                "Gain +10% Damage".to_string(),
+                "for every 100".to_string(),
+                "Max HP you have.".to_string(),
+            ],
+            Heirloom::GoldIntoDamage => vec![
+                "Gain +1% Damage".to_string(),
+                "for every 10".to_string(),
+                "coins you have.".to_string(),
+            ],
+            Heirloom::DeathDefiance => vec![
+                "Survive death once,".to_string(),
+                "restore 50% HP,".to_string(),
+                "freeze all enemies".to_string(),
+                "for 3 seconds.".to_string(),
+            ],
+            Heirloom::RegenLifesteal => vec![
+                "Lose 5 HP Regen,".to_string(),
+                "gain 5% Lifesteal.".to_string(),
+            ],
+            Heirloom::StandStill => vec![
+                "Standing still".to_string(),
+                "increases damage".to_string(),
+                "rapidly.".to_string(),
+            ],
+            Heirloom::ThornArmor => vec![
+                "Gain +20% Thorns".to_string(),
+                "for every 10".to_string(),
+                "Defence you have.".to_string(),
+                "Gain +10 Defence.".to_string(),
+            ],
+            Heirloom::LifestealCoins => vec![
+                "Lifesteal triggers".to_string(),
+                "give you a coin.".to_string(),
+                "Gain +5% Lifesteal.".to_string(),
+            ],
+
+            // Wave 2 heirlooms
+            Heirloom::CoinHeal => vec![
+                "Picking up coins".to_string(),
+                "has a 25% chance".to_string(),
+                "to heal 1 HP.".to_string(),
+            ],
+            Heirloom::CrateBreakDamage => vec![
+                "Breaking crates".to_string(),
+                "permanently gives".to_string(),
+                "+1% damage.".to_string(),
+            ],
+            Heirloom::TomeDoubleUpgrade => vec![
+                "Upgrade Tomes".to_string(),
+                "level up gear".to_string(),
+                "an extra time.".to_string(),
+            ],
+            Heirloom::CritHeal => vec![
+                "Critical hits".to_string(),
+                "have a 25% chance".to_string(),
+                "to heal 1 HP.".to_string(),
+            ],
+            Heirloom::LowHPDamage => vec![
+                "Deal more damage".to_string(),
+                "the lower your".to_string(),
+                "HP is (up to".to_string(),
+                "+75% at 0 HP).".to_string(),
+            ],
+            Heirloom::ChaosStats => vec![
+                "+2 Chaos. +10 HP,".to_string(),
+                "+10 MP, +10% dmg,".to_string(),
+                "+10 def, +10% crit".to_string(),
+                "+10 spd, +10 dodge".to_string(),
             ],
         }
     }
@@ -1071,6 +1183,34 @@ impl Heirloom {
                 commands
                     .entity(entity)
                     .insert(crate::player::combat_heirlooms::ReaperState::default());
+            }
+            Heirloom::MaxHPHunt => {
+                // Only add tracker if this is the first MaxHPHunt heirloom
+                // (skills already includes this heirloom when this is called)
+                if skills.get_count(Heirloom::MaxHPHunt) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::MaxHPHuntTracker::default());
+                }
+            }
+            Heirloom::StandStill => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::StandStillState::default());
+            }
+            Heirloom::CrateBreakDamage => {
+                // Only add tracker if this is the first one
+                if skills.get_count(Heirloom::CrateBreakDamage) == 1 {
+                    commands.entity(entity).insert(
+                        crate::player::combat_heirlooms::CrateBreakDamageTracker::default(),
+                    );
+                }
+            }
+            Heirloom::DodgeCrit => {
+                // Add the dodge buff state component
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::DodgeCritState::default());
             }
 
             _ => {}
@@ -1227,7 +1367,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::HPRegenCooldown, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::MPRegenCooldown, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common),
-                // HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
@@ -1237,7 +1377,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::Health, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Shield, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon),
@@ -1279,6 +1419,22 @@ impl Default for HeirloomChoiceQueue {
                     HeirloomRarity::Rare,
                 ),
                 HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Rare),
+                // New heirlooms
+                HeirloomChoiceState::new(Heirloom::MaxHPHunt, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::MaxHPDamage, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::DeathDefiance, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::RegenLifesteal, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::StandStill, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::ThornArmor, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::LifestealCoins, HeirloomRarity::Legendary),
+                // Wave 2 heirlooms
+                HeirloomChoiceState::new(Heirloom::CoinHeal, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::CrateBreakDamage, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::TomeDoubleUpgrade, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::CritHeal, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::LowHPDamage, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::ChaosStats, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
         }
@@ -1343,18 +1499,15 @@ impl HeirloomChoiceQueue {
         // Base probabilities: Common 61%, Uncommon 23%, Rare 13%, Legendary 3%
         // Loot bonus increases higher rarity chances
         // Formula: each point of loot increases higher rarity chances by shifting thresholds
-        // Each point of loot: +0.1% legendary, +0.2% rare, +0.1% uncommon, -1.0% common
+        // Each point of loot: +0.1% legendary, +0.2% rare, +0.1% uncommon
         // Since we roll 0-99 (100 values), each 1% = 1.0 threshold point
 
         let loot_bonus_f = loot_bonus as f32;
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
-        // Legendary: base 97 (3%), increases by 0.3% per loot = -0.3 threshold per loot
-        let legendary_threshold = (97.0 - loot_bonus_f * 0.1).max(0.0) as i32;
-        // Rare: base 84 (13%), increases by 0.4% per loot = -0.4 threshold per loot
-        let rare_threshold = (84.0 - loot_bonus_f * 0.2).max(0.0) as i32;
-        // Uncommon: base 61 (23%), increases by 0.3% per loot = -0.3 threshold per loot
-        let uncommon_threshold = (61.0 - loot_bonus_f * 0.1).max(0.0) as i32;
-        let roll = rng.gen_range(0..100);
+        let legendary_threshold = (98.5 - loot_bonus_f * 0.1).max(0.0);
+        let rare_threshold = (88.0 - loot_bonus_f * 0.2).max(0.0);
+        let uncommon_threshold = (68.0 - loot_bonus_f * 0.1).max(0.0);
+        let roll = rng.gen_range(0_f32..100_f32);
 
         if roll >= legendary_threshold {
             HeirloomRarity::Legendary

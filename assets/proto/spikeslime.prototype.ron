@@ -4,7 +4,7 @@
   schematics: {
     "survival_rogue_like::enemy::Mob": SpikeSlime,
     "survival_rogue_like::enemy::CombatAlignment": Hostile,
-    "survival_rogue_like::enemy::FollowSpeed": (0.32),
+    "survival_rogue_like::enemy::FollowSpeed": (0.38),
     "survival_rogue_like::animations::enemy_sprites::EnemyAnimationState": Walk,
     "survival_rogue_like::enemy::LeapAttack": (activation_distance: 38., startup: 0.7, duration: 0.2, cooldown: 1.5, speed: 145.),
     "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 120., cooldown: 2.0, projectile: SlimeGooProjectile),

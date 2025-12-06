@@ -924,16 +924,30 @@ impl ItemAttributes {
         old_max_mana: i32,
         old_shield: i32,
         skills: &PlayerSkills,
+        dodge_crit_buff_active: bool,
     ) {
-        let computed_health = self.health + skills.get_count(Heirloom::Health) * 25;
+        // ChaosStats: +10 to many stats per stack
+        let chaos_stats_stacks = skills.get_count(Heirloom::ChaosStats);
+        let chaos_health_bonus = chaos_stats_stacks * 10;
+        let chaos_mana_bonus = chaos_stats_stacks * 10;
+        let chaos_dmg_bonus = chaos_stats_stacks * 10; // +10% dmg
+        let chaos_defence_bonus = chaos_stats_stacks * 10;
+        let chaos_crit_bonus = chaos_stats_stacks * 10; // +10% crit
+        let chaos_speed_bonus = chaos_stats_stacks * 10; // +10% speed
+        let chaos_dodge_bonus = chaos_stats_stacks * 10;
+
+        let computed_health =
+            self.health + skills.get_count(Heirloom::Health) * 25 + chaos_health_bonus;
         let computed_speed = self.speed.value
+            + chaos_speed_bonus
+            + if dodge_crit_buff_active { 30 } else { 0 } // DodgeCrit speed buff
             - if skills.has(Heirloom::ReinforcedArmor) {
                 5
             } else {
                 0
             };
-        if self.mana.value > 0 && self.mana.value != old_max_mana {
-            entity.insert(MaxMana(self.mana.value));
+        if self.mana.value > 0 && self.mana.value + chaos_mana_bonus != old_max_mana {
+            entity.insert(MaxMana(self.mana.value + chaos_mana_bonus));
         }
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));
@@ -943,10 +957,12 @@ impl ItemAttributes {
         }
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
+            let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
             entity.insert(AttackCooldown(
                 self.attack_cooldown
                     * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
-                    / attack_speed_mod,
+                    / attack_speed_mod
+                    / dodge_crit_attack_speed_mod,
             ));
         } else {
             entity.remove::<AttackCooldown>();
@@ -954,27 +970,48 @@ impl ItemAttributes {
 
         entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
-            self.crit_chance.value + skills.get_count(Heirloom::CritChance) * 10,
+            self.crit_chance.value + skills.get_count(Heirloom::CritChance) * 10 + chaos_crit_bonus,
         ));
         entity.insert(CritDamage(
             self.crit_damage.value + skills.get_count(Heirloom::CritDamage) * 15,
         ));
         entity.insert(BonusDamage(
-            self.bonus_damage.value + skills.get_count(Heirloom::Attack) * 10,
+            self.bonus_damage.value + skills.get_count(Heirloom::Attack) * 10 + chaos_dmg_bonus,
         ));
+        // RegenLifesteal: -5 hp regen, +5% lifesteal per stack
+        // Allow negative values - negative regen will damage the player on regen ticks
+        let regen_lifesteal_stacks = skills.get_count(Heirloom::RegenLifesteal);
         entity.insert(HealthRegen(
             self.health_regen.value
                 + skills.get_count(Heirloom::HPRegen) * 5
-                + skills.get_count(Heirloom::HealEcho) * 20,
+                + skills.get_count(Heirloom::HealEcho) * 20
+                - regen_lifesteal_stacks * 5,
         ));
         entity.insert(Healing(self.healing.value));
-        entity.insert(Thorns(
-            self.thorns.value + skills.get_count(Heirloom::Thorns) * 15,
-        ));
+
+        // ThornArmor: +10 defence per stack, +20% thorns per 10 defence per stack
+        // Thorns now work as a percentage of player damage reflected back
+        let thorn_armor_stacks = skills.get_count(Heirloom::ThornArmor);
+        let base_thorns = self.thorns.value + skills.get_count(Heirloom::Thorns) * 15;
+        // Calculate defence first (including ThornArmor bonus) to compute thorn bonus
+        let total_defence = self.defence.value
+            + skills.get_count(Heirloom::Defence) * 10
+            + thorn_armor_stacks * 10
+            + chaos_defence_bonus
+            + if skills.has(Heirloom::ReinforcedArmor) {
+                2 * (min(0, computed_speed) / 5).abs()
+            } else {
+                0
+            };
+        let thorn_armor_bonus = if thorn_armor_stacks > 0 {
+            (total_defence / 10) * 20 * thorn_armor_stacks // 20% thorns per 10 defence per stack
+        } else {
+            0
+        };
+        entity.insert(Thorns(base_thorns + thorn_armor_bonus));
         // Calculate raw dodge value from stats and heirlooms
-        let raw_dodge = self.dodge.value
-            + skills.get_count(Heirloom::DodgeChance) * 10
-            + skills.get_count(Heirloom::DodgeCrit) * 10;
+        let raw_dodge =
+            self.dodge.value + skills.get_count(Heirloom::DodgeChance) * 10 + chaos_dodge_bonus;
         // Asymptotic formula: approaches 100 but never reaches it
         // Formula: 100 * raw / (raw + 100)
         // At raw 100 this gives 50%, at raw 200 gives 66.6%
@@ -987,16 +1024,14 @@ impl ItemAttributes {
         entity.insert(Speed(
             computed_speed + skills.get_count(Heirloom::Speed) * 15,
         ));
-        entity.insert(Lifesteal(self.lifesteal.value));
-        entity.insert(Defence(
-            self.defence.value
-                + skills.get_count(Heirloom::Defence) * 10
-                + if skills.has(Heirloom::ReinforcedArmor) {
-                    2 * (min(0, computed_speed) / 5).abs()
-                } else {
-                    0
-                },
+        // Lifesteal: base + RegenLifesteal (+5% per stack) + LifestealCoins (+5% per stack)
+        entity.insert(Lifesteal(
+            self.lifesteal.value
+                + regen_lifesteal_stacks * 5
+                + skills.get_count(Heirloom::LifestealCoins) * 5,
         ));
+        // Defence already calculated above for ThornArmor
+        entity.insert(Defence(total_defence));
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(
             self.loot_rate.value + skills.get_count(Heirloom::LoadedDice) * 10,
@@ -1542,6 +1577,7 @@ impl Plugin for AttributesPlugin {
                     add_current_shield_with_max_shield,
                     handle_cape_att_increase_on_level_up.before(handle_level_up),
                     regen_shield,
+                    update_player_health_percent,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -1561,13 +1597,48 @@ pub fn clamp_health(
             &mut CurrentShield,
             &MaxShield,
             Option<&GameOverSent>,
+            &mut PlayerSkills,
         ),
         With<Player>,
     >,
     mut game_over_event: EventWriter<GameOverEvent>,
+    mobs: Query<(Entity, &TextureAtlasSprite), With<crate::enemy::Mob>>,
 ) {
-    for (entity, mut h, max_h, mut s, max_s, game_over_sent) in health.iter_mut() {
+    for (entity, mut h, max_h, mut s, max_s, game_over_sent, mut skills) in health.iter_mut() {
         if h.0 <= 0 {
+            // Check for Death Defiance heirloom
+            let defiance_count = skills.get_count(Heirloom::DeathDefiance);
+            if defiance_count > 0 {
+                // Consume one stack of Death Defiance
+                if let Some(idx) = skills
+                    .heirlooms
+                    .iter()
+                    .position(|h| h.heirloom == Heirloom::DeathDefiance)
+                {
+                    skills.heirlooms.remove(idx);
+
+                    // Restore to 50% max health
+                    h.0 = max_h.0 / 2;
+
+                    // Freeze all mobs for 3 seconds with blue tint
+                    for (mob_entity, sprite) in mobs.iter() {
+                        commands.entity(mob_entity).insert(
+                            crate::player::combat_heirlooms::DeathDefianceFrozen {
+                                timer: Timer::from_seconds(3.0, TimerMode::Once),
+                                original_color: sprite.color,
+                            },
+                        );
+                        // Apply blue tint
+                        commands.entity(mob_entity).insert(TextureAtlasSprite {
+                            color: Color::rgba(0.5, 0.7, 1.0, 1.0),
+                            ..sprite.clone()
+                        });
+                    }
+
+                    continue; // Don't trigger game over
+                }
+            }
+
             h.0 = 0;
             // Only send game over event once
             if game_over_sent.is_none() {
@@ -1612,6 +1683,7 @@ fn handle_player_item_attribute_change_events(
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
     game: Res<Game>,
+    dodge_crit_state: Query<&crate::player::combat_heirlooms::DodgeCritState, With<Player>>,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
@@ -1632,12 +1704,18 @@ fn handle_player_item_attribute_change_events(
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
+        // Check if DodgeCrit buff is active
+        let dodge_crit_buff_active = dodge_crit_state
+            .get_single()
+            .map(|s| s.buff_active)
+            .unwrap_or(false);
         new_att.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
             old_mana.0,
             old_shield.0,
             skills,
+            dodge_crit_buff_active,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
             if !main_hand.get_obj().is_weapon() {
@@ -1949,6 +2027,21 @@ pub fn handle_cape_att_increase_on_level_up(
             cape_stack.metadata.level = Some((level + 1) as u8);
             inv.equipment_items.with_item_in_slot(3, cape_stack);
             att_event.send(AttributeChangeEvent);
+        }
+    }
+}
+
+/// Updates the PlayerHealthPercent resource based on player's current/max health
+/// This runs every frame to keep the resource in sync for damage calculations
+pub fn update_player_health_percent(
+    player_health: Query<(&CurrentHealth, &MaxHealth), With<crate::player::Player>>,
+    mut health_percent: ResMut<crate::PlayerHealthPercent>,
+) {
+    if let Ok((current, max)) = player_health.get_single() {
+        if max.0 > 0 {
+            health_percent.percent = current.0 as f32 / max.0 as f32;
+        } else {
+            health_percent.percent = 1.0;
         }
     }
 }

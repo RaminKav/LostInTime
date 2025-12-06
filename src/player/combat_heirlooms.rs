@@ -798,3 +798,251 @@ pub fn break_crates_with_roll(
         });
     }
 }
+
+// ============================================================================
+// MaxHPHunt - Every 3 kills grants +1 max hp per stack
+// ============================================================================
+
+/// Tracks kills for the MaxHPHunt heirloom
+#[derive(Component, Default)]
+pub struct MaxHPHuntTracker {
+    pub kill_count: u32,
+}
+
+pub fn handle_max_hp_hunt(
+    mut death_events: EventReader<EnemyDeathEvent>,
+    mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills, &mut MaxHealth), With<Player>>,
+) {
+    let kill_count = death_events.iter().count() as u32;
+    if kill_count == 0 {
+        return;
+    }
+
+    let Ok((mut tracker, skills, mut max_hp)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::MaxHPHunt);
+    if stacks <= 0 {
+        return;
+    }
+
+    tracker.kill_count += kill_count;
+
+    // Every 3 kills grants +1 max hp per stack
+    while tracker.kill_count >= 3 {
+        tracker.kill_count -= 3;
+        max_hp.0 += stacks; // Each stack gives +1 hp per trigger
+    }
+}
+
+// ============================================================================
+// StandStill - Standing still increases damage
+// ============================================================================
+
+/// Tracks standing still time for the StandStill heirloom
+#[derive(Component)]
+pub struct StandStillState {
+    pub time_still: f32,
+    pub was_moving: bool,
+}
+
+impl Default for StandStillState {
+    fn default() -> Self {
+        Self {
+            time_still: 0.0,
+            was_moving: false,
+        }
+    }
+}
+
+/// Maximum time to reach full damage bonus
+const STAND_STILL_MAX_TIME: f32 = 3.0;
+/// Time before buff starts ramping
+const STAND_STILL_START_TIME: f32 = 0.3;
+
+pub fn tick_stand_still_state(
+    time: Res<Time>,
+    mut player_query: Query<(&mut StandStillState, &crate::inputs::MovementVector), With<Player>>,
+) {
+    let Ok((mut state, movement)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let is_moving = movement.0.length_squared() > 0.01;
+
+    if is_moving {
+        state.time_still = 0.0;
+        state.was_moving = true;
+    } else {
+        state.time_still = (state.time_still + time.delta_seconds()).min(STAND_STILL_MAX_TIME);
+        state.was_moving = false;
+    }
+}
+
+impl StandStillState {
+    /// Get the damage multiplier based on time standing still
+    /// Returns 1.0 if not standing still long enough, ramps to 1.5 at max time
+    /// Additional stacks increase the max multiplier by 0.5 each
+    pub fn get_damage_multiplier(&self, stacks: i32) -> f32 {
+        if self.time_still < STAND_STILL_START_TIME {
+            return 1.0;
+        }
+
+        // Calculate progress from start time to max time
+        let progress = ((self.time_still - STAND_STILL_START_TIME)
+            / (STAND_STILL_MAX_TIME - STAND_STILL_START_TIME))
+            .clamp(0.0, 1.0);
+
+        // Each stack adds 0.5 to the max multiplier (1 stack = 1.5x, 2 stacks = 2.0x, etc.)
+        let max_bonus = 0.5 * stacks as f32;
+
+        1.0 + (progress * max_bonus)
+    }
+}
+
+// ============================================================================
+// DeathDefiance - Survive death, freeze all enemies
+// ============================================================================
+
+/// Marker component for mobs frozen by Death Defiance
+#[derive(Component)]
+pub struct DeathDefianceFrozen {
+    pub timer: Timer,
+    pub original_color: Color,
+}
+
+pub fn handle_death_defiance_freeze(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut frozen_mobs: Query<(Entity, &mut DeathDefianceFrozen, &mut TextureAtlasSprite)>,
+) {
+    for (entity, mut frozen, mut sprite) in frozen_mobs.iter_mut() {
+        frozen.timer.tick(time.delta());
+
+        if frozen.timer.just_finished() {
+            // Restore original color and remove freeze
+            sprite.color = frozen.original_color;
+            commands.entity(entity).remove::<DeathDefianceFrozen>();
+        }
+    }
+}
+
+// ============================================================================
+// CrateBreakDamage - Breaking crates gives permanent damage bonus
+// ============================================================================
+
+/// Tracks total damage bonus from breaking crates
+#[derive(Component, Default)]
+pub struct CrateBreakDamageTracker {
+    pub bonus_damage_percent: f32,
+}
+
+pub fn handle_crate_break_damage(
+    mut obj_break_events: EventReader<ObjBreakEvent>,
+    mut player_query: Query<(&mut CrateBreakDamageTracker, &PlayerSkills), With<Player>>,
+) {
+    let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::CrateBreakDamage);
+    if stacks <= 0 {
+        return;
+    }
+
+    for event in obj_break_events.iter() {
+        // Check if this was a crate
+        if matches!(
+            event.obj,
+            crate::item::WorldObject::Crate | crate::item::WorldObject::Crate2
+        ) {
+            // Each crate gives 1% damage per stack
+            tracker.bonus_damage_percent += 1.0 * stacks as f32;
+        }
+    }
+}
+
+// ============================================================================
+// DodgeCrit - Dodging gives speed/attack speed buff and next hit does 2x damage
+// ============================================================================
+
+/// State for the DodgeCrit heirloom buff
+#[derive(Component)]
+pub struct DodgeCritState {
+    pub buff_active: bool,
+    pub buff_timer: Timer,
+    pub next_hit_bonus: bool,
+}
+
+impl Default for DodgeCritState {
+    fn default() -> Self {
+        Self {
+            buff_active: false,
+            buff_timer: Timer::from_seconds(3.0, TimerMode::Once),
+            next_hit_bonus: false,
+        }
+    }
+}
+
+pub fn handle_dodge_crit_activation(
+    mut dodge_events: EventReader<crate::ui::damage_numbers::DodgeEvent>,
+    mut player_query: Query<(&mut DodgeCritState, &PlayerSkills), With<Player>>,
+    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+) {
+    let Ok((mut state, skills)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    if !skills.has(Heirloom::DodgeCrit) {
+        return;
+    }
+
+    for _ in dodge_events.iter() {
+        // Activate the buff
+        state.buff_active = true;
+        state.buff_timer.reset();
+        state.next_hit_bonus = true;
+        attribute_event.send(crate::attributes::AttributeChangeEvent);
+    }
+}
+
+pub fn tick_dodge_crit_buff(
+    time: Res<Time>,
+    mut player_query: Query<&mut DodgeCritState, With<Player>>,
+    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+) {
+    let Ok(mut state) = player_query.get_single_mut() else {
+        return;
+    };
+
+    if state.buff_active {
+        state.buff_timer.tick(time.delta());
+        if state.buff_timer.just_finished() {
+            state.buff_active = false;
+            state.next_hit_bonus = false; // Also clear the next hit bonus
+            attribute_event.send(crate::attributes::AttributeChangeEvent);
+        }
+    }
+}
+
+/// Reset DodgeCrit next hit bonus after player deals damage
+pub fn handle_dodge_crit_next_hit_reset(
+    mut hit_events: EventReader<crate::combat::HitEvent>,
+    mut player_query: Query<&mut DodgeCritState, With<Player>>,
+) {
+    // Only process hits that are from the player (not from mobs hitting player)
+    for hit in hit_events.iter() {
+        if hit.hit_by_mob.is_some() {
+            continue;
+        }
+
+        // Reset the next hit bonus
+        if let Ok(mut state) = player_query.get_single_mut() {
+            if state.next_hit_bonus {
+                state.next_hit_bonus = false;
+            }
+        }
+        break; // Only need to process once per frame
+    }
+}

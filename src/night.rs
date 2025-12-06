@@ -59,7 +59,7 @@ impl InfiniteMode {
     /// Get the speed multiplier for the current difficulty level
     /// Scales from 1.0 (level 0) to 2.5 (level 5) in 0.3 increments
     pub fn get_speed_multiplier(&self) -> f32 {
-        1.0 + (self.difficulty_level as f32 * 0.3)
+        1.0 + (self.difficulty_level as f32 * 0.5)
     }
 
     /// Get the red tint alpha for the current difficulty level

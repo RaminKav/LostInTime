@@ -29,27 +29,8 @@ pub struct SecondHitDelay {
     pub weapon_obj: WorldObject,
 }
 
-pub fn handle_on_hit_skills(
-    mut hit_events: EventReader<HitEvent>,
-    mut commands: Commands,
-    player_q: Query<(Entity, &Attack, &PlayerSkills), With<Player>>,
-    asset_server: Res<AssetServer>,
-    in_i_frame: Query<&InvincibilityTimer>,
-) {
-    let (player, attack, skills) = player_q.single();
-    if !skills.has(Heirloom::OnHitEcho) {
-        return;
-    }
-    for hit in hit_events.iter() {
-        if hit.hit_entity == player {
-            // is in invincibility frames from a previous hit
-            if in_i_frame.get(hit.hit_entity).is_ok() {
-                continue;
-            }
-            spawn_echo_hitbox(&mut commands, &asset_server, player, attack.0);
-        }
-    }
-}
+// OnHitEcho is now triggered in handle_modify_health_event (src/attributes/modifiers.rs)
+// so that all sources of HP loss trigger the echo, not just combat hits.
 
 pub fn handle_second_split_attack(
     mobs: Query<Option<&Frail>, With<Mob>>,

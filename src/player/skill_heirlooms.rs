@@ -1210,3 +1210,48 @@ pub fn reduce_skill_cooldown_on_crit(
         }
     }
 }
+
+/// Handle CritHeal - crits have a chance to heal
+pub fn handle_crit_heal(
+    mut hit_events: EventReader<crate::combat::HitEvent>,
+    player_query: Query<&PlayerSkills, With<crate::player::Player>>,
+    mut modify_health_event: EventWriter<crate::attributes::modifiers::ModifyHealthEvent>,
+) {
+    let Ok(skills) = player_query.get_single() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::CritHeal);
+    if stacks <= 0 {
+        return;
+    }
+
+    let mut rng = rand::thread_rng();
+
+    for hit in hit_events.iter() {
+        // Only process crits from player attacks (not from mobs hitting player)
+        // Treat crit and overcrit the same
+        if (!hit.was_crit && !hit.was_overcrit) || hit.hit_by_mob.is_some() {
+            continue;
+        }
+
+        let chance = 25 * stacks; // 25% per stack
+        let heal_amount = if chance > 100 {
+            // Past 100%, chance for 2 HP
+            let extra_chance = chance - 100;
+            if rng.gen_ratio(extra_chance.clamp(1, 100) as u32, 100) {
+                2
+            } else {
+                1
+            }
+        } else if rng.gen_ratio(chance.clamp(1, 100) as u32, 100) {
+            1
+        } else {
+            0
+        };
+
+        if heal_amount > 0 {
+            modify_health_event.send(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
+        }
+    }
+}

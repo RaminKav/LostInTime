@@ -165,7 +165,7 @@ pub fn handle_spread_arrows_attack(
 
 pub fn handle_on_hit_upgrades(
     mut hits: EventReader<HitEvent>,
-    upgrades: Query<&PlayerSkills, With<Player>>,
+    upgrades: Query<(&PlayerSkills, &GlobalTransform), With<Player>>,
     proto: ProtoParam,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
@@ -194,6 +194,8 @@ pub fn handle_on_hit_upgrades(
         *elec_count = 0;
     }
     let player_attributes = player_att.single();
+    let (skills, player_txfm) = upgrades.single();
+    let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
         let mut rng = rand::thread_rng();
 
@@ -203,7 +205,6 @@ pub fn handle_on_hit_upgrades(
         let Ok((hit_e, hit_entity_txfm)) = mobs.get(hit.hit_entity) else {
             continue;
         };
-        let skills = upgrades.single();
         if let Some(proj) = &hit.hit_with_projectile {
             if proj.is_skill_projectile() {
                 continue;
@@ -397,6 +398,19 @@ pub fn handle_on_hit_upgrades(
 
             if heal_amount > 0 {
                 modify_health_events.send(ModifyHealthEvent(heal_amount));
+
+                // LifestealCoins: Spawn a coin for each lifesteal proc
+                if skills.has(Heirloom::LifestealCoins) {
+                    let d = 16.0;
+                    let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+                    proto_commands.spawn_item_from_proto(
+                        WorldObject::Coin,
+                        &proto,
+                        player_pos + drop_offset,
+                        1,
+                        None,
+                    );
+                }
             }
         }
     }

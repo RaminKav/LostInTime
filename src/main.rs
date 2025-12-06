@@ -11,8 +11,8 @@ use ai::{
     AIPlugin,
 };
 use attributes::{
-    Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, Defence, Dodge, Healing,
-    HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
+    Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, CurrentHealth, Defence, Dodge,
+    Healing, HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
 };
 mod audio;
 mod bounce;
@@ -173,6 +173,7 @@ fn main() {
         .insert_resource(StartOfRunActionsHappened(false))
         .insert_resource(ClearColor(Color::BLACK))
         .insert_resource(crate::player::score::RunScore::new())
+        .insert_resource(PlayerHealthPercent::default())
         .add_state::<GameState>()
         .edit_schedule(CoreSchedule::FixedUpdate, |s| {
             s.configure_set(CoreGameSet::Main.run_if(in_state(GameState::Main)));
@@ -323,6 +324,14 @@ impl Default for Game {
         }
     }
 }
+
+/// Resource to track player health percentage for damage calculations
+/// This avoids query conflicts with systems that modify CurrentHealth
+#[derive(Resource, Default)]
+pub struct PlayerHealthPercent {
+    pub percent: f32,
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum CoreGameSet {
     Main,
@@ -418,6 +427,25 @@ pub struct GameParam<'w, 's> {
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
     pub coins: ResMut<'w, crate::player::currency::CoinCurrency>,
     pub time_fragments: ResMut<'w, crate::player::currency::TimeFragmentCurrency>,
+    pub player_health_percent: Res<'w, PlayerHealthPercent>,
+    pub stand_still_query: Query<
+        'w,
+        's,
+        Option<&'static crate::player::combat_heirlooms::StandStillState>,
+        With<Player>,
+    >,
+    pub crate_break_damage_query: Query<
+        'w,
+        's,
+        Option<&'static crate::player::combat_heirlooms::CrateBreakDamageTracker>,
+        With<Player>,
+    >,
+    pub dodge_crit_query: Query<
+        'w,
+        's,
+        Option<&'static mut crate::player::combat_heirlooms::DodgeCritState>,
+        With<Player>,
+    >,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -607,8 +635,9 @@ impl<'w, 's> GameParam<'w, 's> {
         dmg_bonus: u32,
         attack_override: Option<i32>,
     ) -> (u32, bool, bool) {
-        let (attack, _, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
+        let (attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
             self.player_stats.single();
+        let skills = self.get_player_skills();
         let mut rng = rand::thread_rng();
         let dmg_mult = dmg_mult.unwrap_or(1.);
         let dmg = attack_override.unwrap_or(attack.0);
@@ -618,7 +647,63 @@ impl<'w, 's> GameParam<'w, 's> {
             0
         };
         // Convert bonus damage percentage to multiplier (e.g., 30% -> 1.3x)
-        let bonus_damage_multiplier = 1.0 + (bonus_dmg.0 as f32 / 100.0);
+        let mut bonus_damage_multiplier = 1.0 + (bonus_dmg.0 as f32 / 100.0);
+
+        // MaxHPDamage: +10% damage per 100 max hp per stack
+        let max_hp_damage_stacks = skills.get_count(Heirloom::MaxHPDamage);
+        if max_hp_damage_stacks > 0 {
+            let hp_bonus = (max_health.0 as f32 / 100.0) * 0.10 * max_hp_damage_stacks as f32;
+            bonus_damage_multiplier += hp_bonus;
+        }
+
+        // GoldIntoDamage: +1% damage per 10 coins per stack
+        let gold_damage_stacks = skills.get_count(Heirloom::GoldIntoDamage);
+        if gold_damage_stacks > 0 {
+            let gold_bonus = (self.coins.coins as f32 / 10.0) * 0.01 * gold_damage_stacks as f32;
+            bonus_damage_multiplier += gold_bonus;
+        }
+
+        // StandStill: Standing still increases damage (ramps up over 3s)
+        let stand_still_stacks = skills.get_count(Heirloom::StandStill);
+        if stand_still_stacks > 0 {
+            if let Ok(Some(stand_still_state)) = self.stand_still_query.get_single() {
+                let stand_still_mult = stand_still_state.get_damage_multiplier(stand_still_stacks);
+
+                bonus_damage_multiplier *= stand_still_mult;
+            }
+        }
+
+        // CrateBreakDamage: Bonus damage from breaking crates
+        if let Ok(Some(crate_tracker)) = self.crate_break_damage_query.get_single() {
+            if crate_tracker.bonus_damage_percent > 0.0 {
+                bonus_damage_multiplier += crate_tracker.bonus_damage_percent / 100.0;
+            }
+        }
+
+        // LowHPDamage: More damage the lower HP is (80% -> 0% = 1x -> 1.75x)
+        let low_hp_damage_stacks = skills.get_count(Heirloom::LowHPDamage);
+        if low_hp_damage_stacks > 0 {
+            let health_percent = self.player_health_percent.percent;
+            // Only applies when health is below 80%
+            if health_percent < 0.8 {
+                // Linear scale from 80% -> 0% = 1x -> 1.75x (base), +0.3x per additional stack
+                let max_bonus = 0.75 + (low_hp_damage_stacks - 1) as f32 * 0.3;
+                let t = 1.0 - (health_percent / 0.8); // 0 at 80%, 1 at 0%
+                bonus_damage_multiplier += max_bonus * t;
+            }
+        }
+
+        // DodgeCrit: Next hit after dodge does 2x damage
+        let dodge_crit_next_hit_bonus = if let Ok(Some(state)) = self.dodge_crit_query.get_single()
+        {
+            state.next_hit_bonus
+        } else {
+            false
+        };
+        if dodge_crit_next_hit_bonus {
+            bonus_damage_multiplier *= 2.0;
+            info!("[DodgeCrit] Next hit bonus applied! 2x damage.");
+        }
 
         let total_crit_chance = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
 

@@ -2,10 +2,15 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::{
+    attributes::modifiers::ModifyHealthEvent,
     audio::{AudioSoundEffect, SoundSpawner},
     client::persist_time_fragments,
     combat::EnemyDeathEvent,
     item::WorldObject,
+    player::{
+        skills::{Heirloom, PlayerSkills},
+        Player,
+    },
     GameState,
 };
 
@@ -63,7 +68,12 @@ pub fn handle_modify_currency(
     state: Res<State<GameState>>,
     mut commands: Commands,
     mut coins: ResMut<CoinCurrency>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    mut modify_health_event: EventWriter<ModifyHealthEvent>,
 ) {
+    let skills = player_skills.get_single().ok();
+    let mut rng = rand::thread_rng();
+
     for event in events.iter() {
         if event.obj == WorldObject::TimeFragment {
             time_fragments.time_fragments = (time_fragments.time_fragments + event.delta).max(0);
@@ -75,6 +85,35 @@ pub fn handle_modify_currency(
             }
         } else if event.obj == WorldObject::Coin {
             coins.coins = (coins.coins as i32 + event.delta).max(0) as u32;
+
+            // CoinHeal: Picking up coins has a chance to heal
+            if event.delta > 0 {
+                if let Some(skills) = skills {
+                    let stacks = skills.get_count(Heirloom::CoinHeal);
+                    if stacks > 0 {
+                        // Each coin pickup is a separate check
+                        for _ in 0..event.delta {
+                            let chance = 25 * stacks; // 25% per stack
+                            let heal_amount = if chance > 100 {
+                                // Past 100%, chance for 2 HP
+                                let extra_chance = chance - 100;
+                                if rng.gen_ratio(extra_chance.clamp(1, 100) as u32, 100) {
+                                    2
+                                } else {
+                                    1
+                                }
+                            } else if rng.gen_ratio(chance.clamp(1, 100) as u32, 100) {
+                                1
+                            } else {
+                                0
+                            };
+                            if heal_amount > 0 {
+                                modify_health_event.send(ModifyHealthEvent(heal_amount));
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if event.delta > 0 {

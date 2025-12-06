@@ -631,7 +631,7 @@ pub fn change_hotbar_slot(
 pub fn update_inventory_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
-    mut ui_elements: Query<(Entity, &InventorySlotState)>,
+    mut ui_elements: Query<(Entity, &mut InventorySlotState)>,
     interactables: Query<&Interactable>,
     inv_ui_state: Res<State<UIState>>,
     inv_query: Query<Entity, With<InventoryUI>>,
@@ -639,13 +639,24 @@ pub fn update_inventory_ui(
     inv: Query<&mut Inventory>,
     cont_param: UIContainersParam,
 ) {
-    for (e, slot_state) in ui_elements.iter_mut() {
+    for (e, mut slot_state) in ui_elements.iter_mut() {
         // check current inventory state against that slot's state
         // if they do not match, delete and respawn
 
         // hotbars are hidden when inventory is open, so defer update
-        // untile inv is closed again.
+        // until inv is closed again. But still mark dirty if count changed
+        // so they update properly when inv closes.
         if inv_ui_state.0.is_inv_open() && slot_state.r#type.is_hotbar() {
+            // Check if hotbar slot needs updating and mark dirty for later
+            let hotbar_item = inv
+                .single()
+                .get_items_from_slot_type(slot_state.r#type)
+                .items[slot_state.slot_index]
+                .clone();
+            let real_count = hotbar_item.as_ref().map(|i| i.item_stack.count);
+            if slot_state.count != real_count {
+                slot_state.dirty = true;
+            }
             continue;
         }
 

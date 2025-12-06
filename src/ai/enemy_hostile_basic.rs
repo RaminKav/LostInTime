@@ -187,6 +187,7 @@ pub fn follow(
         Option<&EnemyAttackCooldown>,
         Option<&Slow>,
         Option<&Parried>,
+        Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -201,8 +202,13 @@ pub fn follow(
         att_cooldown,
         slowed_option,
         parried_option,
+        frozen_option,
     ) in follows.iter_mut()
     {
+        // Skip movement if frozen by Death Defiance
+        if frozen_option.is_some() {
+            continue;
+        }
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
             continue;
         }
@@ -313,6 +319,7 @@ pub fn leap_attack(
         &EnemyAnimationState,
         Option<&Slow>,
         Option<&mut Parried>,
+        Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -330,8 +337,13 @@ pub fn leap_attack(
         anim_state,
         slow_option,
         mut parried_option,
+        frozen_option,
     ) in attacks.iter_mut()
     {
+        // Skip if frozen by Death Defiance
+        if frozen_option.is_some() {
+            continue;
+        }
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation();
         let attack_transform = transforms.get_mut(entity).unwrap();
@@ -410,11 +422,16 @@ pub fn projectile_attack(
         &FollowSpeed,
         &mut ProjectileAttackState,
         &EnemyAnimationState,
+        Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
     )>,
     mut events: EventWriter<RangedAttackEvent>,
     time: Res<Time>,
 ) {
-    for (entity, follow_speed, mut attack, anim_state) in attacks.iter_mut() {
+    for (entity, follow_speed, mut attack, anim_state, frozen_option) in attacks.iter_mut() {
+        // Skip if frozen by Death Defiance
+        if frozen_option.is_some() {
+            continue;
+        }
         // Get the positions of the attacker and target
         let target_translation = transforms.get(attack.target).unwrap().translation;
         let attack_transform = transforms.get_mut(entity).unwrap();
@@ -458,11 +475,22 @@ pub fn projectile_attack(
 }
 pub fn idle(
     mut transforms: Query<&mut KinematicCharacterController>,
-    mut idles: Query<(Entity, &mut IdleState), With<EnemyAnimationState>>,
+    mut idles: Query<
+        (
+            Entity,
+            &mut IdleState,
+            Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
+        ),
+        With<EnemyAnimationState>,
+    >,
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    for (entity, mut idle) in idles.iter_mut() {
+    for (entity, mut idle, frozen_option) in idles.iter_mut() {
+        // Skip if frozen by Death Defiance
+        if frozen_option.is_some() {
+            continue;
+        }
         // Get the positions of the follower and target
         idle.walk_timer.tick(time.delta());
         let mut idle_transform = transforms.get_mut(entity).unwrap();

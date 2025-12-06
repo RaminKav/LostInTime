@@ -1216,6 +1216,77 @@
             size: (16., 16.),
             anchor: None,
         ),
+        // New heirlooms
+        MaxHPHunt: WorldObjectData(
+            texture_pos: (14., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MaxHPDamage: WorldObjectData(
+            texture_pos: (15., 21.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        GoldIntoDamage: WorldObjectData(
+            texture_pos: (0., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DeathDefiance: WorldObjectData(
+            texture_pos: (1., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        RegenLifesteal: WorldObjectData(
+            texture_pos: (2., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        StandStill: WorldObjectData(
+            texture_pos: (3., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornArmor: WorldObjectData(
+            texture_pos: (4., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LifestealCoins: WorldObjectData(
+            texture_pos: (5., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CoinHeal: WorldObjectData(
+            texture_pos: (6., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CrateBreakDamage: WorldObjectData(
+            texture_pos: (7., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        TomeDoubleUpgrade: WorldObjectData(
+            texture_pos: (8., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        CritHeal: WorldObjectData(
+            texture_pos: (9., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        LowHPDamage: WorldObjectData(
+            texture_pos: (10., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ChaosStats: WorldObjectData(
+            texture_pos: (11., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

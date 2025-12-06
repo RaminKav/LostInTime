@@ -851,6 +851,7 @@ pub fn handle_interaction_clicks(
                                             moved_item.slot = 0;
                                             inv.furnace_items.items[0] = Some(moved_item);
                                         }
+                                        state.dirty = true;
                                         continue;
                                     }
 
@@ -872,6 +873,7 @@ pub fn handle_interaction_clicks(
                                             moved_item.slot = 1;
                                             inv.furnace_items.items[1] = Some(moved_item);
                                         }
+                                        state.dirty = true;
                                         continue;
                                     }
                                 }
@@ -890,6 +892,7 @@ pub fn handle_interaction_clicks(
                                             Some(moved_item);
                                     }
                                 }
+                                state.dirty = true;
                                 continue;
                             }
                         }
@@ -909,8 +912,10 @@ pub fn handle_interaction_clicks(
                             }
                         } else {
                             inv.items
-                                .move_item_from_hotbar_to_inv_or_vice_versa(state.slot_index)
+                                .move_item_from_hotbar_to_inv_or_vice_versa(state.slot_index);
                         }
+                        // Mark source slot dirty after any shift-click move operation
+                        state.dirty = true;
                     }
                 }
                 _ => (),
@@ -990,6 +995,10 @@ pub fn handle_cursor_skills_buttons(
                             // Add chaos if ChaosBoost heirloom was picked
                             if picked_skill.heirloom == Heirloom::ChaosBoost {
                                 chaos_tracker.add_chaos(1.5);
+                            }
+                            // Add chaos if ChaosStats heirloom was picked (+2 chaos)
+                            if picked_skill.heirloom == Heirloom::ChaosStats {
+                                chaos_tracker.add_chaos(2.0);
                             }
 
                             // Mark heirloom shrine as used if this was from a shrine
