@@ -7,16 +7,17 @@ pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
-use crate::attributes::add_item_glows;
+use crate::attributes::{add_item_glows, ProjectileSize};
 
 pub mod combat_helpers;
+use crate::player::melee_skills::spawn_echo_hitbox;
 use crate::{
     ai::{FollowState, LeapAttackState},
     animations::{AttackEvent, HitAnimationTracker},
     assets::{Graphics, SpriteAnchor},
     attributes::{
-        modifiers::ModifyManaEvent, Attack, AttackCooldown, CurrentHealth, CurrentShield,
-        InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth, ShieldRegen,
+        modifiers::ModifyManaEvent, Attack, AttackCooldown, AttributeChangeEvent, CurrentHealth,
+        CurrentShield, InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth, ShieldRegen,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -37,11 +38,13 @@ use crate::{
     },
     juice::{bounce::BounceOnHit, spawn_xp_particles},
     player::{
+        combat_heirlooms::{HallucinationStatType, HallucinationStats},
         levels::{ExperienceReward, PlayerLevel},
         mage_skills::spawn_ice_explosion_hitbox,
         skills::{Heirloom, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
+    ui::damage_numbers::spawn_floating_text_with_shadow,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     AppExt, CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite,
     DEBUG,
@@ -231,6 +234,8 @@ pub fn handle_hits(
         Entity,
         &mut CurrentHealth,
         &MaxHealth,
+        Option<&Attack>,
+        Option<&ProjectileSize>,
         Option<&mut CurrentShield>,
         Option<&mut ShieldRegen>,
         Option<&SlimeTempShield>,
@@ -251,6 +256,9 @@ pub fn handle_hits(
     proto_param: ProtoParam,
     mut analytics_events: EventWriter<AnalyticsUpdateEvent>,
     slime_shields: Query<Entity, With<SlimeTempShieldSprite>>,
+    mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
+    mut attribute_events: EventWriter<AttributeChangeEvent>,
+    asset_server: Res<AssetServer>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -262,6 +270,8 @@ pub fn handle_hits(
             e,
             mut hit_health,
             max_health,
+            attack,
+            proj_size,
             mut shields_option,
             mut shield_regen_option,
             slime_shield_option,
@@ -325,13 +335,42 @@ pub fn handle_hits(
             } else {
                 let is_player = game.game.player == e;
                 if let Some(mob) = mob_option {
-                    if game.get_player_skills().has(Heirloom::LethalBlow)
-                        && hit_health.0 <= max_health.0 / 5
-                        && !mob.is_boss()
-                        && Heirloom::LethalBlow
-                            .is_obj_valid(hit.hit_with_melee.unwrap_or(WorldObject::None))
-                    {
-                        hit_health.0 = 0;
+                    let lethal_blow_count =
+                        game.get_player_skills().get_count(Heirloom::LethalBlow);
+                    if lethal_blow_count > 0 && !mob.is_boss() {
+                        // 2% flat chance to execute (works on all weapons)
+                        let mut rng = rand::thread_rng();
+                        if rng.gen_bool(0.02 * lethal_blow_count as f64) {
+                            hit_health.0 = 0;
+
+                            // Hallucination effect: grant random stat buff
+                            if let Ok(mut hallucination_stats) =
+                                hallucination_query.get_single_mut()
+                            {
+                                let stat_type = HallucinationStatType::random();
+                                let amount = rng.gen_range(1..=5);
+                                hallucination_stats.add_stat(stat_type, amount);
+
+                                // Show floating text with stat gain at player position (like item pickups)
+                                let player_pos = game.player().position;
+                                let drop_spread = 16.;
+                                let pos_offset = Vec3::new(
+                                    rng.gen_range(-drop_spread..drop_spread),
+                                    rng.gen_range(0.0..drop_spread) + 10.,
+                                    2.,
+                                );
+                                spawn_floating_text_with_shadow(
+                                    &mut commands,
+                                    &asset_server,
+                                    player_pos + pos_offset,
+                                    stat_type.color(),
+                                    format!("+{} {}", amount, stat_type.name()),
+                                );
+
+                                // Trigger attribute recalculation
+                                attribute_events.send(AttributeChangeEvent);
+                            }
+                        }
                     }
                 }
                 let final_dmg = dmg
@@ -346,7 +385,10 @@ pub fn handle_hits(
                     if final_dmg >= 1 {
                         // shield breaks
                         commands.entity(e).remove::<SlimeTempShield>();
-                        commands.entity(slime_shields.single()).despawn_recursive();
+                        // Safely get the shield entity - might not exist if already despawned
+                        if let Ok(shield_entity) = slime_shields.get_single() {
+                            commands.entity(shield_entity).despawn_recursive();
+                        }
                         shielded_hit = true;
                         if *DEBUG {
                             info!("Slime Temp Shield broken!");
@@ -370,6 +412,15 @@ pub fn handle_hits(
                         } else {
                             0
                         };
+                    if is_player && game.has_skill(Heirloom::OnHitEcho) {
+                        spawn_echo_hitbox(
+                            &mut commands,
+                            &asset_server,
+                            e,
+                            attack.unwrap_or(&Attack(0)).0,
+                            proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
+                        );
+                    }
                     if *DEBUG {
                         info!("HP {:?}", hit_health.0);
                     }
@@ -480,7 +531,12 @@ pub fn cleanup_marked_for_death_entities(
         With<MarkedForDeath>,
     >,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
-    player: Query<(&PlayerSkills, &Attack, &ManaRegen)>,
+    player: Query<(
+        &PlayerSkills,
+        &Attack,
+        &ManaRegen,
+        &crate::attributes::ProjectileSize,
+    )>,
     graphics: Res<Graphics>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     neaby_mobs: Query<(Entity, &GlobalTransform), (With<Mob>, Without<MarkedForDeath>)>,
@@ -519,7 +575,7 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<SpikeAttackState>() // Remove StoneGolem's attack state
                 .remove::<MarkedForDeath>();
         } else {
-            let (skills, attack, mana_regen) = player.single();
+            let (skills, attack, mana_regen, projectile_size) = player.single();
 
             // Only trigger heirloom on-kill effects if the kill wasn't from a heirloom effect
             // This prevents chaining (e.g., ice explosion killing enemies that trigger more ice explosions)
@@ -533,6 +589,7 @@ pub fn cleanup_marked_for_death_entities(
                             &graphics,
                             mob_pos.translation(),
                             attack.0 / 4,
+                            projectile_size.get_multiplier(),
                         );
                     }
                     if skills.has(Heirloom::FrozenMPRegen) {

@@ -1046,3 +1046,134 @@ pub fn handle_dodge_crit_next_hit_reset(
         break; // Only need to process once per frame
     }
 }
+
+// ============================================================================
+// LethalBlow Hallucination Stats - Tracks stat bonuses from execute procs
+// ============================================================================
+
+/// Tracks accumulated stat bonuses from LethalBlow hallucinations
+/// Tracks stat bonuses from LethalBlow hallucination executes.
+/// Wraps ItemAttributes so it can be combined with player attributes using combine().
+#[derive(Component, Default, Debug, Clone)]
+pub struct HallucinationStats(pub crate::attributes::ItemAttributes);
+
+/// List of stats that can be buffed by hallucinations
+#[derive(Clone, Copy, Debug)]
+pub enum HallucinationStatType {
+    Attack,
+    Health,
+    Defence,
+    CritChance,
+    CritDamage,
+    Speed,
+    Lifesteal,
+    Dodge,
+    HealthRegen,
+    Healing,
+    Thorns,
+    XPRate,
+    Luck,
+    Mana,
+    Size,
+    ManaRegen,
+    AttackSpeed,
+}
+
+impl HallucinationStatType {
+    pub fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        match rng.gen_range(0..17) {
+            0 => Self::Attack,
+            1 => Self::Health,
+            2 => Self::Defence,
+            3 => Self::CritChance,
+            4 => Self::CritDamage,
+            5 => Self::Speed,
+            6 => Self::Lifesteal,
+            7 => Self::HealthRegen,
+            8 => Self::Healing,
+            9 => Self::Thorns,
+            10 => Self::XPRate,
+            11 => Self::Luck,
+            12 => Self::Mana,
+            13 => Self::Size,
+            14 => Self::ManaRegen,
+            15 => Self::AttackSpeed,
+            16 => Self::Dodge,
+            _ => Self::AttackSpeed,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Attack => "Attack",
+            Self::Health => "Health",
+            Self::Defence => "Defence",
+            Self::CritChance => "Crit",
+            Self::CritDamage => "Crit DMG",
+            Self::Speed => "Speed",
+            Self::Lifesteal => "Lifesteal",
+            Self::Dodge => "Dodge",
+            Self::HealthRegen => "Health Regen",
+            Self::Healing => "Healing",
+            Self::Thorns => "Thorns",
+            Self::XPRate => "XP",
+            Self::Luck => "Luck",
+            Self::Mana => "Mana",
+            Self::Size => "Size",
+            Self::ManaRegen => "Mana Regen",
+            Self::AttackSpeed => "Attack Speed",
+        }
+    }
+
+    pub fn color(&self) -> bevy::prelude::Color {
+        match self {
+            Self::Attack => crate::colors::LIGHT_RED,
+            Self::Health => crate::colors::LIGHT_RED,
+            Self::Defence => crate::colors::GREY,
+            Self::CritChance => crate::colors::YELLOW,
+            Self::CritDamage => crate::colors::YELLOW,
+            Self::Speed => crate::colors::LIGHT_GREEN,
+            Self::Lifesteal => crate::colors::LIGHT_RED,
+            Self::Dodge => crate::colors::YELLOW,
+            Self::HealthRegen => crate::colors::LIGHT_RED,
+            Self::Healing => crate::colors::LIGHT_GREEN,
+            Self::Thorns => crate::colors::LIGHT_GREEN,
+            Self::XPRate => crate::colors::YELLOW,
+            Self::Luck => crate::colors::YELLOW,
+            Self::Mana => crate::colors::LIGHT_BLUE,
+            Self::Size => crate::colors::LIGHT_BLUE,
+            Self::ManaRegen => crate::colors::LIGHT_BLUE,
+            Self::AttackSpeed => crate::colors::LIGHT_GREEN,
+        }
+    }
+}
+
+impl HallucinationStats {
+    pub fn add_stat(&mut self, stat_type: HallucinationStatType, amount: i32) {
+        match stat_type {
+            HallucinationStatType::Attack => self.0.attack.value += amount,
+            HallucinationStatType::Health => self.0.health.value += amount,
+            HallucinationStatType::Defence => self.0.defence.value += amount,
+            HallucinationStatType::CritChance => self.0.crit_chance.value += amount,
+            HallucinationStatType::CritDamage => self.0.crit_damage.value += amount,
+            HallucinationStatType::Speed => self.0.speed.value += amount,
+            HallucinationStatType::Lifesteal => self.0.lifesteal.value += amount,
+            HallucinationStatType::Dodge => self.0.dodge.value += amount,
+            HallucinationStatType::HealthRegen => self.0.health_regen.value += amount,
+            HallucinationStatType::Healing => self.0.healing.value += amount,
+            HallucinationStatType::Thorns => self.0.thorns.value += amount,
+            HallucinationStatType::XPRate => self.0.xp_rate.value += amount,
+            HallucinationStatType::Luck => self.0.loot_rate.value += amount,
+            HallucinationStatType::Mana => self.0.mana.value += amount,
+            HallucinationStatType::Size => self.0.size.value += amount,
+            HallucinationStatType::ManaRegen => self.0.mana_regen.value += amount,
+            HallucinationStatType::AttackSpeed => self.0.attack_speed.value += amount,
+        }
+    }
+
+    /// Get the inner ItemAttributes for combining with player stats
+    pub fn as_item_attributes(&self) -> &crate::attributes::ItemAttributes {
+        &self.0
+    }
+}

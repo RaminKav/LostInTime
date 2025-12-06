@@ -165,7 +165,14 @@ pub fn handle_spread_arrows_attack(
 
 pub fn handle_on_hit_upgrades(
     mut hits: EventReader<HitEvent>,
-    upgrades: Query<(&PlayerSkills, &GlobalTransform), With<Player>>,
+    upgrades: Query<
+        (
+            &PlayerSkills,
+            &GlobalTransform,
+            &crate::attributes::ProjectileSize,
+        ),
+        With<Player>,
+    >,
     proto: ProtoParam,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
@@ -194,7 +201,7 @@ pub fn handle_on_hit_upgrades(
         *elec_count = 0;
     }
     let player_attributes = player_att.single();
-    let (skills, player_txfm) = upgrades.single();
+    let (skills, player_txfm, projectile_size) = upgrades.single();
     let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
         let mut rng = rand::thread_rng();
@@ -263,6 +270,7 @@ pub fn handle_on_hit_upgrades(
                     &game.graphics,
                     hit_entity_txfm.translation(),
                     hit.damage / 4,
+                    projectile_size.get_multiplier(),
                 );
                 // Only play sound once per frame to avoid audio spam
                 if !throttle.sound_played {
@@ -401,7 +409,7 @@ pub fn handle_on_hit_upgrades(
 
                 // LifestealCoins: Spawn a coin for each lifesteal proc
                 if skills.has(Heirloom::LifestealCoins) {
-                    let d = 16.0;
+                    let d = 32.0;
                     let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
                     proto_commands.spawn_item_from_proto(
                         WorldObject::Coin,

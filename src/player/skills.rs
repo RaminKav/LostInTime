@@ -816,9 +816,12 @@ impl Heirloom {
                 "time.".to_string(),
             ],
             Heirloom::LethalBlow => vec![
-                "Melee attacks ".to_string(),
-                "execute enemies ".to_string(),
-                "below 20% health.".to_string(),
+                "2% chance to".to_string(),
+                "execute enemies.".to_string(),
+                "Executes cause".to_string(),
+                "hallucinations,".to_string(),
+                "granting random".to_string(),
+                "stat buffs.".to_string(),
             ],
             Heirloom::SkillChargeIncrease => vec![
                 "Gain +1 extra".to_string(),
@@ -1212,6 +1215,14 @@ impl Heirloom {
                     .entity(entity)
                     .insert(crate::player::combat_heirlooms::DodgeCritState::default());
             }
+            Heirloom::LethalBlow => {
+                // Add hallucination stats tracker (only once)
+                if skills.get_count(Heirloom::LethalBlow) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::HallucinationStats::default());
+                }
+            }
 
             _ => {}
         }
@@ -1384,7 +1395,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare),
-                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon),

@@ -197,18 +197,26 @@ impl DimensionPlugin {
                         move_player_event.send(MovePlayerEvent { pos });
                     }
                 } else {
-                    // Set starting day based on era:
-                    // Era 1 (Main) = day 1, Era 2 (Second) = day 2, Era 3 (Third) = day 3
-                    let era_starting_day = (new_era.index() + 1) as u8;
-                    night.days = era_starting_day;
-                    night.time = 0.;
-                    info!("Era {:?} starting at day {}", new_era, era_starting_day);
+                    // Check if we're returning from a dungeon vs entering a truly new era
+                    let curr_era = &game.era.current_era;
+                    let returning_from_dungeon = curr_era.is_dungeon();
 
-                    // Reset era timer and infinite mode for the new era (12 minutes to find the boss and portal)
-                    crate::night::reset_era_timer_and_infinite_mode(
-                        &mut era_timer,
-                        &mut infinite_mode,
-                    );
+                    // Set starting day based on era (only when entering a new era, not returning from dungeon)
+                    if !returning_from_dungeon {
+                        // Era 1 (Main) = day 1, Era 2 (Second) = day 2, Era 3 (Third) = day 3
+                        let era_starting_day = (new_era.index() + 1) as u8;
+                        night.days = era_starting_day;
+                        night.time = 0.;
+                        info!("Era {:?} starting at day {}", new_era, era_starting_day);
+
+                        // Reset era timer and infinite mode for the new era (12 minutes to find the boss and portal)
+                        crate::night::reset_era_timer_and_infinite_mode(
+                            &mut era_timer,
+                            &mut infinite_mode,
+                        );
+                    } else {
+                        info!("Returning from dungeon to {:?}, keeping era timer", new_era);
+                    }
                 }
 
                 let curr_era = game.era.current_era.clone();

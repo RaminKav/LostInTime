@@ -936,6 +936,9 @@ impl ItemAttributes {
         let chaos_speed_bonus = chaos_stats_stacks * 10; // +10% speed
         let chaos_dodge_bonus = chaos_stats_stacks * 10;
 
+        // Note: Hallucination stats from LethalBlow are now combined via ItemAttributes::combine()
+        // before this function is called, so they're already included in self.
+
         let computed_health =
             self.health + skills.get_count(Heirloom::Health) * 25 + chaos_health_bonus;
         let computed_speed = self.speed.value
@@ -1684,6 +1687,7 @@ fn handle_player_item_attribute_change_events(
     ui_state: Res<State<UIState>>,
     game: Res<Game>,
     dodge_crit_state: Query<&crate::player::combat_heirlooms::DodgeCritState, With<Player>>,
+    hallucination_stats: Query<&crate::player::combat_heirlooms::HallucinationStats, With<Player>>,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
@@ -1701,6 +1705,12 @@ fn handle_player_item_attribute_change_events(
         for a in eqp_attributes.iter().chain(equips.iter()) {
             new_att = new_att.combine(a);
         }
+
+        // Combine hallucination stats from LethalBlow executes
+        if let Ok(hall_stats) = hallucination_stats.get_single() {
+            new_att = new_att.combine(hall_stats.as_item_attributes());
+        }
+
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;
         }
@@ -1984,7 +1994,6 @@ pub fn add_item_glows(
     if commands.get_entity(new_item_e).is_none() {
         return None;
     }
-    info!("Adding item glows for rarity: {:?}", rarity);
     rarity.get_item_glow().map(|glow| {
         commands
             .spawn(SpriteBundle {

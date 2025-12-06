@@ -6,7 +6,9 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
-    attributes::{modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen},
+    attributes::{
+        modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen, ProjectileSize,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     colors::LIGHT_RED,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider},
@@ -85,19 +87,28 @@ pub fn handle_echo_after_heal(
             &PreviousHealth,
             &PlayerSkills,
             &Attack,
+            &ProjectileSize,
         ),
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, changed_health, prev_health, skills, attack) in changed_health.iter_mut() {
+    for (e, changed_health, prev_health, skills, attack, projectile_size) in
+        changed_health.iter_mut()
+    {
         let delta = changed_health.0 - prev_health.0;
         if delta <= 0 {
             continue;
         }
 
         if skills.has(Heirloom::HealEcho) {
-            spawn_echo_hitbox(&mut commands, &asset_server, e, attack.0);
+            spawn_echo_hitbox(
+                &mut commands,
+                &asset_server,
+                e,
+                attack.0,
+                projectile_size.get_multiplier(),
+            );
         }
     }
 }
@@ -241,6 +252,7 @@ pub fn handle_parry_success(
             &HealthRegen,
             &GlobalTransform,
             &PlayerSkills,
+            &ProjectileSize,
         ),
         With<Player>,
     >,
@@ -250,7 +262,8 @@ pub fn handle_parry_success(
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
 ) {
     for _ in parry_success_event.iter() {
-        let (player_e, attack, health_regen, player_txfm, skills) = player.single();
+        let (player_e, attack, health_regen, player_txfm, skills, projectile_size) =
+            player.single();
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -262,7 +275,13 @@ pub fn handle_parry_success(
             modify_health_event.send(ModifyHealthEvent(health_regen.0));
         }
         if skills.has(Heirloom::ParryEcho) {
-            spawn_echo_hitbox(&mut commands, &asset_server, player_e, attack.0);
+            spawn_echo_hitbox(
+                &mut commands,
+                &asset_server,
+                player_e,
+                attack.0,
+                projectile_size.get_multiplier(),
+            );
         }
     }
 }
@@ -285,17 +304,22 @@ pub fn spawn_echo_hitbox(
     asset_server: &AssetServer,
     player: Entity,
     dmg: i32,
+    size_multiplier: f32,
 ) {
     // Use default animation to ensure it starts at frame 0
     let anim = AsepriteAnimation::default();
 
+    // Scale the collider radius by the size multiplier
+    let base_radius = 26.0;
+    let scaled_radius = base_radius * size_multiplier;
+
     // Queue deferred spawn with parent - actual entity will be created in PreUpdate and parented
     spawn_deferred_aseprite_collider(
         commands,
-        Transform::from_translation(Vec3::ZERO),
+        Transform::from_translation(Vec3::ZERO).with_scale(Vec3::splat(size_multiplier)),
         10.5,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 26.),
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
         asset_server.load::<Aseprite, _>(Echo::PATH),
         anim,
         false,

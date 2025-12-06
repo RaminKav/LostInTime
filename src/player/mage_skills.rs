@@ -176,17 +176,22 @@ pub fn spawn_ice_explosion_hitbox(
     graphics: &Graphics,
     pos: Vec3,
     dmg: i32,
+    size_multiplier: f32,
 ) {
     // Use default animation to ensure it starts at frame 0
     let anim = AsepriteAnimation::default();
 
+    // Scale the collider radius by the size multiplier
+    let base_radius = 28.0;
+    let scaled_radius = base_radius * size_multiplier;
+
     // Queue deferred spawn - actual entity will be created in PreUpdate
     spawn_deferred_aseprite_collider(
         commands,
-        Transform::from_translation(pos),
+        Transform::from_translation(pos).with_scale(Vec3::splat(size_multiplier)),
         10.5,
         dmg,
-        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 28.),
+        Collider::capsule(Vec2::ZERO, Vec2::ZERO, scaled_radius),
         graphics.ice_explosion_ase.as_ref().unwrap().clone(),
         anim,
         false,

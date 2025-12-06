@@ -58,6 +58,7 @@ pub fn handle_active_skill_event(
         ),
         With<Player>,
     >,
+    player_projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
     sprint_states: Query<&SprintState, With<Player>>,
     spear_states: Query<&SpearState, With<Player>>,
     lunge_states: Query<&LungeState, With<Player>>,
@@ -705,11 +706,16 @@ pub fn handle_active_skill_event(
                 // Skill Echo trigger: spawn an echo AoE at player position when using any skill
                 if skills.has(crate::player::skills::Heirloom::SkillEcho) {
                     let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
+                    let size_mult = player_projectile_size
+                        .get_single()
+                        .map(|s| s.get_multiplier())
+                        .unwrap_or(1.0);
                     crate::player::melee_skills::spawn_echo_hitbox(
                         &mut commands,
                         &asset_server,
                         player_e,
                         echo_dmg,
+                        size_mult,
                     );
                 }
             }
