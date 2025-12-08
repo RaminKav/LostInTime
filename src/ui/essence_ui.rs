@@ -310,16 +310,15 @@ pub fn handle_submit_essence_choice(
     essence_ui: Query<Entity, With<EssenceUI>>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
-    time_fragments: Res<TimeFragmentCurrency>,
-    coins: Res<CoinCurrency>,
     mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     shop: Res<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
     mut game: GameParam,
 ) {
     for choice in ev.iter() {
-        if time_fragments.time_fragments >= choice.choice.time_fragment_cost as i32
-            && coins.coins >= choice.choice.coin_cost
+        // Access coins and time_fragments through GameParam to avoid resource conflicts
+        if game.get_time_fragments() >= choice.choice.time_fragment_cost as i32
+            && game.get_coins() >= choice.choice.coin_cost
         {
             currency_event.send(ModifyCurencyEvent {
                 delta: -(choice.choice.time_fragment_cost as i32),
@@ -372,7 +371,10 @@ pub fn handle_submit_essence_choice(
 
                 // Update the chunk cache so the merchant stays "Done" when chunk respawns
                 if let Some(tile_pos) = shop.tile_pos {
-                    info!("Updating blacksmith merchant in chunk cache at {:?} to Done state", tile_pos);
+                    info!(
+                        "Updating blacksmith merchant in chunk cache at {:?} to Done state",
+                        tile_pos
+                    );
                     game.add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
                 }
             }
@@ -381,7 +383,10 @@ pub fn handle_submit_essence_choice(
 }
 
 pub fn handle_populate_essence_shop_on_new_spawn(
-    mut new_spawns: Query<(Entity, &mut EssenceShopChoices, &GlobalTransform), Added<EssenceShopChoices>>,
+    mut new_spawns: Query<
+        (Entity, &mut EssenceShopChoices, &GlobalTransform),
+        Added<EssenceShopChoices>,
+    >,
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
     heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
     purchase_tracker: Res<BlacksmithPurchaseTracker>,
@@ -391,9 +396,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         let mut rng = rand::thread_rng();
 
         // Store tile position for chunk cache updates
-        let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(
-            transform.translation().truncate()
-        );
+        let tile_pos =
+            crate::world::world_helpers::world_pos_to_tile_pos(transform.translation().truncate());
         shop.tile_pos = Some(tile_pos);
 
         // Get the price multiplier based on previous purchases
