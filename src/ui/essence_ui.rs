@@ -81,6 +81,7 @@ pub struct SubmitEssenceChoice {
 pub struct EssenceShopChoices {
     pub choices: Vec<EssenceOption>,
     pub owner_entity: Option<Entity>,
+    pub tile_pos: Option<crate::world::TileMapPosition>,
 }
 aseprite!(pub BlacksmithMerchant, "textures/blacksmith.ase");
 
@@ -314,6 +315,7 @@ pub fn handle_submit_essence_choice(
     mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     shop: Res<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
+    mut game: GameParam,
 ) {
     for choice in ev.iter() {
         if time_fragments.time_fragments >= choice.choice.time_fragment_cost as i32
@@ -367,20 +369,32 @@ pub fn handle_submit_essence_choice(
                     .remove::<EssenceShopChoices>()
                     .insert(WorldObject::BlacksmithMerchantDone)
                     .remove::<InteractionGuideTrigger>();
+
+                // Update the chunk cache so the merchant stays "Done" when chunk respawns
+                if let Some(tile_pos) = shop.tile_pos {
+                    info!("Updating blacksmith merchant in chunk cache at {:?} to Done state", tile_pos);
+                    game.add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
+                }
             }
         }
     }
 }
 
 pub fn handle_populate_essence_shop_on_new_spawn(
-    mut new_spawns: Query<(Entity, &mut EssenceShopChoices), Added<EssenceShopChoices>>,
+    mut new_spawns: Query<(Entity, &mut EssenceShopChoices, &GlobalTransform), Added<EssenceShopChoices>>,
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
     heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
     purchase_tracker: Res<BlacksmithPurchaseTracker>,
 ) {
-    for (entity, mut shop) in new_spawns.iter_mut() {
+    for (entity, mut shop, transform) in new_spawns.iter_mut() {
         let mut shop_choices = vec![];
         let mut rng = rand::thread_rng();
+
+        // Store tile position for chunk cache updates
+        let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(
+            transform.translation().truncate()
+        );
+        shop.tile_pos = Some(tile_pos);
 
         // Get the price multiplier based on previous purchases
         let purchase_multiplier = purchase_tracker.get_price_multiplier();
