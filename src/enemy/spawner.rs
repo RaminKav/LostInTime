@@ -457,10 +457,14 @@ fn tick_spawner_timers(
 
             // Speed up spawns during night OR infinite mode
             if night_tracker.is_night() || infinite_mode.active {
-                // 5x spawn rate at night / infinite mode
+                // 3x spawn rate at night / infinite mode
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
                 spawner.spawn_timer.tick(time.delta());
+                // tick extra time in infinite mode
+                if infinite_mode.active {
+                    spawner.spawn_timer.tick(time.delta());
+                }
             }
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();

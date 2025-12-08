@@ -473,7 +473,7 @@ fn juice_up_spawned_mobs_per_day(
         );
         hp.0 = (hp.0 as f32 * (chaos_factor.powf(1.1))) as i32;
         att.0 = (att.0 as f32 * (chaos_factor.powf(0.7))) as i32;
-        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.125)) as u32;
+        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.175)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }
