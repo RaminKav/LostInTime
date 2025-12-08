@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::view::RenderLayers};
+use bevy::{ecs::system::ParamSet, prelude::*, render::view::RenderLayers};
 use bevy_aseprite::aseprite;
 use rand::{seq::SliceRandom, Rng};
 use strum::IntoEnumIterator;
@@ -310,15 +310,17 @@ pub fn handle_submit_essence_choice(
     essence_ui: Query<Entity, With<EssenceUI>>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
-    mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
+    mut params: ParamSet<(GameParam, Query<(Entity, &mut PlayerSkills), With<Player>>)>,
     shop: Res<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
-    mut game: GameParam,
 ) {
     for choice in ev.iter() {
-        // Access coins and time_fragments through GameParam to avoid resource conflicts
-        if game.get_time_fragments() >= choice.choice.time_fragment_cost as i32
-            && game.get_coins() >= choice.choice.coin_cost
+        // Access coins and time_fragments through GameParam (set 0)
+        let time_fragments = params.p0().get_time_fragments();
+        let coins = params.p0().get_coins();
+
+        if time_fragments >= choice.choice.time_fragment_cost as i32
+            && coins >= choice.choice.coin_cost
         {
             currency_event.send(ModifyCurencyEvent {
                 delta: -(choice.choice.time_fragment_cost as i32),
@@ -329,8 +331,8 @@ pub fn handle_submit_essence_choice(
                 obj: WorldObject::Coin,
             });
 
-            // Add heirloom to player's heirloom pool
-            if let Ok((player_entity, mut player_skills)) = player_query.get_single_mut() {
+            // Add heirloom to player's heirloom pool (set 1 - mutable access)
+            if let Ok((player_entity, mut player_skills)) = params.p1().get_single_mut() {
                 let heirloom_with_rarity = HeirloomWithRarity {
                     heirloom: choice.choice.heirloom.clone(),
                     rarity: choice.choice.rarity.clone(),
@@ -369,13 +371,15 @@ pub fn handle_submit_essence_choice(
                     .insert(WorldObject::BlacksmithMerchantDone)
                     .remove::<InteractionGuideTrigger>();
 
-                // Update the chunk cache so the merchant stays "Done" when chunk respawns
+                // Update the chunk cache so the merchant stays "Done" when chunk respawns (set 0)
                 if let Some(tile_pos) = shop.tile_pos {
                     info!(
                         "Updating blacksmith merchant in chunk cache at {:?} to Done state",
                         tile_pos
                     );
-                    game.add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
+                    params
+                        .p0()
+                        .add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
                 }
             }
         }
