@@ -162,7 +162,7 @@ fn calculate_percent_damage(
 ) -> i32 {
     if is_boss {
         let (damage, _, _) =
-            game.calculate_player_damage(commands, target, 0, Some(percent), 0, None);
+            game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
         i32::max(1, damage as i32)
     } else {
         ((max_health as f32) * percent).ceil().max(1.0) as i32

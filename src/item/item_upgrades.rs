@@ -378,6 +378,11 @@ pub fn handle_on_hit_upgrades(
             );
         }
 
+        // Skip lifesteal for damage from heirloom effects (e.g., poison, burning)
+        if hit.from_heirloom_effect {
+            continue;
+        }
+
         // Calculate total lifesteal: base from heirloom (10% per stack) + equipment lifesteal attribute
         let heirloom_lifesteal = skills.get_count(Heirloom::Lifesteal) * 10; // 10% per stack
         let equipment_lifesteal = player_attributes.lifesteal.value;

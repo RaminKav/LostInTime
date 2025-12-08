@@ -18,10 +18,10 @@ use crate::{
     status_effects::Frail,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
-    GameParam, HitEvent, InvincibilityTimer,
+    GameParam, HitEvent,
 };
 
-use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
+use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
 
 #[derive(Component)]
@@ -50,13 +50,15 @@ pub fn handle_second_split_attack(
             continue;
         };
 
+        let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
         let (damage, was_crit, was_overcrit) = game.calculate_player_damage(
             &mut commands,
             e,
-            (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
+            (frail_stacks * 5) as u32,
             None,
             0,
             None,
+            frail_stacks,
         );
 
         let split_damage = f32::floor(damage as f32 / 2.) as i32;

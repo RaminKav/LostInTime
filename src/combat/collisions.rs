@@ -116,13 +116,15 @@ fn check_melee_hit_collisions(
                 continue;
             };
 
+            let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
             let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
                 &mut commands,
                 hit_entity,
-                (frail_option.map(|f| f.num_stacks).unwrap_or(0) * 5) as u32,
+                0,
                 None,
                 0,
                 None,
+                frail_stacks,
             );
 
             let is_status_effected =
@@ -227,6 +229,7 @@ fn check_projectile_hit_mob_collisions(
             let (burning, mut slow, frail) = status_check.get_mut(*e2).unwrap();
             let is_slowed = slow.is_some();
             let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
+            let frail_stacks = frail.map(|f| f.num_stacks).unwrap_or(0);
 
             let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
                 10
@@ -237,8 +240,15 @@ fn check_projectile_hit_mob_collisions(
             } else {
                 0
             };
-            let (mut damage, was_crit, was_overcrit) =
-                game.calculate_player_damage(&mut commands, *e2, crit_bonus, None, 0, Some(att.0));
+            let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
+                &mut commands,
+                *e2,
+                crit_bonus,
+                None,
+                0,
+                Some(att.0),
+                frail_stacks,
+            );
             if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
                 damage = f32::ceil(damage as f32 * 1.2) as u32;
             }

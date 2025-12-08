@@ -79,6 +79,7 @@ pub enum AudioSoundEffect {
     GainExp,
     LevelUp,
     PlayerHit,
+    SwordSwing,
 }
 #[derive(Component)]
 
@@ -147,6 +148,7 @@ fn get_sound_cooldown_duration(sound: &AudioSoundEffect) -> Option<f32> {
         AudioSoundEffect::Bow => Some(0.1),          // 100ms
         AudioSoundEffect::Claw => Some(0.1),         // 100ms
         AudioSoundEffect::AirWaveAttack => Some(0.15), // 150ms
+        AudioSoundEffect::SwordSwing => Some(0.15),  // 150ms - prevent spam with Rapidfire
 
         // Explosion/AOE sounds - prevent overlapping
         AudioSoundEffect::IceExplosion => Some(0.15), // 150ms
@@ -176,7 +178,7 @@ fn get_sound_cooldown_duration(sound: &AudioSoundEffect) -> Option<f32> {
         AudioSoundEffect::LegendaryDrop2 => Some(0.3),
 
         // Other sounds - no cooldown needed (infrequent or one-time)
-        _ => None,
+        _ => Some(0.2),
     }
 }
 
@@ -221,22 +223,35 @@ pub fn handle_sound_spawners(
                 );
             }
 
-            let sound_handle = asset_server.load(format!("sounds/{}.ogg", sound.sound));
-            audio.play_with_settings(
-                sound_handle.clone(),
-                PlaybackSettings::ONCE.with_volume(sound.volume),
-            );
+            // Handle SwordSwing specially - play random swing sound
+            if sound.sound == AudioSoundEffect::SwordSwing {
+                use rand::seq::SliceRandom;
+                let swing1 = asset_server.load("sounds/swing.ogg");
+                let swing2 = asset_server.load("sounds/swing2.ogg");
+                let swing3 = asset_server.load("sounds/swing3.ogg");
+                let swings = vec![swing1, swing2, swing3];
+                if let Some(random_sound) = swings.choose(&mut rand::thread_rng()) {
+                    audio.play_with_settings(
+                        random_sound.clone(),
+                        PlaybackSettings::ONCE.with_volume(sound.volume),
+                    );
+                }
+            } else {
+                let sound_handle = asset_server.load(format!("sounds/{}.ogg", sound.sound));
+                audio.play_with_settings(
+                    sound_handle.clone(),
+                    PlaybackSettings::ONCE.with_volume(sound.volume),
+                );
+            }
             commands.entity(e).despawn();
         }
     }
 }
 pub fn sword_swing_sound(
-    asset_server: Res<AssetServer>,
-    audio: Res<Audio>,
+    mut commands: Commands,
     mouse_button_input: Res<Input<MouseButton>>,
     player_query: Query<(Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
     curr_ui_state: Res<State<UIState>>,
-    game: GameParam,
 ) {
     let (attack_timer_option, player_anim) = player_query.single();
     if mouse_button_input.pressed(MouseButton::Left)
@@ -247,25 +262,8 @@ pub fn sword_swing_sound(
             return;
         }
         trace!("AUDIO!!");
-        let is_dagger = if let Some(main_hand_state) = game.game.player_state.main_hand_slot.clone()
-        {
-            main_hand_state.get_obj() == WorldObject::Dagger
-        } else {
-            false
-        };
-        let swing1 = asset_server.load("sounds/swing.ogg");
-        let swing2 = asset_server.load("sounds/swing2.ogg");
-        let swing3 = asset_server.load("sounds/swing3.ogg");
-        let dagger1 = asset_server.load("sounds/Dagger1.ogg");
-        let dagger2 = asset_server.load("sounds/Dagger2.ogg");
-        let swings = if is_dagger {
-            vec![dagger1, dagger2]
-        } else {
-            vec![swing1, swing2, swing3]
-        };
-        swings.iter().choose(&mut rand::thread_rng()).map(|sound| {
-            audio.play_with_settings(sound.clone(), PlaybackSettings::ONCE.with_volume(0.5))
-        });
+        // Use SoundSpawner to get automatic cooldown rate limiting
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.5));
     }
 }
 pub fn bgm_audio(

@@ -626,6 +626,7 @@ impl<'w, 's> GameParam<'w, 's> {
     /// Returns (damage, was_crit, was_overcrit)
     /// Overcrit happens when crit chance > 100% and a second roll succeeds
     /// Overcrit does an additional 30% damage on top of crit damage
+    /// frail_stacks: Number of frail stacks on target (each stack increases damage by 10%)
     pub fn calculate_player_damage(
         &self,
         commands: &mut Commands,
@@ -634,6 +635,7 @@ impl<'w, 's> GameParam<'w, 's> {
         dmg_mult: Option<f32>,
         dmg_bonus: u32,
         attack_override: Option<i32>,
+        frail_stacks: u8,
     ) -> (u32, bool, bool) {
         let (attack, max_health, _, crit_chance, crit_dmg, bonus_dmg, combo_option, ..) =
             self.player_stats.single();
@@ -721,6 +723,13 @@ impl<'w, 's> GameParam<'w, 's> {
             (is_crit, false)
         };
 
+        // Frail multiplier: 1.1x damage per stack (applied multiplicatively at the end)
+        let frail_multiplier = if frail_stacks > 0 {
+            1.1_f32.powi(frail_stacks as i32)
+        } else {
+            1.0
+        };
+
         if did_crit {
             commands.entity(hit_entity).insert(WasHitWithCrit);
             if did_overcrit {
@@ -734,13 +743,16 @@ impl<'w, 's> GameParam<'w, 's> {
                 ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
                     * bonus_damage_multiplier
                     * crit_multiplier
-                    * overcrit_multiplier) as u32,
+                    * overcrit_multiplier
+                    * frail_multiplier) as u32, // Apply Frail multiplicatively
                 true,
                 did_overcrit,
             )
         } else {
             (
-                ((dmg_mult * (dmg + dmg_bonus as i32) as f32) * bonus_damage_multiplier) as u32,
+                ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
+                    * bonus_damage_multiplier
+                    * frail_multiplier) as u32, // Apply Frail multiplicatively
                 false,
                 false,
             )

@@ -776,8 +776,8 @@ impl Heirloom {
                 "Your Attacks have".to_string(),
                 "a chance to apply".to_string(),
                 "a Frail stack that".to_string(),
-                "gives +3% critical".to_string(),
-                "chance on hits".to_string(),
+                "gives +10% Damage".to_string(),
+                "on hits.".to_string(),
             ],
             Heirloom::SlowStacks => vec![
                 "Your Attacks have".to_string(),
