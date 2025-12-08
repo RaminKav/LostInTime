@@ -43,7 +43,7 @@ pub fn setup_leaderboard_ui(
         cache.last_error.is_some()
     );
 
-    let panel_width = 90.0;
+    let panel_width = 102.0;
     let panel_height = 75.0;
 
     // Position in top left corner
@@ -122,7 +122,7 @@ fn spawn_leaderboard_entries(
         cache.last_error.is_some()
     );
 
-    let text_x = panel_x - panel_width / 2. + 5.;
+    let text_x = panel_x - panel_width / 2.;
     let start_y = panel_y + panel_height / 2. - 18.5;
     let row_spacing = -12.0;
 
@@ -229,8 +229,8 @@ fn spawn_leaderboard_entries(
             ));
 
             // Truncate name if too long
-            let name = if entry.player_name.len() > 8 {
-                format!("{}...", &entry.player_name[..8])
+            let name = if entry.player_name.len() > 9 {
+                format!("{}...", &entry.player_name[..9])
             } else {
                 entry.player_name.clone()
             };
@@ -270,7 +270,7 @@ fn spawn_leaderboard_entries(
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 38., y, 15.)),
+                    transform: Transform::from_translation(Vec3::new(text_x + 48., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
@@ -298,7 +298,7 @@ fn spawn_leaderboard_entries(
                     )
                     .with_alignment(TextAlignment::Left),
                     text_anchor: bevy::sprite::Anchor::CenterLeft,
-                    transform: Transform::from_translation(Vec3::new(text_x + 58., y, 15.)),
+                    transform: Transform::from_translation(Vec3::new(text_x + 74., y, 15.)),
                     ..Default::default()
                 },
                 RenderLayers::from_layers(&[3]),
