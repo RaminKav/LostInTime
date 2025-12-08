@@ -1,3 +1,4 @@
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::utils::Duration;
 use bevy_proto::prelude::ProtoCommands;
@@ -22,8 +23,9 @@ use crate::{
         rogue_skills::{LungeState, SprintState},
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState,
-            FirePillarState, HealSkillState, Heirloom, IceWallSkillState, PlayerSkills,
-            RapidfireState, ShoutSkillState, Slot1ChargeTracker, Slot2ChargeTracker, StealthState,
+            FirePillarState, HealSkillState, Heirloom, IceWallSkillState, PiercingStarSkillState,
+            PlayerSkills, RapidfireState, ShoutSkillState, Slot1ChargeTracker, Slot2ChargeTracker,
+            StealthState,
         },
         Player,
     },
@@ -35,6 +37,27 @@ use crate::{
 #[derive(Component)]
 pub struct Stealthed;
 
+#[derive(SystemParam)]
+pub struct SkillStateQueries<'w, 's> {
+    pub stealth_states: Query<'w, 's, &'static StealthState, With<Player>>,
+    pub rapidfire_states: Query<'w, 's, &'static RapidfireState, With<Player>>,
+    pub fire_pillar_states: Query<'w, 's, &'static FirePillarState, With<Player>>,
+    pub heal_states: Query<'w, 's, &'static HealSkillState, With<Player>>,
+    pub buckshot_states: Query<'w, 's, &'static BuckshotSkillState, With<Player>>,
+    pub icewall_states: Query<'w, 's, &'static IceWallSkillState, With<Player>>,
+    pub druidtree_states: Query<'w, 's, &'static DruidTreeSkillState, With<Player>>,
+    pub shout_states: Query<'w, 's, &'static ShoutSkillState, With<Player>>,
+    pub piercing_star_states: Query<'w, 's, &'static PiercingStarSkillState, With<Player>>,
+    pub sprint_states: Query<'w, 's, &'static SprintState, With<Player>>,
+    pub spear_states: Query<'w, 's, &'static SpearState, With<Player>>,
+    pub lunge_states: Query<'w, 's, &'static LungeState, With<Player>>,
+    pub teleport_states: Query<'w, 's, &'static mut TeleportState, With<Player>>,
+    pub slot1_trackers: Query<'w, 's, &'static mut Slot1ChargeTracker, With<Player>>,
+    pub slot2_trackers: Query<'w, 's, &'static mut Slot2ChargeTracker, With<Player>>,
+    pub player_projectile_size:
+        Query<'w, 's, &'static crate::attributes::ProjectileSize, With<Player>>,
+}
+
 pub fn handle_active_skill_event(
     mut events: EventReader<ActiveSkillUsedEvent>,
     mut commands: Commands,
@@ -43,14 +66,6 @@ pub fn handle_active_skill_event(
             Entity,
             &mut PlayerSkills,
             &GlobalTransform,
-            Option<&StealthState>,
-            Option<&RapidfireState>,
-            Option<&FirePillarState>,
-            Option<&HealSkillState>,
-            Option<&BuckshotSkillState>,
-            Option<&IceWallSkillState>,
-            Option<&DruidTreeSkillState>,
-            Option<&ShoutSkillState>,
             Option<&Attack>,
             &mut CurrentHealth,
             &MaxHealth,
@@ -58,13 +73,7 @@ pub fn handle_active_skill_event(
         ),
         With<Player>,
     >,
-    player_projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
-    sprint_states: Query<&SprintState, With<Player>>,
-    spear_states: Query<&SpearState, With<Player>>,
-    lunge_states: Query<&LungeState, With<Player>>,
-    mut teleport_states: Query<&mut TeleportState, With<Player>>,
-    mut slot1_trackers: Query<&mut Slot1ChargeTracker, With<Player>>,
-    mut slot2_trackers: Query<&mut Slot2ChargeTracker, With<Player>>,
+    mut skill_states: SkillStateQueries,
     time: Res<Time>,
     cursor: Res<CursorPos>,
     asset_server: Res<AssetServer>,
@@ -73,24 +82,18 @@ pub fn handle_active_skill_event(
     proto_param: ProtoParam,
 ) {
     for ev in events.iter() {
-        for (
-            player_e,
-            skills,
-            player_txfm,
-            stealth_state,
-            rapid_state,
-            pillar_state,
-            heal_state,
-            buckshot_state,
-            icewall_state,
-            druidtree_state,
-            shout_state,
-            attack_opt,
-            mut health,
-            max_health,
-            facing_dir,
-        ) in players.iter_mut()
+        for (player_e, skills, player_txfm, attack_opt, mut health, max_health, facing_dir) in
+            players.iter_mut()
         {
+            // Get optional states from separate queries
+            let stealth_state = skill_states.stealth_states.get(player_e).ok();
+            let rapid_state = skill_states.rapidfire_states.get(player_e).ok();
+            let pillar_state = skill_states.fire_pillar_states.get(player_e).ok();
+            let heal_state = skill_states.heal_states.get(player_e).ok();
+            let buckshot_state = skill_states.buckshot_states.get(player_e).ok();
+            let icewall_state = skill_states.icewall_states.get(player_e).ok();
+            let druidtree_state = skill_states.druidtree_states.get(player_e).ok();
+            let shout_state = skill_states.shout_states.get(player_e).ok();
             // Credit Card
             let credit_card_count = skills.get_count(Heirloom::CreditCard);
             for _ in 0..credit_card_count {
@@ -111,10 +114,10 @@ pub fn handle_active_skill_event(
             }
 
             // Get legacy skill states from separate queries
-            let sprint_state = sprint_states.get(player_e).ok();
-            let spear_state = spear_states.get(player_e).ok();
-            let lunge_state = lunge_states.get(player_e).ok();
-            let teleport_state = teleport_states.get_mut(player_e).ok();
+            let sprint_state = skill_states.sprint_states.get(player_e).ok();
+            let spear_state = skill_states.spear_states.get(player_e).ok();
+            let lunge_state = skill_states.lunge_states.get(player_e).ok();
+            let teleport_state = skill_states.teleport_states.get_mut(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
             let slot_skill = match ev.slot {
                 0 => skills.active_skill_slot_1.as_ref(),
@@ -127,7 +130,7 @@ pub fn handle_active_skill_event(
                 let mut should_start_cooldown = true;
                 if ev.slot == 1 {
                     // Use slot 1's independent tracker
-                    if let Ok(mut tracker) = slot1_trackers.get_mut(player_e) {
+                    if let Ok(mut tracker) = skill_states.slot1_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
@@ -141,7 +144,7 @@ pub fn handle_active_skill_event(
                     }
                 } else if ev.slot == 2 {
                     // Use slot 2's independent tracker
-                    if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
+                    if let Ok(mut tracker) = skill_states.slot2_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
@@ -275,9 +278,10 @@ pub fn handle_active_skill_event(
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(FirePillarState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(FirePillarState {
+                            cooldown_timer: cd,
+                            hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
+                        });
                         // spawn fire ring projectile at cursor world position with player's attack as damage
                         let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
@@ -568,6 +572,55 @@ pub fn handle_active_skill_event(
 
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
+                    ActiveSkill::PiercingStar => {
+                        if should_start_cooldown {
+                            if let Ok(p) = skill_states.piercing_star_states.get(player_e) {
+                                if !p.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            // If using a charge, remove any existing skill state to prevent blocking
+                            if skill_states.piercing_star_states.get(player_e).is_ok() {
+                                commands.entity(player_e).remove::<PiercingStarSkillState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(
+                            ev.cooldown * skills.skill_cooldown_multiplier(),
+                            TimerMode::Once,
+                        );
+                        if !should_start_cooldown {
+                            // If using a charge, don't start cooldown yet - set timer to finished
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        // Don't tick the timer here - let tick_skill_cooldowns handle it
+                        commands
+                            .entity(player_e)
+                            .insert(PiercingStarSkillState { cooldown_timer: cd });
+
+                        // Calculate direction to cursor
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let direction_to_cursor = (cursor_pos - player_pos).normalize_or_zero();
+
+                        // Spawn ThrowingStarLarge projectile
+                        let power_mult = skills.skill_power_multiplier();
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::ThrowingStarLarge,
+                            direction: direction_to_cursor,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: None,
+                            spawn_delay: 0.0,
+                        });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
+                    }
                     ActiveSkill::Sprint => {
                         if should_start_cooldown {
                             if let Some(s) = sprint_state {
@@ -619,7 +672,7 @@ pub fn handle_active_skill_event(
                                 // We have charges remaining, reset cooldown to start charge regeneration
                                 // Get the appropriate tracker based on which slot teleport is in
                                 if ev.slot == 1 {
-                                    if let Ok(tracker) = slot1_trackers.get(player_e) {
+                                    if let Ok(tracker) = skill_states.slot1_trackers.get(player_e) {
                                         if tracker.0.current_charges < tracker.0.max_charges {
                                             teleport.cooldown_timer = Timer::from_seconds(
                                                 tracker.0.base_cooldown
@@ -629,7 +682,7 @@ pub fn handle_active_skill_event(
                                         }
                                     }
                                 } else if ev.slot == 2 {
-                                    if let Ok(tracker) = slot2_trackers.get(player_e) {
+                                    if let Ok(tracker) = skill_states.slot2_trackers.get(player_e) {
                                         if tracker.0.current_charges < tracker.0.max_charges {
                                             teleport.cooldown_timer = Timer::from_seconds(
                                                 tracker.0.base_cooldown
@@ -706,7 +759,8 @@ pub fn handle_active_skill_event(
                 // Skill Echo trigger: spawn an echo AoE at player position when using any skill
                 if skills.has(crate::player::skills::Heirloom::SkillEcho) {
                     let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
-                    let size_mult = player_projectile_size
+                    let size_mult = skill_states
+                        .player_projectile_size
                         .get_single()
                         .map(|s| s.get_multiplier())
                         .unwrap_or(1.0);
@@ -765,6 +819,7 @@ pub fn tick_skill_cooldowns(
     mut icewall_cd: Query<(Entity, &mut IceWallSkillState)>,
     mut druidtree_cd: Query<(Entity, &mut DruidTreeSkillState)>,
     mut shout_cd: Query<(Entity, &mut ShoutSkillState)>,
+    mut piercing_star_cd: Query<(Entity, &mut PiercingStarSkillState)>,
     mut sprint_cd: Query<(Entity, &mut SprintState)>,
     mut dummy_query: Query<(Entity, &mut DruidTreeDummy)>,
 ) {
@@ -783,6 +838,7 @@ pub fn tick_skill_cooldowns(
     }
     for (e, mut p) in pillar_cd.iter_mut() {
         p.cooldown_timer.tick(time.delta());
+        p.hit_clear_timer.tick(time.delta());
         if p.cooldown_timer.finished() {
             commands.entity(e).remove::<FirePillarState>();
         }
@@ -817,6 +873,12 @@ pub fn tick_skill_cooldowns(
             commands.entity(e).remove::<ShoutSkillState>();
         }
     }
+    for (e, mut p) in piercing_star_cd.iter_mut() {
+        p.cooldown_timer.tick(time.delta());
+        if p.cooldown_timer.finished() {
+            commands.entity(e).remove::<PiercingStarSkillState>();
+        }
+    }
     // Tick Sprint cooldown - this ensures it ticks even while sprinting
     for (_e, mut sprint) in sprint_cd.iter_mut() {
         sprint.sprint_cooldown_timer.tick(time.delta());
@@ -826,6 +888,32 @@ pub fn tick_skill_cooldowns(
         dummy.timer.tick(time.delta());
         if dummy.timer.finished() {
             commands.entity(e).despawn_recursive();
+        }
+    }
+}
+
+/// Clear hit_entities for FireRing projectiles every 1.0s while FirePillar is active
+pub fn handle_fire_pillar_hit_clear(
+    mut fire_pillar_states: Query<&mut FirePillarState>,
+    mut fire_ring_projectiles: Query<
+        (
+            &mut crate::item::projectile::ProjectileState,
+            &crate::item::projectile::Projectile,
+        ),
+        With<crate::item::projectile::Projectile>,
+    >,
+) {
+    for mut pillar_state in fire_pillar_states.iter_mut() {
+        if pillar_state.hit_clear_timer.just_finished() {
+            info!("Clearing hit_entities for FireRing projectiles due to FirePillar effect");
+            // Clear hit_entities for all FireRing projectiles
+            for (mut proj_state, proj) in fire_ring_projectiles.iter_mut() {
+                if matches!(proj, crate::item::projectile::Projectile::FireRing) {
+                    info!("Clearing hit_entities for FireRing projectile");
+                    proj_state.hit_entities.clear();
+                    pillar_state.hit_clear_timer.reset();
+                }
+            }
         }
     }
 }

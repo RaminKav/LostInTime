@@ -49,6 +49,9 @@ impl Plugin for CollisionPlugion {
                 check_boss_to_objects_collisions.run_if(is_not_paused),
                 check_mob_to_player_collisions.run_if(is_not_paused),
                 check_projectile_hit_mob_collisions.run_if(is_not_paused),
+                check_fire_ring_ongoing_collisions
+                    .run_if(is_not_paused)
+                    .after(crate::player::skill_heirlooms::handle_fire_pillar_hit_clear),
                 check_projectile_hit_player_collisions.run_if(is_not_paused),
                 check_object_trigger_collisions
                     .run_if(is_not_paused)
@@ -326,6 +329,170 @@ fn check_projectile_hit_mob_collisions(
         }
     }
 }
+
+/// Check for ongoing collisions with FireRing projectiles after hit_entities are cleared
+/// This allows enemies already colliding to take damage again immediately
+fn check_fire_ring_ongoing_collisions(
+    mut commands: Commands,
+    player_attack: Query<(Entity, &Children), With<Player>>,
+    allowed_targets: Query<
+        (Entity, &GlobalTransform),
+        (
+            Without<ItemStack>,
+            Without<MainHand>,
+            Without<Projectile>,
+            Without<Pet>,
+            Without<TouchTriggerObjectAction>,
+        ),
+    >,
+    mut hit_event: EventWriter<HitEvent>,
+    rapier_context: Res<RapierContext>,
+    mut projectiles: Query<
+        (
+            Entity,
+            &mut ProjectileState,
+            &Projectile,
+            &Attack,
+            Option<&IceExplosionDmg>,
+            Option<&SpearAttack>,
+        ),
+        Without<EnemyProjectile>,
+    >,
+    proj_transforms: Query<&GlobalTransform, Without<EnemyProjectile>>,
+    children: Query<&Children>,
+    mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
+    nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
+    game: GameParam,
+    mut status_event: EventWriter<StatusEffectEvent>,
+    pet_check: Query<Entity, With<PetProjectileMarker>>,
+) {
+    // Only process FireRing projectiles
+    for (proj_entity, mut state, proj, att, ice_aoe, spear_att) in projectiles.iter_mut() {
+        if *proj != Projectile::FireRing {
+            continue;
+        }
+
+        // Check for ongoing intersections with this FireRing projectile
+        // Try the projectile entity first, then check children if it has any
+        let entities_to_check: Vec<Entity> = {
+            let mut entities = vec![proj_entity];
+            if let Ok(proj_children) = children.get(proj_entity) {
+                entities.extend(proj_children.iter());
+            }
+            entities
+        };
+
+        for collider_entity in entities_to_check {
+            for (e1, e2, _) in rapier_context.intersections_with(collider_entity) {
+                for (e1, e2) in [(e1, e2), (e2, e1)] {
+                    // Find which entity is the projectile/collider and which is the target
+                    let target_e = if e1 == collider_entity {
+                        e2
+                    } else if e2 == collider_entity {
+                        e1
+                    } else {
+                        continue;
+                    };
+
+                let Ok((player_e, player_children)) = player_attack.get_single() else {
+                    continue;
+                };
+                if player_e == target_e || player_children.contains(&target_e) || !allowed_targets.contains(target_e) {
+                    continue;
+                }
+
+                // Only process if not already in hit_entities (to avoid duplicate hits in same frame)
+                if state.hit_entities.contains(&target_e) {
+                    continue;
+                }
+
+                // Add to hit_entities to prevent duplicate processing
+                state.hit_entities.push(target_e);
+
+                let (burning, mut slow, frail) = status_check.get_mut(target_e).unwrap();
+                let is_slowed = slow.is_some();
+                let is_status_effected = burning.is_some() || is_slowed || frail.is_some();
+                let frail_stacks = frail.map(|f| f.num_stacks).unwrap_or(0);
+
+                let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
+                    10
+                } else {
+                    0
+                } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
+                    10
+                } else {
+                    0
+                };
+
+                let (mut damage, was_crit, was_overcrit) = game.calculate_player_damage(
+                    &mut commands,
+                    target_e,
+                    crit_bonus,
+                    None,
+                    0,
+                    Some(att.0),
+                    frail_stacks,
+                );
+
+                if is_status_effected && game.has_skill(Heirloom::TeleportStatusDMG) {
+                    damage = f32::ceil(damage as f32 * 1.2) as u32;
+                }
+
+                let (_e, hit_txfm) = allowed_targets.get(target_e).unwrap();
+                let enemy_pos = hit_txfm.translation().truncate();
+
+                if let Some(_) = spear_att {
+                    for (mob_e, mob_txfm) in nearby_mobs.iter() {
+                        let delta = mob_txfm.translation().truncate() - enemy_pos;
+                        if delta.length() <= 70. {
+                            commands.entity(mob_e).insert(SpearGravity {
+                                target: enemy_pos,
+                                timer: Timer::from_seconds(0.5, TimerMode::Once),
+                            });
+                        }
+                    }
+                }
+
+                if ice_aoe.is_some() {
+                    try_add_slow_stacks(target_e, &mut commands, &mut status_event, slow.as_deref_mut());
+                }
+
+                // For FireRing, calculate direction from projectile to enemy
+                let proj_pos = proj_transforms
+                    .get(proj_entity)
+                    .map(|t| t.translation().truncate())
+                    .unwrap_or(enemy_pos);
+                let delta = enemy_pos - proj_pos;
+                let knockback_dir = delta.normalize_or_zero();
+
+                let is_from_heirloom = matches!(
+                    proj,
+                    Projectile::IceExplosionAOE
+                );
+
+                hit_event.send(HitEvent {
+                    hit_by_pet: pet_check.get(collider_entity).ok(),
+                    hit_entity: target_e,
+                    damage: damage as i32,
+                    dir: knockback_dir,
+                    hit_with_melee: None,
+                    hit_with_projectile: Some(proj.clone()),
+                    ignore_tool: false,
+                    hit_by_mob: None,
+                    was_crit,
+                    was_overcrit,
+                    from_heirloom_effect: is_from_heirloom,
+                });
+
+                if nearby_mobs.get(target_e).is_ok() {
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
+                }
+                }
+            }
+        }
+    }
+}
+
 fn check_projectile_hit_player_collisions(
     mut commands: Commands,
     enemy_attack: Query<(Entity, &Attack), With<Mob>>,

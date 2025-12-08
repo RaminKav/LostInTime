@@ -152,15 +152,15 @@ pub fn build_item_stack_with_parsed_attributes(
     new_stack.metadata.level = Some(level);
     new_stack.rarity = rarity.clone();
     if play_audio && rarity == ItemRarity::Legendary {
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5).with_delay(0.55));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2).with_delay(2.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.15));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3).with_delay(0.55));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.15).with_delay(2.3));
     }
     if play_audio && rarity == ItemRarity::Rare {
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.15));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2).with_delay(0.4));
     }
 
     new_stack
@@ -222,10 +222,10 @@ pub fn spawn_rarity_animation(
 ) {
     if new_rarity == ItemRarity::Legendary {
         // Sound effect
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 1.));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.5).with_delay(0.55));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.2).with_delay(2.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.15));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.3).with_delay(0.55));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.15).with_delay(2.3));
 
         // glow/shake effects
         commands
@@ -249,8 +249,8 @@ pub fn spawn_rarity_animation(
             .insert(VisibilityBundle::default())
             .insert(DoneAnimation)
             .insert(RenderLayers::from_layers(&[3]));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.7));
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.5).with_delay(0.4));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.15));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.3));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2).with_delay(0.4));
     }
 }

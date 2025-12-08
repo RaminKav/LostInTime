@@ -2,21 +2,11 @@
   name: "ThrowingStar",
   templates: ["projectile.prototype.ron"],
   schematics: {
-        "survival_rogue_like::item::WorldObject": ThrowingStar,
         "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
         "survival_rogue_like::item::projectile::Projectile": ThrowingStar,
-        "survival_rogue_like::item::item_actions::ConsumableItem": (),
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 220., spawn_offset: (x: 0., y: 2.), hit_entities: [], despawn_on_hit: true),
-        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/throwingstar.png", size: (x: 16., y: 16.), cols: 4, rows: 1),
-        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/ninjastar.png", size: (x: 16., y: 16.), cols: 8, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.02),
         "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
-        "survival_rogue_like::inventory::ItemStack": (
-            obj_type: ThrowingStar,
-            metadata: (
-                name: "Throwing Star", 
-                desc: ["A throwing star.", "Throwable with the", "Claw weapon."]
-            ),
-            count: 1
-      ),
   }
 )

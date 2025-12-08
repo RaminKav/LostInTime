@@ -133,7 +133,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: CritChanceIcon,
-            active_skill: Stealth,
+            active_skill: PiercingStar,
         ),
         Gunslinger: (
             name: "Gunslinger",

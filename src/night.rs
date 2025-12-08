@@ -10,7 +10,6 @@ use crate::{
     GameState, ScreenResolution, GAME_HEIGHT,
 };
 
-const CHAOS_TIMER_SECONDS: f32 = 10.0;
 #[derive(Component)]
 pub struct Night(Timer);
 
@@ -30,10 +29,14 @@ pub struct InfiniteMode {
     pub elapsed_seconds: f32,
 }
 
-/// Maximum difficulty level in infinite mode
-pub const MAX_DIFFICULTY_LEVEL: u8 = 5;
+/// Maximum difficulty level in infinite mode (Tier 1: 1-5, Tier 2: 6-10)
+pub const MAX_DIFFICULTY_LEVEL: u8 = 10;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
+const CHAOS_TIMER_SECONDS: f32 = 12.0;
+
+/// Era timer - 12 minutes per era. Timer pauses in dungeons.
+pub const ERA_TIMER_SECONDS: f32 = 12.0 * 60.0; // 12 minutes
 
 impl InfiniteMode {
     pub fn new() -> Self {
@@ -59,29 +62,71 @@ impl InfiniteMode {
     }
 
     /// Get the chaos bonus for mob scaling (only during infinite mode)
+    /// Tier 1: 1x multiplier, Tier 2: 3x multiplier (triple chaos)
     pub fn get_chaos_bonus(&self) -> f32 {
         if self.active {
-            self.chaos_bonus
+            self.chaos_bonus * self.get_chaos_multiplier()
         } else {
             0.0
         }
     }
 
-    /// Get the speed multiplier for the current difficulty level
-    /// Scales from 1.0 (level 0) to 2.5 (level 5) in 0.3 increments
-    pub fn get_speed_multiplier(&self) -> f32 {
-        1.0 + (self.difficulty_level as f32 * 0.5)
+    /// Get which tier the current difficulty level is in
+    /// Tier 1: levels 1-5, Tier 2: levels 6-10
+    pub fn get_tier(&self) -> u8 {
+        if self.difficulty_level <= 5 {
+            1
+        } else {
+            2
+        }
     }
 
-    /// Get the red tint alpha for the current difficulty level
-    /// Scales from 0.0 (level 0) to 1.0 (level 5) in 0.2 increments
+    /// Get the speed multiplier for the current difficulty level
+    /// Tier 1 (1-5): 50% speed per level (1.5x to 3.5x)
+    /// Tier 2 (6-10): 70% speed per level (4.2x to 7.7x)
+    pub fn get_speed_multiplier(&self) -> f32 {
+        if self.difficulty_level <= 5 {
+            // Tier 1: 50% per level
+            1.0 + (self.difficulty_level as f32 * 0.5)
+        } else {
+            // Tier 2: 70% per level, starting from tier 1 max (3.5x at level 5)
+            let tier1_max = 1.0 + (5.0 * 0.5); // 3.5x
+            let tier2_levels = self.difficulty_level - 5;
+            tier1_max + (tier2_levels as f32 * 0.7)
+        }
+    }
+
+    /// Get the tint alpha for the current difficulty level
+    /// Tier 1 (1-5): Purple tint from 0.2 to 1.0 alpha
+    /// Tier 2 (6-10): Red tint always at 1.0 alpha
     pub fn get_tint_alpha(&self) -> f32 {
-        self.difficulty_level as f32 * 0.2
+        if self.difficulty_level <= 5 {
+            // Tier 1: Purple tint from 0.2 (level 1) to 1.0 (level 5)
+            // Range is 0.8 over 4 intervals (level 1->2, 2->3, 3->4, 4->5)
+            let base_alpha = 0.2;
+            let alpha_range = 1.0 - base_alpha; // 0.8
+            let intervals = 4.0; // 4 intervals between levels 1-5
+            if self.difficulty_level == 0 {
+                base_alpha
+            } else {
+                base_alpha + (alpha_range / intervals * (self.difficulty_level - 1) as f32)
+            }
+        } else {
+            // Tier 2: Always 1.0 alpha for red tint
+            1.0
+        }
+    }
+
+    /// Get the chaos bonus multiplier for the current tier
+    /// Tier 1: 1x (default), Tier 2: 3x (triple)
+    pub fn get_chaos_multiplier(&self) -> f32 {
+        if self.difficulty_level <= 5 {
+            1.0
+        } else {
+            3.0
+        }
     }
 }
-
-/// Era timer - 12 minutes per era. Timer pauses in dungeons.
-pub const ERA_TIMER_SECONDS: f32 = 12.0 * 60.0; // 12 minutes
 
 /// Resource to track era timer
 #[derive(Resource, Clone, Debug)]
@@ -283,9 +328,13 @@ pub fn handle_infinite_mode_started(
     for _ in events.iter() {
         if !infinite_mode.active {
             *infinite_mode = InfiniteMode::new();
+            let tier = infinite_mode.get_tier();
+            let tier_name = if tier == 1 { "Purple" } else { "Red" };
             info!(
-                "INFINITE MODE ACTIVATED! Starting at difficulty {}, speed {:.1}x, tint {:.1}. Chaos will increase every 30 seconds.",
+                "INFINITE MODE ACTIVATED! Starting at difficulty {} (Tier {} - {}), speed {:.1}x, tint {:.1}. Chaos will increase every 30 seconds.",
                 infinite_mode.difficulty_level,
+                tier,
+                tier_name,
                 infinite_mode.get_speed_multiplier(),
                 infinite_mode.get_tint_alpha()
             );
@@ -313,7 +362,7 @@ pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<Infin
     }
 }
 
-/// Tick the difficulty timer in infinite mode - increases difficulty every 2 minutes (up to 5 times)
+/// Tick the difficulty timer in infinite mode - increases difficulty every 1.5 minutes (up to level 10)
 pub fn tick_infinite_mode_difficulty(time: Res<Time>, mut infinite_mode: ResMut<InfiniteMode>) {
     if !infinite_mode.active {
         return;
@@ -327,9 +376,13 @@ pub fn tick_infinite_mode_difficulty(time: Res<Time>, mut infinite_mode: ResMut<
     infinite_mode.difficulty_timer.tick(time.delta());
     if infinite_mode.difficulty_timer.just_finished() {
         infinite_mode.difficulty_level += 1;
+        let tier = infinite_mode.get_tier();
+        let tier_name = if tier == 1 { "Purple" } else { "Red" };
         info!(
-            "Infinite mode: Difficulty increased to level {}! Speed: {:.1}x, Tint: {:.1}",
+            "Infinite mode: Difficulty increased to level {} (Tier {} - {})! Speed: {:.1}x, Tint: {:.1}",
             infinite_mode.difficulty_level,
+            tier,
+            tier_name,
             infinite_mode.get_speed_multiplier(),
             infinite_mode.get_tint_alpha()
         );

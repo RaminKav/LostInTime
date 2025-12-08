@@ -212,6 +212,7 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
                     skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
+                    skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
                     skill_heirlooms::apply_rapid_fire_speed_buff.run_if(is_not_paused),

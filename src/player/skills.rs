@@ -208,6 +208,7 @@ pub enum ActiveSkill {
     IceWall,
     DruidTree,
     Shout,
+    PiercingStar,
 }
 
 impl ActiveSkill {
@@ -228,6 +229,7 @@ impl ActiveSkill {
             ActiveSkill::IceWall => 10.0,
             ActiveSkill::DruidTree => 14.0,
             ActiveSkill::Shout => 7.0,
+            ActiveSkill::PiercingStar => 10.0,
         }
     }
 }
@@ -246,6 +248,7 @@ pub struct RapidfireState {
 #[derive(Component, Clone)]
 pub struct FirePillarState {
     pub cooldown_timer: Timer,
+    pub hit_clear_timer: Timer,
 }
 #[derive(Component, Clone)]
 pub struct HealSkillState {
@@ -267,6 +270,10 @@ pub struct DruidTreeSkillState {
 pub struct ShoutSkillState {
     pub cooldown_timer: Timer,
 }
+#[derive(Component, Clone)]
+pub struct PiercingStarSkillState {
+    pub cooldown_timer: Timer,
+}
 
 impl ActiveSkill {
     pub fn get_title(&self) -> String {
@@ -285,6 +292,7 @@ impl ActiveSkill {
             ActiveSkill::IceWall => "Ice Wall".to_string(),
             ActiveSkill::DruidTree => "Druid Tree".to_string(),
             ActiveSkill::Shout => "Shout".to_string(),
+            ActiveSkill::PiercingStar => "Piercing Star".to_string(),
         }
     }
 
@@ -322,7 +330,7 @@ impl ActiveSkill {
             ActiveSkill::Rapidfire => vec![
                 "Active: +80% attack".to_string(),
                 "speed and unlimited ammo".to_string(),
-                "speed for 3 seconds.".to_string(),
+                "for 3 seconds.".to_string(),
             ],
             ActiveSkill::FirePillar => {
                 vec!["Active: Summon a ring".to_string(), "of fire.".to_string()]
@@ -348,6 +356,10 @@ impl ActiveSkill {
                 "Active: Release an AoE".to_string(),
                 "burst of damage".to_string(),
                 "around you.".to_string(),
+            ],
+            ActiveSkill::PiercingStar => vec![
+                "Active: Throw a large".to_string(),
+                "piercing star projectile.".to_string(),
             ],
         }
     }
@@ -445,6 +457,7 @@ impl ActiveSkill {
                     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),
+                    hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
                 });
             }
             ActiveSkill::Heal => {
@@ -482,6 +495,14 @@ impl ActiveSkill {
             ActiveSkill::Shout => {
                 let cooldown = ActiveSkill::Shout.get_base_cooldown();
                 commands.entity(entity).insert(ShoutSkillState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                });
+            }
+            ActiveSkill::PiercingStar => {
+                let cooldown = ActiveSkill::PiercingStar.get_base_cooldown();
+                commands.entity(entity).insert(PiercingStarSkillState {
                     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),

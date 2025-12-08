@@ -3,6 +3,7 @@ use bevy::{
     reflect::TypeUuid,
     render::render_resource::{AsBindGroup, ShaderRef},
     sprite::{Material2d, Material2dPlugin},
+    utils::Duration,
 };
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
@@ -65,6 +66,7 @@ impl Plugin for EnemyPlugin {
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
                     enhance_infinite_mode_mobs.before(add_current_health_with_max_health),
+                    enhance_infinite_mode_leap_attack_startup,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -505,16 +507,27 @@ fn enhance_infinite_mode_mobs(
     mut commands: Commands,
 ) {
     for (entity, mut follow_speed, maybe_sprite) in mobs.iter_mut() {
-        // Apply speed boost based on current difficulty level (1.0x to 2.5x)
+        // Apply speed boost based on current difficulty level
         let speed_multiplier = infinite_mode.get_speed_multiplier();
         follow_speed.0 *= speed_multiplier;
 
-        // Apply red tint based on current difficulty level (alpha 0.0 to 1.0)
+        // Apply tint based on tier: Tier 1 = Purple, Tier 2 = Red
         let tint_alpha = infinite_mode.get_tint_alpha();
+        let tier = infinite_mode.get_tier();
         if let Some(mut sprite) = maybe_sprite {
-            // Interpolate from white (1.0, 1.0, 1.0) to red (1.0, 0.5, 0.5) based on tint_alpha
-            let green_blue = 1.0 - (tint_alpha * 0.5); // Goes from 1.0 to 0.5
-            sprite.color = Color::rgba(1.0, green_blue, green_blue, 1.0);
+            if tier == 1 {
+                // Tier 1: Purple tint (interpolate from white to purple based on alpha)
+                // Purple RGB: (0.8, 0.4, 1.0) - bright purple
+                let r = 1.0 - (tint_alpha * 0.2); // 1.0 to 0.8
+                let g = 1.0 - (tint_alpha * 0.6); // 1.0 to 0.4
+                let b = 1.0; // Always 1.0 for purple
+                sprite.color = Color::rgba(r, g, b, 1.0);
+            } else {
+                // Tier 2: Red tint (always full red, alpha is always 1.0)
+                // Interpolate from white (1.0, 1.0, 1.0) to red (1.0, 0.5, 0.5)
+                let green_blue = 1.0 - (tint_alpha * 0.5); // Goes from 1.0 to 0.5
+                sprite.color = Color::rgba(1.0, green_blue, green_blue, 1.0);
+            }
         }
 
         // Store the difficulty level this mob was spawned at for reference
@@ -522,9 +535,11 @@ fn enhance_infinite_mode_mobs(
             difficulty_level: infinite_mode.difficulty_level,
         });
 
+        let tier = infinite_mode.get_tier();
+        let tier_name = if tier == 1 { "Purple" } else { "Red" };
         debug!(
-            "Enhanced infinite mode mob: speed {:.1}x, tint alpha {:.1} (difficulty {})",
-            speed_multiplier, tint_alpha, infinite_mode.difficulty_level
+            "Enhanced infinite mode mob: speed {:.1}x, tint alpha {:.1} (difficulty {}, Tier {} - {})",
+            speed_multiplier, tint_alpha, infinite_mode.difficulty_level, tier, tier_name
         );
     }
 }
@@ -533,4 +548,44 @@ fn enhance_infinite_mode_mobs(
 #[derive(Component, Debug, Clone)]
 pub struct InfiniteMobTint {
     pub difficulty_level: u8,
+}
+
+/// Scale up LeapAttack startup speed for infinite mode mobs
+/// This runs when LeapAttackState is added to ensure the startup timer is scaled correctly
+fn enhance_infinite_mode_leap_attack_startup(
+    mut leap_attack_states: Query<
+        &mut LeapAttackState,
+        (Added<LeapAttackState>, With<InfiniteModeMob>),
+    >,
+    infinite_mode: Res<crate::night::InfiniteMode>,
+) {
+    if !infinite_mode.active {
+        return;
+    }
+
+    let speed_multiplier = infinite_mode.get_speed_multiplier();
+    for mut leap_state in leap_attack_states.iter_mut() {
+        // Scale down the startup timer duration (faster startup = shorter duration)
+        // Divide by speed multiplier to make it faster
+        let original_duration = leap_state.attack_startup_timer.duration();
+        let original_elapsed = leap_state.attack_startup_timer.elapsed();
+        let scaled_duration_secs = original_duration.as_secs_f32() / speed_multiplier;
+
+        // Create new timer with scaled duration
+        let mut new_timer = Timer::from_seconds(scaled_duration_secs, TimerMode::Once);
+        // Preserve the elapsed time proportionally (scale elapsed by the same factor)
+        let elapsed_ratio = original_elapsed.as_secs_f32() / original_duration.as_secs_f32();
+        let scaled_elapsed_secs = scaled_duration_secs * elapsed_ratio;
+        // Tick the new timer by the scaled elapsed time
+        new_timer.tick(Duration::from_secs_f32(scaled_elapsed_secs));
+
+        leap_state.attack_startup_timer = new_timer;
+
+        debug!(
+            "Scaled LeapAttack startup for infinite mode mob: {:.2}s -> {:.2}s ({}x speed)",
+            original_duration.as_secs_f32(),
+            scaled_duration_secs,
+            speed_multiplier
+        );
+    }
 }

@@ -55,6 +55,7 @@ pub enum Projectile {
     GreenWhip,
     Arrow,
     ThrowingStar,
+    ThrowingStarLarge,
     IceExplosionAOE,
     SlimeGooProjectile,
     Arc,
