@@ -22,7 +22,7 @@ use crate::{
 };
 
 use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
-aseprite!(pub Echo, "textures/effects/OnHitAoe.aseprite");
+aseprite!(pub Echo, "textures/effects/OnHitAoE.aseprite");
 
 #[derive(Component)]
 pub struct SecondHitDelay {
