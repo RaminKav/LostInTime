@@ -221,7 +221,7 @@ impl ActiveSkill {
             ActiveSkill::SprintLunge => 3.0,
             ActiveSkill::Teleport => 1.5,
             ActiveSkill::Stealth => 11.0,
-            ActiveSkill::Rapidfire => 10.0,
+            ActiveSkill::Rapidfire => 12.0,
             ActiveSkill::FirePillar => 14.0,
             ActiveSkill::Heal => 60.0,
             ActiveSkill::Buckshot => 6.0,
@@ -320,7 +320,7 @@ impl ActiveSkill {
                 "all damage.".to_string(),
             ],
             ActiveSkill::Rapidfire => vec![
-                "Active: +60% attack".to_string(),
+                "Active: +80% attack".to_string(),
                 "speed and unlimited ammo".to_string(),
                 "speed for 3 seconds.".to_string(),
             ],
@@ -436,7 +436,7 @@ impl ActiveSkill {
                     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),
-                    attack_speed_bonus: 1.6,
+                    attack_speed_bonus: 1.8,
                 });
             }
             ActiveSkill::FirePillar => {

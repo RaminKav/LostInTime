@@ -314,6 +314,7 @@ pub fn auto_submit_score_on_game_over(
     run_score: Res<RunScore>,
     game_data: Res<crate::client::GameData>,
     chaos: Res<crate::chaos::ChaosTracker>,
+    infinite_mode: Res<crate::night::InfiniteMode>,
     class: Res<PlayerClass>,
     graphics: Res<Graphics>,
     mut last_submitted: ResMut<LastSubmittedScore>,
@@ -334,6 +335,9 @@ pub fn auto_submit_score_on_game_over(
 
         let score = run_score.score as i32;
 
+        // Include both global chaos and infinite mode chaos bonus
+        let total_chaos = chaos.get_chaos() + infinite_mode.get_chaos_bonus();
+
         // Store the score being submitted (rank will be updated when response arrives)
         last_submitted.score = score;
         last_submitted.rank = None; // Clear previous rank
@@ -344,7 +348,7 @@ pub fn auto_submit_score_on_game_over(
             player_name: player_name.clone(),
             score,
             class: class_name.clone(),
-            chaos_level: chaos.get_chaos().trunc() as i32,
+            chaos_level: total_chaos.trunc() as i32,
             mobs_killed: run_score.mobs_killed as i32,
             objs_destroyed: run_score.objs_destroyed as i32,
         });

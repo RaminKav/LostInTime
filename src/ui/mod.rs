@@ -131,6 +131,7 @@ impl Plugin for UIPlugin {
             .add_event::<RemoveFromSlotEvent>()
             .add_event::<ToolTipUpdateEvent>()
             .init_resource::<BeaconGuidanceRegistry>()
+            .init_resource::<BlacksmithPurchaseTracker>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<SubmitEssenceChoice>()
@@ -151,6 +152,7 @@ impl Plugin for UIPlugin {
                     .after(auto_fetch_leaderboard_on_menu)  // Ensure fetch happens first
             )
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
+            .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
             .add_systems((
                 // Clean up leaderboard when entering other UI states to avoid duplicates
                 cleanup_leaderboard_ui

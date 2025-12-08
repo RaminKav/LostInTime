@@ -18,6 +18,30 @@ use crate::{
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
 
+/// Resource to track how many purchases the player has made at blacksmith merchants
+/// This determines price scaling (25% increase per purchase)
+#[derive(Resource, Default, Debug, Clone)]
+pub struct BlacksmithPurchaseTracker {
+    pub purchases_made: u32,
+}
+
+impl BlacksmithPurchaseTracker {
+    /// Get the price multiplier based on purchases made
+    /// Each purchase increases prices by 25%
+    pub fn get_price_multiplier(&self) -> f32 {
+        1.75_f32.powi(self.purchases_made as i32)
+    }
+}
+
+/// Reset the blacksmith purchase tracker on new run
+pub fn reset_blacksmith_tracker(mut tracker: ResMut<BlacksmithPurchaseTracker>) {
+    info!(
+        "Resetting blacksmith purchase tracker from {} purchases",
+        tracker.purchases_made
+    );
+    tracker.purchases_made = 0;
+}
+
 use super::skill_choice_ui::spawn_heirloom_tooltip_card;
 
 use super::{
@@ -289,6 +313,7 @@ pub fn handle_submit_essence_choice(
     coins: Res<CoinCurrency>,
     mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
     shop: Res<EssenceShopChoices>,
+    mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
 ) {
     for choice in ev.iter() {
         if time_fragments.time_fragments >= choice.choice.time_fragment_cost as i32
@@ -323,6 +348,14 @@ pub fn handle_submit_essence_choice(
                 attribute_event.send(AttributeChangeEvent);
             }
 
+            // Increment purchase counter to increase prices for next shop
+            purchase_tracker.purchases_made += 1;
+            info!(
+                "Blacksmith purchase made! Total purchases: {}, Next price multiplier: {:.2}x",
+                purchase_tracker.purchases_made,
+                purchase_tracker.get_price_multiplier()
+            );
+
             next_inv_state.set(UIState::Closed);
             commands.remove_resource::<EssenceShopChoices>();
             if let Ok(e) = essence_ui.get_single() {
@@ -341,13 +374,16 @@ pub fn handle_submit_essence_choice(
 
 pub fn handle_populate_essence_shop_on_new_spawn(
     mut new_spawns: Query<(Entity, &mut EssenceShopChoices), Added<EssenceShopChoices>>,
-    game: GameParam,
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
     heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
+    purchase_tracker: Res<BlacksmithPurchaseTracker>,
 ) {
     for (entity, mut shop) in new_spawns.iter_mut() {
         let mut shop_choices = vec![];
         let mut rng = rand::thread_rng();
+
+        // Get the price multiplier based on previous purchases
+        let purchase_multiplier = purchase_tracker.get_price_multiplier();
 
         while shop_choices.len() < 3 {
             // Determine rarity based on luck/randomness
@@ -377,13 +413,18 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 _ => 0,
             };
 
-            let base_cost = game.get_player_level() as f32 * 4. + 3.;
+            // Base cost (level 1 equivalent: 1 * 4 + 3 = 7)
+            let base_cost = 7.;
             let random_adjustment = rand::thread_rng().gen_range(2.0..7.0) * rarity_cost_inc * 2.;
+
+            // Apply purchase multiplier to scale prices
+            let final_cost =
+                (base_cost * rarity_cost_inc + random_adjustment) * purchase_multiplier;
 
             shop_choices.push(EssenceOption {
                 heirloom: heirloom_choice.heirloom,
                 rarity: heirloom_choice.rarity,
-                coin_cost: (base_cost * rarity_cost_inc + random_adjustment).trunc() as u32,
+                coin_cost: final_cost.trunc() as u32,
                 time_fragment_cost: time_frag_cost,
             });
         }

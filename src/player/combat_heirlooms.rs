@@ -10,7 +10,7 @@ use crate::{
     attributes::{CurrentHealth, MaxHealth},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
-    enemy::Mob,
+    enemy::{EliteMob, Mob},
     item::WorldObject,
     player::{
         skills::{Heirloom, PlayerSkills},
@@ -627,17 +627,17 @@ pub fn handle_boss_hit_mana_orb_drops(
     proto: ProtoParam,
     mut hit_events: EventReader<HitEvent>,
     game: GameParam,
-    mobs: Query<(&Mob, &GlobalTransform)>,
+    mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
 ) {
     let mut rng = rand::thread_rng();
 
     for hit in hit_events.iter() {
         // Check if hit entity is a boss
-        let Ok((mob, boss_transform)) = mobs.get(hit.hit_entity) else {
+        let Ok((mob, boss_transform, is_elite)) = mobs.get(hit.hit_entity) else {
             continue;
         };
 
-        if !mob.is_boss() {
+        if !mob.is_boss() && is_elite.is_none() {
             continue;
         }
 
@@ -653,7 +653,7 @@ pub fn handle_boss_hit_mana_orb_drops(
         }
 
         // 30% chance to drop mana orb
-        if !rng.gen_bool(0.30) {
+        if !rng.gen_bool(0.25) {
             continue;
         }
 

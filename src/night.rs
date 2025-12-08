@@ -10,6 +10,7 @@ use crate::{
     GameState, ScreenResolution, GAME_HEIGHT,
 };
 
+const CHAOS_TIMER_SECONDS: f32 = 10.0;
 #[derive(Component)]
 pub struct Night(Timer);
 
@@ -25,6 +26,8 @@ pub struct InfiniteMode {
     /// Chaos bonus accumulated during infinite mode (increases every 30s)
     /// This is separate from the global chaos tracker and only applies during infinite mode
     pub chaos_bonus: f32,
+    /// Elapsed time in endless mode (seconds)
+    pub elapsed_seconds: f32,
 }
 
 /// Maximum difficulty level in infinite mode
@@ -36,7 +39,7 @@ impl InfiniteMode {
     pub fn new() -> Self {
         Self {
             active: true,
-            chaos_timer: Timer::from_seconds(30.0, TimerMode::Repeating),
+            chaos_timer: Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating),
             // Start at difficulty level 1 so mobs immediately get some enhancement
             difficulty_level: 1,
             difficulty_timer: Timer::from_seconds(
@@ -44,7 +47,15 @@ impl InfiniteMode {
                 TimerMode::Repeating,
             ),
             chaos_bonus: 0.0,
+            elapsed_seconds: 0.0,
         }
+    }
+
+    /// Get the elapsed time formatted as MM:SS
+    pub fn get_elapsed_display_string(&self) -> String {
+        let minutes = (self.elapsed_seconds / 60.0) as u32;
+        let seconds = (self.elapsed_seconds % 60.0) as u32;
+        format!("{:02}:{:02}", minutes, seconds)
     }
 
     /// Get the chaos bonus for mob scaling (only during infinite mode)
@@ -289,6 +300,9 @@ pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<Infin
         return;
     }
 
+    // Tick elapsed time
+    infinite_mode.elapsed_seconds += time.delta_seconds();
+
     infinite_mode.chaos_timer.tick(time.delta());
     if infinite_mode.chaos_timer.just_finished() {
         infinite_mode.chaos_bonus += 1.0;
@@ -374,10 +388,11 @@ pub fn reset_era_timer_and_infinite_mode(
     // Also reset infinite mode when entering a new era
     infinite_mode.active = false;
     infinite_mode.difficulty_level = 0;
-    infinite_mode.chaos_timer = Timer::from_seconds(30.0, TimerMode::Repeating);
+    infinite_mode.chaos_timer = Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating);
     infinite_mode.difficulty_timer =
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
     infinite_mode.chaos_bonus = 0.0;
+    infinite_mode.elapsed_seconds = 0.0;
 
     info!(
         "Era timer reset to {:02}:{:02}, infinite mode deactivated",
@@ -396,11 +411,12 @@ fn reset_era_timer_on_new_run(
 
     // Reset infinite mode completely
     infinite_mode.active = false;
-    infinite_mode.chaos_timer = Timer::from_seconds(30.0, TimerMode::Repeating);
+    infinite_mode.chaos_timer = Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating);
     infinite_mode.difficulty_level = 0;
     infinite_mode.difficulty_timer =
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
     infinite_mode.chaos_bonus = 0.0;
+    infinite_mode.elapsed_seconds = 0.0;
 
     info!("Era timer and infinite mode reset for new run");
 }

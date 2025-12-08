@@ -62,6 +62,8 @@ pub struct ClockText;
 pub struct EraTimerHUD;
 #[derive(Component)]
 pub struct EraTimerText;
+#[derive(Component)]
+pub struct EndlessElapsedText;
 
 #[derive(Component)]
 pub struct ActiveSkillIcon;
@@ -1136,13 +1138,38 @@ pub fn setup_era_timer_hud(
             RenderLayers::from_layers(&[3]),
         ))
         .set_parent(era_timer_frame);
+
+    // Spawn the endless elapsed timer (hidden initially, shown only during endless mode)
+    let _endless_elapsed_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "00:00",
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: WHITE.with_a(0.), // Hidden initially
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., -12., 1.), // Below the ENDLESS text
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            EndlessElapsedText,
+            RenderLayers::from_layers(&[3]),
+        ))
+        .set_parent(era_timer_frame);
 }
 
 /// Update era timer HUD text
 pub fn handle_update_era_timer_hud(
     era_timer: Res<crate::night::EraTimer>,
     infinite_mode: Res<crate::night::InfiniteMode>,
-    mut timer_text: Query<&mut Text, With<EraTimerText>>,
+    mut timer_text: Query<&mut Text, (With<EraTimerText>, Without<EndlessElapsedText>)>,
+    mut elapsed_text: Query<&mut Text, (With<EndlessElapsedText>, Without<EraTimerText>)>,
     mut timer_bg: Query<(&mut Sprite, &mut Transform), With<EraTimerHUD>>,
     res: Res<ScreenResolution>,
 ) {
@@ -1164,11 +1191,22 @@ pub fn handle_update_era_timer_hud(
         }
     }
 
+    // Update endless elapsed timer (only visible during endless mode)
+    for mut text in elapsed_text.iter_mut() {
+        if infinite_mode.active {
+            text.sections[0].value = infinite_mode.get_elapsed_display_string();
+            text.sections[0].style.color = YELLOW;
+        } else {
+            // Hide when not in endless mode
+            text.sections[0].style.color = WHITE.with_a(0.);
+        }
+    }
+
     // Update background color and size based on mode
     for (mut sprite, mut transform) in timer_bg.iter_mut() {
         if infinite_mode.active {
-            // Bigger size for "ENDLESS" text
-            sprite.custom_size = Some(Vec2::new(68., 16.));
+            // Bigger size for "ENDLESS" text + elapsed timer below
+            sprite.custom_size = Some(Vec2::new(68., 24.));
             sprite.color = Color::rgba(0.4, 0.1, 0.1, 0.8);
             transform.translation.x = -res.game_width / 2. + 68.5;
         } else if era_timer.remaining_seconds <= 60.0 {

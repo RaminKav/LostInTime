@@ -550,6 +550,9 @@ pub fn toggle_skills_visibility(
     }
 
     if *DEBUG && key_input.just_pressed(KeyCode::N) {
+        if queue.queue.is_empty() {
+            return;
+        }
         let remaining_choices = queue.queue.remove(0).to_vec();
         for choice in remaining_choices.iter() {
             queue.pool.push(choice.clone());
