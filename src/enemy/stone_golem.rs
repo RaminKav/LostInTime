@@ -10,7 +10,7 @@ use crate::{
 use bevy::prelude::*;
 use bevy::sprite::{ColorMaterial, MaterialMesh2dBundle};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::Collider;
+use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
 use rand::Rng;
 use seldom_state::{
     prelude::StateMachine,
@@ -90,6 +90,7 @@ pub fn handle_new_stone_golem_state_machine(
                 transform: *transform,
                 ..Default::default()
             })
+            .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_1))
             .insert(FollowState {
                 target: game.game.player,
                 curr_delta: None,

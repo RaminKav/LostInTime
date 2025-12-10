@@ -14,6 +14,34 @@ use crate::{
     ScreenResolution,
 };
 
+/// Format a score number to condensed format (k for thousands, M for millions)
+/// 0-9999: no change
+/// 10000-99999: 12.4k, 88.2k, etc
+/// 100000-999999: 134k, 478k
+/// 1000000+: 1.43M, 20.5M, 999M, etc
+fn format_score(score: i32) -> String {
+    if score < 10000 {
+        score.to_string()
+    } else if score < 100000 {
+        // 10k-99k: show one decimal place
+        format!("{:.1}k", score as f32 / 1000.0)
+    } else if score < 1000000 {
+        // 100k-999k: no decimal places
+        format!("{}k", score / 1000)
+    } else {
+        // 1M+: show up to 2 decimal places, but remove trailing zeros
+        let millions = score as f32 / 1000000.0;
+        // Format with 2 decimal places, then remove trailing zeros and decimal point if needed
+        let formatted = format!("{:.2}M", millions);
+        let trimmed = formatted.trim_end_matches('0');
+        if trimmed.ends_with('.') {
+            trimmed.trim_end_matches('.').to_string()
+        } else {
+            trimmed.to_string()
+        }
+    }
+}
+
 #[derive(Component)]
 pub struct LeaderboardUI;
 
@@ -261,7 +289,7 @@ fn spawn_leaderboard_entries(
             commands.spawn((
                 Text2dBundle {
                     text: Text::from_section(
-                        format!("{}", entry.score),
+                        format_score(entry.score),
                         TextStyle {
                             font: asset_server.load("fonts/4x5.ttf"),
                             font_size: 5.0,

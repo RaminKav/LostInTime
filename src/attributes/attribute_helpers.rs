@@ -52,6 +52,7 @@ pub fn create_new_random_item_stack_with_attributes(
         stack.metadata.level,
         commands,
         play_audio,
+        proto,
     )
 }
 
@@ -99,18 +100,18 @@ pub fn get_rarity_rng(mut rng: ThreadRng, loot_bonus: i32) -> ItemRarity {
     let loot_bonus_f = loot_bonus as f32;
     // Calculate adjusted thresholds (higher threshold = more chance for that rarity)
     // Legendary: base 1 (4%), increases by 0.5% per loot = +0.125 threshold per loot
-    let legendary_threshold = (1.0 + loot_bonus_f * 0.125).min(25.0) as i32;
+    let legendary_threshold = (98.5 - loot_bonus_f * 0.1).min(25.0);
     // Rare: base 4 (12%), increases by 0.4% per loot = +0.1 threshold per loot
-    let rare_threshold = (4.0 + loot_bonus_f * 0.1).min(25.0) as i32;
+    let rare_threshold = (88.0 + loot_bonus_f * 0.2).min(25.0);
     // Uncommon: base 13 (36%), increases by 0.3% per loot = +0.075 threshold per loot
-    let uncommon_threshold = (13.0 + loot_bonus_f * 0.075).min(25.0) as i32;
+    let uncommon_threshold = (68.0 + loot_bonus_f * 0.1).min(25.0);
 
-    let rarity_rng = rng.gen_range(0..25);
-    if rarity_rng < legendary_threshold {
+    let rarity_rng = rng.gen_range(0_f32..100_f32);
+    if rarity_rng >= legendary_threshold {
         ItemRarity::Legendary
-    } else if rarity_rng < rare_threshold {
+    } else if rarity_rng >= rare_threshold {
         ItemRarity::Rare
-    } else if rarity_rng < uncommon_threshold {
+    } else if rarity_rng >= uncommon_threshold {
         ItemRarity::Uncommon
     } else {
         ItemRarity::Common
@@ -126,6 +127,7 @@ pub fn build_item_stack_with_parsed_attributes(
     level_option: Option<u8>,
     commands: &mut Commands,
     play_audio: bool,
+    proto: &ProtoParam,
 ) -> ItemStack {
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
         raw_bonus_att.into_item_attributes(rarity.clone(), equip_type)
@@ -161,6 +163,9 @@ pub fn build_item_stack_with_parsed_attributes(
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.15));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.3));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2).with_delay(0.4));
+    }
+    for _ in 0..(level - 1) {
+        new_stack = levelup_item_stats(&new_stack, 1, &proto, false);
     }
 
     new_stack

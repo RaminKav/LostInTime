@@ -182,7 +182,7 @@ pub fn spawn_ice_explosion_hitbox(
     let anim = AsepriteAnimation::default();
 
     // Scale the collider radius by the size multiplier
-    let base_radius = 28.0;
+    let base_radius = 26.0;
     let scaled_radius = base_radius * size_multiplier;
 
     // Queue deferred spawn - actual entity will be created in PreUpdate

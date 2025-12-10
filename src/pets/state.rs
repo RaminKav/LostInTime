@@ -239,7 +239,7 @@ pub fn configure_pet_on_spawn(
                 5
             }
         };
-        
+
         let pet_state = PetState {
             max_distance_from_player: 16. * 9.,
             max_target_distance: 16. * 9.,
@@ -262,7 +262,7 @@ pub fn configure_pet_on_spawn(
                 commands
                     .entity(pet_entity)
                     .insert(crate::pets::pet_abilities::SlimeShieldTimer(
-                        Timer::from_seconds(30.0, TimerMode::Repeating),
+                        Timer::from_seconds(45.0, TimerMode::Repeating),
                     ));
             }
             crate::pets::state::Pet::Fairy => {

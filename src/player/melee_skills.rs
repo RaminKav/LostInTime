@@ -312,7 +312,7 @@ pub fn spawn_echo_hitbox(
     let anim = AsepriteAnimation::default();
 
     // Scale the collider radius by the size multiplier
-    let base_radius = 26.0;
+    let base_radius = 24.0;
     let scaled_radius = base_radius * size_multiplier;
 
     // Queue deferred spawn with parent - actual entity will be created in PreUpdate and parented

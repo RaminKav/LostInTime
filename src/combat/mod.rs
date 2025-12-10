@@ -190,7 +190,8 @@ fn handle_enemy_death(
             for drop in LootTablePlugin::get_drops(
                 loot_table,
                 &proto_param,
-                loot_bonus.single().0,
+                // loot_bonus.single().0,
+                0,
                 Some(mob_lvl.0),
             ) {
                 let mut rng = rand::thread_rng();

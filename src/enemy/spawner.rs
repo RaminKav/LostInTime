@@ -23,7 +23,7 @@ use crate::{
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, FollowSpeed, Mob};
 
-pub const BASE_MAX_MOBS_TOTAL: i32 = 120;
+pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
@@ -447,6 +447,16 @@ fn tick_spawner_timers(
             return;
         }
         let day = night_tracker.days;
+        let endless_mode_spawn_count_increase = if infinite_mode.active {
+            match infinite_mode.difficulty_level {
+                0..=3 => 1,
+                4..=7 => 2,
+                8..=10 => 3,
+                _ => 0,
+            }
+        } else {
+            0
+        };
         for spawner in spawners.spawners.iter_mut() {
             debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
             if day < spawner.min_days_to_spawn {
@@ -468,7 +478,9 @@ fn tick_spawner_timers(
             }
             if spawner.spawn_timer.finished() {
                 spawner.spawn_timer.reset();
-                for _ in 0..spawner.num_to_spawn.unwrap_or(1) {
+                for _ in 0..(spawner.num_to_spawn.unwrap_or(1)
+                    + endless_mode_spawn_count_increase as u32)
+                {
                     // info!("send spawn event! {:?}", spawner.enemy);
                     spawn_event.send(MobSpawnEvent {
                         spawner: spawner_e,

@@ -1325,7 +1325,10 @@ pub fn handle_crit_heal(
     for hit in hit_events.iter() {
         // Only process crits from player attacks (not from mobs hitting player)
         // Treat crit and overcrit the same
-        if (!hit.was_crit && !hit.was_overcrit) || hit.hit_by_mob.is_some() {
+        if (!hit.was_crit && !hit.was_overcrit)
+            || hit.hit_by_mob.is_some()
+            || hit.from_heirloom_effect
+        {
             continue;
         }
 

@@ -973,7 +973,7 @@ impl ItemAttributes {
 
         entity.insert(Attack(self.attack.value));
         entity.insert(CritChance(
-            self.crit_chance.value + skills.get_count(Heirloom::CritChance) * 10 + chaos_crit_bonus,
+            self.crit_chance.value + skills.get_count(Heirloom::CritChance) * 7 + chaos_crit_bonus,
         ));
         entity.insert(CritDamage(
             self.crit_damage.value + skills.get_count(Heirloom::CritDamage) * 15,
@@ -1917,6 +1917,7 @@ fn handle_new_items_raw_attributes(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
+    proto: ProtoParam,
 ) {
     for (e, stack, raw_bonus_att_option, raw_base_att, eqp_type, item_level, starting_weapon) in
         new_items.iter()
@@ -1939,6 +1940,7 @@ fn handle_new_items_raw_attributes(
             item_level.map(|l| l.0),
             &mut commands,
             false,
+            &proto,
         );
 
         if new_stack.rarity.clone() == ItemRarity::Rare {

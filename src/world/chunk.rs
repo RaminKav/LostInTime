@@ -6,6 +6,10 @@ use bevy::utils::HashMap;
 use bevy_ecs_tilemap::{prelude::*, tiles::TilePos};
 use bevy_rapier2d::prelude::Collider;
 
+/// Marker component for water tile colliders - prevents projectiles from hitting them
+#[derive(Component)]
+pub struct WaterCollider;
+
 use super::dimension::{dim_spawned, ActiveDimension, GenerationSeed};
 
 use super::dungeon::Dungeon;
@@ -309,6 +313,7 @@ impl ChunkPlugin {
                                         ) + pos_offset.extend(0.),
                                     )),
                                     Collider::cuboid(TILE_SIZE.x / 2. - 2., TILE_SIZE.y / 2. - 2.),
+                                    WaterCollider,
                                     Name::new("WATER"),
                                 ))
                                 .id(),

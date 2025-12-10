@@ -101,6 +101,7 @@ pub fn handle_add_damage_numbers_after_hit(
             Entity,
             &CurrentHealth,
             &mut PreviousHealth,
+            Option<&MaxHealth>,
             Option<&WasHitWithCrit>,
             Option<&WasHitWithOvercrit>,
         ),
@@ -111,9 +112,11 @@ pub fn handle_add_damage_numbers_after_hit(
     raw_dmg: Query<(&Attack, &BonusDamage)>,
     game: Res<Game>,
 ) {
-    for (e, changed_health, mut prev_health, crit_option, overcrit_option) in changed_health.iter_mut() {
+    for (e, changed_health, mut prev_health, max_health, crit_option, overcrit_option) in
+        changed_health.iter_mut()
+    {
         let delta = changed_health.0 - prev_health.0;
-        if delta == 0 {
+        if delta == 0 || prev_health.0 >= max_health.map_or(i32::MAX, |mh| mh.0) {
             continue;
         }
         let mut rng = rand::thread_rng();
@@ -123,12 +126,11 @@ pub fn handle_add_damage_numbers_after_hit(
             rng.gen_range(0_f64..drop_spread) as f32,
             2.,
         );
-        prev_health.0 = changed_health.0;
         let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
         let is_overcrit = overcrit_option.is_some();
-
+        prev_health.0 = changed_health.0;
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,
@@ -148,7 +150,13 @@ pub fn handle_add_damage_numbers_after_hit(
                 format!(
                     "{}{}",
                     delta.abs(),
-                    if is_overcrit { "!!" } else if is_crit { "!" } else { "" }
+                    if is_overcrit {
+                        "!!"
+                    } else if is_crit {
+                        "!"
+                    } else {
+                        ""
+                    }
                 )
             } else {
                 format!("+{}", delta)

@@ -60,6 +60,7 @@ pub struct MenuButtonExtras<'w, 's> {
     night_tracker: Option<Res<'w, NightTracker>>,
     seed: Option<Res<'w, GenerationSeed>>,
     scrapper_event: EventWriter<'w, ScrapperEvent>,
+    game_over_event: EventWriter<'w, crate::client::GameOverEvent>,
     selection_state: ResMut<'w, ClassSelectionState>,
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
     time_fragment_currency: Option<ResMut<'w, TimeFragmentCurrency>>,
@@ -89,6 +90,8 @@ pub enum MenuButton {
     ClassUnlockNo,
     AchievementsPrev,
     AchievementsNext,
+    OptionsRestart,
+    OptionsExit,
 }
 #[derive(Component)]
 pub struct InfoModal;
@@ -441,6 +444,47 @@ pub fn handle_menu_button_click_events(
                 commands.remove_resource::<CraftingTracker>();
                 commands.remove_resource::<EraManager>();
                 commands.remove_resource::<WorldObjectCache>();
+            }
+            MenuButton::OptionsRestart | MenuButton::OptionsExit => {
+                // Both buttons need to clean up the run data properly
+                // Trigger game over event to save analytics and run data
+                extras.game_over_event.send_default();
+
+                info!(
+                    "Options menu: {} - cleaning up run",
+                    if event.button == MenuButton::OptionsRestart {
+                        "Restart"
+                    } else {
+                        "Exit to Menu"
+                    }
+                );
+
+                // Clean up all world entities (except those marked to persist)
+                for e in extras.world_entities.iter() {
+                    if let Some(entity_commands) = commands.get_entity(e) {
+                        entity_commands.despawn_recursive();
+                    }
+                }
+
+                // Remove save file
+                let _ = fs::remove_file(datafiles::save_file());
+
+                // Clean up run-specific resources
+                commands.remove_resource::<ChestContainer>();
+                commands.remove_resource::<FurnaceContainer>();
+                commands.remove_resource::<AnalyticsData>();
+                commands.remove_resource::<HeirloomChoiceQueue>();
+                commands.remove_resource::<Game>();
+                commands.remove_resource::<NightTracker>();
+                commands.remove_resource::<ContainerRegistry>();
+                commands.remove_resource::<CraftingTracker>();
+                commands.remove_resource::<EraManager>();
+                commands.remove_resource::<WorldObjectCache>();
+                commands.remove_resource::<ChaosTracker>();
+
+                // Close options UI and transition to main menu
+                next_ui_state.set(UIState::Closed);
+                next_state.set(GameState::MainMenu);
             }
         }
     }

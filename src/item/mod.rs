@@ -461,6 +461,7 @@ pub enum WorldObject {
 
     Scrapper,
     ScrapperBlock,
+
     // Capes
     GreyCape,
     RedCape,
@@ -757,20 +758,20 @@ impl WorldObject {
     }
     pub fn get_weapon_levelup_upgrade(&self) -> i32 {
         match self {
-            WorldObject::WoodSword => 2,
-            WorldObject::Sword => 2,
-            WorldObject::Spear => 2,
-            WorldObject::Dagger => 1,
-            WorldObject::Hammer => 2,
-            WorldObject::Gun => 2,
-            WorldObject::Blowdart => 2,
-            WorldObject::FireStaff => 2,
-            WorldObject::Claw => 2,
-            WorldObject::WoodBow => 2,
-            WorldObject::IceStaff => 2,
-            WorldObject::BasicStaff => 1,
-            WorldObject::MagicWhip => 1,
-            _ => 0,
+            // WorldObject::WoodSword => 2,
+            // WorldObject::Sword => 2,
+            // WorldObject::Spear => 2,
+            // WorldObject::Dagger => 1,
+            // WorldObject::Hammer => 2,
+            // WorldObject::Gun => 2,
+            // WorldObject::Blowdart => 2,
+            // WorldObject::FireStaff => 2,
+            // WorldObject::Claw => 2,
+            // WorldObject::WoodBow => 2,
+            // WorldObject::IceStaff => 2,
+            // WorldObject::BasicStaff => 1,
+            // WorldObject::MagicWhip => 1,
+            _ => 1,
         }
     }
     pub fn is_water_placeable(&self) -> bool {

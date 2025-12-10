@@ -741,7 +741,7 @@ impl Heirloom {
         match self {
             Heirloom::Chest => vec!["Gain a Loot Chest".to_string()],
             Heirloom::CritChance => vec![
-                "Gain +10% Critical".to_string(),
+                "Gain +7% Critical".to_string(),
                 "Chance, ".to_string(),
                 "permanantly.".to_string(),
             ],

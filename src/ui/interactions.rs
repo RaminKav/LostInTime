@@ -1415,6 +1415,8 @@ pub fn handle_cursor_main_menu_buttons(
                 | MenuButton::ClassUnlockYes
                 | MenuButton::ClassUnlockNo
                 | MenuButton::GameOverOK
+                | MenuButton::OptionsRestart
+                | MenuButton::OptionsExit
         );
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
