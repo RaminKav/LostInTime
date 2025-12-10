@@ -116,7 +116,8 @@ pub fn handle_add_damage_numbers_after_hit(
         changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
-        if delta == 0 || prev_health.0 >= max_health.map_or(i32::MAX, |mh| mh.0) {
+
+        if delta == 0 || prev_health.0 > max_health.map_or(i32::MAX, |mh| mh.0) {
             continue;
         }
         let mut rng = rand::thread_rng();
