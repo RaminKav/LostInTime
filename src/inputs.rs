@@ -645,11 +645,15 @@ pub fn toggle_inventory(
     proto: ProtoParam,
     _inv: Query<&mut Inventory>,
     mut next_ui_state: ResMut<NextState<UIState>>,
+    curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
     if key_input.just_pressed(KeyCode::I) || key_input.just_pressed(KeyCode::Tab) {
-        next_ui_state.set(UIState::Inventory);
+        // Don't allow opening inventory while item chest is open
+        if curr_ui_state.0 != UIState::ItemChest {
+            next_ui_state.set(UIState::Inventory);
+        }
     }
 
     if *DEBUG {
