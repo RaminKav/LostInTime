@@ -100,11 +100,11 @@ pub fn get_rarity_rng(mut rng: ThreadRng, loot_bonus: i32) -> ItemRarity {
     let loot_bonus_f = loot_bonus as f32;
     // Calculate adjusted thresholds (higher threshold = more chance for that rarity)
     // Legendary: base 1 (4%), increases by 0.5% per loot = +0.125 threshold per loot
-    let legendary_threshold = (98.5 - loot_bonus_f * 0.1).min(25.0);
+    let legendary_threshold = (98.5 - loot_bonus_f * 0.1).max(0.0);
     // Rare: base 4 (12%), increases by 0.4% per loot = +0.1 threshold per loot
-    let rare_threshold = (88.0 + loot_bonus_f * 0.2).min(25.0);
+    let rare_threshold = (88.0 + loot_bonus_f * 0.2).min(99.0);
     // Uncommon: base 13 (36%), increases by 0.3% per loot = +0.075 threshold per loot
-    let uncommon_threshold = (68.0 + loot_bonus_f * 0.1).min(25.0);
+    let uncommon_threshold = (68.0 + loot_bonus_f * 0.1).min(99.0);
 
     let rarity_rng = rng.gen_range(0_f32..100_f32);
     if rarity_rng >= legendary_threshold {
