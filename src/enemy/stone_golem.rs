@@ -5,12 +5,13 @@ use crate::{
     enemy::{FollowSpeed, Mob},
     item::projectile::Projectile,
     player::Player,
-    GameParam,
+    status_effects::Slow,
+    GameParam, PLAYER_MOVE_SPEED,
 };
 use bevy::prelude::*;
 use bevy::sprite::{ColorMaterial, MaterialMesh2dBundle};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
-use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group};
+use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 use rand::Rng;
 use seldom_state::{
     prelude::StateMachine,
@@ -415,5 +416,46 @@ pub fn handle_stone_golem_death(
                 commands.entity(entity).despawn_recursive();
             }
         }
+    }
+}
+
+/// Move stone golem towards player when in FollowState
+/// This is separate from the regular follow system because stone golem uses Aseprite animations
+pub fn stone_golem_follow(
+    mut transforms: Query<&mut Transform>,
+    mut mover: Query<&mut KinematicCharacterController>,
+    mut follows: Query<
+        (Entity, &FollowState, &Mob, Option<&Slow>),
+        Without<crate::combat::MarkedForDeath>,
+    >,
+    time: Res<Time>,
+) {
+    for (entity, follow, mob, slowed_option) in follows.iter_mut() {
+        // Only handle StoneGolem
+        if mob != &Mob::StoneGolem {
+            continue;
+        }
+
+        // Get the positions of the follower and target
+        let target_translation = transforms.get(follow.target).unwrap().translation;
+        let follow_transform = transforms.get(entity).unwrap();
+        let follow_translation = follow_transform.translation;
+
+        // Calculate direction to target
+        let delta =
+            (target_translation.truncate() - follow_translation.truncate()).normalize_or_zero();
+
+        // Get mover and set collision filter to pass through world objects
+        let mut mover = mover.get_mut(entity).unwrap();
+        mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
+
+        // Apply movement with slow debuff
+        mover.translation = Some(
+            delta
+                * follow.speed
+                * PLAYER_MOVE_SPEED
+                * time.delta_seconds()
+                * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15)),
+        );
     }
 }

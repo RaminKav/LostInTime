@@ -76,6 +76,7 @@ impl Plugin for EnemyPlugin {
                     red_mushking::handle_aoe_attack,
                     stone_golem::tick_spike_attack_timer,
                     stone_golem::handle_spike_attack,
+                    stone_golem::stone_golem_follow,
                     stone_golem::update_stone_golem_walk_animation,
                     stone_golem::handle_stone_golem_death,
                 )
@@ -473,7 +474,7 @@ fn juice_up_spawned_mobs_per_day(
             global_chaos,
             infinite_chaos
         );
-        hp.0 = (hp.0 as f32 * (chaos_factor.powf(1.1))) as i32;
+        hp.0 = (hp.0 as f32 * (chaos_factor.powf(0.8))) as i32;
         att.0 = (att.0 as f32 * (chaos_factor.powf(0.7))) as i32;
         exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.125)) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));

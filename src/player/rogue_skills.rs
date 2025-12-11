@@ -142,12 +142,13 @@ pub fn handle_lunge(
                     FacingDirection::Left => PI / 2.,
                     FacingDirection::Right => PI / 2.,
                 };
+                let skill_power_mult = skills.skill_power_multiplier();
                 let lunge_e = spawn_temp_collider(
                     &mut commands,
                     Transform::from_translation(Vec3::new(0., 0., 0.))
                         .with_rotation(Quat::from_rotation_z(angle)),
                     0.5,
-                    dmg.0,
+                    (dmg.0 as f32 * skill_power_mult) as i32,
                     Collider::cuboid(9., 1.5 * TILE_SIZE.x),
                     Projectile::None,
                 );

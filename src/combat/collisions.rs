@@ -237,7 +237,7 @@ fn check_projectile_hit_mob_collisions(
             let frail_stacks = frail.map(|f| f.num_stacks).unwrap_or(0);
 
             let crit_bonus = if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
-                10
+                15
             } else {
                 0
             } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
@@ -419,7 +419,7 @@ fn check_fire_ring_ongoing_collisions(
 
                     let crit_bonus =
                         if is_slowed && game.has_skill(Heirloom::FrozenCrit) {
-                            10
+                            15
                         } else {
                             0
                         } + if state.mana_bar_full && game.has_skill(Heirloom::MPBarCrit) {
