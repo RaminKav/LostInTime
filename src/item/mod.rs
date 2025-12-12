@@ -1173,7 +1173,7 @@ pub fn handle_break_object(
         }
         // Item Drops
         if let Ok(loot_table) = loot_tables.get(broken.entity) {
-            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None) {
+            for drop in LootTablePlugin::get_drops(loot_table, &proto_param, 0, None, false) {
                 let pos = if broken.obj.is_medium_size(&proto_param) {
                     tile_pos_to_world_pos(
                         TileMapPosition::new(broken.pos.chunk_pos, broken.pos.tile_pos),

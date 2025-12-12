@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::{
-    attributes::modifiers::ModifyHealthEvent,
+    attributes::{modifiers::ModifyHealthEvent, AttributeChangeEvent},
     audio::{AudioSoundEffect, SoundSpawner},
     client::persist_time_fragments,
     combat::EnemyDeathEvent,
@@ -70,6 +70,7 @@ pub fn handle_modify_currency(
     mut coins: ResMut<CoinCurrency>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
+    mut attribute_change_event: EventWriter<AttributeChangeEvent>,
 ) {
     let skills = player_skills.get_single().ok();
     let mut rng = rand::thread_rng();
@@ -85,6 +86,13 @@ pub fn handle_modify_currency(
             }
         } else if event.obj == WorldObject::Coin {
             coins.coins = (coins.coins as i32 + event.delta).max(0) as u32;
+            
+            // Trigger attribute recalculation if player has GoldIntoDamage
+            if let Some(skills) = skills {
+                if skills.has(Heirloom::GoldIntoDamage) {
+                    attribute_change_event.send_default();
+                }
+            }
 
             // CoinHeal: Picking up coins has a chance to heal
             if event.delta > 0 {

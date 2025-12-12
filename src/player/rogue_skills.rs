@@ -91,7 +91,12 @@ pub fn handle_sprint_timer(
                 && !anim.is_an_attack()
                 && attack_cooldown_option.is_none()
             {
-                commands.entity(e).insert(PlayerAnimation::RunAttack2);
+                commands
+                    .entity(e)
+                    .insert(PlayerAnimation::RunAttack2)
+                    .insert(crate::animations::player_sprite::AttackAnimationTimer(
+                        Timer::from_seconds(1.0, TimerMode::Once),
+                    ));
                 attack_event.send(AttackEvent {
                     direction,
                     ignore_cooldown: false,

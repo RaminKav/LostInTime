@@ -649,21 +649,8 @@ impl<'w, 's> GameParam<'w, 's> {
             0
         };
         // Convert bonus damage percentage to multiplier (e.g., 30% -> 1.3x)
+        // BonusDamage now includes MaxHPDamage and GoldIntoDamage bonuses
         let mut bonus_damage_multiplier = 1.0 + (bonus_dmg.0 as f32 / 100.0);
-
-        // MaxHPDamage: +10% damage per 100 max hp per stack
-        let max_hp_damage_stacks = skills.get_count(Heirloom::MaxHPDamage);
-        if max_hp_damage_stacks > 0 {
-            let hp_bonus = (max_health.0 as f32 / 100.0) * 0.10 * max_hp_damage_stacks as f32;
-            bonus_damage_multiplier += hp_bonus;
-        }
-
-        // GoldIntoDamage: +1% damage per 10 coins per stack
-        let gold_damage_stacks = skills.get_count(Heirloom::GoldIntoDamage);
-        if gold_damage_stacks > 0 {
-            let gold_bonus = (self.coins.coins as f32 / 10.0) * 0.01 * gold_damage_stacks as f32;
-            bonus_damage_multiplier += gold_bonus;
-        }
 
         // StandStill: Standing still increases damage (ramps up over 3s)
         let stand_still_stacks = skills.get_count(Heirloom::StandStill);

@@ -807,17 +807,13 @@ pub fn break_crates_with_roll(
 #[derive(Component, Default)]
 pub struct MaxHPHuntTracker {
     pub kill_count: u32,
+    pub total_hp_gained: i32, // Total max HP gained from this heirloom
 }
 
 pub fn handle_max_hp_hunt(
     mut death_events: EventReader<EnemyDeathEvent>,
     mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills, &mut MaxHealth), With<Player>>,
 ) {
-    let kill_count = death_events.iter().count() as u32;
-    if kill_count == 0 {
-        return;
-    }
-
     let Ok((mut tracker, skills, mut max_hp)) = player_query.get_single_mut() else {
         return;
     };
@@ -827,12 +823,17 @@ pub fn handle_max_hp_hunt(
         return;
     }
 
-    tracker.kill_count += kill_count;
+    // Count kills from events (each event is one kill)
+    for _death_event in death_events.iter() {
+        tracker.kill_count += 1;
 
-    // Every 3 kills grants +1 max hp per stack
-    while tracker.kill_count >= 3 {
-        tracker.kill_count -= 3;
-        max_hp.0 += stacks; // Each stack gives +1 hp per trigger
+        // Every 3 kills grants +1 max hp per stack
+        if tracker.kill_count >= 3 {
+            tracker.kill_count -= 3;
+            let hp_gained = stacks; // Each stack gives +1 hp per trigger
+            max_hp.0 += hp_gained;
+            tracker.total_hp_gained += hp_gained; // Track total HP gained
+        }
     }
 }
 

@@ -158,6 +158,7 @@ pub fn handle_new_loot_chest_spawn(
             &proto_param,
             0,
             Some(player_level.single().level),
+            false,
         )
         .iter()
         {

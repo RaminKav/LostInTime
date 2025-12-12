@@ -952,7 +952,12 @@ pub fn mouse_click_system(
         let mut did_attack = false;
         if let Some(main_hand) = main_hand_option {
             if main_hand == WorldObject::WoodBow {
-                commands.entity(player_e).insert(PlayerAnimation::Bow);
+                commands
+                    .entity(player_e)
+                    .insert(PlayerAnimation::Bow)
+                    .insert(crate::animations::player_sprite::AttackAnimationTimer(
+                        Timer::from_seconds(1.0, TimerMode::Once),
+                    ));
                 attack_event.send(AttackEvent {
                     direction,
                     ignore_cooldown: false,
@@ -967,7 +972,12 @@ pub fn mouse_click_system(
             }
         }
         if did_attack {
-            commands.entity(player_e).insert(PlayerAnimation::Attack);
+            commands
+                .entity(player_e)
+                .insert(PlayerAnimation::Attack)
+                .insert(crate::animations::player_sprite::AttackAnimationTimer(
+                    Timer::from_seconds(1.0, TimerMode::Once),
+                ));
         }
         attack_event.send(AttackEvent {
             direction,

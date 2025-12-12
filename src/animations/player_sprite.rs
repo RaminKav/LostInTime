@@ -13,15 +13,13 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
 use crate::{
-    attributes::AttributeChangeEvent,
-    inputs::FacingDirection,
-    item::WorldObject,
-    player::{
-        skills::{PlayerClass, SkillClass},
-        Player,
-    },
-    FairyPetSprite, SlimePetSprite,
+    attributes::AttributeChangeEvent, inputs::FacingDirection, item::WorldObject,
+    player::skills::PlayerClass, FairyPetSprite, SlimePetSprite,
 };
+
+/// Timer to track how long an attack animation has been playing
+#[derive(Component)]
+pub struct AttackAnimationTimer(pub Timer);
 
 aseprite!(pub PlayerRedAseprite, "textures/player/player_red.aseprite");
 aseprite!(pub PlayerBlueAseprite, "textures/player/player_blue.aseprite");
@@ -52,8 +50,6 @@ pub enum PlayerAnimation {
     Attack,
     Bow,
     Lunge,
-    RunAttack,
-    RunAttack1,
     RunAttack2,
     Teleport,
 }
@@ -71,8 +67,6 @@ impl PlayerAnimation {
             PlayerAnimation::Attack => format!("Attack2{}", dir_str),
             PlayerAnimation::Bow => format!("Bow{}", dir_str),
             PlayerAnimation::Lunge => format!("Lunge{}", dir_str),
-            PlayerAnimation::RunAttack => format!("RunAttack{}", dir_str),
-            PlayerAnimation::RunAttack1 => format!("RunAttack1{}", dir_str),
             PlayerAnimation::RunAttack2 => format!("RunAttack2{}", dir_str),
             PlayerAnimation::Teleport => format!("Teleport{}", dir_str),
         }
@@ -86,8 +80,6 @@ impl PlayerAnimation {
             PlayerAnimation::Attack => true,
             PlayerAnimation::Lunge => true,
             PlayerAnimation::Bow => true,
-            PlayerAnimation::RunAttack => true,
-            PlayerAnimation::RunAttack1 => true,
             PlayerAnimation::RunAttack2 => true,
             PlayerAnimation::Teleport => true,
             _ => false,
@@ -145,8 +137,6 @@ impl PlayerAnimation {
             PlayerAnimation::Attack => true,
             PlayerAnimation::Bow => true,
             PlayerAnimation::Lunge => true,
-            PlayerAnimation::RunAttack => true,
-            PlayerAnimation::RunAttack1 => true,
             PlayerAnimation::RunAttack2 => true,
             PlayerAnimation::Teleport => true,
             _ => false,
@@ -156,8 +146,6 @@ impl PlayerAnimation {
         match self {
             PlayerAnimation::Attack => true,
             // PlayerAnimation::Lunge => true,
-            PlayerAnimation::RunAttack => true,
-            PlayerAnimation::RunAttack1 => true,
             PlayerAnimation::RunAttack2 => true,
             _ => false,
         }
@@ -237,12 +225,40 @@ pub fn handle_player_animation_change(
 }
 
 pub fn cleanup_one_time_animations(
-    mut query: Query<(Entity, &PlayerAnimation, &AsepriteAnimation)>,
+    mut query: Query<(
+        Entity,
+        &PlayerAnimation,
+        &AsepriteAnimation,
+        Option<&crate::attributes::AttackCooldown>,
+        Option<&mut AttackAnimationTimer>,
+    )>,
     mut commands: Commands,
+    time: Res<Time>,
 ) {
-    for (e, curr_anim, anim_state) in query.iter_mut() {
-        if curr_anim.is_one_time_anim() && anim_state.just_finished() {
-            commands.entity(e).insert(PlayerAnimation::Idle);
+    for (e, curr_anim, anim_state, attack_cooldown_option, attack_timer_option) in query.iter_mut()
+    {
+        if curr_anim.is_one_time_anim() {
+            let mut animation_finished = anim_state.just_finished();
+
+            // Allow attack animations to be interrupted early if attack cooldown is very low
+            // This prevents animation duration from being the bottleneck for attack speed
+            if curr_anim.is_an_attack() || curr_anim.is_shooting_bow() {
+                if let Some(cooldown) = attack_cooldown_option {
+                    if let Some(mut attack_timer) = attack_timer_option {
+                        attack_timer.0.tick(time.delta());
+                        // If attack cooldown is less than 0.25s (typical animation duration),
+                        // allow the animation to finish after the cooldown duration has elapsed
+                        if cooldown.0 < 0.25 && attack_timer.0.elapsed_secs() >= cooldown.0 * 0.8 {
+                            animation_finished = true;
+                        }
+                    }
+                }
+            }
+
+            if animation_finished {
+                commands.entity(e).insert(PlayerAnimation::Idle);
+                commands.entity(e).remove::<AttackAnimationTimer>();
+            }
         }
     }
 }

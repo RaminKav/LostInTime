@@ -925,6 +925,7 @@ impl ItemAttributes {
         old_shield: i32,
         skills: &PlayerSkills,
         dodge_crit_buff_active: bool,
+        coins: u32,
     ) {
         // ChaosStats: +10 to many stats per stack
         let chaos_stats_stacks = skills.get_count(Heirloom::ChaosStats);
@@ -958,6 +959,7 @@ impl ItemAttributes {
         if skills.get_count(Heirloom::Shield) * 10 != old_shield {
             entity.insert(MaxShield(skills.get_count(Heirloom::Shield) * 10));
         }
+        info!("ATTACK SPEED {:?}", self.attack_speed.value);
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
@@ -978,9 +980,28 @@ impl ItemAttributes {
         entity.insert(CritDamage(
             self.crit_damage.value + skills.get_count(Heirloom::CritDamage) * 15,
         ));
-        entity.insert(BonusDamage(
-            self.bonus_damage.value + skills.get_count(Heirloom::Attack) * 10 + chaos_dmg_bonus,
-        ));
+
+        // Calculate dynamic damage bonuses
+        let mut total_bonus_damage =
+            self.bonus_damage.value + skills.get_count(Heirloom::Attack) * 10 + chaos_dmg_bonus;
+
+        // MaxHPDamage: +10% damage per 100 max hp per stack
+        let max_hp_damage_stacks = skills.get_count(Heirloom::MaxHPDamage);
+        if max_hp_damage_stacks > 0 {
+            // Use computed_health which was calculated earlier in this function
+            let hp_bonus_percent =
+                (computed_health.value as f32 / 100.0) * 10.0 * max_hp_damage_stacks as f32;
+            total_bonus_damage += hp_bonus_percent as i32;
+        }
+
+        // GoldIntoDamage: +1% damage per 10 coins per stack
+        let gold_damage_stacks = skills.get_count(Heirloom::GoldIntoDamage);
+        if gold_damage_stacks > 0 {
+            let gold_bonus_percent = (coins as f32 / 10.0) * 1.0 * gold_damage_stacks as f32;
+            total_bonus_damage += gold_bonus_percent as i32;
+        }
+
+        entity.insert(BonusDamage(total_bonus_damage));
         // RegenLifesteal: -5 hp regen, +5% lifesteal per stack
         // Allow negative values - negative regen will damage the player on regen ticks
         let regen_lifesteal_stacks = skills.get_count(Heirloom::RegenLifesteal);
@@ -1037,7 +1058,7 @@ impl ItemAttributes {
         entity.insert(Defence(total_defence));
         entity.insert(XpRateBonus(self.xp_rate.value));
         entity.insert(LootRateBonus(
-            self.loot_rate.value + skills.get_count(Heirloom::LoadedDice) * 10,
+            self.loot_rate.value + skills.get_count(Heirloom::LoadedDice) * 7,
         ));
         entity.insert(ManaRegen(
             self.mana_regen.value + skills.get_count(Heirloom::MPRegen) * 5,
@@ -1688,6 +1709,7 @@ fn handle_player_item_attribute_change_events(
     game: Res<Game>,
     dodge_crit_state: Query<&crate::player::combat_heirlooms::DodgeCritState, With<Player>>,
     hallucination_stats: Query<&crate::player::combat_heirlooms::HallucinationStats, With<Player>>,
+    coins: Res<crate::player::currency::CoinCurrency>,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
@@ -1726,6 +1748,7 @@ fn handle_player_item_attribute_change_events(
             old_shield.0,
             skills,
             dodge_crit_buff_active,
+            coins.coins,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
             if !main_hand.get_obj().is_weapon() {

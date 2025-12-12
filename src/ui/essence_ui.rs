@@ -126,7 +126,7 @@ pub fn handle_essence_heirloom_tooltip(
                     essence_option.get_heirloom(),
                     essence_option.get_rarity(),
                     Vec3::new(-130., 0., 15.), // Left side of the essence shop
-                    None,
+                    None,                      // No scaling text for shop tooltips
                 );
 
                 commands
@@ -400,8 +400,9 @@ pub fn handle_populate_essence_shop_on_new_spawn(
         let mut rng = rand::thread_rng();
 
         // Store tile position for chunk cache updates
-        let tile_pos =
-            crate::world::world_helpers::world_pos_to_tile_pos(transform.translation().truncate());
+        // Account for sprite anchor offset (y: 12.0) to get the correct base tile position
+        let world_pos = transform.translation().truncate() - bevy::math::Vec2::new(0., 12.);
+        let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(world_pos);
         shop.tile_pos = Some(tile_pos);
 
         // Get the price multiplier based on previous purchases

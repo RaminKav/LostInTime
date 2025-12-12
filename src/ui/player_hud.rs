@@ -3,8 +3,9 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle}
 use std::collections::HashMap;
 
 use super::{
-    damage_numbers::spawn_text, interactions::Interaction, spawn_inv_slot, spawn_item_stack_icon,
-    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
+    damage_numbers::spawn_text, interactions::Interaction, spawn_heirloom_tooltip_card,
+    spawn_inv_slot, spawn_item_stack_icon, InventorySlotType, InventoryState, InventoryUI,
+    UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
@@ -616,6 +617,178 @@ pub struct SkillHudIcon(pub Heirloom);
 #[derive(Component)]
 pub struct HeirloomCounterText;
 
+#[derive(Component)]
+pub struct HeirloomHudTooltip;
+
+/// System to handle tooltips for heirloom icons in the HUD
+pub fn handle_heirloom_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<crate::inputs::CursorPos>,
+    hit_detection_sprites: Query<
+        (Entity, &Sprite, &GlobalTransform),
+        With<super::interactions::Interactable>,
+    >,
+    mut hud_icons: Query<(
+        Entity,
+        &GlobalTransform,
+        &UIElement,
+        &mut super::interactions::Interactable,
+        &SkillHudIcon,
+    )>,
+    existing_tooltips: Query<Entity, With<HeirloomHudTooltip>>,
+    mut last_hovered: Local<Option<Heirloom>>,
+    player_query: Query<
+        (
+            &PlayerSkills,
+            &crate::attributes::MaxHealth,
+            Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
+            Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
+        ),
+        With<Player>,
+    >,
+    coins: Res<CoinCurrency>,
+) {
+    use super::interactions::Interaction;
+
+    // First, do hit detection and update interactable states
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+
+    // Update all heirloom hud icons' interactable state based on cursor position
+    for (entity, _, ui_elem, mut interactable, _) in hud_icons.iter_mut() {
+        if ui_elem == &UIElement::HeirloomHudIcon {
+            let is_hit = hit_entity
+                .as_ref()
+                .map(|(e, _sprite, _transform)| *e == entity)
+                .unwrap_or(false);
+
+            if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::Hovering);
+            } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+            }
+        }
+    }
+
+    // Now find the currently hovered heirloom directly from the icon
+    let currently_hovered = hud_icons
+        .iter()
+        .filter(|(_, _, ui_elem, _, _)| ui_elem == &&UIElement::HeirloomHudIcon)
+        .find(|(_, _, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(_, transform, _, _, skill_icon)| (skill_icon.0.clone(), transform.translation()));
+
+    let hovered_heirloom = currently_hovered.as_ref().map(|(h, _)| h.clone());
+
+    // Only update if the hover state changed
+    if *last_hovered == hovered_heirloom {
+        return;
+    }
+
+    // Despawn all existing tooltips
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    // Spawn new tooltip if hovering
+    if let Some((heirloom, icon_pos)) = currently_hovered {
+        let Ok((skills, max_health, hunt_tracker, crate_tracker)) = player_query.get_single()
+        else {
+            return;
+        };
+
+        // Get the rarity from the player's heirloom list
+        let rarity = skills
+            .heirlooms
+            .iter()
+            .find(|h| h.heirloom == heirloom)
+            .map(|h| h.rarity.clone())
+            .unwrap_or(HeirloomRarity::Common);
+
+        // Get current scaling value if applicable
+        let scaling_text = get_heirloom_scaling_text(
+            heirloom.clone(),
+            skills,
+            coins.coins,
+            max_health.0,
+            hunt_tracker,
+            crate_tracker,
+        );
+
+        // Position tooltip below the hovered icon
+        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 70., 15.);
+
+        let tooltip_e = spawn_heirloom_tooltip_card(
+            &graphics,
+            &mut commands,
+            &asset_server,
+            heirloom,
+            rarity,
+            tooltip_pos,
+            scaling_text,
+        );
+
+        commands
+            .entity(tooltip_e)
+            .insert(HeirloomHudTooltip)
+            .insert(RenderLayers::from_layers(&[3]));
+    }
+
+    *last_hovered = hovered_heirloom;
+}
+
+/// Helper function to get current scaling value for heirlooms that scale
+fn get_heirloom_scaling_text(
+    heirloom: Heirloom,
+    skills: &PlayerSkills,
+    coins: u32,
+    max_health: i32,
+    hunt_tracker: Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
+    crate_tracker: Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
+) -> Option<String> {
+    match heirloom {
+        Heirloom::GoldIntoDamage => {
+            let stacks = skills.get_count(Heirloom::GoldIntoDamage);
+            if stacks > 0 {
+                let gold_bonus_percent = (coins as f32 / 10.0) * 1.0 * stacks as f32;
+                Some(format!("(+{}% damage)", gold_bonus_percent as i32))
+            } else {
+                None
+            }
+        }
+        Heirloom::MaxHPDamage => {
+            let stacks = skills.get_count(Heirloom::MaxHPDamage);
+            if stacks > 0 {
+                let hp_bonus_percent = (max_health as f32 / 100.0) * 10.0 * stacks as f32;
+                Some(format!("(+{}% damage)", hp_bonus_percent as i32))
+            } else {
+                None
+            }
+        }
+        Heirloom::MaxHPHunt => {
+            // Show total max HP gained from this heirloom
+            if let Some(tracker) = hunt_tracker {
+                if tracker.total_hp_gained > 0 {
+                    Some(format!("(+{} Max HP)", tracker.total_hp_gained))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        Heirloom::CrateBreakDamage => {
+            // Show current damage bonus from crate breaks
+            if let Some(tracker) = crate_tracker {
+                Some(format!("(+{:.1}% damage)", tracker.bonus_damage_percent))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
 pub fn handle_update_player_skills(
     player_skills: Query<&PlayerSkills, Changed<PlayerSkills>>,
     mut commands: Commands,
@@ -709,7 +882,7 @@ pub fn handle_update_player_skills(
                     (GAME_HEIGHT - 15.) / 2. - 2.5 - (row as f32 * ROW_SPACING),
                 );
 
-                // Create the main icon
+                // Create the main icon with interactability directly attached
                 let icon = commands
                     .spawn(SpriteSheetBundle {
                         sprite: graphics.get_heirloom_icon(heirloom.clone()),
@@ -721,8 +894,14 @@ pub fn handle_update_player_skills(
                         },
                         ..Default::default()
                     })
+                    .insert(Sprite {
+                        custom_size: Some(Vec2::new(16., 16.)),
+                        ..Default::default()
+                    })
                     .insert(RenderLayers::from_layers(&[3]))
                     .insert(SkillHudIcon(heirloom.clone()))
+                    .insert(super::interactions::Interactable::default())
+                    .insert(UIElement::HeirloomHudIcon)
                     .insert(Name::new("HUD ICON!!"))
                     .id();
 

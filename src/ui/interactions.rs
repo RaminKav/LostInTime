@@ -143,6 +143,7 @@ pub enum UIElement {
     AchievementCrossOut,
     SmallKey,
     MediumKey,
+    HeirloomHudIcon,
     LargeKey,
     XLKey,
     XLKeyHover,

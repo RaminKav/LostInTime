@@ -422,6 +422,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                handle_heirloom_hud_tooltip
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 update_active_skill_keybind_text
                     .in_set(OnUpdate(GameState::Main)),
             )

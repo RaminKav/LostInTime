@@ -458,6 +458,8 @@ fn juice_up_spawned_mobs_per_day(
     let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0) * 1.5;
     // Get infinite mode chaos bonus (only applies during infinite mode, not carried to next era)
     let infinite_chaos = infinite_mode.get_chaos_bonus() * 1.5;
+    let is_infinite_mode = infinite_mode.active;
+    let infinite_mode_xp_scaling = if is_infinite_mode { 0.25 } else { 1.0 };
     let total_chaos = global_chaos + infinite_chaos;
 
     for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
@@ -476,7 +478,7 @@ fn juice_up_spawned_mobs_per_day(
         );
         hp.0 = (hp.0 as f32 * (chaos_factor.powf(0.8))) as i32;
         att.0 = (att.0 as f32 * (chaos_factor.powf(0.7))) as i32;
-        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.125)) as u32;
+        exp.0 = (exp.0 as f32 * (1. + chaos_factor * 0.117) * infinite_mode_xp_scaling) as u32;
         commands.entity(e).insert(MobLevel(night_tracker.days + 1));
     }
 }

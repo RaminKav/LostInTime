@@ -124,65 +124,65 @@ impl SkillClass {
         match self {
             SkillClass::Warrior => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 8.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 6.) as i32, quality, 1.);
             }
             SkillClass::Paladin => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.health = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Knight => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.defence = AttributeValue::new(level * 3, quality, 1.);
             }
 
             SkillClass::Rogue => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.speed = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Archer => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.crit_damage = AttributeValue::new(level * 4, quality, 1.);
             }
             SkillClass::Kid => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.dodge = AttributeValue::new(level * 3, quality, 1.);
             }
 
             SkillClass::Thief => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Gunslinger => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
             }
 
             SkillClass::FireMage => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.mana = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::IceMage => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.mana = AttributeValue::new(level * 5, quality, 1.);
             }
             SkillClass::Wizard => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.mana_regen =
                     AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
             }
             SkillClass::Druid => {
                 stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 5.) as i32, quality, 1.);
+                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
                 stats.health_regen = AttributeValue::new(level * 1, quality, 1.);
             }
             _ => (),
@@ -538,7 +538,7 @@ pub enum Heirloom {
     CritChance, //tusk
     CritDamage,       //flint
     SkillCDReduction, // placeholder
-    LoadedDice,       // increases luck by 10
+    LoadedDice,       // increases luck by 7
     Health,           //red mushroom
     Shield,           // CD
     Thorns,           //bushling scale
@@ -753,7 +753,7 @@ impl Heirloom {
                 vec!["Reduce skill".to_string(), "cooldowns by 15%.".to_string()]
             }
             Heirloom::LoadedDice => {
-                vec!["Gain +10 Luck,".to_string(), "permanently.".to_string()]
+                vec!["Gain +7 Luck,".to_string(), "permanently.".to_string()]
             }
             Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
@@ -1536,8 +1536,8 @@ impl HeirloomChoiceQueue {
 
         let loot_bonus_f = loot_bonus as f32;
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
-        let legendary_threshold = (98.5 - loot_bonus_f * 0.1).max(0.0);
-        let rare_threshold = (88.0 - loot_bonus_f * 0.2).max(0.0);
+        let legendary_threshold = (99.0 - loot_bonus_f * 0.08).max(0.0);
+        let rare_threshold = (88.0 - loot_bonus_f * 0.12).max(0.0);
         let uncommon_threshold = (68.0 - loot_bonus_f * 0.1).max(0.0);
         let roll = rng.gen_range(0_f32..100_f32);
 

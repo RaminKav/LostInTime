@@ -10,6 +10,7 @@ pub mod collisions;
 use crate::attributes::{add_item_glows, ProjectileSize};
 
 pub mod combat_helpers;
+use crate::night::InfiniteMode;
 use crate::player::melee_skills::spawn_echo_hitbox;
 use crate::{
     ai::{FollowState, LeapAttackState},
@@ -176,15 +177,16 @@ fn handle_enemy_death(
     mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
     mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills)>,
     mut proto_commands: ProtoCommands,
-    loot_bonus: Query<&LootRateBonus>,
     mut commands: Commands,
     graphics: Res<Graphics>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
             continue;
         };
         let (mut player_level, player_skills) = player_xp.single_mut();
+        let is_infinite_mode = infinite_mode.active;
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(
@@ -193,6 +195,7 @@ fn handle_enemy_death(
                 // loot_bonus.single().0,
                 0,
                 Some(mob_lvl.0),
+                is_infinite_mode,
             ) {
                 let mut rng = rand::thread_rng();
                 let d = if mob.is_boss() { 30. } else { 10. };

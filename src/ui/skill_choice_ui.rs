@@ -271,6 +271,7 @@ pub fn tick_skill_choice_interaction_lock_timers(
 }
 /// Helper function to spawn a single heirloom tooltip card
 /// Returns the entity ID of the card
+/// scaling_text: Optional text showing current scaling value (e.g., "(+25% damage)")
 pub fn spawn_heirloom_tooltip_card(
     graphics: &Graphics,
     commands: &mut Commands,
@@ -278,10 +279,8 @@ pub fn spawn_heirloom_tooltip_card(
     heirloom: crate::player::skills::Heirloom,
     rarity: crate::player::skills::HeirloomRarity,
     position: Vec3,
-    parent: Option<Entity>,
+    scaling_text: Option<String>,
 ) -> Entity {
-    use crate::attributes::ItemGlow;
-
     let size = SKILLS_CHOICE_UI_SIZE;
     let ui_element = heirloom.get_ui_element(rarity.clone());
     let card_e = commands
@@ -391,8 +390,31 @@ pub fn spawn_heirloom_tooltip_card(
         text_desc.set_parent(card_e);
     }
 
-    if let Some(parent_e) = parent {
-        commands.entity(card_e).set_parent(parent_e);
+    // Add scaling text if provided (shows current progress for scaling heirlooms)
+    if let Some(scaling_text) = scaling_text {
+        let desc_count = heirloom.get_desc().len();
+        let mut text_scaling = commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    scaling_text,
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: crate::colors::LIGHT_GREY, // Dark grey for subtle display
+                    },
+                ),
+                text_anchor: Anchor::Center,
+                transform: Transform {
+                    translation: Vec3::new(0.5, -(desc_count as f32 * 9.) - 5.0, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("Heirloom Scaling Text"),
+            RenderLayers::from_layers(&[3]),
+        ));
+        text_scaling.set_parent(card_e);
     }
 
     card_e
