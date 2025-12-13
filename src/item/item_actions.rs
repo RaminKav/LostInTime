@@ -281,7 +281,10 @@ impl ItemActions {
                 }
                 ItemAction::BeaconPortal => {
                     if let Some(e) = item_action_param.beacon_guidance.portal.take() {
-                        commands.entity(e).despawn_recursive();
+                        // Safely despawn - check if entity exists first
+                        if let Some(entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn_recursive();
+                        }
                     } else {
                         let icon_e =
                             crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
@@ -296,7 +299,10 @@ impl ItemActions {
                 }
                 ItemAction::BeaconDungeonEntrance => {
                     if let Some(e) = item_action_param.beacon_guidance.dungeon.take() {
-                        commands.entity(e).despawn_recursive();
+                        // Safely despawn - check if entity exists first
+                        if let Some(entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn_recursive();
+                        }
                     } else {
                         let pos = game
                             .world_obj_cache
@@ -306,20 +312,26 @@ impl ItemActions {
                                 crate::world::world_helpers::tile_pos_to_world_pos(*tp, false)
                             })
                             .unwrap_or(Vec2::ZERO);
-                        let icon_e =
-                            crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
-                                commands,
-                                &game.graphics,
-                                &item_action_param.asset_server,
-                                obj,
-                                pos,
-                            );
-                        item_action_param.beacon_guidance.dungeon = Some(icon_e);
+                        // Only spawn if we have a valid position (not Vec2::ZERO)
+                        if pos != Vec2::ZERO {
+                            let icon_e =
+                                crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
+                                    commands,
+                                    &game.graphics,
+                                    &item_action_param.asset_server,
+                                    obj,
+                                    pos,
+                                );
+                            item_action_param.beacon_guidance.dungeon = Some(icon_e);
+                        }
                     }
                 }
                 ItemAction::BeaconBossShrine => {
                     if let Some(e) = item_action_param.beacon_guidance.boss.take() {
-                        commands.entity(e).despawn_recursive();
+                        // Safely despawn - check if entity exists first
+                        if let Some(entity_commands) = commands.get_entity(e) {
+                            entity_commands.despawn_recursive();
+                        }
                     } else {
                         let pos = game
                             .world_obj_cache
@@ -329,15 +341,18 @@ impl ItemActions {
                                 crate::world::world_helpers::tile_pos_to_world_pos(*tp, false)
                             })
                             .unwrap_or(Vec2::ZERO);
-                        let icon_e =
-                            crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
-                                commands,
-                                &game.graphics,
-                                &item_action_param.asset_server,
-                                obj,
-                                pos,
-                            );
-                        item_action_param.beacon_guidance.boss = Some(icon_e);
+                        // Only spawn if we have a valid position (not Vec2::ZERO)
+                        if pos != Vec2::ZERO {
+                            let icon_e =
+                                crate::ui::damage_numbers::spawn_screen_locked_icon_to_world_pos(
+                                    commands,
+                                    &game.graphics,
+                                    &item_action_param.asset_server,
+                                    obj,
+                                    pos,
+                                );
+                            item_action_param.beacon_guidance.boss = Some(icon_e);
+                        }
                     }
                 }
                 _ => {}

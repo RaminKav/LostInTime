@@ -585,6 +585,19 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<PiercingStarSkillState>();
                             }
                         }
+
+                        // Calculate direction to cursor first - validate before setting cooldown
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let direction_to_cursor = (cursor_pos - player_pos).normalize_or_zero();
+
+                        // Only proceed if we have a valid direction (not zero)
+                        if direction_to_cursor.length_squared() < 0.01 {
+                            // Cursor is too close to player, skip spawning but don't set cooldown
+                            continue;
+                        }
+
+                        // Now set cooldown since we're about to spawn the projectile
                         let mut cd = Timer::from_seconds(
                             ev.cooldown * skills.skill_cooldown_multiplier(),
                             TimerMode::Once,
@@ -597,11 +610,6 @@ pub fn handle_active_skill_event(
                         commands
                             .entity(player_e)
                             .insert(PiercingStarSkillState { cooldown_timer: cd });
-
-                        // Calculate direction to cursor
-                        let player_pos = player_txfm.translation().truncate();
-                        let cursor_pos = cursor.world_coords.truncate();
-                        let direction_to_cursor = (cursor_pos - player_pos).normalize_or_zero();
 
                         // Spawn ThrowingStarLarge projectile
                         let power_mult = skills.skill_power_multiplier();
@@ -1118,19 +1126,44 @@ pub fn initialize_skill_charge_tracker(
     }
 }
 
+/// System to trigger attribute recalculation when RapidfireState is added
+/// Similar to trigger_attribute_update_on_buff_added for potions
+pub fn trigger_attribute_update_on_rapidfire_added(
+    added_rapidfire: Query<(), Added<RapidfireState>>,
+    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+) {
+    if !added_rapidfire.is_empty() {
+        attribute_event.send_default();
+    }
+}
+
 /// System to apply attack speed buff to player's attack cooldown
+/// This runs in PostUpdate to ensure it runs after attribute recalculation
+/// It applies the multiplier whenever attributes are recalculated while Rapidfire is active
 pub fn apply_rapid_fire_speed_buff(
     mut player_query: Query<(&mut AttackCooldown, &RapidfireState), With<Player>>,
+    mut att_events: EventReader<crate::attributes::AttributeChangeEvent>,
+    added_rapidfire: Query<(), Added<RapidfireState>>,
 ) {
+    // Check if attributes were recalculated this frame OR Rapidfire was just added
+    let should_apply = !att_events.is_empty() || !added_rapidfire.is_empty();
+
+    // Only apply if attributes were recalculated or Rapidfire was just activated
+    if !should_apply {
+        return;
+    }
+
     for (mut attack_cooldown, buff) in player_query.iter_mut() {
-        // Only apply if duration is active (not finished and timer has been started)
-        // A timer that's pre-ticked to finished will have percent() == 1.0, so we check for that
-        if buff.duration.finished() || buff.duration.percent() >= 1.0 {
+        // Only apply if duration is active (not finished)
+        if buff.duration.finished() {
             continue;
         }
         // Safety check: ensure cooldown is valid before division
         if attack_cooldown.0 > 0.0 && attack_cooldown.0.is_finite() && buff.attack_speed_bonus > 0.0
         {
+            // Apply the multiplier (divide by the bonus)
+            // This is safe because AttackCooldown is recalculated from scratch each time
+            // attributes change, so we're not compounding the multiplier
             attack_cooldown.0 = attack_cooldown.0 / buff.attack_speed_bonus;
         }
     }

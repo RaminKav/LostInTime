@@ -812,9 +812,10 @@ pub struct MaxHPHuntTracker {
 
 pub fn handle_max_hp_hunt(
     mut death_events: EventReader<EnemyDeathEvent>,
-    mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills, &mut MaxHealth), With<Player>>,
+    mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills), With<Player>>,
+    mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
-    let Ok((mut tracker, skills, mut max_hp)) = player_query.get_single_mut() else {
+    let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
         return;
     };
 
@@ -824,6 +825,7 @@ pub fn handle_max_hp_hunt(
     }
 
     // Count kills from events (each event is one kill)
+    let mut hp_was_gained = false;
     for _death_event in death_events.iter() {
         tracker.kill_count += 1;
 
@@ -831,9 +833,15 @@ pub fn handle_max_hp_hunt(
         if tracker.kill_count >= 3 {
             tracker.kill_count -= 3;
             let hp_gained = stacks; // Each stack gives +1 hp per trigger
-            max_hp.0 += hp_gained;
             tracker.total_hp_gained += hp_gained; // Track total HP gained
+            hp_was_gained = true;
         }
+    }
+
+    // Trigger attribute recalculation if HP was gained
+    // This ensures the MaxHPHunt bonus is included in the max health calculation
+    if hp_was_gained {
+        attribute_events.send_default();
     }
 }
 

@@ -926,6 +926,7 @@ impl ItemAttributes {
         skills: &PlayerSkills,
         dodge_crit_buff_active: bool,
         coins: u32,
+        max_hp_hunt_bonus: i32, // Max HP gained from MaxHPHunt heirloom
     ) {
         // ChaosStats: +10 to many stats per stack
         let chaos_stats_stacks = skills.get_count(Heirloom::ChaosStats);
@@ -940,8 +941,10 @@ impl ItemAttributes {
         // Note: Hallucination stats from LethalBlow are now combined via ItemAttributes::combine()
         // before this function is called, so they're already included in self.
 
-        let computed_health =
-            self.health + skills.get_count(Heirloom::Health) * 25 + chaos_health_bonus;
+        let computed_health = self.health
+            + skills.get_count(Heirloom::Health) * 25
+            + chaos_health_bonus
+            + max_hp_hunt_bonus;
         let computed_speed = self.speed.value
             + chaos_speed_bonus
             + if dodge_crit_buff_active { 30 } else { 0 } // DodgeCrit speed buff
@@ -1709,6 +1712,7 @@ fn handle_player_item_attribute_change_events(
     game: Res<Game>,
     dodge_crit_state: Query<&crate::player::combat_heirlooms::DodgeCritState, With<Player>>,
     hallucination_stats: Query<&crate::player::combat_heirlooms::HallucinationStats, With<Player>>,
+    max_hp_hunt_tracker: Query<&crate::player::combat_heirlooms::MaxHPHuntTracker, With<Player>>,
     coins: Res<crate::player::currency::CoinCurrency>,
 ) {
     for _event in att_events.iter() {
@@ -1741,6 +1745,13 @@ fn handle_player_item_attribute_change_events(
             .get_single()
             .map(|s| s.buff_active)
             .unwrap_or(false);
+
+        // Get MaxHPHunt bonus
+        let max_hp_hunt_bonus = max_hp_hunt_tracker
+            .get_single()
+            .map(|tracker| tracker.total_hp_gained)
+            .unwrap_or(0);
+
         new_att.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
@@ -1749,6 +1760,7 @@ fn handle_player_item_attribute_change_events(
             skills,
             dodge_crit_buff_active,
             coins.coins,
+            max_hp_hunt_bonus,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
             if !main_hand.get_obj().is_weapon() {

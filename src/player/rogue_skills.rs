@@ -129,6 +129,8 @@ pub fn handle_lunge(
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
     keybinds: Res<crate::keybinds::KeyBindings>,
+    asset_server: Res<AssetServer>,
+    projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
 ) {
     for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
@@ -158,6 +160,22 @@ pub fn handle_lunge(
                     Projectile::None,
                 );
                 commands.entity(lunge_e).set_parent(e);
+
+                // Skill Echo trigger: spawn an echo AoE at player position when using SprintLunge
+                if skills.has(Heirloom::SkillEcho) {
+                    let echo_dmg = (dmg.0 as f32 * 1.) as i32;
+                    let size_mult = projectile_size
+                        .get_single()
+                        .map(|s| s.get_multiplier())
+                        .unwrap_or(1.0);
+                    crate::player::melee_skills::spawn_echo_hitbox(
+                        &mut commands,
+                        &asset_server,
+                        e,
+                        echo_dmg,
+                        size_mult,
+                    );
+                }
 
                 lunge_state.lunge_duration.tick(time.delta());
                 lunge_state.lunge_cooldown_timer.tick(time.delta());

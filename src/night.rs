@@ -36,7 +36,7 @@ pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
 const CHAOS_TIMER_SECONDS: f32 = 12.0;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.
-pub const ERA_TIMER_SECONDS: f32 = 10.0 * 60.0; // 10 minutes
+pub const ERA_TIMER_SECONDS: f32 = 11.0 * 60.0; // 10 minutes
 
 impl InfiniteMode {
     pub fn new() -> Self {

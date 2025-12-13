@@ -8,7 +8,7 @@
     // (WoodPlank, ([(item: Log, count: 1)], Inventory, 4)),
     // (WoodWallBlock, ([(item: Log, count: 4)], Inventory, 4)),
     // (WoodDoorBlock, ([(item: Log, count: 6)], Inventory, 1)),
-    (StoneWallBlock, ([(item: StoneChunk, count: 4)], Inventory, 4)),
+    // (StoneWallBlock, ([(item: StoneChunk, count: 4)], Inventory, 4)),
     (Stick, ([(item: Log, count: 2)], Inventory, 1)),
     (BridgeBlock, ([(item: Log, count: 4)], Inventory, 4)),
     (Bandage, ([(item: SlimeGoo, count: 4),(item: String, count: 2),(item: PlantFibre, count: 2)], Inventory, 1)),
