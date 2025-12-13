@@ -1691,6 +1691,140 @@ fn clamp_mana(mut health: Query<(&mut CurrentMana, &MaxMana), With<Player>>) {
         }
     }
 }
+/// Calculate inventory buffs from all items in inventory (not hotbar)
+/// Returns a combined ItemAttributes with all inventory buffs
+fn calculate_inventory_buffs(
+    inv: &Inventory,
+    proto: &crate::proto::proto_param::ProtoParam,
+) -> ItemAttributes {
+    use crate::inventory::InventoryItemStack;
+
+    let mut inventory_buffs = ItemAttributes::default();
+
+    // Iterate through inventory items (not hotbar, not equipment, not accessories)
+    // Hotbar is slots 0-5, inventory is slots 6+
+    for (slot_idx, item_opt) in inv.items.items.iter().enumerate() {
+        // Skip hotbar slots (0-5) - only check inventory slots (6+)
+        if slot_idx < 6 {
+            continue;
+        }
+
+        if let Some(InventoryItemStack { item_stack, .. }) = item_opt {
+            // Only process equipment items (weapons, armor, accessories)
+            if let Some(equip_type) = item_stack.obj_type.get_equip_type(proto) {
+                if !equip_type.is_weapon() && !equip_type.is_armor() && !equip_type.is_accessory() {
+                    continue;
+                }
+
+                // Get the inventory buff line index
+                if let Some(line_index) = item_stack.metadata.inventory_buff_line_index {
+                    // Extract the attribute value from the specified line
+                    if let Some(buff_att) =
+                        extract_inventory_buff_attribute(item_stack, line_index, proto)
+                    {
+                        inventory_buffs = inventory_buffs.combine(&buff_att);
+                    }
+                }
+            }
+        }
+    }
+
+    inventory_buffs
+}
+
+/// Extract the attribute value from a specific tooltip line index
+fn extract_inventory_buff_attribute(
+    stack: &ItemStack,
+    line_index: usize,
+    proto: &crate::proto::proto_param::ProtoParam,
+) -> Option<ItemAttributes> {
+    let raw_base_att = proto.get_component::<RawItemBaseAttributes, _>(stack.obj_type)?;
+    let raw_bonus_att = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
+    let equip_type = proto.get_component::<EquipmentType, _>(stack.obj_type)?;
+
+    // Get tooltips to find which attribute is at this line
+    let (tooltips, _, _) = stack.attributes.get_tooltips(
+        stack.rarity.clone(),
+        Some(raw_base_att),
+        raw_bonus_att,
+        stack.metadata.level.unwrap_or(1) as i32,
+        stack.obj_type,
+        equip_type,
+    );
+
+    // Get the attribute name from the tooltip line
+    if let Some((name, _, _)) = tooltips.get(line_index) {
+        // Parse the attribute name and extract the value from ItemAttributes
+        let mut buff_att = ItemAttributes::default();
+        let mut matched = false;
+
+        // Match attribute name to ItemAttributes field
+        // Order matters - check more specific patterns first
+        if name.contains("HP Regen") {
+            buff_att.health_regen = stack.attributes.health_regen;
+            matched = true;
+        } else if name.contains("HP") && !name.contains("Regen") {
+            buff_att.health = stack.attributes.health;
+            matched = true;
+        } else if name.contains("Mana Regen") {
+            buff_att.mana_regen = stack.attributes.mana_regen;
+            matched = true;
+        } else if name.contains("Mana") && !name.contains("Regen") {
+            buff_att.mana = stack.attributes.mana;
+            matched = true;
+        } else if name.contains("Crit DMG") {
+            buff_att.crit_damage = stack.attributes.crit_damage;
+            matched = true;
+        } else if name.contains("% Crit") && !name.contains("DMG") {
+            buff_att.crit_chance = stack.attributes.crit_chance;
+            matched = true;
+        } else if name.contains("% Attack Speed") {
+            // Attack Speed should not be selectable, but if it is, we still extract it
+            buff_att.attack_speed = stack.attributes.attack_speed;
+            matched = true;
+        } else if name.contains("% Damage") {
+            buff_att.bonus_damage = stack.attributes.bonus_damage;
+            matched = true;
+        } else if name.contains("% Lifesteal") {
+            buff_att.lifesteal = stack.attributes.lifesteal;
+            matched = true;
+        } else if name.contains("% XP") {
+            buff_att.xp_rate = stack.attributes.xp_rate;
+            matched = true;
+        } else if name.contains("% Luck") {
+            buff_att.loot_rate = stack.attributes.loot_rate;
+            matched = true;
+        } else if name.contains("Defence") {
+            buff_att.defence = stack.attributes.defence;
+            matched = true;
+        } else if name.contains("Dodge") {
+            buff_att.dodge = stack.attributes.dodge;
+            matched = true;
+        } else if name.contains("Healing") {
+            buff_att.healing = stack.attributes.healing;
+            matched = true;
+        } else if name.contains("Thorns") {
+            buff_att.thorns = stack.attributes.thorns;
+            matched = true;
+        } else if name.contains("Speed") && !name.contains("Attack") {
+            buff_att.speed = stack.attributes.speed;
+            matched = true;
+        } else if name.contains("Proj. Size") {
+            buff_att.size = stack.attributes.size;
+            matched = true;
+        }
+
+        if matched {
+            Some(buff_att)
+        } else {
+            // No match found - this shouldn't happen if line selection works correctly
+            None
+        }
+    } else {
+        None
+    }
+}
+
 fn handle_player_item_attribute_change_events(
     mut commands: Commands,
     player: Query<(Entity, &Inventory), With<Player>>,
@@ -1714,6 +1848,7 @@ fn handle_player_item_attribute_change_events(
     hallucination_stats: Query<&crate::player::combat_heirlooms::HallucinationStats, With<Player>>,
     max_hp_hunt_tracker: Query<&crate::player::combat_heirlooms::MaxHPHuntTracker, With<Player>>,
     coins: Res<crate::player::currency::CoinCurrency>,
+    proto: crate::proto::proto_param::ProtoParam,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
@@ -1736,6 +1871,10 @@ fn handle_player_item_attribute_change_events(
         if let Ok(hall_stats) = hallucination_stats.get_single() {
             new_att = new_att.combine(hall_stats.as_item_attributes());
         }
+
+        // Calculate inventory buffs from items in inventory (not hotbar)
+        let inventory_buffs = calculate_inventory_buffs(&inv, &proto);
+        new_att = new_att.combine(&inventory_buffs);
 
         if new_att.attack_cooldown == 0. {
             new_att.attack_cooldown = 0.4;

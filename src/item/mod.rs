@@ -229,6 +229,8 @@ pub struct ItemDisplayMetaData {
     pub desc: Vec<String>,
     pub level: Option<u8>,
     pub item_ability: Option<ItemAbility>,
+    /// Index of the bonus attribute line selected for inventory buff (0-based)
+    pub inventory_buff_line_index: Option<usize>,
 }
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(

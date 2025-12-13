@@ -7,7 +7,7 @@ use crate::{
         Dodge, Healing, HealthRegen, ItemAttributes, ItemRarity, LootRateBonus, MaxHealth, MaxMana,
         RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
     },
-    colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED},
+    colors::{BLACK, GREY, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -360,6 +360,46 @@ pub fn handle_spawn_inv_item_tooltip(
                     ))
                     .id();
                 commands.entity(tooltip).add_child(text);
+            }
+
+            // Draw green box around inventory buff line if this is the selected line
+            // Note: buff_line_index is the index from get_tooltips (attributes only, no name)
+            // But tooltip_text has name at index 0, so attributes start at index 1
+            // So we need to add 1 to buff_line_index to match tooltip_text index
+            if let Some(buff_line_index) = item.item_stack.metadata.inventory_buff_line_index {
+                // buff_line_index is from get_tooltips (0-based for attributes)
+                // tooltip_text index = buff_line_index + 1 (because name is at index 0)
+                if i == buff_line_index + 1 && i > 0 {
+                    // Spawn a green box behind the text line (7px height)
+                    // Position it at the same Y as the text line, centered horizontally
+                    let box_width = size.x - 14.0; // Full width minus padding (8px on each side)
+                    let box_height = 7.0;
+                    // Box is centered horizontally in the tooltip
+                    let box_x = 0.0;
+                    // Use the same Y position as the text line
+                    let box_y = size.y / 2. - 14. - (i as f32 * 10.) - props.offset;
+                    let box_pos = Vec3::new(box_x, box_y, 0.9); // Slightly behind text
+
+                    let green_box = commands
+                        .spawn((
+                            SpriteBundle {
+                                sprite: Sprite {
+                                    color: LIGHT_GREEN,
+                                    custom_size: Some(Vec2::new(box_width, box_height)),
+                                    ..Default::default()
+                                },
+                                transform: Transform {
+                                    translation: box_pos,
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                            Name::new("INVENTORY_BUFF_BOX"),
+                        ))
+                        .id();
+                    commands.entity(tooltip).add_child(green_box);
+                }
             }
 
             if item.is_recipe && i > 2 {

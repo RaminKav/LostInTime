@@ -87,6 +87,19 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     new_stack.rarity = rarity;
 
     new_stack = levelup_item_stats(&new_stack, level, proto, true);
+
+    // Re-select inventory buff line after rerolling
+    let raw_base_att = proto
+        .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
+        .unwrap();
+    new_stack.metadata.inventory_buff_line_index = select_random_inventory_buff_line(
+        &new_stack,
+        raw_base_att,
+        raw_bonus_att_option,
+        &eqp_type,
+        proto,
+    );
+
     new_stack
 }
 
@@ -168,7 +181,71 @@ pub fn build_item_stack_with_parsed_attributes(
         new_stack = levelup_item_stats(&new_stack, 1, &proto, false);
     }
 
+    // Select a random bonus attribute line for inventory buff
+    new_stack.metadata.inventory_buff_line_index = select_random_inventory_buff_line(
+        &new_stack,
+        raw_base_att,
+        raw_bonus_att_option,
+        &equip_type,
+        proto,
+    );
+
     new_stack
+}
+
+/// Selects a random bonus attribute line index for inventory buff
+/// Returns None if there are no bonus attributes
+pub fn select_random_inventory_buff_line(
+    stack: &ItemStack,
+    raw_base_att: &RawItemBaseAttributes,
+    raw_bonus_att_option: Option<&RawItemBonusAttributes>,
+    equip_type: &EquipmentType,
+    _proto: &ProtoParam,
+) -> Option<usize> {
+    // Get tooltips to find which lines are bonus attributes
+    let (tooltips, _, _) = stack.attributes.get_tooltips(
+        stack.rarity.clone(),
+        Some(raw_base_att),
+        raw_bonus_att_option,
+        stack.metadata.level.unwrap_or(1) as i32,
+        stack.obj_type,
+        equip_type,
+    );
+
+    // Identify base attributes based on equipment type
+    // These should NOT be selectable as inventory buffs
+    let base_attributes: Vec<&str> = if equip_type.is_weapon() || equip_type.is_tool() {
+        // For weapons/tools: exclude Attack, Hits/s, and Attack Speed (base stats)
+        vec!["Attack", "Hits/s", "% Attack Speed"]
+    } else if equip_type.is_equipment() && !equip_type.is_accessory() {
+        // For armor: exclude HP and Defence (base stats)
+        vec!["HP", "Defence"]
+    } else {
+        // Accessories: no base attributes, everything is bonus (including Attack Speed)
+        vec![]
+    };
+
+    // Find bonus attribute line indices (skip name line at index 0)
+    let mut bonus_line_indices = Vec::new();
+    for (i, (name, _, _)) in tooltips.iter().enumerate() {
+        // Skip the name line (index 0)
+        if i == 0 {
+            continue;
+        }
+        // Check if this is a bonus attribute (not a base attribute)
+        let is_base = base_attributes.iter().any(|base| name.contains(base));
+        if !is_base && !name.is_empty() {
+            bonus_line_indices.push(i);
+        }
+    }
+
+    // Select a random bonus line index
+    if bonus_line_indices.is_empty() {
+        None
+    } else {
+        let mut rng = rand::thread_rng();
+        Some(bonus_line_indices[rng.gen_range(0..bonus_line_indices.len())])
+    }
 }
 
 pub fn levelup_item_stats(
