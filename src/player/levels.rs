@@ -39,7 +39,7 @@ impl PlayerLevel {
 
     pub fn add_xp(&mut self, xp: u32, skills: &PlayerSkills) -> bool {
         let mut did_level_up = false;
-        self.xp += (xp as f32 * (1. + skills.get_count(Heirloom::XPGain) as f32 * 0.1)) as u32;
+        self.xp += (xp as f32 * (1. + skills.get_count(Heirloom::XPGain) as f32 * 0.07)) as u32;
 
         if self.xp >= self.next_level_xp {
             self.level += 1;

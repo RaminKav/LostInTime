@@ -33,7 +33,9 @@ pub struct InfiniteMode {
 pub const MAX_DIFFICULTY_LEVEL: u8 = 10;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
-const CHAOS_TIMER_SECONDS: f32 = 12.0;
+/// Seconds between chaos threshold increases in endless mode (noticeable jumps every 60-90s)
+pub const CHAOS_THRESHOLD_INTERVAL: f32 = 75.0; // 75 seconds for noticeable difficulty ramps
+const CHAOS_TIMER_SECONDS: f32 = CHAOS_THRESHOLD_INTERVAL;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.
 pub const ERA_TIMER_SECONDS: f32 = 11.0 * 60.0; // 10 minutes
@@ -342,8 +344,9 @@ pub fn handle_infinite_mode_started(
     }
 }
 
-/// Tick the chaos timer in infinite mode and increase internal chaos bonus every 30 seconds
+/// Tick the chaos timer in infinite mode and increase internal chaos bonus at thresholds
 /// This chaos is stored in InfiniteMode and only applies during infinite mode (not carried to next era)
+/// Uses exponential growth per threshold to create noticeable difficulty jumps every 75s
 pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<InfiniteMode>) {
     if !infinite_mode.active {
         return;
@@ -354,10 +357,18 @@ pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<Infin
 
     infinite_mode.chaos_timer.tick(time.delta());
     if infinite_mode.chaos_timer.just_finished() {
-        infinite_mode.chaos_bonus += 1.0;
+        // Calculate which threshold we're at (0-indexed)
+        let threshold_number =
+            (infinite_mode.elapsed_seconds / CHAOS_THRESHOLD_INTERVAL).floor() as u32;
+
+        let base_chaos_per_threshold = 3.0;
+        let growth_rate = 1.15_f32;
+        let chaos_to_add = base_chaos_per_threshold * growth_rate.powf(threshold_number as f32);
+
+        infinite_mode.chaos_bonus += chaos_to_add;
         info!(
-            "Infinite mode: Chaos bonus increased to {}!",
-            infinite_mode.chaos_bonus
+            "Infinite mode: Chaos bonus increased by {:.1} to {:.1}! (Threshold {}, {:.0}s elapsed)",
+            chaos_to_add, infinite_mode.chaos_bonus, threshold_number, infinite_mode.elapsed_seconds
         );
     }
 }

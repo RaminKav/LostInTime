@@ -765,7 +765,9 @@ pub fn handle_active_skill_event(
                     _ => {}
                 }
                 // Skill Echo trigger: spawn an echo AoE at player position when using any skill
-                if skills.has(crate::player::skills::Heirloom::SkillEcho) {
+                if active.active_skill != ActiveSkill::Roll
+                    && skills.has(crate::player::skills::Heirloom::SkillEcho)
+                {
                     let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
                     let size_mult = skill_states
                         .player_projectile_size

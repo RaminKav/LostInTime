@@ -11,6 +11,7 @@ use crate::{
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
+    item::ItemDropDespawnTimer,
     player::{
         mage_skills::JustTeleported,
         skills::{Heirloom, PlayerSkills, RapidfireState},
@@ -407,7 +408,12 @@ fn handle_spawn_projectiles_after_delay(
                     "Spawned projectile {:?} with dmg {}",
                     proj.proj, computed_dmg
                 );
-                commands.entity(p).insert(Attack(computed_dmg));
+                commands
+                    .entity(p)
+                    .insert(Attack(computed_dmg))
+                    .insert(ItemDropDespawnTimer(
+                        Timer::from_seconds(30.0, TimerMode::Once), // Despawn after 60 seconds
+                    ));
             }
             commands.entity(e).despawn_recursive();
         }

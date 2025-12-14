@@ -379,6 +379,9 @@ impl ItemStack {
             .insert(AnimationPosTracker(0., 0., 0.3))
             .insert(YSort(0.))
             .insert(obj)
+            .insert(crate::item::ItemDropDespawnTimer(
+                Timer::from_seconds(60.0, TimerMode::Once), // Despawn after 60 seconds
+            ))
             .id();
 
         add_item_glows(commands, &game.graphics, item, self.rarity.clone());

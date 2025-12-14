@@ -628,7 +628,7 @@ fn check_projectile_hit_player_collisions(
                 // Apply defense reduction if the target is a player with defense stat
                 let final_damage = if let Some(defence) = defence_opt {
                     // Same formula as mob-to-player collisions: damage * (0.99 ^ defense)
-                    f32::round(att.0 as f32 * (0.99_f32.powi(defence.0))) as i32
+                    f32::round(att.0 as f32 * (0.995_f32.powi(defence.0))) as i32
                 } else {
                     att.0
                 };
@@ -891,7 +891,7 @@ fn check_mob_to_player_collisions(
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e1,
-                    damage: f32::round(attack.0 as f32 * (0.99_f32.powi(defence.0))) as i32,
+                    damage: f32::round(attack.0 as f32 * (0.995_f32.powi(defence.0))) as i32,
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,

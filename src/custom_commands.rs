@@ -77,6 +77,10 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 let mut proto_data = proto_data.clone();
                 proto_data.count = count;
                 spawned_entity_commands.insert(proto_data).insert(ItemDrop);
+                // Add despawn timer to reduce lag in endless mode
+                spawned_entity_commands.insert(crate::item::ItemDropDespawnTimer(
+                    Timer::from_seconds(60.0, TimerMode::Once), // Despawn after 60 seconds
+                ));
                 let eqp_type = params
                     .get_component::<EquipmentType, _>(obj.clone())
                     .unwrap_or(&EquipmentType::None);

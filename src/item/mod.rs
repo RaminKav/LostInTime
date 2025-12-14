@@ -6,7 +6,7 @@ use crate::client::is_not_paused;
 use crate::colors::{
     BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, RED, YELLOW,
 };
-use crate::combat::{handle_hits, ObjBreakEvent};
+use crate::combat::ObjBreakEvent;
 
 use crate::container::ContainerRegistry;
 use crate::enemy::Mob;
@@ -893,6 +893,11 @@ pub struct UpdateObjectEvent {
 #[derive(Component)]
 pub struct ItemDrop;
 
+/// Timer component for despawning ItemDrop entities after a certain time
+/// This helps reduce lag in endless mode by cleaning up uncollected items
+#[derive(Component)]
+pub struct ItemDropDespawnTimer(pub Timer);
+
 pub struct ItemsPlugin;
 
 impl Plugin for ItemsPlugin {
@@ -938,6 +943,11 @@ impl Plugin for ItemsPlugin {
                     handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_item_drop_despawn_timer
+                    .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
@@ -1229,6 +1239,23 @@ pub fn handle_break_object(
             let offset_pos = world_pos + Vec2::new(quads.0, quads.1) - anchor_offset;
             let ai_pos = world_pos_to_AIPos(offset_pos);
             game.set_pos_validity_for_pathfinding(ai_pos, true);
+        }
+    }
+}
+
+/// System to handle despawning ItemDrop entities after their timer expires
+/// This helps reduce lag in endless mode by cleaning up uncollected items
+fn handle_item_drop_despawn_timer(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut item_drops: Query<(Entity, &mut ItemDropDespawnTimer)>,
+) {
+    for (entity, mut timer) in item_drops.iter_mut() {
+        timer.0.tick(time.delta());
+        if timer.0.finished() {
+            if let Some(commands) = commands.get_entity(entity) {
+                commands.despawn_recursive();
+            }
         }
     }
 }

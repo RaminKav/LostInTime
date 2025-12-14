@@ -769,20 +769,20 @@ impl Heirloom {
                 "Gain +15% Attack".to_string(),
                 "Speed, permanently. ".to_string(),
             ],
-            Heirloom::XPGain => vec!["Gain +10% XP".to_string(), "permanently. ".to_string()],
+            Heirloom::XPGain => vec!["Gain +7% XP".to_string(), "permanently. ".to_string()],
             Heirloom::CreditCard => vec![
                 "Gain 1 Coin when".to_string(),
                 "you use your active".to_string(),
                 "skill.".to_string(),
             ],
             Heirloom::DodgeChance => vec![
-                "Gain +10% Dodge".to_string(),
+                "Gain +7% Dodge".to_string(),
                 "Chance,".to_string(),
                 "permanently.".to_string(),
             ],
             Heirloom::Gigantify => vec![
                 "Your Attacks gain".to_string(),
-                "+15% Size".to_string(),
+                "+10% Size".to_string(),
                 "permanently.".to_string(),
             ],
 
@@ -1413,7 +1413,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Rare),
                 // HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
                 // HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
@@ -1452,7 +1452,7 @@ impl Default for HeirloomChoiceQueue {
                 ),
                 HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Rare),
                 // New heirlooms
-                HeirloomChoiceState::new(Heirloom::MaxHPHunt, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::MaxHPHunt, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::MaxHPDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DeathDefiance, HeirloomRarity::Legendary),
@@ -1537,7 +1537,7 @@ impl HeirloomChoiceQueue {
         let loot_bonus_f = loot_bonus as f32;
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
         let legendary_threshold = (99.0 - loot_bonus_f * 0.08).max(0.0);
-        let rare_threshold = (88.0 - loot_bonus_f * 0.12).max(0.0);
+        let rare_threshold = (92.0 - loot_bonus_f * 0.12).max(0.0);
         let uncommon_threshold = (68.0 - loot_bonus_f * 0.1).max(0.0);
         let roll = rng.gen_range(0_f32..100_f32);
 

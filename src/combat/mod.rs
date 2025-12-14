@@ -210,12 +210,21 @@ fn handle_enemy_death(
 
                 if let Some(drop_e) = drop_e {
                     add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
+                    // Add despawn timer to reduce lag in endless mode
+                    commands
+                        .entity(drop_e)
+                        .insert(crate::item::ItemDropDespawnTimer(
+                            Timer::from_seconds(60.0, TimerMode::Once), // Despawn after 60 seconds
+                        ));
                 }
             }
         }
         //give player xp
         let did_level = player_level.add_xp(mob_xp.0, &player_skills);
-        spawn_xp_particles(death_event.enemy_pos, &mut commands, mob_xp.0, did_level);
+        // Only spawn XP particles if not in endless mode (to reduce lag)
+        if !is_infinite_mode {
+            spawn_xp_particles(death_event.enemy_pos, &mut commands, mob_xp.0, did_level);
+        }
     }
 }
 fn handle_invincibility_frames(

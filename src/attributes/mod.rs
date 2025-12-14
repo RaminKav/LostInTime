@@ -1038,7 +1038,7 @@ impl ItemAttributes {
         entity.insert(Thorns(base_thorns + thorn_armor_bonus));
         // Calculate raw dodge value from stats and heirlooms
         let raw_dodge =
-            self.dodge.value + skills.get_count(Heirloom::DodgeChance) * 10 + chaos_dodge_bonus;
+            self.dodge.value + skills.get_count(Heirloom::DodgeChance) * 7 + chaos_dodge_bonus;
         // Asymptotic formula: approaches 100 but never reaches it
         // Formula: 100 * raw / (raw + 100)
         // At raw 100 this gives 50%, at raw 200 gives 66.6%
@@ -1067,7 +1067,7 @@ impl ItemAttributes {
             self.mana_regen.value + skills.get_count(Heirloom::MPRegen) * 5,
         ));
         entity.insert(ProjectileSize(
-            self.size.value + skills.get_count(Heirloom::Gigantify) * 15,
+            self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
         ));
     }
     pub fn get_random_existing_bonus_attribute_string(&self, filter: &Vec<&str>) -> Option<String> {
