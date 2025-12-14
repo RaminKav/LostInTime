@@ -20,7 +20,7 @@ use crate::{
     colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
     inputs::player_move_inputs,
     inventory::{Inventory, ItemStack},
-    item::{Equipment, EquipmentType, WorldObject},
+    item::{BonusStatLine, Equipment, EquipmentType, WorldObject},
     juice::ShakeEffect,
     player::{
         levels::{handle_level_up, PlayerLevel},
@@ -47,10 +47,6 @@ use self::health_regen::{handle_health_regen, handle_mana_regen};
 pub struct AttributesPlugin;
 
 aseprite!(pub RarityGlows, "textures/effects/RarityGlows.aseprite");
-#[derive(Resource, Reflect, Default, Bundle)]
-pub struct BlockAttributeBundle {
-    pub health: CurrentHealth,
-}
 #[derive(
     Component,
     PartialEq,
@@ -184,8 +180,40 @@ impl AttributeQuality {
 }
 
 impl ItemAttributes {
-    pub fn get_tooltips(
-        &self,
+    /// Helper function to format a stat line attribute name and value into a tooltip string
+    fn format_stat_line_tooltip(attribute_name: &str, value: i32) -> String {
+        let is_positive = value > 0;
+        let sign = if is_positive { "+" } else { "" };
+        match attribute_name {
+            "health" => format!("{}{} HP", sign, value),
+            "shield" => format!("{}{} Shield", sign, value),
+            "attack" => format!("{}{} Attack", sign, value),
+            "crit_chance" => format!("{}{}% Crit Chance", sign, value),
+            "crit_damage" => format!("{}{}% Crit DMG", sign, value),
+            "bonus_damage" => format!("{}{}% Damage", sign, value),
+            "health_regen" => format!("{}{} HP Regen", sign, value),
+            "healing" => format!("{}{} Healing", sign, value),
+            "thorns" => format!("{}{} Thorns", sign, value),
+            "dodge" => format!("{}{}% Dodge", sign, value),
+            "speed" => format!("{}{}% Speed", sign, value),
+            "lifesteal" => format!("{}{}% Lifesteal", sign, value),
+            "defence" => format!("{}{} Defence", sign, value),
+            "attack_speed" => format!("{}{}% Attack Speed", sign, value),
+            "loot_rate" => format!("{}{}% Luck", sign, value),
+            "mana" => format!("{}{} Mana", sign, value),
+            "size" | "projectile_size" => format!("{}{}% Size", sign, value),
+            "xp_rate" => format!("{}{}% XP", sign, value),
+            "mana_regen" => format!("{}{} MP Regen", sign, value),
+            "durability" => format!("{}{} Durability", sign, value),
+            "max_durability" => format!("{}{} Max Durability", sign, value),
+            _ => format!("{}{} {}", sign, value, attribute_name),
+        }
+    }
+
+    /// Generate tooltips from individual bonus stat lines (allows duplicate stats)
+    pub fn get_tooltips_from_stat_lines(
+        stat_lines: &[crate::item::BonusStatLine],
+        combined_attrs: &ItemAttributes, // Combined base + bonus attributes
         rarity: ItemRarity,
         base_att: Option<&RawItemBaseAttributes>,
         bonus_att: Option<&RawItemBonusAttributes>,
@@ -194,7 +222,11 @@ impl ItemAttributes {
         equip_type: &EquipmentType,
     ) -> (Vec<(String, String, AttributeQuality)>, f32, f32) {
         let mut tooltips: Vec<(String, String, AttributeQuality)> = vec![];
-        let is_positive = |val: i32| val > 0;
+        let r = rarity.get_rarity_attributes_bonus();
+        let mut total_score = 0.;
+        let mut total_atts = 0.;
+        let is_cape = equip_type.is_cape();
+
         let base_att_lvl_bonus = if equip_type.is_weapon() || equip_type.is_tool() {
             (level - 1) as f32 * obj.get_weapon_levelup_upgrade() as f32
         } else {
@@ -210,671 +242,152 @@ impl ItemAttributes {
             } else {
                 (0., 0.)
             };
-        let r = rarity.get_rarity_attributes_bonus();
-        let mut total_score = 0.;
-        let mut total_atts = 0.;
 
-        let is_cape = equip_type.is_cape();
-        if self.health.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} HP",
-                    if is_positive(self.health.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.health.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(health) = &base_att.unwrap().health {
+        // Track which attributes are base attributes so we can filter them from bonus stat lines
+        let mut base_attribute_names = std::collections::HashSet::new();
+
+        // Add base attributes first (check if they exist in raw_base_att and have non-zero values)
+        if let Some(base_att) = base_att {
+            if base_att.health.is_some() && combined_attrs.health.value != 0 {
+                base_attribute_names.insert("health".to_string());
+                tooltips.push((
+                    format!(
+                        "{}{} HP",
+                        if combined_attrs.health.value > 0 {
+                            "+"
+                        } else {
+                            ""
+                        },
+                        combined_attrs.health.value
+                    ),
+                    if is_cape {
+                        "".to_string()
+                    } else if let Some(health) = &base_att.health {
                         format!(
                             "({}-{})",
                             f32::round(*health.start() as f32 * r + base_hp_lvl_bonus) as i32,
                             f32::round(*health.end() as f32 * r + base_hp_lvl_bonus) as i32
                         )
                     } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().health.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(*bonus_att.unwrap().health.clone().unwrap().end() as f32 * r)
-                                as i32
-                        )
-                    }
-                },
-                self.health.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.health.range_percentage;
-        }
-        if self.defence.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Defence",
-                    if is_positive(self.defence.value) {
-                        "+"
-                    } else {
-                        ""
+                        "".to_string()
                     },
-                    self.defence.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(defence) = &base_att.unwrap().defence {
+                    combined_attrs.health.quality,
+                ));
+            }
+            if base_att.defence.is_some() && combined_attrs.defence.value != 0 {
+                base_attribute_names.insert("defence".to_string());
+                tooltips.push((
+                    format!(
+                        "{}{} Defence",
+                        if combined_attrs.defence.value > 0 {
+                            "+"
+                        } else {
+                            ""
+                        },
+                        combined_attrs.defence.value
+                    ),
+                    if is_cape {
+                        "".to_string()
+                    } else if let Some(defence) = &base_att.defence {
                         format!(
                             "({}-{})",
                             f32::round(*defence.start() as f32 * r + base_def_lvl_bonus) as i32,
                             f32::round(*defence.end() as f32 * r + base_def_lvl_bonus) as i32
                         )
                     } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().defence.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().defence.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.defence.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.defence.range_percentage;
-        }
-        if self.attack.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Attack",
-                    if is_positive(self.attack.value) {
-                        "+"
-                    } else {
-                        ""
+                        "".to_string()
                     },
-                    self.attack.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(attack) = &base_att.unwrap().attack {
+                    combined_attrs.defence.quality,
+                ));
+            }
+            if base_att.attack.is_some() && combined_attrs.attack.value != 0 {
+                base_attribute_names.insert("attack".to_string());
+                tooltips.push((
+                    format!(
+                        "{}{} Attack",
+                        if combined_attrs.attack.value > 0 {
+                            "+"
+                        } else {
+                            ""
+                        },
+                        combined_attrs.attack.value
+                    ),
+                    if is_cape {
+                        "".to_string()
+                    } else if let Some(attack) = &base_att.attack {
                         format!(
                             "({}-{})",
                             f32::round(*attack.start() as f32 * r + base_att_lvl_bonus) as i32,
                             f32::round(*attack.end() as f32 * r + base_att_lvl_bonus) as i32
                         )
                     } else {
+                        "".to_string()
+                    },
+                    combined_attrs.attack.quality,
+                ));
+            }
+            // Check for speed as a base attribute
+            if base_att.speed.is_some() && combined_attrs.speed.value != 0 {
+                base_attribute_names.insert("speed".to_string());
+                let base_speed_lvl_bonus = if let Some(speed) = &base_att.speed {
+                    f32::round(*speed.start() as f32 * r * 0.1)
+                } else {
+                    0.
+                };
+                tooltips.push((
+                    format!(
+                        "{}{} Speed",
+                        if combined_attrs.speed.value > 0 {
+                            "+"
+                        } else {
+                            ""
+                        },
+                        combined_attrs.speed.value
+                    ),
+                    if is_cape {
+                        "".to_string()
+                    } else if let Some(speed) = &base_att.speed {
                         format!(
                             "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().attack.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(*bonus_att.unwrap().attack.clone().unwrap().end() as f32 * r)
-                                as i32
+                            f32::round(*speed.start() as f32 * r + base_speed_lvl_bonus) as i32,
+                            f32::round(*speed.end() as f32 * r + base_speed_lvl_bonus) as i32
                         )
-                    }
-                },
-                self.attack.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.attack.range_percentage;
+                    } else {
+                        "".to_string()
+                    },
+                    combined_attrs.speed.quality,
+                ));
+            }
         }
-        if self.attack_cooldown != 0. {
+
+        // Add attack cooldown (Hits/s) if it exists
+        if combined_attrs.attack_cooldown != 0. {
             tooltips.push((
-                format!("{:.2} Hits/s", 1. / self.attack_cooldown),
+                format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
                 "".to_string(),
                 AttributeQuality::Average,
             ));
         }
-        if self.dodge.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Dodge",
-                    if is_positive(self.dodge.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.dodge.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(dodge) = &base_att.unwrap().dodge {
-                        format!(
-                            "({}-{})",
-                            f32::round(*dodge.start() as f32 * r) as i32,
-                            f32::round(*dodge.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().dodge.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(*bonus_att.unwrap().dodge.clone().unwrap().end() as f32 * r)
-                                as i32
-                        )
-                    }
-                },
-                self.dodge.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.dodge.range_percentage;
-        }
-        if self.crit_chance.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Crit",
-                    if is_positive(self.crit_chance.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.crit_chance.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(crit_chance) = &base_att.unwrap().crit_chance {
-                        format!(
-                            "({}-{})",
-                            f32::round(*crit_chance.start() as f32 * r) as i32,
-                            f32::round(*crit_chance.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().crit_chance.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().crit_chance.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.crit_chance.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.crit_chance.range_percentage;
-        }
-        if self.crit_damage.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Crit DMG",
-                    if is_positive(self.crit_damage.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.crit_damage.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(crit_damage) = &base_att.unwrap().crit_damage {
-                        format!(
-                            "({}-{})",
-                            f32::round(*crit_damage.start() as f32 * r) as i32,
-                            f32::round(*crit_damage.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().crit_damage.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().crit_damage.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.crit_damage.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.crit_damage.range_percentage;
-        }
-        if self.bonus_damage.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Damage",
-                    if is_positive(self.bonus_damage.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.bonus_damage.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(bonus_damage) = &base_att.unwrap().bonus_damage {
-                        format!(
-                            "({}-{})",
-                            f32::round(*bonus_damage.start() as f32 * r) as i32,
-                            f32::round(*bonus_damage.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().bonus_damage.clone().unwrap().start() as f32
-                                    * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().bonus_damage.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.bonus_damage.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.bonus_damage.range_percentage;
-        }
-        if self.health_regen.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} HP Regen",
-                    if is_positive(self.health_regen.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.health_regen.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(health_regen) = &base_att.unwrap().health_regen {
-                        format!(
-                            "({}-{})",
-                            f32::round(*health_regen.start() as f32 * r) as i32,
-                            f32::round(*health_regen.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().health_regen.clone().unwrap().start() as f32
-                                    * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().health_regen.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.health_regen.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.health_regen.range_percentage;
-        }
-        if self.healing.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Healing",
-                    if is_positive(self.healing.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.healing.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(healing) = &base_att.unwrap().healing {
-                        format!(
-                            "({}-{})",
-                            f32::round(*healing.start() as f32 * r) as i32,
-                            f32::round(*healing.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().healing.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().healing.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.healing.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.healing.range_percentage;
-        }
-        if self.thorns.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Thorns",
-                    if is_positive(self.thorns.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.thorns.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(thorns) = &base_att.unwrap().thorns {
-                        format!(
-                            "({}-{})",
-                            f32::round(*thorns.start() as f32 * r) as i32,
-                            f32::round(*thorns.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().thorns.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(*bonus_att.unwrap().thorns.clone().unwrap().end() as f32 * r)
-                                as i32
-                        )
-                    }
-                },
-                self.thorns.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.thorns.range_percentage;
-        }
-        if self.speed.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Speed",
-                    if is_positive(self.speed.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.speed.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(speed) = &base_att.unwrap().speed {
-                        format!(
-                            "({}-{})",
-                            f32::round(*speed.start() as f32 * r) as i32,
-                            f32::round(*speed.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().speed.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(*bonus_att.unwrap().speed.clone().unwrap().end() as f32 * r)
-                                as i32
-                        )
-                    }
-                },
-                self.speed.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.speed.range_percentage;
-        }
-        if self.lifesteal.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Lifesteal",
-                    if is_positive(self.lifesteal.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.lifesteal.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(lifesteal) = &base_att.unwrap().lifesteal {
-                        format!(
-                            "({}-{})",
-                            f32::round(*lifesteal.start() as f32 * r) as i32,
-                            f32::round(*lifesteal.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().lifesteal.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().lifesteal.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.lifesteal.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.lifesteal.range_percentage;
-        }
+        for stat_line in stat_lines {
+            // Skip if this is a base attribute (already shown in base attributes section)
+            if base_attribute_names.contains(&stat_line.attribute_name) {
+                continue;
+            }
 
-        if self.xp_rate.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% XP",
-                    if is_positive(self.xp_rate.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.xp_rate.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(xp_rate) = &base_att.unwrap().xp_rate {
-                        format!(
-                            "({}-{})",
-                            f32::round(*xp_rate.start() as f32 * r) as i32,
-                            f32::round(*xp_rate.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().xp_rate.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().xp_rate.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.xp_rate.quality,
-            ));
+            let tooltip_text =
+                Self::format_stat_line_tooltip(&stat_line.attribute_name, stat_line.value);
+            // For bonus attributes, we can show range if available
+            let range_text = if is_cape {
+                "".to_string()
+            } else if let Some(bonus_att) = bonus_att {
+                // Try to get range from bonus_att
+                Self::get_range_text_for_attribute(&stat_line.attribute_name, bonus_att, r)
+            } else {
+                "".to_string()
+            };
+            tooltips.push((tooltip_text, range_text, stat_line.quality));
             total_atts += 1.;
-            total_score += self.xp_rate.range_percentage;
-        }
-        if self.loot_rate.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Luck",
-                    if is_positive(self.loot_rate.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.loot_rate.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(loot_rate) = &base_att.unwrap().loot_rate {
-                        format!(
-                            "({}-{})",
-                            f32::round(*loot_rate.start() as f32 * r) as i32,
-                            f32::round(*loot_rate.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().loot_rate.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().loot_rate.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.loot_rate.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.loot_rate.range_percentage;
-        }
-        if self.mana.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Mana",
-                    if is_positive(self.mana.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.mana.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(mana) = &base_att.unwrap().mana {
-                        format!(
-                            "({}-{})",
-                            f32::round(*mana.start() as f32 * r) as i32,
-                            f32::round(*mana.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(*bonus_att.unwrap().mana.clone().unwrap().start() as f32 * r)
-                                as i32,
-                            f32::round(*bonus_att.unwrap().mana.clone().unwrap().end() as f32 * r)
-                                as i32
-                        )
-                    }
-                },
-                self.mana.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.mana.range_percentage;
-        }
-        if self.mana_regen.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Mana Regen",
-                    if is_positive(self.mana_regen.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.mana_regen.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else {
-                    if let Some(mana_regen) = &base_att.unwrap().mana_regen {
-                        format!(
-                            "({}-{})",
-                            f32::round(*mana_regen.start() as f32 * r) as i32,
-                            f32::round(*mana_regen.end() as f32 * r) as i32
-                        )
-                    } else {
-                        format!(
-                            "({}-{})",
-                            f32::round(
-                                *bonus_att.unwrap().mana_regen.clone().unwrap().start() as f32 * r
-                            ) as i32,
-                            f32::round(
-                                *bonus_att.unwrap().mana_regen.clone().unwrap().end() as f32 * r
-                            ) as i32
-                        )
-                    }
-                },
-                self.mana_regen.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.mana_regen.range_percentage;
-        }
-        if self.size.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{} Proj. Size",
-                    if is_positive(self.size.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.size.value
-                ),
-                if let Some(size) = &base_att.unwrap().size {
-                    format!(
-                        "({}-{})",
-                        f32::round(*size.start() as f32 * r) as i32,
-                        f32::round(*size.end() as f32 * r) as i32
-                    )
-                } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(*bonus_att.unwrap().size.clone().unwrap().start() as f32 * r)
-                            as i32,
-                        f32::round(*bonus_att.unwrap().size.clone().unwrap().end() as f32 * r)
-                            as i32
-                    )
-                },
-                self.size.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.size.range_percentage;
-        }
-        if self.attack_speed.value != 0 {
-            tooltips.push((
-                format!(
-                    "{}{}% Attack Speed",
-                    if is_positive(self.attack_speed.value) {
-                        "+"
-                    } else {
-                        ""
-                    },
-                    self.attack_speed.value
-                ),
-                if is_cape {
-                    "".to_string()
-                } else if let Some(attack_speed) = &base_att.unwrap().attack_speed {
-                    format!(
-                        "({}-{})",
-                        f32::round(*attack_speed.start() as f32 * r) as i32,
-                        f32::round(*attack_speed.end() as f32 * r) as i32
-                    )
-                } else {
-                    format!(
-                        "({}-{})",
-                        f32::round(
-                            *bonus_att.unwrap().attack_speed.clone().unwrap().start() as f32 * r
-                        ) as i32,
-                        f32::round(
-                            *bonus_att.unwrap().attack_speed.clone().unwrap().end() as f32 * r
-                        ) as i32
-                    )
-                },
-                self.attack_speed.quality,
-            ));
-            total_atts += 1.;
-            total_score += self.size.range_percentage;
+            total_score += stat_line.range_percentage;
         }
         let ratio = if total_atts == 0. {
             0.
@@ -883,6 +396,17 @@ impl ItemAttributes {
         };
         (tooltips, ratio, total_atts)
     }
+
+    /// Helper to get range text for an attribute from RawItemBonusAttributes
+    fn get_range_text_for_attribute(
+        _attribute_name: &str,
+        _bonus_att: &RawItemBonusAttributes,
+        _r: f32,
+    ) -> String {
+        //TODO: Decide if we want range text anymore, if so, gotta fix this.
+        "".to_string()
+    }
+
     pub fn get_stats_summary(&self) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
         tooltips.push(("Health:          ".to_string(), format!("{}", self.health)));
@@ -1070,7 +594,11 @@ impl ItemAttributes {
             self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
         ));
     }
-    pub fn get_random_existing_bonus_attribute_string(&self, filter: &Vec<&str>) -> Option<String> {
+    pub fn get_random_existing_bonus_attribute_string(
+        &self,
+        bonus_stat_lines: &Vec<BonusStatLine>,
+        filter: &Vec<&str>,
+    ) -> Option<String> {
         debug!("Getting random existing attribute from: {:?}", self);
         let existing_attributes = vec![
             ("health", self.health.value),
@@ -1096,7 +624,13 @@ impl ItemAttributes {
             ("size", self.size.value),
         ]
         .iter()
-        .filter(|(name, val)| *val > 0 && !filter.contains(name))
+        .filter(|(name, val)| {
+            (*val > 0
+                || bonus_stat_lines
+                    .iter()
+                    .any(|line| &line.attribute_name == name))
+                && !filter.contains(name)
+        })
         .map(|(name, _)| name.to_string())
         .collect::<Vec<String>>();
         if existing_attributes.is_empty() {
@@ -1142,6 +676,47 @@ impl ItemAttributes {
         }
         self
     }
+
+    /// Sum up a vector of bonus stat lines into ItemAttributes
+    /// This allows duplicate stats (e.g., +5 crit, +9 crit) to be combined
+    pub fn from_stat_lines(stat_lines: &[crate::item::BonusStatLine]) -> Self {
+        let mut attrs = ItemAttributes::default();
+        for stat_line in stat_lines {
+            let attr_value = AttributeValue::new(
+                stat_line.value,
+                stat_line.quality,
+                stat_line.range_percentage,
+            );
+            match stat_line.attribute_name.as_str() {
+                "health" => attrs.health = attrs.health + attr_value,
+                "shield" => attrs.shield = attrs.shield + attr_value,
+                "attack" => attrs.attack = attrs.attack + attr_value,
+                "crit_chance" => attrs.crit_chance = attrs.crit_chance + attr_value,
+                "crit_damage" => attrs.crit_damage = attrs.crit_damage + attr_value,
+                "bonus_damage" => attrs.bonus_damage = attrs.bonus_damage + attr_value,
+                "health_regen" => attrs.health_regen = attrs.health_regen + attr_value,
+                "healing" => attrs.healing = attrs.healing + attr_value,
+                "thorns" => attrs.thorns = attrs.thorns + attr_value,
+                "dodge" => attrs.dodge = attrs.dodge + attr_value,
+                "speed" => attrs.speed = attrs.speed + attr_value,
+                "lifesteal" => attrs.lifesteal = attrs.lifesteal + attr_value,
+                "defence" => attrs.defence = attrs.defence + attr_value,
+                "attack_speed" => attrs.attack_speed = attrs.attack_speed + attr_value,
+                "loot_rate" => attrs.loot_rate = attrs.loot_rate + attr_value,
+                "mana" => attrs.mana = attrs.mana + attr_value,
+                "size" | "projectile_size" => attrs.size = attrs.size + attr_value,
+                "xp_rate" => attrs.xp_rate = attrs.xp_rate + attr_value,
+                "mana_regen" => attrs.mana_regen = attrs.mana_regen + attr_value,
+                "durability" => attrs.durability = attrs.durability + attr_value,
+                "max_durability" => attrs.max_durability = attrs.max_durability + attr_value,
+                _ => warn!(
+                    "Unknown attribute name in stat line: {}",
+                    stat_line.attribute_name
+                ),
+            }
+        }
+        attrs
+    }
     pub fn combine(&self, other: &ItemAttributes) -> ItemAttributes {
         ItemAttributes {
             health: self.health + other.health,
@@ -1185,13 +760,14 @@ macro_rules! setup_raw_bonus_attributes {
             pub fn into_item_attributes(
                 &self,
                 rarity: ItemRarity,
-                item_type: &EquipmentType
+                item_type: &EquipmentType,
+                stat_lines_out: Option<&mut Vec<crate::item::BonusStatLine>>,
             ) -> ItemAttributes {
                 // take fields of Range<i32> into one i32
                 let mut rng = rand::thread_rng();
                 let num_bonus_attributes = rarity.get_num_bonus_attributes(item_type);
                 let num_attributes = rng.gen_range(num_bonus_attributes);
-                let mut item_attributes = ItemAttributes::default();
+                let mut stat_lines = Vec::new();
                 let valid_attributes = {
                     let mut v = Vec::new();
                     $(
@@ -1202,15 +778,9 @@ macro_rules! setup_raw_bonus_attributes {
                     v
                 };
                 let num_valid_attributes = valid_attributes.len();
-                let mut already_picked_attributes = Vec::new();
                 for _ in 0..num_attributes {
                     let picked_attribute_index = rng.gen_range(0..num_valid_attributes);
-                    let mut picked_attribute = valid_attributes[picked_attribute_index];
-                    while already_picked_attributes.contains(&picked_attribute) {
-                        let picked_attribute_index = rng.gen_range(0..num_valid_attributes);
-                        picked_attribute = valid_attributes[picked_attribute_index];
-                    }
-                    already_picked_attributes.push(picked_attribute);
+                    let picked_attribute = valid_attributes[picked_attribute_index];
                     $(
                         {
                             if stringify!($field_name) == picked_attribute {
@@ -1220,17 +790,24 @@ macro_rules! setup_raw_bonus_attributes {
                                 let total_range = range.end() - range.start();
                                 let value = rng.gen_range(range.clone());
                                 let percent_of_total_range = (value - range.start()) as f32 / total_range as f32;
-                                item_attributes.$field_name = AttributeValue::new(
+                                let stat_line = crate::item::BonusStatLine {
+                                    attribute_name: stringify!($field_name).to_string(),
                                         value,
-                                        AttributeQuality::get_quality(range, value),
-                                        percent_of_total_range
-                                    );
+                                    quality: AttributeQuality::get_quality(range, value),
+                                    range_percentage: percent_of_total_range,
+                                };
+                                stat_lines.push(stat_line);
                             }
                         }
                     )*
                 }
 
-                item_attributes
+                // Store stat lines in output parameter
+                if let Some(out) = stat_lines_out {
+                    *out = stat_lines.clone();
+                }
+
+                ItemAttributes::from_stat_lines(&stat_lines)
             }
         }
     }
@@ -1732,94 +1309,50 @@ fn calculate_inventory_buffs(
     inventory_buffs
 }
 
-/// Extract the attribute value from a specific tooltip line index
+/// Extract the attribute value from a specific bonus stat line index
+/// The line_index is an index into stack.metadata.bonus_stat_lines
 fn extract_inventory_buff_attribute(
     stack: &ItemStack,
     line_index: usize,
-    proto: &crate::proto::proto_param::ProtoParam,
+    _proto: &crate::proto::proto_param::ProtoParam,
 ) -> Option<ItemAttributes> {
-    let raw_base_att = proto.get_component::<RawItemBaseAttributes, _>(stack.obj_type)?;
-    let raw_bonus_att = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
-    let equip_type = proto.get_component::<EquipmentType, _>(stack.obj_type)?;
-
-    // Get tooltips to find which attribute is at this line
-    let (tooltips, _, _) = stack.attributes.get_tooltips(
-        stack.rarity.clone(),
-        Some(raw_base_att),
-        raw_bonus_att,
-        stack.metadata.level.unwrap_or(1) as i32,
-        stack.obj_type,
-        equip_type,
-    );
-
-    // Get the attribute name from the tooltip line
-    if let Some((name, _, _)) = tooltips.get(line_index) {
-        // Parse the attribute name and extract the value from ItemAttributes
+    // Get the stat line directly from bonus_stat_lines
+    if let Some(stat_line) = stack.metadata.bonus_stat_lines.get(line_index) {
+        // Convert the single stat line to ItemAttributes
         let mut buff_att = ItemAttributes::default();
-        let mut matched = false;
+        let attr_value = AttributeValue::new(
+            stat_line.value,
+            stat_line.quality,
+            stat_line.range_percentage,
+        );
 
         // Match attribute name to ItemAttributes field
-        // Order matters - check more specific patterns first
-        if name.contains("HP Regen") {
-            buff_att.health_regen = stack.attributes.health_regen;
-            matched = true;
-        } else if name.contains("HP") && !name.contains("Regen") {
-            buff_att.health = stack.attributes.health;
-            matched = true;
-        } else if name.contains("Mana Regen") {
-            buff_att.mana_regen = stack.attributes.mana_regen;
-            matched = true;
-        } else if name.contains("Mana") && !name.contains("Regen") {
-            buff_att.mana = stack.attributes.mana;
-            matched = true;
-        } else if name.contains("Crit DMG") {
-            buff_att.crit_damage = stack.attributes.crit_damage;
-            matched = true;
-        } else if name.contains("% Crit") && !name.contains("DMG") {
-            buff_att.crit_chance = stack.attributes.crit_chance;
-            matched = true;
-        } else if name.contains("% Attack Speed") {
-            // Attack Speed should not be selectable, but if it is, we still extract it
-            buff_att.attack_speed = stack.attributes.attack_speed;
-            matched = true;
-        } else if name.contains("% Damage") {
-            buff_att.bonus_damage = stack.attributes.bonus_damage;
-            matched = true;
-        } else if name.contains("% Lifesteal") {
-            buff_att.lifesteal = stack.attributes.lifesteal;
-            matched = true;
-        } else if name.contains("% XP") {
-            buff_att.xp_rate = stack.attributes.xp_rate;
-            matched = true;
-        } else if name.contains("% Luck") {
-            buff_att.loot_rate = stack.attributes.loot_rate;
-            matched = true;
-        } else if name.contains("Defence") {
-            buff_att.defence = stack.attributes.defence;
-            matched = true;
-        } else if name.contains("Dodge") {
-            buff_att.dodge = stack.attributes.dodge;
-            matched = true;
-        } else if name.contains("Healing") {
-            buff_att.healing = stack.attributes.healing;
-            matched = true;
-        } else if name.contains("Thorns") {
-            buff_att.thorns = stack.attributes.thorns;
-            matched = true;
-        } else if name.contains("Speed") && !name.contains("Attack") {
-            buff_att.speed = stack.attributes.speed;
-            matched = true;
-        } else if name.contains("Proj. Size") {
-            buff_att.size = stack.attributes.size;
-            matched = true;
+        match stat_line.attribute_name.as_str() {
+            "health" => buff_att.health = attr_value,
+            "shield" => buff_att.shield = attr_value,
+            "attack" => buff_att.attack = attr_value,
+            "crit_chance" => buff_att.crit_chance = attr_value,
+            "crit_damage" => buff_att.crit_damage = attr_value,
+            "bonus_damage" => buff_att.bonus_damage = attr_value,
+            "health_regen" => buff_att.health_regen = attr_value,
+            "healing" => buff_att.healing = attr_value,
+            "thorns" => buff_att.thorns = attr_value,
+            "dodge" => buff_att.dodge = attr_value,
+            "speed" => buff_att.speed = attr_value,
+            "lifesteal" => buff_att.lifesteal = attr_value,
+            "defence" => buff_att.defence = attr_value,
+            "attack_speed" => buff_att.attack_speed = attr_value,
+            "loot_rate" => buff_att.loot_rate = attr_value,
+            "mana" => buff_att.mana = attr_value,
+            "size" | "projectile_size" => buff_att.size = attr_value,
+            "xp_rate" => buff_att.xp_rate = attr_value,
+            "mana_regen" => buff_att.mana_regen = attr_value,
+            "durability" => buff_att.durability = attr_value,
+            "max_durability" => buff_att.max_durability = attr_value,
+            _ => return None, // Unknown attribute
         }
 
-        if matched {
-            Some(buff_att)
-        } else {
-            // No match found - this shouldn't happen if line selection works correctly
-            None
-        }
+        Some(buff_att)
     } else {
         None
     }

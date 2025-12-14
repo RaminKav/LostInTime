@@ -58,6 +58,9 @@ pub fn create_new_random_item_stack_with_attributes(
 
 pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> ItemStack {
     let level = stack.metadata.level.unwrap_or(1);
+    let raw_base_att = proto
+        .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
+        .unwrap();
     let raw_bonus_att_option = proto.get_component::<RawItemBonusAttributes, _>(stack.obj_type);
     let Some(eqp_type) = proto.get_component::<EquipmentType, _>(stack.obj_type) else {
         return stack.clone();
@@ -70,8 +73,10 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     } else {
         stack.rarity.clone()
     };
+    // Regenerate bonus attributes
+    let mut bonus_stat_lines = Vec::new();
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
-        raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type)
+        raw_bonus_att.into_item_attributes(rarity.clone(), eqp_type, Some(&mut bonus_stat_lines))
     } else {
         ItemAttributes::default()
     };
@@ -82,16 +87,17 @@ pub fn reroll_item_bonus_attributes(stack: &ItemStack, proto: &ProtoParam) -> It
     final_att.attack_cooldown = stack.attributes.attack_cooldown;
     final_att.defence = stack.attributes.defence;
     final_att.health = stack.attributes.health;
+    if raw_base_att.speed.is_some() {
+        final_att.speed = stack.attributes.speed;
+    }
 
     let mut new_stack = stack.copy_with_attributes(&final_att);
     new_stack.rarity = rarity;
+    new_stack.metadata.bonus_stat_lines = bonus_stat_lines;
 
     new_stack = levelup_item_stats(&new_stack, level, proto, true);
 
     // Re-select inventory buff line after rerolling
-    let raw_base_att = proto
-        .get_component::<RawItemBaseAttributes, _>(stack.obj_type)
-        .unwrap();
     new_stack.metadata.inventory_buff_line_index = select_random_inventory_buff_line(
         &new_stack,
         raw_base_att,
@@ -142,8 +148,9 @@ pub fn build_item_stack_with_parsed_attributes(
     play_audio: bool,
     proto: &ProtoParam,
 ) -> ItemStack {
+    let mut bonus_stat_lines = Vec::new();
     let parsed_bonus_att = if let Some(raw_bonus_att) = raw_bonus_att_option {
-        raw_bonus_att.into_item_attributes(rarity.clone(), equip_type)
+        raw_bonus_att.into_item_attributes(rarity.clone(), equip_type, Some(&mut bonus_stat_lines))
     } else {
         ItemAttributes::default()
     };
@@ -166,6 +173,8 @@ pub fn build_item_stack_with_parsed_attributes(
     let mut new_stack = stack.copy_with_attributes(&final_att);
     new_stack.metadata.level = Some(level);
     new_stack.rarity = rarity.clone();
+    // Store bonus stat lines in metadata
+    new_stack.metadata.bonus_stat_lines = bonus_stat_lines;
     if play_audio && rarity == ItemRarity::Legendary {
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop1, 0.15));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::LegendaryDrop2, 0.3));
@@ -195,56 +204,47 @@ pub fn build_item_stack_with_parsed_attributes(
 
 /// Selects a random bonus attribute line index for inventory buff
 /// Returns None if there are no bonus attributes
+/// The index is into stack.metadata.bonus_stat_lines
 pub fn select_random_inventory_buff_line(
     stack: &ItemStack,
     raw_base_att: &RawItemBaseAttributes,
-    raw_bonus_att_option: Option<&RawItemBonusAttributes>,
-    equip_type: &EquipmentType,
+    _raw_bonus_att_option: Option<&RawItemBonusAttributes>,
+    _equip_type: &EquipmentType,
     _proto: &ProtoParam,
 ) -> Option<usize> {
-    // Get tooltips to find which lines are bonus attributes
-    let (tooltips, _, _) = stack.attributes.get_tooltips(
-        stack.rarity.clone(),
-        Some(raw_base_att),
-        raw_bonus_att_option,
-        stack.metadata.level.unwrap_or(1) as i32,
-        stack.obj_type,
-        equip_type,
-    );
+    // Build a set of attribute names that are actually base attributes
+    // This matches the logic in get_tooltips_from_stat_lines
+    let mut base_attribute_names = std::collections::HashSet::new();
 
-    // Identify base attributes based on equipment type
-    // These should NOT be selectable as inventory buffs
-    let base_attributes: Vec<&str> = if equip_type.is_weapon() || equip_type.is_tool() {
-        // For weapons/tools: exclude Attack, Hits/s, and Attack Speed (base stats)
-        vec!["Attack", "Hits/s", "% Attack Speed"]
-    } else if equip_type.is_equipment() && !equip_type.is_accessory() {
-        // For armor: exclude HP and Defence (base stats)
-        vec!["HP", "Defence"]
-    } else {
-        // Accessories: no base attributes, everything is bonus (including Attack Speed)
-        vec![]
-    };
-
-    // Find bonus attribute line indices (skip name line at index 0)
-    let mut bonus_line_indices = Vec::new();
-    for (i, (name, _, _)) in tooltips.iter().enumerate() {
-        // Skip the name line (index 0)
-        if i == 0 {
-            continue;
-        }
-        // Check if this is a bonus attribute (not a base attribute)
-        let is_base = base_attributes.iter().any(|base| name.contains(base));
-        if !is_base && !name.is_empty() {
-            bonus_line_indices.push(i);
-        }
+    if raw_base_att.health.is_some() {
+        base_attribute_names.insert("health".to_string());
+    }
+    if raw_base_att.defence.is_some() {
+        base_attribute_names.insert("defence".to_string());
+    }
+    if raw_base_att.attack.is_some() {
+        base_attribute_names.insert("attack".to_string());
+    }
+    if raw_base_att.speed.is_some() {
+        base_attribute_names.insert("speed".to_string());
     }
 
+    // Get all bonus stat lines that are not base attributes
+    let bonus_stat_lines: Vec<(usize, &crate::item::BonusStatLine)> = stack
+        .metadata
+        .bonus_stat_lines
+        .iter()
+        .enumerate()
+        .filter(|(_, stat_line)| !base_attribute_names.contains(&stat_line.attribute_name))
+        .collect();
+
     // Select a random bonus line index
-    if bonus_line_indices.is_empty() {
+    if bonus_stat_lines.is_empty() {
         None
     } else {
         let mut rng = rand::thread_rng();
-        Some(bonus_line_indices[rng.gen_range(0..bonus_line_indices.len())])
+        let selected = rng.gen_range(0..bonus_stat_lines.len());
+        Some(bonus_stat_lines[selected].0)
     }
 }
 
@@ -281,16 +281,32 @@ pub fn levelup_item_stats(
                 filter.push("defence");
             }
             for _ in 0..num_upgrades {
-                if let Some(bonus_mod) = stack
-                    .attributes
-                    .get_random_existing_bonus_attribute_string(&filter)
+                if let Some(bonus_mod) =
+                    stack.attributes.get_random_existing_bonus_attribute_string(
+                        &stack.metadata.bonus_stat_lines,
+                        &filter,
+                    )
                 {
                     modifiers.push((bonus_mod, 1));
                 }
             }
         }
         for (modifier, delta) in modifiers {
-            stack = stack.get_copy_with_modified_attributes(AttributeModifier { modifier, delta });
+            if stack
+                .metadata
+                .bonus_stat_lines
+                .iter()
+                .any(|line| line.attribute_name == modifier)
+            {
+                stack.metadata.bonus_stat_lines.iter_mut().for_each(|line| {
+                    if line.attribute_name == modifier {
+                        line.value += delta;
+                    }
+                });
+            } else {
+                stack =
+                    stack.get_copy_with_modified_attributes(AttributeModifier { modifier, delta });
+            }
         }
     }
     stack.clone()

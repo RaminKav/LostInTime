@@ -411,6 +411,18 @@ impl ItemStack {
             && self.metadata == other.metadata
             && self.rarity == other.rarity
     }
+
+    /// Get the item attributes, reconstructing from stat lines if they exist
+    /// This ensures attributes are always in sync with stat lines
+    pub fn get_attributes(&self) -> ItemAttributes {
+        if !self.metadata.bonus_stat_lines.is_empty() {
+            // Reconstruct from stat lines to ensure consistency
+            ItemAttributes::from_stat_lines(&self.metadata.bonus_stat_lines)
+        } else {
+            // Fall back to stored attributes
+            self.attributes.clone()
+        }
+    }
     pub fn add_to_inventory(
         self,
         container: &mut Container,

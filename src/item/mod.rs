@@ -211,6 +211,31 @@ impl ActiveMainHandState {
     }
 }
 
+/// Represents a single bonus stat line on an item
+#[derive(
+    Component,
+    PartialEq,
+    Clone,
+    Reflect,
+    FromReflect,
+    Schematic,
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+#[reflect(Schematic, Default)]
+pub struct BonusStatLine {
+    /// The attribute name (e.g., "crit_chance", "dodge", "health")
+    pub attribute_name: String,
+    /// The value for this stat line
+    pub value: i32,
+    /// Quality of this stat line
+    pub quality: crate::attributes::AttributeQuality,
+    /// Range percentage for this stat line
+    pub range_percentage: f32,
+}
+
 #[derive(
     Component,
     PartialEq,
@@ -231,6 +256,8 @@ pub struct ItemDisplayMetaData {
     pub item_ability: Option<ItemAbility>,
     /// Index of the bonus attribute line selected for inventory buff (0-based)
     pub inventory_buff_line_index: Option<usize>,
+    /// Individual bonus stat lines (allows duplicate stats like +5 crit, +9 crit)
+    pub bonus_stat_lines: Vec<BonusStatLine>,
 }
 /// The core enum of the game, lists everything that can be held or placed in the game
 #[derive(

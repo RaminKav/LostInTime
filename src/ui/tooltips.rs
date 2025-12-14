@@ -139,7 +139,9 @@ pub fn handle_spawn_inv_item_tooltip(
         let equip_type = proto.get_component::<EquipmentType, _>(item.item_stack.obj_type);
         let item_rarity = item.item_stack.rarity.clone();
         let level = item.item_stack.metadata.level;
-        let (attributes, score, num_attributes) = item.item_stack.attributes.get_tooltips(
+        let (attributes, score, num_attributes) = ItemAttributes::get_tooltips_from_stat_lines(
+            &item.item_stack.metadata.bonus_stat_lines,
+            &item.item_stack.attributes,
             item_rarity.clone(),
             raw_base_attributes,
             raw_bonus_attributes,
@@ -363,13 +365,98 @@ pub fn handle_spawn_inv_item_tooltip(
             }
 
             // Draw green box around inventory buff line if this is the selected line
-            // Note: buff_line_index is the index from get_tooltips (attributes only, no name)
-            // But tooltip_text has name at index 0, so attributes start at index 1
-            // So we need to add 1 to buff_line_index to match tooltip_text index
+            // Tooltip structure: [name (index 0), base_attrs..., attack_cooldown (if exists), bonus_stat_lines...]
             if let Some(buff_line_index) = item.item_stack.metadata.inventory_buff_line_index {
-                // buff_line_index is from get_tooltips (0-based for attributes)
-                // tooltip_text index = buff_line_index + 1 (because name is at index 0)
-                if i == buff_line_index + 1 && i > 0 {
+                // Count base attributes that appear before bonus stat lines
+                // Base attributes have range text like "({}-{})", bonus stat lines have empty range text
+                let num_base_attrs = {
+                    let mut count = 0;
+
+                    for (attr_name, range_text, _) in attributes.iter() {
+                        // Base attributes have non-empty range text (showing the range like "({}-{})")
+                        // Bonus stat lines have empty range text
+                        let has_range = !range_text.is_empty();
+
+                        // Check if this matches a base attribute pattern
+                        if attr_name.contains(" HP") && !attr_name.contains("Regen") {
+                            if has_range {
+                                // Base attribute (has range text)
+                                count += 1;
+                            } else {
+                                // Bonus stat line (no range text) - stop counting base attributes
+                                break;
+                            }
+                        } else if attr_name.contains(" Defence") {
+                            if has_range {
+                                count += 1;
+                            } else {
+                                break;
+                            }
+                        } else if attr_name.contains(" Speed") {
+                            if has_range {
+                                // Speed can be a base attribute
+                                count += 1;
+                            } else {
+                                break;
+                            }
+                        } else if attr_name.contains(" Attack") && !attr_name.contains("Speed") {
+                            if has_range {
+                                count += 1;
+                            } else {
+                                break;
+                            }
+                        } else if attr_name.contains("Hits/s") {
+                            // Hits/s is always a base attribute (attack_cooldown), no range text but it's base
+                            count += 1;
+                        } else {
+                            // We've hit a bonus stat line (different pattern, no range text)
+                            break;
+                        }
+                    }
+                    count
+                };
+
+                let filtered_buff_line_index = {
+                    // Build a set of base attribute names by checking which attributes in the tooltip have range text
+                    // and match base attribute patterns
+                    //TODO: this is sus, gotta be a better way
+                    let mut base_attribute_names = std::collections::HashSet::new();
+                    for (attr_name, range_text, _) in attributes.iter() {
+                        let has_range = !range_text.is_empty();
+                        if attr_name.contains(" HP") && !attr_name.contains("Regen") && has_range {
+                            base_attribute_names.insert("health".to_string());
+                        } else if attr_name.contains(" Defence") && has_range {
+                            base_attribute_names.insert("defence".to_string());
+                        } else if attr_name.contains(" Speed") && has_range {
+                            base_attribute_names.insert("speed".to_string());
+                        } else if attr_name.contains(" Attack")
+                            && !attr_name.contains("Speed")
+                            && has_range
+                        {
+                            base_attribute_names.insert("attack".to_string());
+                        }
+                        if !has_range && !attr_name.contains("Hits/s") {
+                            break;
+                        }
+                    }
+
+                    let mut filtered_index = 0;
+                    for (idx, stat_line) in
+                        item.item_stack.metadata.bonus_stat_lines.iter().enumerate()
+                    {
+                        if idx >= buff_line_index {
+                            break;
+                        }
+                        if !base_attribute_names.contains(&stat_line.attribute_name) {
+                            filtered_index += 1;
+                        }
+                    }
+                    filtered_index
+                };
+
+                // Tooltip index = 1 (name) + num_base_attrs + filtered_buff_line_index
+                let tooltip_index = 1 + num_base_attrs + filtered_buff_line_index;
+                if i == tooltip_index && i > 0 {
                     // Spawn a green box behind the text line (7px height)
                     // Position it at the same Y as the text line, centered horizontally
                     let box_width = size.x - 14.0; // Full width minus padding (8px on each side)
