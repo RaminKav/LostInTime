@@ -104,30 +104,76 @@ pub fn get_player_spawn_tile(grid: Vec<Vec<i8>>) -> Option<TileMapPosition> {
     let center_x = grid_size / 2;
     let center_y = grid_size / 2;
 
-    // Spawn player at the south of the circular room (fixed position)
-    let player_x = center_x;
-    let player_y = center_y + 10; // South of center
+    // Preferred spawn position: south of center
+    let preferred_x = center_x;
+    let preferred_y = center_y + 10;
 
-    // Ensure the position is within bounds and walkable
-    if player_x < grid_size && player_y < grid_size && grid[player_y][player_x] == 1 {
-        let player_tile_pos = TileMapPosition::new(
-            IVec2::new(
-                f64::floor((player_x as f64 - 3. * CHUNK_SIZE as f64) / (CHUNK_SIZE) as f64) as i32,
-                f64::floor(((3. * CHUNK_SIZE as f64) - player_y as f64 - 1.) / (CHUNK_SIZE) as f64)
-                    as i32
-                    + 1,
-            ),
-            TilePos {
-                x: f64::floor(player_x as f64 % (CHUNK_SIZE) as f64) as u32,
-                y: f64::ceil(CHUNK_SIZE as f64 - (player_y as f64 % (CHUNK_SIZE) as f64)) as u32
-                    - 1,
-            },
-        );
-        let temp_world_pos = tile_pos_to_world_pos(player_tile_pos, false) + Vec2::new(0., 9.);
-        let player_pos = world_pos_to_tile_pos(temp_world_pos);
-        return Some(player_pos);
+    // Search for a valid walkable position, starting from preferred position
+    // Search in a spiral pattern outward if the preferred position is blocked
+    let mut search_radius = 0;
+    let max_search_radius = 15; // Don't search too far from center
+
+    while search_radius <= max_search_radius {
+        // Check preferred position first
+        if search_radius == 0 {
+            let player_x = preferred_x;
+            let player_y = preferred_y;
+            if player_x < grid_size && player_y < grid_size && grid[player_y][player_x] == 1 {
+                return convert_grid_pos_to_tile_pos(player_x, player_y);
+            }
+        } else {
+            // Search in a square pattern around the preferred position
+            for offset_x in (-search_radius as i32)..=(search_radius as i32) {
+                for offset_y in (-search_radius as i32)..=(search_radius as i32) {
+                    // Only check positions on the perimeter of the current search radius
+                    if offset_x.abs() == search_radius as i32
+                        || offset_y.abs() == search_radius as i32
+                    {
+                        let player_x = (preferred_x as i32 + offset_x) as usize;
+                        let player_y = (preferred_y as i32 + offset_y) as usize;
+
+                        if player_x < grid_size
+                            && player_y < grid_size
+                            && grid[player_y][player_x] == 1
+                        {
+                            return convert_grid_pos_to_tile_pos(player_x, player_y);
+                        }
+                    }
+                }
+            }
+        }
+        search_radius += 1;
     }
+
+    // Fallback: search the entire center area if spiral search failed
+    // This should rarely happen, but ensures we always find a spawn point
+    for y in center_y.saturating_sub(15)..=center_y.saturating_add(15).min(grid_size - 1) {
+        for x in center_x.saturating_sub(15)..=center_x.saturating_add(15).min(grid_size - 1) {
+            if grid[y][x] == 1 {
+                return convert_grid_pos_to_tile_pos(x, y);
+            }
+        }
+    }
+
     None
+}
+
+fn convert_grid_pos_to_tile_pos(player_x: usize, player_y: usize) -> Option<TileMapPosition> {
+    let player_tile_pos = TileMapPosition::new(
+        IVec2::new(
+            f64::floor((player_x as f64 - 3. * CHUNK_SIZE as f64) / (CHUNK_SIZE) as f64) as i32,
+            f64::floor(((3. * CHUNK_SIZE as f64) - player_y as f64 - 1.) / (CHUNK_SIZE) as f64)
+                as i32
+                + 1,
+        ),
+        TilePos {
+            x: f64::floor(player_x as f64 % (CHUNK_SIZE) as f64) as u32,
+            y: f64::ceil(CHUNK_SIZE as f64 - (player_y as f64 % (CHUNK_SIZE) as f64)) as u32 - 1,
+        },
+    );
+    let temp_world_pos = tile_pos_to_world_pos(player_tile_pos, false) + Vec2::new(0., 9.);
+    let player_pos = world_pos_to_tile_pos(temp_world_pos);
+    Some(player_pos)
 }
 //TODO: add seed to this rng
 pub fn _gen_old_dungeon(steps: i32, grid_size: usize, bias: Bias) -> Vec<Vec<i8>> {

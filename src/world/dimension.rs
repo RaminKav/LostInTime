@@ -195,6 +195,8 @@ impl DimensionPlugin {
                     if let Some(pos) = get_player_spawn_tile(grid.clone()) {
                         info!("MOVING PLAYER TO {:?}", pos);
                         move_player_event.send(MovePlayerEvent { pos });
+                    } else {
+                        error!("Failed to find valid player spawn position in dungeon! This should not happen.");
                     }
                 } else {
                     // Check if we're returning from a dungeon vs entering a truly new era
