@@ -96,8 +96,8 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
         UnlockUpgradeKind::StartingTools => match tier {
             0 => "Tier 1: Start with Wood Axe".to_string(),
             1 => "Tier 2: Start with Wood Axe and Pickaxe".to_string(),
-            2 => "Tier 3: Start with Wood Axe, Pickaxe, and Salvage Bin".to_string(),
-            _ => format!("Unlocked: Start with Wood Axe, Pickaxe, and Salvage Bin",),
+            2 => "Tier 3: Start with Wood Axe and Pickaxe".to_string(),
+            _ => format!("Unlocked: Start with Wood Axe and Pickaxe",),
         },
         UnlockUpgradeKind::ThirdActiveSkillSlot => {
             if upgrades.third_active_skill_slot_unlocked {

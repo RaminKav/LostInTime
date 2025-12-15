@@ -121,7 +121,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartFood => 8,
             UnlockUpgradeKind::StartTome => 15,
             UnlockUpgradeKind::StartOrb => 20,
-            UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe, Tier 3: SalvageBin
+            UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
             UnlockUpgradeKind::ThirdActiveSkillSlot => 100, // Will be set separately
         }
     }
@@ -153,7 +153,7 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartOrb => self.orb_tier = self.orb_tier.saturating_add(1),
             UnlockUpgradeKind::StartingTools => {
                 // Cap at tier 3 (SalvageBin)
-                self.starting_tools_tier = (self.starting_tools_tier + 1).min(3);
+                self.starting_tools_tier = (self.starting_tools_tier + 1).min(2);
             }
             UnlockUpgradeKind::ThirdActiveSkillSlot => self.third_active_skill_slot_unlocked = true,
         }
@@ -174,10 +174,6 @@ impl UnlockUpgrades {
         self.starting_tools_tier >= 2
     }
 
-    pub fn has_salvage_bin(&self) -> bool {
-        self.starting_tools_tier >= 3
-    }
-
     pub fn next_cost(&self, kind: UnlockUpgradeKind) -> u32 {
         match kind {
             UnlockUpgradeKind::StartingTools => {
@@ -185,7 +181,6 @@ impl UnlockUpgrades {
                 match tier {
                     0 => 30,  // Tier 1: WoodAxe
                     1 => 100, // Tier 2: Pickaxe (70 more)
-                    2 => 200, // Tier 3: SalvageBin (100 more)
                     _ => 0,   // Max tier reached
                 }
             }

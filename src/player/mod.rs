@@ -528,16 +528,6 @@ fn give_player_starting_items(
             );
         }
 
-        if upgrades.has_salvage_bin() {
-            proto_commands.spawn_item_from_proto(
-                WorldObject::ScrapperBlock,
-                &proto,
-                player_pos,
-                1,
-                None,
-            );
-        }
-
         force_player_autopick(&mut game);
     }
 
