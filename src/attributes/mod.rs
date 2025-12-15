@@ -1723,6 +1723,104 @@ pub fn add_item_glows(
     })
 }
 
+/// Helper function to convert ItemAttributes to BonusStatLines
+/// Used for capes which don't use the normal bonus attribute generation system
+fn item_attributes_to_bonus_stat_lines(attrs: &ItemAttributes) -> Vec<crate::item::BonusStatLine> {
+    use crate::item::BonusStatLine;
+    let mut stat_lines = Vec::new();
+
+    if attrs.bonus_damage.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "bonus_damage".to_string(),
+            value: attrs.bonus_damage.value,
+            quality: attrs.bonus_damage.quality,
+            range_percentage: attrs.bonus_damage.range_percentage,
+        });
+    }
+    if attrs.health.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "health".to_string(),
+            value: attrs.health.value,
+            quality: attrs.health.quality,
+            range_percentage: attrs.health.range_percentage,
+        });
+    }
+    if attrs.defence.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "defence".to_string(),
+            value: attrs.defence.value,
+            quality: attrs.defence.quality,
+            range_percentage: attrs.defence.range_percentage,
+        });
+    }
+    if attrs.speed.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "speed".to_string(),
+            value: attrs.speed.value,
+            quality: attrs.speed.quality,
+            range_percentage: attrs.speed.range_percentage,
+        });
+    }
+    if attrs.crit_damage.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "crit_damage".to_string(),
+            value: attrs.crit_damage.value,
+            quality: attrs.crit_damage.quality,
+            range_percentage: attrs.crit_damage.range_percentage,
+        });
+    }
+    if attrs.dodge.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "dodge".to_string(),
+            value: attrs.dodge.value,
+            quality: attrs.dodge.quality,
+            range_percentage: attrs.dodge.range_percentage,
+        });
+    }
+    if attrs.crit_chance.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "crit_chance".to_string(),
+            value: attrs.crit_chance.value,
+            quality: attrs.crit_chance.quality,
+            range_percentage: attrs.crit_chance.range_percentage,
+        });
+    }
+    if attrs.attack_speed.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "attack_speed".to_string(),
+            value: attrs.attack_speed.value,
+            quality: attrs.attack_speed.quality,
+            range_percentage: attrs.attack_speed.range_percentage,
+        });
+    }
+    if attrs.mana.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "mana".to_string(),
+            value: attrs.mana.value,
+            quality: attrs.mana.quality,
+            range_percentage: attrs.mana.range_percentage,
+        });
+    }
+    if attrs.mana_regen.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "mana_regen".to_string(),
+            value: attrs.mana_regen.value,
+            quality: attrs.mana_regen.quality,
+            range_percentage: attrs.mana_regen.range_percentage,
+        });
+    }
+    if attrs.health_regen.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "health_regen".to_string(),
+            value: attrs.health_regen.value,
+            quality: attrs.health_regen.quality,
+            range_percentage: attrs.health_regen.range_percentage,
+        });
+    }
+
+    stat_lines
+}
+
 pub fn handle_cape_att_increase_on_level_up(
     mut player: Query<(&mut Inventory, &PlayerLevel, &PlayerClass), Changed<PlayerLevel>>,
     mut att_event: EventWriter<AttributeChangeEvent>,
@@ -1732,7 +1830,12 @@ pub fn handle_cape_att_increase_on_level_up(
         if level.level == level.next_level {
             let mut cape_stack = proto.get_item_data(class.class.get_cape()).unwrap().clone();
             let level = level.level as i32 - 1;
-            cape_stack.attributes = class.class.compute_cape_stats(level);
+            let cape_attrs = class.class.compute_cape_stats(level);
+
+            // Convert ItemAttributes to BonusStatLines for tooltip display
+            cape_stack.metadata.bonus_stat_lines = item_attributes_to_bonus_stat_lines(&cape_attrs);
+
+            cape_stack.attributes = cape_attrs;
             if level >= 11 {
                 cape_stack.rarity = ItemRarity::Legendary;
             } else if level >= 7 {

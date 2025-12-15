@@ -1079,7 +1079,7 @@ impl Heirloom {
 
             // New heirlooms
             Heirloom::MaxHPHunt => {
-                vec!["Every 3 kills".to_string(), "gain +1 Max HP.".to_string()]
+                vec!["Every 5 kills".to_string(), "gain +1 Max HP.".to_string()]
             }
             Heirloom::MaxHPDamage => vec![
                 "Gain +10% Damage".to_string(),
