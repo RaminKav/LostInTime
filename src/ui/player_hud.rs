@@ -426,7 +426,7 @@ pub fn setup_currency_ui(
             ),
             text_anchor: Anchor::CenterLeft,
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2. + 64., GAME_HEIGHT / 2. - 43.5, 6.),
+                translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 97.5, 6.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },

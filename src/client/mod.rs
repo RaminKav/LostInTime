@@ -31,10 +31,7 @@ use crate::{
     container::{Container, ContainerRegistry},
     datafiles,
     inventory::{Inventory, ItemStack},
-    item::{
-        projectile::Projectile, CraftingTracker, EquipmentType, Foliage, MainHand, Wall,
-        WorldObject,
-    },
+    item::{projectile::Projectile, CraftingTracker, Foliage, MainHand, Wall, WorldObject},
     night::NightTracker,
     player::{
         achievements::Achievements,
@@ -48,7 +45,6 @@ use crate::{
         unlocks::{UnlockUpgrades, UnlockedClasses},
         Player,
     },
-    proto::proto_param::ProtoParam,
     ui::{ChestContainer, FurnaceContainer},
     vectorize::{vectorize, vectorize_inner},
     world::{
@@ -216,7 +212,6 @@ pub struct GameData {
     pub rogue_points: u128,
     pub magic_points: u128,
     pub longest_run: u8,
-    pub seen_gear: Vec<ItemStack>,
     pub user_id: String,
     pub class_ranks: ClassRankSystem,
     pub high_scores: HighScores,
@@ -236,8 +231,6 @@ pub struct GameData {
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
-    inv: Query<&Inventory>,
-    proto_param: ProtoParam,
     mut game_over: EventReader<GameOverEvent>,
     mut analytics_data: ResMut<AnalyticsData>,
     all_time_fragments: Query<Entity, With<MoveUIAnimation>>,
@@ -283,27 +276,10 @@ pub fn handle_append_run_data_after_death(
         }
         let currency = time_fragments.as_ref();
         game_data.time_fragments = currency.time_fragments.max(0) as u128;
-        let inv = inv.single();
-        for item in inv.items.items.clone().iter().flatten() {
-            if item.slot < 6 {
-                //hotbar item
-                if let Some(eqp_type) = item.get_obj().get_equip_type(&proto_param) {
-                    if eqp_type != EquipmentType::Axe
-                        && eqp_type != EquipmentType::Pickaxe
-                        && !item.get_obj().is_cape()
-                    {
-                        game_data.seen_gear.push(item.item_stack.clone());
-                    }
-                }
-            }
-        }
         if game_data.user_id.is_empty() {
             game_data.user_id = Uuid::new_v4().to_string();
         }
         analytics_data.user_id = game_data.user_id.clone();
-        for item in inv.equipment_items.items.iter().flatten() {
-            game_data.seen_gear.push(item.item_stack.clone());
-        }
 
         // Award class rank experience based on run performance
         if let Some(class) = &player_class {

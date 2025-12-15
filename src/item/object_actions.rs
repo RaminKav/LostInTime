@@ -161,6 +161,21 @@ impl ObjectAction {
                 });
             }
             ObjectAction::DungeonExit => {
+                // Unlock dungeon completion achievement
+                if let Some(ref mut achievements) = item_action_param.achievements {
+                    use crate::player::achievements::{persist_achievements_state, Achievement};
+                    if achievements.complete(Achievement::DungeonCrawler) {
+                        persist_achievements_state(achievements);
+                        item_action_param.achievement_events.send(
+                            crate::player::achievements::AchievementUnlockedEvent {
+                                achievement: Achievement::DungeonCrawler,
+                                reward_currency: Achievement::DungeonCrawler.reward_currency(),
+                            },
+                        );
+                        info!("Achievement completed: DungeonCrawler");
+                    }
+                }
+
                 // Find the most recent non-dungeon era, defaulting to Era::Main if none found
                 let current_era: usize = game
                     .era
