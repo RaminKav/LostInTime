@@ -1,7 +1,7 @@
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::utils::Duration;
-use bevy_proto::prelude::ProtoCommands;
+use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
 use rand::Rng;
 
@@ -79,7 +79,8 @@ pub fn handle_active_skill_event(
     asset_server: Res<AssetServer>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
     mut proto_commands: ProtoCommands,
-    proto_param: ProtoParam,
+    mut proto_param: ProtoParam,
+    prototypes: Prototypes,
 ) {
     for ev in events.iter() {
         for (player_e, skills, player_txfm, attack_opt, mut health, max_health, facing_dir) in
@@ -504,25 +505,43 @@ pub fn handle_active_skill_event(
 
                         // Spawn a non-damageable dummy tree at cursor position
                         let dummy_pos = cursor.world_coords + Vec3::new(0., 0., 990.);
-                        commands.spawn((
-                            SpriteBundle {
-                                sprite: Sprite {
-                                    color: Color::rgba(0.4, 0.6, 0.2, 1.0),
-                                    custom_size: Some(Vec2::new(24.0, 32.0)),
-                                    ..default()
-                                },
-                                transform: Transform::from_translation(dummy_pos),
-                                ..default()
-                            },
-                            Collider::cuboid(12.0, 16.0),
-                            Name::new("DruidTreeDummy"),
-                            DruidTreeDummy {
-                                timer: Timer::from_seconds(
-                                    2.0 * skills.skill_power_multiplier(),
-                                    TimerMode::Once,
-                                ),
-                            },
-                        ));
+                        if let Some(p) = proto_commands.spawn_object_from_proto(
+                            WorldObject::GreenSaplingStage2,
+                            dummy_pos.truncate(),
+                            &prototypes,
+                            &mut proto_param,
+                            false,
+                        ) {
+                            commands
+                                .entity(p)
+                                .insert(Collider::cuboid(12.0, 16.0))
+                                .insert(Name::new("DruidTreeDummy"))
+                                .insert(DruidTreeDummy {
+                                    timer: Timer::from_seconds(
+                                        2.0 * skills.skill_power_multiplier(),
+                                        TimerMode::Once,
+                                    ),
+                                });
+                        }
+                        // commands.spawn((
+                        //     SpriteBundle {
+                        //         sprite: Sprite {
+                        //             color: Color::rgba(0.4, 0.6, 0.2, 1.0),
+                        //             custom_size: Some(Vec2::new(24.0, 32.0)),
+                        //             ..default()
+                        //         },
+                        //         transform: Transform::from_translation(dummy_pos),
+                        //         ..default()
+                        //     },
+                        //     Collider::cuboid(12.0, 16.0),
+                        //     Name::new("DruidTreeDummy"),
+                        //     DruidTreeDummy {
+                        //         timer: Timer::from_seconds(
+                        //             2.0 * skills.skill_power_multiplier(),
+                        //             TimerMode::Once,
+                        //         ),
+                        //     },
+                        // ));
 
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
