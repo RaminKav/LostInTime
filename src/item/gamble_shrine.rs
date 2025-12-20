@@ -9,7 +9,10 @@ use crate::{
     inventory::ItemStack,
     item::object_actions::ObjectAction,
     proto::proto_param::ProtoParam,
-    ui::{key_input_guide::InteractionGuideTrigger, BlacksmithMerchant, EssenceShopChoices},
+    ui::{
+        key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent,
+        BlacksmithMerchant, EssenceShopChoices,
+    },
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     GameParam,
 };
@@ -43,6 +46,7 @@ pub fn handle_gamble_shrine_rewards(
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
     for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if shrine.success {
@@ -71,6 +75,12 @@ pub fn handle_gamble_shrine_rewards(
                     .remove::<ObjectAction>();
                 // Use the stored tile position instead of recalculating
                 game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::GambleShrineDone);
+
+                // Update minimap to reflect the shrine is now "Done"
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(shrine.tile_pos),
+                    new_tile: Some(WorldObject::GambleShrineDone),
+                });
             }
         } else if anim.current_frame() == 92 {
             *anim = AsepriteAnimation::from(GambleShrineAnim::tags::IDLE);

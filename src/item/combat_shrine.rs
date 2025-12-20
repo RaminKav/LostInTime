@@ -9,6 +9,7 @@ use crate::{
     enemy::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob},
     item::{object_actions::ObjectAction, LootTable},
     proto::proto_param::ProtoParam,
+    ui::minimap::UpdateMiniMapEvent,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     GameParam,
 };
@@ -102,6 +103,7 @@ pub fn handle_shrine_rewards(
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
     for event in shrine_mob_event.iter() {
         if let Ok((e, t, mut shrine, mut anim)) = shrines.get_mut(event.0) {
@@ -132,6 +134,12 @@ pub fn handle_shrine_rewards(
                     shrine.tile_pos,
                     WorldObject::CombatShrineDone,
                 );
+
+                // Update minimap to reflect the shrine is now "Done"
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(shrine.tile_pos),
+                    new_tile: Some(WorldObject::CombatShrineDone),
+                });
             }
         }
     }

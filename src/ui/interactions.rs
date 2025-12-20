@@ -147,6 +147,10 @@ pub enum UIElement {
     LargeKey,
     XLKey,
     XLKeyHover,
+    MinimapDungeonIcon,
+    MinimapStarIcon,
+    MinimapSkullIcon,
+    MinimapPortalIcon,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {

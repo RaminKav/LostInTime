@@ -4,7 +4,8 @@ use crate::attributes::item_abilities::ItemAbility;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::client::is_not_paused;
 use crate::colors::{
-    BLACK, BLUE, DARK_BROWN, DARK_GREEN, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, RED, YELLOW,
+    BLACK, BLUE, DARK_BROWN, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, LIGHT_GREY, RED,
+    SHRINE_GREEN, YELLOW,
 };
 use crate::combat::ObjBreakEvent;
 
@@ -876,13 +877,19 @@ impl WorldObject {
             WorldObject::Cattail => BLUE,
             WorldObject::WoodWall => LIGHT_BROWN,
             WorldObject::WoodDoor => LIGHT_BROWN,
-            WorldObject::CombatShrine => LIGHT_GREY,
-            WorldObject::CombatShrineDone => LIGHT_GREY,
-            WorldObject::GambleShrine => LIGHT_GREY,
-            WorldObject::GambleShrineDone => LIGHT_GREY,
-            WorldObject::ActiveSkillShrine => LIGHT_GREY,
-            WorldObject::ActiveSkillShrineDone => LIGHT_GREY,
-
+            WorldObject::CombatShrine => SHRINE_GREEN,
+            WorldObject::CombatShrineDone => GREY,
+            WorldObject::GambleShrine => SHRINE_GREEN,
+            WorldObject::GambleShrineDone => GREY,
+            WorldObject::ActiveSkillShrine => SHRINE_GREEN,
+            WorldObject::ActiveSkillShrineDone => GREY,
+            WorldObject::HeirloomShrine => SHRINE_GREEN,
+            WorldObject::HeirloomShrineDone => GREY,
+            WorldObject::BlacksmithMerchant => SHRINE_GREEN,
+            WorldObject::BlacksmithMerchantDone => GREY,
+            WorldObject::BossShrine => RED,
+            WorldObject::DungeonEntrance => DARK_GREEN,
+            WorldObject::TimeGate => BLUE,
             //era2
             WorldObject::Era2Boulder => LIGHT_GREY,
             WorldObject::Era2Boulder2 => LIGHT_GREY,

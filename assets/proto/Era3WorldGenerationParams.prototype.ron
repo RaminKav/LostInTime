@@ -158,11 +158,11 @@
         // WaterBoulder2: 0.02,
       },
       schematic_frequencies: {
-        CombatShrine: 0.15,
-        GambleShrine: 0.15,
+        CombatShrine: 0.12,
+        GambleShrine: 0.05,
         // ActiveSkillShrine: 0.1,
-        HeirloomShrine: 0.13,
-        BlacksmithMerchant: 0.15,
+        HeirloomShrine: 0.1,
+        BlacksmithMerchant: 0.08,
       },
       obj_allowed_tiles_map: {
         SmallGreenTree: [GrassTile],

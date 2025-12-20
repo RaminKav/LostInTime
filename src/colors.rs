@@ -10,6 +10,7 @@ pub const _GOLD: Color = Color::rgba(201. / 255., 114. / 255., 69. / 255., 1.);
 pub const ORANGE: Color = Color::rgba(201. / 255., 109. / 255., 69. / 255., 1.);
 pub const LIGHT_RED: Color = Color::rgba(202. / 255., 53. / 255., 55. / 255., 1.);
 pub const LIGHT_GREY: Color = Color::rgba(160. / 255., 155. / 255., 131. / 255., 1.);
+pub const SHRINE_GREEN: Color = Color::rgba(0. / 255., 255. / 255., 15. / 255., 1.);
 pub const LIGHT_GREEN: Color = Color::rgba(163. / 255., 182. / 255., 69. / 255., 1.);
 pub const LIGHT_BLUE: Color = Color::rgba(98. / 255., 153. / 255., 178. / 255., 1.);
 pub const LIGHT_BROWN: Color = Color::rgba(168. / 255., 112. / 255., 71. / 255., 1.);

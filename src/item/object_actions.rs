@@ -25,6 +25,7 @@ use crate::ui::damage_numbers::{
 };
 use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
 use crate::ui::key_input_guide::InteractionGuideTrigger;
+use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::world_helpers;
@@ -601,6 +602,12 @@ impl ObjectAction {
 
                 // Update the world object cache so the totem stays "Done" when chunk respawns
                 game.add_object_to_chunk_cache(obj_pos, WorldObject::ChaosTotemDone);
+
+                // Update minimap to reflect the totem is now "Done"
+                item_action_param.minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(obj_pos),
+                    new_tile: Some(WorldObject::ChaosTotemDone),
+                });
 
                 let spawn_pos = pos + Vec2::new(0., -18.);
                 // We need both mutable proto_commands and immutable proto_param.

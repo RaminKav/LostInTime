@@ -2,8 +2,11 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
-    assets::Graphics, item::object_actions::ObjectAction,
-    ui::key_input_guide::InteractionGuideTrigger, world::TileMapPosition, GameParam,
+    assets::Graphics,
+    item::object_actions::ObjectAction,
+    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
+    world::TileMapPosition,
+    GameParam,
 };
 
 use super::WorldObject;
@@ -69,6 +72,7 @@ pub fn handle_active_skill_shrine_completion(
     shrines: Query<(Entity, &ActiveSkillShrineState)>,
     mut commands: Commands,
     mut game: GameParam,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -83,6 +87,12 @@ pub fn handle_active_skill_shrine_completion(
 
             // Update the world object cache so the shrine stays "Done" when chunk respawns
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::ActiveSkillShrineDone);
+
+            // Update minimap to reflect the shrine is now "Done"
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(shrine.tile_pos),
+                new_tile: Some(WorldObject::ActiveSkillShrineDone),
+            });
         }
     }
 }

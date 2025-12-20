@@ -5,7 +5,7 @@ use crate::{
     assets::Graphics,
     item::object_actions::ObjectAction,
     player::skills::HeirloomChoiceQueue,
-    ui::key_input_guide::InteractionGuideTrigger,
+    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     GameParam,
 };
@@ -59,6 +59,7 @@ pub fn handle_heirloom_shrine_completion(
     shrines: Query<(Entity, &HeirloomShrineState)>,
     mut commands: Commands,
     mut game: GameParam,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
     for (e, shrine) in shrines.iter() {
         if shrine.is_used {
@@ -72,6 +73,12 @@ pub fn handle_heirloom_shrine_completion(
             // Update the world object cache using the stored tile position
             // This ensures we update the exact same tile that was originally cached
             game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::HeirloomShrineDone);
+
+            // Update minimap to reflect the shrine is now "Done"
+            minimap_event.send(UpdateMiniMapEvent {
+                pos: Some(shrine.tile_pos),
+                new_tile: Some(WorldObject::HeirloomShrineDone),
+            });
         }
     }
 }

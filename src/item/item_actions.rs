@@ -16,6 +16,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     ui::{
         item_chest::{ItemChestAnimState, ItemChestState},
+        minimap::UpdateMiniMapEvent,
         scrapper_ui::ScrapperContainer,
         ChestContainer, FurnaceContainer, InventorySlotState, InventorySlotType, UIState,
     },
@@ -147,6 +148,7 @@ pub struct ItemActionParam<'w, 's> {
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,
+    pub minimap_event: EventWriter<'w, UpdateMiniMapEvent>,
     pub cursor_pos: Res<'w, CursorPos>,
     pub hunger_query: Query<'w, 's, &'static mut Hunger>,
     pub chest_query: Query<'w, 's, &'static ChestContainer>,

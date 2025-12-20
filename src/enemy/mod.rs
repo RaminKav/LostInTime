@@ -385,15 +385,16 @@ pub fn handle_new_mob_state_machine(
     }
 }
 fn handle_mob_move_minimap_update(
-    moving_enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Changed<GlobalTransform>)>,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    _moving_enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Changed<GlobalTransform>)>,
+    mut _minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
-    if moving_enemies.iter().count() > 0 {
-        minimap_event.send(UpdateMiniMapEvent {
-            pos: None,
-            new_tile: None,
-        });
-    }
+    return;
+    // if moving_enemies.iter().count() > 0 {
+    //     minimap_event.send(UpdateMiniMapEvent {
+    //         pos: None,
+    //         new_tile: None,
+    //     });
+    // }
 }
 fn juice_up_spawned_elite_mobs(
     mut elites: Query<

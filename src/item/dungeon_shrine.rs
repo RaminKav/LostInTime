@@ -12,6 +12,7 @@ use crate::{
         combat_shrine::CombatShrineAnim, object_actions::ObjectAction, LootTable, PlaceItemEvent,
     },
     proto::proto_param::ProtoParam,
+    ui::minimap::UpdateMiniMapEvent,
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
     GameParam,
 };
@@ -134,6 +135,7 @@ pub fn handle_dungeon_shrine_rewards(
     mut commands: Commands,
     mut game: GameParam,
     mut place_item_event: EventWriter<PlaceItemEvent>,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     objs: Query<(Entity, &WorldObject)>,
 ) {
     let mut is_done = false;
@@ -173,10 +175,13 @@ pub fn handle_dungeon_shrine_rewards(
                     .remove::<ObjectAction>();
 
                 // Use the stored tile position instead of recalculating
-                game.add_object_to_chunk_cache(
-                    shrine.tile_pos,
-                    done_object,
-                );
+                game.add_object_to_chunk_cache(shrine.tile_pos, done_object);
+
+                // Update minimap to reflect the shrine is now "Done"
+                minimap_event.send(UpdateMiniMapEvent {
+                    pos: Some(shrine.tile_pos),
+                    new_tile: Some(done_object),
+                });
 
                 place_item_event.send(PlaceItemEvent {
                     obj: WorldObject::DungeonExit,

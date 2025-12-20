@@ -261,7 +261,6 @@ pub fn player_move_inputs(
     >,
     time: Res<Time>,
     key_input: ResMut<Input<KeyCode>>,
-    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
     mut commands: Commands,
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
     asset_server: Res<AssetServer>,
@@ -388,10 +387,6 @@ pub fn player_move_inputs(
             commands.entity(player_e).insert(PlayerAnimation::Walk);
         }
 
-        minimap_event.send(UpdateMiniMapEvent {
-            pos: None,
-            new_tile: None,
-        });
         if run_dust_timer.0.percent() == 0. {
             particle.single_mut().reset();
             run_dust_timer.0.tick(time.delta());

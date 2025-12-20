@@ -175,7 +175,7 @@ fn load_schematic(
     key_input: Res<Input<KeyCode>>,
     game: GameParam,
 ) {
-    if key_input.just_pressed(KeyCode::M) && *DEBUG {
+    if key_input.just_pressed(KeyCode::B) && *DEBUG {
         info!(
             "Loading schematic scene... {} {:?}",
             game.player().position,
