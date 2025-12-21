@@ -217,19 +217,19 @@ impl ActiveSkill {
         match self {
             ActiveSkill::Roll => 0.0, // Handled separately in player_move_inputs
             ActiveSkill::Parry => 1.2,
-            ActiveSkill::ParrySpear => 14.,
+            ActiveSkill::ParrySpear => 12.,
             ActiveSkill::Sprint => 12.0,
-            ActiveSkill::SprintLunge => 3.0,
-            ActiveSkill::Teleport => 1.5,
+            ActiveSkill::SprintLunge => 3.5,
+            ActiveSkill::Teleport => 2.0,
             ActiveSkill::Stealth => 11.0,
             ActiveSkill::Rapidfire => 12.0,
-            ActiveSkill::FirePillar => 14.0,
+            ActiveSkill::FirePillar => 12.0,
             ActiveSkill::Heal => 60.0,
             ActiveSkill::Buckshot => 6.0,
             ActiveSkill::IceWall => 10.0,
             ActiveSkill::DruidTree => 14.0,
             ActiveSkill::Shout => 7.0,
-            ActiveSkill::PiercingStar => 10.0,
+            ActiveSkill::PiercingStar => 8.0,
         }
     }
 }

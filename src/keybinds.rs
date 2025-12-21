@@ -81,6 +81,10 @@ pub struct KeyBindings {
     pub active_skill_slot_1: KeyCode,
     #[serde(with = "keycode_serde")]
     pub active_skill_slot_2: KeyCode,
+    #[serde(with = "keycode_serde")]
+    pub inventory: KeyCode,
+    #[serde(with = "keycode_serde")]
+    pub minimap: KeyCode,
 }
 
 impl Default for KeyBindings {
@@ -89,11 +93,19 @@ impl Default for KeyBindings {
             active_skill_slot_0: KeyCode::Space,
             active_skill_slot_1: KeyCode::LShift,
             active_skill_slot_2: KeyCode::Q,
+            inventory: KeyCode::E,
+            minimap: KeyCode::M,
         }
     }
 }
 
 impl KeyBindings {
+    pub fn get_inventory_key(&self) -> KeyCode {
+        self.inventory
+    }
+    pub fn get_minimap_key(&self) -> KeyCode {
+        self.minimap
+    }
     pub fn get_active_skill_key(&self, slot: usize) -> KeyCode {
         match slot {
             0 => self.active_skill_slot_0,
@@ -110,6 +122,14 @@ impl KeyBindings {
             2 => self.active_skill_slot_2 = key,
             _ => {}
         }
+    }
+
+    pub fn set_inventory_key(&mut self, key: KeyCode) {
+        self.inventory = key;
+    }
+
+    pub fn set_minimap_key(&mut self, key: KeyCode) {
+        self.minimap = key;
     }
 
     pub fn load() -> Self {
@@ -137,15 +157,6 @@ impl KeyBindings {
         if let Ok(file) = File::create(&path) {
             let _ = serde_json::to_writer_pretty(file, &game_data);
         }
-    }
-}
-
-pub fn get_active_skill_keybind(slot: usize) -> KeyCode {
-    match slot {
-        0 => KeyCode::Space,
-        1 => KeyCode::LShift,
-        2 => KeyCode::Q,
-        i => unreachable!("invalid active skill slot {i:?}"),
     }
 }
 

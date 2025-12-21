@@ -24,7 +24,7 @@ use crate::{
         skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
-    GameState, ScreenResolution, GAME_HEIGHT,
+    GameState, KeyBindings, ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
 aseprite!(pub Clock, "ui/Clock.aseprite");
@@ -78,6 +78,12 @@ pub struct ActiveSkillKeybindText {
 pub struct ActiveSkillKeyBackground {
     pub slot: usize,
 }
+
+#[derive(Component)]
+pub struct InventoryKeybindText;
+
+#[derive(Component)]
+pub struct InventoryKeyBackground;
 
 /// Helper function to determine key size and UI element based on KeyCode
 fn get_key_size_and_element(key: KeyCode) -> (UIElement, f32) {
@@ -329,6 +335,7 @@ pub fn setup_currency_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     coins: Res<CoinCurrency>,
+    keybinds: Res<KeyBindings>,
 ) {
     let time_fragments = currency.as_ref();
     let text = commands
@@ -447,18 +454,46 @@ pub fn setup_currency_ui(
         Vec2::new(0., 0.),
         3,
     );
-    commands
+
+    // Get the inventory keybind and determine the key size/element
+    let inventory_key = keybinds.get_inventory_key();
+    let (key_element, key_width) = get_key_size_and_element(inventory_key);
+
+    // Spawn dynamic key background
+    let key_bg = commands
         .spawn(SpriteBundle {
-            texture: asset_server.load("textures/EKey.png"),
+            texture: graphics.get_ui_element_texture(key_element),
             transform: Transform::from_translation(Vec3::new(-0.5, 13., 1.)),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(10., 10.)),
+                custom_size: Some(Vec2::new(key_width, 10.)),
                 ..Default::default()
             },
             ..Default::default()
         })
         .insert(RenderLayers::from_layers(&[3]))
-        .set_parent(bag_icon);
+        .insert(InventoryKeyBackground)
+        .set_parent(bag_icon)
+        .id();
+
+    // Spawn keybind text as child of key background
+    commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                crate::keybinds::get_key_display_name(inventory_key),
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Center),
+            text_anchor: bevy::sprite::Anchor::Center,
+            transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(InventoryKeybindText)
+        .set_parent(key_bg);
 }
 
 pub fn update_currency_text(
@@ -1551,6 +1586,31 @@ pub fn update_active_skill_keybind_text(
     for (key_bg, mut texture, mut sprite) in key_backgrounds.iter_mut() {
         let key = keybinds.get_active_skill_key(key_bg.slot);
         let (key_element, key_width) = get_key_size_and_element(key);
+        *texture = graphics.get_ui_element_texture(key_element);
+        sprite.custom_size = Some(Vec2::new(key_width, 10.));
+    }
+}
+
+pub fn update_inventory_keybind_text(
+    keybinds: Res<crate::keybinds::KeyBindings>,
+    mut texts: Query<&mut Text, With<InventoryKeybindText>>,
+    mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<InventoryKeyBackground>>,
+    graphics: Res<Graphics>,
+) {
+    if !keybinds.is_changed() {
+        return;
+    }
+
+    let inventory_key = keybinds.get_inventory_key();
+
+    // Update text
+    for mut text in texts.iter_mut() {
+        text.sections[0].value = crate::keybinds::get_key_display_name(inventory_key);
+    }
+
+    // Update key background size and texture
+    for (mut texture, mut sprite) in key_backgrounds.iter_mut() {
+        let (key_element, key_width) = get_key_size_and_element(inventory_key);
         *texture = graphics.get_ui_element_texture(key_element);
         sprite.custom_size = Some(Vec2::new(key_width, 10.));
     }

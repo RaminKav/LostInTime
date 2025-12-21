@@ -643,8 +643,9 @@ pub fn toggle_inventory(
     curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
 ) {
-    if key_input.just_pressed(KeyCode::I) || key_input.just_pressed(KeyCode::Tab) {
+    if key_input.just_pressed(keybinds.get_inventory_key()) {
         // Don't allow opening inventory while item chest is open
         if curr_ui_state.0 != UIState::ItemChest {
             next_ui_state.set(UIState::Inventory);
@@ -828,12 +829,12 @@ pub fn diagnostics(
     mouse_button_input: Res<Input<MouseButton>>,
     entities: Query<Entity>,
     mobs: Query<&Mob>,
-    spawners: Query<&GlobalSpawners>,
+    spawners: Res<GlobalSpawners>,
 ) {
     if mouse_button_input.just_pressed(MouseButton::Right) {
         debug!("Entity Count: {:?}", entities.iter().count());
         debug!("Mob Count: {:?}", mobs.iter().count());
-        debug!("Spawner Count: {:?}", spawners.iter().count());
+        debug!("Spawner Count: {:?}", spawners.spawners.iter().count());
     }
 }
 pub fn mouse_click_system(

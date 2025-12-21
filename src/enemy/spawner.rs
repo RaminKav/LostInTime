@@ -5,23 +5,21 @@ use rand::Rng;
 
 use crate::{
     client::is_not_paused,
-    combat::EnemyDeathEvent,
     custom_commands::CommandsExt,
-    night::{InfiniteMode, InfiniteModeMob, NewDayEvent, NightTracker},
+    night::{InfiniteMode, InfiniteModeMob, NightTracker},
     player::Player,
     proto::proto_param::ProtoParam,
     run_once_per_run,
     world::{
-        chunk::Chunk,
         dimension::{ActiveDimension, DimensionSpawnEvent},
         dungeon::Dungeon,
-        world_helpers::{camera_pos_to_chunk_pos, tile_pos_to_world_pos, world_pos_to_tile_pos},
+        world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
         TileMapPosition, CHUNK_SIZE, TILE_SIZE,
     },
     GameParam, GameState, DEBUG,
 };
 
-use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, FollowSpeed, Mob};
+use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
@@ -37,7 +35,6 @@ impl Plugin for SpawnerPlugin {
                     test_mob_count,
                     spawn_one_time_enemies_at_day,
                     spawn_stone_golem_timer.run_if(is_not_paused),
-                    reduce_chunk_mob_count_on_mob_death,
                     reset_stone_golem_timer_on_era_change,
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -62,7 +59,6 @@ pub struct Spawner {
     pub min_days_to_spawn: u8,
     pub enemy: Mob,
     pub num_to_spawn: Option<u32>,
-    pub num_spawned: u32,
 }
 impl PartialEq for Spawner {
     fn eq(&self, other: &Self) -> bool {
@@ -71,16 +67,14 @@ impl PartialEq for Spawner {
             && self.enemy == other.enemy
     }
 }
-#[derive(Component, Debug)]
+#[derive(Resource, Debug)]
 pub struct GlobalSpawners {
     pub spawners: Vec<Spawner>,
     pub initial_spawn_delay: Timer,
-    pub spawned_mobs: i32,
 }
 
 #[derive(Debug)]
 pub struct MobSpawnEvent {
-    spawner: Entity,
     mob: Mob,
     bypass_timers: bool,
 }
@@ -122,7 +116,6 @@ fn add_spawners_to_new_chunks(
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 3,
             num_to_spawn: Some(2),
-            num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
@@ -130,7 +123,6 @@ fn add_spawners_to_new_chunks(
             spawn_timer: Timer::from_seconds(18.5, TimerMode::Once),
             min_days_to_spawn: 0,
             num_to_spawn: Some(3),
-            num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::RedMushling,
@@ -138,7 +130,6 @@ fn add_spawners_to_new_chunks(
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 0,
             num_to_spawn: None,
-            num_spawned: 0,
         });
         // spawners.push(Spawner {
         //     enemy: Mob::Hog,
@@ -146,7 +137,6 @@ fn add_spawners_to_new_chunks(
         //     spawn_timer: Timer::from_seconds(120., TimerMode::Once),
         //     min_days_to_spawn: 0,
         //     num_to_spawn: None,
-        //     num_spawned: 0,
         // });
         spawners.push(Spawner {
             enemy: Mob::StingFly,
@@ -154,7 +144,6 @@ fn add_spawners_to_new_chunks(
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(2),
-            num_spawned: 0,
         });
         spawners.push(Spawner {
             enemy: Mob::Bushling,
@@ -162,38 +151,14 @@ fn add_spawners_to_new_chunks(
             spawn_timer: Timer::from_seconds(25., TimerMode::Once),
             min_days_to_spawn: 1,
             num_to_spawn: Some(3),
-            num_spawned: 0,
         });
     }
-    commands.spawn(GlobalSpawners {
+    commands.insert_resource(GlobalSpawners {
         spawners,
-        spawned_mobs: 0,
         initial_spawn_delay: Timer::from_seconds(5., TimerMode::Once),
     });
 }
 
-fn _handle_add_fairy_spawners(
-    mut chunk_query: Query<(&Chunk, &mut GlobalSpawners)>,
-    new_day_event: EventReader<NewDayEvent>,
-    player_pos: Query<&GlobalTransform, With<Player>>,
-) {
-    if !new_day_event.is_empty() {
-        let player_chunk = camera_pos_to_chunk_pos(&player_pos.single().translation().truncate());
-        for (chunk, mut spawners) in chunk_query.iter_mut() {
-            if chunk.chunk_pos == player_chunk {
-                debug!("ADDED FAIRY SPAWNER TO {player_chunk:?}");
-                spawners.spawners.push(Spawner {
-                    enemy: Mob::Fairy,
-                    weight: 9999.,
-                    spawn_timer: Timer::from_seconds(60., TimerMode::Once),
-                    min_days_to_spawn: 0,
-                    num_to_spawn: Some(1),
-                    num_spawned: 0,
-                });
-            }
-        }
-    }
-}
 fn handle_spawn_mobs(
     game: GameParam,
     mut proto_commands: ProtoCommands,
@@ -202,7 +167,7 @@ fn handle_spawn_mobs(
     mut spawner_trigger_event: EventReader<MobSpawnEvent>,
     proto_param: ProtoParam,
     player_t: Query<&GlobalTransform, With<Player>>,
-    mut spawners: Query<&mut GlobalSpawners>,
+    mut spawners: ResMut<GlobalSpawners>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     infinite_mode: Res<InfiniteMode>,
 ) {
@@ -211,9 +176,9 @@ fn handle_spawn_mobs(
     }
     'outer: for e in spawner_trigger_event.iter() {
         let mut rng = rand::thread_rng();
-        let maybe_spawner = spawners.get_mut(e.spawner);
+        let maybe_spawner = spawners.spawners.iter_mut().find(|s| s.enemy == e.mob);
         let mut picked_mob_to_spawn = None;
-        if let Ok(mut chunk_spawner) = maybe_spawner {
+        if let Some(mut chunk_spawner) = maybe_spawner {
             let player_pos = player_t.single().translation().truncate();
             let mut pos = player_pos;
             let mut can_spawn_mob_here_check = false;
@@ -235,17 +200,8 @@ fn handle_spawn_mobs(
                 }
             }
             picked_mob_to_spawn = Some((e.mob.clone(), pos));
-
-            chunk_spawner
-                .spawners
-                .iter_mut()
-                .find(|s| s.enemy == e.mob)
-                .expect("Mob spawner should exist {:mob}")
-                .num_spawned += 1;
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
-            spawners.get_mut(e.spawner).unwrap().spawned_mobs += 1;
-
             if let Some(spawned_mob) =
                 proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
             {
@@ -263,20 +219,6 @@ fn handle_spawn_mobs(
                 if infinite_mode.active {
                     commands.entity(spawned_mob).insert(InfiniteModeMob);
                 }
-            }
-        }
-    }
-}
-fn reduce_chunk_mob_count_on_mob_death(
-    mut death_events: EventReader<EnemyDeathEvent>,
-    game: GameParam,
-    mut spawners: Query<&mut GlobalSpawners>,
-) {
-    for death in death_events.iter() {
-        let chunk = camera_pos_to_chunk_pos(&death.enemy_pos);
-        if let Some(chunk_entity) = game.get_chunk_entity(chunk) {
-            if let Ok(mut chunk_spawner) = spawners.get_mut(chunk_entity) {
-                chunk_spawner.spawned_mobs -= 1;
             }
         }
     }
@@ -412,82 +354,78 @@ fn reset_stone_golem_timer_on_era_change(
 
 fn tick_spawner_timers(
     time: Res<Time>,
-    mut spawners: Query<(Entity, &mut GlobalSpawners)>,
+    mut spawners: ResMut<GlobalSpawners>,
     night_tracker: Res<NightTracker>,
     infinite_mode: Res<InfiniteMode>,
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
 ) {
-    for (spawner_e, mut spawners) in spawners.iter_mut() {
-        if !spawners.initial_spawn_delay.finished() {
-            spawners.initial_spawn_delay.tick(time.delta());
+    if !spawners.initial_spawn_delay.finished() {
+        spawners.initial_spawn_delay.tick(time.delta());
+        return;
+    }
+    // for each spawned chunk, check if mob count is < max
+    // and if so, send event to spawn more
+    let mob_count = mobs
+        .iter()
+        .filter(|m| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
+        .count() as i32;
+
+    // In infinite mode, allow more mobs to spawn
+    let max_mobs = if infinite_mode.active {
+        BASE_MAX_MOBS_TOTAL * 2 + night_tracker.days as i32 * 10
+    } else {
+        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+    };
+
+    if mob_count >= max_mobs {
+        info!(
+            "MAX MOBS {:?} {:?} {:?}",
+            mob_count,
+            max_mobs,
+            mobs.iter().count()
+        );
+        return;
+    }
+    let day = night_tracker.days;
+    let endless_mode_spawn_count_increase = if infinite_mode.active {
+        match infinite_mode.difficulty_level {
+            0..=3 => 1,
+            4..=7 => 2,
+            8..=10 => 3,
+            _ => 0,
+        }
+    } else {
+        0
+    };
+    for spawner in spawners.spawners.iter_mut() {
+        debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
+        if day < spawner.min_days_to_spawn {
             continue;
         }
-        // for each spawned chunk, check if mob count is < max
-        // and if so, send event to spawn more
-        let mob_count = mobs
-            .iter()
-            .filter(|m| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
-            .count() as i32;
 
-        // In infinite mode, allow more mobs to spawn
-        let max_mobs = if infinite_mode.active {
-            BASE_MAX_MOBS_TOTAL * 2 + night_tracker.days as i32 * 10
-        } else {
-            BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
-        };
+        spawner.spawn_timer.tick(time.delta());
 
-        if mob_count >= max_mobs {
-            info!(
-                "MAX MOBS {:?} {:?} {:?}",
-                mob_count,
-                max_mobs,
-                mobs.iter().count()
-            );
-            return;
-        }
-        let day = night_tracker.days;
-        let endless_mode_spawn_count_increase = if infinite_mode.active {
-            match infinite_mode.difficulty_level {
-                0..=3 => 1,
-                4..=7 => 2,
-                8..=10 => 3,
-                _ => 0,
-            }
-        } else {
-            0
-        };
-        for spawner in spawners.spawners.iter_mut() {
-            debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
-            if day < spawner.min_days_to_spawn {
-                continue;
-            }
-
+        // Speed up spawns during night OR infinite mode
+        if night_tracker.is_night() || infinite_mode.active {
+            // 3x spawn rate at night / infinite mode
             spawner.spawn_timer.tick(time.delta());
-
-            // Speed up spawns during night OR infinite mode
-            if night_tracker.is_night() || infinite_mode.active {
-                // 3x spawn rate at night / infinite mode
+            spawner.spawn_timer.tick(time.delta());
+            spawner.spawn_timer.tick(time.delta());
+            // tick extra time in infinite mode
+            if infinite_mode.active {
                 spawner.spawn_timer.tick(time.delta());
-                spawner.spawn_timer.tick(time.delta());
-                spawner.spawn_timer.tick(time.delta());
-                // tick extra time in infinite mode
-                if infinite_mode.active {
-                    spawner.spawn_timer.tick(time.delta());
-                }
             }
-            if spawner.spawn_timer.finished() {
-                spawner.spawn_timer.reset();
-                for _ in 0..(spawner.num_to_spawn.unwrap_or(1)
-                    + endless_mode_spawn_count_increase as u32)
-                {
-                    // info!("send spawn event! {:?}", spawner.enemy);
-                    spawn_event.send(MobSpawnEvent {
-                        spawner: spawner_e,
-                        mob: spawner.enemy.clone(),
-                        bypass_timers: false,
-                    });
-                }
+        }
+        if spawner.spawn_timer.finished() {
+            spawner.spawn_timer.reset();
+            for _ in
+                0..(spawner.num_to_spawn.unwrap_or(1) + endless_mode_spawn_count_increase as u32)
+            {
+                spawn_event.send(MobSpawnEvent {
+                    mob: spawner.enemy.clone(),
+                    bypass_timers: false,
+                });
             }
         }
     }

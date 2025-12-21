@@ -430,6 +430,10 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                update_inventory_keybind_text
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
                 handle_essence_heirloom_tooltip
                     .in_set(OnUpdate(GameState::Main)),
             )

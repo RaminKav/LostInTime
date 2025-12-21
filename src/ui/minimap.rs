@@ -97,8 +97,12 @@ pub struct MinimapTileCache {
     pub explored_terrain: HashMap<TileMapPosition, [WorldObject; 4]>,
 }
 
-fn toggle_island_map(key_input: Res<Input<KeyCode>>, mut map_open: ResMut<IslandMapOpen>) {
-    if key_input.just_pressed(KeyCode::M) {
+fn toggle_island_map(
+    key_input: Res<Input<KeyCode>>,
+    mut map_open: ResMut<IslandMapOpen>,
+    keybinds: Res<crate::keybinds::KeyBindings>,
+) {
+    if key_input.just_pressed(keybinds.get_minimap_key()) {
         map_open.0 = !map_open.0;
     }
 }

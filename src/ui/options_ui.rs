@@ -18,17 +18,24 @@ pub struct OptionsUI;
 
 #[derive(Component)]
 pub struct KeyBindButton {
-    slot: usize,
+    bind_type: KeyBindType,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum KeyBindType {
+    ActiveSkill(usize),
+    Inventory,
+    Minimap,
 }
 
 #[derive(Component)]
 pub struct KeyBindText {
-    slot: usize,
+    bind_type: KeyBindType,
 }
 
 #[derive(Component)]
 pub struct WaitingForKeyInput {
-    pub slot: usize,
+    pub bind_type: KeyBindType,
 }
 
 pub fn handle_options_clicks(
@@ -56,9 +63,9 @@ pub fn handle_options_clicks(
                 Interaction::Hovering => {
                     if left_mouse_released {
                         // Start waiting for key input
-                        commands
-                            .entity(entity)
-                            .insert(WaitingForKeyInput { slot: button.slot });
+                        commands.entity(entity).insert(WaitingForKeyInput {
+                            bind_type: button.bind_type,
+                        });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                 }
@@ -109,7 +116,11 @@ pub fn handle_key_rebind_input(
 
         // Set the new key binding
         for (entity, waiting_for) in waiting.iter() {
-            keybinds.set_active_skill_key(waiting_for.slot, key);
+            match waiting_for.bind_type {
+                KeyBindType::ActiveSkill(slot) => keybinds.set_active_skill_key(slot, key),
+                KeyBindType::Inventory => keybinds.set_inventory_key(key),
+                KeyBindType::Minimap => keybinds.set_minimap_key(key),
+            }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
             commands
@@ -129,9 +140,9 @@ pub fn update_keybind_text(
     mut texts: Query<(&KeyBindText, &mut Text)>,
     mut was_waiting: Local<bool>,
 ) {
-    // Collect waiting slots to avoid borrow issues
-    let waiting_slots: Vec<usize> = waiting.iter().map(|w| w.slot).collect();
-    let is_waiting = !waiting_slots.is_empty();
+    // Collect waiting bind types to avoid borrow issues
+    let waiting_binds: Vec<KeyBindType> = waiting.iter().map(|w| w.bind_type).collect();
+    let is_waiting = !waiting_binds.is_empty();
 
     // Update if:
     // - Keybinds changed, OR
@@ -144,11 +155,15 @@ pub fn update_keybind_text(
     *was_waiting = is_waiting;
 
     for (key_text, mut text) in texts.iter_mut() {
-        if waiting_slots.contains(&key_text.slot) {
+        if waiting_binds.contains(&key_text.bind_type) {
             text.sections[0].value = "Press any key...".to_string();
             text.sections[0].style.color = crate::colors::YELLOW_2;
         } else {
-            let key = keybinds.get_active_skill_key(key_text.slot);
+            let key = match key_text.bind_type {
+                KeyBindType::ActiveSkill(slot) => keybinds.get_active_skill_key(slot),
+                KeyBindType::Inventory => keybinds.get_inventory_key(),
+                KeyBindType::Minimap => keybinds.get_minimap_key(),
+            };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
         }
@@ -236,12 +251,58 @@ pub fn setup_options_ui(
             &mut commands,
             &graphics,
             &asset_server,
-            slot,
+            KeyBindType::ActiveSkill(slot),
             Vec3::new(text_x + 2., y, 11.),
             Vec3::new(text_x + 160., y - 3.5, 11.),
             &keybinds,
         );
     }
+
+    // UI keybinds section
+    let ui_section_y = start_y + row_spacing * 3.5;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Other Keybinds",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(text_x, ui_section_y, 11.)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Other Keybind Section Title"),
+    ));
+
+    // Inventory keybind
+    let inventory_y = ui_section_y + row_spacing * 1.5;
+    spawn_keybind_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        KeyBindType::Inventory,
+        Vec3::new(text_x + 2., inventory_y, 11.),
+        Vec3::new(text_x + 160., inventory_y - 3.5, 11.),
+        &keybinds,
+    );
+
+    // Minimap keybind
+    let minimap_y = inventory_y + row_spacing;
+    spawn_keybind_row(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        KeyBindType::Minimap,
+        Vec3::new(text_x + 2., minimap_y, 11.),
+        Vec3::new(text_x + 160., minimap_y - 3.5, 11.),
+        &keybinds,
+    );
     //TODO: FIX THESE BUTTONS
     // // Only show Restart and Exit buttons during an active game (not in main menu)
     // if game_state.0 == crate::GameState::Main {
@@ -288,22 +349,30 @@ fn spawn_keybind_row(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
-    slot: usize,
+    bind_type: KeyBindType,
     label_pos: Vec3,
     button_pos: Vec3,
     keybinds: &KeyBindings,
 ) {
-    // Skill slot label
-    let slot_name = match slot {
-        0 => "Skill Slot 1:",
-        1 => "Skill Slot 2:",
-        2 => "Skill Slot 3:",
-        _ => "Unknown Slot",
+    // Get label and current key based on bind type
+    let (label, current_key) = match bind_type {
+        KeyBindType::ActiveSkill(slot) => {
+            let label = match slot {
+                0 => "Skill Slot 1:",
+                1 => "Skill Slot 2:",
+                2 => "Skill Slot 3:",
+                _ => "Unknown Slot",
+            };
+            (label, keybinds.get_active_skill_key(slot))
+        }
+        KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
+        KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
     };
+
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                slot_name,
+                label,
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
@@ -318,16 +387,15 @@ fn spawn_keybind_row(
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         UIState::Options,
-        Name::new(format!("Keybind Row Label {}", slot)),
+        Name::new(format!("Keybind Row Label {:?}", bind_type)),
     ));
 
     // Current key text
-    let key = keybinds.get_active_skill_key(slot);
     let current_key_pos = Vec3::new(label_pos.x + 60., label_pos.y, label_pos.z);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
-                crate::keybinds::get_key_display_name(key),
+                crate::keybinds::get_key_display_name(current_key),
                 TextStyle {
                     font: asset_server.load("fonts/4x5.ttf"),
                     font_size: 5.0,
@@ -342,8 +410,8 @@ fn spawn_keybind_row(
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         UIState::Options,
-        KeyBindText { slot },
-        Name::new(format!("Keybind Current Key {}", slot)),
+        KeyBindText { bind_type },
+        Name::new(format!("Keybind Current Key {:?}", bind_type)),
     ));
 
     // Rebind button
@@ -362,9 +430,9 @@ fn spawn_keybind_row(
         .insert(UIState::Options)
         .insert(UIElement::BackButton)
         .insert(OptionsUI)
-        .insert(KeyBindButton { slot })
+        .insert(KeyBindButton { bind_type })
         .insert(Interactable::default())
-        .insert(Name::new(format!("Keybind Button {}", slot)))
+        .insert(Name::new(format!("Keybind Button {:?}", bind_type)))
         .id();
 
     commands
@@ -385,7 +453,7 @@ fn spawn_keybind_row(
             },
             RenderLayers::from_layers(&[3]),
             UIState::Options,
-            Name::new(format!("Keybind Button Label {}", slot)),
+            Name::new(format!("Keybind Button Label {:?}", bind_type)),
         ))
         .set_parent(button_entity);
 }

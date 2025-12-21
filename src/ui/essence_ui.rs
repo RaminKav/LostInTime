@@ -1,15 +1,15 @@
 use bevy::{ecs::system::ParamSet, prelude::*, render::view::RenderLayers};
 use bevy_aseprite::aseprite;
-use rand::{seq::SliceRandom, Rng};
-use strum::IntoEnumIterator;
+use bevy_proto::prelude::ProtoCommands;
+use rand::Rng;
 
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
+    custom_commands::CommandsExt,
     inventory::ItemStack,
     item::WorldObject,
     player::{
-        currency::{CoinCurrency, TimeFragmentCurrency},
         skills::{Heirloom, HeirloomRarity, HeirloomWithRarity, PlayerSkills},
         ModifyCurencyEvent, Player,
     },
@@ -310,9 +310,14 @@ pub fn handle_submit_essence_choice(
     essence_ui: Query<Entity, With<EssenceUI>>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
-    mut params: ParamSet<(GameParam, Query<(Entity, &mut PlayerSkills), With<Player>>)>,
+    mut params: ParamSet<(
+        GameParam,
+        Query<(Entity, &mut PlayerSkills, &GlobalTransform), With<Player>>,
+    )>,
     shop: Res<EssenceShopChoices>,
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
 ) {
     for choice in ev.iter() {
         // Access coins and time_fragments through GameParam (set 0)
@@ -332,7 +337,9 @@ pub fn handle_submit_essence_choice(
             });
 
             // Add heirloom to player's heirloom pool (set 1 - mutable access)
-            if let Ok((player_entity, mut player_skills)) = params.p1().get_single_mut() {
+            if let Ok((player_entity, mut player_skills, player_transform)) =
+                params.p1().get_single_mut()
+            {
                 let heirloom_with_rarity = HeirloomWithRarity {
                     heirloom: choice.choice.heirloom.clone(),
                     rarity: choice.choice.rarity.clone(),
@@ -346,7 +353,17 @@ pub fn handle_submit_essence_choice(
                     &mut commands,
                     player_skills.clone(),
                 );
-
+                let player_pos = player_transform.translation().truncate();
+                // handle drops
+                if let Some((drop, count)) = heirloom_with_rarity.heirloom.get_instant_drop() {
+                    proto_commands.spawn_item_from_proto(
+                        drop,
+                        &proto,
+                        player_pos + Vec2::new(0., -18.), // offset so it doesn't spawn on the player
+                        count,
+                        None,
+                    );
+                }
                 // Trigger attribute recalculation
                 attribute_event.send(AttributeChangeEvent);
             }

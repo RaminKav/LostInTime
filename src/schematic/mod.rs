@@ -118,7 +118,7 @@ fn clear_schematic_entities(
     query: Query<Entity, With<SchematicBuilderObject>>,
     key_input: Res<Input<KeyCode>>,
 ) {
-    if key_input.just_pressed(KeyCode::C) {
+    if *DEBUG && key_input.just_pressed(KeyCode::C) {
         for e in query.iter() {
             if let Some(entity_cmds) = commands.get_entity(e) {
                 entity_cmds.despawn_recursive();
@@ -132,7 +132,7 @@ fn save_schematic_scene(world: &mut World) {
         Res<Input<KeyCode>>,
     )> = SystemState::new(world);
     let (query, key_input) = state.get(world);
-    if key_input.just_pressed(KeyCode::J) {
+    if *DEBUG && key_input.just_pressed(KeyCode::J) {
         info!("Saving schematic scene...");
         let type_registry = AppTypeRegistry::default();
         {
