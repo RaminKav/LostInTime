@@ -32,6 +32,7 @@ use crate::item::projectile::ArcProjectileData;
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::sapling::Sapling;
+use crate::ui::CleanUpRunStateEvent;
 use crate::world::chunk::Chunk;
 use crate::{inventory::ItemStack, Game, Player};
 use crate::{GameParam, GameState};
@@ -99,6 +100,7 @@ impl Material2d for AnimatedTextureMaterial {
 impl Plugin for AnimationsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(Material2dPlugin::<AnimatedTextureMaterial>::default())
+            .add_event::<CleanUpRunStateEvent>()
             .add_system(preload_player_sprites.in_schedule(OnExit(GameState::Loading)))
             .add_systems(
                 (
@@ -128,10 +130,7 @@ impl Plugin for AnimationsPlugin {
                 handle_move_animations,
                 handle_ui_time_fragments,
             ))
-            .add_system(
-                maintain_player_red_tint
-                    .in_set(OnUpdate(GameState::GameOver)),
-            );
+            .add_system(maintain_player_red_tint.in_set(OnUpdate(GameState::GameOver)));
     }
 }
 

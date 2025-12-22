@@ -38,7 +38,7 @@ use crate::{
         dimension::{ActiveDimension, EraManager, GenerationSeed},
         generation::WorldObjectCache,
     },
-    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT, ZOOM_SCALE,
+    DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
 use super::{scrapper_ui::ScrapperEvent, Interactable, UIElement};
@@ -60,7 +60,6 @@ pub struct MenuButtonExtras<'w, 's> {
     night_tracker: Option<Res<'w, NightTracker>>,
     seed: Option<Res<'w, GenerationSeed>>,
     scrapper_event: EventWriter<'w, ScrapperEvent>,
-    game_over_event: EventWriter<'w, crate::client::GameOverEvent>,
     selection_state: ResMut<'w, ClassSelectionState>,
     confirm_state: ResMut<'w, ClassUnlockConfirmState>,
     time_fragment_currency: Option<ResMut<'w, TimeFragmentCurrency>>,
@@ -72,6 +71,7 @@ pub struct MenuButtonExtras<'w, 's> {
     pagination_state: ResMut<'w, AchievementsPagination>,
     run_unlock_state: ResMut<'w, RunUnlockState>,
     screen_res: Res<'w, ScreenResolution>,
+    player_class: Option<Res<'w, PlayerClass>>,
 }
 
 #[derive(Component, Clone, Eq, Display, Debug, PartialEq)]
@@ -164,6 +164,7 @@ pub fn handle_menu_button_click_events(
     mut commands: Commands,
     mut extras: MenuButtonExtras,
     current_ui_state: Res<State<UIState>>,
+    mut cleanup_event: EventWriter<CleanUpRunStateEvent>,
 ) {
     for event in event_reader.iter() {
         let info_modal_open = extras.info_modal.iter().next().is_some();
@@ -433,58 +434,33 @@ pub fn handle_menu_button_click_events(
                 let _ = fs::remove_file(datafiles::save_file());
                 next_state.0 = Some(GameState::MainMenu);
 
-                //cleanup resources with Entity refs
-                commands.remove_resource::<ChestContainer>();
-                commands.remove_resource::<FurnaceContainer>();
-                commands.remove_resource::<AnalyticsData>();
-                commands.remove_resource::<HeirloomChoiceQueue>();
-                commands.remove_resource::<Game>();
-                commands.remove_resource::<NightTracker>();
-                commands.remove_resource::<ContainerRegistry>();
-                commands.remove_resource::<CraftingTracker>();
-                commands.remove_resource::<EraManager>();
-                commands.remove_resource::<WorldObjectCache>();
+                cleanup_event.send_default();
             }
-            MenuButton::OptionsRestart | MenuButton::OptionsExit => {
-                // Both buttons need to clean up the run data properly
-                // Trigger game over event to save analytics and run data
-                extras.game_over_event.send_default();
+            MenuButton::OptionsRestart => {
+                info!("Options menu: Restarting with same class/pet");
 
-                info!(
-                    "Options menu: {} - cleaning up run",
-                    if event.button == MenuButton::OptionsRestart {
-                        "Restart"
-                    } else {
-                        "Exit to Menu"
-                    }
-                );
+                if let Some(player_class) = extras.player_class.as_ref() {
+                    extras.selection_state.selected_class = Some(player_class.class.clone());
+                    extras.selection_state.selected_pet = player_class.pets.first().cloned();
+                    commands.insert_resource(PlayerClass {
+                        class: player_class.class.clone(),
+                        pets: player_class.pets.clone(),
+                    });
 
-                // Clean up all world entities (except those marked to persist)
-                for e in extras.world_entities.iter() {
-                    if let Some(entity_commands) = commands.get_entity(e) {
-                        entity_commands.despawn_recursive();
-                    }
+                    extras
+                        .run_unlock_state
+                        .reset_for_run(&*extras.unlock_upgrades);
                 }
 
-                // Remove save file
-                let _ = fs::remove_file(datafiles::save_file());
-
-                // Clean up run-specific resources
-                commands.remove_resource::<ChestContainer>();
-                commands.remove_resource::<FurnaceContainer>();
-                commands.remove_resource::<AnalyticsData>();
-                commands.remove_resource::<HeirloomChoiceQueue>();
-                commands.remove_resource::<Game>();
-                commands.remove_resource::<NightTracker>();
-                commands.remove_resource::<ContainerRegistry>();
-                commands.remove_resource::<CraftingTracker>();
-                commands.remove_resource::<EraManager>();
-                commands.remove_resource::<WorldObjectCache>();
-                commands.remove_resource::<ChaosTracker>();
-
-                // Close options UI and transition to main menu
+                next_ui_state.set(UIState::Closed);
+                next_state.set(GameState::Initializing);
+                cleanup_event.send_default();
+            }
+            MenuButton::OptionsExit => {
+                info!("Options menu: Exiting to main menu");
                 next_ui_state.set(UIState::Closed);
                 next_state.set(GameState::MainMenu);
+                cleanup_event.send_default();
             }
         }
     }
@@ -728,4 +704,59 @@ pub fn update_achievements_notification_icon(
             .insert(AchievementsNotificationIcon)
             .insert(RenderLayers::from_layers(&[3]));
     }
+}
+
+#[derive(Default)]
+pub struct CleanUpRunStateEvent;
+
+pub fn cleanup_run_state(
+    event: EventReader<CleanUpRunStateEvent>,
+    mut commands: Commands,
+    world_entities: Query<
+        Entity,
+        (
+            Or<(With<Visibility>, With<ActiveDimension>, With<Collider>)>,
+            Without<DoNotDespawnOnGameOver>,
+        ),
+    >,
+    boss_health_bars: Query<
+        Entity,
+        Or<(
+            With<crate::ui::boss_health_bar::BossHealthBar>,
+            With<crate::ui::boss_health_bar::BossHealthBarFrame>,
+            With<crate::ui::boss_health_bar::BossNameText>,
+        )>,
+    >,
+    guide_hud: Query<Entity, With<crate::ui::key_input_guide::InteractGuide>>,
+) {
+    if event.is_empty() {
+        return;
+    }
+    info!("Cleaning up ALL run data on GameState::Main exit");
+
+    for entity in boss_health_bars.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+    for entity in guide_hud.iter() {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    for e in world_entities.iter() {
+        if let Some(entity_commands) = commands.get_entity(e) {
+            entity_commands.despawn_recursive();
+        }
+    }
+
+    let _ = fs::remove_file(datafiles::save_file());
+
+    commands.remove_resource::<ChestContainer>();
+    commands.remove_resource::<FurnaceContainer>();
+    commands.insert_resource(AnalyticsData::default());
+    commands.insert_resource(HeirloomChoiceQueue::default());
+    commands.insert_resource(Game::default());
+    commands.insert_resource(NightTracker::default());
+    commands.insert_resource(ContainerRegistry::default());
+    commands.insert_resource(CraftingTracker::default());
+    commands.insert_resource(EraManager::default());
+    commands.insert_resource(WorldObjectCache::default());
 }

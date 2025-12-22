@@ -153,6 +153,7 @@ impl Plugin for UIPlugin {
             )
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
             .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(cleanup_run_state.in_base_set(CoreSet::PreUpdate).run_if(not(in_state(GameState::MainMenu))))
             .add_systems((
                 // Clean up leaderboard when entering other UI states to avoid duplicates
                 cleanup_leaderboard_ui

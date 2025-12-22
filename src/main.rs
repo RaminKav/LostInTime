@@ -251,9 +251,10 @@ fn main() {
                 .run_if(run_once_per_run())
                 .in_set(OnUpdate(GameState::Main)),
         )
-        .add_system(
+        .add_systems((
             set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::GameOver)),
-        )
+            set_start_of_run_action_resource_false.in_schedule(OnEnter(GameState::MainMenu)),
+        ))
         .add_system(spawn_menu_text_buttons.in_schedule(OnEnter(GameState::MainMenu)))
         .add_system(handle_menu_button_click_events.run_if(not(in_state(GameState::Loading))))
         .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));

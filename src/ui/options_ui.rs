@@ -303,37 +303,37 @@ pub fn setup_options_ui(
         Vec3::new(text_x + 160., minimap_y - 3.5, 11.),
         &keybinds,
     );
-    //TODO: FIX THESE BUTTONS
-    // // Only show Restart and Exit buttons during an active game (not in main menu)
-    // if game_state.0 == crate::GameState::Main {
-    //     // Restart button
-    //     let restart_button = crate::ui::main_menu::spawn_menu_button(
-    //         Vec3::new(0., -55., 11.),
-    //         Vec3::new(-30., 0., 1.),
-    //         "Restart Run",
-    //         crate::ui::main_menu::MenuButton::OptionsRestart,
-    //         Vec2::new(84., 18.),
-    //         &mut commands,
-    //         &graphics,
-    //         &asset_server,
-    //         crate::ui::UIElement::UnlocksButton,
-    //     );
-    //     commands.entity(restart_button).insert(OptionsUI);
 
-    //     // Exit to Menu button
-    //     let exit_button = crate::ui::main_menu::spawn_menu_button(
-    //         Vec3::new(0., -80., 11.),
-    //         Vec3::new(-30., 0., 1.),
-    //         "Exit to Menu",
-    //         crate::ui::main_menu::MenuButton::OptionsExit,
-    //         Vec2::new(84., 18.),
-    //         &mut commands,
-    //         &graphics,
-    //         &asset_server,
-    //         crate::ui::UIElement::UnlocksButton,
-    //     );
-    //     commands.entity(exit_button).insert(OptionsUI);
-    // }
+    //TODO: fix restart button
+    if game_state.0 == crate::GameState::Main {
+        // // Restart button
+        // let restart_button = crate::ui::main_menu::spawn_menu_button(
+        //     Vec3::new(0., -75., 11.),
+        //     Vec3::new(-30., 0., 1.),
+        //     "Restart",
+        //     crate::ui::main_menu::MenuButton::OptionsRestart,
+        //     Vec2::new(84., 18.),
+        //     &mut commands,
+        //     &graphics,
+        //     &asset_server,
+        //     crate::ui::UIElement::UnlocksButton,
+        // );
+        // commands.entity(restart_button).insert(OptionsUI);
+
+        // Exit to Menu button
+        let exit_button = crate::ui::main_menu::spawn_menu_button(
+            Vec3::new(-110., -108., 11.),
+            Vec3::new(-50., -1., 1.),
+            "Exit to Menu",
+            crate::ui::main_menu::MenuButton::OptionsExit,
+            Vec2::new(118., 18.),
+            &mut commands,
+            &graphics,
+            &asset_server,
+            crate::ui::UIElement::AchievementsButton,
+        );
+        commands.entity(exit_button).insert(OptionsUI);
+    }
 
     // Back Button
     let back_button = spawn_back_button(
