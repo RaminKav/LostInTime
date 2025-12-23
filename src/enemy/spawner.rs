@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
@@ -13,8 +12,7 @@ use crate::{
     world::{
         dimension::{ActiveDimension, DimensionSpawnEvent},
         dungeon::Dungeon,
-        world_helpers::{tile_pos_to_world_pos, world_pos_to_tile_pos},
-        TileMapPosition, CHUNK_SIZE, TILE_SIZE,
+        TILE_SIZE,
     },
     GameParam, GameState, DEBUG,
 };
@@ -33,7 +31,6 @@ impl Plugin for SpawnerPlugin {
                     tick_spawner_timers.run_if(is_not_paused),
                     // handle_add_fairy_spawners,
                     test_mob_count,
-                    spawn_one_time_enemies_at_day,
                     spawn_stone_golem_timer.run_if(is_not_paused),
                     reset_stone_golem_timer_on_era_change,
                 )
@@ -224,38 +221,6 @@ fn handle_spawn_mobs(
     }
 }
 
-fn spawn_one_time_enemies_at_day(
-    game: GameParam,
-    night_tracker: ResMut<NightTracker>,
-    mut proto_commands: ProtoCommands,
-    prototypes: Prototypes,
-    proto_param: ProtoParam,
-    mut day_tracker: Local<u8>,
-    maybe_dungeon: Query<Option<&Dungeon>, With<ActiveDimension>>,
-) {
-    if maybe_dungeon.get_single().is_ok() {
-        return;
-    }
-    if night_tracker.days == 4 && *day_tracker == 3 {
-        let mut rng = rand::thread_rng();
-        let mut pos = Vec2::new(0., 0.);
-        for _ in 0..10 {
-            let tile_pos = TilePos {
-                x: rng.gen_range(0..CHUNK_SIZE),
-                y: rng.gen_range(0..CHUNK_SIZE),
-            };
-            pos = tile_pos_to_world_pos(TileMapPosition::new(IVec2::new(0, 0), tile_pos), true);
-            if let Some(_existing_object) =
-                game.get_obj_entity_at_tile(world_pos_to_tile_pos(pos), &proto_param)
-            {
-                continue;
-            }
-            break;
-        }
-        proto_commands.spawn_from_proto(Mob::RedMushking, &prototypes, pos);
-        *day_tracker += 1;
-    }
-}
 /// Resource to track Stone Golem spawn timer
 #[derive(Resource)]
 pub struct StoneGolemSpawnTimer {

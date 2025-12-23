@@ -1,6 +1,6 @@
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use item_abilities::handle_item_abilitiy_on_attack;
-use rand::Rng;
+use rand::{seq::IteratorRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::{max, min},
@@ -486,7 +486,6 @@ impl ItemAttributes {
         if skills.get_count(Heirloom::Shield) * 10 != old_shield {
             entity.insert(MaxShield(skills.get_count(Heirloom::Shield) * 10));
         }
-        info!("ATTACK SPEED {:?}", self.attack_speed.value);
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
@@ -598,53 +597,17 @@ impl ItemAttributes {
         &self,
         bonus_stat_lines: &Vec<BonusStatLine>,
         filter: &Vec<&str>,
-    ) -> Option<String> {
+    ) -> Option<(usize, BonusStatLine)> {
         debug!("Getting random existing attribute from: {:?}", self);
-        let existing_attributes = vec![
-            ("health", self.health.value),
-            ("attack", self.attack.value),
-            ("crit_chance", self.crit_chance.value),
-            ("crit_damage", self.crit_damage.value),
-            ("bonus_damage", self.bonus_damage.value),
-            ("health_regen", self.health_regen.value),
-            ("healing", self.healing.value),
-            ("thorns", self.thorns.value),
-            ("dodge", self.dodge.value),
-            ("speed", self.speed.value),
-            ("lifesteal", self.lifesteal.value),
-            ("defence", self.defence.value),
-            ("xp_rate", self.xp_rate.value),
-            ("attack_speed", self.attack_speed.value),
-            ("loot_rate", self.loot_rate.value),
-            ("mana", self.mana.value),
-            ("projectile_size", self.size.value),
-            ("mana_regen", self.mana_regen.value),
-            ("durability", self.durability.value),
-            ("max_durability", self.max_durability.value),
-            ("size", self.size.value),
-        ]
-        .iter()
-        .filter(|(name, val)| {
-            (*val > 0
-                || bonus_stat_lines
-                    .iter()
-                    .any(|line| &line.attribute_name == name))
-                && !filter.contains(name)
-        })
-        .map(|(name, _)| name.to_string())
-        .collect::<Vec<String>>();
-        if existing_attributes.is_empty() {
-            debug!("No existing attributes found");
-            None
-        } else {
-            let mut rng = rand::thread_rng();
-            let index = rng.gen_range(0..existing_attributes.len());
-            debug!(
-                "Randomly selected attribute: {}",
-                existing_attributes[index]
-            );
-            Some(existing_attributes[index].clone())
-        }
+
+        let rng = rand::thread_rng();
+        let picked_bonus_attribute = bonus_stat_lines
+            .iter()
+            .cloned()
+            .filter(|s| !filter.contains(&s.attribute_name.as_str()))
+            .enumerate()
+            .choose(&mut rng.clone());
+        picked_bonus_attribute
     }
     pub fn change_attribute(&mut self, modifier: AttributeModifier) -> &Self {
         match modifier.modifier.as_str() {

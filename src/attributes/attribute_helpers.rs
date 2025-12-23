@@ -256,7 +256,7 @@ pub fn levelup_item_stats(
 ) -> ItemStack {
     let mut stack = stack.clone();
     for _ in 0..level {
-        let mut modifiers: Vec<(String, i32)> = vec![];
+        let mut modifiers: Vec<(String, i32, Option<usize>)> = vec![];
 
         let rarity = stack.rarity.clone();
         let num_upgrades = match rarity {
@@ -269,44 +269,38 @@ pub fn levelup_item_stats(
             let mut filter: Vec<&str> = vec![];
             if eqp_type.is_weapon() || eqp_type.is_tool() {
                 if !skip_main_attributes {
-                    modifiers.push(("attack".to_owned(), 1));
+                    modifiers.push(("attack".to_owned(), 1, None));
                 }
                 filter.push("attack");
             } else if eqp_type.is_equipment() && !eqp_type.is_accessory() {
                 if !skip_main_attributes {
-                    modifiers.push(("health".to_owned(), 2));
-                    modifiers.push(("defence".to_owned(), 1));
+                    modifiers.push(("health".to_owned(), 2, None));
+                    modifiers.push(("defence".to_owned(), 1, None));
                 }
                 filter.push("health");
                 filter.push("defence");
             }
             for _ in 0..num_upgrades {
-                if let Some(bonus_mod) =
+                if let Some((index, bonus_mod)) =
                     stack.attributes.get_random_existing_bonus_attribute_string(
                         &stack.metadata.bonus_stat_lines,
                         &filter,
                     )
                 {
-                    modifiers.push((bonus_mod, 1));
+                    modifiers.push((bonus_mod.attribute_name.clone(), 1, Some(index)));
                 }
             }
         }
-        for (modifier, delta) in modifiers {
+        for (modifier, delta, index) in modifiers {
             if stack
                 .metadata
                 .bonus_stat_lines
                 .iter()
                 .any(|line| line.attribute_name == modifier)
             {
-                stack.metadata.bonus_stat_lines.iter_mut().for_each(|line| {
-                    if line.attribute_name == modifier {
-                        line.value += delta;
-                    }
-                });
-            } else {
-                stack =
-                    stack.get_copy_with_modified_attributes(AttributeModifier { modifier, delta });
+                stack.metadata.bonus_stat_lines[index.unwrap()].value += delta;
             }
+            stack = stack.get_copy_with_modified_attributes(AttributeModifier { modifier, delta });
         }
     }
     stack.clone()

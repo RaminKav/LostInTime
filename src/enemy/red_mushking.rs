@@ -7,6 +7,7 @@ use crate::{
     player::levels::ExperienceReward,
     world::{
         dimension::{Era, EraManager},
+        portal::BossKillTracker,
         world_helpers::tile_pos_to_world_pos,
     },
     GameParam, TextureCamera,
@@ -401,6 +402,7 @@ pub fn handle_death(
     mut death: Query<(Entity, &mut AsepriteAnimation, &super::Mob), With<DeathState>>,
     era_manager: Res<EraManager>,
     mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
+    mut boss_kill_tracker: ResMut<BossKillTracker>,
 ) {
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
@@ -422,6 +424,10 @@ pub fn handle_death(
             if era_manager.current_era == Era::Third {
                 info!("Red Mushking defeated in Era 3! Starting INFINITE MODE!");
                 infinite_mode_event.send_default();
+            } else {
+                // Mark the current era's boss as killed
+                boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
+                info!("Boss killed in era {:?}", era_manager.current_era);
             }
             commands.entity(entity).despawn_recursive();
         }
