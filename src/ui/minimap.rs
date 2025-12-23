@@ -22,39 +22,57 @@ impl Plugin for MinimapPlugin {
             .insert_resource(IslandMapOpen(false))
             .insert_resource(FogOfWarData::default())
             .add_event::<UpdateMiniMapEvent>()
-            .add_system(toggle_island_map.run_if(in_state(GameState::Main)))
+            .add_system(
+                toggle_island_map
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
             .add_system(
                 clear_cache_for_new_dimensions
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
             )
             .add_system(
-                update_minimap_cache
+                close_map_on_dungeon_entry
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+            )
+            .add_system(
+                update_minimap_cache
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
             .add_system(
                 cache_explored_chunks
                     .after(CustomFlush)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
             .add_system(
                 update_fog_of_war
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
             .add_system(
                 setup_island_map
                     .after(CustomFlush)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing)))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
-            .add_system(update_player_marker_on_map.run_if(in_state(GameState::Main)))
+            .add_system(
+                update_player_marker_on_map
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
+            )
             .add_system(
                 update_object_icons_on_map
                     .after(setup_island_map)
-                    .run_if(in_state(GameState::Main)),
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
             .add_system(
                 update_fog_overlay_on_map
                     .after(setup_island_map)
-                    .run_if(in_state(GameState::Main)),
+                    .run_if(in_state(GameState::Main))
+                    .run_if(|dungeon: Query<&Dungeon>| dungeon.is_empty()),
             )
             .add_system(close_map_on_game_over.run_if(in_state(GameState::Main)));
     }
@@ -138,12 +156,19 @@ fn clear_cache_for_new_dimensions(
     map_query: Query<Entity, With<IslandMap>>,
     fog_query: Query<Entity, With<IslandMapFogOverlay>>,
     marker_query: Query<Entity, With<IslandMapPlayerMarker>>,
+    dungeon_check: Query<&Dungeon>,
+    game: GameParam,
 ) {
     for _ in new_dim.iter() {
-        // Clear both caches for new dimensions (eras)
+        let is_dungeon_transition =
+            dungeon_check.iter().next().is_some() || game.era.current_era.is_dungeon();
+
         cache.cache = HashMap::new();
         cache.explored_terrain = HashMap::new();
-        fog_data.explored_tiles.clear();
+
+        if !is_dungeon_transition {
+            fog_data.explored_tiles.clear();
+        }
         map_open.0 = false;
 
         for map in map_query.iter() {
@@ -156,7 +181,11 @@ fn clear_cache_for_new_dimensions(
             commands.entity(marker).despawn_recursive();
         }
 
-        info!("Cleared map cache, fog of war, and map entities for new dimension");
+        if is_dungeon_transition {
+            info!("Dungeon transition detected - preserving fog of war");
+        } else {
+            info!("Cleared map cache, fog of war, and map entities for new dimension");
+        }
     }
 }
 
@@ -944,6 +973,17 @@ fn update_fog_overlay_on_map(
             IslandMapFogOverlay,
             Name::new("ISLAND_MAP_FOG_OVERLAY"),
         ));
+    }
+}
+
+/// System to close the map when entering a dungeon
+fn close_map_on_dungeon_entry(
+    dungeon_query: Query<&Dungeon, Added<Dungeon>>,
+    mut map_open: ResMut<IslandMapOpen>,
+) {
+    if !dungeon_query.is_empty() {
+        map_open.0 = false;
+        info!("Closed minimap on dungeon entry");
     }
 }
 

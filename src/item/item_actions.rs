@@ -167,6 +167,7 @@ pub struct ItemActionParam<'w, 's> {
     pub achievement_events: EventWriter<'w, crate::player::achievements::AchievementUnlockedEvent>,
     pub player_skills:
         Query<'w, 's, &'static crate::player::skills::PlayerSkills, With<crate::player::Player>>,
+    pub infinite_mode: Res<'w, crate::night::InfiniteMode>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

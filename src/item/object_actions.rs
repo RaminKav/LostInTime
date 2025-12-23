@@ -156,6 +156,11 @@ impl ObjectAction {
                     .send(MovePlayerEvent { pos });
             }
             ObjectAction::DungeonTeleport => {
+                // Prevent dungeon entry if endless mode is active
+                if item_action_param.infinite_mode.active {
+                    info!("Cannot enter dungeon while endless mode is active");
+                    return;
+                }
                 item_action_param.dim_event.send(DimensionSpawnEvent {
                     swap_to_dim_now: true,
                     new_era: Some(Era::DungeonMain),
