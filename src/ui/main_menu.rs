@@ -758,5 +758,5 @@ pub fn cleanup_run_state(
     commands.insert_resource(ContainerRegistry::default());
     commands.insert_resource(CraftingTracker::default());
     commands.insert_resource(EraManager::default());
-    commands.insert_resource(WorldObjectCache::default());
+    commands.remove_resource::<WorldObjectCache>();
 }

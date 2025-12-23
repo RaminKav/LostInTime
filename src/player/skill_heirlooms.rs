@@ -504,13 +504,11 @@ pub fn handle_active_skill_event(
                             .insert(DruidTreeSkillState { cooldown_timer: cd });
 
                         // Spawn a non-damageable dummy tree at cursor position
-                        let dummy_pos = cursor.world_coords + Vec3::new(0., 0., 990.);
-                        if let Some(p) = proto_commands.spawn_object_from_proto(
+                        let dummy_pos = cursor.world_coords;
+                        if let Some(p) = proto_commands.spawn_from_proto(
                             WorldObject::GreenSaplingStage2,
-                            dummy_pos.truncate(),
                             &prototypes,
-                            &mut proto_param,
-                            false,
+                            dummy_pos.truncate(),
                         ) {
                             commands
                                 .entity(p)

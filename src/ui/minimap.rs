@@ -5,7 +5,7 @@ use crate::world::dimension::{ActiveDimension, SpawnDimension};
 use crate::world::dungeon::Dungeon;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE};
-use crate::{CustomFlush, GameParam, GameState, Player};
+use crate::{CustomFlush, GameParam, GameState, Player, DEBUG};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -756,6 +756,9 @@ fn update_fog_of_war(
     mut fog_data: ResMut<FogOfWarData>,
     mut last_position: Local<Option<(IVec2, TilePos)>>,
 ) {
+    if *DEBUG {
+        return;
+    }
     let Ok(player_transform) = player_query.get_single() else {
         return;
     };
@@ -774,7 +777,7 @@ fn update_fog_of_war(
 
     *last_position = Some(current_pos);
 
-    let reveal_radius = 16;
+    let reveal_radius = 20;
 
     for dy in -reveal_radius..=reveal_radius {
         for dx in -reveal_radius..=reveal_radius {
@@ -817,6 +820,9 @@ fn update_fog_overlay_on_map(
     mut meshes: ResMut<Assets<Mesh>>,
     game: GameParam,
 ) {
+    if *DEBUG {
+        return;
+    }
     if !map_open.0 {
         if map_open.is_changed() {
             for fog in fog_query.iter() {

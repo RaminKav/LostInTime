@@ -165,23 +165,39 @@ pub struct Chunk {
 pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<GenerationSeed>) {
     let gen_radius = ((ISLAND_SIZE / CHUNK_SIZE as f32) + 1.) as i32;
     let era = game.era.current_era.clone();
+
+    // Calculate expected number of tiles for HashMap pre-allocation
+    let chunks_per_axis = (2 * gen_radius + 1) as usize;
+    let total_chunks = chunks_per_axis * chunks_per_axis;
+    let tiles_per_chunk = (CHUNK_SIZE * CHUNK_SIZE) as usize;
+    let expected_tiles = total_chunks * tiles_per_chunk;
+
     info!(
-        "Caching ALL chunks {:?}",
-        game.world_generation_params.water_frequency,
+        "Caching ALL chunks: {} chunks, {} tiles total (water_freq: {:?})",
+        total_chunks, expected_tiles, game.world_generation_params.water_frequency,
     );
+
+    game.world_obj_cache.tile_data_cache.reserve(expected_tiles);
+
+    let noise_generators = crate::world::noise_helpers::CachedNoiseGenerators::new(seed.seed);
+
     for y in -gen_radius..=gen_radius {
         for x in -gen_radius..=gen_radius {
             let chunk_pos = IVec2::new(x, y);
-            for y in 0..CHUNK_SIZE {
-                for x in 0..CHUNK_SIZE {
-                    let tile_pos = TilePos { x, y };
+            for tile_y in 0..CHUNK_SIZE {
+                for tile_x in 0..CHUNK_SIZE {
+                    let tile_pos = TilePos {
+                        x: tile_x,
+                        y: tile_y,
+                    };
 
-                    let (bits, mut index_shift, blocks) = TilePlugin::get_tile_from_perlin_noise(
-                        &game.world_generation_params,
-                        chunk_pos,
-                        tile_pos,
-                        seed.seed,
-                    );
+                    let (bits, mut index_shift, blocks) =
+                        TilePlugin::get_tile_from_perlin_noise_cached(
+                            &game.world_generation_params,
+                            chunk_pos,
+                            tile_pos,
+                            &noise_generators,
+                        );
 
                     let block_bits = bits[0] + bits[1] * 2 + bits[2] * 4 + bits[3] * 8;
                     if index_shift == 0 {
@@ -204,6 +220,8 @@ pub fn generate_and_cache_island_chunks(mut game: GameParam, seed: Res<Generatio
             }
         }
     }
+
+    info!("Finished caching {} tiles", expected_tiles);
 }
 
 impl ChunkPlugin {

@@ -20,8 +20,8 @@ use portal::handle_player_near_portal;
 use serde::{Deserialize, Serialize};
 use world_helpers::tile_pos_to_world_pos;
 
+use crate::item::WorldObject;
 use crate::GameState;
-use crate::{item::WorldObject, schematic::SchematicType};
 
 use self::{
     chunk::ChunkPlugin,
@@ -36,7 +36,7 @@ use self::{
 
 pub const TILE_SIZE: TilemapTileSize = TilemapTileSize { x: 16., y: 16. };
 pub const CHUNK_SIZE: u32 = 16;
-pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 7.; // Increased from 6 to 12 for larger island
+pub const ISLAND_SIZE: f32 = CHUNK_SIZE as f32 * 5.; // Increased from 6 to 12 for larger island
 pub const MAX_VISIBILITY: u32 = (2.3 * (CHUNK_SIZE as f32 / 2.) * TILE_SIZE.x) as u32;
 pub const NUM_CHUNKS_AROUND_CAMERA: i32 = 1;
 
@@ -124,7 +124,7 @@ pub struct WorldGeneration {
     pub dirt_frequency: f64,
     pub forest_params: ForestGenerationParams,
     pub stone_wall_frequency: f64,
-    pub schematic_frequencies: HashMap<SchematicType, f64>,
+    pub schematic_frequencies: HashMap<WorldObject, f64>,
     pub object_generation_frequencies: HashMap<WorldObject, f64>,
     pub obj_allowed_tiles_map: HashMap<WorldObject, Vec<WorldObject>>,
 }

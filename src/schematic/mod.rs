@@ -8,13 +8,12 @@ use bevy::{
     tasks::IoTaskPool,
 };
 
-use strum_macros::{Display, IntoStaticStr};
 pub mod loot_chests;
 mod schematic_spawner;
 use crate::{
     assets::SpriteSize,
     inventory::ItemStack,
-    item::{handle_placing_world_object, Foliage, PlaceItemEvent, Wall, WorldObject},
+    item::{Foliage, PlaceItemEvent, Wall, WorldObject},
     player::Player,
     proto::proto_param::ProtoParam,
     world::{
@@ -26,30 +25,9 @@ use crate::{
 use loot_chests::*;
 
 use self::schematic_spawner::{
-    attempt_to_spawn_schematic_in_chunk, give_chunks_schematic_spawners,
+    attempt_to_spawn_schematic_in_chunk, clear_schematic_tracker, give_chunks_schematic_spawners,
+    log_schematic_spawn_stats, SchematicSpawnTracker,
 };
-#[derive(
-    Component,
-    Debug,
-    Hash,
-    Eq,
-    PartialEq,
-    Clone,
-    Reflect,
-    FromReflect,
-    Default,
-    IntoStaticStr,
-    Display,
-)]
-pub enum SchematicType {
-    #[default]
-    CombatShrine,
-    GambleShrine,
-    ActiveSkillShrine,
-    HeirloomShrine,
-    BlacksmithMerchant,
-}
-
 #[derive(Component)]
 pub struct SchematicBuilderObject;
 
@@ -64,9 +42,9 @@ pub struct SchematicPlugin;
 impl Plugin for SchematicPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(SchematicToggle::default())
+            .init_resource::<SchematicSpawnTracker>()
             .register_type::<SchematicToggle>()
             .add_event::<SchematicSpawnEvent>()
-            // .add_plugin(ResourceInspectorPlugin::<SchematicToggle>::default())
             .add_systems(
                 (
                     save_schematic_scene,
@@ -78,15 +56,14 @@ impl Plugin for SchematicPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems((
-                handle_new_scene_entities_parent_chunk
-                    .before(handle_placing_world_object)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
                 attempt_to_spawn_schematic_in_chunk
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
                 give_chunks_schematic_spawners
                     .after(GenerationPlugin::generate_and_cache_objects)
                     .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
-            ));
+            ))
+            .add_system(clear_schematic_tracker.in_schedule(OnEnter(GameState::Initializing)))
+            .add_system(log_schematic_spawn_stats.in_schedule(OnExit(GameState::Initializing)));
     }
 }
 fn mark_new_world_obj_as_schematic(
@@ -191,7 +168,7 @@ fn load_schematic(
     }
 }
 
-pub fn handle_new_scene_entities_parent_chunk(
+pub fn _handle_new_scene_entities_parent_chunk(
     mut game: GameParam,
     proto_param: ProtoParam,
     new_scenes: Query<

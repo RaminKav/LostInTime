@@ -5,39 +5,55 @@ use rand::Rng;
 
 use super::{CHUNK_SIZE, TILE_SIZE};
 
+/// Cached Perlin noise generators to avoid recreating them for every tile.
+/// Creating Perlin generators is expensive - this saves ~888,000 allocations during world init.
+pub struct CachedNoiseGenerators {
+    pub n1: Perlin,
+    pub n2: Perlin,
+    pub n3: Perlin,
+}
+
+impl CachedNoiseGenerators {
+    pub fn new(seed: u64) -> Self {
+        let seed = seed as u32;
+        Self {
+            n1: Perlin::new(1 + seed),
+            n2: Perlin::new(2 + seed),
+            n3: Perlin::new(3 + seed),
+        }
+    }
+}
+
+/// Get perlin noise value for a tile position using cached generators.
+/// This is the optimized version that reuses pre-created Perlin generators.
+pub fn get_perlin_noise_for_tile_cached(x: f64, y: f64, generators: &CachedNoiseGenerators) -> f64 {
+    // base_oct controls the "wavelength" of noise features
+    // 1/50 = wavelength of ~50 tiles, giving ~2 full waves across a 96-tile island
+    let base_oct = 1. / 50.;
+
+    // e1: large features (ponds, terrain regions) - wavelength ~50 tiles
+    let e1 = (generators.n1.get([x * base_oct, y * base_oct]) + 1.) / 2.;
+    // e2: medium features - wavelength ~12 tiles
+    let e2 = (generators.n2.get([x * base_oct * 4., y * base_oct * 4.]) + 1.) / 2.;
+    // e3: small details - wavelength ~6 tiles
+    let e3 = (generators.n3.get([x * base_oct * 8., y * base_oct * 8.]) + 1.) / 2.;
+
+    // Use e1 (large features) as base, but blend with min(e2, e3) to create larger water regions
+    // This preserves low values (for water) while making them more cohesive
+    // e1 dominates for large-scale structure, but if e2 or e3 is low, it pulls the result down
+    let detail_min = f64::min(e2, e3);
+    // Use min() to ensure low values create water, but e1 creates larger regions
+    // This creates larger ponds: if e1 is low in a region, that entire region becomes water
+    let result = f64::min(e1, detail_min + 0.15);
+    result.clamp(0., 1.)
+}
+
+/// Legacy function that creates generators per-call (slow, for backwards compatibility).
+/// Kept for use in fallback cases where generators aren't available.
+#[allow(dead_code)]
 pub fn get_perlin_noise_for_tile(x: f64, y: f64, seed: u64) -> f64 {
-    //TODO: make sure this seed cast to u32 is ok
-    let seed = seed as u32;
-    let n1 = Perlin::new(1 + seed);
-    let n2 = Perlin::new(2 + seed);
-    let n3 = Perlin::new(3 + seed);
-    // let n1 = Fbm::<Perlin>::new(seed)
-    //     .set_octaves(2)
-    //     .set_frequency(1.)
-    //     .set_lacunarity(2.0)
-    //     .set_persistence(0.01);
-    // let n2 = Fbm::<Perlin>::new(1 + seed)
-    //     .set_octaves(2)
-    //     .set_frequency(1. / 2.)
-    //     .set_lacunarity(4.0)
-    //     .set_persistence(0.01);
-    // let n3 = Fbm::<Perlin>::new(2 + seed)
-    //     .set_octaves(2)
-    //     .set_frequency(1. / 4.)
-    //     .set_lacunarity(8.0)
-    //     .set_persistence(0.01);
-    // .set_persistence(1.);
-    // let _noise_m = Simplex::new(4 + seed);
-    // let _noise_m2 = Simplex::new(5 + seed);
-    // let _noise_m3 = Simplex::new(6 + seed);
-
-    let base_oct = 1. / 200.;
-
-    let e1 = (n1.get([x * base_oct, y * base_oct]) + 1.) / 2.;
-    let e2 = (n2.get([x * base_oct * 8., y * base_oct * 8.]) + 1.) / 2.;
-    let e3 = (n3.get([x * base_oct * 16., y * base_oct * 16.]) + 1.) / 2.;
-
-    (f64::min(e1, f64::min(e2, e3) + 0.1)).clamp(0., 1.)
+    let generators = CachedNoiseGenerators::new(seed);
+    get_perlin_noise_for_tile_cached(x, y, &generators)
 }
 
 pub fn _poisson_disk_sampling(

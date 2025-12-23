@@ -45,7 +45,7 @@ use crate::{
     },
     player::levels::ExperienceReward,
     sapling::{GrowsInto, Sapling},
-    schematic::{loot_chests::LootChestType, SchematicType},
+    schematic::loot_chests::LootChestType,
     status_effects::{StatusEffectState, StatusEffectTracker},
     ui::{
         crafting_ui::CraftingContainerType,
@@ -103,7 +103,6 @@ impl Plugin for ProtoPlugin {
             .register_type::<ItemActions>()
             .register_type::<AttributeValue>()
             .register_type::<AttributeQuality>()
-            .register_type::<SchematicType>()
             .register_type::<ObjectAction>()
             .register_type::<ConsumableItem>()
             .register_type::<FoliageSize>()
@@ -138,7 +137,6 @@ impl Plugin for ProtoPlugin {
             .register_type::<AnimationPosTracker>()
             .register_type::<HashMap<WorldObject, Vec<WorldObject>>>()
             .register_type::<HashMap<WorldObject, f64>>()
-            .register_type::<HashMap<SchematicType, f64>>()
             .register_type::<HashMap<WorldObject, f32>>()
             .register_type::<Vec<WorldObject>>()
             .register_type::<Vec<u8>>()

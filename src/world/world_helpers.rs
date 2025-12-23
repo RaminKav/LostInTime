@@ -50,7 +50,10 @@ pub fn world_pos_to_tile_pos(pos: Vec2) -> TileMapPosition {
 }
 pub fn world_pos_to_chunk_relative_world_pos(pos: Vec2) -> Vec2 {
     let chunk_pos = camera_pos_to_chunk_pos(&pos);
-    pos - (Vec2::new(chunk_pos.x as f32, chunk_pos.y as f32) * CHUNK_SIZE as f32 * TILE_SIZE.x)
+    pos - Vec2::new(
+        chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
+        chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y,
+    )
 }
 
 pub fn world_pos_to_chunk_relative_tile_pos(pos: Vec2) -> TileMapPosition {
@@ -63,8 +66,8 @@ pub fn tile_pos_to_world_pos(pos: TileMapPosition, _center: bool) -> Vec2 {
     Vec2::new(
         pos.tile_pos.x as f32 * TILE_SIZE.x
             + pos.chunk_pos.x as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
-        pos.tile_pos.y as f32 * TILE_SIZE.x
-            + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.x,
+        pos.tile_pos.y as f32 * TILE_SIZE.y
+            + pos.chunk_pos.y as f32 * CHUNK_SIZE as f32 * TILE_SIZE.y,
     )
 }
 pub fn world_pos_to_ui_screen_pos(pos: Vec2, camera_pos: Vec2) -> Vec2 {
