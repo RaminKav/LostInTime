@@ -601,7 +601,6 @@ pub fn update_achievements_page_display(
     asset_server: Res<AssetServer>,
     analytics: Option<Res<crate::client::analytics::AnalyticsData>>,
     bounce_tracker: Option<Res<crate::player::achievements::BounceAchievementTracker>>,
-    chaos_tracker: Option<Res<crate::chaos::ChaosTracker>>,
     game_data: Option<Res<crate::client::GameData>>,
     achievements_bg_query: Query<Entity, (With<AchievementsUI>, With<UIState>)>,
     warning_animations: Query<(Entity, &AchievementRow), With<AchievementWarningAnimation>>,
@@ -654,16 +653,15 @@ pub fn update_achievements_page_display(
         row_states.push(maybe_achievement.map(|achievement| {
             let is_completed = achievements.is_completed(achievement);
             let is_claimed = achievements.is_claimed(achievement);
-            // Try to get analytics from current run first, then from cumulative analytics in GameData
-            let analytics_for_progress = analytics.as_deref().or_else(|| {
-                game_data
-                    .as_ref()
-                    .and_then(|gd| gd.cumulative_analytics.as_ref())
-            });
+            // Get both cumulative and current run analytics separately
+            let cumulative_analytics = game_data
+                .as_ref()
+                .and_then(|gd| gd.cumulative_analytics.as_ref());
+            let current_run_analytics = analytics.as_deref();
             let progress = achievement.get_progress(
-                analytics_for_progress,
+                cumulative_analytics,
+                current_run_analytics,
                 bounce_tracker.as_deref(),
-                chaos_tracker.as_deref(),
             );
             (achievement, is_completed, is_claimed, progress)
         }));

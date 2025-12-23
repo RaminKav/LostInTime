@@ -51,41 +51,39 @@ pub fn handle_combat_shrine_activate_animation(
                     * Vec2::splat(TILE_SIZE.x);
                 let spawn_pos = t.translation().truncate() + offset;
                 let choice_mob = rng.gen_range(0..possible_spawns.len());
-                if can_spawn_mob_here(spawn_pos, &game, &proto_param, fallback_count >= 10) {
-                    if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                        possible_spawns[choice_mob].clone(),
-                        &proto_param.prototypes,
-                        spawn_pos,
-                    ) {
-                        fallback_count = 0;
-                        num_to_spawn -= 1;
-                        //last mob is elite
-                        if num_to_spawn <= 1 {
-                            commands.entity(mob).insert(EliteMob);
-                        }
-                        proto_param
-                            .proto_commands
-                            .commands()
-                            .entity(mob)
-                            .insert(CombatAlignment::Hostile)
-                            .insert(LootTable {
-                                drops: vec![
-                                    Loot {
-                                        item: WorldObject::Coin,
-                                        min: 1,
-                                        max: 1,
-                                        rate: 0.2,
-                                    },
-                                    Loot {
-                                        item: WorldObject::TimeFragment,
-                                        min: 1,
-                                        max: 1,
-                                        rate: 0.02,
-                                    },
-                                ],
-                            })
-                            .insert(CombatShrineMob { parent_shrine: e });
+                if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
+                    possible_spawns[choice_mob].clone(),
+                    &proto_param.prototypes,
+                    spawn_pos,
+                ) {
+                    fallback_count = 0;
+                    num_to_spawn -= 1;
+                    //last mob is elite
+                    if num_to_spawn <= 1 {
+                        commands.entity(mob).insert(EliteMob);
                     }
+                    proto_param
+                        .proto_commands
+                        .commands()
+                        .entity(mob)
+                        .insert(CombatAlignment::Hostile)
+                        .insert(LootTable {
+                            drops: vec![
+                                Loot {
+                                    item: WorldObject::Coin,
+                                    min: 1,
+                                    max: 1,
+                                    rate: 0.2,
+                                },
+                                Loot {
+                                    item: WorldObject::TimeFragment,
+                                    min: 1,
+                                    max: 1,
+                                    rate: 0.02,
+                                },
+                            ],
+                        })
+                        .insert(CombatShrineMob { parent_shrine: e });
                 }
             }
         }
@@ -130,10 +128,7 @@ pub fn handle_shrine_rewards(
                     .remove::<ObjectAction>();
                 *anim = AsepriteAnimation::from(CombatShrineAnim::tags::DONE);
                 // Use the stored tile position instead of recalculating
-                game.add_object_to_chunk_cache(
-                    shrine.tile_pos,
-                    WorldObject::CombatShrineDone,
-                );
+                game.add_object_to_chunk_cache(shrine.tile_pos, WorldObject::CombatShrineDone);
 
                 // Update minimap to reflect the shrine is now "Done"
                 minimap_event.send(UpdateMiniMapEvent {

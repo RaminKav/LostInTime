@@ -85,16 +85,28 @@ pub fn setup_skill_choice_ui(
         .insert(Name::new("SKILL ICON!!"))
         .id();
 
-    let title_text = spawn_text(
-        &mut commands,
-        &asset_server,
-        Vec3::new(0., 0., 1.),
-        BLACK,
-        "Choose a new skill".to_string(),
-        Anchor::Center,
-        2.,
-        3,
-    );
+    let title_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Choose an Heirloom".to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.0,
+                        color: BLACK,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., -1., 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+        ))
+        .id();
+
     commands
         .entity(title_text)
         .insert(UIState::Skills)

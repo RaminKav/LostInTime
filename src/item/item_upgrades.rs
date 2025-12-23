@@ -204,6 +204,10 @@ pub fn handle_on_hit_upgrades(
     let (skills, player_txfm, projectile_size) = upgrades.single();
     let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
+        // Skip damage from heirloom effects (e.g., poison, burning)
+        if hit.from_heirloom_effect {
+            continue;
+        }
         let mut rng = rand::thread_rng();
 
         if hit.hit_entity == game.game.player {
@@ -376,11 +380,6 @@ pub fn handle_on_hit_upgrades(
                 &mut status_event,
                 slowed_option.as_deref_mut(),
             );
-        }
-
-        // Skip lifesteal for damage from heirloom effects (e.g., poison, burning)
-        if hit.from_heirloom_effect {
-            continue;
         }
 
         // Calculate total lifesteal: base from heirloom (10% per stack) + equipment lifesteal attribute

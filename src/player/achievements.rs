@@ -158,75 +158,33 @@ impl Achievement {
 
     /// Get progress for this achievement (current, target)
     /// Returns None if this achievement doesn't have progress tracking
+    /// Combines cumulative analytics (from GameData) with current run analytics
     pub fn get_progress(
         &self,
-        analytics: Option<&crate::client::analytics::AnalyticsData>,
+        cumulative_analytics: Option<&crate::client::analytics::AnalyticsData>,
+        current_run_analytics: Option<&crate::client::analytics::AnalyticsData>,
         bounce_tracker: Option<&BounceAchievementTracker>,
-        chaos_tracker: Option<&crate::chaos::ChaosTracker>,
     ) -> Option<(u32, u32)> {
+        // Helper to get combined mob kills from both cumulative and current run
+        let get_mob_kills = |mob: &Mob| -> u32 {
+            let cumulative_kills = cumulative_analytics
+                .and_then(|c| c.mobs_killed.get(mob))
+                .copied()
+                .unwrap_or(0);
+            let current_kills = current_run_analytics
+                .and_then(|c| c.mobs_killed.get(mob))
+                .copied()
+                .unwrap_or(0);
+            // Add current run kills to cumulative total
+            cumulative_kills + current_kills
+        };
+
         match self {
             // Achievements that need analytics
-            Achievement::Kill100FurDevils => {
-                if let Some(analytics_data) = analytics {
-                    info!(
-                        "Getting progress for achievement: {:?} {:?}",
-                        self, analytics_data.mobs_killed
-                    );
-
-                    Some((
-                        analytics_data
-                            .mobs_killed
-                            .get(&Mob::FurDevil)
-                            .copied()
-                            .unwrap_or(0),
-                        1000,
-                    ))
-                } else {
-                    Some((0, 1000))
-                }
-            }
-            Achievement::BushlingSlayer1 => {
-                if let Some(analytics_data) = analytics {
-                    Some((
-                        analytics_data
-                            .mobs_killed
-                            .get(&Mob::Bushling)
-                            .copied()
-                            .unwrap_or(0),
-                        1000,
-                    ))
-                } else {
-                    Some((0, 1000))
-                }
-            }
-            Achievement::StingflySlayer => {
-                if let Some(analytics_data) = analytics {
-                    Some((
-                        analytics_data
-                            .mobs_killed
-                            .get(&Mob::StingFly)
-                            .copied()
-                            .unwrap_or(0),
-                        1000,
-                    ))
-                } else {
-                    Some((0, 1000))
-                }
-            }
-            Achievement::MushlingSlayer => {
-                if let Some(analytics_data) = analytics {
-                    Some((
-                        analytics_data
-                            .mobs_killed
-                            .get(&Mob::RedMushling)
-                            .copied()
-                            .unwrap_or(0),
-                        1000,
-                    ))
-                } else {
-                    Some((0, 1000))
-                }
-            }
+            Achievement::Kill100FurDevils => Some((get_mob_kills(&Mob::FurDevil), 1000)),
+            Achievement::BushlingSlayer1 => Some((get_mob_kills(&Mob::Bushling), 1000)),
+            Achievement::StingflySlayer => Some((get_mob_kills(&Mob::StingFly), 1000)),
+            Achievement::MushlingSlayer => Some((get_mob_kills(&Mob::RedMushling), 1000)),
             // Achievements that don't need analytics
             Achievement::Bouncy => {
                 if let Some(bounce) = bounce_tracker {
