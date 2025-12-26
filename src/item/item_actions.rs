@@ -26,7 +26,7 @@ use crate::{
         world_helpers::{can_object_be_placed_here, world_pos_to_tile_pos},
         TileMapPosition,
     },
-    BounceEvent, GameParam, TextureCamera,
+    BounceEvent, GameParam, GameState, TextureCamera,
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_ecs_tilemap::tiles::TilePos;
@@ -145,6 +145,7 @@ pub struct ItemActionParam<'w, 's> {
     pub dim_event: EventWriter<'w, DimensionSpawnEvent>,
     pub analytics_event: EventWriter<'w, AnalyticsUpdateEvent>,
     pub next_inv_state: ResMut<'w, NextState<UIState>>,
+    pub next_game_state: ResMut<'w, NextState<GameState>>,
     pub modify_mana_event: EventWriter<'w, ModifyManaEvent>,
     pub place_item_event: EventWriter<'w, PlaceItemEvent>,
     pub action_success_event: EventWriter<'w, ActionSuccessEvent>,

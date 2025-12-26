@@ -53,10 +53,11 @@ use crate::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
         modifiers::handle_modify_health_event,
-        Attack, AttackCooldown, AttributeQuality, AttributeValue, CritChance, CritDamage,
-        CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen, MaxHealth,
-        MaxMana, PlayerAttributeBundle, ShieldRegen,
+        Attack, AttackCooldown, AttributeQuality, AttributeValue, BonusAttackSpeed, CritChance,
+        CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen,
+        MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
+    blessings::OwnedBlessings,
     client::is_not_paused,
     container::Container,
     custom_commands::CommandsExt,
@@ -210,8 +211,8 @@ impl Plugin for PlayerPlugin {
                     tick_combo_counter.run_if(is_not_paused),
                     handle_add_combo_counter,
                     skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
-                    skill_heirlooms::trigger_attribute_update_on_rapidfire_added
-                        .run_if(is_not_paused),
+                    skill_heirlooms::add_rapidfire_speed_to_bonus.run_if(is_not_paused),
+                    skill_heirlooms::remove_rapidfire_speed_from_bonus.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
                     skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
@@ -282,11 +283,6 @@ impl Plugin for PlayerPlugin {
                     .after(PhysicsSet::SyncBackendFlush)
                     .before(TransformSystem::TransformPropagate)
                     .before(move_camera_with_player)
-                    .in_base_set(CoreSet::PostUpdate),
-            )
-            .add_system(
-                skill_heirlooms::apply_rapid_fire_speed_buff
-                    .run_if(is_not_paused)
                     .in_base_set(CoreSet::PostUpdate),
             );
     }
@@ -403,8 +399,10 @@ fn spawn_player(
         .insert(PlayerLevel::new(1))
         .insert(PlayerStats::new())
         .insert(Sensor)
+        .insert(OwnedBlessings::default())
         .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
+        .insert(BonusAttackSpeed::new())
         .id();
 
     // let mut hunger = Hunger::new(100);

@@ -451,6 +451,7 @@ impl ItemAttributes {
         dodge_crit_buff_active: bool,
         coins: u32,
         max_hp_hunt_bonus: i32, // Max HP gained from MaxHPHunt heirloom
+        bonus_attack_speed: Option<&BonusAttackSpeed>,
     ) {
         // ChaosStats: +10 to many stats per stack
         let chaos_stats_stacks = skills.get_count(Heirloom::ChaosStats);
@@ -489,11 +490,15 @@ impl ItemAttributes {
         if self.attack_cooldown > 0. {
             let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
+            let bonus_attack_speed_multiplier = bonus_attack_speed
+                .map(|b| b.get_multiplier())
+                .unwrap_or(1.0);
             entity.insert(AttackCooldown(
                 self.attack_cooldown
                     * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
                     / attack_speed_mod
-                    / dodge_crit_attack_speed_mod,
+                    / dodge_crit_attack_speed_mod
+                    / bonus_attack_speed_multiplier,
             ));
         } else {
             entity.remove::<AttackCooldown>();
@@ -1105,6 +1110,33 @@ impl ProjectileSize {
         1. + self.0 as f32 / 100.
     }
 }
+
+#[derive(Component, Clone, Debug, Default)]
+pub struct BonusAttackSpeed {
+    pub multiplier: f32,
+}
+impl BonusAttackSpeed {
+    pub fn new() -> Self {
+        Self { multiplier: 1.0 }
+    }
+
+    pub fn add_multiplier(&mut self, multiplier: f32) {
+        if multiplier > 0.0 {
+            self.multiplier += multiplier;
+        }
+    }
+
+    pub fn remove_multiplier(&mut self, multiplier: f32) {
+        if multiplier > 0.0 {
+            self.multiplier -= multiplier;
+        }
+    }
+
+    pub fn get_multiplier(&self) -> f32 {
+        self.multiplier
+    }
+}
+
 #[derive(Default, Component, Clone, Debug, Copy)]
 pub struct XpRateBonus(pub i32);
 #[derive(Default, Component, Clone, Debug, Copy)]
@@ -1113,6 +1145,22 @@ pub struct LootRateBonus(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct ManaRegen(pub i32);
+
+pub fn trigger_attribute_update_on_bonus_speed_change(
+    changed_bonus: Query<
+        Entity,
+        (
+            With<Player>,
+            With<BonusAttackSpeed>,
+            Changed<BonusAttackSpeed>,
+        ),
+    >,
+    mut attribute_event: EventWriter<AttributeChangeEvent>,
+) {
+    if !changed_bonus.is_empty() {
+        attribute_event.send_default();
+    }
+}
 
 impl Plugin for AttributesPlugin {
     fn build(&self, app: &mut App) {
@@ -1137,6 +1185,11 @@ impl Plugin for AttributesPlugin {
                     handle_new_items_raw_attributes.before(CustomFlush),
                     handle_player_item_attribute_change_events.after(CustomFlush),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (trigger_attribute_update_on_bonus_speed_change
+                    .before(handle_player_item_attribute_change_events),)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
@@ -1345,6 +1398,7 @@ fn handle_player_item_attribute_change_events(
     max_hp_hunt_tracker: Query<&crate::player::combat_heirlooms::MaxHPHuntTracker, With<Player>>,
     coins: Res<crate::player::currency::CoinCurrency>,
     proto: crate::proto::proto_param::ProtoParam,
+    bonus_attack_speed: Query<&BonusAttackSpeed, With<Player>>,
 ) {
     for _event in att_events.iter() {
         let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
@@ -1387,6 +1441,8 @@ fn handle_player_item_attribute_change_events(
             .map(|tracker| tracker.total_hp_gained)
             .unwrap_or(0);
 
+        let bonus_speed = bonus_attack_speed.get_single().ok();
+
         new_att.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
@@ -1396,6 +1452,7 @@ fn handle_player_item_attribute_change_events(
             dodge_crit_buff_active,
             coins.coins,
             max_hp_hunt_bonus,
+            bonus_speed,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
             if !main_hand.get_obj().is_weapon() {

@@ -9,6 +9,7 @@ use crate::{
     assets::Graphics,
     attributes::Attack,
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::OwnedBlessings,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider, DeferredComponent},
     inputs::MovementVector,
     item::{projectile::Projectile, WorldObject},
@@ -51,6 +52,7 @@ pub fn handle_teleport(
             &AsepriteAnimation,
             &mut KinematicCharacterController,
             &mut TeleportState,
+            &OwnedBlessings,
         ),
         (With<Player>, With<TeleportState>),
     >,
@@ -59,8 +61,17 @@ pub fn handle_teleport(
     mut commands: Commands,
     time: Res<Time>,
 ) {
-    let Ok((e, player_pos, skills, mut move_direction, dmg, aseprite, mut kcc, mut teleport_state)) =
-        player.get_single_mut()
+    let Ok((
+        e,
+        player_pos,
+        skills,
+        mut move_direction,
+        dmg,
+        aseprite,
+        mut kcc,
+        mut teleport_state,
+        blessings,
+    )) = player.get_single_mut()
     else {
         return;
     };
@@ -94,9 +105,9 @@ pub fn handle_teleport(
     if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
-        let power_mult = skills.skill_power_multiplier();
-        let base_distance = 2.5 * TILE_SIZE.x;
-        let distance = direction * base_distance * power_mult;
+        let power_mult = skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
+        let base_distance = 3.5 * TILE_SIZE.x;
+        let distance = direction * base_distance;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
         if let Some(tile_data) = game.get_tile_data(pos) {
             if tile_data.block_type.contains(&WorldObject::WaterTile) {

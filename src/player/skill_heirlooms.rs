@@ -7,12 +7,13 @@ use rand::Rng;
 
 use crate::{
     ai::FollowState,
-    attributes::{Attack, AttackCooldown, CurrentHealth, MaxHealth},
+    attributes::{Attack, BonusAttackSpeed, CurrentHealth, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::{Blessing, OwnedBlessings},
     combat::HitEvent,
     custom_commands::CommandsExt,
     enemy::Mob,
-    inputs::{CursorPos, FacingDirection},
+    inputs::CursorPos,
     item::{
         projectile::{Projectile, RangedAttackEvent},
         WorldObject,
@@ -69,7 +70,7 @@ pub fn handle_active_skill_event(
             Option<&Attack>,
             &mut CurrentHealth,
             &MaxHealth,
-            &FacingDirection,
+            &OwnedBlessings,
         ),
         With<Player>,
     >,
@@ -79,11 +80,11 @@ pub fn handle_active_skill_event(
     asset_server: Res<AssetServer>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
     mut proto_commands: ProtoCommands,
-    mut proto_param: ProtoParam,
+    proto_param: ProtoParam,
     prototypes: Prototypes,
 ) {
     for ev in events.iter() {
-        for (player_e, skills, player_txfm, attack_opt, mut health, max_health, facing_dir) in
+        for (player_e, skills, player_txfm, attack_opt, mut health, max_health, blessings) in
             players.iter_mut()
         {
             // Get optional states from separate queries
@@ -127,6 +128,15 @@ pub fn handle_active_skill_event(
                 _ => None,
             };
             if let Some(active) = slot_skill {
+                let blessing_cd_mult = blessings.get_skill_cooldown_increase();
+                if active.active_skill != ActiveSkill::Roll {
+                    if blessings.has_blessing(Blessing::SkillAttackSpeed) {
+                        // Apply attack speed buff after using a skill
+                        commands
+                            .entity(player_e)
+                            .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
+                    }
+                }
                 // For slot 1 and 2 (class skills), handle charge consumption from their independent trackers
                 let mut should_start_cooldown = true;
                 if ev.slot == 1 {
@@ -137,7 +147,9 @@ pub fn handle_active_skill_event(
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
                                 tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown * skills.skill_cooldown_multiplier(),
+                                    tracker.0.base_cooldown
+                                        * skills.skill_cooldown_multiplier()
+                                        * blessing_cd_mult,
                                     TimerMode::Once,
                                 );
                             }
@@ -151,14 +163,18 @@ pub fn handle_active_skill_event(
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
                                 tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown * skills.skill_cooldown_multiplier(),
+                                    tracker.0.base_cooldown
+                                        * skills.skill_cooldown_multiplier()
+                                        * blessing_cd_mult,
                                     TimerMode::Once,
                                 );
                             }
                         }
                     }
                 }
-
+                let power_mult =
+                    skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
+                let skill_cd = ev.cooldown * skills.skill_cooldown_multiplier() * blessing_cd_mult;
                 match active.active_skill {
                     ActiveSkill::Stealth => {
                         // respect cooldown if state exists and we're not using a charge
@@ -174,16 +190,12 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<StealthState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        let power_mult = skills.skill_power_multiplier();
                         let mut dur = Timer::from_seconds(2.0 * power_mult, TimerMode::Once);
                         dur.tick(time.delta());
                         commands
@@ -223,22 +235,18 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<RapidfireState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        let power_mult = skills.skill_power_multiplier();
-                        let dur = Timer::from_seconds(3.0 * power_mult, TimerMode::Once);
+                        let dur = Timer::from_seconds(3.0, TimerMode::Once);
                         info!("dur: {:?}", dur);
                         commands.entity(player_e).insert(RapidfireState {
                             duration: dur,
                             cooldown_timer: cd,
-                            attack_speed_bonus: 1.6,
+                            attack_speed_bonus: 0.8 * power_mult,
                         });
 
                         // Spawn cosmetic attack speed effect on top of player
@@ -270,10 +278,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<FirePillarState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -284,7 +289,6 @@ pub fn handle_active_skill_event(
                             hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
                         });
                         // spawn fire ring projectile at cursor world position with player's attack as damage
-                        let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult) as i32;
                         let pos = cursor.world_coords.truncate();
@@ -314,10 +318,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<HealSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -327,7 +328,6 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(HealSkillState { cooldown_timer: cd });
                         // Heal for 30% of max health (placeholder value), increased by skill power
-                        let power_mult = skills.skill_power_multiplier();
                         let heal_amount = (max_health.0 as f32 * 0.3 * power_mult) as i32;
                         health.0 = (health.0 + heal_amount).min(max_health.0);
 
@@ -360,10 +360,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<BuckshotSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -403,7 +400,6 @@ pub fn handle_active_skill_event(
                                 (i as f32 - (bullet_count - 1) as f32 / 2.0) * spread_angle;
                             let bullet_dir = Vec2::from_angle(base_angle + angle_offset);
 
-                            let power_mult = skills.skill_power_multiplier();
                             let bullet_dmg = attack_opt.map(|a| (a.0 as f32 * power_mult) as i32);
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Bullet,
@@ -446,10 +442,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<IceWallSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -459,7 +452,6 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(IceWallSkillState { cooldown_timer: cd });
                         // Placeholder: spawn ice explosion at cursor for now
-                        let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 2.) as i32; // ice wall does double base dmg
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
@@ -490,10 +482,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<DruidTreeSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -515,31 +504,9 @@ pub fn handle_active_skill_event(
                                 .insert(Collider::cuboid(12.0, 16.0))
                                 .insert(Name::new("DruidTreeDummy"))
                                 .insert(DruidTreeDummy {
-                                    timer: Timer::from_seconds(
-                                        2.0 * skills.skill_power_multiplier(),
-                                        TimerMode::Once,
-                                    ),
+                                    timer: Timer::from_seconds(2.0 * power_mult, TimerMode::Once),
                                 });
                         }
-                        // commands.spawn((
-                        //     SpriteBundle {
-                        //         sprite: Sprite {
-                        //             color: Color::rgba(0.4, 0.6, 0.2, 1.0),
-                        //             custom_size: Some(Vec2::new(24.0, 32.0)),
-                        //             ..default()
-                        //         },
-                        //         transform: Transform::from_translation(dummy_pos),
-                        //         ..default()
-                        //     },
-                        //     Collider::cuboid(12.0, 16.0),
-                        //     Name::new("DruidTreeDummy"),
-                        //     DruidTreeDummy {
-                        //         timer: Timer::from_seconds(
-                        //             2.0 * skills.skill_power_multiplier(),
-                        //             TimerMode::Once,
-                        //         ),
-                        //     },
-                        // ));
 
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
@@ -556,10 +523,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<ShoutSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -569,9 +533,6 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(ShoutSkillState { cooldown_timer: cd });
 
-                        // Spawn Shout projectile at player position (AoE burst around player)
-                        let player_pos = player_txfm.translation().truncate();
-                        let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult) as i32;
 
@@ -615,10 +576,7 @@ pub fn handle_active_skill_event(
                         }
 
                         // Now set cooldown since we're about to spawn the projectile
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -628,8 +586,6 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(PiercingStarSkillState { cooldown_timer: cd });
 
-                        // Spawn ThrowingStarLarge projectile
-                        let power_mult = skills.skill_power_multiplier();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult) as i32;
 
@@ -661,10 +617,7 @@ pub fn handle_active_skill_event(
                         }
                         // Sprint is activated by inserting Sprinting component, handled in rogue_skills.rs
                         // Just update cooldown here
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -690,7 +643,7 @@ pub fn handle_active_skill_event(
                         if let Some(mut teleport) = teleport_state {
                             if should_start_cooldown {
                                 // No charges left, start full cooldown
-                                let cooldown = ev.cooldown * skills.skill_cooldown_multiplier();
+                                let cooldown = skill_cd;
                                 teleport.cooldown_timer =
                                     Timer::from_seconds(cooldown, TimerMode::Once);
                             } else {
@@ -701,7 +654,8 @@ pub fn handle_active_skill_event(
                                         if tracker.0.current_charges < tracker.0.max_charges {
                                             teleport.cooldown_timer = Timer::from_seconds(
                                                 tracker.0.base_cooldown
-                                                    * skills.skill_cooldown_multiplier(),
+                                                    * skills.skill_cooldown_multiplier()
+                                                    * blessing_cd_mult,
                                                 TimerMode::Once,
                                             );
                                         }
@@ -711,7 +665,8 @@ pub fn handle_active_skill_event(
                                         if tracker.0.current_charges < tracker.0.max_charges {
                                             teleport.cooldown_timer = Timer::from_seconds(
                                                 tracker.0.base_cooldown
-                                                    * skills.skill_cooldown_multiplier(),
+                                                    * skills.skill_cooldown_multiplier()
+                                                    * blessing_cd_mult,
                                                 TimerMode::Once,
                                             );
                                         }
@@ -732,10 +687,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<SpearState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -761,10 +713,7 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<LungeState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(
-                            ev.cooldown * skills.skill_cooldown_multiplier(),
-                            TimerMode::Once,
-                        );
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
                             cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
@@ -808,7 +757,8 @@ pub fn tick_stealth_and_buffs(
     mut commands: Commands,
     time: Res<Time>,
     mut stealth: Query<(Entity, &mut StealthState), With<Stealthed>>,
-    mut rapid: Query<(Entity, &mut RapidfireState)>,
+    mut rapid: Query<(Entity, &mut RapidfireState), With<Player>>,
+    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
     for (e, mut s) in stealth.iter_mut() {
@@ -817,14 +767,14 @@ pub fn tick_stealth_and_buffs(
             commands.entity(e).remove::<Stealthed>();
         }
     }
-    // Tick RapidfireState duration timer
     for (e, mut r) in rapid.iter_mut() {
+        let was_finished = r.duration.finished();
         r.duration.tick(time.delta());
-        if r.duration.finished() {
-            info!("Removing RapidfireState from entity {:?}", e);
-            commands.entity(e).remove::<RapidfireState>();
-            // Trigger attribute recalculation to reset AttackCooldown
-            attribute_event.send_default();
+        if !was_finished && r.duration.finished() {
+            if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+                bonus_speed.remove_multiplier(r.attack_speed_bonus);
+                attribute_event.send_default();
+            }
         }
     }
 }
@@ -1089,7 +1039,7 @@ pub fn initialize_skill_charge_tracker(
             } else {
                 // Create new tracker with max charges
                 let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                init_timer.tick(Duration::from_secs_f32(base_cooldown)); // Start finished
+                init_timer.tick(Duration::from_secs_f32(base_cooldown));
                 commands.entity(player_e).insert(Slot1ChargeTracker(
                     crate::player::skills::SkillChargeTracker {
                         current_charges: max_charges,
@@ -1145,45 +1095,31 @@ pub fn initialize_skill_charge_tracker(
     }
 }
 
-/// System to trigger attribute recalculation when RapidfireState is added
-/// Similar to trigger_attribute_update_on_buff_added for potions
-pub fn trigger_attribute_update_on_rapidfire_added(
-    added_rapidfire: Query<(), Added<RapidfireState>>,
+pub fn add_rapidfire_speed_to_bonus(
+    added_rapidfire: Query<&RapidfireState, Added<RapidfireState>>,
+    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
-    if !added_rapidfire.is_empty() {
-        attribute_event.send_default();
+    for buff in added_rapidfire.iter() {
+        if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+            bonus_speed.add_multiplier(buff.attack_speed_bonus);
+            attribute_event.send_default();
+        }
     }
 }
 
-/// System to apply attack speed buff to player's attack cooldown
-/// This runs in PostUpdate to ensure it runs after attribute recalculation
-/// It applies the multiplier whenever attributes are recalculated while Rapidfire is active
-pub fn apply_rapid_fire_speed_buff(
-    mut player_query: Query<(&mut AttackCooldown, &RapidfireState), With<Player>>,
-    mut att_events: EventReader<crate::attributes::AttributeChangeEvent>,
-    added_rapidfire: Query<(), Added<RapidfireState>>,
+pub fn remove_rapidfire_speed_from_bonus(
+    mut removed_rapidfire: RemovedComponents<RapidfireState>,
+    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
+    rapidfire_query: Query<&RapidfireState>,
+    mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
 ) {
-    // Check if attributes were recalculated this frame OR Rapidfire was just added
-    let should_apply = !att_events.is_empty() || !added_rapidfire.is_empty();
-
-    // Only apply if attributes were recalculated or Rapidfire was just activated
-    if !should_apply {
-        return;
-    }
-
-    for (mut attack_cooldown, buff) in player_query.iter_mut() {
-        // Only apply if duration is active (not finished)
-        if buff.duration.finished() {
-            continue;
-        }
-        // Safety check: ensure cooldown is valid before division
-        if attack_cooldown.0 > 0.0 && attack_cooldown.0.is_finite() && buff.attack_speed_bonus > 0.0
-        {
-            // Apply the multiplier (divide by the bonus)
-            // This is safe because AttackCooldown is recalculated from scratch each time
-            // attributes change, so we're not compounding the multiplier
-            attack_cooldown.0 = attack_cooldown.0 / buff.attack_speed_bonus;
+    for entity in removed_rapidfire.iter() {
+        if let Ok(buff) = rapidfire_query.get(entity) {
+            if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+                bonus_speed.remove_multiplier(buff.attack_speed_bonus);
+                attribute_event.send_default();
+            }
         }
     }
 }

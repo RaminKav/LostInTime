@@ -439,17 +439,17 @@ impl ActiveSkill {
                 });
             }
             ActiveSkill::Rapidfire => {
-                let cooldown = ActiveSkill::Rapidfire.get_base_cooldown();
-                // Pre-tick the duration timer so it starts finished (buff not active)
-                let mut duration = Timer::from_seconds(3.0, TimerMode::Once);
-                duration.tick(Duration::from_secs(99));
-                commands.entity(entity).insert(RapidfireState {
-                    duration,
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                    attack_speed_bonus: 1.8,
-                });
+                // let cooldown = ActiveSkill::Rapidfire.get_base_cooldown();
+                // // Pre-tick the duration timer so it starts finished (buff not active)
+                // let mut duration = Timer::from_seconds(3.0, TimerMode::Once);
+                // duration.tick(Duration::from_secs(99));
+                // commands.entity(entity).insert(RapidfireState {
+                //     duration,
+                //     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                //         .tick(Duration::from_secs(99))
+                //         .clone(),
+                //     attack_speed_bonus: 0.8,
+                // });
             }
             ActiveSkill::FirePillar => {
                 let cooldown = ActiveSkill::FirePillar.get_base_cooldown();

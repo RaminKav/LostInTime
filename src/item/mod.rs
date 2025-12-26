@@ -87,7 +87,7 @@ use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
 use self::potion_buffs::{
-    apply_attack_speed_buff_to_cooldown, tick_potion_buffs, trigger_attribute_update_on_buff_added,
+    add_attack_speed_buff_to_bonus, tick_potion_buffs,
 };
 use self::projectile::RangedAttackPlugin;
 
@@ -1000,15 +1000,9 @@ impl Plugin for ItemsPlugin {
                     add_heirloom_shrine_visuals_on_spawn,
                     handle_heirloom_shrine_completion,
                     tick_potion_buffs.run_if(is_not_paused),
-                    trigger_attribute_update_on_buff_added,
+                    add_attack_speed_buff_to_bonus,
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            )
-            // Apply attack speed buff after attribute recalculation
-            .add_system(
-                apply_attack_speed_buff_to_cooldown
-                    .in_base_set(CoreSet::PostUpdate)
-                    .run_if(in_state(GameState::Main)),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }

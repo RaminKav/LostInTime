@@ -39,7 +39,7 @@ use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
     world::world_helpers::world_pos_to_tile_pos,
 };
-use crate::{BounceEvent, GameParam};
+use crate::{BounceEvent, GameParam, GameState};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -650,26 +650,9 @@ impl ObjectAction {
                     // No boss kill tracker, can't proceed
                     return;
                 }
-
-                // Determine next era based on current era
-                let next_era = match current_era {
-                    Era::Main => Some(Era::Second),
-                    Era::Second => Some(Era::Third),
-                    Era::Third => {
-                        return;
-                    }
-                    Era::DungeonMain => {
-                        // Shouldn't be able to use portal in dungeon
-                        return;
-                    }
-                };
-
-                if let Some(era) = next_era {
-                    item_action_param.dim_event.send(DimensionSpawnEvent {
-                        swap_to_dim_now: true,
-                        new_era: Some(era),
-                    });
-                }
+                item_action_param
+                    .next_game_state
+                    .set(GameState::BlessingChoice);
             }
             _ => {}
         }

@@ -63,6 +63,7 @@ mod ai;
 mod animations;
 mod assets;
 mod attributes;
+mod blessings;
 mod chaos;
 mod client;
 mod colors;
@@ -83,6 +84,7 @@ use animations::AnimationsPlugin;
 use assets::{GameAssetsPlugin, Graphics, GraphicsDesc, SpriteSize};
 use bevy_asset_loader::prelude::{AssetCollection, LoadingState, LoadingStateAppExt};
 use bevy_ecs_tilemap::TilemapPlugin;
+use blessings::BlessingsPlugin;
 use client::ClientPlugin;
 use combat::*;
 use enemy::EnemyPlugin;
@@ -239,6 +241,7 @@ fn main() {
         .add_plugin(SchematicPlugin)
         .add_plugin(JuicePlugin)
         .add_plugin(PetsPlugin)
+        .add_plugin(BlessingsPlugin)
         // .add_plugin(DiagnosticExplorerAgentPlugin)
         .add_startup_system(setup)
         .add_loading_state(
@@ -348,6 +351,7 @@ pub enum GameState {
     Initializing, // New state for game initialization with loading screen
     Main,
     GameOver,
+    BlessingChoice,
 }
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 struct CustomFlush;

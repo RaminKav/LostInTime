@@ -1,4 +1,4 @@
-use crate::attributes::{AttackCooldown, AttributeChangeEvent};
+use crate::attributes::{AttributeChangeEvent, BonusAttackSpeed};
 use crate::player::Player;
 use bevy::prelude::*;
 
@@ -34,30 +34,17 @@ impl MovementSpeedBuff {
     }
 }
 
-/// System to trigger attribute recalculation when attack speed buff is added
-pub fn trigger_attribute_update_on_buff_added(
-    added_buffs: Query<(), Added<AttackSpeedBuff>>,
+/// System to add attack speed multiplier to BonusAttackSpeed when buff is added
+pub fn add_attack_speed_buff_to_bonus(
+    added_buffs: Query<(Entity, &AttackSpeedBuff), Added<AttackSpeedBuff>>,
+    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
 ) {
-    if !added_buffs.is_empty() {
-        attribute_event.send_default();
-    }
-}
-
-/// System to apply attack speed buff AFTER attributes are calculated
-/// This runs after handle_player_item_attribute_change_events
-pub fn apply_attack_speed_buff_to_cooldown(
-    mut player_query: Query<(&mut AttackCooldown, &AttackSpeedBuff), With<Player>>,
-    att_events: EventReader<AttributeChangeEvent>,
-) {
-    // Only apply when attributes were just recalculated
-    if att_events.is_empty() {
-        return;
-    }
-
-    for (mut attack_cooldown, buff) in player_query.iter_mut() {
-        // Apply the speed multiplier to the attack cooldown ONCE after recalculation
-        attack_cooldown.0 = attack_cooldown.0 / buff.speed_multiplier;
+    for (_entity, buff) in added_buffs.iter() {
+        if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+            bonus_speed.add_multiplier(buff.speed_multiplier);
+            attribute_event.send_default();
+        }
     }
 }
 
@@ -66,14 +53,17 @@ pub fn tick_potion_buffs(
     mut commands: Commands,
     mut attack_speed_buffs: Query<(Entity, &mut AttackSpeedBuff)>,
     mut movement_speed_buffs: Query<(Entity, &mut MovementSpeedBuff)>,
+    mut player_query: Query<&mut BonusAttackSpeed, With<Player>>,
     mut attribute_event: EventWriter<AttributeChangeEvent>,
     time: Res<Time>,
 ) {
-    // Tick attack speed buffs
     for (entity, mut buff) in attack_speed_buffs.iter_mut() {
         buff.timer.tick(time.delta());
         if buff.timer.finished() {
-            attribute_event.send_default();
+            if let Ok(mut bonus_speed) = player_query.get_single_mut() {
+                bonus_speed.remove_multiplier(buff.speed_multiplier);
+                attribute_event.send_default();
+            }
             commands.entity(entity).remove::<AttackSpeedBuff>();
         }
     }

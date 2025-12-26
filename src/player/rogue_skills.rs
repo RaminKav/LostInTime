@@ -4,6 +4,7 @@ use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
     attributes::Attack,
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::OwnedBlessings,
     colors::BLACK,
     combat_helpers::spawn_temp_collider,
     enemy::Mob,
@@ -125,6 +126,7 @@ pub fn handle_lunge(
         &PlayerSkills,
         &FacingDirection,
         &Attack,
+        &OwnedBlessings,
     )>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
@@ -132,7 +134,7 @@ pub fn handle_lunge(
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
 ) {
-    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg) in query.iter_mut() {
+    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg, blessings) in query.iter_mut() {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
             if key_inputs.just_pressed(keybinds.get_active_skill_key(lunge_slot))
                 && lunge_state.lunge_cooldown_timer.finished()
@@ -149,7 +151,8 @@ pub fn handle_lunge(
                     FacingDirection::Left => PI / 2.,
                     FacingDirection::Right => PI / 2.,
                 };
-                let skill_power_mult = skills.skill_power_multiplier();
+                let skill_power_mult =
+                    skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
                 let lunge_e = spawn_temp_collider(
                     &mut commands,
                     Transform::from_translation(Vec3::new(0., 0., 0.))

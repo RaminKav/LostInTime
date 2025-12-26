@@ -135,7 +135,11 @@ impl Plugin for DimensionPlugin {
             .add_system(
                 Self::new_dim_with_params
                     .in_base_set(CoreSet::PreUpdate)
-                    .run_if(in_state(GameState::Main).or_else(in_state(GameState::Initializing))),
+                    .run_if(
+                        in_state(GameState::Main)
+                            .or_else(in_state(GameState::Initializing))
+                            .or_else(in_state(GameState::BlessingChoice)),
+                    ),
             )
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
