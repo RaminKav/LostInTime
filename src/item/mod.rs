@@ -21,7 +21,8 @@ use crate::proto::proto_param::ProtoParam;
 
 use crate::schematic::loot_chests::get_random_loot_chest_type;
 use crate::status_effects::{
-    handle_burning_ticks, handle_frail_stack_ticks, handle_slow_stack_ticks,
+    check_freeze_on_slow_stacks, handle_burning_ticks, handle_frail_stack_ticks,
+    handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{ChestContainer, InventorySlotType};
@@ -86,9 +87,7 @@ use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
-use self::potion_buffs::{
-    add_attack_speed_buff_to_bonus, tick_potion_buffs,
-};
+use self::potion_buffs::{add_attack_speed_buff_to_bonus, tick_potion_buffs};
 use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
@@ -314,6 +313,7 @@ pub enum WorldObject {
     Spear,
     Hammer,
     FireStaff,
+    PlasmaStaff,
     Blowdart,
     Gun,
     IceShard,
@@ -647,6 +647,7 @@ impl WorldObject {
             WorldObject::Gun => true,
             WorldObject::Blowdart => true,
             WorldObject::FireStaff => true,
+            WorldObject::PlasmaStaff => true,
             WorldObject::Hammer => true,
             WorldObject::WoodBow => true,
             WorldObject::Claw => true,
@@ -716,6 +717,7 @@ impl WorldObject {
             WorldObject::Claw => true,
             WorldObject::IceStaff => true,
             WorldObject::FireStaff => true,
+            WorldObject::PlasmaStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             WorldObject::Gun => true,
@@ -736,6 +738,7 @@ impl WorldObject {
         match self {
             WorldObject::IceStaff => true,
             WorldObject::FireStaff => true,
+            WorldObject::PlasmaStaff => true,
             WorldObject::BasicStaff => true,
             WorldObject::MagicWhip => true,
             _ => false,
@@ -973,7 +976,14 @@ impl Plugin for ItemsPlugin {
                     add_gamble_visuals_on_spawn,
                     handle_frail_stack_ticks.run_if(is_not_paused),
                     handle_slow_stack_ticks.run_if(is_not_paused),
+                    handle_frozen_ticks.run_if(is_not_paused),
+                    check_freeze_on_slow_stacks.run_if(is_not_paused),
                     handle_combat_shrine_activate_animation,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
                     handle_on_hit_upgrades.run_if(is_not_paused),
                     handle_reset_proj_hit_enemies_state.run_if(is_not_paused),
                 )

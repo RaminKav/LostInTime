@@ -272,6 +272,7 @@ pub fn shuffle_items(
                     .map(|old_item| old_item != *obj)
                     .unwrap_or(true)
                     && (obj.is_weapon() || obj.is_armor() || obj.is_accessory())
+                    && obj != &WorldObject::PlasmaStaff
             })
             .collect_vec();
         let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
@@ -321,7 +322,10 @@ pub fn handle_anim_events(
                 if item_chest_state.picked_item.is_none() {
                     let mut rng = rand::thread_rng();
                     let filtered_items = WorldObject::iter()
-                        .filter(|obj| obj.is_weapon() || obj.is_armor() || obj.is_accessory())
+                        .filter(|obj| {
+                            (obj.is_weapon() || obj.is_armor() || obj.is_accessory())
+                                && obj != &WorldObject::PlasmaStaff
+                        })
                         .collect_vec();
                     let pick_new_item = filtered_items.choose(&mut rng).expect("No items found");
                     let mut stack = proto.get_item_data(pick_new_item.clone()).unwrap().clone();

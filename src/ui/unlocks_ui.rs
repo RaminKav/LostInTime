@@ -51,7 +51,7 @@ const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
     UnlockUpgradeKind::StartTome,
     UnlockUpgradeKind::StartOrb,
     UnlockUpgradeKind::StartingTools,
-    UnlockUpgradeKind::ThirdActiveSkillSlot,
+    UnlockUpgradeKind::SecondActiveSkillSlot,
 ];
 
 fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
@@ -99,8 +99,8 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
             2 => "Tier 3: Start with Wood Axe and Pickaxe".to_string(),
             _ => format!("Unlocked: Start with Wood Axe and Pickaxe",),
         },
-        UnlockUpgradeKind::ThirdActiveSkillSlot => {
-            if upgrades.third_active_skill_slot_unlocked {
+        UnlockUpgradeKind::SecondActiveSkillSlot => {
+            if upgrades.second_active_skill_slot_unlocked {
                 "Unlocked: Gain a third active skill slot.".to_string()
             } else {
                 "Gain a third active skill slot.".to_string()

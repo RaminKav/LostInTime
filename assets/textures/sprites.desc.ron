@@ -195,6 +195,11 @@
             size: (16., 16.),
             anchor: Some((0.2, 0.23)),
         ),
+        PlasmaStaff: WorldObjectData(
+            texture_pos: (11., 5.),
+            size: (16., 16.),
+            anchor: Some((0.2, 0.23)),
+        ),
         Ring: WorldObjectData(
             texture_pos: (4., 2.),
             size: (16., 16.),

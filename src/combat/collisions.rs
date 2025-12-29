@@ -2,7 +2,9 @@ use super::{
     try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
     StatusEffectEvent,
 };
+use crate::blessings::{Blessing, OwnedBlessings};
 use crate::client::is_not_paused;
+use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
 use crate::ui::damage_numbers::FloatingTextQueue;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -50,9 +52,10 @@ impl Plugin for CollisionPlugion {
                 check_boss_to_objects_collisions.run_if(is_not_paused),
                 check_mob_to_player_collisions.run_if(is_not_paused),
                 check_projectile_hit_mob_collisions.run_if(is_not_paused),
-                check_fire_ring_ongoing_collisions
+                check_multihit_projectile_ongoing_collisions
                     .run_if(is_not_paused)
-                    .after(crate::player::skill_heirlooms::handle_fire_pillar_hit_clear),
+                    .after(handle_fire_pillar_hit_clear)
+                    .after(handle_laser_beam_hit_clear),
                 check_projectile_hit_player_collisions.run_if(is_not_paused),
                 check_object_trigger_collisions
                     .run_if(is_not_paused)
@@ -329,9 +332,9 @@ fn check_projectile_hit_mob_collisions(
     }
 }
 
-/// Check for ongoing collisions with FireRing projectiles after hit_entities are cleared
+/// Check for ongoing collisions with multi-hit projectiles (FireRing, LaserBeam) after hit_entities are cleared
 /// This allows enemies already colliding to take damage again immediately
-fn check_fire_ring_ongoing_collisions(
+fn check_multihit_projectile_ongoing_collisions(
     mut commands: Commands,
     player_attack: Query<(Entity, &Children), With<Player>>,
     allowed_targets: Query<
@@ -366,13 +369,13 @@ fn check_fire_ring_ongoing_collisions(
     mut status_event: EventWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
 ) {
-    // Only process FireRing projectiles
+    // Only process multi-hit projectiles (FireRing, LaserBeam)
     for (proj_entity, mut state, proj, att, ice_aoe, spear_att) in projectiles.iter_mut() {
-        if *proj != Projectile::FireRing {
+        if *proj != Projectile::FireRing && *proj != Projectile::LaserBeam {
             continue;
         }
 
-        // Check for ongoing intersections with this FireRing projectile
+        // Check for ongoing intersections with this multi-hit projectile
         // Try the projectile entity first, then check children if it has any
         let entities_to_check: Vec<Entity> = {
             let mut entities = vec![proj_entity];
@@ -466,7 +469,7 @@ fn check_fire_ring_ongoing_collisions(
                         );
                     }
 
-                    // For FireRing, calculate direction from projectile to enemy
+                    // For multi-hit projectiles, calculate direction from projectile to enemy
                     let proj_pos = proj_transforms
                         .get(proj_entity)
                         .map(|t| t.translation().truncate())
@@ -491,7 +494,12 @@ fn check_fire_ring_ongoing_collisions(
                     });
 
                     if nearby_mobs.get(target_e).is_ok() {
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
+                        // Play appropriate sound based on projectile type
+                        let sound = match proj {
+                            Projectile::LaserBeam => AudioSoundEffect::LightningStaffHit,
+                            _ => AudioSoundEffect::IceStaffHit,
+                        };
+                        commands.spawn(SoundSpawner::new(sound, 0.4));
                     }
                 }
             }
@@ -794,6 +802,7 @@ fn check_mob_to_player_collisions(
             Option<&Stealthed>,
             Option<&LungeState>,
             &Attack, // Player's attack for thorns calculation
+            &OwnedBlessings,
         ),
         With<Player>,
     >,
@@ -806,6 +815,7 @@ fn check_mob_to_player_collisions(
     mut dodge_event: EventWriter<DodgeEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
     mut parry_events: EventWriter<ParrySuccessEvent>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
 ) {
     let (
         player_e,
@@ -818,6 +828,7 @@ fn check_mob_to_player_collisions(
         stealth_opt,
         lunge_opt,
         player_attack,
+        owned_blessings,
     ) = player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
@@ -919,6 +930,32 @@ fn check_mob_to_player_collisions(
                     was_overcrit: false,
                     from_heirloom_effect: false,
                 });
+            }
+
+            // ThornsSpikes blessing: spawn 5 stationary projectiles in a circle around the player
+            let has_thorns_spikes = owned_blessings.has_blessing(Blessing::ThornsSpikes);
+
+            if has_thorns_spikes && in_i_frame.get(e1).is_err() {
+                let spike_damage =
+                    f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
+                let num_spikes = 5;
+
+                for i in 0..num_spikes {
+                    let angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
+                    let direction = Vec2::new(angle.cos(), angle.sin());
+
+                    ranged_attack_event.send(RangedAttackEvent {
+                        projectile: Projectile::SpearProjectile,
+                        direction,
+                        from_enemy: false,
+                        is_followup_proj: true,
+                        mana_cost: None,
+                        from_entity: Some(player_e),
+                        dmg_override: Some(spike_damage),
+                        pos_override: Some(player_txfm.translation.truncate() + direction * 10.0),
+                        spawn_delay: 0.0,
+                    });
+                }
             }
         }
     }

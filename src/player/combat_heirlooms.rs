@@ -8,6 +8,7 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     attributes::{CurrentHealth, MaxHealth},
+    blessings::{Blessing, OwnedBlessings},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
@@ -595,6 +596,7 @@ pub fn handle_mana_orb_drops(
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
     game: GameParam,
+    blessings: Query<&OwnedBlessings>,
 ) {
     let mut rng = rand::thread_rng();
     for event in death_events.iter() {
@@ -603,7 +605,11 @@ pub fn handle_mana_orb_drops(
                 .map(|obj| obj.is_magic_weapon())
                 .unwrap_or(false)
         });
-        if !has_mana_item {
+        let has_mana_blessing = blessings
+            .get(game.game.player)
+            .map(|b| b.has_blessing(Blessing::AttackManaCost))
+            .unwrap_or(false);
+        if !has_mana_item && !has_mana_blessing {
             continue;
         }
 
@@ -628,6 +634,7 @@ pub fn handle_boss_hit_mana_orb_drops(
     mut hit_events: EventReader<HitEvent>,
     game: GameParam,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
+    blessings: Query<&OwnedBlessings>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -648,7 +655,12 @@ pub fn handle_boss_hit_mana_orb_drops(
                 .unwrap_or(false)
         });
 
-        if !has_staff {
+        let has_mana_blessing = blessings
+            .get(game.game.player)
+            .map(|b| b.has_blessing(Blessing::AttackManaCost))
+            .unwrap_or(false);
+
+        if !has_staff && !has_mana_blessing {
             continue;
         }
 

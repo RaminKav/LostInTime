@@ -79,6 +79,9 @@ pub enum Projectile {
     AttackSpeed,
     Shout,
     GolemSpike,
+    LaserBeam,
+    PlasmaBall,
+    PlasmaExplosion,
 }
 
 impl Projectile {
@@ -98,6 +101,7 @@ impl Projectile {
             Projectile::DaggerProjectile1 => true,
             Projectile::DaggerProjectile2 => true,
             Projectile::SpearProjectile => true,
+            Projectile::LaserBeam => true,
             _ => false,
         }
     }
@@ -109,6 +113,7 @@ impl Projectile {
             Projectile::FireRing => true,
             Projectile::IceWall => true,
             Projectile::Shout => true,
+            Projectile::LaserBeam => true,
             _ => false,
         }
     }
@@ -370,13 +375,17 @@ fn handle_spawn_projectiles_after_delay(
                     }
                 }
                 // AUDIO
-                if proj.proj == Projectile::Fireball {
+                if proj.proj == Projectile::Fireball || proj.proj == Projectile::FireRing {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
                 } else if proj.proj == Projectile::Arrow {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
-                } else if proj.proj == Projectile::ThrowingStar {
+                } else if proj.proj == Projectile::ThrowingStar
+                    || proj.proj == Projectile::ThrowingStarLarge
+                {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
-                } else if proj.proj == Projectile::Electricity {
+                } else if proj.proj == Projectile::Electricity
+                    || proj.proj == Projectile::PlasmaBall
+                {
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
                 }
 

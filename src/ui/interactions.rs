@@ -1,8 +1,13 @@
 use std::time::Duration;
 
+use crate::{
+    blessings::{Blessing, HeirloomStatsBonuses},
+    chaos::ChaosTracker,
+    ui::damage_numbers::spawn_floating_text_with_shadow,
+};
 use bevy::prelude::*;
-
 use bevy_proto::prelude::ProtoCommands;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumIter};
 
@@ -12,12 +17,14 @@ use crate::{
         attribute_helpers::create_new_random_item_stack_with_attributes, AttributeChangeEvent,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::OwnedBlessings,
     colors::{DARK_GREEN, RED},
     inputs::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     pets::state::UpdatePetWeaponEvent,
     player::{
+        combat_heirlooms::HallucinationStatType,
         levels::PlayerLevel,
         skills::{Heirloom, HeirloomChoiceQueue, PlayerSkills},
         stats::StatType,
@@ -945,7 +952,14 @@ pub fn handle_cursor_skills_buttons(
         (Entity, &mut Interactable, &SkillChoiceUI),
         Without<InventorySlotState>,
     >,
-    mut player_skills: Query<(Entity, &mut PlayerSkills, &GlobalTransform, &PlayerLevel)>,
+    mut player_skills: Query<(
+        Entity,
+        &mut PlayerSkills,
+        &GlobalTransform,
+        &PlayerLevel,
+        &OwnedBlessings,
+        &mut HeirloomStatsBonuses,
+    )>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
@@ -955,7 +969,8 @@ pub fn handle_cursor_skills_buttons(
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
     mut shrine_query: Query<&mut HeirloomShrineState>,
-    mut chaos_tracker: ResMut<crate::chaos::ChaosTracker>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
+    asset_server: Res<AssetServer>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -980,7 +995,8 @@ pub fn handle_cursor_skills_buttons(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed && state.interaction_lock_timer.finished() {
-                        let (e, mut skills, t, level) = player_skills.single_mut();
+                        let (e, mut skills, t, level, blessings, mut heirloom_stats) =
+                            player_skills.single_mut();
                         let picked_skill = state.skill_choice.clone();
                         if ui_state == &UIState::Skills {
                             skill_queue.handle_pick_skill(
@@ -1006,10 +1022,38 @@ pub fn handle_cursor_skills_buttons(
                                 chaos_tracker.add_chaos(2.0);
                             }
 
-                            // Mark heirloom shrine as used if this was from a shrine
                             for mut shrine in shrine_query.iter_mut() {
                                 if !shrine.is_used {
                                     shrine.is_used = true;
+
+                                    if blessings.has_blessing(Blessing::HeirloomStats) {
+                                        let stat_type = HallucinationStatType::random();
+                                        let mut rng = rand::thread_rng();
+
+                                        let amount = rng.gen_range(1..=4); // Base amount for heirloom stats blessing
+                                        heirloom_stats.add_stat(stat_type, amount);
+
+                                        // Show floating text with stat gain at player position (like item pickups)
+                                        let player_pos = t.translation();
+                                        let drop_spread = 16.;
+                                        let pos_offset = Vec3::new(
+                                            rng.gen_range(-drop_spread..drop_spread),
+                                            rng.gen_range(0.0..drop_spread) + 10.,
+                                            2.,
+                                        );
+                                        spawn_floating_text_with_shadow(
+                                            &mut commands,
+                                            &asset_server,
+                                            player_pos + pos_offset,
+                                            stat_type.color(),
+                                            format!("+{} {}", amount, stat_type.name()),
+                                        );
+
+                                        info!(
+                                            "HeirloomStats blessing: Gained +{} {:?}",
+                                            amount, stat_type
+                                        );
+                                    }
                                 }
                             }
 
@@ -1022,11 +1066,11 @@ pub fn handle_cursor_skills_buttons(
                         } else if ui_state == &UIState::ActiveSkills {
                             match state.index {
                                 0 => {
-                                    skills.active_skill_slot_1 =
+                                    skills.roll_skill_slot =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 1 => {
-                                    skills.active_skill_slot_2 =
+                                    skills.active_skill_slot_1 =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 _ => (),

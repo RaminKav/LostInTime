@@ -207,6 +207,7 @@ impl Plugin for UIPlugin {
                     setup_currency_ui.run_if(run_once_per_run()),
                     setup_clock_hud.run_if(run_once_per_run()),
                     setup_era_timer_hud.run_if(run_once_per_run()),
+                    setup_chaos_ui.run_if(run_once_per_run()),
                 )
                     .in_schedule(OnEnter(GameState::Main)),
             )
@@ -224,14 +225,14 @@ impl Plugin for UIPlugin {
                     handle_enemy_health_bar_change,
                     add_ui_icon_for_elite_mobs,
                     handle_add_dodge_text,
-                    tick_damage_numbers,
-                    handle_queued_floating_texts,
                     boss_health_bar::spawn_boss_health_bar,
                     boss_health_bar::update_boss_health_bar,
                     boss_health_bar::cleanup_boss_health_bar_on_despawn,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_systems((handle_queued_floating_texts.run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
+                        tick_damage_numbers.run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice)))))
             .add_system(
                 handle_add_damage_numbers_after_hit
                     .before(handle_hits)
@@ -415,12 +416,14 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
 
                     handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
-                    handle_update_player_skills.after(clamp_health),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),
                 )
                     .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                    handle_update_player_skills.after(clamp_health).run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
             )
             .add_system(
                 handle_heirloom_hud_tooltip
@@ -550,6 +553,7 @@ impl Plugin for UIPlugin {
         );
 
         app.add_system(update_currency_text.run_if(in_state(GameState::Main)))
+            .add_system(update_chaos_ui.run_if(in_state(GameState::Main)))
             .add_system(update_score_text.run_if(resource_changed::<RunScore>()))
             .add_system(player_hud::update_skill_charge_text.run_if(in_state(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));

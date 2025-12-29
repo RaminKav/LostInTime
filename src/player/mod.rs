@@ -57,7 +57,7 @@ use crate::{
         CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen,
         MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
-    blessings::OwnedBlessings,
+    blessings::{HeirloomStatsBonuses, OwnedBlessings},
     client::is_not_paused,
     container::Container,
     custom_commands::CommandsExt,
@@ -216,6 +216,7 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
                     skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
+                    skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
                     skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
                     skill_heirlooms::reduce_skill_cooldown_on_crit
@@ -400,6 +401,7 @@ fn spawn_player(
         .insert(PlayerStats::new())
         .insert(Sensor)
         .insert(OwnedBlessings::default())
+        .insert(HeirloomStatsBonuses::default())
         .insert(PlayerSkills::default())
         .insert(SkillPoints { count: 0 })
         .insert(BonusAttackSpeed::new())
@@ -530,7 +532,7 @@ fn give_player_starting_items(
     }
 
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
-    // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(100));
+    proto_commands.spawn_item_from_proto(WorldObject::PlasmaStaff, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));

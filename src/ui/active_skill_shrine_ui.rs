@@ -267,21 +267,21 @@ pub fn handle_active_skill_shrine_ui_interaction(
                         let picked_skill = shrine_ui.skill_choice.clone();
 
                         // Check if player has open slots (check slot 3 first if unlocked)
-                        let has_slot_3_unlocked = unlock_upgrades
+                        let has_slot_2_unlocked = unlock_upgrades
                             .as_ref()
-                            .map(|u| u.third_active_skill_slot_unlocked)
+                            .map(|u| u.second_active_skill_slot_unlocked)
                             .unwrap_or(false);
-                        
-                        if has_slot_3_unlocked && skills.active_skill_slot_3.is_none() {
+
+                        if has_slot_2_unlocked && skills.active_skill_slot_2.is_none() {
                             // Auto-assign to slot 3 if unlocked and empty
-                            skills.active_skill_slot_3 = Some(picked_skill.clone());
+                            skills.active_skill_slot_2 = Some(picked_skill.clone());
+                        } else if skills.roll_skill_slot.is_none() {
+                            skills.roll_skill_slot = Some(picked_skill.clone());
                         } else if skills.active_skill_slot_1.is_none() {
                             skills.active_skill_slot_1 = Some(picked_skill.clone());
-                        } else if skills.active_skill_slot_2.is_none() {
-                            skills.active_skill_slot_2 = Some(picked_skill.clone());
-                        } else if has_slot_3_unlocked {
-                            // Slot 3 is full, show overwrite UI
-                            commands.insert_resource(crate::item::active_skill_shrine::ActiveSkillShrineOverwrite {
+                        } else if has_slot_2_unlocked {
+                            // Slot 2 is full, show overwrite UI
+                            commands.insert_resource(ActiveSkillShrineOverwrite {
                                 skill_choice: picked_skill.clone(),
                                 shrine_entity: shrine_selection.shrine_entity,
                             });
@@ -290,7 +290,7 @@ pub fn handle_active_skill_shrine_ui_interaction(
                             return;
                         } else {
                             // Both slots full - automatically swap the second active skill slot (slot 2, which is not Roll)
-                            skills.active_skill_slot_2 = Some(picked_skill.clone());
+                            skills.active_skill_slot_1 = Some(picked_skill.clone());
                         }
 
                         // Add skill components
@@ -343,15 +343,12 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     let skills = skills.single();
-    let mut choices = vec![
-        skills.active_skill_slot_1.clone(),
-        skills.active_skill_slot_2.clone(),
-    ];
-    
-    // Add slot 3 if unlocked
+    let mut choices = vec![skills.active_skill_slot_1.clone()];
+
+    // Add slot 2 if unlocked
     if let Some(upgrades) = unlock_upgrades.as_ref() {
-        if upgrades.third_active_skill_slot_unlocked {
-            choices.push(skills.active_skill_slot_3.clone());
+        if upgrades.second_active_skill_slot_unlocked {
+            choices.push(skills.active_skill_slot_2.clone());
         }
     }
     let t_offset = Vec2::new(4., 4.);
@@ -558,7 +555,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
     mut commands: Commands,
     mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
-    shrine_overwrite_res: Option<Res<crate::item::active_skill_shrine::ActiveSkillShrineOverwrite>>,
+    shrine_overwrite_res: Option<Res<ActiveSkillShrineOverwrite>>,
 ) {
     // Only handle if this is a shrine overwrite, not heirloom limbo
     let overwrite = if let Some(overwrite_res) = shrine_overwrite_res.as_ref() {
@@ -597,21 +594,21 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
 
                         match skill_ui.index {
                             0 => {
-                                skills.active_skill_slot_1 = Some(new_skill.clone());
+                                skills.roll_skill_slot = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill
                                     .active_skill
                                     .add_skill_components(player_e, &mut commands);
                             }
                             1 => {
-                                skills.active_skill_slot_2 = Some(new_skill.clone());
+                                skills.active_skill_slot_1 = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill
                                     .active_skill
                                     .add_skill_components(player_e, &mut commands);
                             }
                             2 => {
-                                skills.active_skill_slot_3 = Some(new_skill.clone());
+                                skills.active_skill_slot_2 = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill
                                     .active_skill
@@ -627,7 +624,7 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         }
 
                         // Remove resources
-                        commands.remove_resource::<crate::item::active_skill_shrine::ActiveSkillShrineOverwrite>();
+                        commands.remove_resource::<ActiveSkillShrineOverwrite>();
                         commands.remove_resource::<ActiveSkillShrineSelection>();
                         next_ui_state.set(UIState::Closed);
                         att_event.send(crate::attributes::AttributeChangeEvent);

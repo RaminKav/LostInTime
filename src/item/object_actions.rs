@@ -39,7 +39,7 @@ use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
     world::world_helpers::world_pos_to_tile_pos,
 };
-use crate::{BounceEvent, GameParam, GameState};
+use crate::{BounceEvent, GameParam, GameState, DEBUG};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -413,13 +413,13 @@ impl ObjectAction {
                     .ok()
                     .map(|skills| {
                         let mut current = Vec::new();
-                        if let Some(slot1) = &skills.active_skill_slot_1 {
+                        if let Some(slot1) = &skills.roll_skill_slot {
                             current.push(slot1.active_skill.clone());
                         }
-                        if let Some(slot2) = &skills.active_skill_slot_2 {
+                        if let Some(slot2) = &skills.active_skill_slot_1 {
                             current.push(slot2.active_skill.clone());
                         }
-                        if let Some(slot3) = &skills.active_skill_slot_3 {
+                        if let Some(slot3) = &skills.active_skill_slot_2 {
                             current.push(slot3.active_skill.clone());
                         }
                         current
@@ -637,18 +637,16 @@ impl ObjectAction {
                 );
             }
             ObjectAction::TimePortal => {
-                let current_era = game.era.current_era.clone();
+                if !*DEBUG {
+                    let current_era = game.era.current_era.clone();
 
-                // Check if boss_kill_tracker exists and if boss for current era has been killed
-                if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
-                    if !boss_kill_tracker.is_boss_killed(&current_era) {
-                        // Boss not killed yet, don't allow teleportation
-                        // TODO: Maybe show some message to player?
+                    if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
+                        if !boss_kill_tracker.is_boss_killed(&current_era) {
+                            return;
+                        }
+                    } else {
                         return;
                     }
-                } else {
-                    // No boss kill tracker, can't proceed
-                    return;
                 }
                 item_action_param
                     .next_game_state

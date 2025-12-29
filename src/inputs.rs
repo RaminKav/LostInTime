@@ -1,3 +1,4 @@
+use crate::blessings::OwnedBlessings;
 use crate::item::potion_buffs::MovementSpeedBuff;
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -15,7 +16,7 @@ use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState, HealSkillState,
-    Heirloom, IceWallSkillState, PlayerSkills,
+    Heirloom, IceWallSkillState, LaserBeamState, PlayerSkills,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -33,7 +34,7 @@ use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 use rand::Rng;
 
-use crate::attributes::Speed;
+use crate::attributes::{CurrentMana, Speed};
 use crate::combat::{AttackTimer, HitEvent};
 
 use crate::enemy::Mob;
@@ -44,7 +45,6 @@ use crate::item::object_actions::ObjectAction;
 use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
-use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::{
     change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
 };
@@ -53,7 +53,7 @@ use crate::world::chunk::Chunk;
 use crate::world::world_helpers::world_pos_to_tile_pos;
 
 use crate::player::mage_skills::TeleportState;
-use crate::player::melee_skills::{ParryState, SpearState};
+use crate::player::melee_skills::SpearState;
 use crate::player::rogue_skills::{LungeState, SprintState};
 use crate::player::skills::{
     FirePillarState, PiercingStarSkillState, RapidfireState, ShoutSkillState, StealthState,
@@ -424,7 +424,6 @@ pub fn dispatch_active_skill_events(
             Option<&SprintState>,
             Option<&LungeState>,
             Option<&TeleportState>,
-            Option<&ParryState>,
             Option<&SpearState>,
             Option<&StealthState>,
             Option<&RapidfireState>,
@@ -435,6 +434,7 @@ pub fn dispatch_active_skill_events(
             Option<&DruidTreeSkillState>,
             Option<&ShoutSkillState>,
             Option<&PiercingStarSkillState>,
+            Option<&LaserBeamState>,
         ),
         With<Player>,
     >,
@@ -447,7 +447,6 @@ pub fn dispatch_active_skill_events(
         sprint_state,
         lunge_state,
         teleport_state,
-        parry_state,
         spear_state,
         stealth_state,
         rapid_state,
@@ -458,23 +457,28 @@ pub fn dispatch_active_skill_events(
         druidtree_state,
         shout_state,
         piercing_star_state,
+        laser_beam_state,
     )) = player_q.get_single()
     else {
         return;
     };
-    // Check which key was pressed, prioritizing higher slots (2, 1, 0)
+    // Check which key was pressed, prioritizing higher slots (3, 2, 1, 0)
     // Only handle ONE key per frame to prevent multiple slots from triggering
     // Check all keys first, then handle only the highest priority one
+    let slot_3_key = keybinds.get_active_skill_key(3);
     let slot_2_key = keybinds.get_active_skill_key(2);
     let slot_1_key = keybinds.get_active_skill_key(1);
     let slot_0_key = keybinds.get_active_skill_key(0);
 
+    let slot_3_pressed = key_input.just_pressed(slot_3_key);
     let slot_2_pressed = key_input.just_pressed(slot_2_key);
     let slot_1_pressed = key_input.just_pressed(slot_1_key);
     let slot_0_pressed = key_input.just_pressed(slot_0_key);
 
-    // Determine which slot to handle based on priority (2 > 1 > 0)
-    let pressed_slot = if slot_2_pressed {
+    // Determine which slot to handle based on priority (3 > 2 > 1 > 0)
+    let pressed_slot = if slot_3_pressed {
+        Some(3)
+    } else if slot_2_pressed {
         Some(2)
     } else if slot_1_pressed {
         Some(1)
@@ -527,9 +531,7 @@ pub fn dispatch_active_skill_events(
                 ActiveSkill::Teleport => teleport_state
                     .map(|t| !t.cooldown_timer.finished())
                     .unwrap_or(false),
-                ActiveSkill::Parry => parry_state
-                    .map(|p| !p.cooldown_timer.finished())
-                    .unwrap_or(false),
+                ActiveSkill::Parry => false, //--- IGNORE ---
                 ActiveSkill::ParrySpear => spear_state
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
@@ -558,6 +560,9 @@ pub fn dispatch_active_skill_events(
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
                 ActiveSkill::PiercingStar => piercing_star_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::LaserBeam => laser_beam_state
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
             };
@@ -695,11 +700,11 @@ pub fn toggle_inventory(
             // proto_commands.spawn_item_from_proto(WorldObject::BasicStaff, &proto, pos, 1, Some(5));
             // proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
+            // proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StoneGolem, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            // proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);
@@ -846,7 +851,16 @@ pub fn mouse_click_system(
     mut attack_event: EventWriter<AttackEvent>,
     mut hit_event: EventWriter<HitEvent>,
 
-    player_query: Query<(Entity, Option<&AttackTimer>, &PlayerAnimation), With<Player>>,
+    mut player_query: Query<
+        (
+            Entity,
+            Option<&AttackTimer>,
+            &PlayerAnimation,
+            &OwnedBlessings,
+            &mut CurrentMana,
+        ),
+        With<Player>,
+    >,
     mut inv: Query<&mut Inventory>,
     inv_state: Res<InventoryState>,
     ui_state: Res<State<UIState>>,
@@ -855,8 +869,6 @@ pub fn mouse_click_system(
     mut item_action_param: ItemActionParam,
     obj_actions: Query<&ObjectAction>,
     ammo_query_any: Query<&Ammo>,
-    // mut meshes: ResMut<Assets<Mesh>>,
-    // mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
@@ -864,7 +876,8 @@ pub fn mouse_click_system(
 
     let cursor_tile_pos = world_pos_to_tile_pos(cursor_pos.world_coords.truncate());
     let player_pos = game.player().position;
-    let (player_e, attack_timer_option, player_anim) = player_query.single();
+    let (player_e, attack_timer_option, player_anim, blessings, mut current_mana) =
+        player_query.single_mut();
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
@@ -881,6 +894,16 @@ pub fn mouse_click_system(
         if attack_timer_option.is_some() || player_anim.is_one_time_anim() {
             return;
         }
+
+        // AttackManaCost blessing: check mana cost and deduct before attacking
+        let attack_mana_cost = blessings.get_attack_mana_cost();
+        if attack_mana_cost > 0 {
+            if current_mana.0 < attack_mana_cost {
+                return;
+            }
+            current_mana.0 -= attack_mana_cost;
+        }
+
         let mut main_hand_option = None;
         // if it has AttackTimer, the action is on cooldown, so we abort.
         if let Some(tool) = &game.player().main_hand_slot {

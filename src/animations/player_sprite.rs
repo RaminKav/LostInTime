@@ -13,8 +13,11 @@ use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 
 use crate::{
-    attributes::AttributeChangeEvent, inputs::FacingDirection, item::WorldObject,
-    player::skills::PlayerClass, FairyPetSprite, SlimePetSprite,
+    attributes::AttributeChangeEvent,
+    inputs::FacingDirection,
+    item::WorldObject,
+    player::skills::{ActiveSkillChoiceState, HeirloomRarity, PlayerClass},
+    FairyPetSprite, SlimePetSprite,
 };
 
 /// Timer to track how long an attack animation has been playing
@@ -293,12 +296,10 @@ pub fn change_player_class_visuals(
         let class_data = graphics.get_class_data(class.clone());
         let active_skill = &class_data.active_skill;
 
-        // Update active skill slot 2 with the class's unique active skill
-        player_skills.active_skill_slot_2 =
-            Some(crate::player::skills::ActiveSkillChoiceState::new(
-                active_skill.clone(),
-                crate::player::skills::HeirloomRarity::Common,
-            ));
+        player_skills.active_skill_slot_1 = Some(ActiveSkillChoiceState::new(
+            active_skill.clone(),
+            HeirloomRarity::Common,
+        ));
 
         // Add skill components for the active skill
         active_skill.add_skill_components(e, &mut commands);

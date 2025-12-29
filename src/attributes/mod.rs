@@ -16,6 +16,7 @@ use crate::{
     animations::{AnimatedTextureMaterial, DoneAnimation},
     assets::Graphics,
     attributes::attribute_helpers::{build_item_stack_with_parsed_attributes, get_rarity_rng},
+    blessings::{Blessing, HeirloomStatsBonuses, OwnedBlessings},
     client::{is_not_paused, GameOverEvent},
     colors::{GREY, LIGHT_BLUE, LIGHT_GREY, LIGHT_RED, ORANGE, UNCOMMON_GREEN},
     inputs::player_move_inputs,
@@ -23,10 +24,11 @@ use crate::{
     item::{BonusStatLine, Equipment, EquipmentType, WorldObject},
     juice::ShakeEffect,
     player::{
+        combat_heirlooms::{DodgeCritState, HallucinationStats, MaxHPHuntTracker},
         levels::{handle_level_up, PlayerLevel},
         skills::{Heirloom, PlayerClass, PlayerSkills},
         stats::StatType,
-        Limb,
+        CoinCurrency, Limb,
     },
     proto::proto_param::ProtoParam,
     ui::{
@@ -448,6 +450,7 @@ impl ItemAttributes {
         old_max_mana: i32,
         old_shield: i32,
         skills: &PlayerSkills,
+        blessings: &OwnedBlessings,
         dodge_crit_buff_active: bool,
         coins: u32,
         max_hp_hunt_bonus: i32, // Max HP gained from MaxHPHunt heirloom
@@ -462,19 +465,35 @@ impl ItemAttributes {
         let chaos_crit_bonus = chaos_stats_stacks * 10; // +10% crit
         let chaos_speed_bonus = chaos_stats_stacks * 10; // +10% speed
         let chaos_dodge_bonus = chaos_stats_stacks * 10;
+        let has_tiny_blessing = blessings.has_blessing(Blessing::Tiny);
+        let has_giant_blessing = blessings.has_blessing(Blessing::Giant);
 
         // Note: Hallucination stats from LethalBlow are now combined via ItemAttributes::combine()
         // before this function is called, so they're already included in self.
 
-        let computed_health = self.health
+        let mut computed_health = self.health
             + skills.get_count(Heirloom::Health) * 25
             + chaos_health_bonus
             + max_hp_hunt_bonus;
+        computed_health.value += if has_giant_blessing {
+            (computed_health.value as f32 * 0.5) as i32
+        } else {
+            0
+        };
+        computed_health.value += if has_tiny_blessing {
+            -(computed_health.value as f32 * 0.5) as i32
+        } else {
+            0
+        };
         let computed_speed = self.speed.value
             + chaos_speed_bonus
             + if dodge_crit_buff_active { 30 } else { 0 } // DodgeCrit speed buff
             - if skills.has(Heirloom::ReinforcedArmor) {
                 5
+            } else {
+                0
+            } - if has_giant_blessing {
+                50
             } else {
                 0
             };
@@ -493,12 +512,14 @@ impl ItemAttributes {
             let bonus_attack_speed_multiplier = bonus_attack_speed
                 .map(|b| b.get_multiplier())
                 .unwrap_or(1.0);
+            let bonus_tiny_attack_speed = if has_tiny_blessing { 1.5 } else { 1.0 };
             entity.insert(AttackCooldown(
                 self.attack_cooldown
                     * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
                     / attack_speed_mod
                     / dodge_crit_attack_speed_mod
-                    / bonus_attack_speed_multiplier,
+                    / bonus_attack_speed_multiplier
+                    / bonus_tiny_attack_speed,
             ));
         } else {
             entity.remove::<AttackCooldown>();
@@ -557,7 +578,8 @@ impl ItemAttributes {
                 2 * (min(0, computed_speed) / 5).abs()
             } else {
                 0
-            };
+            }
+            + if has_giant_blessing { 50 } else { 0 };
         let thorn_armor_bonus = if thorn_armor_stacks > 0 {
             (total_defence / 10) * 20 * thorn_armor_stacks // 20% thorns per 10 defence per stack
         } else {
@@ -565,8 +587,10 @@ impl ItemAttributes {
         };
         entity.insert(Thorns(base_thorns + thorn_armor_bonus));
         // Calculate raw dodge value from stats and heirlooms
-        let raw_dodge =
-            self.dodge.value + skills.get_count(Heirloom::DodgeChance) * 7 + chaos_dodge_bonus;
+        let raw_dodge = self.dodge.value
+            + skills.get_count(Heirloom::DodgeChance) * 7
+            + chaos_dodge_bonus
+            + if has_tiny_blessing { 50 } else { 0 };
         // Asymptotic formula: approaches 100 but never reaches it
         // Formula: 100 * raw / (raw + 100)
         // At raw 100 this gives 50%, at raw 200 gives 66.6%
@@ -1387,21 +1411,36 @@ fn handle_player_item_attribute_change_events(
             &MaxHealth,
             &MaxMana,
             &MaxShield,
+            &OwnedBlessings,
+            Option<&DodgeCritState>,
+            Option<&HallucinationStats>,
+            Option<&HeirloomStatsBonuses>,
+            Option<&MaxHPHuntTracker>,
+            Option<&BonusAttackSpeed>,
         ),
         With<Player>,
     >,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
     game: Res<Game>,
-    dodge_crit_state: Query<&crate::player::combat_heirlooms::DodgeCritState, With<Player>>,
-    hallucination_stats: Query<&crate::player::combat_heirlooms::HallucinationStats, With<Player>>,
-    max_hp_hunt_tracker: Query<&crate::player::combat_heirlooms::MaxHPHuntTracker, With<Player>>,
-    coins: Res<crate::player::currency::CoinCurrency>,
+
+    coins: Res<CoinCurrency>,
     proto: crate::proto::proto_param::ProtoParam,
-    bonus_attack_speed: Query<&BonusAttackSpeed, With<Player>>,
 ) {
     for _event in att_events.iter() {
-        let (att, skills, old_health, old_mana, old_shield) = player_atts.single();
+        let (
+            att,
+            skills,
+            old_health,
+            old_mana,
+            old_shield,
+            blessings,
+            dodge_crit_state,
+            hallucination_stats,
+            heirloom_stats_bonuses,
+            max_hp_hunt_tracker,
+            bonus_attack_speed,
+        ) = player_atts.single();
         let mut new_att = att.clone();
         let (player, inv) = player.single();
         let equips: Vec<ItemAttributes> = inv
@@ -1418,8 +1457,13 @@ fn handle_player_item_attribute_change_events(
         }
 
         // Combine hallucination stats from LethalBlow executes
-        if let Ok(hall_stats) = hallucination_stats.get_single() {
+        if let Some(hall_stats) = hallucination_stats {
             new_att = new_att.combine(hall_stats.as_item_attributes());
+        }
+
+        // Combine heirloom stats bonuses from HeirloomStats blessing
+        if let Some(heirloom_stats) = heirloom_stats_bonuses {
+            new_att = new_att.combine(heirloom_stats.as_item_attributes());
         }
 
         // Calculate inventory buffs from items in inventory (not hotbar)
@@ -1430,18 +1474,12 @@ fn handle_player_item_attribute_change_events(
             new_att.attack_cooldown = 0.4;
         }
         // Check if DodgeCrit buff is active
-        let dodge_crit_buff_active = dodge_crit_state
-            .get_single()
-            .map(|s| s.buff_active)
-            .unwrap_or(false);
+        let dodge_crit_buff_active = dodge_crit_state.map(|s| s.buff_active).unwrap_or(false);
 
         // Get MaxHPHunt bonus
         let max_hp_hunt_bonus = max_hp_hunt_tracker
-            .get_single()
             .map(|tracker| tracker.total_hp_gained)
             .unwrap_or(0);
-
-        let bonus_speed = bonus_attack_speed.get_single().ok();
 
         new_att.add_attribute_components(
             &mut commands.entity(player),
@@ -1449,10 +1487,11 @@ fn handle_player_item_attribute_change_events(
             old_mana.0,
             old_shield.0,
             skills,
+            blessings,
             dodge_crit_buff_active,
             coins.coins,
             max_hp_hunt_bonus,
-            bonus_speed,
+            bonus_attack_speed,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
             if !main_hand.get_obj().is_weapon() {

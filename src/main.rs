@@ -115,8 +115,11 @@ use world::{
 };
 use world::{dimension::EraManager, WorldGeneration};
 
-use crate::assets::{ClassPetData, SpriteAnchor};
 use crate::player::ClassUnlockConfig;
+use crate::{
+    assets::{ClassPetData, SpriteAnchor},
+    blessings::OwnedBlessings,
+};
 use lazy_static::lazy_static;
 
 use logs_wheel::LogFileInitializer;
@@ -451,6 +454,7 @@ pub struct GameParam<'w, 's> {
         Option<&'static mut crate::player::combat_heirlooms::DodgeCritState>,
         With<Player>,
     >,
+    pub blessings_query: Query<'w, 's, &'static OwnedBlessings, With<Player>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -672,6 +676,11 @@ impl<'w, 's> GameParam<'w, 's> {
             if crate_tracker.bonus_damage_percent > 0.0 {
                 bonus_damage_multiplier += crate_tracker.bonus_damage_percent / 100.0;
             }
+        }
+
+        // AttackManaCost blessing: +10% damage when attacks cost mana
+        if let Ok(blessings) = self.blessings_query.get_single() {
+            bonus_damage_multiplier += blessings.get_attack_mana_cost_damage_bonus();
         }
 
         // LowHPDamage: More damage the lower HP is (80% -> 0% = 1x -> 1.75x)

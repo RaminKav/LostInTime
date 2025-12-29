@@ -209,6 +209,7 @@ pub enum ActiveSkill {
     DruidTree,
     Shout,
     PiercingStar,
+    LaserBeam,
 }
 
 impl ActiveSkill {
@@ -230,6 +231,7 @@ impl ActiveSkill {
             ActiveSkill::DruidTree => 14.0,
             ActiveSkill::Shout => 7.0,
             ActiveSkill::PiercingStar => 8.0,
+            ActiveSkill::LaserBeam => 10.0,
         }
     }
 }
@@ -247,6 +249,11 @@ pub struct RapidfireState {
 }
 #[derive(Component, Clone)]
 pub struct FirePillarState {
+    pub cooldown_timer: Timer,
+    pub hit_clear_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct LaserBeamState {
     pub cooldown_timer: Timer,
     pub hit_clear_timer: Timer,
 }
@@ -293,6 +300,7 @@ impl ActiveSkill {
             ActiveSkill::DruidTree => "Druid Tree".to_string(),
             ActiveSkill::Shout => "Shout".to_string(),
             ActiveSkill::PiercingStar => "Piercing Star".to_string(),
+            ActiveSkill::LaserBeam => "Laser Beam".to_string(),
         }
     }
 
@@ -360,6 +368,11 @@ impl ActiveSkill {
             ActiveSkill::PiercingStar => vec![
                 "Active: Throw a large".to_string(),
                 "piercing star projectile.".to_string(),
+            ],
+            ActiveSkill::LaserBeam => vec![
+                "Active: Fire a powerful".to_string(),
+                "laser beam that hits".to_string(),
+                "enemies multiple times.".to_string(),
             ],
         }
     }
@@ -506,6 +519,15 @@ impl ActiveSkill {
                     cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
                         .tick(Duration::from_secs(99))
                         .clone(),
+                });
+            }
+            ActiveSkill::LaserBeam => {
+                let cooldown = ActiveSkill::LaserBeam.get_base_cooldown();
+                commands.entity(entity).insert(LaserBeamState {
+                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
+                        .tick(Duration::from_secs(99))
+                        .clone(),
+                    hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                 });
             }
             ActiveSkill::Roll => {}
@@ -1648,6 +1670,7 @@ pub struct HeirloomWithRarity {
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub heirlooms: Vec<HeirloomWithRarity>,
+    pub roll_skill_slot: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_1: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_2: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_3: Option<ActiveSkillChoiceState>,
@@ -1657,10 +1680,11 @@ impl Default for PlayerSkills {
     fn default() -> Self {
         Self {
             heirlooms: vec![],
-            active_skill_slot_1: Some(ActiveSkillChoiceState::new(
+            roll_skill_slot: Some(ActiveSkillChoiceState::new(
                 ActiveSkill::Roll,
                 HeirloomRarity::Common,
             )),
+            active_skill_slot_1: None,
             active_skill_slot_2: None,
             active_skill_slot_3: None,
         }
@@ -1713,21 +1737,21 @@ impl PlayerSkills {
     }
     pub fn has_active_skill(&self, active_skill: ActiveSkill) -> Option<usize> {
         if self
-            .active_skill_slot_1
+            .roll_skill_slot
             .as_ref()
             .is_some_and(|s| s.active_skill == active_skill)
         {
             return Some(0);
         }
         if self
-            .active_skill_slot_2
+            .active_skill_slot_1
             .as_ref()
             .is_some_and(|s| s.active_skill == active_skill)
         {
             return Some(1);
         }
         if self
-            .active_skill_slot_3
+            .active_skill_slot_2
             .as_ref()
             .is_some_and(|s| s.active_skill == active_skill)
         {
@@ -1750,14 +1774,18 @@ impl PlayerSkills {
     pub fn get_active_skill_in_slot(&self, slot: usize) -> Option<ActiveSkill> {
         match slot {
             0 => self
-                .active_skill_slot_1
+                .roll_skill_slot
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
             1 => self
-                .active_skill_slot_2
+                .active_skill_slot_1
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
             2 => self
+                .active_skill_slot_2
+                .as_ref()
+                .map(|s| s.active_skill.clone()),
+            3 => self
                 .active_skill_slot_3
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
@@ -1766,8 +1794,10 @@ impl PlayerSkills {
     }
     pub fn insert_active_skill(&mut self, skill: ActiveSkillChoiceState, slot: usize) {
         match slot {
+            0 => self.roll_skill_slot = Some(skill),
             1 => self.active_skill_slot_1 = Some(skill),
             2 => self.active_skill_slot_2 = Some(skill),
+            3 => self.active_skill_slot_3 = Some(skill),
             _ => {}
         }
     }

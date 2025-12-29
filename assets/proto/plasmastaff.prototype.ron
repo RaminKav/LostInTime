@@ -1,0 +1,38 @@
+(
+  name: "PlasmaStaff",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": PlasmaStaff,
+  "survival_rogue_like::item::EquipmentType": Weapon,
+  "survival_rogue_like::attributes::RawItemBaseAttributes": (
+        attack: Some((start: 10, end: 16)),
+  ),
+  "survival_rogue_like::attributes::RawItemBonusAttributes": (
+        crit_damage: Some((start: 2, end: 4)),
+        crit_chance: Some((start: 2, end: 6)),
+        healing: Some((start: 3, end: 10)),
+        speed: Some((start: 4, end: 5)),
+        health_regen: Some((start: 2, end: 3)),
+        thorns: Some((start: 3, end: 4)),
+        dodge: Some((start: 1, end: 4)),
+        loot_rate: Some((start: 3, end: 5)),
+        mana: Some((start: 4, end: 8)),
+        mana_regen: Some((start: 1, end: 5)),
+  ),
+  "survival_rogue_like::item::melee::MeleeAttack": (),
+  "survival_rogue_like::item::item_actions::ManaCost": (15),
+  "survival_rogue_like::item::projectile::RangedAttack": (PlasmaBall),
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: PlasmaStaff,
+        attributes: (
+            attack_cooldown: 0.5
+        ),
+        metadata: (
+            name: "Plasma Staff ", 
+            desc: ["A Plasma Staff."]
+        ),
+        count: 1
+  ),
+  "survival_rogue_like::ui::scrapper_ui::ScrapsInto": ([(obj: Log, chance: 1.), (obj: Log, chance: 0.5)]),
+  }
+)

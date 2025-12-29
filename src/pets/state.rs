@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::{
+    blessings::{Blessing, OwnedBlessings},
     enemy::Mob,
     inventory::{Inventory, ItemStack},
     item::projectile::{Projectile, RangedAttack, RangedAttackEvent},
@@ -83,7 +84,12 @@ pub struct PetState {
 pub struct UpdatePetWeaponEvent;
 
 impl PetState {
-    pub fn change_wepon(&mut self, new_weapon: Option<ItemStack>, proto: &ProtoParam) {
+    pub fn change_wepon(
+        &mut self,
+        new_weapon: Option<ItemStack>,
+        proto: &ProtoParam,
+        attack_speed_buff: f32,
+    ) {
         self.weapon_slot = new_weapon.clone();
 
         match new_weapon {
@@ -97,7 +103,7 @@ impl PetState {
                     1.55
                 };
                 self.attack_cooldown = Timer::from_seconds(
-                    item.attributes.attack_cooldown * pet_att_speed_nerf,
+                    item.attributes.attack_cooldown * pet_att_speed_nerf * attack_speed_buff,
                     TimerMode::Repeating,
                 );
                 self.projectile = proto
@@ -284,25 +290,36 @@ pub fn update_pet_weapon_on_inv_change(
     proto: ProtoParam,
     inv_state: Res<InventoryState>,
     mut events: EventReader<UpdatePetWeaponEvent>,
+    blessings: Query<&OwnedBlessings>,
 ) {
     for _ in events.iter() {
         if let Ok(inventory) = player_inventory.get_single() {
+            let blessings = blessings.single();
+            let attack_speed_buff = if blessings.has_blessing(Blessing::PetAttackSpeed) {
+                0.75
+            } else {
+                1.0
+            };
             for mut pet_state in pets.iter_mut() {
                 if inv_state.active_hotbar_slot == pet_state.hot_bar_slot {
-                    pet_state.change_wepon(None, &proto);
+                    pet_state.change_wepon(None, &proto, attack_speed_buff);
                     continue;
                 }
                 // Check if player has a weapon in their hot bar slot
                 if let Some(item_stack) = &inventory.items.items[pet_state.hot_bar_slot] {
                     let weapon_obj = item_stack.get_obj();
                     if weapon_obj.is_weapon() {
-                        pet_state.change_wepon(Some(item_stack.item_stack.clone()), &proto);
+                        pet_state.change_wepon(
+                            Some(item_stack.item_stack.clone()),
+                            &proto,
+                            attack_speed_buff,
+                        );
                     } else {
                         // Player has no weapon in hot bar slot
-                        pet_state.change_wepon(None, &proto);
+                        pet_state.change_wepon(None, &proto, attack_speed_buff);
                     }
                 } else {
-                    pet_state.change_wepon(None, &proto);
+                    pet_state.change_wepon(None, &proto, attack_speed_buff);
                 }
             }
         }

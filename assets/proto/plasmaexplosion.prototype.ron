@@ -1,0 +1,13 @@
+(
+  name: "PlasmaExplosion",
+  templates: ["projectile.prototype.ron"],
+  schematics: {
+        "survival_rogue_like::proto::ColliderProto": (x: 32., y: 32.),
+        "survival_rogue_like::item::projectile::Projectile": PlasmaExplosion,
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., spawn_offset: (x: -64., y: -64.), hit_entities: [], despawn_on_hit: false),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/PlasmaExplosionLarge.png", size: (x: 64., y: 64.), cols: 9, rows: 1),
+        "survival_rogue_like::animations::DoneAnimation": (),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.04),
+        "survival_rogue_like::animations::AnimationPosTracker": (0.0, 0.0, 0.3),
+  }
+)

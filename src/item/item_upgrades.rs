@@ -3,7 +3,8 @@ use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::attributes::modifiers::ModifyHealthEvent;
-use crate::attributes::ItemAttributes;
+use crate::attributes::{CurrentHealth, ItemAttributes};
+use crate::blessings::OwnedBlessings;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
@@ -189,7 +190,7 @@ pub fn handle_on_hit_upgrades(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
     asset_server: Res<AssetServer>,
-    player_att: Query<&ItemAttributes, With<Player>>,
+    player_att_blessings: Query<(&ItemAttributes, &OwnedBlessings, &CurrentHealth), With<Player>>,
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
 ) {
@@ -200,7 +201,10 @@ pub fn handle_on_hit_upgrades(
     if *elec_count > 0 && att_cooldown_query.single().is_none() {
         *elec_count = 0;
     }
-    let player_attributes = player_att.single();
+    let Ok((player_attributes, player_blessings, current_hp)) = player_att_blessings.get_single()
+    else {
+        return;
+    };
     let (skills, player_txfm, projectile_size) = upgrades.single();
     let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
@@ -216,6 +220,10 @@ pub fn handle_on_hit_upgrades(
         let Ok((hit_e, hit_entity_txfm)) = mobs.get(hit.hit_entity) else {
             continue;
         };
+        let kevin_chance = player_blessings.get_kevin_self_damage_chance();
+        if current_hp.0 > 1 && kevin_chance > 0.0 && rng.gen_bool(kevin_chance as f64) {
+            modify_health_events.send(ModifyHealthEvent(-1));
+        }
         if let Some(proj) = &hit.hit_with_projectile {
             if proj.is_skill_projectile() {
                 continue;
@@ -310,12 +318,16 @@ pub fn handle_on_hit_upgrades(
         else {
             continue;
         };
+        // Calculate poison chance with blessing bonus
+        let blessing_poison = player_blessings.get_poison_bonus_chance();
+        let bonus_stack = if rng.gen_bool(blessing_poison) { 1 } else { 0 };
+        let total_poison_chance = (skills.calculate_poison_chance()).clamp(0., 1.);
         if (hit.hit_with_projectile.clone().unwrap_or_default() == Projectile::Dart)
-            || rng.gen_bool(skills.calculate_poison_chance().clamp(0., 1.))
+            || rng.gen_bool(total_poison_chance)
         {
             if let Some(mut burning) = burning_option {
                 // Increment stacks and reset duration
-                burning.stacks += 1;
+                burning.stacks += 1 + bonus_stack;
                 burning.duration_timer.reset();
                 status_event.send(StatusEffectEvent {
                     entity: hit_e,

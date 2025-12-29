@@ -4,6 +4,7 @@ use bevy_save::{CloneReflect, Snapshot};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    attributes::AttributeChangeEvent,
     enemy::Mob,
     item::{Equipment, ItemDrop},
     night::NightTracker,
@@ -141,6 +142,7 @@ impl Plugin for DimensionPlugin {
                             .or_else(in_state(GameState::BlessingChoice)),
                     ),
             )
+            .add_system(rebuild_attributes_on_new_dimension.in_schedule(OnEnter(GameState::Main)))
             .add_system(apply_system_buffers.in_set(CustomFlush));
     }
 }
@@ -303,7 +305,9 @@ impl DimensionPlugin {
         }
     }
 }
-
+pub fn rebuild_attributes_on_new_dimension(mut attribute_event: EventWriter<AttributeChangeEvent>) {
+    attribute_event.send_default();
+}
 pub fn dim_spawned(dim_spawn: Query<Entity, With<ActiveDimension>>) -> bool {
     dim_spawn.iter().count() > 0
 }

@@ -13,8 +13,9 @@ use crate::{
         hunger::Hunger, CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana, MaxShield,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    chaos::ChaosTracker,
     client::GameOverEvent,
-    colors::{BLACK, BLUE, RED, SHIELD_BLUE, WHITE, YELLOW},
+    colors::{BLACK, BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
@@ -84,6 +85,23 @@ pub struct InventoryKeybindText;
 
 #[derive(Component)]
 pub struct InventoryKeyBackground;
+
+#[derive(Component)]
+pub struct ChaosText;
+
+#[derive(Component)]
+pub struct ChaosBar;
+
+/// Helper function to blend two colors
+fn lerp_color(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    Color::rgba(
+        a.r() + (b.r() - a.r()) * t,
+        a.g() + (b.g() - a.g()) * t,
+        a.b() + (b.b() - a.b()) * t,
+        a.a() + (b.a() - a.a()) * t,
+    )
+}
 
 /// Helper function to determine key size and UI element based on KeyCode
 fn get_key_size_and_element(key: KeyCode) -> (UIElement, f32) {
@@ -494,6 +512,136 @@ pub fn setup_currency_ui(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(InventoryKeybindText)
         .set_parent(key_bg);
+}
+
+pub fn setup_chaos_ui(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
+    chaos_tracker: Res<ChaosTracker>,
+) {
+    // Chaos text
+    let chaos_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Chaos: {:.1}", chaos_tracker.get_chaos()),
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: BLACK,
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 107.5, 6.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            ChaosText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("CHAOS TEXT"),
+        ))
+        .id();
+
+    // Chaos bar background (empty bar frame)
+    let bar_bg = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.2, 0.2, 0.2, 0.8),
+                custom_size: Some(Vec2::new(40., 2.)),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., -6., 0.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .set_parent(chaos_text)
+        .id();
+
+    // Chaos bar fill
+    let chaos_value = chaos_tracker.get_chaos();
+    let fill_percent = (chaos_value / 40.0).min(1.0);
+    let fill_width = 40.0 * fill_percent;
+
+    // Color blend: green (0) -> yellow (13.33) -> orange (26.67) -> red (40)
+    let bar_color = if chaos_value <= 13.33 {
+        // Green to Yellow
+        let t = chaos_value / 13.33;
+        lerp_color(LIGHT_GREEN, YELLOW, t)
+    } else if chaos_value <= 26.67 {
+        // Yellow to Orange
+        let t = (chaos_value - 13.33) / (26.67 - 13.33);
+        lerp_color(YELLOW, ORANGE, t)
+    } else {
+        // Orange to Red
+        let t = ((chaos_value - 26.67) / (40.0 - 26.67)).min(1.0);
+        lerp_color(ORANGE, RED, t)
+    };
+    info!("Chaos bar color: {:?}", fill_width);
+    commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: bar_color,
+                custom_size: Some(Vec2::new(fill_width, 2.)),
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(0., -6., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(ChaosBar)
+        .set_parent(chaos_text);
+}
+
+pub fn update_chaos_ui(
+    chaos_tracker: Res<ChaosTracker>,
+    mut chaos_text_query: Query<&mut Text, With<ChaosText>>,
+    mut chaos_bar_query: Query<&mut Sprite, With<ChaosBar>>,
+) {
+    if !chaos_tracker.is_changed() {
+        return;
+    }
+
+    let chaos_value = chaos_tracker.get_chaos();
+
+    // Update text
+    for mut text in chaos_text_query.iter_mut() {
+        text.sections[0].value = format!("Chaos: {:.1}", chaos_value);
+    }
+
+    // Update bar
+    let fill_percent = (chaos_value / 40.0).min(1.0);
+    let fill_width = 40.0 * fill_percent;
+
+    // Color blend: green (0) -> yellow (13.33) -> orange (26.67) -> red (40)
+    let bar_color = if chaos_value <= 13.33 {
+        // Green to Yellow
+        let t = chaos_value / 13.33;
+        lerp_color(LIGHT_GREEN, YELLOW, t)
+    } else if chaos_value <= 26.67 {
+        // Yellow to Orange
+        let t = (chaos_value - 13.33) / (26.67 - 13.33);
+        lerp_color(YELLOW, ORANGE, t)
+    } else {
+        // Orange to Red
+        let t = ((chaos_value - 26.67) / (40.0 - 26.67)).min(1.0);
+        lerp_color(ORANGE, RED, t)
+    };
+
+    for mut sprite in chaos_bar_query.iter_mut() {
+        sprite.custom_size = Some(Vec2::new(fill_width, 2.));
+        sprite.color = bar_color;
+    }
 }
 
 pub fn update_currency_text(
@@ -999,15 +1147,21 @@ pub fn handle_update_player_skills(
 
         // Build list of active skill slots to display
         let mut active_skill_slots = vec![
+            new_skills.roll_skill_slot.clone(),
             new_skills.active_skill_slot_1.clone(),
-            new_skills.active_skill_slot_2.clone(),
         ];
 
-        // Add third slot if unlocked
+        // Add second active skill slot if unlocked
         if let Some(upgrades) = unlock_upgrades.as_ref() {
-            if upgrades.third_active_skill_slot_unlocked {
-                active_skill_slots.push(new_skills.active_skill_slot_3.clone());
+            if upgrades.second_active_skill_slot_unlocked {
+                active_skill_slots.push(new_skills.active_skill_slot_2.clone());
             }
+        }
+
+        // Add third active skill slot if it has a skill assigned
+        // (this slot is only filled by blessings when both slot 1 and 2 are full)
+        if new_skills.active_skill_slot_3.is_some() {
+            active_skill_slots.push(new_skills.active_skill_slot_3.clone());
         }
 
         for (i, active_skill_option) in active_skill_slots.iter().enumerate() {

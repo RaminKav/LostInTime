@@ -81,10 +81,16 @@ pub struct KeyBindings {
     pub active_skill_slot_1: KeyCode,
     #[serde(with = "keycode_serde")]
     pub active_skill_slot_2: KeyCode,
+    #[serde(with = "keycode_serde", default = "default_slot_3_key")]
+    pub active_skill_slot_3: KeyCode,
     #[serde(with = "keycode_serde")]
     pub inventory: KeyCode,
     #[serde(with = "keycode_serde")]
     pub minimap: KeyCode,
+}
+
+fn default_slot_3_key() -> KeyCode {
+    KeyCode::R
 }
 
 impl Default for KeyBindings {
@@ -93,6 +99,7 @@ impl Default for KeyBindings {
             active_skill_slot_0: KeyCode::Space,
             active_skill_slot_1: KeyCode::LShift,
             active_skill_slot_2: KeyCode::Q,
+            active_skill_slot_3: KeyCode::R,
             inventory: KeyCode::E,
             minimap: KeyCode::M,
         }
@@ -111,6 +118,7 @@ impl KeyBindings {
             0 => self.active_skill_slot_0,
             1 => self.active_skill_slot_1,
             2 => self.active_skill_slot_2,
+            3 => self.active_skill_slot_3,
             _ => KeyCode::Space,
         }
     }
@@ -120,6 +128,7 @@ impl KeyBindings {
             0 => self.active_skill_slot_0 = key,
             1 => self.active_skill_slot_1 = key,
             2 => self.active_skill_slot_2 = key,
+            3 => self.active_skill_slot_3 = key,
             _ => {}
         }
     }

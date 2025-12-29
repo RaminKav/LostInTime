@@ -16,6 +16,7 @@ pub enum StatusEffect {
     Slow,
     Frail,
     Poison,
+    Frozen,
 }
 
 #[derive(Deserialize, Debug, Clone, Reflect, FromReflect)]
@@ -60,6 +61,13 @@ pub struct Frail {
 pub struct Slow {
     pub num_stacks: u8,
     pub timer: Timer,
+}
+
+/// Frozen status effect from Freeze blessing - mob is completely frozen when at 3 stacks
+#[derive(Component, Debug)]
+pub struct Frozen {
+    pub timer: Timer,
+    pub original_color: Color,
 }
 
 pub fn handle_new_status_effect_event(
@@ -260,6 +268,61 @@ pub fn try_add_slow_stacks(
             status_event.send(StatusEffectEvent {
                 entity: hit_e,
                 effect: StatusEffect::Slow,
+                num_stacks: 1,
+            });
+        }
+    }
+}
+
+/// Handle frozen status effect ticks - mobs are frozen with blue tint
+pub fn handle_frozen_ticks(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut frozen_mobs: Query<(Entity, &mut Frozen, &mut TextureAtlasSprite)>,
+) {
+    for (entity, mut frozen, mut sprite) in frozen_mobs.iter_mut() {
+        frozen.timer.tick(time.delta());
+
+        if frozen.timer.just_finished() {
+            // Restore original color and remove freeze
+            sprite.color = frozen.original_color;
+            commands.entity(entity).remove::<Frozen>();
+        }
+    }
+}
+
+/// Check if a mob should become frozen when reaching 3 slow stacks (Freeze blessing)
+pub fn check_freeze_on_slow_stacks(
+    mut commands: Commands,
+    blessings: Query<&crate::blessings::OwnedBlessings>,
+    slow_query: Query<(Entity, &Slow, &TextureAtlasSprite), (Changed<Slow>, Without<Frozen>)>,
+    mut status_event: EventWriter<StatusEffectEvent>,
+) {
+    let has_freeze_blessing = blessings
+        .get_single()
+        .map(|b| b.has_blessing(crate::blessings::Blessing::Freeze))
+        .unwrap_or(false);
+
+    if !has_freeze_blessing {
+        return;
+    }
+
+    for (entity, slow, sprite) in slow_query.iter() {
+        if slow.num_stacks >= 3 {
+            // Freeze the mob with a blue tint
+            commands.entity(entity).insert(Frozen {
+                timer: Timer::from_seconds(2.0, TimerMode::Once),
+                original_color: sprite.color,
+            });
+            // Apply blue tint
+            commands.entity(entity).insert(TextureAtlasSprite {
+                color: Color::rgba(0.5, 0.7, 1.0, 1.0),
+                ..sprite.clone()
+            });
+            // Send frozen status event
+            status_event.send(StatusEffectEvent {
+                entity,
+                effect: StatusEffect::Frozen,
                 num_stacks: 1,
             });
         }

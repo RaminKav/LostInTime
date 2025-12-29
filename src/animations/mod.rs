@@ -28,7 +28,7 @@ pub mod player_sprite;
 use crate::ai::LeapAttackState;
 use crate::enemy::{EnemyMaterial, Mob};
 use crate::inputs::{mouse_click_system, FacingDirection, MovementVector};
-use crate::item::projectile::ArcProjectileData;
+use crate::item::projectile::{ArcProjectileData, Projectile, ProjectileState, RangedAttackEvent};
 use crate::item::{Equipment, MainHand, WorldObject, PLAYER_EQUIPMENT_POSITIONS};
 use crate::player::Limb;
 use crate::sapling::Sapling;
@@ -324,9 +324,12 @@ fn animate_spritesheet_animations(
             &mut AnimationTimer,
             &mut TextureAtlasSprite,
             &Handle<TextureAtlas>,
+            &GlobalTransform,
             Option<&Children>,
             Option<&ArcProjectileData>,
             Option<&DoneAnimation>,
+            Option<&Projectile>,
+            Option<&ProjectileState>,
         ),
         (
             Without<ItemStack>,
@@ -334,15 +337,19 @@ fn animate_spritesheet_animations(
         ),
     >,
     mut children_txfm_query: Query<&mut Transform>,
+    mut ranged_att_event: EventWriter<RangedAttackEvent>,
 ) {
     for (
         e,
         mut timer,
         mut sprite,
         texture_atlas_handle,
+        transform,
         children_option,
         proj_arc_option,
         remove_me_option,
+        proj_option,
+        proj_state_option,
     ) in &mut query
     {
         timer.tick(time.delta());
@@ -355,6 +362,25 @@ fn animate_spritesheet_animations(
             }
             if sprite.index == num_frame - 1 && remove_me_option.is_some() {
                 commands.entity(e).despawn_recursive();
+                if let Some(proj) = proj_option {
+                    if proj == &Projectile::PlasmaBall {
+                        // despawn plasmaball projectile and spawn explosion
+                        ranged_att_event.send(RangedAttackEvent {
+                            projectile: Projectile::PlasmaExplosion,
+                            direction: proj_state_option
+                                .map(|state| state.direction)
+                                .unwrap_or(Vec2::ZERO),
+                            from_entity: None,
+                            from_enemy: false,
+                            is_followup_proj: true,
+                            mana_cost: None,
+                            dmg_override: None,
+                            pos_override: Some(transform.translation().truncate()),
+                            spawn_delay: 0.01,
+                        });
+                        continue;
+                    }
+                }
                 continue;
             }
 

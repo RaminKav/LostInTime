@@ -244,8 +244,8 @@ pub fn setup_options_ui(
     let start_y = 46.5;
     let row_spacing = -16.0;
 
-    // Skill slot keybinds
-    for slot in 0..3 {
+    // Skill slot keybinds (slots 0-3)
+    for slot in 0..4 {
         let y = start_y + row_spacing * slot as f32;
         spawn_keybind_row(
             &mut commands,
@@ -259,7 +259,7 @@ pub fn setup_options_ui(
     }
 
     // UI keybinds section
-    let ui_section_y = start_y + row_spacing * 3.5;
+    let ui_section_y = start_y + row_spacing * 4.5;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -358,9 +358,10 @@ fn spawn_keybind_row(
     let (label, current_key) = match bind_type {
         KeyBindType::ActiveSkill(slot) => {
             let label = match slot {
-                0 => "Skill Slot 1:",
-                1 => "Skill Slot 2:",
-                2 => "Skill Slot 3:",
+                0 => "Roll:",
+                1 => "Skill Slot 1:",
+                2 => "Skill Slot 2:",
+                3 => "Blessing Skill Slot:",
                 _ => "Unknown Slot",
             };
             (label, keybinds.get_active_skill_key(slot))
@@ -391,7 +392,7 @@ fn spawn_keybind_row(
     ));
 
     // Current key text
-    let current_key_pos = Vec3::new(label_pos.x + 60., label_pos.y, label_pos.z);
+    let current_key_pos = Vec3::new(label_pos.x + 90., label_pos.y, label_pos.z);
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(

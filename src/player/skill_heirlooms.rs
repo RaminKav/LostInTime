@@ -15,7 +15,7 @@ use crate::{
     enemy::Mob,
     inputs::CursorPos,
     item::{
-        projectile::{Projectile, RangedAttackEvent},
+        projectile::{Projectile, ProjectileState, RangedAttackEvent},
         WorldObject,
     },
     player::{
@@ -24,9 +24,9 @@ use crate::{
         rogue_skills::{LungeState, SprintState},
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState,
-            FirePillarState, HealSkillState, Heirloom, IceWallSkillState, PiercingStarSkillState,
-            PlayerSkills, RapidfireState, ShoutSkillState, Slot1ChargeTracker, Slot2ChargeTracker,
-            StealthState,
+            FirePillarState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
+            PiercingStarSkillState, PlayerSkills, RapidfireState, ShoutSkillState,
+            Slot1ChargeTracker, Slot2ChargeTracker, StealthState,
         },
         Player,
     },
@@ -43,6 +43,7 @@ pub struct SkillStateQueries<'w, 's> {
     pub stealth_states: Query<'w, 's, &'static StealthState, With<Player>>,
     pub rapidfire_states: Query<'w, 's, &'static RapidfireState, With<Player>>,
     pub fire_pillar_states: Query<'w, 's, &'static FirePillarState, With<Player>>,
+    pub laser_beam_states: Query<'w, 's, &'static LaserBeamState, With<Player>>,
     pub heal_states: Query<'w, 's, &'static HealSkillState, With<Player>>,
     pub buckshot_states: Query<'w, 's, &'static BuckshotSkillState, With<Player>>,
     pub icewall_states: Query<'w, 's, &'static IceWallSkillState, With<Player>>,
@@ -91,6 +92,7 @@ pub fn handle_active_skill_event(
             let stealth_state = skill_states.stealth_states.get(player_e).ok();
             let rapid_state = skill_states.rapidfire_states.get(player_e).ok();
             let pillar_state = skill_states.fire_pillar_states.get(player_e).ok();
+            let laser_beam_state = skill_states.laser_beam_states.get(player_e).ok();
             let heal_state = skill_states.heal_states.get(player_e).ok();
             let buckshot_state = skill_states.buckshot_states.get(player_e).ok();
             let icewall_state = skill_states.icewall_states.get(player_e).ok();
@@ -122,9 +124,10 @@ pub fn handle_active_skill_event(
             let teleport_state = skill_states.teleport_states.get_mut(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
             let slot_skill = match ev.slot {
-                0 => skills.active_skill_slot_1.as_ref(),
-                1 => skills.active_skill_slot_2.as_ref(),
-                2 => skills.active_skill_slot_3.as_ref(),
+                0 => skills.roll_skill_slot.as_ref(),
+                1 => skills.active_skill_slot_1.as_ref(),
+                2 => skills.active_skill_slot_2.as_ref(),
+                3 => skills.active_skill_slot_3.as_ref(),
                 _ => None,
             };
             if let Some(active) = slot_skill {
@@ -304,6 +307,45 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+                    }
+                    ActiveSkill::LaserBeam => {
+                        if should_start_cooldown {
+                            if let Some(l) = laser_beam_state {
+                                if !l.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if laser_beam_state.is_some() {
+                                commands.entity(player_e).remove::<LaserBeamState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands.entity(player_e).insert(LaserBeamState {
+                            cooldown_timer: cd,
+                            hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+                        });
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let player_pos = player_txfm.translation().truncate();
+                        let direction =
+                            (cursor.world_coords.truncate() - player_pos).normalize_or_zero();
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::LaserBeam,
+                            direction,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: Some(Vec2::ZERO),
+                            spawn_delay: 0.0,
+                        });
+                        commands
+                            .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.5));
                     }
                     ActiveSkill::Heal => {
                         if should_start_cooldown {
@@ -791,6 +833,7 @@ pub fn tick_skill_cooldowns(
     mut stealth_cd: Query<(Entity, &mut StealthState)>,
     mut rapid_cd: Query<(Entity, &mut RapidfireState)>,
     mut pillar_cd: Query<(Entity, &mut FirePillarState)>,
+    mut laser_beam_cd: Query<(Entity, &mut LaserBeamState)>,
     mut heal_cd: Query<(Entity, &mut HealSkillState)>,
     mut buckshot_cd: Query<(Entity, &mut BuckshotSkillState)>,
     mut icewall_cd: Query<(Entity, &mut IceWallSkillState)>,
@@ -818,6 +861,13 @@ pub fn tick_skill_cooldowns(
         p.hit_clear_timer.tick(time.delta());
         if p.cooldown_timer.finished() {
             commands.entity(e).remove::<FirePillarState>();
+        }
+    }
+    for (e, mut l) in laser_beam_cd.iter_mut() {
+        l.cooldown_timer.tick(time.delta());
+        l.hit_clear_timer.tick(time.delta());
+        if l.cooldown_timer.finished() {
+            commands.entity(e).remove::<LaserBeamState>();
         }
     }
     for (e, mut h) in heal_cd.iter_mut() {
@@ -872,23 +922,35 @@ pub fn tick_skill_cooldowns(
 /// Clear hit_entities for FireRing projectiles every 1.0s while FirePillar is active
 pub fn handle_fire_pillar_hit_clear(
     mut fire_pillar_states: Query<&mut FirePillarState>,
-    mut fire_ring_projectiles: Query<
-        (
-            &mut crate::item::projectile::ProjectileState,
-            &crate::item::projectile::Projectile,
-        ),
-        With<crate::item::projectile::Projectile>,
-    >,
+    mut fire_ring_projectiles: Query<(&mut ProjectileState, &Projectile), With<Projectile>>,
 ) {
     for mut pillar_state in fire_pillar_states.iter_mut() {
         if pillar_state.hit_clear_timer.just_finished() {
             info!("Clearing hit_entities for FireRing projectiles due to FirePillar effect");
             // Clear hit_entities for all FireRing projectiles
             for (mut proj_state, proj) in fire_ring_projectiles.iter_mut() {
-                if matches!(proj, crate::item::projectile::Projectile::FireRing) {
+                if matches!(proj, Projectile::FireRing) {
                     info!("Clearing hit_entities for FireRing projectile");
                     proj_state.hit_entities.clear();
                     pillar_state.hit_clear_timer.reset();
+                }
+            }
+        }
+    }
+}
+
+/// Clear hit_entities for LaserBeam projectiles periodically while LaserBeamState is active
+pub fn handle_laser_beam_hit_clear(
+    mut laser_beam_states: Query<&mut LaserBeamState>,
+    mut laser_beam_projectiles: Query<(&mut ProjectileState, &Projectile), With<Projectile>>,
+) {
+    for mut laser_state in laser_beam_states.iter_mut() {
+        if laser_state.hit_clear_timer.just_finished() {
+            // Clear hit_entities for all LaserBeam projectiles
+            for (mut proj_state, proj) in laser_beam_projectiles.iter_mut() {
+                if matches!(proj, Projectile::LaserBeam) {
+                    proj_state.hit_entities.clear();
+                    laser_state.hit_clear_timer.reset();
                 }
             }
         }
@@ -1020,7 +1082,7 @@ pub fn initialize_skill_charge_tracker(
         let max_charges = 1 + skills.skill_extra_charges();
 
         // Manage tracker for slot 1 (active_skill_slot_2)
-        if let Some(slot_2_skill) = &skills.active_skill_slot_2 {
+        if let Some(slot_2_skill) = &skills.active_skill_slot_1 {
             let base_cooldown = slot_2_skill.active_skill.get_base_cooldown();
 
             if let Ok(mut tracker) = slot1_trackers.get_mut(player_e) {
@@ -1057,7 +1119,7 @@ pub fn initialize_skill_charge_tracker(
         }
 
         // Manage tracker for slot 2 (active_skill_slot_3)
-        if let Some(slot_3_skill) = &skills.active_skill_slot_3 {
+        if let Some(slot_3_skill) = &skills.active_skill_slot_2 {
             let base_cooldown = slot_3_skill.active_skill.get_base_cooldown();
 
             if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
@@ -1149,6 +1211,7 @@ pub fn reduce_skill_cooldown_on_crit(
     mut spear_states: Query<&mut SpearState, With<Player>>,
     mut lunge_states: Query<&mut LungeState, With<Player>>,
     mut teleport_states: Query<&mut TeleportState, With<Player>>,
+    mut laser_beam_states: Query<&mut LaserBeamState, With<Player>>,
 ) {
     for hit in hit_events.iter() {
         // Only process crits from player attacks (not from mobs hitting player)
@@ -1259,6 +1322,13 @@ pub fn reduce_skill_cooldown_on_crit(
                 }
             }
             if let Ok(mut state) = teleport_states.get_single_mut() {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Ok(mut state) = laser_beam_states.get_single_mut() {
                 if !state.cooldown_timer.finished() {
                     state
                         .cooldown_timer

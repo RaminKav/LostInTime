@@ -10,6 +10,7 @@ pub mod collisions;
 use crate::attributes::{add_item_glows, ProjectileSize};
 
 pub mod combat_helpers;
+use crate::blessings::OwnedBlessings;
 use crate::night::InfiniteMode;
 use crate::player::melee_skills::spawn_echo_hitbox;
 use crate::{
@@ -18,7 +19,7 @@ use crate::{
     assets::{Graphics, SpriteAnchor},
     attributes::{
         modifiers::ModifyManaEvent, Attack, AttackCooldown, AttributeChangeEvent, CurrentHealth,
-        CurrentShield, InvincibilityCooldown, LootRateBonus, ManaRegen, MaxHealth, ShieldRegen,
+        CurrentShield, InvincibilityCooldown, ManaRegen, MaxHealth, ShieldRegen,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -175,7 +176,7 @@ fn handle_enemy_death(
     mut death_events: EventReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
-    mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills)>,
+    mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -185,8 +186,11 @@ fn handle_enemy_death(
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
             continue;
         };
-        let (mut player_level, player_skills) = player_xp.single_mut();
+        let (mut player_level, player_skills, blessings) = player_xp.single_mut();
         let is_infinite_mode = infinite_mode.active;
+
+        let has_double_gold = blessings.has_double_gold_drops();
+
         // drop loot
         if let Ok(loot_table) = loot_tables.get(death_event.entity) {
             for drop in LootTablePlugin::get_drops(
@@ -197,33 +201,55 @@ fn handle_enemy_death(
                 Some(mob_lvl.0),
                 is_infinite_mode,
             ) {
-                let mut rng = rand::thread_rng();
-                let d = if mob.is_boss() { 30. } else { 10. };
-                let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                let drop_e = proto_commands.spawn_item_from_proto(
-                    drop.obj_type,
-                    &proto_param,
-                    death_event.enemy_pos + drop_offset,
-                    drop.count,
-                    Some(player_level.level),
-                );
+                let count = if drop.obj_type == WorldObject::Coin && has_double_gold {
+                    2
+                } else {
+                    1
+                };
+                for _ in 0..count {
+                    let mut rng = rand::thread_rng();
+                    let d = if mob.is_boss() { 30. } else { 10. };
+                    let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+                    let drop_e = proto_commands.spawn_item_from_proto(
+                        drop.obj_type,
+                        &proto_param,
+                        death_event.enemy_pos + drop_offset,
+                        drop.count,
+                        Some(player_level.level),
+                    );
 
-                if let Some(drop_e) = drop_e {
-                    add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
-                    // Add despawn timer to reduce lag in endless mode
-                    commands
-                        .entity(drop_e)
-                        .insert(crate::item::ItemDropDespawnTimer(
-                            Timer::from_seconds(60.0, TimerMode::Once), // Despawn after 60 seconds
-                        ));
+                    if let Some(drop_e) = drop_e {
+                        add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
+                        commands
+                            .entity(drop_e)
+                            .insert(crate::item::ItemDropDespawnTimer(Timer::from_seconds(
+                                60.0,
+                                TimerMode::Once,
+                            )));
+                    }
                 }
             }
         }
+
+        let double_xp_chance = blessings.get_double_xp_chance();
+
+        let xp_multiplier =
+            if double_xp_chance > 0.0 && rand::thread_rng().gen_bool(double_xp_chance as f64) {
+                2
+            } else {
+                1
+            };
+
         //give player xp
-        let did_level = player_level.add_xp(mob_xp.0, &player_skills);
+        let did_level = player_level.add_xp(mob_xp.0 * xp_multiplier, &player_skills);
         // Only spawn XP particles if not in endless mode (to reduce lag)
         if !is_infinite_mode {
-            spawn_xp_particles(death_event.enemy_pos, &mut commands, mob_xp.0, did_level);
+            spawn_xp_particles(
+                death_event.enemy_pos,
+                &mut commands,
+                mob_xp.0 * xp_multiplier,
+                did_level,
+            );
         }
     }
 }
@@ -272,6 +298,13 @@ pub fn handle_hits(
     mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
     mut attribute_events: EventWriter<AttributeChangeEvent>,
     asset_server: Res<AssetServer>,
+    mut player_blessing_mana_query: Query<
+        (
+            &crate::blessings::OwnedBlessings,
+            &mut crate::attributes::CurrentMana,
+        ),
+        With<Player>,
+    >,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -419,12 +452,41 @@ pub fn handle_hits(
                 }
 
                 if !shielded_hit {
-                    hit_health.0 -= final_dmg
-                        - if game.has_skill(Heirloom::MinusOneDamageOnHit) && is_player {
+                    let minus_one_reduction =
+                        if game.has_skill(Heirloom::MinusOneDamageOnHit) && is_player {
                             1
                         } else {
                             0
                         };
+                    let damage_to_apply = final_dmg - minus_one_reduction;
+
+                    // ManaGuard blessing: 80% of damage comes from mana instead of health
+                    let mana_guard_percentage = player_blessing_mana_query
+                        .get_single()
+                        .map(|(b, _)| b.get_mana_guard_percentage())
+                        .unwrap_or(0.0);
+
+                    if is_player && mana_guard_percentage > 0.0 {
+                        let mana_damage = (damage_to_apply as f32 * mana_guard_percentage) as i32;
+                        let health_damage = damage_to_apply - mana_damage;
+
+                        // Apply mana damage first
+                        if let Ok((_, mut current_mana)) =
+                            player_blessing_mana_query.get_single_mut()
+                        {
+                            let actual_mana_damage = mana_damage.min(current_mana.0);
+                            current_mana.0 -= actual_mana_damage;
+                            // Any overflow goes to health
+                            let overflow = mana_damage - actual_mana_damage;
+                            hit_health.0 -= health_damage + overflow;
+                        } else {
+                            // No mana query result, apply full damage to health
+                            hit_health.0 -= damage_to_apply;
+                        }
+                    } else {
+                        hit_health.0 -= damage_to_apply;
+                    }
+
                     if is_player && game.has_skill(Heirloom::OnHitEcho) {
                         spawn_echo_hitbox(
                             &mut commands,
