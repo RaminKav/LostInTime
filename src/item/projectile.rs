@@ -82,6 +82,7 @@ pub enum Projectile {
     LaserBeam,
     PlasmaBall,
     PlasmaExplosion,
+    ThornsProjectile,
 }
 
 impl Projectile {
@@ -101,6 +102,7 @@ impl Projectile {
             Projectile::DaggerProjectile1 => true,
             Projectile::DaggerProjectile2 => true,
             Projectile::SpearProjectile => true,
+            Projectile::ThornsProjectile => true,
             Projectile::LaserBeam => true,
             _ => false,
         }

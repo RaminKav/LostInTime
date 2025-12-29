@@ -945,7 +945,7 @@ fn check_mob_to_player_collisions(
                     let direction = Vec2::new(angle.cos(), angle.sin());
 
                     ranged_attack_event.send(RangedAttackEvent {
-                        projectile: Projectile::SpearProjectile,
+                        projectile: Projectile::ThornsProjectile,
                         direction,
                         from_enemy: false,
                         is_followup_proj: true,
