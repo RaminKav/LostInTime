@@ -779,7 +779,7 @@ impl Heirloom {
             }
             Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
-            Heirloom::Speed => vec!["Gain +15 Speed,".to_string(), "permanently.".to_string()],
+            Heirloom::Speed => vec!["Gain +10 Speed,".to_string(), "permanently.".to_string()],
             Heirloom::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
                 vec![
@@ -1756,6 +1756,13 @@ impl PlayerSkills {
             .is_some_and(|s| s.active_skill == active_skill)
         {
             return Some(2);
+        }
+        if self
+            .active_skill_slot_3
+            .as_ref()
+            .is_some_and(|s| s.active_skill == active_skill)
+        {
+            return Some(3);
         }
         None
     }

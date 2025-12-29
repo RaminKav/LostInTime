@@ -601,7 +601,7 @@ impl ItemAttributes {
         };
         entity.insert(Dodge(effective_dodge));
         entity.insert(Speed(
-            computed_speed + skills.get_count(Heirloom::Speed) * 15,
+            computed_speed + skills.get_count(Heirloom::Speed) * 10,
         ));
         // Lifesteal: base + RegenLifesteal (+5% per stack) + LifestealCoins (+5% per stack)
         entity.insert(Lifesteal(
