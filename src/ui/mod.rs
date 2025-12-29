@@ -113,6 +113,7 @@ impl Plugin for UIPlugin {
             .insert_resource(ClassSelectionState::default())
             .init_resource::<ClassUnlockHoverState>()
             .init_resource::<ClassUnlockConfirmState>()
+            .init_resource::<CheatSettings>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
             .insert_resource(crate::keybinds::KeyBindings::load())
@@ -387,6 +388,8 @@ impl Plugin for UIPlugin {
                     update_keybind_text
                         .run_if(in_state(UIState::Options))
                         .after(handle_key_rebind_input),
+                    handle_cheat_checkbox_click.run_if(in_state(UIState::Options)),
+                    update_cheat_checkbox_visual.run_if(in_state(UIState::Options)),
                     handle_achievement_row_clicks.run_if(in_state(UIState::Achievements)))
                 )
             .add_system(

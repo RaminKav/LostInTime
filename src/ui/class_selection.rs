@@ -23,7 +23,10 @@ use crate::{
         unlocks::{persist_unlock_data, UnlockUpgrades},
         ClassUnlockData, UnlockedClasses,
     },
-    ui::{spawn_back_button, spawn_back_button_texture_only, MenuButton, UIElement, UIState},
+    ui::{
+        spawn_back_button, spawn_back_button_texture_only, CheatSettings, MenuButton, UIElement,
+        UIState,
+    },
     FairyPetSprite, Pet, RenderLayers, ScreenResolution, SlimePetSprite, GAME_HEIGHT,
 };
 
@@ -144,6 +147,7 @@ pub fn setup_class_selection_ui(
     unlocked_classes: Res<UnlockedClasses>,
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     _class_unlocks: Option<Res<ClassUnlockData>>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     let overlay = spawn_ui_overlay(
         &mut commands,
@@ -266,7 +270,8 @@ pub fn setup_class_selection_ui(
         let x_offset = (i % 6) as f32 * 27.0 - 166.; // Center the options
         let y_offset = ((i / 6) as f32).trunc() * -29.0; // every 6 options, go to next row
 
-        let class_unlocked = unlocked_classes.contains(class);
+        let class_unlocked =
+            cheat_settings.bypass_class_unlocks || unlocked_classes.contains(class);
         let class_selected = class == &default_class;
 
         // Class slot background
@@ -524,6 +529,7 @@ pub fn update_class_unlock_warnings(
     unlocked_classes: Res<UnlockedClasses>,
     existing_warnings: Query<(Entity, &ClassIcon), With<ClassUnlockWarningAnimation>>,
     overlay_query: Query<Entity, (With<ClassSelectionUI>, With<UIState>)>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     // Get overlay entity for parenting
     let overlay = overlay_query.iter().next();
@@ -540,22 +546,23 @@ pub fn update_class_unlock_warnings(
 
     // Despawn warnings for classes that no longer need them (unlocked or requirements not met)
     for (class, entity) in existing_warnings_by_class.iter() {
-        let should_have_warning = if unlocked_classes.contains(class) {
-            false // Class is unlocked, no warning needed
-        } else if let (Some(unlock_data), Some(achievements_res)) =
-            (class_unlocks.as_ref(), achievements.as_ref())
-        {
-            if let Some(entry) = unlock_data.entry(class) {
-                entry
-                    .achievements
-                    .iter()
-                    .all(|req| achievements_res.has(*req))
+        let should_have_warning =
+            if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(class) {
+                false // Class is unlocked (or cheat enabled), no warning needed
+            } else if let (Some(unlock_data), Some(achievements_res)) =
+                (class_unlocks.as_ref(), achievements.as_ref())
+            {
+                if let Some(entry) = unlock_data.entry(class) {
+                    entry
+                        .achievements
+                        .iter()
+                        .all(|req| achievements_res.has(*req))
+                } else {
+                    false
+                }
             } else {
                 false
-            }
-        } else {
-            false
-        };
+            };
 
         if !should_have_warning {
             commands.entity(*entity).despawn_recursive();
@@ -719,6 +726,7 @@ pub fn handle_class_selection(
     unlock_currency: Option<Res<TimeFragmentCurrency>>,
     mut hover_state: ResMut<ClassUnlockHoverState>,
     mut confirm_state: ResMut<ClassUnlockConfirmState>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -737,7 +745,8 @@ pub fn handle_class_selection(
             Some(hit_ent) if hit_ent.0 == entity => {
                 if let Some(slot) = class_option.as_mut() {
                     let class_id = slot.class.clone();
-                    let is_locked = !unlocked_classes.contains(&class_id);
+                    let is_locked = !cheat_settings.bypass_class_unlocks
+                        && !unlocked_classes.contains(&class_id);
                     slot.is_locked = is_locked;
                     let slot_pos = global_transform
                         .map(|t| t.translation())
@@ -878,6 +887,7 @@ pub fn update_class_unlock_panel(
     graphics: Res<Graphics>,
     mut panel_query: Query<(&mut Visibility, &mut Transform), With<ClassUnlockInfoPanel>>,
     mut text_query: Query<(&ClassUnlockInfoTextKind, &mut Text), With<ClassUnlockInfoText>>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     let Some(class) = hover_state.hovered_class.clone() else {
         if let Ok((mut vis, _)) = panel_query.get_single_mut() {
@@ -886,7 +896,7 @@ pub fn update_class_unlock_panel(
         return;
     };
 
-    if unlocked_classes.contains(&class) {
+    if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(&class) {
         if let Ok((mut vis, _)) = panel_query.get_single_mut() {
             *vis = Visibility::Hidden;
         }
@@ -1699,14 +1709,15 @@ pub fn update_class_option_icons(
     unlocked_classes: Res<UnlockedClasses>,
     graphics: Res<Graphics>,
     mut class_icons: Query<(&ClassIcon, &mut Handle<Image>)>,
+    cheat_settings: Res<CheatSettings>,
 ) {
-    if !unlocked_classes.is_changed() {
+    if !unlocked_classes.is_changed() && !cheat_settings.is_changed() {
         return;
     }
 
     for (class_icon, mut texture) in class_icons.iter_mut() {
         let class_data = graphics.get_class_data(class_icon.class.clone());
-        if unlocked_classes.contains(&class_icon.class) {
+        if cheat_settings.bypass_class_unlocks || unlocked_classes.contains(&class_icon.class) {
             *texture = graphics
                 .get_ui_element_texture(class_data.class_icon.clone())
                 .clone();

@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::{ScreenResolution, GAME_HEIGHT};
-const VERSION: &str = "v0.12.0";
+const VERSION: &str = "v0.12.1";
 #[derive(Component)]
 pub struct FPSText;
 

@@ -13,6 +13,16 @@ use crate::{
     ScreenResolution,
 };
 
+/// Resource to track cheat settings
+#[derive(Resource, Default, Debug, Clone)]
+pub struct CheatSettings {
+    /// When true, all classes and pets are selectable regardless of unlock status
+    pub bypass_class_unlocks: bool,
+}
+
+#[derive(Component)]
+pub struct CheatCheckbox;
+
 #[derive(Component)]
 pub struct OptionsUI;
 
@@ -183,6 +193,7 @@ pub fn setup_options_ui(
     resolution: Res<ScreenResolution>,
     keybinds: Res<KeyBindings>,
     game_state: Res<State<crate::GameState>>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     let overlay = ui_helpers::spawn_ui_overlay(
         &mut commands,
@@ -219,7 +230,8 @@ pub fn setup_options_ui(
         OptionsUI,
         Name::new("Options Title"),
     ));
-    let text_x = -resolution.game_width / 2. + 22.;
+    let left_side_x = -resolution.game_width / 2. + 22.;
+    let right_side_x = resolution.game_width / 2. - 142.;
     // Section title
     commands.spawn((
         Text2dBundle {
@@ -233,7 +245,7 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(text_x, 70., 11.)),
+            transform: Transform::from_translation(Vec3::new(left_side_x, 70., 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -252,8 +264,8 @@ pub fn setup_options_ui(
             &graphics,
             &asset_server,
             KeyBindType::ActiveSkill(slot),
-            Vec3::new(text_x + 2., y, 11.),
-            Vec3::new(text_x + 160., y - 3.5, 11.),
+            Vec3::new(left_side_x + 2., y, 11.),
+            Vec3::new(left_side_x + 160., y - 3.5, 11.),
             &keybinds,
         );
     }
@@ -272,7 +284,7 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(text_x, ui_section_y, 11.)),
+            transform: Transform::from_translation(Vec3::new(left_side_x, ui_section_y, 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -287,8 +299,8 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         KeyBindType::Inventory,
-        Vec3::new(text_x + 2., inventory_y, 11.),
-        Vec3::new(text_x + 160., inventory_y - 3.5, 11.),
+        Vec3::new(left_side_x + 2., inventory_y, 11.),
+        Vec3::new(left_side_x + 160., inventory_y - 3.5, 11.),
         &keybinds,
     );
 
@@ -299,9 +311,43 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         KeyBindType::Minimap,
-        Vec3::new(text_x + 2., minimap_y, 11.),
-        Vec3::new(text_x + 160., minimap_y - 3.5, 11.),
+        Vec3::new(left_side_x + 2., minimap_y, 11.),
+        Vec3::new(left_side_x + 160., minimap_y - 3.5, 11.),
         &keybinds,
+    );
+
+    // Cheats section
+    let cheats_section_y = 70.;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Cheats",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(right_side_x, cheats_section_y, 11.)),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Cheats Section Title"),
+    ));
+
+    // Unlock all classes checkbox
+    let checkbox_y = 50.;
+    spawn_cheat_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Unlock All Classes:",
+        Vec3::new(right_side_x, checkbox_y, 11.),
+        Vec3::new(right_side_x + 100.5, checkbox_y + 0.5, 11.),
+        cheat_settings.bypass_class_unlocks,
     );
 
     //TODO: fix restart button
@@ -457,4 +503,133 @@ fn spawn_keybind_row(
             Name::new(format!("Keybind Button Label {:?}", bind_type)),
         ))
         .set_parent(button_entity);
+}
+
+fn spawn_cheat_checkbox(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    label: &str,
+    label_pos: Vec3,
+    checkbox_pos: Vec3,
+    is_checked: bool,
+) {
+    // Label
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                label,
+                TextStyle {
+                    font: asset_server.load("fonts/4x5.ttf"),
+                    font_size: 5.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(label_pos),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        UIState::Options,
+        Name::new("Cheat Checkbox Label"),
+    ));
+
+    // Checkbox - uses same assets as achievements UI (CheckBox / CheckBoxSelected)
+    // Use the current state to determine initial texture
+    let checkbox_type = if is_checked {
+        UIElement::CheckBoxSelected
+    } else {
+        UIElement::CheckBox
+    };
+    commands
+        .spawn(SpriteBundle {
+            texture: graphics.get_ui_element_texture(checkbox_type).clone(),
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(9., 9.)),
+                ..Default::default()
+            },
+            transform: Transform::from_translation(checkbox_pos),
+            visibility: Visibility::Visible,
+            ..Default::default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(UIState::Options)
+        .insert(OptionsUI)
+        .insert(CheatCheckbox)
+        .insert(Interactable::default())
+        .insert(Name::new("Cheat Checkbox"));
+}
+
+pub fn handle_cheat_checkbox_click(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut checkboxes: Query<(Entity, &mut Interactable, &mut Handle<Image>), With<CheatCheckbox>>,
+    mut cheat_settings: ResMut<CheatSettings>,
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+) {
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_released = mouse_input.just_released(MouseButton::Left);
+
+    for (entity, mut interactable, mut texture) in checkboxes.iter_mut() {
+        match hit_test {
+            Some(hit) if hit.0 == entity => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+                }
+                Interaction::Hovering => {
+                    if left_mouse_released {
+                        // Toggle the cheat setting
+                        cheat_settings.bypass_class_unlocks = !cheat_settings.bypass_class_unlocks;
+
+                        // Update checkbox texture
+                        let checkbox_type = if cheat_settings.bypass_class_unlocks {
+                            UIElement::CheckBoxSelected
+                        } else {
+                            UIElement::CheckBox
+                        };
+                        *texture = graphics.get_ui_element_texture(checkbox_type).clone();
+
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                        info!(
+                            "Cheat: bypass_class_unlocks = {}",
+                            cheat_settings.bypass_class_unlocks
+                        );
+                    }
+                }
+                _ => {}
+            },
+            _ => {
+                let Interaction::Hovering = interactable.current() else {
+                    continue;
+                };
+                interactable.change(Interaction::None);
+            }
+        }
+    }
+}
+
+pub fn update_cheat_checkbox_visual(
+    cheat_settings: Res<CheatSettings>,
+    mut checkboxes: Query<&mut Handle<Image>, With<CheatCheckbox>>,
+    graphics: Res<Graphics>,
+) {
+    if !cheat_settings.is_changed() {
+        return;
+    }
+
+    let checkbox_type = if cheat_settings.bypass_class_unlocks {
+        UIElement::CheckBoxSelected
+    } else {
+        UIElement::CheckBox
+    };
+
+    for mut texture in checkboxes.iter_mut() {
+        *texture = graphics
+            .get_ui_element_texture(checkbox_type.clone())
+            .clone();
+    }
 }
