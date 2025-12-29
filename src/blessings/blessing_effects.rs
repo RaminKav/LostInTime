@@ -234,16 +234,7 @@ pub fn handle_blessing_selected(
                 let laser_beam_skill =
                     ActiveSkillChoiceState::new(ActiveSkill::LaserBeam, HeirloomRarity::Legendary);
 
-                if player_skills.active_skill_slot_2.is_none() {
-                    player_skills.insert_active_skill(laser_beam_skill, 2);
-                } else if player_skills.active_skill_slot_3.is_none() {
-                    player_skills.insert_active_skill(laser_beam_skill, 3);
-                    if let Some(ref mut upgrades) = unlock_upgrades {
-                        upgrades.second_active_skill_slot_unlocked = true;
-                    }
-                } else {
-                    player_skills.insert_active_skill(laser_beam_skill, 3);
-                }
+                player_skills.insert_active_skill(laser_beam_skill, 3);
 
                 ActiveSkill::LaserBeam.add_skill_components(player_entity, &mut commands);
             }
@@ -263,17 +254,7 @@ pub fn handle_blessing_selected(
                     let skill_choice =
                         ActiveSkillChoiceState::new(random_skill.clone(), HeirloomRarity::Rare);
 
-                    if player_skills.active_skill_slot_2.is_none() {
-                        player_skills.insert_active_skill(skill_choice, 2);
-                    } else if player_skills.active_skill_slot_2.is_none() {
-                        player_skills.insert_active_skill(skill_choice, 3);
-
-                        if let Some(ref mut upgrades) = unlock_upgrades {
-                            upgrades.second_active_skill_slot_unlocked = true;
-                        }
-                    } else {
-                        player_skills.insert_active_skill(skill_choice, 3);
-                    }
+                    player_skills.insert_active_skill(skill_choice, 3);
 
                     random_skill.add_skill_components(player_entity, &mut commands);
 

@@ -431,6 +431,7 @@ impl ObjectAction {
                     .filter(|skill| {
                         *skill != ActiveSkill::Roll
                             && *skill != ActiveSkill::Parry
+                            && *skill != ActiveSkill::LaserBeam
                             && !player_current_skills.contains(skill)
                     })
                     .collect();

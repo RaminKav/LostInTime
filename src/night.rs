@@ -125,7 +125,7 @@ impl InfiniteMode {
         if self.difficulty_level <= 5 {
             1.0
         } else {
-            3.0
+            2.0
         }
     }
 }

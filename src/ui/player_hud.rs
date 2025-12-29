@@ -1147,24 +1147,24 @@ pub fn handle_update_player_skills(
 
         // Build list of active skill slots to display
         let mut active_skill_slots = vec![
-            new_skills.roll_skill_slot.clone(),
-            new_skills.active_skill_slot_1.clone(),
+            (new_skills.roll_skill_slot.clone(), 0),
+            (new_skills.active_skill_slot_1.clone(), 1),
         ];
 
         // Add second active skill slot if unlocked
         if let Some(upgrades) = unlock_upgrades.as_ref() {
             if upgrades.second_active_skill_slot_unlocked {
-                active_skill_slots.push(new_skills.active_skill_slot_2.clone());
+                active_skill_slots.push((new_skills.active_skill_slot_2.clone(), 2));
             }
         }
 
         // Add third active skill slot if it has a skill assigned
         // (this slot is only filled by blessings when both slot 1 and 2 are full)
         if new_skills.active_skill_slot_3.is_some() {
-            active_skill_slots.push(new_skills.active_skill_slot_3.clone());
+            active_skill_slots.push((new_skills.active_skill_slot_3.clone(), 3));
         }
 
-        for (i, active_skill_option) in active_skill_slots.iter().enumerate() {
+        for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
             let icon_bg = commands
                 .spawn(SpriteBundle {
                     texture: graphics.get_ui_element_texture(UIElement::ScreenIconSlotLarge),
@@ -1187,7 +1187,7 @@ pub fn handle_update_player_skills(
                 .insert(ActiveSkillIcon)
                 .id();
             // Get the actual keybind for this slot
-            let keybind = keybinds.get_active_skill_key(i);
+            let keybind = keybinds.get_active_skill_key(*slot_index);
             let (key_element, key_width) = get_key_size_and_element(keybind);
 
             // Spawn generic key background

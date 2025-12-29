@@ -532,7 +532,7 @@ fn give_player_starting_items(
     }
 
     // proto_commands.spawn_item_from_proto(WorldObject::UpgradeTome, &proto, Vec2::ZERO, 64, None);
-    proto_commands.spawn_item_from_proto(WorldObject::PlasmaStaff, &proto, Vec2::ZERO, 1, Some(1));
+    // proto_commands.spawn_item_from_proto(WorldObject::PlasmaStaff, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Chestplate, &proto, Vec2::ZERO, 1, Some(1));
     // proto_commands.spawn_item_from_proto(WorldObject::Pendant, &proto, Vec2::ZERO, 1, Some(1));
