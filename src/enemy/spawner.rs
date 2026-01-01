@@ -3,6 +3,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
+    chaos::ChaosTracker,
     client::is_not_paused,
     custom_commands::CommandsExt,
     night::{InfiniteMode, InfiniteModeMob, NightTracker},
@@ -110,16 +111,16 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(22., TimerMode::Once),
             min_days_to_spawn: 3,
             num_to_spawn: Some(2),
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(18.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(14.5, TimerMode::Once),
             min_days_to_spawn: 0,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(4),
         });
         spawners.push(Spawner {
             enemy: Mob::RedMushling,
@@ -138,14 +139,14 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(22., TimerMode::Once),
             min_days_to_spawn: 2,
             num_to_spawn: Some(2),
         });
         spawners.push(Spawner {
             enemy: Mob::Bushling,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(25., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(18., TimerMode::Once),
             min_days_to_spawn: 1,
             num_to_spawn: Some(3),
         });
@@ -324,6 +325,7 @@ fn tick_spawner_timers(
     infinite_mode: Res<InfiniteMode>,
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
+    chaos_tracker: Res<ChaosTracker>,
 ) {
     if !spawners.initial_spawn_delay.finished() {
         spawners.initial_spawn_delay.tick(time.delta());
@@ -352,6 +354,14 @@ fn tick_spawner_timers(
         );
         return;
     }
+    let chaos = chaos_tracker.get_chaos();
+    let bonus_spawn_count_chaos = if infinite_mode.active {
+        0
+    } else if night_tracker.is_night() {
+        (chaos / 3.).floor() as u32
+    } else {
+        (chaos / 5.).floor() as u32
+    };
     let day = night_tracker.days;
     let endless_mode_spawn_count_increase = if infinite_mode.active {
         match infinite_mode.difficulty_level {
@@ -384,8 +394,9 @@ fn tick_spawner_timers(
         }
         if spawner.spawn_timer.finished() {
             spawner.spawn_timer.reset();
-            for _ in
-                0..(spawner.num_to_spawn.unwrap_or(1) + endless_mode_spawn_count_increase as u32)
+            for _ in 0..(spawner.num_to_spawn.unwrap_or(1)
+                + bonus_spawn_count_chaos
+                + endless_mode_spawn_count_increase as u32)
             {
                 spawn_event.send(MobSpawnEvent {
                     mob: spawner.enemy.clone(),

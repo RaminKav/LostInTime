@@ -19,17 +19,15 @@ use crate::{
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
     chaos::ChaosTracker,
+    client::is_not_paused,
     colors::{BLACK, DARK_GREEN, GREY, LIGHT_BROWN, LIGHT_GREEN, PINK, RED},
     inputs::FacingDirection,
     item::{projectile::Projectile, Loot, LootTable},
     night::{InfiniteModeMob, NightTracker},
-    player::{
-        levels::{ExperienceReward, PlayerLevel},
-        skills::PlayerSkills,
-    },
+    player::levels::{ExperienceReward, PlayerLevel},
     proto::{proto_param::ProtoParam, ColliderCapsulProto},
     ui::minimap::UpdateMiniMapEvent,
-    world::{dimension::EraManager, dungeon::Dungeon, TileMapPosition},
+    world::{dungeon::Dungeon, TileMapPosition},
     AppExt, GameParam, GameState,
 };
 
@@ -61,8 +59,7 @@ impl Plugin for EnemyPlugin {
                     stone_golem::handle_new_stone_golem_state_machine,
                     handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
-                    red_mushling::handle_mushling_rush_warnings,
-                    handle_mob_move_minimap_update,
+                    red_mushling::handle_mushling_rush_warnings.run_if(is_not_paused),
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
                     enhance_infinite_mode_mobs.before(add_current_health_with_max_health),
@@ -72,13 +69,13 @@ impl Plugin for EnemyPlugin {
             )
             .add_systems(
                 (
-                    red_mushking::tick_aoe_attack_timer,
-                    red_mushking::handle_aoe_attack,
-                    stone_golem::tick_spike_attack_timer,
-                    stone_golem::handle_spike_attack,
-                    stone_golem::stone_golem_follow,
-                    stone_golem::update_stone_golem_walk_animation,
-                    stone_golem::handle_stone_golem_death,
+                    red_mushking::tick_aoe_attack_timer.run_if(is_not_paused),
+                    red_mushking::handle_aoe_attack.run_if(is_not_paused),
+                    stone_golem::tick_spike_attack_timer.run_if(is_not_paused),
+                    stone_golem::handle_spike_attack.run_if(is_not_paused),
+                    stone_golem::stone_golem_follow.run_if(is_not_paused),
+                    stone_golem::update_stone_golem_walk_animation.run_if(is_not_paused),
+                    stone_golem::handle_stone_golem_death.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -465,19 +462,16 @@ fn juice_up_spawned_mobs_per_day(
 
     for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
         // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
-        let chaos_factor = 1.
-            + night_tracker.days as f32
-            + (player_level.single().level as f32 * 0.2)
-            + total_chaos;
+        let chaos_factor = 1. + total_chaos;
 
         let early_cutoff = 20.0_f32;
 
         let hp_multiplier = if chaos_factor <= early_cutoff {
             // Early game: keep current scaling (similar difficulty)
-            chaos_factor.powf(0.8)
+            chaos_factor.powf(0.7)
         } else {
             // Late game: exponential scaling
-            let early_base = early_cutoff.powf(0.8); // ~12.0
+            let early_base = early_cutoff.powf(0.7); // ~12.0
             let late_chaos = chaos_factor - early_cutoff;
             // Each 10 chaos = 1.4x multiplier (adjustable for tuning)
             let exponential_part = 1.4_f32.powf(late_chaos / 10.0);

@@ -3,9 +3,10 @@ use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
-        Attack, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage, Defence,
-        Dodge, Healing, HealthRegen, ItemAttributes, ItemRarity, LootRateBonus, MaxHealth, MaxMana,
-        RawItemBaseAttributes, RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
+        Attack, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
+        CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen, ItemAttributes,
+        ItemRarity, LootRateBonus, MaxHealth, MaxMana, RawItemBaseAttributes,
+        RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
     },
     colors::{BLACK, GREY, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
     inventory::{Inventory, ItemStack},
@@ -559,19 +560,23 @@ pub fn handle_spawn_inv_player_stats(
     curr_ui_state: Res<State<UIState>>,
     player_stats: Query<
         (
-            &Attack,
-            &MaxHealth,
-            &MaxMana,
-            &Defence,
-            &CritChance,
-            &CritDamage,
-            &BonusDamage,
-            &HealthRegen,
-            &Healing,
-            &Thorns,
-            &Dodge,
-            &Speed,
-            &XpRateBonus,
+            (
+                &Attack,
+                &MaxHealth,
+                &CurrentHealth,
+                &MaxMana,
+                &CurrentMana,
+                &Defence,
+                &CritChance,
+                &CritDamage,
+                &BonusDamage,
+                &HealthRegen,
+                &Healing,
+                &Thorns,
+                &Dodge,
+                &Speed,
+                &XpRateBonus,
+            ),
             &LootRateBonus,
         ),
         With<Player>,
@@ -605,19 +610,23 @@ pub fn handle_spawn_inv_player_stats(
         };
 
         let (
-            attack,
-            max_health,
-            max_mana,
-            defence,
-            crit_chance,
-            crit_damage,
-            bonus_damage,
-            health_regen,
-            healing,
-            thorns,
-            dodge,
-            speed,
-            xp_rate_bonus,
+            (
+                attack,
+                max_health,
+                curr_health,
+                max_mana,
+                curr_mana,
+                defence,
+                crit_chance,
+                crit_damage,
+                bonus_damage,
+                health_regen,
+                healing,
+                thorns,
+                dodge,
+                speed,
+                xp_rate_bonus,
+            ),
             loot_rate_bonus,
         ) = player_stats.single();
 
@@ -638,7 +647,7 @@ pub fn handle_spawn_inv_player_stats(
             loot_rate: AttributeValue::new(loot_rate_bonus.0, AttributeQuality::Low, 0.),
             ..default()
         }
-        .get_stats_summary();
+        .get_stats_summary(curr_health.0, curr_mana.0);
 
         let tooltip = commands
             .spawn((

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     animations::AnimationTimer,
+    chaos::ChaosTracker,
     colors::YELLOW,
     player::skills::{Heirloom, PlayerSkills},
     ui::{damage_numbers::spawn_floating_text_with_shadow, UIState},
@@ -37,7 +38,12 @@ impl PlayerLevel {
         }
     }
 
-    pub fn add_xp(&mut self, xp: u32, skills: &PlayerSkills) -> bool {
+    pub fn add_xp(
+        &mut self,
+        xp: u32,
+        skills: &PlayerSkills,
+        chaos_tracker: &mut ChaosTracker,
+    ) -> bool {
         let mut did_level_up = false;
         self.xp += (xp as f32 * (1. + skills.get_count(Heirloom::XPGain) as f32 * 0.07)) as u32;
 
@@ -53,6 +59,9 @@ impl PlayerLevel {
                 "EXP: {:?} LEVEL: {:?} NEXT: {:?}",
                 self.xp, self.level, self.next_level_xp
             );
+        }
+        if did_level_up {
+            chaos_tracker.add_chaos(0.2);
         }
         did_level_up
     }

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     audio::{BGMPicker, UpdateBGMTrackEvent},
+    chaos::ChaosTracker,
     client::is_not_paused,
     colors::{overwrite_alpha, NIGHT},
     run_once_per_run,
@@ -276,6 +277,7 @@ pub fn tick_night_color(
     bgm_tracker: Res<BGMPicker>,
     mut new_day_event: EventWriter<NewDayEvent>,
     infinite_mode: Res<InfiniteMode>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     // In infinite mode, keep it always night
     if infinite_mode.active {
@@ -299,6 +301,7 @@ pub fn tick_night_color(
             sprite.color = overwrite_alpha(sprite.color, night_tracker.get_alpha());
             if night_tracker.time == 24. {
                 night_tracker.days += 1;
+                chaos_tracker.add_chaos(1.);
                 night_tracker.time = 0.;
             }
             if night_tracker.is_start_of_new_day() && night_tracker.days > 0 {

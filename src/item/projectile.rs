@@ -18,7 +18,7 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
-    GameParam, GameState, Pet,
+    Game, GameParam, GameState, Pet,
 };
 
 use super::ammo::Ammo;
@@ -206,7 +206,7 @@ fn handle_ranged_attack_event(
     >,
     rapidfire_state: Query<&RapidfireState, With<Player>>,
     transforms: Query<&GlobalTransform>,
-    game: GameParam,
+    game: Res<Game>,
     mut commands: Commands,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     mut ammo_query: Query<&mut Ammo>,
@@ -245,7 +245,7 @@ fn handle_ranged_attack_event(
             && !is_rapidfire_active
         // Don't consume ammo during Rapidfire
         {
-            if let Some(main_hand) = game.player().main_hand_slot.clone() {
+            if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
                 let held_e = main_hand.entity;
                 if let Ok(mut ammo) = ammo_query.get_mut(held_e) {
                     if !ammo.can_fire() {
@@ -279,7 +279,7 @@ fn handle_ranged_attack_event(
                 .translation()
                 .truncate()
         } else {
-            game.player().position.truncate()
+            game.player_state.position.truncate()
         };
 
         let size = if proj_event.projectile.is_anchored_to_player_pos() {

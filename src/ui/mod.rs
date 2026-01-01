@@ -419,6 +419,8 @@ impl Plugin for UIPlugin {
                         .run_if(state_changed::<UIState>().and_then(in_state(UIState::ItemChest))),
 
                     handle_cursor_item_chest_button.run_if(in_state(UIState::ItemChest)),
+                    interactions::handle_cursor_heirloom_chest_button
+                        .run_if(in_state(UIState::ItemChest)),
                     setup_essence_ui
                         .before(CustomFlush)
                         .run_if(resource_added::<EssenceShopChoices>()),

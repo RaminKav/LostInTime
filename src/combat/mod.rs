@@ -11,6 +11,7 @@ use crate::attributes::{add_item_glows, ProjectileSize};
 
 pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
+use crate::chaos::ChaosTracker;
 use crate::night::InfiniteMode;
 use crate::player::melee_skills::spawn_echo_hitbox;
 use crate::{
@@ -181,6 +182,7 @@ fn handle_enemy_death(
     mut commands: Commands,
     graphics: Res<Graphics>,
     infinite_mode: Res<InfiniteMode>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
@@ -241,7 +243,8 @@ fn handle_enemy_death(
             };
 
         //give player xp
-        let did_level = player_level.add_xp(mob_xp.0 * xp_multiplier, &player_skills);
+        let did_level =
+            player_level.add_xp(mob_xp.0 * xp_multiplier, &player_skills, &mut chaos_tracker);
         // Only spawn XP particles if not in endless mode (to reduce lag)
         if !is_infinite_mode {
             spawn_xp_particles(

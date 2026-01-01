@@ -1,4 +1,5 @@
 use crate::blessings::OwnedBlessings;
+use crate::chaos::ChaosTracker;
 use crate::item::potion_buffs::MovementSpeedBuff;
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -60,7 +61,7 @@ use crate::player::skills::{
 };
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    GameUpscale, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+    GameUpscale, KeyBindings, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -648,7 +649,8 @@ pub fn toggle_inventory(
     curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<KeyBindings>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     if key_input.just_pressed(keybinds.get_inventory_key()) {
         // Don't allow opening inventory while item chest is open
@@ -672,7 +674,9 @@ pub fn toggle_inventory(
         }
         if key_input.just_pressed(KeyCode::C) {
             let skills = game.get_player_skills().clone();
-            let did_level = game.get_player_level_mut().add_xp(200, &skills);
+            let did_level = game
+                .get_player_level_mut()
+                .add_xp(200, &skills, &mut chaos_tracker);
 
             flash_event.send(FlashExpBarEvent {
                 amount: 100,
@@ -704,7 +708,7 @@ pub fn toggle_inventory(
             // proto_commands.spawn_from_proto(Mob::Bushling, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::StoneGolem, &proto.prototypes, pos);
             // proto_commands.spawn_from_proto(Mob::Fairy, &proto.prototypes, pos);
-            proto_commands.spawn_from_proto(Mob::StingFly, &proto.prototypes, pos);
+            proto_commands.spawn_from_proto(Mob::FurDevil, &proto.prototypes, pos);
             // commands.entity(t.unwrap()).insert(MobLevel(10));
             // proto_commands.spawn_from_proto(Mob::RedMushking, &proto.prototypes, pos);
             // let f = proto_commands.spawn_from_proto(Mob::SpikeSlime, &proto.prototypes, pos);

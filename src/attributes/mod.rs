@@ -409,10 +409,16 @@ impl ItemAttributes {
         "".to_string()
     }
 
-    pub fn get_stats_summary(&self) -> Vec<(String, String)> {
+    pub fn get_stats_summary(&self, curr_health: i32, curr_mana: i32) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
-        tooltips.push(("Health:          ".to_string(), format!("{}", self.health)));
-        tooltips.push(("Mana:          ".to_string(), format!("{}", self.mana)));
+        tooltips.push((
+            "Health:          ".to_string(),
+            format!("{}/{}", curr_health, self.health),
+        ));
+        tooltips.push((
+            "Mana:          ".to_string(),
+            format!("{}/{}", curr_mana, self.mana),
+        ));
         tooltips.push((
             "Attack:             ".to_string(),
             format!(

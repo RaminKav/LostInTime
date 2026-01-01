@@ -4,7 +4,6 @@ use crate::{
     attributes::{
         hunger::Hunger,
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
-        ItemRarity,
     },
     chaos::IncreaseChaosEvent,
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
@@ -15,9 +14,7 @@ use crate::{
     player::{stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
-        item_chest::{ItemChestAnimState, ItemChestState},
-        minimap::UpdateMiniMapEvent,
-        scrapper_ui::ScrapperContainer,
+        item_chest::ItemChestState, minimap::UpdateMiniMapEvent, scrapper_ui::ScrapperContainer,
         ChestContainer, FurnaceContainer, InventorySlotState, InventorySlotType, UIState,
     },
     world::{
@@ -53,6 +50,7 @@ pub enum ItemAction {
     DungeonKey,
     GrantSkillPoint(u8),
     ItemChest,
+    HeirloomChest,
     BeaconPortal,
     BeaconDungeonEntrance,
     BeaconBossShrine,
@@ -273,15 +271,10 @@ impl ItemActions {
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ItemChest => {
-                    commands.insert_resource(ItemChestState {
-                        shuffle_timer: Timer::from_seconds(0.06, TimerMode::Once),
-                        shuffle_duration_timer: Timer::from_seconds(1.5, TimerMode::Once),
-                        picked_item: None,
-                        current_entity: None,
-                        current_item: None,
-                        state: ItemChestAnimState::Closed,
-                        current_ui_rarity: ItemRarity::Common,
-                    });
+                    commands.insert_resource(ItemChestState::new_item_chest());
+                }
+                ItemAction::HeirloomChest => {
+                    commands.insert_resource(ItemChestState::new_heirloom_chest());
                 }
                 ItemAction::BeaconPortal => {
                     if let Some(e) = item_action_param.beacon_guidance.portal.take() {

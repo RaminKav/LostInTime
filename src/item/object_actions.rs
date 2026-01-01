@@ -89,6 +89,7 @@ pub enum TouchTriggerObjectAction {
     None,
     Bounce,
     ItemChest,
+    HeirloomChest,
 }
 
 impl ObjectAction {
@@ -669,15 +670,11 @@ impl TouchTriggerObjectAction {
                 item_action_param.bounce_event.send(BounceEvent);
             }
             TouchTriggerObjectAction::ItemChest => {
-                commands.insert_resource(ItemChestState {
-                    shuffle_timer: Timer::from_seconds(0.05, TimerMode::Once),
-                    shuffle_duration_timer: Timer::from_seconds(1.5, TimerMode::Once),
-                    picked_item: None,
-                    current_entity: None,
-                    current_item: None,
-                    state: ItemChestAnimState::Closed,
-                    current_ui_rarity: ItemRarity::Common,
-                });
+                commands.insert_resource(ItemChestState::new_item_chest());
+                commands.entity(entity).despawn_recursive();
+            }
+            TouchTriggerObjectAction::HeirloomChest => {
+                commands.insert_resource(ItemChestState::new_heirloom_chest());
                 commands.entity(entity).despawn_recursive();
             }
             _ => {}

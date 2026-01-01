@@ -1617,6 +1617,57 @@ impl HeirloomChoiceQueue {
             );
         }
     }
+
+    /// Grant a heirloom directly from the pool (used by heirloom chests).
+    /// Unlike handle_pick_skill, this doesn't manipulate the queue.
+    pub fn grant_heirloom_from_pool(
+        &mut self,
+        skill: HeirloomChoiceState,
+        proto_commands: &mut ProtoCommands,
+        proto: &ProtoParam,
+        player_pos: Vec2,
+        player_skills: &mut PlayerSkills,
+        player_level: u8,
+    ) {
+        // Add to player's heirlooms
+        player_skills.heirlooms.push(HeirloomWithRarity {
+            heirloom: skill.heirloom.clone(),
+            rarity: skill.rarity.clone(),
+        });
+
+        // Remove from pool if it's a one-time heirloom
+        if skill.is_one_time_heirloom {
+            self.pool.retain(|x| x.heirloom != skill.heirloom);
+        }
+
+        // Add child heirlooms to pool
+        for child in skill.child_heirlooms.iter() {
+            if !player_skills
+                .heirlooms
+                .iter()
+                .any(|h| h.heirloom == child.heirloom)
+            {
+                self.pool.push(child.clone());
+            }
+        }
+
+        // Remove clashing heirlooms from pool
+        for clash in skill.clashing_heirlooms.iter() {
+            self.pool.retain(|x| x.heirloom != *clash);
+        }
+
+        // Handle drops
+        if let Some((drop, count)) = skill.heirloom.get_instant_drop() {
+            proto_commands.spawn_item_from_proto(
+                drop,
+                proto,
+                player_pos + Vec2::new(0., -18.),
+                count,
+                Some(player_level),
+            );
+        }
+    }
+
     pub fn handle_reroll_slot(
         &mut self,
         slot: usize,

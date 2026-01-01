@@ -1,6 +1,7 @@
 use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
+use crate::chaos::ChaosTracker;
 use crate::client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent};
 use crate::client::is_not_paused;
 use crate::colors::{
@@ -331,6 +332,8 @@ pub enum WorldObject {
     MovementSpeedPotion,
     Chest,
     ChestBlock,
+    HeirloomChest,
+    HeirloomChestBlock,
     DungeonEntrance,
     DungeonEntranceBlock,
     CombatShrine,
@@ -1164,6 +1167,7 @@ pub fn handle_break_object(
         (Without<WorldObject>, Without<Mob>, Without<Player>),
     >,
     anchor: Query<&SpriteAnchor>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
@@ -1253,7 +1257,7 @@ pub fn handle_break_object(
         if let Ok(exp) = xp.get(broken.entity) {
             let player_skills = game.get_player_skills().clone();
             let mut player_xp = game.get_player_level_mut();
-            let did_level = player_xp.add_xp(exp.0, &player_skills);
+            let did_level = player_xp.add_xp(exp.0, &player_skills, &mut chaos_tracker);
             let t = tile_pos_to_world_pos(broken.pos, true);
             spawn_xp_particles(t, &mut commands, exp.0, did_level);
         }

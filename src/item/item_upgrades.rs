@@ -2,8 +2,9 @@ use rand::Rng;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
+use crate::assets::Graphics;
 use crate::attributes::modifiers::ModifyHealthEvent;
-use crate::attributes::{CurrentHealth, ItemAttributes};
+use crate::attributes::{CurrentHealth, ItemAttributes, ProjectileSize};
 use crate::blessings::OwnedBlessings;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
@@ -15,6 +16,7 @@ use crate::status_effects::{
     try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
 };
 use crate::world::y_sort::YSort;
+use crate::Game;
 use crate::{
     combat::{AttackTimer, HitEvent},
     inputs::CursorPos,
@@ -44,10 +46,6 @@ pub struct BowUpgradeSpread(pub u8);
 #[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
 #[reflect(Component, Schematic)]
 pub struct ArrowSpeedUpgrade(pub f32);
-
-#[derive(Component, Reflect, Schematic, FromReflect, Default, Clone)]
-#[reflect(Component, Schematic)]
-pub struct VenomOnHitUpgrade;
 
 // Local state for throttling ice explosions per frame
 #[derive(Default)]
@@ -168,16 +166,18 @@ pub fn handle_on_hit_upgrades(
     mut hits: EventReader<HitEvent>,
     upgrades: Query<
         (
+            Entity,
             &PlayerSkills,
             &GlobalTransform,
-            &crate::attributes::ProjectileSize,
+            &ProjectileSize,
+            Option<&AttackTimer>,
         ),
         With<Player>,
     >,
     proto: ProtoParam,
     mut commands: Commands,
     mut proto_commands: ProtoCommands,
-    game: GameParam,
+    game: Res<Game>,
     mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut burn_or_venom_mobs: Query<(
         Option<&mut Burning>,
@@ -186,7 +186,7 @@ pub fn handle_on_hit_upgrades(
         Option<&mut Slow>,
     )>,
     mut elec_count: Local<u8>,
-    att_cooldown_query: Query<Option<&AttackTimer>, With<Player>>,
+    graphics: Res<Graphics>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut status_event: EventWriter<StatusEffectEvent>,
     asset_server: Res<AssetServer>,
@@ -198,14 +198,14 @@ pub fn handle_on_hit_upgrades(
     throttle.count = 0;
     throttle.sound_played = false;
 
-    if *elec_count > 0 && att_cooldown_query.single().is_none() {
+    let (player_e, skills, player_txfm, projectile_size, att_cooldown) = upgrades.single();
+    if *elec_count > 0 && att_cooldown.is_none() {
         *elec_count = 0;
     }
     let Ok((player_attributes, player_blessings, current_hp)) = player_att_blessings.get_single()
     else {
         return;
     };
-    let (skills, player_txfm, projectile_size) = upgrades.single();
     let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
         // Skip damage from heirloom effects (e.g., poison, burning)
@@ -214,7 +214,7 @@ pub fn handle_on_hit_upgrades(
         }
         let mut rng = rand::thread_rng();
 
-        if hit.hit_entity == game.game.player {
+        if hit.hit_entity == player_e {
             continue;
         }
         let Ok((hit_e, hit_entity_txfm)) = mobs.get(hit.hit_entity) else {
@@ -266,7 +266,7 @@ pub fn handle_on_hit_upgrades(
                 spawn_delay: 0.1,
             });
         }
-        let Some(main_hand) = game.player().main_hand_slot else {
+        let Some(main_hand) = game.player_state.main_hand_slot.clone() else {
             continue;
         };
         if hit.hit_with_projectile.clone().unwrap_or_default() != Projectile::IceExplosionAOE
@@ -279,7 +279,7 @@ pub fn handle_on_hit_upgrades(
                 throttle.count += 1;
                 spawn_ice_explosion_hitbox(
                     &mut commands,
-                    &game.graphics,
+                    &graphics,
                     hit_entity_txfm.translation(),
                     hit.damage / 4,
                     projectile_size.get_multiplier(),

@@ -19,7 +19,7 @@ use crate::{
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
-    night::NightTracker,
+    night::{InfiniteMode, NightTracker},
     player::{
         levels::PlayerLevel,
         skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
@@ -519,13 +519,17 @@ pub fn setup_chaos_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     chaos_tracker: Res<ChaosTracker>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
     // Chaos text
     let chaos_text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    format!("Chaos: {:.1}", chaos_tracker.get_chaos()),
+                    format!(
+                        "Chaos: {:.1}",
+                        chaos_tracker.get_chaos() + infinite_mode.chaos_bonus
+                    ),
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
