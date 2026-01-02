@@ -7,7 +7,7 @@ pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
-use crate::attributes::{add_item_glows, ProjectileSize};
+use crate::attributes::{add_item_glows, CurrentMana, ProjectileSize};
 
 pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
@@ -301,13 +301,7 @@ pub fn handle_hits(
     mut hallucination_query: Query<&mut HallucinationStats, With<Player>>,
     mut attribute_events: EventWriter<AttributeChangeEvent>,
     asset_server: Res<AssetServer>,
-    mut player_blessing_mana_query: Query<
-        (
-            &crate::blessings::OwnedBlessings,
-            &mut crate::attributes::CurrentMana,
-        ),
-        With<Player>,
-    >,
+    mut player_blessing_mana_query: Query<(&OwnedBlessings, &mut CurrentMana), With<Player>>,
 ) {
     for hit in hit_events.iter() {
         // is in invincibility frames from a previous hit
@@ -491,13 +485,21 @@ pub fn handle_hits(
                     }
 
                     if is_player && game.has_skill(Heirloom::OnHitEcho) {
-                        spawn_echo_hitbox(
-                            &mut commands,
-                            &asset_server,
-                            e,
-                            attack.unwrap_or(&Attack(0)).0,
-                            proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
-                        );
+                        if let Ok((_, mut current_mana)) =
+                            player_blessing_mana_query.get_single_mut()
+                        {
+                            let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
+                            if current_mana.0 >= mana_cost {
+                                current_mana.0 -= mana_cost;
+                                spawn_echo_hitbox(
+                                    &mut commands,
+                                    &asset_server,
+                                    e,
+                                    attack.unwrap_or(&Attack(0)).0,
+                                    proj_size.unwrap_or(&ProjectileSize(0)).get_multiplier(),
+                                );
+                            }
+                        };
                     }
                     if *DEBUG {
                         info!("HP {:?}", hit_health.0);
@@ -609,11 +611,12 @@ pub fn cleanup_marked_for_death_entities(
         With<MarkedForDeath>,
     >,
     mut analytics: EventWriter<AnalyticsUpdateEvent>,
-    player: Query<(
+    mut player: Query<(
         &PlayerSkills,
         &Attack,
         &ManaRegen,
-        &crate::attributes::ProjectileSize,
+        &mut CurrentMana,
+        &ProjectileSize,
     )>,
     graphics: Res<Graphics>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
@@ -653,7 +656,8 @@ pub fn cleanup_marked_for_death_entities(
                 .remove::<SpikeAttackState>() // Remove StoneGolem's attack state
                 .remove::<MarkedForDeath>();
         } else {
-            let (skills, attack, mana_regen, projectile_size) = player.single();
+            let (skills, attack, mana_regen, mut current_mana, projectile_size) =
+                player.single_mut();
 
             // Only trigger heirloom on-kill effects if the kill wasn't from a heirloom effect
             // This prevents chaining (e.g., ice explosion killing enemies that trigger more ice explosions)
@@ -662,13 +666,17 @@ pub fn cleanup_marked_for_death_entities(
             if can_trigger_heirloom_effects {
                 if let Some(_) = slow_option {
                     if skills.has(Heirloom::FrozenAoE) {
-                        spawn_ice_explosion_hitbox(
-                            &mut commands,
-                            &graphics,
-                            mob_pos.translation(),
-                            attack.0 / 4,
-                            projectile_size.get_multiplier(),
-                        );
+                        let mana_cost = Heirloom::FrozenAoE.get_mana_cost();
+                        if current_mana.0 >= mana_cost {
+                            current_mana.0 -= mana_cost;
+                            spawn_ice_explosion_hitbox(
+                                &mut commands,
+                                &graphics,
+                                mob_pos.translation(),
+                                attack.0 / 4,
+                                projectile_size.get_multiplier(),
+                            );
+                        }
                     }
                     if skills.has(Heirloom::FrozenMPRegen) {
                         modify_mana_event.send(ModifyManaEvent(
@@ -678,22 +686,27 @@ pub fn cleanup_marked_for_death_entities(
                 }
                 if let Some(p) = poison_option {
                     if skills.has(Heirloom::ViralVenum) {
-                        for (mob_e, txfm) in neaby_mobs.iter() {
-                            if mob_pos.translation().distance(txfm.translation()) < 3. * TILE_SIZE.x
-                            {
-                                commands.entity(mob_e).insert(Burning {
-                                    stacks: p.stacks,
-                                    duration_timer: Timer::from_seconds(
-                                        p.duration_timer.duration().as_secs_f32(),
-                                        TimerMode::Once,
-                                    ),
-                                    tick_timer: p.tick_timer.clone(),
-                                });
-                                status_event.send(StatusEffectEvent {
-                                    entity: mob_e,
-                                    effect: StatusEffect::Poison,
-                                    num_stacks: p.stacks as i32,
-                                });
+                        let mana_cost = Heirloom::ViralVenum.get_mana_cost();
+                        if current_mana.0 >= mana_cost {
+                            current_mana.0 -= mana_cost;
+                            for (mob_e, txfm) in neaby_mobs.iter() {
+                                if mob_pos.translation().distance(txfm.translation())
+                                    < 3. * TILE_SIZE.x
+                                {
+                                    commands.entity(mob_e).insert(Burning {
+                                        stacks: p.stacks,
+                                        duration_timer: Timer::from_seconds(
+                                            p.duration_timer.duration().as_secs_f32(),
+                                            TimerMode::Once,
+                                        ),
+                                        tick_timer: p.tick_timer.clone(),
+                                    });
+                                    status_event.send(StatusEffectEvent {
+                                        entity: mob_e,
+                                        effect: StatusEffect::Poison,
+                                        num_stacks: p.stacks as i32,
+                                    });
+                                }
                             }
                         }
                     }

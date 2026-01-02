@@ -24,6 +24,7 @@ pub fn handle_modify_health_event(
             &PlayerSkills,
             &Attack,
             &ProjectileSize,
+            &mut CurrentMana,
         ),
         With<Player>,
     >,
@@ -31,8 +32,15 @@ pub fn handle_modify_health_event(
     asset_server: Res<AssetServer>,
 ) {
     for event in event.iter() {
-        let (player_entity, mut health, bonus_healing_rate, skills, attack, projectile_size) =
-            query.single_mut();
+        let (
+            player_entity,
+            mut health,
+            bonus_healing_rate,
+            skills,
+            attack,
+            projectile_size,
+            mut current_mana,
+        ) = query.single_mut();
 
         // Apply healing bonus only to positive health changes
         let final_delta = if event.0 > 0 {
@@ -45,13 +53,17 @@ pub fn handle_modify_health_event(
 
         // OnHitEcho: Trigger echo when taking damage (any HP loss)
         if final_delta < 0 && skills.has(Heirloom::OnHitEcho) {
-            spawn_echo_hitbox(
-                &mut commands,
-                &asset_server,
-                player_entity,
-                attack.0,
-                projectile_size.get_multiplier(),
-            );
+            let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
+            if current_mana.0 >= mana_cost {
+                current_mana.0 -= mana_cost;
+                spawn_echo_hitbox(
+                    &mut commands,
+                    &asset_server,
+                    player_entity,
+                    attack.0,
+                    projectile_size.get_multiplier(),
+                );
+            }
         }
     }
 }

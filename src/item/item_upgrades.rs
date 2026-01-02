@@ -4,7 +4,8 @@ use std::time::Duration;
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::assets::Graphics;
 use crate::attributes::modifiers::ModifyHealthEvent;
-use crate::attributes::{CurrentHealth, ItemAttributes, ProjectileSize};
+use crate::attributes::{CurrentHealth, CurrentMana, ItemAttributes, ProjectileSize};
+use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::blessings::OwnedBlessings;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
@@ -164,13 +165,14 @@ pub fn handle_spread_arrows_attack(
 
 pub fn handle_on_hit_upgrades(
     mut hits: EventReader<HitEvent>,
-    upgrades: Query<
+    mut upgrades: Query<
         (
             Entity,
             &PlayerSkills,
             &GlobalTransform,
             &ProjectileSize,
             Option<&AttackTimer>,
+            &mut CurrentMana,
         ),
         With<Player>,
     >,
@@ -198,7 +200,8 @@ pub fn handle_on_hit_upgrades(
     throttle.count = 0;
     throttle.sound_played = false;
 
-    let (player_e, skills, player_txfm, projectile_size, att_cooldown) = upgrades.single();
+    let (player_e, skills, player_txfm, projectile_size, att_cooldown, mut current_mana) =
+        upgrades.single_mut();
     if *elec_count > 0 && att_cooldown.is_none() {
         *elec_count = 0;
     }
@@ -230,7 +233,7 @@ pub fn handle_on_hit_upgrades(
             }
         }
 
-        if skills.has(Heirloom::IncreaseProjectilCount)
+        if skills.has(Heirloom::IncreaseProjectileCount)
             && hit.hit_with_projectile == Some(Projectile::Electricity)
             && *elec_count == 0
         {
@@ -273,45 +276,50 @@ pub fn handle_on_hit_upgrades(
             && skills.has(Heirloom::IceStaffAoE)
             && rng.gen_bool((skills.get_count(Heirloom::IceStaffAoE) as f64 * 0.1).clamp(0., 1.))
         {
-            // Throttle explosions per frame to prevent lag when hitting many enemies
-            const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
-            if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
-                throttle.count += 1;
-                spawn_ice_explosion_hitbox(
-                    &mut commands,
-                    &graphics,
-                    hit_entity_txfm.translation(),
-                    hit.damage / 4,
-                    projectile_size.get_multiplier(),
-                );
-                // Only play sound once per frame to avoid audio spam
-                if !throttle.sound_played {
-                    throttle.sound_played = true;
-                    commands.spawn(crate::audio::SoundSpawner::new(
-                        crate::audio::AudioSoundEffect::IceExplosion,
-                        0.4,
-                    ));
+            let mana_cost = Heirloom::IceStaffAoE.get_mana_cost();
+            if current_mana.0 >= mana_cost {
+                current_mana.0 -= mana_cost;
+                // Throttle explosions per frame to prevent lag when hitting many enemies
+                const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
+                if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
+                    throttle.count += 1;
+                    spawn_ice_explosion_hitbox(
+                        &mut commands,
+                        &graphics,
+                        hit_entity_txfm.translation(),
+                        hit.damage / 4,
+                        projectile_size.get_multiplier(),
+                    );
+                    // Only play sound once per frame to avoid audio spam
+                    if !throttle.sound_played {
+                        throttle.sound_played = true;
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+                    }
                 }
             }
         }
         if skills.has(Heirloom::IceStaffFloor)
             && rng.gen_bool((skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1).clamp(0., 1.))
         {
-            let ice = spawn_one_time_aseprite_collider(
-                &mut commands,
-                Transform::from_translation(hit_entity_txfm.translation()),
-                6.5,
-                hit.damage / 5,
-                Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
-                asset_server.load::<Aseprite, _>(IceFloor::PATH),
-                AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
-                true,
-                Projectile::IceExplosionAOE,
-            );
-            commands
-                .entity(ice)
-                .insert(YSort(-0.1))
-                .insert(IceExplosionDmg);
+            let mana_cost = Heirloom::IceStaffFloor.get_mana_cost();
+            if current_mana.0 >= mana_cost {
+                current_mana.0 -= mana_cost;
+                let ice = spawn_one_time_aseprite_collider(
+                    &mut commands,
+                    Transform::from_translation(hit_entity_txfm.translation()),
+                    6.5,
+                    hit.damage / 5,
+                    Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
+                    asset_server.load::<Aseprite, _>(IceFloor::PATH),
+                    AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
+                    true,
+                    Projectile::IceExplosionAOE,
+                );
+                commands
+                    .entity(ice)
+                    .insert(YSort(-0.1))
+                    .insert(IceExplosionDmg);
+            }
         }
         let Ok((burning_option, _poisoned_option, frailed_option, mut slowed_option)) =
             burn_or_venom_mobs.get_mut(hit.hit_entity)

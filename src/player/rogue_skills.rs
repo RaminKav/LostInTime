@@ -2,7 +2,7 @@ use std::{f32::consts::PI, time::Duration};
 
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
-    attributes::Attack,
+    attributes::{Attack, CurrentMana},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
     colors::BLACK,
@@ -127,6 +127,7 @@ pub fn handle_lunge(
         &FacingDirection,
         &Attack,
         &OwnedBlessings,
+        &mut CurrentMana,
     )>,
     key_inputs: Res<Input<KeyCode>>,
     mut commands: Commands,
@@ -134,7 +135,9 @@ pub fn handle_lunge(
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
 ) {
-    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg, blessings) in query.iter_mut() {
+    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg, blessings, mut current_mana) in
+        query.iter_mut()
+    {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
             if key_inputs.just_pressed(keybinds.get_active_skill_key(lunge_slot))
                 && lunge_state.lunge_cooldown_timer.finished()
@@ -166,18 +169,23 @@ pub fn handle_lunge(
 
                 // Skill Echo trigger: spawn an echo AoE at player position when using SprintLunge
                 if skills.has(Heirloom::SkillEcho) {
-                    let echo_dmg = (dmg.0 as f32 * 1.) as i32;
-                    let size_mult = projectile_size
-                        .get_single()
-                        .map(|s| s.get_multiplier())
-                        .unwrap_or(1.0);
-                    crate::player::melee_skills::spawn_echo_hitbox(
-                        &mut commands,
-                        &asset_server,
-                        e,
-                        echo_dmg,
-                        size_mult,
-                    );
+                    let mana_cost = Heirloom::SkillEcho.get_mana_cost();
+                    if current_mana.0 >= mana_cost {
+                        current_mana.0 -= mana_cost;
+
+                        let echo_dmg = (dmg.0 as f32 * 1.) as i32;
+                        let size_mult = projectile_size
+                            .get_single()
+                            .map(|s| s.get_multiplier())
+                            .unwrap_or(1.0);
+                        crate::player::melee_skills::spawn_echo_hitbox(
+                            &mut commands,
+                            &asset_server,
+                            e,
+                            echo_dmg,
+                            size_mult,
+                        );
+                    }
                 }
 
                 lunge_state.lunge_duration.tick(time.delta());

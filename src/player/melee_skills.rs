@@ -7,7 +7,8 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::{
-        modifiers::ModifyHealthEvent, Attack, CurrentHealth, HealthRegen, ProjectileSize,
+        modifiers::ModifyHealthEvent, Attack, CurrentHealth, CurrentMana, HealthRegen,
+        ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     colors::LIGHT_RED,
@@ -90,12 +91,13 @@ pub fn handle_echo_after_heal(
             &PlayerSkills,
             &Attack,
             &ProjectileSize,
+            &mut CurrentMana,
         ),
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
 ) {
-    for (e, changed_health, prev_health, skills, attack, projectile_size) in
+    for (e, changed_health, prev_health, skills, attack, projectile_size, mut current_mana) in
         changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
@@ -104,13 +106,17 @@ pub fn handle_echo_after_heal(
         }
 
         if skills.has(Heirloom::HealEcho) {
-            spawn_echo_hitbox(
-                &mut commands,
-                &asset_server,
-                e,
-                attack.0,
-                projectile_size.get_multiplier(),
-            );
+            let mana_cost = Heirloom::HealEcho.get_mana_cost();
+            if current_mana.0 >= mana_cost {
+                current_mana.0 -= mana_cost;
+                spawn_echo_hitbox(
+                    &mut commands,
+                    &asset_server,
+                    e,
+                    attack.0,
+                    projectile_size.get_multiplier(),
+                );
+            }
         }
     }
 }

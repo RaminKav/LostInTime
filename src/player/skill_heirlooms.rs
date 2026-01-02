@@ -7,7 +7,7 @@ use rand::Rng;
 
 use crate::{
     ai::FollowState,
-    attributes::{Attack, BonusAttackSpeed, CurrentHealth, MaxHealth},
+    attributes::{Attack, BonusAttackSpeed, CurrentHealth, CurrentMana, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
     combat::HitEvent,
@@ -20,7 +20,7 @@ use crate::{
     },
     player::{
         mage_skills::TeleportState,
-        melee_skills::SpearState,
+        melee_skills::{spawn_echo_hitbox, SpearState},
         rogue_skills::{LungeState, SprintState},
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState,
@@ -72,6 +72,7 @@ pub fn handle_active_skill_event(
             &mut CurrentHealth,
             &MaxHealth,
             &OwnedBlessings,
+            &mut CurrentMana,
         ),
         With<Player>,
     >,
@@ -85,8 +86,16 @@ pub fn handle_active_skill_event(
     prototypes: Prototypes,
 ) {
     for ev in events.iter() {
-        for (player_e, skills, player_txfm, attack_opt, mut health, max_health, blessings) in
-            players.iter_mut()
+        for (
+            player_e,
+            skills,
+            player_txfm,
+            attack_opt,
+            mut health,
+            max_health,
+            blessings,
+            mut current_mana,
+        ) in players.iter_mut()
         {
             // Get optional states from separate queries
             let stealth_state = skill_states.stealth_states.get(player_e).ok();
@@ -776,19 +785,23 @@ pub fn handle_active_skill_event(
                 if active.active_skill != ActiveSkill::Roll
                     && skills.has(crate::player::skills::Heirloom::SkillEcho)
                 {
-                    let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
-                    let size_mult = skill_states
-                        .player_projectile_size
-                        .get_single()
-                        .map(|s| s.get_multiplier())
-                        .unwrap_or(1.0);
-                    crate::player::melee_skills::spawn_echo_hitbox(
-                        &mut commands,
-                        &asset_server,
-                        player_e,
-                        echo_dmg,
-                        size_mult,
-                    );
+                    let mana_cost = Heirloom::SkillEcho.get_mana_cost();
+                    if current_mana.0 >= mana_cost {
+                        current_mana.0 -= mana_cost;
+                        let echo_dmg = attack_opt.map(|a| (a.0 as f32 * 1.) as i32).unwrap_or(15);
+                        let size_mult = skill_states
+                            .player_projectile_size
+                            .get_single()
+                            .map(|s| s.get_multiplier())
+                            .unwrap_or(1.0);
+                        spawn_echo_hitbox(
+                            &mut commands,
+                            &asset_server,
+                            player_e,
+                            echo_dmg,
+                            size_mult,
+                        );
+                    }
                 }
             }
         }

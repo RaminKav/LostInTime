@@ -586,7 +586,7 @@ pub enum Heirloom {
 
     // Weapon Upgrades
     ChanceToProcExtraAttack, // sceptor
-    IncreaseProjectilCount,  //whip
+    IncreaseProjectileCount, //whip
 
     IceStaffAoE,   // frozen tear
     BowArrowSpeed, // yarn
@@ -665,6 +665,24 @@ pub enum Heirloom {
 }
 
 impl Heirloom {
+    pub fn get_mana_cost(&self) -> i32 {
+        match self {
+            Heirloom::OnHitEcho => 3,
+            Heirloom::ChanceToProcExtraAttack => 5,
+            Heirloom::IncreaseProjectileCount => 3,
+            Heirloom::IceStaffAoE => 3,
+            Heirloom::FrozenAoE => 3,
+            Heirloom::IceStaffFloor => 2,
+            Heirloom::ViralVenum => 3,
+            Heirloom::HealEcho => 3,
+            Heirloom::SkillEcho => 3,
+            Heirloom::WaveAttack => 3,
+            Heirloom::AntFarm => 2,
+            Heirloom::StoneTooth => 2,
+            Heirloom::Reaper => 2,
+            _ => 0,
+        }
+    }
     pub fn get_title(&self) -> String {
         match self {
             Heirloom::CritChance => "Tusk".to_string(),
@@ -699,7 +717,7 @@ impl Heirloom {
             Heirloom::TeleportManaRegen => "Infused Cast".to_string(),
             Heirloom::TeleportStatusDMG => "Shock Mastery".to_string(),
             Heirloom::ChanceToProcExtraAttack => "Sceptor".to_string(),
-            Heirloom::IncreaseProjectilCount => "Whip".to_string(),
+            Heirloom::IncreaseProjectileCount => "Whip".to_string(),
             Heirloom::BowArrowSpeed => "Thread".to_string(),
             Heirloom::Gigantify => "Sappling".to_string(),
             Heirloom::XPGain => "Microchip".to_string(),
@@ -814,6 +832,7 @@ impl Heirloom {
                 "sonic wave attack".to_string(),
                 "that travels a".to_string(),
                 "short distance.".to_string(),
+                format!("Costs {} mana.", Heirloom::WaveAttack.get_mana_cost()),
             ],
             Heirloom::FrailStacks => vec![
                 "Your Attacks have".to_string(),
@@ -834,21 +853,28 @@ impl Heirloom {
                 "rush towards".to_string(),
                 "enemies, dealing".to_string(),
                 "damage.".to_string(),
+                format!("Costs {} mana.", Heirloom::AntFarm.get_mana_cost()),
             ],
             Heirloom::StoneTooth => vec![
                 "Spawn rocks that".to_string(),
                 "orbit you and deal".to_string(),
                 "damage to enemies".to_string(),
                 "they hit.".to_string(),
+                format!("Costs {} mana.", Heirloom::StoneTooth.get_mana_cost()),
             ],
             Heirloom::Reaper => vec![
                 "Soul fragments".to_string(),
                 "chase enemies".to_string(),
                 "after each kill,".to_string(),
                 "damaging them.".to_string(),
+                format!("Costs {} mana.", Heirloom::Reaper.get_mana_cost()),
             ],
             Heirloom::SkillEcho => {
-                vec!["Using a skill".to_string(), "summons an echo.".to_string()]
+                vec![
+                    "Using a skill".to_string(),
+                    "summons an echo.".to_string(),
+                    format!("Costs {} mana.", Heirloom::SkillEcho.get_mana_cost()),
+                ]
             }
             Heirloom::PoisonStacks => vec![
                 "Your Attacks have".to_string(),
@@ -914,11 +940,19 @@ impl Heirloom {
                 "Attacks have a.".to_string(),
                 "chance to trigger".to_string(),
                 "another attack.".to_string(),
+                format!(
+                    "Costs {} mana.",
+                    Heirloom::ChanceToProcExtraAttack.get_mana_cost()
+                ),
             ],
-            Heirloom::IncreaseProjectilCount => vec![
+            Heirloom::IncreaseProjectileCount => vec![
                 "Increase all weapon".to_string(),
                 "projectile count".to_string(),
                 "by 1.".to_string(),
+                format!(
+                    "Costs {} mana.",
+                    Heirloom::IncreaseProjectileCount.get_mana_cost()
+                ),
             ],
 
             Heirloom::IceStaffAoE => vec![
@@ -927,6 +961,7 @@ impl Heirloom {
                 "trigger an ice".to_string(),
                 "explosion that".to_string(),
                 "damages enemies. ".to_string(),
+                format!("Costs {} mana.", Heirloom::IceStaffAoE.get_mana_cost()),
             ],
             Heirloom::BowArrowSpeed => {
                 vec!["Your Projectiles".to_string(), "move faster.".to_string()]
@@ -990,6 +1025,7 @@ impl Heirloom {
                 "an echo that".to_string(),
                 "damages enemies ".to_string(),
                 "around you.".to_string(),
+                format!("Costs {} mana.", Heirloom::OnHitEcho.get_mana_cost()),
             ],
 
             Heirloom::Knockback => vec![
@@ -1019,6 +1055,7 @@ impl Heirloom {
                 "ice explosion that".to_string(),
                 "damages enemies.".to_string(),
                 "+25% freeze chance.".to_string(),
+                format!("Costs {} mana.", Heirloom::FrozenAoE.get_mana_cost()),
             ],
             Heirloom::IceStaffFloor => vec![
                 "Your Attacks have".to_string(),
@@ -1026,6 +1063,7 @@ impl Heirloom {
                 "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
                 "+25% freeze chance.".to_string(),
+                format!("Costs {} mana.", Heirloom::IceStaffFloor.get_mana_cost()),
             ],
             Heirloom::FrozenCrit => vec![
                 "Attacking frozen".to_string(),
@@ -1074,6 +1112,7 @@ impl Heirloom {
                 "poison to nearby".to_string(),
                 "enemies.".to_string(),
                 "+25% poison chance.".to_string(),
+                format!("Costs {} mana.", Heirloom::ViralVenum.get_mana_cost()),
             ],
             Heirloom::HealEcho => vec![
                 "Healing triggers".to_string(),
@@ -1081,6 +1120,7 @@ impl Heirloom {
                 "damages enemies ".to_string(),
                 "around you.".to_string(),
                 "+20 Health regen.".to_string(),
+                format!("Costs {} mana.", Heirloom::HealEcho.get_mana_cost()),
             ],
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
@@ -1189,7 +1229,7 @@ impl Heirloom {
         skills: PlayerSkills,
     ) {
         match self {
-            Heirloom::IncreaseProjectilCount => {
+            Heirloom::IncreaseProjectileCount => {
                 commands.entity(entity).insert(ClawUpgradeMultiThrow(
                     Timer::from_seconds(0.12, TimerMode::Once),
                     1,
@@ -1423,7 +1463,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::MPRegen, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::DodgeCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common),
-                HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
+                // HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common),
@@ -1452,7 +1492,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(
-                    Heirloom::IncreaseProjectilCount,
+                    Heirloom::IncreaseProjectileCount,
                     HeirloomRarity::Legendary,
                 ),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),

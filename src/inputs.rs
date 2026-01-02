@@ -938,7 +938,13 @@ pub fn mouse_click_system(
                     (game.skill_count(Heirloom::ChanceToProcExtraAttack) as f64 * 0.25)
                         .clamp(0., 1.),
                 ) {
-                2
+                let mana_cost = Heirloom::ChanceToProcExtraAttack.get_mana_cost();
+                if current_mana.0 >= mana_cost {
+                    current_mana.0 -= mana_cost;
+                    2
+                } else {
+                    1
+                }
             } else {
                 1
             };

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     animations::AttackEvent,
+    attributes::CurrentMana,
     audio::{AudioSoundEffect, SoundSpawner},
     item::projectile::{Projectile, RangedAttackEvent},
     player::{
@@ -36,12 +37,11 @@ impl Default for ItemAbility {
 pub fn handle_item_abilitiy_on_attack(
     mut attacks: EventReader<AttackEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut player: Query<(&PlayerSkills, &Attack), With<Player>>,
+    mut player: Query<(&PlayerSkills, &Attack, &mut CurrentMana), With<Player>>,
     game: GameParam,
     mut commands: Commands,
 ) {
-    let (skills, dmg) = player.single_mut();
-
+    let (skills, dmg, mut current_mana) = player.single_mut();
     let Some(_) = game.player().main_hand_slot else {
         return;
     };
@@ -50,18 +50,22 @@ pub fn handle_item_abilitiy_on_attack(
         if skills.has(Heirloom::WaveAttack)
             && rng.gen_bool((skills.get_count(Heirloom::WaveAttack) as f64 * 0.25).clamp(0., 1.))
         {
-            ranged_attack_event.send(RangedAttackEvent {
-                projectile: Projectile::Arc,
-                direction: attack.direction,
-                from_entity: None,
-                from_enemy: false,
-                is_followup_proj: true,
-                mana_cost: None,
-                dmg_override: Some(dmg.0),
-                pos_override: None,
-                spawn_delay: 0.1,
-            });
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.4));
+            let mana_cost = Heirloom::WaveAttack.get_mana_cost();
+            if current_mana.0 >= mana_cost {
+                current_mana.0 -= mana_cost;
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: Projectile::Arc,
+                    direction: attack.direction,
+                    from_entity: None,
+                    from_enemy: false,
+                    is_followup_proj: true,
+                    mana_cost: None,
+                    dmg_override: Some(dmg.0),
+                    pos_override: None,
+                    spawn_delay: 0.1,
+                });
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.4));
+            }
         }
     }
 }

@@ -7,7 +7,7 @@ use rand::Rng;
 
 use crate::{
     assets::Graphics,
-    attributes::{CurrentHealth, MaxHealth},
+    attributes::{CurrentHealth, CurrentMana, MaxHealth},
     blessings::{Blessing, OwnedBlessings},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
@@ -187,12 +187,14 @@ pub fn handle_ant_farm_state(
             &GlobalTransform,
             &PlayerSkills,
             Option<&mut AntFarmState>,
+            &mut CurrentMana,
         ),
         With<Player>,
     >,
     graphics: Res<Graphics>,
 ) {
-    let Ok((player_e, player_txfm, skills, mut state_option)) = player_query.get_single_mut()
+    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+        player_query.get_single_mut()
     else {
         return;
     };
@@ -229,6 +231,12 @@ pub fn handle_ant_farm_state(
     let mut rng = rand::thread_rng();
     let count_usize = count_i32.max(0) as usize;
     for i in 0..count_usize {
+        let mana_cost = Heirloom::AntFarm.get_mana_cost();
+        if curr_mana.0 >= mana_cost {
+            curr_mana.0 -= mana_cost;
+        } else {
+            break;
+        }
         let angle = rng.gen_range(0.0..TAU);
         let distance = rng.gen_range(0.0..6.0);
         let offset = Vec2::from_angle(angle) * distance;
@@ -248,7 +256,7 @@ pub fn handle_ant_farm_state(
             },
             AntFarmAnt {
                 target: None,
-                damage_fraction: 1.0 / 3.0,
+                damage_fraction: 1.0,
                 speed: ANT_SPEED,
                 lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
                 spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
@@ -349,6 +357,7 @@ pub fn update_stone_tooth(
             &GlobalTransform,
             &PlayerSkills,
             Option<&mut StoneToothState>,
+            &mut CurrentMana,
         ),
         With<Player>,
     >,
@@ -358,7 +367,8 @@ pub fn update_stone_tooth(
     graphics: Res<Graphics>,
     game: GameParam,
 ) {
-    let Ok((player_e, player_txfm, skills, mut state_option)) = player_query.get_single_mut()
+    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+        player_query.get_single_mut()
     else {
         return;
     };
@@ -417,6 +427,12 @@ pub fn update_stone_tooth(
 
     if owned_entities.len() < stacks as usize {
         for index in owned_entities.len()..stacks as usize {
+            let mana_cost = Heirloom::StoneTooth.get_mana_cost();
+            if curr_mana.0 >= mana_cost {
+                curr_mana.0 -= mana_cost;
+            } else {
+                break;
+            }
             let base_angle = TAU * index as f32 / stacks as f32;
             let offset = Vec2::from_angle(base_angle) * STONE_TOOTH_RADIUS;
             let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
@@ -496,7 +512,7 @@ pub fn update_stone_tooth(
                     snapshot.entity,
                     snapshot.max_health,
                     snapshot.kind.is_boss(),
-                    0.35,
+                    1.,
                 );
                 hit_events.send(HitEvent {
                     hit_entity: snapshot.entity,
@@ -522,29 +538,25 @@ pub fn update_stone_tooth(
 pub fn handle_reaper_soul_spawns(
     mut commands: Commands,
     mut death_events: EventReader<EnemyDeathEvent>,
-    player_query: Query<&PlayerSkills, With<Player>>,
+    mut player_query: Query<(&PlayerSkills, &mut CurrentMana), With<Player>>,
     graphics: Res<Graphics>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
 ) {
-    let Ok(skills) = player_query.get_single() else {
-        for _ in death_events.iter() {}
+    let Ok((skills, mut curr_mana)) = player_query.get_single_mut() else {
         return;
     };
     let stacks = skills.get_count(Heirloom::Reaper);
     let spawn_count = stacks.max(0) as usize;
 
     let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
-        for _ in death_events.iter() {}
         return;
     };
     let Some(sprite_template) = get_world_object_sprite(&graphics, WorldObject::ReaperSoul) else {
-        for _ in death_events.iter() {}
         return;
     };
 
     let mob_snapshots = gather_live_mobs(&mobs);
     if mob_snapshots.is_empty() || spawn_count == 0 {
-        for _ in death_events.iter() {}
         return;
     }
 
@@ -565,6 +577,12 @@ pub fn handle_reaper_soul_spawns(
         };
 
         for i in 0..spawn_count {
+            let mana_cost = Heirloom::Reaper.get_mana_cost();
+            if curr_mana.0 >= mana_cost {
+                curr_mana.0 -= mana_cost;
+            } else {
+                break;
+            }
             let offset = Vec2::from_angle(rng.gen_range(0.0..TAU)) * rng.gen_range(0.0..4.0);
             let mut sprite = sprite_template.clone();
             sprite.custom_size = Some(Vec2::splat(14.0));
