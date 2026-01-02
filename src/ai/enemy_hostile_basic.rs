@@ -162,6 +162,7 @@ pub struct LeapAttackState {
     pub attack_cooldown_timer: Timer,
     pub speed: f32,
     pub dir: Option<Vec2>,
+    pub attack_preview_entity: Option<Entity>,
 }
 
 // Entities in the `Attack` state should move towards the given entity at the given speed

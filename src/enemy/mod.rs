@@ -70,6 +70,7 @@ impl Plugin for EnemyPlugin {
             .add_systems(
                 (
                     red_mushking::tick_aoe_attack_timer.run_if(is_not_paused),
+                    red_mushking::tick_leap_attack_timer.run_if(is_not_paused),
                     red_mushking::handle_aoe_attack.run_if(is_not_paused),
                     stone_golem::tick_spike_attack_timer.run_if(is_not_paused),
                     stone_golem::handle_spike_attack.run_if(is_not_paused),
@@ -307,6 +308,7 @@ pub fn handle_new_mob_state_machine(
                         ),
                         dir: None,
                         speed: leap_attack.speed,
+                        attack_preview_entity: None,
                     },
                 )
                 .trans::<LeapAttackState>(

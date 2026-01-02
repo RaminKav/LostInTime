@@ -17,6 +17,7 @@ use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::{
     control::KinematicCharacterController,
     geometry::{Collider, Sensor},
+    prelude::{CollisionGroups, Group},
 };
 use rand::Rng;
 use seldom_state::{
@@ -47,15 +48,25 @@ aseprite!(pub RedMushking, "textures/redmushking/red_mushking.ase");
 //  - jump to player and attack (very often)
 // every so often, use summon attack
 
-const MAX_JUMP_DISTANCE: f32 = 16. * 5.5;
+const MAX_JUMP_DISTANCE: f32 = 16. * 8.0; // 8 tiles = 128 pixels
 
 pub fn handle_new_red_mushking_state_machine(
     mut commands: Commands,
-    spawn_events: Query<(Entity, &Mob, &Transform, &FollowSpeed, &LeapAttack), Added<Mob>>,
+    mut spawn_events: Query<
+        (
+            Entity,
+            &Mob,
+            &Transform,
+            &FollowSpeed,
+            &LeapAttack,
+            &mut KinematicCharacterController,
+        ),
+        Added<Mob>,
+    >,
     asset_server: Res<AssetServer>,
     game: GameParam,
 ) {
-    for (e, mob, transform, follow_speed, leap_attack) in spawn_events.iter() {
+    for (e, mob, transform, follow_speed, leap_attack, mut mover) in spawn_events.iter_mut() {
         if mob != &Mob::RedMushking {
             continue;
         }
@@ -71,6 +82,7 @@ pub fn handle_new_red_mushking_state_machine(
                 .expect("no shrine found"),
             false,
         );
+        mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
 
         e_cmds
             .insert(AsepriteBundle {
@@ -90,6 +102,9 @@ pub fn handle_new_red_mushking_state_machine(
             .insert(AttackCollider(None))
             .insert(AoEAttackTimer {
                 random_timer: Timer::from_seconds(0.0, TimerMode::Once), // Will be set randomly in tick_aoe_attack_timer
+            })
+            .insert(LeapAttackTimer {
+                random_timer: Timer::from_seconds(0.0, TimerMode::Once), // Will be set randomly in tick_leap_attack_timer
             });
 
         let state_machine = StateMachine::default()
@@ -124,6 +139,7 @@ pub fn handle_new_red_mushking_state_machine(
                     ),
                     dir: None,
                     speed: leap_attack.speed,
+                    attack_preview_entity: None,
                 },
             )
             .trans::<FollowState>(
@@ -192,6 +208,12 @@ pub struct AoEAttackTimer {
     pub random_timer: Timer, // Timer for random interval (1-4s)
 }
 
+/// Component that tracks the leap attack timer (always present on boss)
+#[derive(Component)]
+pub struct LeapAttackTimer {
+    pub random_timer: Timer, // Timer for random interval (2-5s)
+}
+
 /// State that is active during the AoE attack
 #[derive(Clone, Component, Reflect)]
 #[component(storage = "SparseSet")]
@@ -221,8 +243,11 @@ pub fn new_leap_attack(
         &mut AttackCollider,
     )>,
     mut commands: Commands,
+    mut leap_timers: Query<&mut LeapAttackTimer>,
     time: Res<Time>,
     mut game_camera: Query<Entity, With<TextureCamera>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     for (
         entity,
@@ -234,18 +259,90 @@ pub fn new_leap_attack(
         mut att_collider,
     ) in attacks.iter_mut()
     {
-        let frame = anim_state.current_frame();
-        if anim_state.is_paused() {
-            anim_state.play();
+        // Debug: Log timer states
+        let startup_elapsed = leap_attack.attack_startup_timer.elapsed_secs();
+        let startup_duration = leap_attack.attack_startup_timer.duration().as_secs_f32();
+        let startup_finished = leap_attack.attack_startup_timer.finished();
+        let duration_finished = leap_attack.attack_duration_timer.finished();
+        const SLAM_TIME: f32 = 0.45;
+        let has_slammed = leap_attack.attack_duration_timer.percent() >= SLAM_TIME;
+
+        // PHASE 1: Startup (wind-up animation)
+        // Tick startup timer and wait for it to finish
+        if !startup_finished {
+            leap_attack.attack_startup_timer.tick(time.delta());
+
+            // Set animation if not already set
+            let frame = anim_state.current_frame();
+            if !(14..=28).contains(&frame) {
+                *anim_state = AsepriteAnimation::from(RedMushking::tags::ATTACK_HOP);
+                anim_state.play();
+            }
+            continue;
         }
-        if !(14..=28).contains(&frame) {
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::ATTACK_HOP);
-        } else if frame == 23 {
-            // BEGIN DMGING
-            commands
-                .entity(entity)
-                .insert(MobIsAttacking(Mob::RedMushking));
-            if att_collider.0.is_none() {
+
+        // Capture target position at the START of the leap (only once)
+        if leap_attack.dir.is_none() {
+            let target_translation =
+                transforms.get(leap_attack.target).unwrap().translation + Vec3::new(0., 18., 0.);
+            let attack_transform = transforms.get(entity).unwrap();
+            let attack_translation = attack_transform.translation;
+
+            let delta = target_translation - attack_translation;
+            let distance = delta.length();
+            let max_leap_distance = MAX_JUMP_DISTANCE; // 8 tiles = 128 pixels
+
+            // Clamp to max distance if needed
+            let clamped_delta = if distance > max_leap_distance {
+                delta.normalize() * max_leap_distance
+            } else {
+                delta
+            };
+
+            leap_attack.dir = Some(clamped_delta.truncate());
+            info!(
+                "Leap Attack PHASE 1 START: direction {:?}, distance {:.1}, startup: {:.3}/{:.3}s",
+                leap_attack.dir, distance, startup_elapsed, startup_duration
+            );
+            let preview_entity = commands
+                .spawn((
+                    MaterialMesh2dBundle {
+                        mesh: meshes
+                            .add(
+                                shape::Circle {
+                                    radius: 40.0, // 40px diameter
+                                    ..Default::default()
+                                }
+                                .into(),
+                            )
+                            .into(),
+                        material: materials
+                            .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))), // Red with low alpha
+                        transform: Transform {
+                            translation: target_translation + Vec3::new(0., -15., 100.),
+                            ..default()
+                        },
+                        ..default()
+                    },
+                    BossAttackPreview,
+                ))
+                .id();
+            leap_attack.attack_preview_entity = Some(preview_entity);
+        }
+
+        // We've exited phase 1 - log this transition
+
+        // PHASE 2: Active leap (moving and dealing damage)
+        // Only tick duration timer AFTER startup is complete
+        if !duration_finished {
+            leap_attack.attack_duration_timer.tick(time.delta());
+
+            // Spawn damage collider at the start of the active phase (only once)
+            if att_collider.0.is_none() && has_slammed {
+                commands
+                    .entity(entity)
+                    .insert(MobIsAttacking(Mob::RedMushking));
+
                 let hitbox = commands
                     .spawn((
                         TransformBundle::default(),
@@ -259,65 +356,74 @@ pub fn new_leap_attack(
                     .set_parent(entity)
                     .id();
                 att_collider.0 = Some(hitbox);
+
+                // Screen shake
                 let mut rng = rand::thread_rng();
                 let seed = rng.gen_range(0..100000);
-                let speed = 10.;
-                let max_mag = 80.;
-                let noise = 0.5;
-                let dir = Vec2::new(1., 1.);
                 for e in game_camera.iter_mut() {
                     commands.entity(e).insert(ShakeEffect {
                         timer: Timer::from_seconds(0.4, TimerMode::Once),
-                        speed,
+                        speed: 10.,
                         seed,
-                        max_mag,
-                        noise,
-                        dir,
+                        max_mag: 80.,
+                        noise: 0.5,
+                        dir: Vec2::new(1., 1.),
                     });
                 }
+                if let Some(entity) = leap_attack.attack_preview_entity {
+                    if let Some(entity_commands) = commands.get_entity(entity) {
+                        entity_commands.despawn_recursive();
+                    }
+                }
             }
-        }
-        // Get the positions of the attacker and target
-        let target_translation =
-            transforms.get(leap_attack.target).unwrap().translation + Vec3::new(0., 18., 0.);
-        let attack_transform = transforms.get_mut(entity).unwrap();
-        let attack_translation = attack_transform.translation;
-        if frame == 16 && leap_attack.dir.is_none() {
-            let delta = (target_translation - attack_translation).clamp(
-                Vec3::splat(-MAX_JUMP_DISTANCE),
-                Vec3::splat(MAX_JUMP_DISTANCE),
-            );
-            leap_attack.dir = Some(delta.truncate());
+
+            // Move towards target position
+            if let Some(dir) = leap_attack.dir {
+                if !has_slammed {
+                    // Before slam - use normal speed
+                    let leap_duration =
+                        leap_attack.attack_duration_timer.duration().as_secs_f32() * SLAM_TIME;
+                    let leap_speed = dir.length() / leap_duration;
+                    let normalized_dir = dir.normalize_or_zero();
+
+                    kcc.translation = Some(normalized_dir * leap_speed * time.delta_seconds());
+                }
+            }
+            continue;
         }
 
-        // BEGIN MOVING
-        if (18..=23).contains(&frame) {
-            // println!("      begin moveing {:?}", time.delta_seconds());
-            kcc.translation =
-                Some((leap_attack.dir.unwrap_or(Vec2::ZERO) * time.delta_seconds()) * 10. / 6.);
+        // PHASE 3: End of leap - cleanup and transition back
+
+        // Reset leap timer for next attack
+        if let Ok(mut leap_timer) = leap_timers.get_mut(entity) {
+            let mut rng = rand::thread_rng();
+            let random_duration = rng.gen_range(0.5..4.);
+            leap_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
         }
-        // END LEAP ATTACK
-        if frame == 28 {
-            // println!("              end leap attack");
-            commands
-                .entity(entity)
-                .insert(FollowState {
-                    target: leap_attack.target,
-                    curr_delta: None,
-                    curr_path: None,
-                    speed: follow_speed.0,
-                })
-                .insert(EnemyAttackCooldown(
-                    leap_attack.attack_cooldown_timer.clone(),
-                ))
-                .remove::<LeapAttackState>()
-                .remove::<MobIsAttacking>();
-            *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
-            if let Some(hitbox) = att_collider.0 {
-                commands.entity(hitbox).despawn_recursive();
-                att_collider.0 = None;
-            }
+
+        // Reset animation to WALK
+        *anim_state = AsepriteAnimation::from(RedMushking::tags::WALK);
+        anim_state.play();
+
+        // Despawn hitbox
+        if let Some(hitbox) = att_collider.0.take() {
+            commands.entity(hitbox).despawn_recursive();
         }
+
+        // Transition back to FollowState
+        commands
+            .entity(entity)
+            .insert(FollowState {
+                target: leap_attack.target,
+                curr_delta: None,
+                curr_path: None,
+                speed: follow_speed.0,
+            })
+            .insert(EnemyAttackCooldown(
+                leap_attack.attack_cooldown_timer.clone(),
+            ))
+            .remove::<LeapAttackState>()
+            .remove::<MobIsAttacking>();
     }
 }
 pub fn summon_attack(
@@ -389,7 +495,7 @@ pub fn summon_attack(
                     speed: follow_speed.0,
                 })
                 .insert(EnemyAttackCooldown(Timer::from_seconds(
-                    2.,
+                    0.8,
                     TimerMode::Once,
                 )))
                 .remove::<SummonAttackState>();
@@ -473,13 +579,68 @@ pub fn new_follow(
 pub struct JumpTimer;
 
 impl BoolTrigger for JumpTimer {
-    type Param<'w, 's> = Query<'w, 's, &'static EnemyAttackCooldown>;
+    type Param<'w, 's> = (
+        Query<
+            'w,
+            's,
+            (
+                &'static LeapAttackTimer,
+                Option<&'static EnemyAttackCooldown>,
+                Option<&'static AoEAttackState>,
+            ),
+        >,
+        Query<'w, 's, &'static Transform>,
+        Query<'w, 's, (Entity, &'static crate::player::Player)>,
+    );
 
-    fn trigger(&self, entity: Entity, attack_cooldown: Self::Param<'_, '_>) -> bool {
-        if attack_cooldown.get(entity).is_ok() {
-            return false;
+    fn trigger(
+        &self,
+        entity: Entity,
+        (leap_timer_query, transforms, player_query): Self::Param<'_, '_>,
+    ) -> bool {
+        // Check if timer is finished and no cooldown
+        match leap_timer_query.get(entity) {
+            Ok((leap_timer, attack_cooldown, aoe_state)) => {
+                // Don't trigger if on cooldown
+                if attack_cooldown.is_some() {
+                    return false;
+                }
+
+                // Don't trigger if already in AoE attack state
+                if aoe_state.is_some() {
+                    return false;
+                }
+
+                // Don't trigger if timer duration is 0 (uninitialized)
+                if leap_timer.random_timer.duration().as_secs_f32() == 0.0 {
+                    return false;
+                }
+
+                // Don't trigger if timer not finished
+                if !leap_timer.random_timer.finished() {
+                    return false;
+                }
+
+                // Check if player is within 10 tiles (160 pixels)
+                if let Ok(boss_txfm) = transforms.get(entity) {
+                    if let Ok((player_entity, _)) = player_query.get_single() {
+                        if let Ok(player_txfm) = transforms.get(player_entity) {
+                            let distance = (boss_txfm.translation.truncate()
+                                - player_txfm.translation.truncate())
+                            .length();
+                            let max_leap_distance = 10.0 * 16.0;
+
+                            if distance <= max_leap_distance {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                false
+            }
+            Err(_) => false,
         }
-        true
     }
 }
 
@@ -493,20 +654,26 @@ impl BoolTrigger for AoEAttackTimerTrigger {
         (
             &'static AoEAttackTimer,
             Option<&'static EnemyAttackCooldown>,
+            Option<&'static LeapAttackState>,
         ),
     >;
 
     fn trigger(&self, entity: Entity, query: Self::Param<'_, '_>) -> bool {
         match query.get(entity) {
-            Ok((aoe_timer, attack_cooldown)) => {
-                let finished = aoe_timer.random_timer.finished();
+            Ok((aoe_timer, attack_cooldown, leap_state)) => {
                 // Only trigger if not on cooldown and random timer is finished
+                // Also require timer duration > 0 to avoid triggering on uninitialized timers
                 if attack_cooldown.is_some() {
-                    let cooldown_percent = attack_cooldown.unwrap().0.percent();
                     return false;
                 }
-
-                return finished;
+                // Don't trigger if already in leap attack state
+                if leap_state.is_some() {
+                    return false;
+                }
+                if aoe_timer.random_timer.duration().as_secs_f32() == 0.0 {
+                    return false;
+                }
+                aoe_timer.random_timer.finished()
             }
             Err(_) => {
                 // This shouldn't happen often, but log it if it does
@@ -651,6 +818,39 @@ pub fn tick_aoe_attack_timer(
         // Tick the random timer
         let was_finished = aoe_timer.random_timer.finished();
         aoe_timer.random_timer.tick(time.delta());
+    }
+}
+
+/// System to tick the leap attack random timer
+pub fn tick_leap_attack_timer(
+    mut leap_timers: Query<(Entity, &mut LeapAttackTimer), With<Mob>>,
+    boss_health: Query<(&CurrentHealth, &MaxHealth), With<Mob>>,
+    time: Res<Time>,
+) {
+    for (entity, mut leap_timer) in leap_timers.iter_mut() {
+        // If random timer hasn't been set yet, set it to a random duration
+        if leap_timer.random_timer.duration().as_secs_f32() == 0.0 {
+            let mut rng = rand::thread_rng();
+
+            // Check if boss is below half health - if so, use shorter timer (more frequent)
+            let is_below_half_health = boss_health
+                .get(entity)
+                .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
+                .unwrap_or(false);
+
+            let random_duration = if is_below_half_health {
+                // Faster range: 1.5..3.0 seconds
+                rng.gen_range(1.5..3.0)
+            } else {
+                // Normal range: 2.5..5.0 seconds (less frequent than before)
+                rng.gen_range(2.5..5.0)
+            };
+
+            leap_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
+        }
+
+        // Tick the random timer
+        leap_timer.random_timer.tick(time.delta());
     }
 }
 
@@ -825,7 +1025,7 @@ pub fn handle_aoe_attack(
                         speed: 1.0, // Default speed, will be overridden by FollowSpeed
                     })
                     .insert(EnemyAttackCooldown(Timer::from_seconds(
-                        2.0,
+                        1.0,
                         TimerMode::Once,
                     )));
 

@@ -481,22 +481,6 @@ fn give_player_starting_items(
         crate::attributes::ItemRarity::Common
     };
 
-    // Spawn the starting weapon and mark it for rarity override
-    let player_pos = game.player().position.truncate();
-    if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
-        starting_weapon,
-        &proto,
-        player_pos,
-        1,
-        Some(1), // Use default level, we'll override rarity instead
-    ) {
-        // Mark this weapon as a starting weapon with specific rarity
-        commands.entity(weapon_entity).insert(StartingWeapon {
-            rarity: weapon_rarity,
-        });
-        force_player_autopick(&mut game);
-    }
-
     for pet in player_class
         .as_ref()
         .map(|pc| pc.pets.clone())
@@ -550,41 +534,54 @@ fn give_player_starting_items(
     // );
 
     // Handle pending rewards (food, tomes, orbs)
-    if !run_state.pending_rewards {
-        return;
+    if run_state.pending_rewards {
+        let mut rng = rand::thread_rng();
+        let food_options = [
+            WorldObject::RedMushroomBlock,
+            WorldObject::BrownMushroomBlock,
+            WorldObject::Apple,
+        ];
+
+        let player_pos = game.player().position.truncate();
+
+        let mut upgrade_rewards = vec![];
+
+        for _ in 0..run_state.pending_food {
+            upgrade_rewards.push(
+                *food_options
+                    .choose(&mut rng)
+                    .unwrap_or(&WorldObject::RedMushroomBlock),
+            );
+        }
+        for _ in 0..run_state.pending_tomes {
+            upgrade_rewards.push(WorldObject::UpgradeTome);
+        }
+
+        for _ in 0..run_state.pending_orbs {
+            upgrade_rewards.push(WorldObject::OrbOfTransformation);
+        }
+        upgrade_rewards.iter().for_each(|obj| {
+            spawn_reward_drop(&mut proto_commands, &proto, player_pos, *obj, 1);
+        });
+
+        force_player_autopick(&mut game);
     }
 
-    let mut rng = rand::thread_rng();
-    let food_options = [
-        WorldObject::RedMushroomBlock,
-        WorldObject::BrownMushroomBlock,
-        WorldObject::Apple,
-    ];
-
+    // Spawn the starting weapon and mark it for rarity override
     let player_pos = game.player().position.truncate();
-
-    let mut upgrade_rewards = vec![];
-
-    for _ in 0..run_state.pending_food {
-        upgrade_rewards.push(
-            *food_options
-                .choose(&mut rng)
-                .unwrap_or(&WorldObject::RedMushroomBlock),
-        );
+    if let Some(weapon_entity) = proto_commands.spawn_item_from_proto(
+        starting_weapon,
+        &proto,
+        player_pos,
+        1,
+        Some(1), // Use default level, we'll override rarity instead
+    ) {
+        // Mark this weapon as a starting weapon with specific rarity
+        commands.entity(weapon_entity).insert(StartingWeapon {
+            rarity: weapon_rarity,
+        });
+        force_player_autopick(&mut game);
     }
-    for _ in 0..run_state.pending_tomes {
-        upgrade_rewards.push(WorldObject::UpgradeTome);
-    }
-
-    for _ in 0..run_state.pending_orbs {
-        upgrade_rewards.push(WorldObject::OrbOfTransformation);
-    }
-    upgrade_rewards.iter().for_each(|obj| {
-        spawn_reward_drop(&mut proto_commands, &proto, player_pos, *obj, 1);
-    });
-
-    force_player_autopick(&mut game);
-
     // run_state.pending_food = 0;
     // run_state.pending_tomes = 0;
     // run_state.pending_orbs = 0;

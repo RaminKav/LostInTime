@@ -1086,7 +1086,7 @@
             size: (16., 16.),
             anchor: None,
         ),
-        IncreaseProjectilCount: WorldObjectData(
+        IncreaseProjectileCount: WorldObjectData(
             texture_pos: (6., 20.),
             size: (16., 16.),
             anchor: None,
