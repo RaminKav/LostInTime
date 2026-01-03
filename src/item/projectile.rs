@@ -407,13 +407,7 @@ fn handle_spawn_projectiles_after_delay(
                     }
                 }
 
-                let mana_full_bonus =
-                    if game.has_skill(Heirloom::MPBarDMG) && proj.was_mana_bar_full {
-                        1.25
-                    } else {
-                        1.
-                    };
-                let player_att = (game.player_stats.single().0 .0 as f32 * mana_full_bonus) as i32;
+                let player_att = game.player_stats.single().0 .0;
                 let computed_dmg = proj.dmg_override.unwrap_or(player_att);
                 info!(
                     "Spawned projectile {:?} with dmg {}",

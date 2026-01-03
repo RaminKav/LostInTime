@@ -33,10 +33,10 @@ impl Plugin for SpawnerPlugin {
                     // handle_add_fairy_spawners,
                     test_mob_count,
                     spawn_stone_golem_timer.run_if(is_not_paused),
-                    reset_stone_golem_timer_on_era_change,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(reset_stone_golem_timer_on_era_change)
             .add_system(
                 add_spawners_to_new_chunks
                     .run_if(run_once_per_run())
@@ -394,10 +394,14 @@ fn tick_spawner_timers(
         }
         if spawner.spawn_timer.finished() {
             spawner.spawn_timer.reset();
-            for _ in 0..(spawner.num_to_spawn.unwrap_or(1)
-                + bonus_spawn_count_chaos
-                + endless_mode_spawn_count_increase as u32)
-            {
+            let num_to_spawn = if spawner.enemy == Mob::RedMushling {
+                1
+            } else {
+                spawner.num_to_spawn.unwrap_or(1)
+                    + bonus_spawn_count_chaos
+                    + endless_mode_spawn_count_increase as u32
+            };
+            for _ in 0..num_to_spawn {
                 spawn_event.send(MobSpawnEvent {
                     mob: spawner.enemy.clone(),
                     bypass_timers: false,

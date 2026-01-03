@@ -365,7 +365,8 @@ impl ItemAttributes {
         // Add attack cooldown (Hits/s) if it exists
         if combined_attrs.attack_cooldown != 0. {
             tooltips.push((
-                format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
+                "".to_string(),
+                // format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
                 "".to_string(),
                 AttributeQuality::Average,
             ));
@@ -503,8 +504,9 @@ impl ItemAttributes {
             } else {
                 0
             };
-        if self.mana.value > 0 && self.mana.value + chaos_mana_bonus != old_max_mana {
-            entity.insert(MaxMana(self.mana.value + chaos_mana_bonus));
+        let computed_mana = self.mana + skills.get_count(Heirloom::Mana) * 25 + chaos_mana_bonus;
+        if self.mana.value > 0 && computed_mana.value != old_max_mana {
+            entity.insert(MaxMana(computed_mana.value));
         }
         if self.health.value > 0 && computed_health.value != old_max_health {
             entity.insert(MaxHealth(computed_health.value));

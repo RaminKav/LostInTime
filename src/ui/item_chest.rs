@@ -477,7 +477,9 @@ pub fn handle_anim_events(
                                 filtered_items.choose(&mut rng).expect("No items found");
                             let mut stack =
                                 proto.get_item_data(pick_new_item.clone()).unwrap().clone();
-                            let max_item_level = (game.get_player_level() as i32 - 2).max(1) as u8;
+                            let max_item_level = ((game.get_player_level() as i32 / 2) - 5)
+                                .clamp(1, 5) as u8
+                                + (game.get_player_level() as i32 / 10).clamp(0, 10) as u8;
                             let level = rng.gen_range(1..=max_item_level);
                             stack.metadata.level = Some(level);
 

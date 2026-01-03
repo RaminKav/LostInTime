@@ -22,6 +22,18 @@
                 rate: 1.
             ),
             (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 0.5
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 0.5
+            ),
+            (
                 item: Coin,
                 min: 5,
                 max: 10,

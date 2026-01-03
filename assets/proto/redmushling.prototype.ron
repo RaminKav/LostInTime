@@ -24,73 +24,73 @@
                 item: SmallPotion,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.0006
             ),
             (
                 item: LargePotion,
                 min: 1,
                 max: 1,
-                rate: 0.001
+                rate: 0.00025
             ),
             (
                 item: AttackSpeedPotion,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.0006
             ),
             (
                 item: MovementSpeedPotion,
                 min: 1,
                 max: 1,
-                rate: 0.004
+                rate: 0.0006
+            ),
+            (
+                item: ChestBlock,
+                min: 1,
+                max: 1,
+                rate: 0.0025
+            ),
+            (
+                item: HeirloomChest,
+                min: 1,
+                max: 1,
+                rate: 0.003
+            ),
+            (
+                item: UpgradeTome,
+                min: 1,
+                max: 1,
+                rate: 0.007
+            ),
+            (
+                item: OrbOfTransformation,
+                min: 1,
+                max: 1,
+                rate: 0.0035
+            ),
+            (
+                item: Key,
+                min: 1,
+                max: 1,
+                rate: 0.0013
+            ),
+            (
+                item: TimeFragment,
+                min: 1,
+                max: 1,
+                rate: 0.008
+            ),
+            (
+                item: Coin,
+                min: 1,
+                max: 1,
+                rate: 0.22
             ),
             (
                 item: RedMushroomBlock,
                 min: 1,
                 max: 2,
                 rate: 1.
-            ),
-            (
-                item: ChestBlock,
-                min: 1,
-                max: 1,
-                rate: 0.01
-            ),
-            (
-                item: HeirloomChest,
-                min: 1,
-                max: 1,
-                rate: 0.01
-            ),
-            (
-                item: UpgradeTome,
-                min: 1,
-                max: 1,
-                rate: 0.03
-            ),
-            (
-                item: OrbOfTransformation,
-                min: 1,
-                max: 1,
-                rate: 0.015
-            ),
-            (
-                item: Key,
-                min: 1,
-                max: 1,
-                rate: 0.002
-            ),
-            (
-                item: TimeFragment,
-                min: 1,
-                max: 1,
-                rate: 0.01
-            ),
-            (
-                item: Coin,
-                min: 1,
-                max: 1,
-                rate: 0.28
             ),
             ]
         ),

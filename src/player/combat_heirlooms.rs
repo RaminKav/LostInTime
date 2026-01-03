@@ -7,8 +7,7 @@ use rand::Rng;
 
 use crate::{
     assets::Graphics,
-    attributes::{CurrentHealth, CurrentMana, MaxHealth},
-    blessings::{Blessing, OwnedBlessings},
+    attributes::{modifiers::ModifyManaEvent, CurrentHealth, CurrentMana, MaxHealth},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
@@ -485,9 +484,13 @@ pub fn update_stone_tooth(
         let base_angle = TAU * index as f32 / stacks as f32;
         stone.base_angle = base_angle;
 
-        if respawn_stones {
-            stone.active = true;
-            *visibility = Visibility::Inherited;
+        if respawn_stones && stone.active == false {
+            let mana_cost = Heirloom::StoneTooth.get_mana_cost();
+            if curr_mana.0 >= mana_cost {
+                curr_mana.0 -= mana_cost;
+                stone.active = true;
+                *visibility = Visibility::Inherited;
+            }
         }
 
         let angle = base_angle + rotation_progress * TAU;
@@ -616,25 +619,14 @@ pub fn handle_mana_orb_drops(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
-    game: GameParam,
-    blessings: Query<&OwnedBlessings>,
+    heirlooms: Query<&PlayerSkills>,
 ) {
     let mut rng = rand::thread_rng();
     for event in death_events.iter() {
-        let has_mana_item = game.inv_slot_query.iter().any(|slot| {
-            slot.obj_type
-                .map(|obj| obj.is_magic_weapon())
-                .unwrap_or(false)
-        });
-        let has_mana_blessing = blessings
-            .get(game.game.player)
-            .map(|b| b.has_blessing(Blessing::AttackManaCost))
-            .unwrap_or(false);
-        if !has_mana_item && !has_mana_blessing {
-            continue;
-        }
+        let skills = heirlooms.single();
 
-        if !rng.gen_bool(0.30) {
+        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1;
+        if !rng.gen_bool(mana_orb_chance.clamp(0.0, 1.0)) {
             continue;
         }
         let offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
@@ -653,9 +645,8 @@ pub fn handle_boss_hit_mana_orb_drops(
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut hit_events: EventReader<HitEvent>,
-    game: GameParam,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
-    blessings: Query<&OwnedBlessings>,
+    heirlooms: Query<&PlayerSkills>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -669,24 +660,10 @@ pub fn handle_boss_hit_mana_orb_drops(
             continue;
         }
 
-        // Check if player has a staff in hotbar
-        let has_staff = game.inv_slot_query.iter().any(|slot| {
-            slot.obj_type
-                .map(|obj| obj.is_magic_weapon())
-                .unwrap_or(false)
-        });
+        let skills = heirlooms.single();
 
-        let has_mana_blessing = blessings
-            .get(game.game.player)
-            .map(|b| b.has_blessing(Blessing::AttackManaCost))
-            .unwrap_or(false);
-
-        if !has_staff && !has_mana_blessing {
-            continue;
-        }
-
-        // 30% chance to drop mana orb
-        if !rng.gen_bool(0.25) {
+        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1;
+        if !rng.gen_bool(mana_orb_chance.clamp(0.0, 1.0)) {
             continue;
         }
 
@@ -1217,5 +1194,113 @@ impl HallucinationStats {
     /// Get the inner ItemAttributes for combining with player stats
     pub fn as_item_attributes(&self) -> &crate::attributes::ItemAttributes {
         &self.0
+    }
+}
+
+// ============================================================================
+// ManaChargeDamage (MPBarDMG) - Mana regen charges up bonus damage
+// ============================================================================
+
+/// Tracks accumulated mana regen for the MPBarDMG heirloom.
+/// When mana is regenerated, the amount is stored here.
+/// The next weapon attack consumes the stored mana as bonus flat damage.
+#[derive(Component, Default)]
+pub struct ManaChargeDamageState {
+    pub stored_mana_damage: f32,
+}
+
+impl ManaChargeDamageState {
+    /// Get the bonus damage (non-mutating).
+    /// Additional stacks increase the damage by 50% per stack.
+    pub fn get_damage(&self, stacks: i32) -> i32 {
+        if self.stored_mana_damage <= 0.0 {
+            return 0;
+        }
+
+        // Base damage = stored mana, each additional stack adds 50% more
+        // 1 stack = 1.0x, 2 stacks = 1.5x, 3 stacks = 2.0x, etc.
+        let multiplier = 1.0 + (stacks - 1).max(0) as f32 * 0.5;
+        (self.stored_mana_damage * multiplier).floor() as i32
+    }
+
+    /// Reset the stored mana after it was used in an attack
+    pub fn reset(&mut self) {
+        self.stored_mana_damage = 0.0;
+    }
+
+    /// Add mana regen to the stored damage
+    pub fn add_mana(&mut self, amount: i32) {
+        if amount > 0 {
+            self.stored_mana_damage += amount as f32;
+        }
+    }
+
+    /// Check if there's any stored mana to use
+    pub fn has_stored_mana(&self) -> bool {
+        self.stored_mana_damage > 0.0
+    }
+}
+
+/// System to track mana regen and store it for the MPBarDMG heirloom
+pub fn handle_mana_charge_damage(
+    mut mana_events: EventReader<ModifyManaEvent>,
+    mut player_query: Query<(&PlayerSkills, Option<&mut ManaChargeDamageState>), With<Player>>,
+) {
+    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    // Only process if player has the heirloom
+    if skills.get_count(Heirloom::MPBarDMG) <= 0 {
+        return;
+    }
+
+    let Some(mut state) = state_option else {
+        return;
+    };
+
+    for event in mana_events.iter() {
+        // Only track positive mana changes (regen, not consumption)
+        if event.0 > 0 {
+            state.add_mana(event.0);
+        }
+    }
+}
+
+/// System to reset stored mana after an attack is made.
+/// Runs after HitEvents are processed.
+pub fn handle_mana_charge_damage_reset(
+    mut hit_events: EventReader<HitEvent>,
+    mut player_query: Query<(&PlayerSkills, Option<&mut ManaChargeDamageState>), With<Player>>,
+) {
+    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    if skills.get_count(Heirloom::MPBarDMG) <= 0 {
+        return;
+    }
+    // Only reset if there was a hit from the player (not from mobs, not from heirloom effects)
+    let mut player_dealt_damage = false;
+    for event in hit_events.iter() {
+        // Player weapon hits have hit_with_melee or hit_with_projectile set
+        // Exclude heirloom effect damage (like echoes) to only consume on weapon attacks
+        if !event.from_heirloom_effect
+            && (event.hit_with_melee.is_some() || event.hit_with_projectile.is_some())
+            && event.hit_by_mob.is_none()
+        {
+            player_dealt_damage = true;
+            break;
+        }
+    }
+
+    if !player_dealt_damage {
+        return;
+    }
+
+    if let Some(mut state) = state_option {
+        if state.has_stored_mana() {
+            state.reset();
+        }
     }
 }

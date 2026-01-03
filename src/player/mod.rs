@@ -11,9 +11,9 @@ use bevy_rapier2d::{
 use combat_heirlooms::{
     break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
     handle_crate_break_damage, handle_death_defiance_freeze, handle_dodge_crit_activation,
-    handle_dodge_crit_next_hit_reset, handle_mana_orb_drops, handle_max_hp_hunt,
-    handle_reaper_soul_spawns, tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants,
-    update_reaper_souls, update_stone_tooth,
+    handle_dodge_crit_next_hit_reset, handle_mana_charge_damage, handle_mana_charge_damage_reset,
+    handle_mana_orb_drops, handle_max_hp_hunt, handle_reaper_soul_spawns, tick_dodge_crit_buff,
+    tick_stand_still_state, update_ant_farm_ants, update_reaper_souls, update_stone_tooth,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
@@ -202,6 +202,10 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::handle_crit_heal
                         .run_if(is_not_paused)
                         .after(handle_hits),
+                    handle_mana_charge_damage.run_if(is_not_paused),
+                    handle_mana_charge_damage_reset
+                        .run_if(is_not_paused)
+                        .after(handle_hits),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -353,7 +357,7 @@ fn spawn_player(
                 mana: AttributeValue::new(100, AttributeQuality::Low, 0.),
                 attack: AttributeValue::new(0, AttributeQuality::Low, 0.),
                 health_regen: AttributeValue::new(2, AttributeQuality::Low, 0.),
-                mana_regen: AttributeValue::new(5, AttributeQuality::Low, 0.),
+                mana_regen: AttributeValue::new(10, AttributeQuality::Low, 0.),
                 crit_chance: AttributeValue::new(5, AttributeQuality::Low, 0.),
                 crit_damage: AttributeValue::new(150, AttributeQuality::Low, 0.),
                 ..default()
@@ -394,7 +398,7 @@ fn spawn_player(
         .insert(VisibilityBundle::default())
         .insert(FacingDirection::Down)
         .insert(ActiveEvents::COLLISION_EVENTS)
-        .insert(ManaRegenTimer(Timer::from_seconds(2., TimerMode::Once)))
+        .insert(ManaRegenTimer(Timer::from_seconds(6., TimerMode::Once)))
         .insert(RunDustTimer(Timer::from_seconds(0.25, TimerMode::Once)))
         .insert(RigidBody::KinematicPositionBased)
         .insert(PlayerLevel::new(1))

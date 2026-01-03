@@ -562,6 +562,7 @@ pub enum Heirloom {
     SkillCDReduction, // placeholder
     LoadedDice,       // increases luck by 7
     Health,           //red mushroom
+    Mana,             //blue mushroom
     Shield,           // CD
     Thorns,           //bushling scale
     Lifesteal,        // rose
@@ -662,6 +663,7 @@ pub enum Heirloom {
     CritHeal,          // Crits heal
     LowHPDamage,       // More damage at low HP
     ChaosStats,        // +2 chaos, +10 to many stats
+    ManaOrbs,
 }
 
 impl Heirloom {
@@ -689,7 +691,8 @@ impl Heirloom {
             Heirloom::CritDamage => "Flint".to_string(),
             Heirloom::SkillCDReduction => "Stanley".to_string(),
             Heirloom::LoadedDice => "Loaded Dice".to_string(),
-            Heirloom::Health => "Weird Mushroom".to_string(),
+            Heirloom::Health => "Red Mushroom".to_string(),
+            Heirloom::Mana => "Blue Mushroom".to_string(),
             Heirloom::Shield => "CDz".to_string(),
             Heirloom::Speed => "Feather".to_string(),
             Heirloom::Thorns => "Bushling Scales".to_string(),
@@ -774,6 +777,7 @@ impl Heirloom {
             Heirloom::CritHeal => "Vampiric Ring".to_string(),
             Heirloom::LowHPDamage => "Beer!".to_string(),
             Heirloom::ChaosStats => "Chaotic Candle".to_string(),
+            Heirloom::ManaOrbs => "Mana Dust".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -796,6 +800,7 @@ impl Heirloom {
                 vec!["Gain +7 Luck,".to_string(), "permanently.".to_string()]
             }
             Heirloom::Health => vec!["Gain +25 Health,".to_string(), "permanently.".to_string()],
+            Heirloom::Mana => vec!["Gain +25 Mana,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
             Heirloom::Speed => vec!["Gain +10 Speed,".to_string(), "permanently.".to_string()],
             Heirloom::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
@@ -1073,10 +1078,10 @@ impl Heirloom {
                 "+25% freeze chance.".to_string(),
             ],
             Heirloom::MPBarDMG => vec![
-                "Your staff's attacks".to_string(),
-                "gain +25% damage".to_string(),
-                "if your mana bar".to_string(),
-                "is full.".to_string(),
+                "Mana regeneration".to_string(),
+                "is stored, adding".to_string(),
+                "bonus damage on".to_string(),
+                "your next attack.".to_string(),
             ],
             Heirloom::MPBarCrit => vec![
                 "Your staff's attacks".to_string(),
@@ -1213,6 +1218,12 @@ impl Heirloom {
                 "+10 def, +10% crit".to_string(),
                 "+10 spd, +10 dodge".to_string(),
             ],
+            Heirloom::ManaOrbs => vec![
+                "Mana Orbs drop".to_string(),
+                "from mobs with a.".to_string(),
+                "+10% chance. They".to_string(),
+                "trigger mana regen.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1304,6 +1315,14 @@ impl Heirloom {
                     commands
                         .entity(entity)
                         .insert(crate::player::combat_heirlooms::HallucinationStats::default());
+                }
+            }
+            Heirloom::MPBarDMG => {
+                // Add mana charge damage state tracker (only once)
+                if skills.get_count(Heirloom::MPBarDMG) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::ManaChargeDamageState::default());
                 }
             }
 
@@ -1453,6 +1472,7 @@ impl Default for HeirloomChoiceQueue {
             active_heirloom_limbo: None,
             pool: vec![
                 HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::ManaOrbs, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Gigantify, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon),
@@ -1470,13 +1490,14 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::Health, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::Mana, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Shield, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::Lifesteal, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Thorns, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Speed, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::AttackSpeed, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Rare),
-                // HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
                 // HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),

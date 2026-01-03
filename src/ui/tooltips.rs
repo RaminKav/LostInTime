@@ -286,7 +286,16 @@ pub fn handle_spawn_inv_item_tooltip(
                     Anchor::CenterLeft,
                 ));
                 tooltip_text.push(TooltipTextProps::new(
-                    vec!["Material".to_string()],
+                    vec![format!(
+                        "{}Material",
+                        if item.item_stack.obj_type == WorldObject::UpgradeTome
+                            || item.item_stack.obj_type == WorldObject::OrbOfTransformation
+                        {
+                            "Upgrade "
+                        } else {
+                            ""
+                        }
+                    )],
                     0.,
                     AttributeQuality::Low,
                     Anchor::CenterLeft,

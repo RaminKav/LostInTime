@@ -593,14 +593,14 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         let new_skill = overwrite.skill_choice.clone();
 
                         match skill_ui.index {
-                            1 => {
+                            0 => {
                                 skills.active_skill_slot_1 = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill
                                     .active_skill
                                     .add_skill_components(player_e, &mut commands);
                             }
-                            2 => {
+                            1 => {
                                 skills.active_skill_slot_2 = Some(new_skill.clone());
                                 // Add skill components
                                 new_skill

@@ -2,6 +2,7 @@ use super::{
     try_add_slow_stacks, Burning, Frail, HitEvent, HitMarker, InvincibilityTimer, Slow,
     StatusEffectEvent,
 };
+use crate::attributes::ManaRegen;
 use crate::blessings::{Blessing, OwnedBlessings};
 use crate::client::is_not_paused;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
@@ -39,8 +40,6 @@ use rand::Rng;
 
 use crate::pets::state::Pet;
 use crate::world::chunk::WaterCollider;
-
-const MANA_ORB_RESTORE: i32 = 10;
 
 pub struct CollisionPlugion;
 
@@ -663,7 +662,7 @@ fn check_projectile_hit_player_collisions(
 }
 pub fn check_item_drop_collisions(
     mut commands: Commands,
-    player: Query<Entity, With<Player>>,
+    player: Query<(Entity, &ManaRegen), With<Player>>,
     allowed_targets: Query<
         Entity,
         (
@@ -685,7 +684,7 @@ pub fn check_item_drop_collisions(
     if !game.player().is_moving && !inv.single().is_empty() {
         return;
     }
-    let player_e = player.single();
+    let (player_e, mana_regen) = player.single();
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {
             //if the player is colliding with an entity...
@@ -719,7 +718,7 @@ pub fn check_item_drop_collisions(
                 text_timer.add_item(obj);
                 continue;
             } else if obj == WorldObject::ManaOrb {
-                modify_mana_event.send(ModifyManaEvent(MANA_ORB_RESTORE));
+                modify_mana_event.send(ModifyManaEvent(mana_regen.0));
                 analytics.send(AnalyticsUpdateEvent {
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });

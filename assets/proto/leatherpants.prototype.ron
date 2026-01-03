@@ -18,6 +18,7 @@
         loot_rate: Some((start: 6, end: 12)),
         xp_rate: Some((start: 7, end: 15)),
         mana: Some((start: 5, end: 10)),
+        mana_regen: Some((start: 1, end: 2)),
   ),
   "survival_rogue_like::item::EquipmentType": Legs,
   "survival_rogue_like::inventory::ItemStack": (

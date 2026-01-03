@@ -454,6 +454,12 @@ pub struct GameParam<'w, 's> {
         Option<&'static mut crate::player::combat_heirlooms::DodgeCritState>,
         With<Player>,
     >,
+    pub mana_charge_damage_query: Query<
+        'w,
+        's,
+        Option<&'static crate::player::combat_heirlooms::ManaChargeDamageState>,
+        With<Player>,
+    >,
     pub blessings_query: Query<'w, 's, &'static OwnedBlessings, With<Player>>,
 
     #[system_param(ignore)]
@@ -708,6 +714,21 @@ impl<'w, 's> GameParam<'w, 's> {
             info!("[DodgeCrit] Next hit bonus applied! 2x damage.");
         }
 
+        // MPBarDMG: Mana regen charges up bonus flat damage
+        // Note: The stored mana is reset in a separate system (handle_mana_charge_damage_reset)
+        let mana_charge_bonus = {
+            let mana_charge_stacks = skills.get_count(Heirloom::MPBarDMG);
+            if mana_charge_stacks > 0 {
+                if let Ok(Some(state)) = self.mana_charge_damage_query.get_single() {
+                    state.get_damage(mana_charge_stacks)
+                } else {
+                    0
+                }
+            } else {
+                0
+            }
+        };
+
         let total_crit_chance = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
 
         // Determine if we crit and if we overcrit
@@ -731,6 +752,9 @@ impl<'w, 's> GameParam<'w, 's> {
             1.0
         };
 
+        // Total flat bonus damage (including mana charge)
+        let total_dmg_bonus = dmg_bonus as i32 + mana_charge_bonus;
+
         if did_crit {
             commands.entity(hit_entity).insert(WasHitWithCrit);
             if did_overcrit {
@@ -741,7 +765,7 @@ impl<'w, 's> GameParam<'w, 's> {
             // Overcrit adds an extra 50% on top
             let overcrit_multiplier = if did_overcrit { 1.5 } else { 1.0 };
             (
-                ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
+                ((dmg_mult * (dmg + total_dmg_bonus) as f32)
                     * bonus_damage_multiplier
                     * crit_multiplier
                     * overcrit_multiplier
@@ -751,7 +775,7 @@ impl<'w, 's> GameParam<'w, 's> {
             )
         } else {
             (
-                ((dmg_mult * (dmg + dmg_bonus as i32) as f32)
+                ((dmg_mult * (dmg + total_dmg_bonus) as f32)
                     * bonus_damage_multiplier
                     * frail_multiplier) as u32, // Apply Frail multiplicatively
                 false,
