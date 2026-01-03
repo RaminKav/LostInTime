@@ -667,19 +667,19 @@ pub enum Heirloom {
 impl Heirloom {
     pub fn get_mana_cost(&self) -> i32 {
         match self {
-            Heirloom::OnHitEcho => 3,
+            Heirloom::OnHitEcho => 10,
             Heirloom::ChanceToProcExtraAttack => 5,
-            Heirloom::IncreaseProjectileCount => 3,
-            Heirloom::IceStaffAoE => 3,
-            Heirloom::FrozenAoE => 3,
-            Heirloom::IceStaffFloor => 2,
-            Heirloom::ViralVenum => 3,
-            Heirloom::HealEcho => 3,
-            Heirloom::SkillEcho => 3,
-            Heirloom::WaveAttack => 3,
-            Heirloom::AntFarm => 2,
-            Heirloom::StoneTooth => 2,
-            Heirloom::Reaper => 2,
+            Heirloom::IncreaseProjectileCount => 5,
+            Heirloom::IceStaffAoE => 5,
+            Heirloom::FrozenAoE => 5,
+            Heirloom::IceStaffFloor => 3,
+            Heirloom::ViralVenum => 5,
+            Heirloom::HealEcho => 5,
+            Heirloom::SkillEcho => 5,
+            Heirloom::WaveAttack => 5,
+            Heirloom::AntFarm => 4,
+            Heirloom::StoneTooth => 4,
+            Heirloom::Reaper => 5,
             _ => 0,
         }
     }

@@ -22,19 +22,19 @@ use crate::{
     GameParam,
 };
 
-const ANT_FARM_COOLDOWN: f32 = 3.0;
+const ANT_FARM_COOLDOWN: f32 = 4.0;
 const ANT_SPEED: f32 = 180.0;
 const ANT_CONTACT_DISTANCE: f32 = 8.0;
 const ANT_LIFETIME: f32 = 6.0;
 const ANT_CHAIN_DELAY: f32 = 0.25;
 
 const STONE_TOOTH_PERIOD: f32 = 1.5;
-const STONE_TOOTH_RADIUS: f32 = 24.0;
-const STONE_CONTACT_DISTANCE: f32 = 12.0;
+const STONE_TOOTH_RADIUS: f32 = 28.0;
+const STONE_CONTACT_DISTANCE: f32 = 20.0;
 
 const REAPER_SOUL_SPEED: f32 = 220.0;
 const REAPER_SOUL_LIFETIME: f32 = 6.0;
-const REAPER_DAMAGE_PERCENT: f32 = 0.25;
+const REAPER_DAMAGE_PERCENT: f32 = 0.5;
 const REAPER_CONTACT_DISTANCE: f32 = 12.0;
 const REAPER_SOUL_MAX_SPAWN_RANGE: f32 = 320.0;
 const REAPER_SOUL_DRIFT_STRENGTH: f32 = 0.75;
@@ -161,13 +161,16 @@ fn calculate_percent_damage(
     is_boss: bool,
     percent: f32,
 ) -> i32 {
-    if is_boss {
-        let (damage, _, _) =
-            game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
-        i32::max(1, damage as i32)
-    } else {
-        ((max_health as f32) * percent).ceil().max(1.0) as i32
-    }
+    // if is_boss {
+    //     let (damage, _, _) =
+    //         game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
+    //     i32::max(1, damage as i32)
+    // } else {
+    //     ((max_health as f32) * percent).ceil().max(1.0) as i32
+    // }
+    let (damage, _, _) =
+        game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
+    i32::max(1, damage as i32)
 }
 
 fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<TextureAtlasSprite> {
@@ -256,7 +259,7 @@ pub fn handle_ant_farm_state(
             },
             AntFarmAnt {
                 target: None,
-                damage_fraction: 1.0,
+                damage_fraction: 2.0,
                 speed: ANT_SPEED,
                 lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
                 spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
@@ -512,7 +515,7 @@ pub fn update_stone_tooth(
                     snapshot.entity,
                     snapshot.max_health,
                     snapshot.kind.is_boss(),
-                    1.,
+                    2.5,
                 );
                 hit_events.send(HitEvent {
                     hit_entity: snapshot.entity,

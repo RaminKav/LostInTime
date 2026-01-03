@@ -14,7 +14,7 @@ use crate::{
         ModifyCurencyEvent, Player,
     },
     proto::proto_param::ProtoParam,
-    ui::key_input_guide::InteractionGuideTrigger,
+    ui::{key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent},
     GameParam, ScreenResolution, GAME_HEIGHT,
 };
 
@@ -318,6 +318,7 @@ pub fn handle_submit_essence_choice(
     mut purchase_tracker: ResMut<BlacksmithPurchaseTracker>,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
+    mut minimap_event: EventWriter<UpdateMiniMapEvent>,
 ) {
     for choice in ev.iter() {
         // Access coins and time_fragments through GameParam (set 0)
@@ -397,6 +398,11 @@ pub fn handle_submit_essence_choice(
                     params
                         .p0()
                         .add_object_to_chunk_cache(tile_pos, WorldObject::BlacksmithMerchantDone);
+                    // Update minimap to reflect the shrine is now "Done"
+                    minimap_event.send(UpdateMiniMapEvent {
+                        pos: Some(tile_pos),
+                        new_tile: Some(WorldObject::BlacksmithMerchantDone),
+                    });
                 }
             }
         }
