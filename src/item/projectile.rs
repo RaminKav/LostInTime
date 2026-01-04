@@ -83,6 +83,7 @@ pub enum Projectile {
     PlasmaBall,
     PlasmaExplosion,
     ThornsProjectile,
+    ManaOrbProjectile,
 }
 
 impl Projectile {

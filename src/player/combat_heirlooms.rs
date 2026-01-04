@@ -3,7 +3,7 @@ use std::{collections::HashSet, f32::consts::TAU};
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
 use bevy_rapier2d::prelude::RapierContext;
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     assets::Graphics,
@@ -11,7 +11,7 @@ use crate::{
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
-    item::WorldObject,
+    item::{projectile::RangedAttackEvent, WorldObject},
     player::{
         skills::{Heirloom, PlayerSkills},
         Player,
@@ -1301,6 +1301,71 @@ pub fn handle_mana_charge_damage_reset(
     if let Some(mut state) = state_option {
         if state.has_stored_mana() {
             state.reset();
+        }
+    }
+}
+
+// ============================================================================
+// ManaOrbAttack - Mana regen shoots mana orb projectiles at enemies
+// ============================================================================
+
+/// System to spawn mana orb projectiles when mana is regenerated
+pub fn handle_mana_orb_attack(
+    mut mana_events: EventReader<ModifyManaEvent>,
+    mut player_query: Query<(&PlayerSkills, &GlobalTransform), With<Player>>,
+    mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+) {
+    let Ok((skills, player_transform)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::ManaOrbAttack);
+    if stacks <= 0 {
+        return;
+    }
+
+    let player_pos = player_transform.translation().truncate();
+    let mut rng = rand::thread_rng();
+
+    for event in mana_events.iter() {
+        // Only trigger on positive mana changes (regen, not consumption)
+        if event.0 <= 0 {
+            continue;
+        }
+
+        // Find nearby enemies
+        let nearby_mobs: Vec<_> = mobs
+            .iter()
+            .filter(|(_, mob_transform, health)| {
+                health.0 > 0
+                    && (mob_transform.translation().truncate() - player_pos).length() <= 400.0
+            })
+            .collect();
+
+        if nearby_mobs.is_empty() {
+            continue;
+        }
+
+        // Spawn +1 orb per stack
+        let orb_count = stacks as usize;
+        for i in 0..orb_count {
+            // Pick a random nearby enemy
+            if let Some((_, target_transform, _)) = nearby_mobs.choose(&mut rng) {
+                let target_pos = target_transform.translation().truncate();
+                let direction = (target_pos - player_pos).normalize_or_zero();
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: crate::item::projectile::Projectile::ManaOrbProjectile,
+                    direction,
+                    mana_cost: None,
+                    from_enemy: false,
+                    from_entity: None,
+                    is_followup_proj: true,
+                    dmg_override: Some(event.0), // Damage equals mana regen amount
+                    pos_override: Some(player_pos),
+                    spawn_delay: i as f32 * 0.1, // Slight delay between orbs
+                });
+            }
         }
     }
 }

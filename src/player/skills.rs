@@ -664,6 +664,7 @@ pub enum Heirloom {
     LowHPDamage,       // More damage at low HP
     ChaosStats,        // +2 chaos, +10 to many stats
     ManaOrbs,
+    ManaOrbAttack, // Mana regen shoots mana orb projectiles
 }
 
 impl Heirloom {
@@ -778,6 +779,7 @@ impl Heirloom {
             Heirloom::LowHPDamage => "Beer!".to_string(),
             Heirloom::ChaosStats => "Chaotic Candle".to_string(),
             Heirloom::ManaOrbs => "Mana Dust".to_string(),
+            Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1224,6 +1226,13 @@ impl Heirloom {
                 "+10% chance. They".to_string(),
                 "trigger mana regen.".to_string(),
             ],
+            Heirloom::ManaOrbAttack => vec![
+                "Mana regeneration".to_string(),
+                "shoots a mana orb".to_string(),
+                "at an enemy. It does".to_string(),
+                "damage equal to the".to_string(),
+                "amount regenerated.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1473,6 +1482,7 @@ impl Default for HeirloomChoiceQueue {
             pool: vec![
                 HeirloomChoiceState::new(Heirloom::Defence, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::ManaOrbs, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::ManaOrbAttack, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::Attack, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Gigantify, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::Chest, HeirloomRarity::Uncommon),
