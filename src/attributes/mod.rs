@@ -365,8 +365,7 @@ impl ItemAttributes {
         // Add attack cooldown (Hits/s) if it exists
         if combined_attrs.attack_cooldown != 0. {
             tooltips.push((
-                "".to_string(),
-                // format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
+                format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
                 "".to_string(),
                 AttributeQuality::Average,
             ));
