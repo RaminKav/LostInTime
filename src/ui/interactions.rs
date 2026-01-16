@@ -1197,12 +1197,12 @@ pub fn handle_cursor_banish_buttons(
     graphics: Res<Graphics>,
     mut run_unlocks: ResMut<RunUnlockState>,
     mut skill_queue: ResMut<HeirloomChoiceQueue>,
-    mut next_ui_state: ResMut<NextState<UIState>>,
-    skill_ui: Query<Entity, With<SkillChoiceUI>>,
+    skill_ui: Query<(Entity, &SkillChoiceUI), With<SkillChoiceUI>>,
+    dice_buttons: Query<(Entity, &RerollDice), With<RerollDice>>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
-
+    let mut banished_slot: Option<usize> = None;
     for (e, mut interactable, banish) in banish_buttons.iter_mut() {
         let banishes_available = run_unlocks.banishes_remaining > 0;
         match hit_test {
@@ -1228,12 +1228,19 @@ pub fn handle_cursor_banish_buttons(
                             // Clear the entire queue to prevent the pending levelup check
                             // from reopening the UI - banishing is a deliberate choice to
                             // forfeit the current level-up reward
-                            skill_queue.queue.clear();
+                            banished_slot = Some(banish.0);
+                            commands.entity(e).despawn_recursive();
 
-                            for entity in skill_ui.iter() {
-                                commands.entity(entity).despawn_recursive();
+                            for (entity, skill) in skill_ui.iter() {
+                                if skill.index == banish.0 {
+                                    commands.entity(entity).despawn_recursive();
+                                }
                             }
-                            next_ui_state.set(UIState::Closed);
+                            for (entity, dice) in dice_buttons.iter() {
+                                if dice.0 == banish.0 {
+                                    commands.entity(entity).despawn_recursive();
+                                }
+                            }
                         }
                     }
                 }
@@ -1248,6 +1255,12 @@ pub fn handle_cursor_banish_buttons(
                         .insert(graphics.get_ui_element_texture(UIElement::BackButton));
                 }
             }
+        }
+    }
+    // disable other banish buttons if we banish one
+    if let Some(_) = banished_slot {
+        for (e, _, _) in banish_buttons.iter() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }

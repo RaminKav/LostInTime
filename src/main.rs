@@ -133,7 +133,7 @@ pub const TIME_STEP: f32 = 1.0 / 60.0;
 pub const HEIGHT: f32 = 1080.;
 pub const ASPECT_RATIO: f32 = 16.0 / 10.0;
 pub const WIDTH: f32 = HEIGHT * ASPECT_RATIO;
-pub const GAME_HEIGHT: f32 = 200. * ZOOM_SCALE;
+pub const GAME_HEIGHT: f32 = 300. * ZOOM_SCALE;
 const GAME_WIDTH: f32 = GAME_HEIGHT * ASPECT_RATIO; //384 x 240
 lazy_static! {
     pub static ref DEBUG: bool = env::var("DEBUG").is_ok();

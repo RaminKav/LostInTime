@@ -557,7 +557,9 @@ impl ActiveSkill {
 pub enum Heirloom {
     // Passives
     #[default]
-    CritChance, //tusk
+    None,
+
+    CritChance,       //tusk
     CritDamage,       //flint
     SkillCDReduction, // placeholder
     LoadedDice,       // increases luck by 7
@@ -667,6 +669,16 @@ pub enum Heirloom {
     ManaOrbAttack, // Mana regen shoots mana orb projectiles
 }
 
+pub enum HeirloomTrait {
+    Ice,     // 6
+    Water,   // 6
+    Echo,    // 3
+    Magic,   // 4
+    Healing, // 12
+    Poison,  // 4
+    Thorns,  // 2
+}
+
 impl Heirloom {
     pub fn get_mana_cost(&self) -> i32 {
         match self {
@@ -688,6 +700,7 @@ impl Heirloom {
     }
     pub fn get_title(&self) -> String {
         match self {
+            Heirloom::None => "None".to_string(),
             Heirloom::CritChance => "Tusk".to_string(),
             Heirloom::CritDamage => "Flint".to_string(),
             Heirloom::SkillCDReduction => "Stanley".to_string(),
@@ -785,6 +798,7 @@ impl Heirloom {
     pub fn get_desc(&self) -> Vec<String> {
         // max 13 char per line, space included
         match self {
+            Heirloom::None => vec!["No Heirloom".to_string()],
             Heirloom::Chest => vec!["Gain a Loot Chest".to_string()],
             Heirloom::CritChance => vec![
                 "Gain +7% Critical".to_string(),
@@ -1612,7 +1626,7 @@ impl HeirloomChoiceQueue {
                 let matches_rarity = x.rarity == rarity;
                 let passes_filter = filter(x);
                 let not_banned = !self.banned.contains(&x.heirloom);
-                matches_rarity && passes_filter && not_banned
+                matches_rarity && passes_filter && not_banned && x.heirloom != Heirloom::default()
             })
             .collect();
         // Convert back to owned values for choose
@@ -1756,6 +1770,7 @@ impl HeirloomChoiceQueue {
             if picked_skill.is_one_time_heirloom {
                 self.pool.retain(|x| x != &picked_skill);
             }
+
             self.pool.push(old_skill);
             self.queue[0][slot] = picked_skill;
         }
@@ -1765,8 +1780,10 @@ impl HeirloomChoiceQueue {
         if self.queue.is_empty() {
             return None;
         }
-        let choices = self.queue.remove(0);
+        let mut choices = self.queue.remove(0);
         let banned_choice = choices[slot].clone();
+        choices[slot] = HeirloomChoiceState::default();
+        self.queue.push(choices.clone());
         self.banned.insert(banned_choice.heirloom.clone());
         self.pool.retain(|x| x.heirloom != banned_choice.heirloom);
 
@@ -1774,7 +1791,7 @@ impl HeirloomChoiceQueue {
             if index == slot {
                 continue;
             }
-            if !self.banned.contains(&choice.heirloom) {
+            if !self.banned.contains(&choice.heirloom) && choice.heirloom != Heirloom::default() {
                 self.pool.push(choice);
             }
         }

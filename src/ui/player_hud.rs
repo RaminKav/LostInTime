@@ -733,7 +733,7 @@ pub fn update_shieldbar(
         y: INNER_HUD_BAR_SIZE.y,
     });
 
-    flash.timer.tick(Duration::from_nanos(1));
+    // flash.timer.tick(Duration::from_nanos(1));
 }
 pub fn update_xp_bar(
     player_xp_query: Query<&PlayerLevel, With<Player>>,
@@ -755,7 +755,7 @@ pub fn update_xp_bar(
         if level.level >= 10 {
             txfm.translation.x = -5.5;
         }
-        flash.timer.tick(Duration::from_nanos(1));
+        // flash.timer.tick(Duration::from_nanos(1));
         if event.did_level {
             commands.spawn(SoundSpawner::new(AudioSoundEffect::LevelUp, 0.35));
         }
@@ -795,7 +795,7 @@ pub fn update_foodbar(
         x: 53. * hunger.current as f32 / hunger.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
-    flash.timer.tick(Duration::from_nanos(1));
+    // flash.timer.tick(Duration::from_nanos(1));
 }
 
 #[derive(Component, Eq, PartialEq)]
@@ -1075,7 +1075,7 @@ pub fn handle_update_player_skills(
                         sprite: graphics.get_heirloom_icon(heirloom.clone()),
                         texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                         transform: Transform {
-                            translation: offset.extend(1.),
+                            translation: offset.extend(11.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -1378,7 +1378,7 @@ pub fn update_mana_bar(
         x: 60. * current_mana.0 as f32 / max_mana.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
-    flash.timer.tick(Duration::from_nanos(1));
+    // flash.timer.tick(Duration::from_nanos(1));
 }
 
 pub fn setup_clock_hud(

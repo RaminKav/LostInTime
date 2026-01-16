@@ -136,7 +136,6 @@ pub fn display_main_menu(
         .insert(MainMenu)
         .insert(RenderLayers::from_layers(&[3]))
         .insert(Name::new("Main Menu"));
-
     //start music
     bgm_track_event.send(UpdateBGMTrackEvent {
         asset_path: "sounds/bgm_day.ogg".to_owned(),

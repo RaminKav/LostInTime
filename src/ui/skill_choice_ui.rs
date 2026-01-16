@@ -440,13 +440,16 @@ pub fn spawn_skill_choice_entities(
     t_offset: Vec2,
 ) {
     let size = SKILLS_CHOICE_UI_SIZE;
-    let count = choices.len();
-    for i in -1i32..(choices.len() as i32 - 1) {
+    let COUNT: usize = 3;
+    for i in -1i32..(COUNT as i32 - 1) {
         let translation = Vec2::new(
-            i as f32 * (size.x + 16.) + if count == 2 { size.x / 2. } else { 0. } + 0.1,
+            i as f32 * (size.x + 16.) + if COUNT == 2 { size.x / 2. } else { 0. } + 0.1,
             0.,
         );
         let choice = choices[(i + 1) as usize].clone();
+        if choice.heirloom == crate::player::skills::Heirloom::None {
+            continue;
+        }
         let ui_element = choice.heirloom.get_ui_element(choice.rarity.clone());
         let skills_e = commands
             .spawn(SpriteBundle {

@@ -111,16 +111,16 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::SpikeSlime,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(16., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
             min_days_to_spawn: 3,
-            num_to_spawn: Some(2),
+            num_to_spawn: Some(1),
         });
         spawners.push(Spawner {
             enemy: Mob::FurDevil,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(10.5, TimerMode::Once),
+            spawn_timer: Timer::from_seconds(2.5, TimerMode::Once),
             min_days_to_spawn: 0,
-            num_to_spawn: Some(4),
+            num_to_spawn: Some(1),
         });
         spawners.push(Spawner {
             enemy: Mob::RedMushling,
@@ -139,16 +139,16 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(18., TimerMode::Once),
-            min_days_to_spawn: 2,
+            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
+            min_days_to_spawn: 1,
             num_to_spawn: Some(2),
         });
         spawners.push(Spawner {
             enemy: Mob::Bushling,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(16., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(7., TimerMode::Once),
             min_days_to_spawn: 1,
-            num_to_spawn: Some(3),
+            num_to_spawn: Some(1),
         });
     }
     commands.insert_resource(GlobalSpawners {
@@ -181,15 +181,15 @@ fn handle_spawn_mobs(
             let mut pos = player_pos;
             let mut can_spawn_mob_here_check = false;
             let mut fallback_attempts = 10;
-            let max_range: f32 = TILE_SIZE.x * 16.;
+            let max_range: f32 = TILE_SIZE.x * 28.;
 
-            while pos.distance(player_pos) <= TILE_SIZE.x * 8. || !can_spawn_mob_here_check {
+            while pos.distance(player_pos) <= TILE_SIZE.x * 10. || !can_spawn_mob_here_check {
                 let spawn_pos_delta: Vec2 = Vec2::new(
                     rng.gen_range(-max_range / 2. ..max_range / 2.),
                     rng.gen_range(-max_range / 2. ..max_range / 2.),
                 );
                 pos = player_pos + spawn_pos_delta;
-                can_spawn_mob_here_check = can_spawn_mob_here(pos, &game, &proto_param, false);
+                can_spawn_mob_here_check = true; //can_spawn_mob_here(pos, &game, &proto_param, false);
                 fallback_attempts -= 1;
                 if fallback_attempts <= 0 {
                     info!("skip spawn: cant find a valid spawn location {:?}", pos);
@@ -231,7 +231,7 @@ pub struct StoneGolemSpawnTimer {
 impl Default for StoneGolemSpawnTimer {
     fn default() -> Self {
         Self {
-            timer: Timer::from_seconds(240.0, TimerMode::Repeating), // 4 minutes
+            timer: Timer::from_seconds(240.0, TimerMode::Once), // 4 minutes
         }
     }
 }

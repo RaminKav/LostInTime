@@ -291,11 +291,7 @@ pub fn follow(
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()
                 * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15))
-                * if night_tracker.is_night() && is_far_away {
-                    1.5
-                } else {
-                    1.
-                },
+                * if night_tracker.is_night() { 2. } else { 1. },
         );
         commands
             .entity(entity)
