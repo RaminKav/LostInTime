@@ -349,7 +349,7 @@ pub fn handle_submit_essence_choice(
                 player_skills.heirlooms.push(heirloom_with_rarity.clone());
 
                 // Add skill components to the player entity
-                heirloom_with_rarity.heirloom.add_skill_components(
+                heirloom_with_rarity.heirloom.add_heirloom_components(
                     player_entity,
                     &mut commands,
                     player_skills.clone(),

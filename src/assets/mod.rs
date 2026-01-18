@@ -80,7 +80,10 @@ pub struct ClassData {
     pub stat_description: Vec<String>,
     pub class_icon: UIElement,
     pub skill_icon: UIElement,
-    pub active_skill: crate::player::skills::ActiveSkill,
+    /// The 4 active skills for this class (displayed in skill slots 0-3)
+    pub active_skills: [crate::player::skills::ActiveSkill; 4],
+    /// All starting weapons for this class
+    pub starting_weapons: Vec<crate::item::WorldObject>,
 }
 
 /// Data structure for pet information loaded from RON

@@ -3,149 +3,67 @@
         Warrior: (
             name: "Warrior",
             weapon_description: [
-                "Close range slash\n\nattack."
-            ],
-            stat_description: [
-                "+3% Damage per Level."
-            ],
-            class_icon: RedPlayerSelectIcon,
-            skill_icon: MeleePowerIcon,
-            active_skill: Shout,
-        ),
-        Paladin: (
-            name: "Paladin",
-            weapon_description: [
-                "Slow & powerful area\n\nattack. Applies Frail."
+                "Melee weapons:\n\nSword, Spear, Hammer"
             ],
             stat_description: [
                 "+5 Health per Level."
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skill: Heal,
+            active_skills: (Roll, Shout, Heal, ParrySpear),
+            starting_weapons: [Sword, Spear, Hammer],
         ),
-        Knight: (
-            name: "Knight",
-            weapon_description: [
-                "Piercing medium range\n\nattack."
-            ],
-            stat_description: [
-                "+3 Defence per Level."
-            ],
-            class_icon: RedPlayerSelectIcon,
-            skill_icon: DefenceIcon,
-            active_skill: ParrySpear,
-        ),
-
-        Rogue: (
-            name: "Rogue", 
-            weapon_description: [
-                "Close range multi\n\nstrike attack."
-            ],
-            stat_description: [
-                "+3 Speed per Level."
-            ],
-            class_icon: GreenPlayerSelectIcon,
-            skill_icon: SpeedIcon,
-            active_skill: SprintLunge,
-        ),
-        Archer: (
-            name: "Archer", 
-            weapon_description: [
-                "Long range piercing\n\nprojectile attack."
-            ],
-            stat_description: [
-                "+4% Crit damage per\n\nLevel."
-            ],
-            class_icon: GreenPlayerSelectIcon,
-            skill_icon: CritDamageIcon,
-            active_skill: Rapidfire,
-        ),
-        Kid: (
-            name: "Kid", 
-            weapon_description: [
-                "Long range poison\n\nprojectile attack."
-            ],
-            stat_description: [
-                "+3% Dodge per Level."
-            ],
-            class_icon: GreenPlayerSelectIcon,
-            skill_icon: DodgeChanceIcon,
-            active_skill: Sprint,
-        ),
-
         Wizard: (
             name: "Wizard",
             weapon_description: [
-                "Lightning strike\n\nattack.",
-            ],
-            stat_description: [
-                "+1 Mana Regen per\n\nLevel."
-            ],
-            class_icon: BluePlayerSelectIcon,
-            skill_icon: MPRegenIcon,
-            active_skill: Teleport,
-        ),
-        IceMage: (
-            name: "Ice Mage",
-            weapon_description: [
-                "Icicle projectile attack.\n\nApplies slow on hit.",
+                "Magic weapons:\n\nFire, Ice, Basic Staff"
             ],
             stat_description: [
                 "+5 Mana per Level."
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
-            active_skill: IceWall,
+            active_skills: (Teleport, Lightning, IceWall, FirePillar),
+            starting_weapons: [FireStaff, IceStaff, BasicStaff],
         ),
-        FireMage: (
-            name: "Fire Mage",
+        Rogue: (
+            name: "Rogue",
             weapon_description: [
-                "Fire projectile attack.\n\nExplodes on hit.",
+                "Close range multi\n\nstrike dagger attack."
             ],
             stat_description: [
-                "+5 Mana per Level."
+                "+3% Crit Chance per\n\nLevel."
             ],
-            class_icon: BluePlayerSelectIcon,
-            skill_icon: ManaIcon,
-            active_skill: FirePillar,
+            class_icon: GreenPlayerSelectIcon,
+            skill_icon: CritChanceIcon,
+            active_skills: (SprintLunge, DaggerThrow, Stealth, DaggerSlash),
+            starting_weapons: [Dagger],
         ),
-        Druid: (
-            name: "Druid",
-            weapon_description: [
-                "Nature whip attack.\n\n",
-            ],
-            stat_description: [
-                "+1 Health Regen per\n\nLevel."
-            ],
-            class_icon: BluePlayerSelectIcon,
-            skill_icon: HPRegenIcon,
-            active_skill: DruidTree,
-        ),
-
         Thief: (
             name: "Thief",
             weapon_description: [
-                "Long range throwing\n\nstars.",
+                "Fast claw attacks\n\nwith throwing stars."
             ],
             stat_description: [
-                "+3% Crit chance per\n\nLevel."
-            ],
-            class_icon: GreyPlayerSelectIcon,
-            skill_icon: CritChanceIcon,
-            active_skill: PiercingStar,
-        ),
-        Gunslinger: (
-            name: "Gunslinger",
-            weapon_description: [
-                "Rapid fire gun attack.",
-            ],
-            stat_description: [
-                "+3% Attack Speed per\n\nLevel"
+                "+3% Attack Speed per\n\nLevel."
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
-            active_skill: Buckshot,
+            active_skills: (Roll, PiercingStar, TripleThrow, Fury),
+            starting_weapons: [Claw],
+        ),
+        Hunter: (
+            name: "Hunter",
+            weapon_description: [
+                "Ranged weapons:\n\nBow, Gun"
+            ],
+            stat_description: [
+                "+3% Crit Damage per\n\nLevel."
+            ],
+            class_icon: GreenPlayerSelectIcon,
+            skill_icon: CritDamageIcon,
+            active_skills: (Buckshot, Bomb, DruidTree, Rapidfire),
+            starting_weapons: [WoodBow, Gun],
         ),
     },
     pets: {

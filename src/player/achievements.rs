@@ -529,7 +529,6 @@ pub struct AchievementUnlockedEvent {
 impl Achievement {
     pub fn unlocks_class(&self) -> Option<crate::player::skills::SkillClass> {
         match self {
-            Achievement::FirstRunComplete => Some(crate::player::skills::SkillClass::Knight),
             Achievement::Kill100FurDevils => Some(crate::player::skills::SkillClass::Thief),
             // Add more mappings as needed
             _ => None,
@@ -550,7 +549,10 @@ impl Achievement {
 pub fn get_default_unlocked_classes() -> Vec<crate::player::skills::SkillClass> {
     vec![
         crate::player::skills::SkillClass::Warrior,
-        crate::player::skills::SkillClass::FireMage,
+        crate::player::skills::SkillClass::Wizard,
+        crate::player::skills::SkillClass::Rogue,
+        crate::player::skills::SkillClass::Thief,
+        crate::player::skills::SkillClass::Hunter,
     ]
 }
 

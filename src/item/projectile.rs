@@ -84,6 +84,12 @@ pub enum Projectile {
     PlasmaExplosion,
     ThornsProjectile,
     ManaOrbProjectile,
+    DaggerThrow,
+    DaggerSlash,
+    Bomb,
+    BombExplosion,
+    Lightning,
+    FuryKunai,
 }
 
 impl Projectile {
@@ -105,7 +111,15 @@ impl Projectile {
             Projectile::SpearProjectile => true,
             Projectile::ThornsProjectile => true,
             Projectile::LaserBeam => true,
+            Projectile::DaggerSlash => true,
             _ => false,
+        }
+    }
+    pub fn get_custom_rotation(&self) -> Option<f32> {
+        match self {
+            Projectile::FuryKunai => Some(-0.7853982),
+            Projectile::DaggerThrow => Some(-0.7853982),
+            _ => None,
         }
     }
     pub fn is_skill_projectile(&self) -> bool {
@@ -117,6 +131,12 @@ impl Projectile {
             Projectile::IceWall => true,
             Projectile::Shout => true,
             Projectile::LaserBeam => true,
+            Projectile::BombExplosion => true,
+            Projectile::Bomb => true,
+            Projectile::DaggerSlash => true,
+            Projectile::DaggerThrow => true,
+            Projectile::Lightning => true,
+            Projectile::FuryKunai => true,
             _ => false,
         }
     }
@@ -190,6 +210,12 @@ pub struct ProjectileSpawnMarker {
 #[derive(Component)]
 pub struct PetProjectileMarker;
 
+/// Component to track the target position for bomb projectiles
+#[derive(Component)]
+pub struct BombTarget {
+    pub target_pos: Vec2,
+}
+
 fn handle_ranged_attack_event(
     mut events: EventReader<RangedAttackEvent>,
     player_query: Query<
@@ -244,7 +270,8 @@ fn handle_ranged_attack_event(
             && !proj_event.projectile.is_staff_proj()
             && !proj_event.is_followup_proj
             && !is_rapidfire_active
-        // Don't consume ammo during Rapidfire
+            && !proj_event.projectile.is_skill_projectile()
+        // Don't consume ammo during Rapidfire or using skill projectiles
         {
             if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
                 let held_e = main_hand.entity;

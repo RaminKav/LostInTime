@@ -3,19 +3,22 @@ use bevy::prelude::*;
 use bevy::utils::Duration;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use bevy_rapier2d::prelude::Collider;
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     ai::FollowState,
     attributes::{Attack, BonusAttackSpeed, CurrentHealth, CurrentMana, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
-    combat::HitEvent,
+    combat::{
+        status_effects::{StatusEffect, StatusEffectEvent},
+        HitEvent,
+    },
     custom_commands::CommandsExt,
     enemy::Mob,
     inputs::CursorPos,
     item::{
-        projectile::{Projectile, ProjectileState, RangedAttackEvent},
+        projectile::{BombTarget, Projectile, ProjectileState, RangedAttackEvent},
         WorldObject,
     },
     player::{
@@ -23,14 +26,17 @@ use crate::{
         melee_skills::{spawn_echo_hitbox, SpearState},
         rogue_skills::{LungeState, SprintState},
         skills::{
-            ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState,
-            FirePillarState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-            PiercingStarSkillState, PlayerSkills, RapidfireState, ShoutSkillState,
-            Slot1ChargeTracker, Slot2ChargeTracker, StealthState,
+            ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
+            DruidTreeSkillState, FirePillarState, FuryState, HealSkillState, Heirloom,
+            IceWallSkillState, LaserBeamState, LightningState, PiercingStarSkillState,
+            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
+            Slot2ChargeTracker, StealthState, TripleThrowState,
         },
         Player,
     },
     proto::proto_param::ProtoParam,
+    status_effects::Frail,
+    world::TILE_SIZE,
     GameParam,
 };
 
@@ -58,6 +64,12 @@ pub struct SkillStateQueries<'w, 's> {
     pub slot2_trackers: Query<'w, 's, &'static mut Slot2ChargeTracker, With<Player>>,
     pub player_projectile_size:
         Query<'w, 's, &'static crate::attributes::ProjectileSize, With<Player>>,
+    pub lightning_states: Query<'w, 's, &'static LightningState, With<Player>>,
+    pub daggerthrow_states: Query<'w, 's, &'static DaggerThrowState, With<Player>>,
+    pub slash_states: Query<'w, 's, &'static SlashState, With<Player>>,
+    pub triplethrow_states: Query<'w, 's, &'static TripleThrowState, With<Player>>,
+    pub fury_states: Query<'w, 's, &'static FuryState, With<Player>>,
+    pub bomb_states: Query<'w, 's, &'static BombState, With<Player>>,
 }
 
 pub fn handle_active_skill_event(
@@ -84,6 +96,7 @@ pub fn handle_active_skill_event(
     mut proto_commands: ProtoCommands,
     proto_param: ProtoParam,
     prototypes: Prototypes,
+    enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
 ) {
     for ev in events.iter() {
         for (
@@ -131,23 +144,27 @@ pub fn handle_active_skill_event(
             let spear_state = skill_states.spear_states.get(player_e).ok();
             let lunge_state = skill_states.lunge_states.get(player_e).ok();
             let teleport_state = skill_states.teleport_states.get_mut(player_e).ok();
+            let lightning_state = skill_states.lightning_states.get(player_e).ok();
+            let daggerthrow_state = skill_states.daggerthrow_states.get(player_e).ok();
+            let slash_state = skill_states.slash_states.get(player_e).ok();
+            let triplethrow_state = skill_states.triplethrow_states.get(player_e).ok();
+            let fury_state = skill_states.fury_states.get(player_e).ok();
+            let bomb_state = skill_states.bomb_states.get(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
             let slot_skill = match ev.slot {
-                0 => skills.roll_skill_slot.as_ref(),
+                0 => skills.active_skill_slot_0.as_ref(),
                 1 => skills.active_skill_slot_1.as_ref(),
                 2 => skills.active_skill_slot_2.as_ref(),
                 3 => skills.active_skill_slot_3.as_ref(),
+                4 => skills.active_skill_slot_4.as_ref(),
                 _ => None,
             };
             if let Some(active) = slot_skill {
                 let blessing_cd_mult = blessings.get_skill_cooldown_increase();
-                if active.active_skill != ActiveSkill::Roll {
-                    if blessings.has_blessing(Blessing::SkillAttackSpeed) {
-                        // Apply attack speed buff after using a skill
-                        commands
-                            .entity(player_e)
-                            .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
-                    }
+                if blessings.has_blessing(Blessing::SkillAttackSpeed) {
+                    commands
+                        .entity(player_e)
+                        .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
                 }
                 // For slot 1 and 2 (class skills), handle charge consumption from their independent trackers
                 let mut should_start_cooldown = true;
@@ -779,6 +796,269 @@ pub fn handle_active_skill_event(
                             lunge_speed: 9.5,
                         });
                     }
+                    ActiveSkill::Lightning => {
+                        if should_start_cooldown {
+                            if let Some(l) = lightning_state {
+                                if !l.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if lightning_state.is_some() {
+                                commands.entity(player_e).remove::<LightningState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(LightningState { cooldown_timer: cd });
+
+                        // Find 3 nearest enemies
+                        let player_pos = player_txfm.translation().truncate();
+                        let mut enemy_distances: Vec<(Entity, Vec2, f32)> = enemies
+                            .iter()
+                            .map(|(e, t)| {
+                                let pos = t.translation().truncate();
+                                let dist = player_pos.distance(pos);
+                                (e, pos, dist)
+                            })
+                            .collect();
+                        enemy_distances.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+                        enemy_distances.truncate(3);
+
+                        // Spawn lightning at each enemy (using IceExplosionAOE as placeholder)
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        for (_, enemy_pos, _) in enemy_distances {
+                            ranged_attack_events.send(RangedAttackEvent {
+                                projectile: Projectile::Lightning,
+                                direction: Vec2::ZERO,
+                                mana_cost: None,
+                                from_enemy: false,
+                                from_entity: None,
+                                is_followup_proj: false,
+                                dmg_override: Some(dmg),
+                                pos_override: Some(enemy_pos + Vec2::new(0., 26.)),
+                                spawn_delay: 0.0,
+                            });
+                        }
+                        commands
+                            .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
+                    }
+                    ActiveSkill::DaggerThrow => {
+                        if should_start_cooldown {
+                            if let Some(d) = daggerthrow_state {
+                                if !d.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if daggerthrow_state.is_some() {
+                                commands.entity(player_e).remove::<DaggerThrowState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(DaggerThrowState { cooldown_timer: cd });
+
+                        // Find 3 nearest enemies
+                        let player_pos = player_txfm.translation().truncate();
+                        let mut enemy_distances: Vec<(Entity, Vec2, f32)> = enemies
+                            .iter()
+                            .map(|(e, t)| {
+                                let pos = t.translation().truncate();
+                                let dist = player_pos.distance(pos);
+                                (e, pos, dist)
+                            })
+                            .collect();
+                        enemy_distances.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
+                        enemy_distances.truncate(3);
+
+                        // Throw 3 throwing stars towards nearest enemies
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        for (_, enemy_pos, _) in enemy_distances {
+                            let direction = (enemy_pos - player_pos).normalize_or_zero();
+                            ranged_attack_events.send(RangedAttackEvent {
+                                projectile: Projectile::DaggerThrow,
+                                direction,
+                                mana_cost: None,
+                                from_enemy: false,
+                                from_entity: Some(player_e),
+                                is_followup_proj: false,
+                                dmg_override: Some(dmg),
+                                pos_override: None,
+                                spawn_delay: 0.0,
+                            });
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                    ActiveSkill::DaggerSlash => {
+                        if should_start_cooldown {
+                            if let Some(s) = slash_state {
+                                if !s.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if slash_state.is_some() {
+                                commands.entity(player_e).remove::<SlashState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(SlashState { cooldown_timer: cd });
+
+                        // Calculate direction to cursor (like dagger attack)
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let direction = (cursor_pos - player_pos).normalize_or_zero();
+
+                        // Spawn sword projectile in front of player
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::DaggerSlash,
+                            direction,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: None,
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: Some(Vec2::ZERO),
+                            spawn_delay: 0.0,
+                        });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
+                    }
+                    ActiveSkill::TripleThrow => {
+                        if should_start_cooldown {
+                            if let Some(t) = triplethrow_state {
+                                if !t.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if triplethrow_state.is_some() {
+                                commands.entity(player_e).remove::<TripleThrowState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(TripleThrowState { cooldown_timer: cd });
+
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let base_direction = (cursor_pos - player_pos).normalize_or_zero();
+                        let base_angle = base_direction.y.atan2(base_direction.x);
+
+                        // Throw 3 throwing stars in a cone (15 degree spread)
+                        let spread_angle = 15.0_f32.to_radians();
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        for i in 0..3 {
+                            let angle_offset = (i as f32 - 1.0) * spread_angle;
+                            let angle = base_angle + angle_offset;
+                            let direction = Vec2::new(angle.cos(), angle.sin());
+                            ranged_attack_events.send(RangedAttackEvent {
+                                projectile: Projectile::ThrowingStar,
+                                direction,
+                                mana_cost: None,
+                                from_enemy: false,
+                                from_entity: Some(player_e),
+                                is_followup_proj: false,
+                                dmg_override: Some(dmg),
+                                pos_override: None,
+                                spawn_delay: 0.0,
+                            });
+                        }
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
+                    }
+                    ActiveSkill::Fury => {
+                        if should_start_cooldown {
+                            if let Some(f) = fury_state {
+                                if !f.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if fury_state.is_some() {
+                                commands.entity(player_e).remove::<FuryState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands.entity(player_e).insert(FuryState {
+                            cooldown_timer: cd,
+                            duration: Timer::from_seconds(2.5, TimerMode::Once),
+                            throw_timer: Timer::from_seconds(0.3, TimerMode::Repeating),
+                        });
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.3));
+                    }
+                    ActiveSkill::Bomb => {
+                        if should_start_cooldown {
+                            if let Some(b) = bomb_state {
+                                if !b.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if bomb_state.is_some() {
+                                commands.entity(player_e).remove::<BombState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(BombState { cooldown_timer: cd });
+
+                        // Calculate direction to cursor position
+                        let player_pos = player_txfm.translation().truncate();
+                        let cursor_pos = cursor.world_coords.truncate();
+                        let direction = (cursor_pos - player_pos).normalize_or_zero();
+
+                        // Spawn bomb projectile toward cursor position
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult) as i32;
+
+                        // Store the target position for later attachment to the bomb projectile
+                        // We'll attach it after the projectile spawns
+                        commands.entity(player_e).insert(BombTarget {
+                            target_pos: cursor_pos,
+                        });
+
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::Bomb,
+                            direction,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: None,
+                            spawn_delay: 0.0,
+                        });
+                    }
                     _ => {}
                 }
                 // Skill Echo trigger: spawn an echo AoE at player position when using any skill
@@ -822,7 +1102,7 @@ pub fn tick_stealth_and_buffs(
             commands.entity(e).remove::<Stealthed>();
         }
     }
-    for (e, mut r) in rapid.iter_mut() {
+    for (_e, mut r) in rapid.iter_mut() {
         let was_finished = r.duration.finished();
         r.duration.tick(time.delta());
         if !was_finished && r.duration.finished() {
@@ -928,6 +1208,56 @@ pub fn tick_skill_cooldowns(
         dummy.timer.tick(time.delta());
         if dummy.timer.finished() {
             commands.entity(e).despawn_recursive();
+        }
+    }
+}
+
+pub fn tick_new_skill_cooldowns(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut lightning_cd: Query<(Entity, &mut LightningState)>,
+    mut daggerthrow_cd: Query<(Entity, &mut DaggerThrowState)>,
+    mut slash_cd: Query<(Entity, &mut SlashState)>,
+    mut triplethrow_cd: Query<(Entity, &mut TripleThrowState)>,
+    mut fury_cd: Query<(Entity, &mut FuryState)>,
+    mut bomb_cd: Query<(Entity, &mut BombState)>,
+) {
+    for (e, mut l) in lightning_cd.iter_mut() {
+        l.cooldown_timer.tick(time.delta());
+        if l.cooldown_timer.finished() {
+            commands.entity(e).remove::<LightningState>();
+        }
+    }
+    for (e, mut d) in daggerthrow_cd.iter_mut() {
+        d.cooldown_timer.tick(time.delta());
+        if d.cooldown_timer.finished() {
+            commands.entity(e).remove::<DaggerThrowState>();
+        }
+    }
+    for (e, mut s) in slash_cd.iter_mut() {
+        s.cooldown_timer.tick(time.delta());
+        if s.cooldown_timer.finished() {
+            commands.entity(e).remove::<SlashState>();
+        }
+    }
+    for (e, mut t) in triplethrow_cd.iter_mut() {
+        t.cooldown_timer.tick(time.delta());
+        if t.cooldown_timer.finished() {
+            commands.entity(e).remove::<TripleThrowState>();
+        }
+    }
+    for (e, mut f) in fury_cd.iter_mut() {
+        f.cooldown_timer.tick(time.delta());
+        f.duration.tick(time.delta());
+        f.throw_timer.tick(time.delta());
+        if f.cooldown_timer.finished() && f.duration.finished() {
+            commands.entity(e).remove::<FuryState>();
+        }
+    }
+    for (e, mut b) in bomb_cd.iter_mut() {
+        b.cooldown_timer.tick(time.delta());
+        if b.cooldown_timer.finished() {
+            commands.entity(e).remove::<BombState>();
         }
     }
 }
@@ -1420,6 +1750,161 @@ pub fn handle_crit_heal(
 
         if heal_amount > 0 {
             modify_health_event.send(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
+        }
+    }
+}
+
+pub fn handle_fury_skill(
+    fury_states: Query<(&FuryState, &GlobalTransform), With<Player>>,
+    enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    attack_query: Query<&Attack, With<Player>>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+) {
+    for (fury_state, player_transform) in fury_states.iter() {
+        if fury_state.duration.finished() {
+            continue;
+        }
+
+        if fury_state.throw_timer.just_finished() {
+            let player_pos = player_transform.translation().truncate();
+            let power_mult = player_skills
+                .get_single()
+                .map(|s| s.skill_power_multiplier())
+                .unwrap_or(1.0);
+            let base_dmg: i32 = attack_query.get_single().map(|a| a.0).unwrap_or(10);
+            let dmg = (base_dmg as f32 * power_mult) as i32;
+
+            let range = 10.0 * TILE_SIZE.x;
+            let nearby_enemies: Vec<(Entity, Vec2, f32)> = enemies
+                .iter()
+                .map(|(e, t)| {
+                    let pos = t.translation().truncate();
+                    let dist = player_pos.distance(pos);
+                    (e, pos, dist)
+                })
+                .filter(|(_, _, dist)| *dist <= range)
+                .collect();
+
+            let mut rng = rand::thread_rng();
+            let direction = if !nearby_enemies.is_empty() {
+                let (_, enemy_pos, _) = nearby_enemies.choose(&mut rng).unwrap();
+                (*enemy_pos - player_pos).normalize_or_zero()
+            } else {
+                let angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                Vec2::new(angle.cos(), angle.sin())
+            };
+
+            ranged_attack_events.send(RangedAttackEvent {
+                projectile: Projectile::FuryKunai,
+                direction,
+                mana_cost: None,
+                from_enemy: false,
+                from_entity: None,
+                is_followup_proj: false,
+                dmg_override: Some(dmg),
+                pos_override: None,
+                spawn_delay: 0.0,
+            });
+        }
+    }
+}
+
+/// Attach BombTarget component to newly spawned Bomb projectiles
+pub fn handle_attach_bomb_target(
+    mut commands: Commands,
+    mut bomb_projectiles: Query<
+        (Entity, &Projectile, &GlobalTransform),
+        (With<Projectile>, Added<Projectile>),
+    >,
+    player_bomb_targets: Query<(Entity, &BombTarget), With<Player>>,
+    transforms: Query<&GlobalTransform>,
+) {
+    for (proj_entity, proj, proj_transform) in bomb_projectiles.iter_mut() {
+        if *proj != Projectile::Bomb {
+            continue;
+        }
+
+        let proj_pos = proj_transform.translation().truncate();
+        for (player_e, bomb_target) in player_bomb_targets.iter() {
+            if let Ok(player_txfm) = transforms.get(player_e) {
+                let player_pos = player_txfm.translation().truncate();
+                let distance = proj_pos.distance(player_pos);
+                if distance < 100.0 {
+                    commands.entity(proj_entity).insert(BombTarget {
+                        target_pos: bomb_target.target_pos,
+                    });
+                    commands.entity(player_e).remove::<BombTarget>();
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/// Handle bomb explosions when bomb reaches target or hits something
+pub fn handle_bomb_explosion(
+    mut commands: Commands,
+    mut bomb_projectiles: Query<(Entity, &GlobalTransform, Option<&BombTarget>), With<Projectile>>,
+    projectiles: Query<&Projectile>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
+    enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
+    attack_query: Query<&Attack, With<Player>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    mut status_event: EventWriter<StatusEffectEvent>,
+) {
+    let power_mult = player_skills
+        .get_single()
+        .map(|s| s.skill_power_multiplier())
+        .unwrap_or(1.0);
+    let base_dmg: i32 = attack_query.get_single().map(|a| a.0).unwrap_or(10);
+    let dmg = (base_dmg as f32 * power_mult) as i32;
+
+    for (bomb_entity, bomb_txfm, bomb_target_opt) in bomb_projectiles.iter_mut() {
+        if let Ok(proj) = projectiles.get(bomb_entity) {
+            if *proj != Projectile::Bomb {
+                continue;
+            }
+        } else {
+            continue;
+        }
+        if let Some(bomb_target) = bomb_target_opt {
+            let bomb_pos = bomb_txfm.translation().truncate();
+            let distance_to_target = bomb_pos.distance(bomb_target.target_pos);
+
+            if distance_to_target < 5.0 {
+                ranged_attack_events.send(RangedAttackEvent {
+                    projectile: Projectile::BombExplosion,
+                    direction: Vec2::ZERO,
+                    mana_cost: None,
+                    from_enemy: false,
+                    from_entity: None,
+                    is_followup_proj: false,
+                    dmg_override: Some(dmg),
+                    pos_override: Some(bomb_target.target_pos),
+                    spawn_delay: 0.0,
+                });
+
+                let explosion_radius = 50.0;
+                for (enemy_entity, enemy_transform) in enemies.iter() {
+                    let enemy_pos = enemy_transform.translation().truncate();
+                    let distance = bomb_target.target_pos.distance(enemy_pos);
+                    if distance <= explosion_radius {
+                        commands.entity(enemy_entity).insert(Frail {
+                            num_stacks: 3,
+                            timer: Timer::from_seconds(1.2, TimerMode::Repeating),
+                        });
+
+                        status_event.send(StatusEffectEvent {
+                            entity: enemy_entity,
+                            effect: StatusEffect::Frail,
+                            num_stacks: 3,
+                        });
+                    }
+                }
+
+                commands.entity(bomb_entity).despawn_recursive();
+            }
         }
     }
 }

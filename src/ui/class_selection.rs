@@ -1416,59 +1416,60 @@ fn spawn_player_preview(
         .set_parent(player_container)
         .id();
 
-    // Spawn active skill icon and description
-    let active_skill = &class_data.active_skill;
-    let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-    let active_skill_desc = active_skill.get_desc().join("\n\n");
+    for (skill_index, active_skill) in class_data.active_skills.iter().enumerate() {
+        let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
+        let active_skill_desc = active_skill.get_desc().join("\n\n");
 
-    // Active skill icon
-    let _active_skill_icon = commands
-        .spawn(SpriteBundle {
-            texture: active_skill_icon,
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(18., 18.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(ICONS_X_OFFSET, ICONS_Y_OFFSET + ICON_Y_SPACING * 2., 1.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("ACTIVE SKILL ICON"))
-        .set_parent(player_container)
-        .id();
+        let skill_y_offset =
+            ICONS_Y_OFFSET + ICON_Y_SPACING * 2. + ((ICON_Y_SPACING - 4.) * skill_index as f32);
 
-    // Active skill description text
-    let _active_skill_description_text = commands
-        .spawn(Text2dBundle {
-            text: Text::from_section(
-                active_skill_desc,
-                TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
-                    color: DARK_WOOD_BROWN,
+        let _active_skill_icon = commands
+            .spawn(SpriteBundle {
+                texture: active_skill_icon,
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(18., 18.)),
+                    ..Default::default()
                 },
-            )
-            .with_alignment(TextAlignment::Left),
-            text_anchor: Anchor::TopLeft,
-            transform: Transform {
-                translation: Vec3::new(
-                    DESC_TEXT_X,
-                    ICONS_Y_OFFSET + ICON_Y_SPACING * 2. + TEXT_Y_OFFSET,
-                    1.,
-                ),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..default()
-        })
-        .insert(RenderLayers::from_layers(&[3]))
-        .insert(Name::new("ACTIVE SKILL DESCRIPTION"))
-        .set_parent(player_container)
-        .id();
+                transform: Transform {
+                    translation: Vec3::new(ICONS_X_OFFSET, skill_y_offset, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new(format!("ACTIVE SKILL ICON {}", skill_index)))
+            .set_parent(player_container)
+            .id();
+
+        // Active skill description text
+        let _active_skill_description_text = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    active_skill_desc,
+                    TextStyle {
+                        font: asset_server.load("fonts/4x5.ttf"),
+                        font_size: 5.0,
+                        color: DARK_WOOD_BROWN,
+                    },
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::TopLeft,
+                transform: Transform {
+                    translation: Vec3::new(DESC_TEXT_X, skill_y_offset + TEXT_Y_OFFSET, 1.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(Name::new(format!(
+                "ACTIVE SKILL DESCRIPTION {}",
+                skill_index
+            )))
+            .set_parent(player_container)
+            .id();
+    }
 
     player_container
 }

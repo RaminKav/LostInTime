@@ -514,6 +514,9 @@ pub enum WorldObject {
     ChaosTotem,
     ChaosTotemDone,
     Coin,
+    DaggerThrow,
+    Bomb,
+    FuryKunai,
 }
 
 #[derive(

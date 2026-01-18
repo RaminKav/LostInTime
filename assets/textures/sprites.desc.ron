@@ -180,6 +180,16 @@
             size: (16., 16.),
             anchor: Some((0.25,-0.2)),
         ),
+        Bomb: WorldObjectData(
+            texture_pos: (5., 7.),
+            size: (16., 16.),
+            anchor: Some((0.25,-0.2)),
+        ),
+        FuryKunai: WorldObjectData(
+            texture_pos: (5., 6.),
+            size: (16., 16.),
+            anchor: Some((0.25,-0.2)),
+        ),
         ThrowingStar: WorldObjectData(
             texture_pos: (4., 6.),
             size: (16., 16.),
@@ -252,6 +262,11 @@
         ),
         UpgradeTome: WorldObjectData(
             texture_pos: (2., 6.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DaggerThrow: WorldObjectData(
+            texture_pos: (3., 6.),
             size: (16., 16.),
             anchor: None,
         ),

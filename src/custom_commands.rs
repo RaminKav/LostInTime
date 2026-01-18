@@ -144,6 +144,12 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 x_offset = (angle.cos() * (sprite_size.x) + angle.cos() * (sprite_size.y)) / 2.;
                 y_offset = (angle.sin() * (sprite_size.x) + angle.sin() * (sprite_size.y)) / 2.;
             }
+            let custom_rotation =
+                if let Some(proj) = params.get_component::<Projectile, _>(obj.clone()) {
+                    proj.get_custom_rotation()
+                } else {
+                    None
+                };
             proto_data.mana_bar_full = mana_bar_full;
             //TODO: make these prototype data
             spawned_entity_commands
@@ -155,7 +161,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                             y_offset + (angle.sin() * proj_state.spawn_offset.y * scale_up),
                             0.,
                         ),
-                    rotation: Quat::from_rotation_z(angle),
+                    rotation: Quat::from_rotation_z(angle + custom_rotation.unwrap_or(0.)),
                     scale: Vec3::splat(scale_up),
                     ..default()
                 })

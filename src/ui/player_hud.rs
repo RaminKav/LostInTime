@@ -1151,21 +1151,14 @@ pub fn handle_update_player_skills(
 
         // Build list of active skill slots to display
         let mut active_skill_slots = vec![
-            (new_skills.roll_skill_slot.clone(), 0),
+            (new_skills.active_skill_slot_0.clone(), 0),
             (new_skills.active_skill_slot_1.clone(), 1),
+            (new_skills.active_skill_slot_2.clone(), 2),
+            (new_skills.active_skill_slot_3.clone(), 3),
         ];
 
-        // Add second active skill slot if unlocked
-        if let Some(upgrades) = unlock_upgrades.as_ref() {
-            if upgrades.second_active_skill_slot_unlocked {
-                active_skill_slots.push((new_skills.active_skill_slot_2.clone(), 2));
-            }
-        }
-
-        // Add third active skill slot if it has a skill assigned
-        // (this slot is only filled by blessings when both slot 1 and 2 are full)
-        if new_skills.active_skill_slot_3.is_some() {
-            active_skill_slots.push((new_skills.active_skill_slot_3.clone(), 3));
+        if new_skills.active_skill_slot_4.is_some() {
+            active_skill_slots.push((new_skills.active_skill_slot_4.clone(), 4));
         }
 
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {

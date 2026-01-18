@@ -221,6 +221,7 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::remove_rapidfire_speed_from_bonus.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
                     skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
+                    skill_heirlooms::tick_new_skill_cooldowns.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::update_stealth_color.run_if(is_not_paused),
@@ -228,6 +229,14 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::reduce_skill_cooldown_on_crit
                         .after(handle_hits)
                         .run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    skill_heirlooms::handle_fury_skill.run_if(is_not_paused),
+                    skill_heirlooms::handle_attach_bomb_target.run_if(is_not_paused),
+                    skill_heirlooms::handle_bomb_explosion.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

@@ -225,18 +225,10 @@ pub fn handle_active_skill_shrine_ui_interaction(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_choices: Query<(Entity, &mut Interactable, &ActiveSkillShrineUI)>,
-    mut player_skills: Query<(
-        Entity,
-        &mut crate::player::skills::PlayerSkills,
-        &GlobalTransform,
-    )>,
     shrine_selection: ResMut<ActiveSkillShrineSelection>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
-    mut att_event: EventWriter<crate::attributes::AttributeChangeEvent>,
     graphics: Res<Graphics>,
-    mut shrine_query: Query<&mut crate::item::active_skill_shrine::ActiveSkillShrineState>,
-    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -263,52 +255,15 @@ pub fn handle_active_skill_shrine_ui_interaction(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed && shrine_ui.interaction_lock_timer.finished() {
-                        let (player_e, mut skills, _t) = player_skills.single_mut();
                         let picked_skill = shrine_ui.skill_choice.clone();
 
-                        // Check if player has open slots (check slot 3 first if unlocked)
-                        let has_slot_2_unlocked = unlock_upgrades
-                            .as_ref()
-                            .map(|u| u.second_active_skill_slot_unlocked)
-                            .unwrap_or(false);
-
-                        if has_slot_2_unlocked && skills.active_skill_slot_2.is_none() {
-                            // Auto-assign to slot 3 if unlocked and empty
-                            skills.active_skill_slot_2 = Some(picked_skill.clone());
-                        } else if skills.roll_skill_slot.is_none() {
-                            skills.roll_skill_slot = Some(picked_skill.clone());
-                        } else if skills.active_skill_slot_1.is_none() {
-                            skills.active_skill_slot_1 = Some(picked_skill.clone());
-                        } else if has_slot_2_unlocked {
-                            // Slot 2 is full, show overwrite UI
-                            commands.insert_resource(ActiveSkillShrineOverwrite {
-                                skill_choice: picked_skill.clone(),
-                                shrine_entity: shrine_selection.shrine_entity,
-                            });
-                            commands.remove_resource::<ActiveSkillShrineSelection>();
-                            next_ui_state.set(UIState::ActiveSkills);
-                            return;
-                        } else {
-                            // Both slots full - automatically swap the second active skill slot (slot 2, which is not Roll)
-                            skills.active_skill_slot_1 = Some(picked_skill.clone());
-                        }
-
-                        // Add skill components
-                        picked_skill
-                            .active_skill
-                            .add_skill_components(player_e, &mut commands);
-
-                        // Mark shrine as used (completion system will handle cleanup)
-                        if let Ok(mut shrine_state) =
-                            shrine_query.get_mut(shrine_selection.shrine_entity)
-                        {
-                            shrine_state.is_used = true;
-                        }
-
-                        // Remove resource and close UI
+                        commands.insert_resource(ActiveSkillShrineOverwrite {
+                            skill_choice: picked_skill.clone(),
+                            shrine_entity: shrine_selection.shrine_entity,
+                        });
                         commands.remove_resource::<ActiveSkillShrineSelection>();
-                        next_ui_state.set(UIState::Closed);
-                        att_event.send(crate::attributes::AttributeChangeEvent);
+                        next_ui_state.set(UIState::ActiveSkills);
+                        return;
                     }
                 }
                 _ => (),
@@ -340,17 +295,14 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     shrine_overwrite: Res<ActiveSkillShrineOverwrite>,
     res: Res<ScreenResolution>,
     skills: Query<&PlayerSkills>,
-    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
 ) {
     let skills = skills.single();
-    let mut choices = vec![skills.active_skill_slot_1.clone()];
-
-    // Add slot 2 if unlocked
-    if let Some(upgrades) = unlock_upgrades.as_ref() {
-        if upgrades.second_active_skill_slot_unlocked {
-            choices.push(skills.active_skill_slot_2.clone());
-        }
-    }
+    let choices = vec![
+        skills.active_skill_slot_0.clone(),
+        skills.active_skill_slot_1.clone(),
+        skills.active_skill_slot_2.clone(),
+        skills.active_skill_slot_3.clone(),
+    ];
     let t_offset = Vec2::new(4., 4.);
 
     // title bar
@@ -396,24 +348,21 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         9.,
     );
 
-    // Spawn the existing active skills so the player can choose which to replace
     let size = super::SKILLS_CHOICE_UI_SIZE;
+    let num_choices = choices.iter().filter(|c| c.is_some()).count();
+    let card_spacing = 8.; // spacing between cards
+    let total_width = num_choices as f32 * size.x + (num_choices - 1) as f32 * card_spacing;
+    let start_x = -total_width / 2. + size.x / 2.;
+
     let mut spawned_count = 0;
     for (slot_idx, choice) in choices.iter().enumerate() {
         if choice.is_none() {
             continue;
         }
         let choice = choice.as_ref().unwrap();
-        // Use the actual slot index (0 for slot 1, 1 for slot 2) for matching
         let actual_slot_idx = slot_idx;
         let translation = Vec2::new(
-            (spawned_count as i32 - 1) as f32 * (size.x + 16.)
-                + if choices.iter().filter(|c| c.is_some()).count() == 2 {
-                    size.x / 2.
-                } else {
-                    0.
-                }
-                + 0.1,
+            start_x + spawned_count as f32 * (size.x + card_spacing) + 0.1,
             0.,
         );
         let ui_element = choice.active_skill.get_ui_element(choice.rarity.clone());
@@ -593,22 +542,15 @@ pub fn handle_active_skill_shrine_overwrite_interaction(
                         let new_skill = overwrite.skill_choice.clone();
 
                         match skill_ui.index {
-                            0 => {
-                                skills.active_skill_slot_1 = Some(new_skill.clone());
-                                // Add skill components
-                                new_skill
-                                    .active_skill
-                                    .add_skill_components(player_e, &mut commands);
-                            }
-                            1 => {
-                                skills.active_skill_slot_2 = Some(new_skill.clone());
-                                // Add skill components
-                                new_skill
-                                    .active_skill
-                                    .add_skill_components(player_e, &mut commands);
-                            }
+                            0 => skills.active_skill_slot_0 = Some(new_skill.clone()),
+                            1 => skills.active_skill_slot_1 = Some(new_skill.clone()),
+                            2 => skills.active_skill_slot_2 = Some(new_skill.clone()),
+                            3 => skills.active_skill_slot_3 = Some(new_skill.clone()),
                             _ => (),
                         }
+                        new_skill
+                            .active_skill
+                            .add_skill_components(player_e, &mut commands);
 
                         // Mark shrine as used
                         if let Ok(mut shrine_state) = shrine_query.get_mut(overwrite.shrine_entity)

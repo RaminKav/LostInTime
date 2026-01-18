@@ -83,6 +83,8 @@ pub struct KeyBindings {
     pub active_skill_slot_2: KeyCode,
     #[serde(with = "keycode_serde", default = "default_slot_3_key")]
     pub active_skill_slot_3: KeyCode,
+    #[serde(with = "keycode_serde", default = "default_slot_4_key")]
+    pub active_skill_slot_4: KeyCode, // Bonus slot from blessings
     #[serde(with = "keycode_serde")]
     pub inventory: KeyCode,
     #[serde(with = "keycode_serde")]
@@ -90,7 +92,11 @@ pub struct KeyBindings {
 }
 
 fn default_slot_3_key() -> KeyCode {
-    KeyCode::R
+    KeyCode::E
+}
+
+fn default_slot_4_key() -> KeyCode {
+    KeyCode::F
 }
 
 impl Default for KeyBindings {
@@ -99,8 +105,9 @@ impl Default for KeyBindings {
             active_skill_slot_0: KeyCode::Space,
             active_skill_slot_1: KeyCode::LShift,
             active_skill_slot_2: KeyCode::Q,
-            active_skill_slot_3: KeyCode::R,
-            inventory: KeyCode::E,
+            active_skill_slot_3: KeyCode::E,
+            active_skill_slot_4: KeyCode::F, // Bonus slot
+            inventory: KeyCode::Tab,
             minimap: KeyCode::M,
         }
     }
@@ -119,6 +126,7 @@ impl KeyBindings {
             1 => self.active_skill_slot_1,
             2 => self.active_skill_slot_2,
             3 => self.active_skill_slot_3,
+            4 => self.active_skill_slot_4,
             _ => KeyCode::Space,
         }
     }
@@ -129,6 +137,7 @@ impl KeyBindings {
             1 => self.active_skill_slot_1 = key,
             2 => self.active_skill_slot_2 = key,
             3 => self.active_skill_slot_3 = key,
+            4 => self.active_skill_slot_4 = key,
             _ => {}
         }
     }

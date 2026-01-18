@@ -7,7 +7,6 @@ use super::item_actions::ItemActionParam;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::assets::SpriteAnchor;
-use crate::attributes::ItemRarity;
 use crate::chaos::IncreaseChaosEvent;
 use crate::colors::RED;
 use crate::container::Container;
@@ -23,7 +22,7 @@ use crate::ui::damage_numbers::{
     spawn_floating_text_with_shadow, spawn_screen_locked_icon_to_world_pos, BeaconGuidance,
     BeaconTarget,
 };
-use crate::ui::item_chest::{ItemChestAnimState, ItemChestState};
+use crate::ui::item_chest::ItemChestState;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
 use crate::ui::UIState;
@@ -414,14 +413,20 @@ impl ObjectAction {
                     .ok()
                     .map(|skills| {
                         let mut current = Vec::new();
-                        if let Some(slot1) = &skills.roll_skill_slot {
+                        if let Some(slot0) = &skills.active_skill_slot_0 {
+                            current.push(slot0.active_skill.clone());
+                        }
+                        if let Some(slot1) = &skills.active_skill_slot_1 {
                             current.push(slot1.active_skill.clone());
                         }
-                        if let Some(slot2) = &skills.active_skill_slot_1 {
+                        if let Some(slot2) = &skills.active_skill_slot_2 {
                             current.push(slot2.active_skill.clone());
                         }
-                        if let Some(slot3) = &skills.active_skill_slot_2 {
+                        if let Some(slot3) = &skills.active_skill_slot_3 {
                             current.push(slot3.active_skill.clone());
+                        }
+                        if let Some(slot4) = &skills.active_skill_slot_4 {
+                            current.push(slot4.active_skill.clone());
                         }
                         current
                     })
@@ -430,8 +435,7 @@ impl ObjectAction {
                 // Get all active skills from ActiveSkill enum, excluding Roll and skills the player already has
                 let active_skills: Vec<ActiveSkill> = ActiveSkill::iter()
                     .filter(|skill| {
-                        *skill != ActiveSkill::Roll
-                            && *skill != ActiveSkill::Parry
+                        *skill != ActiveSkill::Parry
                             && *skill != ActiveSkill::LaserBeam
                             && !player_current_skills.contains(skill)
                     })

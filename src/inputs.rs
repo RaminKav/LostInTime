@@ -16,8 +16,9 @@ use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
-    ActiveSkill, ActiveSkillUsedEvent, BuckshotSkillState, DruidTreeSkillState, HealSkillState,
-    Heirloom, IceWallSkillState, LaserBeamState, PlayerSkills,
+    ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
+    DruidTreeSkillState, FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
+    LightningState, PlayerSkills, SlashState, TripleThrowState,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -439,6 +440,17 @@ pub fn dispatch_active_skill_events(
         ),
         With<Player>,
     >,
+    player_q2: Query<
+        (
+            Option<&LightningState>,
+            Option<&DaggerThrowState>,
+            Option<&SlashState>,
+            Option<&TripleThrowState>,
+            Option<&FuryState>,
+            Option<&BombState>,
+        ),
+        With<Player>,
+    >,
     slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
     slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
     keybinds: Res<crate::keybinds::KeyBindings>,
@@ -463,21 +475,34 @@ pub fn dispatch_active_skill_events(
     else {
         return;
     };
-    // Check which key was pressed, prioritizing higher slots (3, 2, 1, 0)
+    let Ok((
+        lightning_state,
+        dagger_throw_state,
+        slash_state,
+        triple_throw_state,
+        fury_state,
+        bomb_state,
+    )) = player_q2.get_single()
+    else {
+        return;
+    };
     // Only handle ONE key per frame to prevent multiple slots from triggering
     // Check all keys first, then handle only the highest priority one
+    let slot_4_key = keybinds.get_active_skill_key(4);
     let slot_3_key = keybinds.get_active_skill_key(3);
     let slot_2_key = keybinds.get_active_skill_key(2);
     let slot_1_key = keybinds.get_active_skill_key(1);
     let slot_0_key = keybinds.get_active_skill_key(0);
 
+    let slot_4_pressed = key_input.just_pressed(slot_4_key);
     let slot_3_pressed = key_input.just_pressed(slot_3_key);
     let slot_2_pressed = key_input.just_pressed(slot_2_key);
     let slot_1_pressed = key_input.just_pressed(slot_1_key);
     let slot_0_pressed = key_input.just_pressed(slot_0_key);
 
-    // Determine which slot to handle based on priority (3 > 2 > 1 > 0)
-    let pressed_slot = if slot_3_pressed {
+    let pressed_slot = if slot_4_pressed {
+        Some(4)
+    } else if slot_3_pressed {
         Some(3)
     } else if slot_2_pressed {
         Some(2)
@@ -564,6 +589,24 @@ pub fn dispatch_active_skill_events(
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
                 ActiveSkill::LaserBeam => laser_beam_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Lightning => lightning_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::DaggerThrow => dagger_throw_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::DaggerSlash => slash_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::TripleThrow => triple_throw_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Fury => fury_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::Bomb => bomb_state
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
             };

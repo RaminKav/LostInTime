@@ -1,53 +1,24 @@
 (
-  classes: {
-    Warrior: (
-      achievements: [],
-      cost: 0,
-    ),
-    Paladin: (
-      achievements: [DungeonCrawler, FindHammer],
-      cost: 20,
-    ),
-    Knight: (
-      achievements: [Act1, FindSpear],
-      cost: 25,
-    ),
-    Thief: (
-      achievements: [Bouncy, FindClaw],
-      cost: 20,
-    ),
-    Gunslinger: (
-      achievements: [Chaotic, FindGun],
-      cost: 25,
-    ),
-    IceMage: (
-      achievements: [FairyPet, FindIceStaff],
-      cost: 25,
-    ),
-    FireMage: (
-      achievements: [],
-      cost: 0,
-    ),
-    Wizard: (
-      achievements: [Act2, FindBasicStaff],
-      cost: 30,
-    ),
-    Druid: (
-      achievements: [MushlingSlayer, FindMagicWhip],
-      cost: 25,
-    ),
-    Rogue: (
-      achievements: [BushlingSlayer1, FindDagger],
-      cost: 20,
-    ),
-    Archer: (
-      achievements: [Act3, FindBow],
-      cost: 30,
-    ),
-    Kid: (
-      achievements: [Bouncy2, FindBlowdart],
-      cost: 30,
-    ),
-  },
+    classes: {
+        Warrior: (
+            achievements: [],
+            cost: 0,
+        ),
+        Wizard: (
+            achievements: [],
+            cost: 0,
+        ),
+        Rogue: (
+            achievements: [BushlingSlayer1, FindDagger],
+            cost: 20,
+        ),
+        Thief: (
+            achievements: [Bouncy, FindClaw],
+            cost: 20,
+        ),
+        Hunter: (
+            achievements: [Act3, FindBow, FindGun],
+            cost: 25,
+        ),
+    },
 )
-

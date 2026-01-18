@@ -9,12 +9,9 @@ use crate::{
     colors::LIGHT_GREEN,
     custom_commands::CommandsExt,
     item::WorldObject,
-    player::{
-        skills::{
-            ActiveSkill, ActiveSkillChoiceState, HeirloomChoiceQueue, HeirloomRarity,
-            HeirloomWithRarity, PlayerSkills,
-        },
-        unlocks::UnlockUpgrades,
+    player::skills::{
+        ActiveSkill, ActiveSkillChoiceState, HeirloomChoiceQueue, HeirloomRarity,
+        HeirloomWithRarity, PlayerSkills,
     },
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_floating_text_with_shadow,
@@ -157,7 +154,6 @@ pub fn handle_blessing_selected(
     heirloom_queue: Res<HeirloomChoiceQueue>,
     mut player: Query<(Entity, &mut PlayerSkills, &GlobalTransform)>,
     mut commands: Commands,
-    mut unlock_upgrades: Option<ResMut<UnlockUpgrades>>,
     asset_server: Res<AssetServer>,
     mut blessing_transition_state: ResMut<BlessingTransitionState>,
 ) {
@@ -207,7 +203,7 @@ pub fn handle_blessing_selected(
                         player_skills.heirlooms.push(heirloom_with_rarity.clone());
 
                         // Add skill components to the player entity
-                        heirloom_with_rarity.heirloom.add_skill_components(
+                        heirloom_with_rarity.heirloom.add_heirloom_components(
                             player_entity,
                             &mut commands,
                             player_skills.clone(),
@@ -234,18 +230,13 @@ pub fn handle_blessing_selected(
                 let laser_beam_skill =
                     ActiveSkillChoiceState::new(ActiveSkill::LaserBeam, HeirloomRarity::Legendary);
 
-                player_skills.insert_active_skill(laser_beam_skill, 3);
+                player_skills.insert_active_skill(laser_beam_skill, 4);
 
                 ActiveSkill::LaserBeam.add_skill_components(player_entity, &mut commands);
             }
             Blessing::RandomActiveSkill => {
                 let available_skills: Vec<ActiveSkill> = ActiveSkill::iter()
-                    .filter(|skill| {
-                        !matches!(
-                            skill,
-                            ActiveSkill::Roll | ActiveSkill::Parry | ActiveSkill::LaserBeam
-                        )
-                    })
+                    .filter(|skill| !matches!(skill, ActiveSkill::Parry | ActiveSkill::LaserBeam))
                     .collect();
 
                 if let Some(random_skill) = available_skills.choose(&mut rng) {
@@ -254,7 +245,7 @@ pub fn handle_blessing_selected(
                     let skill_choice =
                         ActiveSkillChoiceState::new(random_skill.clone(), HeirloomRarity::Rare);
 
-                    player_skills.insert_active_skill(skill_choice, 3);
+                    player_skills.insert_active_skill(skill_choice, 4);
 
                     random_skill.add_skill_components(player_entity, &mut commands);
 

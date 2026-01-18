@@ -292,17 +292,32 @@ pub fn change_player_class_visuals(
         let class = &player_class.class;
         let (handle, anim) = class.get_anim_data(&sprite_handles);
 
-        // Get class data to access active skill
+        // Get class data to access all 4 active skills
         let class_data = graphics.get_class_data(class.clone());
-        let active_skill = &class_data.active_skill;
+        let active_skills = &class_data.active_skills;
 
+        // Assign all 4 class skills to slots 0-3
+        player_skills.active_skill_slot_0 = Some(ActiveSkillChoiceState::new(
+            active_skills[0].clone(),
+            HeirloomRarity::Common,
+        ));
         player_skills.active_skill_slot_1 = Some(ActiveSkillChoiceState::new(
-            active_skill.clone(),
+            active_skills[1].clone(),
+            HeirloomRarity::Common,
+        ));
+        player_skills.active_skill_slot_2 = Some(ActiveSkillChoiceState::new(
+            active_skills[2].clone(),
+            HeirloomRarity::Common,
+        ));
+        player_skills.active_skill_slot_3 = Some(ActiveSkillChoiceState::new(
+            active_skills[3].clone(),
             HeirloomRarity::Common,
         ));
 
-        // Add skill components for the active skill
-        active_skill.add_skill_components(e, &mut commands);
+        // Add skill components for all 4 active skills
+        for skill in active_skills.iter() {
+            skill.add_skill_components(e, &mut commands);
+        }
 
         //att update event
         commands

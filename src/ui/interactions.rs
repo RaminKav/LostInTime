@@ -1013,7 +1013,7 @@ pub fn handle_cursor_skills_buttons(
                                 &mut skills,
                                 level.level,
                             );
-                            picked_skill.heirloom.add_skill_components(
+                            picked_skill.heirloom.add_heirloom_components(
                                 e,
                                 &mut commands,
                                 skills.clone(),
@@ -1072,11 +1072,19 @@ pub fn handle_cursor_skills_buttons(
                         } else if ui_state == &UIState::ActiveSkills {
                             match state.index {
                                 0 => {
-                                    skills.roll_skill_slot =
+                                    skills.active_skill_slot_0 =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 1 => {
                                     skills.active_skill_slot_1 =
+                                        skill_queue.active_heirloom_limbo.clone();
+                                }
+                                2 => {
+                                    skills.active_skill_slot_2 =
+                                        skill_queue.active_heirloom_limbo.clone();
+                                }
+                                3 => {
+                                    skills.active_skill_slot_3 =
                                         skill_queue.active_heirloom_limbo.clone();
                                 }
                                 _ => (),
@@ -1471,7 +1479,7 @@ pub fn handle_cursor_heirloom_chest_button(
                                         &mut skills,
                                         level.level,
                                     );
-                                    picked_heirloom.heirloom.add_skill_components(
+                                    picked_heirloom.heirloom.add_heirloom_components(
                                         player_entity,
                                         &mut commands,
                                         skills.clone(),

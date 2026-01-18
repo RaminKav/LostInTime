@@ -30,21 +30,11 @@ use super::{mage_skills::TeleportState, rogue_skills::ComboCounter};
 pub enum SkillClass {
     None,
 
-    Warrior, //Sword
-    Paladin, //hammer
-    Knight,  //Spear
-
-    Thief,      //claw
-    Gunslinger, //gun
-
-    IceMage,  //ice staff
-    FireMage, //fire staff
-    Wizard,   //lightning
-    Druid,    // whip
-
-    Rogue,  //dagger
-    Archer, //bow
-    Kid,    // blowdart
+    Warrior, // Sword, Spear, Hammer - +5 HP per level
+    Wizard,  // Fire Staff, Ice Staff, Basic Staff - +5 MP per level
+    Rogue,   // Dagger - +3% crit chance per level
+    Thief,   // Claw - +3% attack speed per level
+    Hunter,  // Bow, Gun - +3% crit dmg per level
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize, Resource)]
@@ -57,60 +47,50 @@ impl SkillClass {
     pub fn get_cape(&self) -> WorldObject {
         match self {
             SkillClass::Warrior => WorldObject::RedCape,
-            SkillClass::Paladin => WorldObject::RedCape,
-            SkillClass::Knight => WorldObject::RedCape,
-
-            SkillClass::Thief => WorldObject::GreyCape,
-            SkillClass::Gunslinger => WorldObject::GreyCape,
-
-            SkillClass::FireMage => WorldObject::BlueCape,
-            SkillClass::IceMage => WorldObject::BlueCape,
             SkillClass::Wizard => WorldObject::BlueCape,
-            SkillClass::Druid => WorldObject::BlueCape,
-
             SkillClass::Rogue => WorldObject::GreenCape,
-            SkillClass::Archer => WorldObject::GreenCape,
-            SkillClass::Kid => WorldObject::GreenCape,
+            SkillClass::Thief => WorldObject::GreyCape,
+            SkillClass::Hunter => WorldObject::GreenCape,
             _ => WorldObject::GreyCape,
         }
     }
     pub fn get_anim_data(&self, sprites: &PlayerSpriteHandles) -> (Handle<Aseprite>, &str) {
         match self {
             SkillClass::Warrior => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
-            SkillClass::Paladin => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
-            SkillClass::Knight => (sprites.red.clone(), PlayerRedAseprite::tags::IDLE_FRONT),
-
-            SkillClass::Thief => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
-            SkillClass::Gunslinger => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
-
-            SkillClass::FireMage => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
-            SkillClass::IceMage => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
             SkillClass::Wizard => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
-            SkillClass::Druid => (sprites.blue.clone(), PlayerBlueAseprite::tags::IDLE_FRONT),
-
             SkillClass::Rogue => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
-            SkillClass::Archer => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
-            SkillClass::Kid => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
+            SkillClass::Thief => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
+            SkillClass::Hunter => (sprites.green.clone(), PlayerGreenAseprite::tags::IDLE_FRONT),
             _ => (sprites.grey.clone(), PlayerGreyAseprite::tags::IDLE_FRONT),
         }
     }
-    pub fn get_starting_wep(&self) -> WorldObject {
+    /// Returns all starting weapons for the class
+    pub fn get_starting_weapons(&self) -> Vec<WorldObject> {
         match self {
-            SkillClass::Warrior => WorldObject::Sword,
-            SkillClass::Paladin => WorldObject::Hammer,
-            SkillClass::Knight => WorldObject::Spear,
-            SkillClass::Thief => WorldObject::Claw,
-            SkillClass::Rogue => WorldObject::Dagger,
-            SkillClass::Gunslinger => WorldObject::Gun,
-            SkillClass::FireMage => WorldObject::FireStaff,
-            SkillClass::IceMage => WorldObject::IceStaff,
-            SkillClass::Wizard => WorldObject::BasicStaff,
-            SkillClass::Druid => WorldObject::MagicWhip,
-            SkillClass::Archer => WorldObject::WoodBow,
-            SkillClass::Kid => WorldObject::Blowdart,
-            _ => WorldObject::Sword,
+            SkillClass::Warrior => {
+                vec![WorldObject::Sword, WorldObject::Spear, WorldObject::Hammer]
+            }
+            SkillClass::Wizard => {
+                vec![
+                    WorldObject::FireStaff,
+                    WorldObject::IceStaff,
+                    WorldObject::BasicStaff,
+                ]
+            }
+            SkillClass::Rogue => vec![WorldObject::Dagger],
+            SkillClass::Thief => vec![WorldObject::Claw],
+            SkillClass::Hunter => vec![WorldObject::WoodBow, WorldObject::Gun],
+            _ => vec![WorldObject::Sword],
         }
     }
+    /// Returns the first starting weapon (default drop)
+    pub fn get_starting_wep(&self) -> WorldObject {
+        self.get_starting_weapons()
+            .first()
+            .cloned()
+            .unwrap_or(WorldObject::Sword)
+    }
+    /// Returns the 4 active skills for this class
 
     pub fn compute_cape_stats(&self, level: i32) -> ItemAttributes {
         let mut stats = ItemAttributes::default();
@@ -121,69 +101,29 @@ impl SkillClass {
         } else {
             AttributeQuality::Low
         };
+        // Base damage bonus for all classes
+        stats.bonus_damage = AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
+
         match self {
             SkillClass::Warrior => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 6.) as i32, quality, 1.);
-            }
-            SkillClass::Paladin => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
+                // +5 HP per level
                 stats.health = AttributeValue::new(level * 5, quality, 1.);
             }
-            SkillClass::Knight => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.defence = AttributeValue::new(level * 3, quality, 1.);
+            SkillClass::Wizard => {
+                // +5 MP per level
+                stats.mana = AttributeValue::new(level * 5, quality, 1.);
             }
-
             SkillClass::Rogue => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.speed = AttributeValue::new(level * 3, quality, 1.);
-            }
-            SkillClass::Archer => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.crit_damage = AttributeValue::new(level * 4, quality, 1.);
-            }
-            SkillClass::Kid => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.dodge = AttributeValue::new(level * 3, quality, 1.);
-            }
-
-            SkillClass::Thief => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
+                // +3% crit chance per level
                 stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
             }
-            SkillClass::Gunslinger => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
+            SkillClass::Thief => {
+                // +3% attack speed per level
                 stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
             }
-
-            SkillClass::FireMage => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.mana = AttributeValue::new(level * 5, quality, 1.);
-            }
-            SkillClass::IceMage => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.mana = AttributeValue::new(level * 5, quality, 1.);
-            }
-            SkillClass::Wizard => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.mana_regen =
-                    AttributeValue::new(f32::floor(level as f32 * 0.5) as i32, quality, 1.);
-            }
-            SkillClass::Druid => {
-                stats.bonus_damage =
-                    AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
-                stats.health_regen = AttributeValue::new(level * 1, quality, 1.);
+            SkillClass::Hunter => {
+                // +3% crit dmg per level
+                stats.crit_damage = AttributeValue::new(level * 3, quality, 1.);
             }
             _ => (),
         }
@@ -210,6 +150,13 @@ pub enum ActiveSkill {
     Shout,
     PiercingStar,
     LaserBeam,
+    // New skills (consolidated classes)
+    Lightning,   // Wizard - NEW
+    DaggerThrow, // Rogue - NEW
+    DaggerSlash, // Rogue - NEW
+    TripleThrow, // Thief - NEW
+    Fury,        // Thief - NEW
+    Bomb,        // Hunter - NEW
 }
 
 impl ActiveSkill {
@@ -219,7 +166,7 @@ impl ActiveSkill {
             ActiveSkill::Roll => 0.0, // Handled separately in player_move_inputs
             ActiveSkill::Parry => 1.2,
             ActiveSkill::ParrySpear => 12.,
-            ActiveSkill::Sprint => 12.0,
+            ActiveSkill::Sprint => 8.0,
             ActiveSkill::SprintLunge => 3.5,
             ActiveSkill::Teleport => 2.0,
             ActiveSkill::Stealth => 11.0,
@@ -228,10 +175,17 @@ impl ActiveSkill {
             ActiveSkill::Heal => 60.0,
             ActiveSkill::Buckshot => 6.0,
             ActiveSkill::IceWall => 10.0,
-            ActiveSkill::DruidTree => 14.0,
+            ActiveSkill::DruidTree => 11.0,
             ActiveSkill::Shout => 7.0,
             ActiveSkill::PiercingStar => 8.0,
-            ActiveSkill::LaserBeam => 10.0,
+            ActiveSkill::LaserBeam => 13.0,
+            // New skills - placeholder cooldowns
+            ActiveSkill::Lightning => 5.0,
+            ActiveSkill::DaggerThrow => 7.0,
+            ActiveSkill::DaggerSlash => 5.0,
+            ActiveSkill::TripleThrow => 4.0,
+            ActiveSkill::Fury => 13.0,
+            ActiveSkill::Bomb => 5.5,
         }
     }
 }
@@ -281,6 +235,32 @@ pub struct ShoutSkillState {
 pub struct PiercingStarSkillState {
     pub cooldown_timer: Timer,
 }
+#[derive(Component, Clone)]
+pub struct LightningState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct DaggerThrowState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct SlashState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct TripleThrowState {
+    pub cooldown_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct FuryState {
+    pub cooldown_timer: Timer,
+    pub duration: Timer,
+    pub throw_timer: Timer,
+}
+#[derive(Component, Clone)]
+pub struct BombState {
+    pub cooldown_timer: Timer,
+}
 
 impl ActiveSkill {
     pub fn get_title(&self) -> String {
@@ -301,6 +281,13 @@ impl ActiveSkill {
             ActiveSkill::Shout => "Shout".to_string(),
             ActiveSkill::PiercingStar => "Piercing Star".to_string(),
             ActiveSkill::LaserBeam => "Laser Beam".to_string(),
+            // New skills
+            ActiveSkill::Lightning => "Lightning".to_string(),
+            ActiveSkill::DaggerThrow => "Dagger Throw".to_string(),
+            ActiveSkill::DaggerSlash => "Slash".to_string(),
+            ActiveSkill::TripleThrow => "Triple Throw".to_string(),
+            ActiveSkill::Fury => "Fury".to_string(),
+            ActiveSkill::Bomb => "Bomb".to_string(),
         }
     }
 
@@ -374,9 +361,36 @@ impl ActiveSkill {
                 "laser beam that hits".to_string(),
                 "enemies multiple times.".to_string(),
             ],
+            // New skills - placeholder descriptions
+            ActiveSkill::Lightning => vec![
+                "Active: Call down".to_string(),
+                "lightning on enemies.".to_string(),
+            ],
+            ActiveSkill::DaggerThrow => vec![
+                "Active: Throw a".to_string(),
+                "piercing dagger.".to_string(),
+            ],
+            ActiveSkill::DaggerSlash => vec![
+                "Active: Quick slash".to_string(),
+                "attack in front.".to_string(),
+            ],
+            ActiveSkill::TripleThrow => vec![
+                "Active: Throw three".to_string(),
+                "projectiles at once.".to_string(),
+            ],
+            ActiveSkill::Fury => vec![
+                "Active: Enter a fury".to_string(),
+                "state with increased".to_string(),
+                "attack speed.".to_string(),
+            ],
+            ActiveSkill::Bomb => vec![
+                "Active: Throw an".to_string(),
+                "explosive bomb.".to_string(),
+            ],
         }
     }
-
+    //TODO: Grav spear, teleport, and lunge skills rely on this, we should remove the reliance
+    // and get rid of this function
     pub fn add_skill_components(&self, entity: Entity, commands: &mut Commands) {
         match self {
             ActiveSkill::Sprint => {
@@ -530,7 +544,14 @@ impl ActiveSkill {
                     hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                 });
             }
-            ActiveSkill::Roll => {}
+            // New skills - placeholder implementations (default to Roll behavior for now)
+            ActiveSkill::Roll
+            | ActiveSkill::Lightning
+            | ActiveSkill::DaggerThrow
+            | ActiveSkill::DaggerSlash
+            | ActiveSkill::TripleThrow
+            | ActiveSkill::Fury
+            | ActiveSkill::Bomb => {}
         }
     }
 
@@ -1256,7 +1277,7 @@ impl Heirloom {
         }
     }
 
-    pub fn add_skill_components(
+    pub fn add_heirloom_components(
         &self,
         entity: Entity,
         commands: &mut Commands,
@@ -1809,23 +1830,35 @@ pub struct HeirloomWithRarity {
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerSkills {
     pub heirlooms: Vec<HeirloomWithRarity>,
-    pub roll_skill_slot: Option<ActiveSkillChoiceState>,
+    pub active_skill_slot_0: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_1: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_2: Option<ActiveSkillChoiceState>,
     pub active_skill_slot_3: Option<ActiveSkillChoiceState>,
+    /// Slot 4 (bonus slot from blessings, hidden by default)
+    pub active_skill_slot_4: Option<ActiveSkillChoiceState>,
 }
 
 impl Default for PlayerSkills {
     fn default() -> Self {
         Self {
             heirlooms: vec![],
-            roll_skill_slot: Some(ActiveSkillChoiceState::new(
+            active_skill_slot_0: Some(ActiveSkillChoiceState::new(
                 ActiveSkill::Roll,
                 HeirloomRarity::Common,
             )),
-            active_skill_slot_1: None,
-            active_skill_slot_2: None,
-            active_skill_slot_3: None,
+            active_skill_slot_1: Some(ActiveSkillChoiceState::new(
+                ActiveSkill::Roll,
+                HeirloomRarity::Common,
+            )),
+            active_skill_slot_2: Some(ActiveSkillChoiceState::new(
+                ActiveSkill::Roll,
+                HeirloomRarity::Common,
+            )),
+            active_skill_slot_3: Some(ActiveSkillChoiceState::new(
+                ActiveSkill::Roll,
+                HeirloomRarity::Common,
+            )),
+            active_skill_slot_4: None, // Bonus slot - unlocked by blessings
         }
     }
 }
@@ -1876,7 +1909,7 @@ impl PlayerSkills {
     }
     pub fn has_active_skill(&self, active_skill: ActiveSkill) -> Option<usize> {
         if self
-            .roll_skill_slot
+            .active_skill_slot_0
             .as_ref()
             .is_some_and(|s| s.active_skill == active_skill)
         {
@@ -1903,6 +1936,13 @@ impl PlayerSkills {
         {
             return Some(3);
         }
+        if self
+            .active_skill_slot_4
+            .as_ref()
+            .is_some_and(|s| s.active_skill == active_skill)
+        {
+            return Some(4);
+        }
         None
     }
     pub fn get_count(&self, heirloom: Heirloom) -> i32 {
@@ -1920,7 +1960,7 @@ impl PlayerSkills {
     pub fn get_active_skill_in_slot(&self, slot: usize) -> Option<ActiveSkill> {
         match slot {
             0 => self
-                .roll_skill_slot
+                .active_skill_slot_0
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
             1 => self
@@ -1935,15 +1975,30 @@ impl PlayerSkills {
                 .active_skill_slot_3
                 .as_ref()
                 .map(|s| s.active_skill.clone()),
+            4 => self
+                .active_skill_slot_4
+                .as_ref()
+                .map(|s| s.active_skill.clone()),
+            _ => None,
+        }
+    }
+    pub fn get_active_skill_choice_in_slot(&self, slot: usize) -> Option<&ActiveSkillChoiceState> {
+        match slot {
+            0 => self.active_skill_slot_0.as_ref(),
+            1 => self.active_skill_slot_1.as_ref(),
+            2 => self.active_skill_slot_2.as_ref(),
+            3 => self.active_skill_slot_3.as_ref(),
+            4 => self.active_skill_slot_4.as_ref(),
             _ => None,
         }
     }
     pub fn insert_active_skill(&mut self, skill: ActiveSkillChoiceState, slot: usize) {
         match slot {
-            0 => self.roll_skill_slot = Some(skill),
+            0 => self.active_skill_slot_0 = Some(skill),
             1 => self.active_skill_slot_1 = Some(skill),
             2 => self.active_skill_slot_2 = Some(skill),
             3 => self.active_skill_slot_3 = Some(skill),
+            4 => self.active_skill_slot_4 = Some(skill),
             _ => {}
         }
     }
