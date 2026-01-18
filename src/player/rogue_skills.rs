@@ -12,7 +12,7 @@ use crate::{
     item::projectile::Projectile,
     ui::damage_numbers::{spawn_text, DodgeEvent},
     world::TILE_SIZE,
-    AttackTimer, EnemyDeathEvent, GameParam, HitEvent,
+    AttackTimer, EnemyDeathEvent, GameParam, HitEvent, InputMappings,
 };
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
@@ -130,8 +130,9 @@ pub fn handle_lunge(
         &mut CurrentMana,
     )>,
     key_inputs: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<InputMappings>,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
 ) {
@@ -139,7 +140,7 @@ pub fn handle_lunge(
         query.iter_mut()
     {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
-            if key_inputs.just_pressed(keybinds.get_active_skill_key(lunge_slot))
+            if keybinds.check_skill_input(lunge_slot, &key_inputs, &mouse_input)
                 && lunge_state.lunge_cooldown_timer.finished()
             {
                 lunge_state.lunge_cooldown_timer.reset();

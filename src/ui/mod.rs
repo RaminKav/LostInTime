@@ -116,7 +116,7 @@ impl Plugin for UIPlugin {
             .init_resource::<CheatSettings>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
-            .insert_resource(crate::keybinds::KeyBindings::load())
+            .insert_resource(crate::keybinds::InputMappings::load())
             .init_resource::<CurrentNameInput>()
             .init_resource::<CursorBlinkTimer>()
             .insert_resource(FloatingTextQueue::new(0.8))

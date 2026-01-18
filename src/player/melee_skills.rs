@@ -154,17 +154,18 @@ pub struct SpearAttack;
 
 pub fn handle_parry(
     mut player: Query<(Entity, &PlayerSkills, &PlayerAnimation, &mut ParryState), (With<Player>,)>,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
     time: Res<Time>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     let Ok((e, skills, curr_anim, mut parry_state)) = player.get_single_mut() else {
         return;
     };
 
     if let Some(parry_slot) = skills.has_active_skill(ActiveSkill::Parry) {
-        if key_input.just_pressed(keybinds.get_active_skill_key(parry_slot))
+        if keybinds.check_skill_input(parry_slot, &key_input, &mouse_input)
             && parry_state.cooldown_timer.finished()
             && !curr_anim.is_parrying()
         {
@@ -199,11 +200,12 @@ pub fn handle_spear(
         ),
         (With<Player>,),
     >,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     let Ok((e, player_pos, skills, dmg, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
@@ -212,7 +214,7 @@ pub fn handle_spear(
     };
 
     if let Some(spear_slot) = skills.has_active_skill(ActiveSkill::ParrySpear) {
-        if key_input.just_pressed(keybinds.get_active_skill_key(spear_slot))
+        if keybinds.check_skill_input(spear_slot, &key_input, &mouse_input)
             && spear_state.cooldown_timer.finished()
         {
             spear_state.cooldown_timer.reset();

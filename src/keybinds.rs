@@ -5,133 +5,90 @@ use std::io::BufReader;
 
 use crate::datafiles;
 
-mod keycode_serde {
-    use bevy::prelude::KeyCode;
-    use serde::{Deserialize, Deserializer, Serializer};
+#[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct InputMappings {
+    pub active_skill_slot_0: InputBinding,
+    pub active_skill_slot_1: InputBinding,
+    pub active_skill_slot_2: InputBinding,
+    pub active_skill_slot_3: InputBinding,
+    pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
+    pub inventory: InputBinding,
+    pub minimap: InputBinding,
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
-    pub fn serialize<S>(key: &KeyCode, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&format!("{:?}", key))
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<KeyCode, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        // Try to parse the string back to KeyCode
-        // This is a simplified version - in production you'd want a complete mapping
-        match s.as_str() {
-            "Space" => Ok(KeyCode::Space),
-            "LShift" => Ok(KeyCode::LShift),
-            "RShift" => Ok(KeyCode::RShift),
-            "Q" => Ok(KeyCode::Q),
-            "W" => Ok(KeyCode::W),
-            "E" => Ok(KeyCode::E),
-            "R" => Ok(KeyCode::R),
-            "T" => Ok(KeyCode::T),
-            "Y" => Ok(KeyCode::Y),
-            "U" => Ok(KeyCode::U),
-            "I" => Ok(KeyCode::I),
-            "O" => Ok(KeyCode::O),
-            "P" => Ok(KeyCode::P),
-            "A" => Ok(KeyCode::A),
-            "S" => Ok(KeyCode::S),
-            "D" => Ok(KeyCode::D),
-            "F" => Ok(KeyCode::F),
-            "G" => Ok(KeyCode::G),
-            "H" => Ok(KeyCode::H),
-            "J" => Ok(KeyCode::J),
-            "K" => Ok(KeyCode::K),
-            "L" => Ok(KeyCode::L),
-            "Z" => Ok(KeyCode::Z),
-            "X" => Ok(KeyCode::X),
-            "C" => Ok(KeyCode::C),
-            "V" => Ok(KeyCode::V),
-            "B" => Ok(KeyCode::B),
-            "N" => Ok(KeyCode::N),
-            "M" => Ok(KeyCode::M),
-            "LControl" => Ok(KeyCode::LControl),
-            "RControl" => Ok(KeyCode::RControl),
-            "LAlt" => Ok(KeyCode::LAlt),
-            "RAlt" => Ok(KeyCode::RAlt),
-            "Tab" => Ok(KeyCode::Tab),
-            "Key1" => Ok(KeyCode::Key1),
-            "Key2" => Ok(KeyCode::Key2),
-            "Key3" => Ok(KeyCode::Key3),
-            "Key4" => Ok(KeyCode::Key4),
-            "Key5" => Ok(KeyCode::Key5),
-            "Key6" => Ok(KeyCode::Key6),
-            "Key7" => Ok(KeyCode::Key7),
-            "Key8" => Ok(KeyCode::Key8),
-            "Key9" => Ok(KeyCode::Key9),
-            "Key0" => Ok(KeyCode::Key0),
-            _ => Ok(KeyCode::Space), // Default fallback
-        }
-    }
+pub enum InputBinding {
+    KeyBinding(KeyCode),
+    MouseBinding(MouseButton),
 }
 
-#[derive(Resource, Debug, Clone, Serialize, Deserialize)]
-pub struct KeyBindings {
-    #[serde(with = "keycode_serde")]
-    pub active_skill_slot_0: KeyCode,
-    #[serde(with = "keycode_serde")]
-    pub active_skill_slot_1: KeyCode,
-    #[serde(with = "keycode_serde")]
-    pub active_skill_slot_2: KeyCode,
-    #[serde(with = "keycode_serde", default = "default_slot_3_key")]
-    pub active_skill_slot_3: KeyCode,
-    #[serde(with = "keycode_serde", default = "default_slot_4_key")]
-    pub active_skill_slot_4: KeyCode, // Bonus slot from blessings
-    #[serde(with = "keycode_serde")]
-    pub inventory: KeyCode,
-    #[serde(with = "keycode_serde")]
-    pub minimap: KeyCode,
-}
-
-fn default_slot_3_key() -> KeyCode {
-    KeyCode::E
-}
-
-fn default_slot_4_key() -> KeyCode {
-    KeyCode::F
-}
-
-impl Default for KeyBindings {
+impl Default for InputMappings {
     fn default() -> Self {
         Self {
-            active_skill_slot_0: KeyCode::Space,
-            active_skill_slot_1: KeyCode::LShift,
-            active_skill_slot_2: KeyCode::Q,
-            active_skill_slot_3: KeyCode::E,
-            active_skill_slot_4: KeyCode::F, // Bonus slot
-            inventory: KeyCode::Tab,
-            minimap: KeyCode::M,
+            active_skill_slot_0: InputBinding::KeyBinding(KeyCode::Space),
+            active_skill_slot_1: InputBinding::MouseBinding(MouseButton::Right),
+            active_skill_slot_2: InputBinding::KeyBinding(KeyCode::LShift),
+            active_skill_slot_3: InputBinding::KeyBinding(KeyCode::Q),
+            active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
+            inventory: InputBinding::KeyBinding(KeyCode::Tab),
+            minimap: InputBinding::KeyBinding(KeyCode::M),
         }
     }
 }
 
-impl KeyBindings {
-    pub fn get_inventory_key(&self) -> KeyCode {
+impl InputMappings {
+    pub fn get_inventory_key(&self) -> InputBinding {
         self.inventory
     }
-    pub fn get_minimap_key(&self) -> KeyCode {
+    pub fn get_minimap_key(&self) -> InputBinding {
         self.minimap
     }
-    pub fn get_active_skill_key(&self, slot: usize) -> KeyCode {
+    pub fn get_active_skill_key(&self, slot: usize) -> InputBinding {
         match slot {
             0 => self.active_skill_slot_0,
             1 => self.active_skill_slot_1,
             2 => self.active_skill_slot_2,
             3 => self.active_skill_slot_3,
             4 => self.active_skill_slot_4,
-            _ => KeyCode::Space,
+            _ => InputBinding::KeyBinding(KeyCode::Space),
+        }
+    }
+    pub fn check_skill_input(
+        &self,
+        slot: usize,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        let input = self.get_active_skill_key(slot);
+        match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
+    }
+    pub fn check_inv_input(
+        &self,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        let input = self.get_inventory_key();
+        match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
+    }
+    pub fn check_map_input(
+        &self,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        let input = self.get_minimap_key();
+        match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
         }
     }
 
-    pub fn set_active_skill_key(&mut self, slot: usize, key: KeyCode) {
+    pub fn set_active_skill_key(&mut self, slot: usize, key: InputBinding) {
         match slot {
             0 => self.active_skill_slot_0 = key,
             1 => self.active_skill_slot_1 = key,
@@ -142,11 +99,11 @@ impl KeyBindings {
         }
     }
 
-    pub fn set_inventory_key(&mut self, key: KeyCode) {
+    pub fn set_inventory_key(&mut self, key: InputBinding) {
         self.inventory = key;
     }
 
-    pub fn set_minimap_key(&mut self, key: KeyCode) {
+    pub fn set_minimap_key(&mut self, key: InputBinding) {
         self.minimap = key;
     }
 
@@ -179,35 +136,42 @@ impl KeyBindings {
 }
 
 /// Returns a user-friendly display string for a KeyCode
-pub fn get_key_display_name(key: KeyCode) -> String {
+pub fn get_key_display_name(key: InputBinding) -> String {
     match key {
         // Modifier keys - simplify left/right variants
-        KeyCode::LShift | KeyCode::RShift => "Shift".to_string(),
-        KeyCode::LControl | KeyCode::RControl => "Ctrl".to_string(),
-        KeyCode::LAlt | KeyCode::RAlt => "Alt".to_string(),
+        InputBinding::KeyBinding(KeyCode::LShift) | InputBinding::KeyBinding(KeyCode::RShift) => {
+            "Shift".to_string()
+        }
+        InputBinding::KeyBinding(KeyCode::LControl)
+        | InputBinding::KeyBinding(KeyCode::RControl) => "Ctrl".to_string(),
+        InputBinding::KeyBinding(KeyCode::LAlt) | InputBinding::KeyBinding(KeyCode::RAlt) => {
+            "Alt".to_string()
+        }
 
         // Number keys - remove "Key" prefix
-        KeyCode::Key1 => "1".to_string(),
-        KeyCode::Key2 => "2".to_string(),
-        KeyCode::Key3 => "3".to_string(),
-        KeyCode::Key4 => "4".to_string(),
-        KeyCode::Key5 => "5".to_string(),
-        KeyCode::Key6 => "6".to_string(),
-        KeyCode::Key7 => "7".to_string(),
-        KeyCode::Key8 => "8".to_string(),
-        KeyCode::Key9 => "9".to_string(),
-        KeyCode::Key0 => "0".to_string(),
-
+        InputBinding::KeyBinding(KeyCode::Key1) => "1".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key2) => "2".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key3) => "3".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key4) => "4".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key5) => "5".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key6) => "6".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key7) => "7".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key8) => "8".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key9) => "9".to_string(),
+        InputBinding::KeyBinding(KeyCode::Key0) => "0".to_string(),
         // Special keys - shorten or rename
-        KeyCode::Return => "Enter".to_string(),
-        KeyCode::Back => "Bksp".to_string(),
-        KeyCode::Capital => "Caps".to_string(),
-        KeyCode::Escape => "Esc".to_string(),
+        InputBinding::KeyBinding(KeyCode::Return) => "Enter".to_string(),
+        InputBinding::KeyBinding(KeyCode::Back) => "Bksp".to_string(),
+        InputBinding::KeyBinding(KeyCode::Capital) => "Caps".to_string(),
+        InputBinding::KeyBinding(KeyCode::Escape) => "Esc".to_string(),
+        InputBinding::MouseBinding(MouseButton::Left) => "LMB".to_string(),
+        InputBinding::MouseBinding(MouseButton::Right) => "RMB".to_string(),
+        InputBinding::MouseBinding(MouseButton::Middle) => "MMB".to_string(),
 
         // Default: use Debug format but capitalize first letter
-        _ => {
-            let debug_str = format!("{:?}", key);
-            debug_str
-        }
+        _ => match key {
+            InputBinding::KeyBinding(key_input) => format!("{:?}", key_input),
+            InputBinding::MouseBinding(mouse_input) => format!("{:?}", mouse_input),
+        },
     }
 }

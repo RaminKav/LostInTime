@@ -25,7 +25,7 @@ use crate::{
         skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
-    GameState, KeyBindings, ScreenResolution, GAME_HEIGHT,
+    GameState, InputBinding, InputMappings, ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
 aseprite!(pub Clock, "ui/Clock.aseprite");
@@ -104,20 +104,26 @@ fn lerp_color(a: Color, b: Color, t: f32) -> Color {
 }
 
 /// Helper function to determine key size and UI element based on KeyCode
-fn get_key_size_and_element(key: KeyCode) -> (UIElement, f32) {
+fn get_key_size_and_element(key: InputBinding) -> (UIElement, f32) {
     match key {
         // Large keys (Space, Enter, etc.)
-        KeyCode::Space => (UIElement::LargeKey, 30.0),
-        KeyCode::Return => (UIElement::LargeKey, 30.0),
-        KeyCode::Escape => (UIElement::LargeKey, 30.0),
+        InputBinding::KeyBinding(KeyCode::Space) => (UIElement::LargeKey, 30.0),
+        InputBinding::KeyBinding(KeyCode::Return) => (UIElement::LargeKey, 30.0),
+        InputBinding::KeyBinding(KeyCode::Escape) => (UIElement::LargeKey, 30.0),
 
         // Medium keys (Shift, Ctrl, Alt, Tab, Caps, etc.)
-        KeyCode::LShift | KeyCode::RShift => (UIElement::MediumKey, 26.0),
-        KeyCode::LControl | KeyCode::RControl => (UIElement::MediumKey, 26.0),
-        KeyCode::LAlt | KeyCode::RAlt => (UIElement::MediumKey, 26.0),
-        KeyCode::Tab => (UIElement::MediumKey, 26.0),
-        KeyCode::Capital => (UIElement::MediumKey, 26.0),
-        KeyCode::Back => (UIElement::MediumKey, 26.0),
+        InputBinding::KeyBinding(KeyCode::LShift) | InputBinding::KeyBinding(KeyCode::RShift) => {
+            (UIElement::MediumKey, 26.0)
+        }
+        InputBinding::KeyBinding(KeyCode::LControl)
+        | InputBinding::KeyBinding(KeyCode::RControl) => (UIElement::MediumKey, 26.0),
+        InputBinding::KeyBinding(KeyCode::LAlt) | InputBinding::KeyBinding(KeyCode::RAlt) => {
+            (UIElement::MediumKey, 26.0)
+        }
+        InputBinding::KeyBinding(KeyCode::Tab) => (UIElement::MediumKey, 26.0),
+        InputBinding::KeyBinding(KeyCode::Capital) => (UIElement::MediumKey, 26.0),
+        InputBinding::KeyBinding(KeyCode::Back) => (UIElement::MediumKey, 26.0),
+        InputBinding::MouseBinding(_) => (UIElement::MediumKey, 26.0),
 
         // Small keys (all single character keys, numbers, etc.)
         _ => (UIElement::SmallKey, 10.0),
@@ -353,7 +359,7 @@ pub fn setup_currency_ui(
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
     coins: Res<CoinCurrency>,
-    keybinds: Res<KeyBindings>,
+    keybinds: Res<InputMappings>,
 ) {
     let time_fragments = currency.as_ref();
     let text = commands
@@ -989,8 +995,7 @@ pub fn handle_update_player_skills(
     existing_heirloom_icons: Query<(Entity, &SkillHudIcon)>, // Query existing heirloom icons
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
-    unlock_upgrades: Option<Res<crate::player::unlocks::UnlockUpgrades>>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -1718,7 +1723,7 @@ pub fn handle_active_skill_event(
 }
 
 pub fn update_active_skill_keybind_text(
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<(&ActiveSkillKeybindText, &mut Text)>,
     mut key_backgrounds: Query<(&ActiveSkillKeyBackground, &mut Handle<Image>, &mut Sprite)>,
     graphics: Res<Graphics>,
@@ -1743,7 +1748,7 @@ pub fn update_active_skill_keybind_text(
 }
 
 pub fn update_inventory_keybind_text(
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
     mut texts: Query<&mut Text, With<InventoryKeybindText>>,
     mut key_backgrounds: Query<(&mut Handle<Image>, &mut Sprite), With<InventoryKeyBackground>>,
     graphics: Res<Graphics>,

@@ -223,7 +223,7 @@ pub struct GameData {
     #[serde(default)]
     pub cumulative_analytics: Option<AnalyticsData>,
     #[serde(default)]
-    pub keybindings: Option<crate::keybinds::KeyBindings>,
+    pub keybindings: Option<crate::keybinds::InputMappings>,
     #[serde(default)]
     pub player_name: Option<String>,
     #[serde(default)]

@@ -62,7 +62,7 @@ use crate::player::skills::{
 };
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    GameUpscale, KeyBindings, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+    GameUpscale, InputMappings, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -262,7 +262,8 @@ pub fn player_move_inputs(
         ),
     >,
     time: Res<Time>,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
     mut particle: Query<&mut EffectSpawner, With<DustParticles>>,
     asset_server: Res<AssetServer>,
@@ -270,7 +271,7 @@ pub fn player_move_inputs(
     mut audio_timer: Local<Timer>,
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
     mut ammo_query: Query<&mut Ammo>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -322,7 +323,7 @@ pub fn player_move_inputs(
     //TODO: move this tick to animations.rs
     if let Some(roll_slot) = skills.has_active_skill(ActiveSkill::Roll) {
         if player.player_dash_cooldown.finished()
-            && key_input.pressed(keybinds.get_active_skill_key(roll_slot))
+            && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
         {
             player.is_dashing = true;
             active_skill_event.send(ActiveSkillUsedEvent {
@@ -420,6 +421,7 @@ pub fn player_move_inputs(
 pub fn dispatch_active_skill_events(
     mut ev: EventWriter<ActiveSkillUsedEvent>,
     key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     player_q: Query<
         (
             &PlayerSkills,
@@ -453,7 +455,7 @@ pub fn dispatch_active_skill_events(
     >,
     slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
     slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     let Ok((
         skills,
@@ -488,17 +490,12 @@ pub fn dispatch_active_skill_events(
     };
     // Only handle ONE key per frame to prevent multiple slots from triggering
     // Check all keys first, then handle only the highest priority one
-    let slot_4_key = keybinds.get_active_skill_key(4);
-    let slot_3_key = keybinds.get_active_skill_key(3);
-    let slot_2_key = keybinds.get_active_skill_key(2);
-    let slot_1_key = keybinds.get_active_skill_key(1);
-    let slot_0_key = keybinds.get_active_skill_key(0);
 
-    let slot_4_pressed = key_input.just_pressed(slot_4_key);
-    let slot_3_pressed = key_input.just_pressed(slot_3_key);
-    let slot_2_pressed = key_input.just_pressed(slot_2_key);
-    let slot_1_pressed = key_input.just_pressed(slot_1_key);
-    let slot_0_pressed = key_input.just_pressed(slot_0_key);
+    let slot_4_pressed = keybinds.check_skill_input(4, &key_input, &mouse_input);
+    let slot_3_pressed = keybinds.check_skill_input(3, &key_input, &mouse_input);
+    let slot_2_pressed = keybinds.check_skill_input(2, &key_input, &mouse_input);
+    let slot_1_pressed = keybinds.check_skill_input(1, &key_input, &mouse_input);
+    let slot_0_pressed = keybinds.check_skill_input(0, &key_input, &mouse_input);
 
     let pressed_slot = if slot_4_pressed {
         Some(4)
@@ -683,7 +680,8 @@ pub fn close_container(
 }
 pub fn toggle_inventory(
     mut game: GameParam,
-    key_input: ResMut<Input<KeyCode>>,
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
@@ -692,16 +690,15 @@ pub fn toggle_inventory(
     curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
-    keybinds: Res<KeyBindings>,
+    keybinds: Res<InputMappings>,
     mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
-    if key_input.just_pressed(keybinds.get_inventory_key()) {
+    if keybinds.check_inv_input(&key_input, &mouse_input) {
         // Don't allow opening inventory while item chest is open
         if curr_ui_state.0 != UIState::ItemChest {
             next_ui_state.set(UIState::Inventory);
         }
     }
-
     if *DEBUG {
         if key_input.just_pressed(KeyCode::P) {
             dim_event.send(DimensionSpawnEvent {

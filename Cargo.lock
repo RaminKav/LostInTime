@@ -556,6 +556,7 @@ dependencies = [
  "bevy_tasks 0.10.1",
  "bevy_utils 0.10.1",
  "bytemuck",
+ "serde",
 ]
 
 [[package]]
@@ -803,6 +804,7 @@ dependencies = [
  "bevy_math",
  "bevy_reflect 0.10.1",
  "bevy_utils 0.10.1",
+ "serde",
  "thiserror",
 ]
 
@@ -1271,6 +1273,7 @@ dependencies = [
  "bevy_reflect 0.10.1",
  "bevy_utils 0.10.1",
  "crossbeam-channel",
+ "serde",
  "thiserror",
 ]
 
@@ -1285,6 +1288,7 @@ dependencies = [
  "bevy_hierarchy",
  "bevy_math",
  "bevy_reflect 0.10.1",
+ "serde",
 ]
 
 [[package]]
@@ -1372,6 +1376,7 @@ dependencies = [
  "bevy_reflect 0.10.1",
  "bevy_utils 0.10.1",
  "raw-window-handle",
+ "serde",
 ]
 
 [[package]]

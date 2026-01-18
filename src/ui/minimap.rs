@@ -5,7 +5,7 @@ use crate::world::dimension::{ActiveDimension, SpawnDimension};
 use crate::world::dungeon::Dungeon;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE};
-use crate::{CustomFlush, GameParam, GameState, Player, DEBUG};
+use crate::{CustomFlush, GameParam, GameState, InputMappings, Player, DEBUG};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::view::RenderLayers;
@@ -117,10 +117,11 @@ pub struct MinimapTileCache {
 
 fn toggle_island_map(
     key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
     mut map_open: ResMut<IslandMapOpen>,
-    keybinds: Res<crate::keybinds::KeyBindings>,
+    keybinds: Res<InputMappings>,
 ) {
-    if key_input.just_pressed(keybinds.get_minimap_key()) {
+    if keybinds.check_map_input(&key_input, &mouse_input) {
         map_open.0 = !map_open.0;
     }
 }

@@ -6,11 +6,11 @@ use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
     inputs::CursorPos,
-    keybinds::KeyBindings,
+    keybinds::InputMappings,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
     },
-    ScreenResolution,
+    InputBinding, ScreenResolution,
 };
 
 /// Resource to track cheat settings
@@ -98,7 +98,8 @@ pub fn handle_options_clicks(
 pub fn handle_key_rebind_input(
     mut commands: Commands,
     mut key_input: ResMut<Input<KeyCode>>,
-    mut keybinds: ResMut<KeyBindings>,
+    mut mouse_input: ResMut<Input<MouseButton>>,
+    mut keybinds: ResMut<InputMappings>,
     waiting: Query<(Entity, &WaitingForKeyInput)>,
     graphics: Res<Graphics>,
 ) {
@@ -107,10 +108,11 @@ pub fn handle_key_rebind_input(
     }
 
     // Collect keys to avoid borrow checker issues
-    let just_pressed: Vec<KeyCode> = key_input.get_just_pressed().copied().collect();
+    let just_pressed_key: Vec<KeyCode> = key_input.get_just_pressed().copied().collect();
+    let just_pressed_mouse: Vec<MouseButton> = mouse_input.get_just_pressed().copied().collect();
 
     // Check for any key press
-    for key in just_pressed {
+    for key in just_pressed_key {
         // Ignore Escape (used to cancel)
         if key == KeyCode::Escape {
             for (entity, _) in waiting.iter() {
@@ -127,9 +129,11 @@ pub fn handle_key_rebind_input(
         // Set the new key binding
         for (entity, waiting_for) in waiting.iter() {
             match waiting_for.bind_type {
-                KeyBindType::ActiveSkill(slot) => keybinds.set_active_skill_key(slot, key),
-                KeyBindType::Inventory => keybinds.set_inventory_key(key),
-                KeyBindType::Minimap => keybinds.set_minimap_key(key),
+                KeyBindType::ActiveSkill(slot) => {
+                    keybinds.set_active_skill_key(slot, InputBinding::KeyBinding(key))
+                }
+                KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
+                KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -142,10 +146,36 @@ pub fn handle_key_rebind_input(
         key_input.clear();
         break;
     }
+
+    // Check for any mouse press
+    for mouse_button in just_pressed_mouse {
+        for (entity, waiting_for) in waiting.iter() {
+            match waiting_for.bind_type {
+                KeyBindType::ActiveSkill(slot) => {
+                    keybinds.set_active_skill_key(slot, InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::Inventory => {
+                    keybinds.set_inventory_key(InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::Minimap => {
+                    keybinds.set_minimap_key(InputBinding::MouseBinding(mouse_button))
+                }
+            }
+            keybinds.save();
+            commands.entity(entity).remove::<WaitingForKeyInput>();
+            commands
+                .entity(entity)
+                .insert(UIElement::BackButton)
+                .insert(graphics.get_ui_element_texture(UIElement::BackButton));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::UISkillSelection, 0.15));
+        }
+        mouse_input.clear();
+        break;
+    }
 }
 
 pub fn update_keybind_text(
-    keybinds: Res<KeyBindings>,
+    keybinds: Res<InputMappings>,
     waiting: Query<&WaitingForKeyInput>,
     mut texts: Query<(&KeyBindText, &mut Text)>,
     mut was_waiting: Local<bool>,
@@ -191,7 +221,7 @@ pub fn setup_options_ui(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     resolution: Res<ScreenResolution>,
-    keybinds: Res<KeyBindings>,
+    keybinds: Res<InputMappings>,
     game_state: Res<State<crate::GameState>>,
     cheat_settings: Res<CheatSettings>,
 ) {
@@ -398,7 +428,7 @@ fn spawn_keybind_row(
     bind_type: KeyBindType,
     label_pos: Vec3,
     button_pos: Vec3,
-    keybinds: &KeyBindings,
+    keybinds: &InputMappings,
 ) {
     // Get label and current key based on bind type
     let (label, current_key) = match bind_type {
