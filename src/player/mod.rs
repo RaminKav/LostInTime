@@ -237,6 +237,8 @@ impl Plugin for PlayerPlugin {
                     skill_heirlooms::handle_fury_skill.run_if(is_not_paused),
                     skill_heirlooms::handle_attach_bomb_target.run_if(is_not_paused),
                     skill_heirlooms::handle_bomb_explosion.run_if(is_not_paused),
+                    skill_heirlooms::handle_rapidfire_slow_enemies.run_if(is_not_paused),
+                    skill_heirlooms::handle_rapidfire_slow_remove.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

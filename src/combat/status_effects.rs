@@ -70,6 +70,10 @@ pub struct Frozen {
     pub original_color: Color,
 }
 
+/// Component to mark enemies slowed by RapidFire skill (50% speed reduction)
+#[derive(Component, Debug)]
+pub struct RapidfireSlow;
+
 pub fn handle_new_status_effect_event(
     mut query: Query<&mut StatusEffectTracker>,
     mut events: EventReader<StatusEffectEvent>,

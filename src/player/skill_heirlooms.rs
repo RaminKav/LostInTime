@@ -11,7 +11,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
     combat::{
-        status_effects::{StatusEffect, StatusEffectEvent},
+        status_effects::{RapidfireSlow, StatusEffect, StatusEffectEvent},
         HitEvent,
     },
     custom_commands::CommandsExt,
@@ -1109,6 +1109,38 @@ pub fn tick_stealth_and_buffs(
             if let Ok(mut bonus_speed) = player_query.get_single_mut() {
                 bonus_speed.remove_multiplier(r.attack_speed_bonus);
                 attribute_event.send_default();
+            }
+        }
+    }
+}
+
+/// Apply RapidfireSlow to all enemies when RapidFire is active
+pub fn handle_rapidfire_slow_enemies(
+    mut commands: Commands,
+    rapidfire_states: Query<&RapidfireState, With<Player>>,
+    enemies: Query<Entity, (With<Mob>, Without<RapidfireSlow>)>,
+) {
+    // Check if RapidFire is active
+    if let Ok(state) = rapidfire_states.get_single() {
+        if !state.duration.finished() && state.duration.percent() > 0. {
+            for enemy_entity in enemies.iter() {
+                commands.entity(enemy_entity).insert(RapidfireSlow);
+            }
+        }
+    }
+}
+
+/// Remove RapidfireSlow from all enemies when RapidFire ends
+pub fn handle_rapidfire_slow_remove(
+    mut commands: Commands,
+    rapidfire_states: Query<&RapidfireState, With<Player>>,
+    enemies_with_slow: Query<Entity, (With<Mob>, With<RapidfireSlow>)>,
+) {
+    // Check if RapidFire is no longer active
+    if let Ok(state) = rapidfire_states.get_single() {
+        if state.duration.finished() {
+            for enemy_entity in enemies_with_slow.iter() {
+                commands.entity(enemy_entity).remove::<RapidfireSlow>();
             }
         }
     }

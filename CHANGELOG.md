@@ -121,3 +121,23 @@
 - Loot level now matches player level
 - Fixed the game not being able to run on MacOS unless you had OpenSSL installed via Homebrew
 - Fixed a crash involving doors
+
+## 0.13.0
+
+- bug fixes
+- Fix Mushking leap attack (he now actually leaps..)
+- Mana rework:
+  - The goal is to make the mana resoruce more exciting and rewarding to build into regardless of class. There will be more uses for mana, and thus more reason to pick mana heirlooms, etc.
+  - Various Heirlooms that provide combat effects or spawn damaging entities now cost mana to trigger. (ants, stone boulders, wave attack, ice explosions, extra attacks, etc)
+  - Mana orbs no longer spawn by default
+  - [NEW HEIRLOOM] Blue Mushroom: +25 Mana
+  - [NEW HEIRLOOM] Mana Dust: +10% chance to drop mana orb that triggers mana regen
+  - [NEW HEIRLOOM] Wizard Hat: Mana regeneration shoots a mana orb at an enemy, dealing dmg equal to the amoutn regenerated.
+  - [NEW HEIRLOOM] Purple Card: triggering mana regen stores the amount regenerated. On next attack, deal bonus damage equal to stored mana regen.
+  - Staffs cost less mana to cast to compensate for no more mana orbs on default.
+- [NEX] Heirloom Chest: new kind of chest that drops from enemies, gives a random heirloom (similar to the equipment chests)
+- Chaos & Mob scaling Rework
+  - Goal: Make chaos mob scaling and difficulty more smooth and exciting. mobs shoudl spawn more often now, but have less HP, and scaling chaos greatly increases your score potential now, since it also increases Mob spawn rate.
+  - Chaos now scales mob spawn count per spawn wave. The effect is increased during Night Time.
+  - Chaos scales mob HP slightly less now.
+  - Mobs also have a much lower base Health.

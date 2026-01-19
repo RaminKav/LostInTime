@@ -11,7 +11,10 @@ use crate::{
     animations::enemy_sprites::{
         spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
     },
-    combat::{status_effects::Frozen, HitEvent},
+    combat::{
+        status_effects::{Frozen, RapidfireSlow},
+        HitEvent,
+    },
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
@@ -190,6 +193,7 @@ pub fn follow(
         Option<&Parried>,
         Option<&crate::player::combat_heirlooms::DeathDefianceFrozen>,
         Option<&Frozen>,
+        Option<&crate::combat::status_effects::RapidfireSlow>,
     )>,
     mut commands: Commands,
     time: Res<Time>,
@@ -206,6 +210,7 @@ pub fn follow(
         parried_option,
         defiance_frozen_option,
         blessing_frozen_option,
+        rapidfire_slow_option,
     ) in follows.iter_mut()
     {
         // Skip movement if frozen by Death Defiance or Freeze blessing
@@ -291,6 +296,11 @@ pub fn follow(
                 * PLAYER_MOVE_SPEED
                 * time.delta_seconds()
                 * (1. - slowed_option.map_or(0., |s| s.num_stacks as f32 * 0.15))
+                * if rapidfire_slow_option.is_some() {
+                    0.5
+                } else {
+                    1.0
+                }
                 * if night_tracker.is_night() { 2. } else { 1. },
         );
         commands
