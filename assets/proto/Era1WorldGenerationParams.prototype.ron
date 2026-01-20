@@ -29,6 +29,7 @@
         // MediumYellowTree: 0.007,
         // MediumGreenTree: 0.007,
         // RedTree: 0.004,
+        XPJug: 0.0003,
         Boulder: 0.0015,
         Boulder2: 0.0015,
         CoalBoulder: 0.001,

@@ -12,7 +12,6 @@
     "survival_rogue_like::proto::ColliderCapsulProto": (x1: -14., y1: -14., x2: 14., y2: -14., r: 14.),
     "survival_rogue_like::attributes::MaxHealth": (400),
     "survival_rogue_like::attributes::Attack": (20),
-    "survival_rogue_like::player::levels::ExperienceReward": (400),
     "survival_rogue_like::enemy::MobLevel": (1),
     "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
@@ -39,6 +38,49 @@
                 max: 10,
                 rate: 1.
             ),
+            (
+                item: XPShardMedium,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShardMedium,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShardMedium,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShardMedium,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+            (
+                item: XPShard,
+                min: 1,
+                max: 1,
+                rate: 1.
+            ),
+
             ]
         ),
   }

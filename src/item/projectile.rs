@@ -444,9 +444,10 @@ fn handle_spawn_projectiles_after_delay(
                 commands
                     .entity(p)
                     .insert(Attack(computed_dmg))
-                    .insert(ItemDropDespawnTimer(
-                        Timer::from_seconds(30.0, TimerMode::Once), // Despawn after 60 seconds
-                    ));
+                    .insert(ItemDropDespawnTimer(Timer::from_seconds(
+                        5.0,
+                        TimerMode::Once,
+                    )));
             }
             commands.entity(e).despawn_recursive();
         }

@@ -1,0 +1,17 @@
+(
+  name: "XPShardMedium",
+  templates: ["item_drop.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": XPShardMedium,
+  "survival_rogue_like::inventory::ItemStack": (
+        obj_type: XPShardMedium,
+        metadata: (
+            name: "XP Shard",
+            desc: [""]
+        ),
+        rarity: Common,
+        count: 1
+  ),
+  }
+)
+

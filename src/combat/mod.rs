@@ -7,11 +7,12 @@ pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
+pub mod pickup_radius;
 use crate::attributes::{add_item_glows, CurrentMana, ProjectileSize};
 
 pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
-use crate::chaos::ChaosTracker;
+use crate::enemy::EliteMob;
 use crate::night::InfiniteMode;
 use crate::player::melee_skills::spawn_echo_hitbox;
 use crate::{
@@ -39,10 +40,10 @@ use crate::{
         projectile::Projectile,
         EquipmentType, LootTable, LootTablePlugin, MainHand, RequiredEquipmentType, WorldObject,
     },
-    juice::{bounce::BounceOnHit, spawn_xp_particles},
+    juice::bounce::BounceOnHit,
     player::{
         combat_heirlooms::{HallucinationStatType, HallucinationStats},
-        levels::{ExperienceReward, PlayerLevel},
+        levels::PlayerLevel,
         mage_skills::spawn_ice_explosion_hitbox,
         skills::{Heirloom, PlayerSkills},
     },
@@ -120,6 +121,16 @@ impl Plugin for CombatPlugin {
         })
         .add_event::<ObjBreakEvent>()
         .add_plugin(CollisionPlugion)
+        .add_systems(
+            (
+                pickup_radius::update_pickup_radius.run_if(is_not_paused),
+                pickup_radius::handle_item_pickup_radius.run_if(is_not_paused),
+                pickup_radius::handle_magnet_pull.run_if(is_not_paused),
+            )
+                .in_set(OnUpdate(GameState::Main))
+                .chain()
+                .before(collisions::check_item_drop_collisions),
+        )
         // Process deferred Aseprite spawns in PreUpdate to ensure frame 0 initialization
         .add_system(
             handle_deferred_aseprite_spawns
@@ -176,16 +187,15 @@ fn handle_enemy_death(
     proto_param: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
-    mob_data: Query<(&Mob, &ExperienceReward, &MobLevel)>,
+    mob_data: Query<(&Mob, &MobLevel, Option<&EliteMob>)>,
     mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     graphics: Res<Graphics>,
     infinite_mode: Res<InfiniteMode>,
-    mut chaos_tracker: ResMut<ChaosTracker>,
 ) {
     for death_event in death_events.iter() {
-        let Ok((mob, mob_xp, mob_lvl)) = mob_data.get(death_event.entity) else {
+        let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
             continue;
         };
         let (mut player_level, player_skills, blessings) = player_xp.single_mut();
@@ -202,7 +212,17 @@ fn handle_enemy_death(
                 0,
                 Some(mob_lvl.0),
                 is_infinite_mode,
-            ) {
+            )
+            .iter()
+            .filter(|d| {
+                if elite_option.is_some() && d.obj_type == WorldObject::XPShard {
+                    false
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<_>>()
+            {
                 let count = if drop.obj_type == WorldObject::Coin && has_double_gold {
                     2
                 } else {
@@ -225,7 +245,7 @@ fn handle_enemy_death(
                         commands
                             .entity(drop_e)
                             .insert(crate::item::ItemDropDespawnTimer(Timer::from_seconds(
-                                60.0,
+                                300.0,
                                 TimerMode::Once,
                             )));
                     }
@@ -233,25 +253,16 @@ fn handle_enemy_death(
             }
         }
 
-        let double_xp_chance = blessings.get_double_xp_chance();
-
-        let xp_multiplier =
-            if double_xp_chance > 0.0 && rand::thread_rng().gen_bool(double_xp_chance as f64) {
-                2
-            } else {
-                1
-            };
-
-        //give player xp
-        let did_level =
-            player_level.add_xp(mob_xp.0 * xp_multiplier, &player_skills, &mut chaos_tracker);
-        // Only spawn XP particles if not in endless mode (to reduce lag)
-        if !is_infinite_mode {
-            spawn_xp_particles(
-                death_event.enemy_pos,
-                &mut commands,
-                mob_xp.0 * xp_multiplier,
-                did_level,
+        if elite_option.is_some() {
+            let mut rng = rand::thread_rng();
+            let d = if mob.is_boss() { 30. } else { 10. };
+            let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+            let _xp_shard_e = proto_commands.spawn_item_from_proto(
+                WorldObject::XPShardMedium,
+                &proto_param,
+                death_event.enemy_pos + drop_offset,
+                1,
+                Some(player_level.level),
             );
         }
     }

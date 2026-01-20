@@ -305,6 +305,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        XPJug: WorldObjectData(
+            texture_pos: (8., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Scrapper: WorldObjectData(
             texture_pos: (9., 2.),
             size: (16., 16.),
@@ -727,6 +732,21 @@
         ),
         TooltipInspect: WorldObjectData(
             texture_pos: (6., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        XPShard: WorldObjectData(
+            texture_pos: (9., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        XPShardMedium: WorldObjectData(
+            texture_pos: (10., 0.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        XPShardLarge: WorldObjectData(
+            texture_pos: (11., 0.),
             size: (16., 16.),
             anchor: None,
         ),
@@ -1329,6 +1349,16 @@
         ),
         ManaOrbAttack: WorldObjectData(
             texture_pos: (15., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ItemPickupRadius: WorldObjectData(
+            texture_pos: (0., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MagnetPull: WorldObjectData(
+            texture_pos: (1., 23.),
             size: (16., 16.),
             anchor: None,
         ),

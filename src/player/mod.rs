@@ -60,6 +60,7 @@ use crate::{
     },
     blessings::{HeirloomStatsBonuses, OwnedBlessings},
     client::is_not_paused,
+    combat::pickup_radius::BASE_PICKUP_RADIUS,
     container::Container,
     custom_commands::CommandsExt,
     handle_hits,
@@ -391,6 +392,9 @@ fn spawn_player(
             },
         ))
         .insert(SkillClass::None)
+        .insert(crate::combat::pickup_radius::PickupRadius(
+            BASE_PICKUP_RADIUS,
+        ))
         .insert(ShieldRegen {
             delay_timer: Timer::from_seconds(5.0, TimerMode::Once),
             regen_timer: Timer::from_seconds(0.2, TimerMode::Once),

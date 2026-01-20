@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::ProtoCommands;
-use rand::{seq::IteratorRandom, seq::SliceRandom, Rng};
+use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use strum_macros::{Display, EnumIter};
@@ -14,6 +14,10 @@ use crate::{
         PlayerSpriteHandles,
     },
     attributes::{AttributeQuality, AttributeValue, ItemAttributes, ItemGlow},
+    combat::pickup_radius::{
+        MagnetPullTimer, BASE_MAGNET_COOLDOWN, MAGNET_COOLDOWN_REDUCTION_PER_STACK,
+        MIN_MAGNET_COOLDOWN,
+    },
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
@@ -687,7 +691,9 @@ pub enum Heirloom {
     LowHPDamage,       // More damage at low HP
     ChaosStats,        // +2 chaos, +10 to many stats
     ManaOrbs,
-    ManaOrbAttack, // Mana regen shoots mana orb projectiles
+    ManaOrbAttack,    // Mana regen shoots mana orb projectiles
+    ItemPickupRadius, // Increases pickup radius by 25%
+    MagnetPull,       // Periodically pulls all item drops to player
 }
 
 pub enum HeirloomTrait {
@@ -814,6 +820,8 @@ impl Heirloom {
             Heirloom::ChaosStats => "Chaotic Candle".to_string(),
             Heirloom::ManaOrbs => "Mana Dust".to_string(),
             Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
+            Heirloom::ItemPickupRadius => "Magnet".to_string(),
+            Heirloom::MagnetPull => "Gravitation Tome".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1266,7 +1274,18 @@ impl Heirloom {
                 "shoots a mana orb".to_string(),
                 "at an enemy. It does".to_string(),
                 "damage equal to the".to_string(),
-                "amount regenerated.".to_string(),
+            ],
+            Heirloom::ItemPickupRadius => vec![
+                "Increases item".to_string(),
+                "pickup radius by".to_string(),
+                "+25%.".to_string(),
+            ],
+            Heirloom::MagnetPull => vec![
+                "Periodically pulls".to_string(),
+                "all item drops on".to_string(),
+                "the map to you.".to_string(),
+                "Cooldown reduces".to_string(),
+                "with more copies.".to_string(),
             ],
         }
     }
@@ -1314,6 +1333,18 @@ impl Heirloom {
                 commands
                     .entity(entity)
                     .insert(crate::player::combat_heirlooms::AntFarmState::default());
+            }
+            Heirloom::MagnetPull => {
+                commands.entity(entity).insert(MagnetPullTimer {
+                    cooldown_timer: Timer::from_seconds(
+                        (BASE_MAGNET_COOLDOWN
+                            - ((skills.get_count(Heirloom::MagnetPull) - 1) as f32
+                                * MAGNET_COOLDOWN_REDUCTION_PER_STACK))
+                            .max(MIN_MAGNET_COOLDOWN),
+                        TimerMode::Repeating,
+                    ),
+                    duration_timer: Timer::from_seconds(5.0, TimerMode::Once),
+                });
             }
             Heirloom::StoneTooth => {
                 commands
@@ -1595,6 +1626,8 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::CritHeal, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::LowHPDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ChaosStats, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::ItemPickupRadius, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::MagnetPull, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
         }

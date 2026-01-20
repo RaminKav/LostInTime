@@ -13,6 +13,7 @@ use crate::{
         modifiers::ModifyManaEvent, Attack, Defence, Dodge, InvincibilityCooldown, Thorns,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    chaos::ChaosTracker,
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     enemy::{Mob, MobIsAttacking},
     inventory::{Inventory, ItemStack},
@@ -31,7 +32,7 @@ use crate::{
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
         skills::Heirloom,
     },
-    ui::damage_numbers::DodgeEvent,
+    ui::{damage_numbers::DodgeEvent, FlashExpBarEvent},
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
 };
 use bevy::prelude::*;
@@ -680,6 +681,8 @@ pub fn check_item_drop_collisions(
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
     mut text_timer: ResMut<FloatingTextQueue>,
     resolution: Res<ScreenResolution>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
+    mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
     if !game.player().is_moving && !inv.single().is_empty() {
         return;
@@ -725,6 +728,32 @@ pub fn check_item_drop_collisions(
                 commands.entity(e2).despawn_recursive();
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
                 continue;
+            } else if obj == WorldObject::XPShard
+                || obj == WorldObject::XPShardMedium
+                || obj == WorldObject::XPShardLarge
+            {
+                let xp_amount = match obj {
+                    WorldObject::XPShard => 20,
+                    WorldObject::XPShardMedium => 100,
+                    WorldObject::XPShardLarge => 500,
+                    _ => 0,
+                };
+                let player_skills = game.get_player_skills();
+                let mut player_level = game.get_player_level_mut();
+                let did_level = player_level.add_xp(xp_amount, &player_skills, &mut chaos_tracker);
+
+                // Send FlashExpBarEvent to update the XP bar UI
+                flash_event.send(FlashExpBarEvent {
+                    amount: 1,
+                    did_level,
+                });
+
+                analytics.send(AnalyticsUpdateEvent {
+                    update_type: AnalyticsTrigger::ItemCollected(obj),
+                });
+                commands.entity(e2).despawn_recursive();
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+                continue;
             }
             // ...and the entity is an item stack...
             let inv_container = inv.single().items.clone();
@@ -743,6 +772,9 @@ pub fn check_item_drop_collisions(
             if obj != WorldObject::TimeFragment
                 && obj != WorldObject::Coin
                 && obj != WorldObject::ManaOrb
+                && obj != WorldObject::XPShard
+                && obj != WorldObject::XPShardMedium
+                && obj != WorldObject::XPShardLarge
             {
                 text_timer.add_item(obj);
             }

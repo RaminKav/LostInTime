@@ -670,9 +670,8 @@ impl GenerationPlugin {
                             .world_generation_params
                             .obj_allowed_tiles_map
                             .get(&tp.1)
-                            .unwrap_or_else(|| {
-                                panic!("no allowed tiles for obj_to_clear {:?}", &tp.1)
-                            });
+                            .unwrap_or(&vec![WorldObject::GrassTile])
+                            .clone();
                         for allowed_tile in filter.iter() {
                             if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
                                 return true;
