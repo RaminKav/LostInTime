@@ -78,6 +78,7 @@ pub enum InventorySlotType {
     Chest,
     Furnace,
     Scrapper,
+    Trash,
 }
 impl InventorySlotType {
     pub fn is_crafting(self) -> bool {
@@ -103,6 +104,9 @@ impl InventorySlotType {
     }
     pub fn is_scrapper(self) -> bool {
         self == InventorySlotType::Scrapper
+    }
+    pub fn is_trash(self) -> bool {
+        self == InventorySlotType::Trash
     }
 }
 pub fn setup_inv_ui(
@@ -303,6 +307,27 @@ pub fn setup_inv_slots_ui(
                 );
             }
         }
+        // Spawn trash slot (only in regular inventory, not scrapper)
+        if inv_state.0 == UIState::Inventory || inv_state.0 == UIState::Crafting {
+            let trash_item = inv
+                .single_mut()
+                .trash_items
+                .items
+                .get(0)
+                .and_then(|x| x.clone());
+            spawn_inv_slot(
+                &mut commands,
+                &inv_state,
+                &graphics,
+                0,
+                Interaction::None,
+                &inv_state_res,
+                &inv_query,
+                &asset_server,
+                InventorySlotType::Trash,
+                trash_item,
+            );
+        }
     }
 }
 
@@ -370,6 +395,9 @@ pub fn spawn_inv_slot(
             x = 76.;
             y = 54.5;
         }
+    } else if slot_type.is_trash() {
+        x = UI_SLOT_SIZE - (inv_state.inv_size.x) / 2. + UI_SLOT_SIZE / 2. + 4.;
+        y = -inv_state.inv_size.y / 2. - UI_SLOT_SIZE / 2. - 2.;
     } else if ((slot_index / 6) as f32).trunc() == 0. {
         y -= 3.;
     }
@@ -667,6 +695,11 @@ pub fn update_inventory_ui(
         } else if slot_state.r#type.is_scrapper() {
             cont_param.scrapper_option.as_ref().unwrap().items.items[slot_state.slot_index].clone()
         } else if slot_state.r#type.is_furnace() {
+            inv.single()
+                .get_items_from_slot_type(slot_state.r#type)
+                .items[slot_state.slot_index]
+                .clone()
+        } else if slot_state.r#type.is_trash() {
             inv.single()
                 .get_items_from_slot_type(slot_state.r#type)
                 .items[slot_state.slot_index]

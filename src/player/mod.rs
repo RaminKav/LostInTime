@@ -363,7 +363,7 @@ fn spawn_player(
                 accessory_items: Container::with_size(4),
                 crafting_items: Container::with_size(0),
                 furnace_items: Container::with_size(2),
-                ..default()
+                trash_items: Container::with_size(1),
             },
             //TODO: remove itematt and construct from components?
             ItemAttributes {

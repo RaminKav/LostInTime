@@ -378,7 +378,18 @@ pub fn handle_drop_on_slot_events(
                 inv.get_mut_items_from_slot_type(slot_type)
             };
 
-            inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
+            // Trash slot overwrites
+            if slot_type.is_trash() {
+                container.items[drop_event.drop_target_slot_state.slot_index] = Some(inv_stack);
+                crate::ui::inventory_ui::mark_slot_dirty(
+                    drop_event.drop_target_slot_state.slot_index,
+                    slot_type,
+                    &mut game.inv_slot_query,
+                );
+                None
+            } else {
+                inv_stack.drop_item_on_slot(container, &mut game.inv_slot_query, slot_type)
+            }
         };
 
         let updated_drag_item;

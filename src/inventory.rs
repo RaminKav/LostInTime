@@ -36,6 +36,7 @@ pub struct Inventory {
     pub accessory_items: Container,
     pub crafting_items: Container,
     pub furnace_items: Container,
+    pub trash_items: Container,
     // pub crafting_result_item: Container,
 }
 impl Inventory {
@@ -53,6 +54,7 @@ impl Inventory {
             InventorySlotType::Accessory => &self.accessory_items,
             InventorySlotType::Crafting => &self.crafting_items,
             InventorySlotType::Furnace => &self.furnace_items,
+            InventorySlotType::Trash => &self.trash_items,
             _ => &self.items,
         }
     }
@@ -62,6 +64,7 @@ impl Inventory {
             InventorySlotType::Accessory => &mut self.accessory_items,
             InventorySlotType::Crafting => &mut self.crafting_items,
             InventorySlotType::Furnace => &mut self.furnace_items,
+            InventorySlotType::Trash => &mut self.trash_items,
             _ => &mut self.items,
         }
     }
@@ -112,6 +115,13 @@ impl InventoryItemStack {
         inv_slots: &mut Query<&mut InventorySlotState>,
         slot_type: InventorySlotType,
     ) -> Option<ItemStack> {
+        // Trash slots always overwrites
+        if slot_type.is_trash() {
+            container.items[self.slot] = Some(self.clone());
+            mark_slot_dirty(self.slot, slot_type, inv_slots);
+            return None;
+        }
+
         let obj_type = self.item_stack.obj_type;
         let target_item_option = container.items[self.slot].clone();
         if let Some(target_item) = target_item_option {
