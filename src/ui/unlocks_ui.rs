@@ -5,7 +5,7 @@ use bevy::sprite::Anchor;
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
-    inputs::CursorPos,
+    cursor::CursorPos,
     inventory::ItemStack,
     item::WorldObject,
     player::{

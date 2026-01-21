@@ -1,5 +1,6 @@
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
+use crate::cursor::CursorPos;
 use crate::item::potion_buffs::MovementSpeedBuff;
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -115,7 +116,6 @@ impl Plugin for InputsPlugin {
                 toggle_inventory.run_if(in_state(GameState::Main)),
                 close_container.run_if(in_state(GameState::Main)),
             ))
-            .add_system(update_cursor_pos.after(player_move_inputs))
             .add_system(
                 move_camera_with_player
                     .after(PhysicsSet::SyncBackendFlush)
@@ -124,13 +124,6 @@ impl Plugin for InputsPlugin {
                     .run_if(in_state(GameState::Main)),
             );
     }
-}
-#[derive(Default, Reflect, Resource, Debug)]
-#[reflect(Resource)]
-pub struct CursorPos {
-    pub world_coords: Vec3,
-    pub screen_coords: Vec3,
-    pub ui_coords: Vec3,
 }
 
 #[derive(Component, Debug, Default)]
@@ -788,25 +781,7 @@ fn handle_hotbar_key_input(
         }
     }
 }
-pub fn update_cursor_pos(
-    windows: Query<&Window, With<PrimaryWindow>>,
-    camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
-    mut cursor_moved_events: EventReader<CursorMoved>,
-    mut cursor_pos: ResMut<CursorPos>,
-) {
-    for cursor_moved in cursor_moved_events.iter() {
-        // To get the mouse's world position, we have to transform its window position by
-        // any transforms on the camera. This is done by projecting the cursor position into
-        // camera space (world space).
-        for (cam_t, cam) in camera_q.iter() {
-            *cursor_pos = CursorPos {
-                world_coords: cursor_pos_in_world(&windows, cursor_moved.position, cam_t, cam),
-                ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, cam),
-                screen_coords: cursor_moved.position.extend(0.),
-            };
-        }
-    }
-}
+
 pub fn handle_quick_hotbar_consume(
     mut key_input: ResMut<Input<KeyCode>>,
     mut game: GameParam,

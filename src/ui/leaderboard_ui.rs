@@ -2,16 +2,7 @@ use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 
 use crate::{
-    assets::Graphics,
-    client::leaderboard::{FetchLeaderboardEvent, LeaderboardCache},
-    colors::*,
-    inputs::CursorPos,
-    ui::{
-        interactions::{Interactable, Interaction, UIElement},
-        inventory_ui::UIState,
-        ui_helpers,
-    },
-    ScreenResolution,
+    client::leaderboard::LeaderboardCache, colors::*, ui::inventory_ui::UIState, ScreenResolution,
 };
 
 /// Format a score number to condensed format (k for thousands, M for millions)

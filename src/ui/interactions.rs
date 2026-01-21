@@ -20,7 +20,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
     colors::{DARK_GREEN, RED},
-    inputs::CursorPos,
+    cursor::CursorPos,
     inventory::{Inventory, InventoryItemStack, ItemStack},
     item::{heirloom_shrine::HeirloomShrineState, CraftedItemEvent, EquipmentType},
     pets::state::UpdatePetWeaponEvent,

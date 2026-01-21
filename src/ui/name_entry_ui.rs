@@ -8,7 +8,7 @@ use crate::{
     client::GameData,
     colors::*,
     datafiles,
-    inputs::CursorPos,
+    cursor::CursorPos,
     ui::{
         interactions::{Interactable, Interaction, UIElement},
         inventory_ui::UIState,

@@ -818,7 +818,7 @@ pub fn handle_heirloom_hud_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    cursor_pos: Res<crate::inputs::CursorPos>,
+    cursor_pos: Res<crate::cursor::CursorPos>,
     hit_detection_sprites: Query<
         (Entity, &Sprite, &GlobalTransform),
         With<super::interactions::Interactable>,

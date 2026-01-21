@@ -20,7 +20,7 @@ use crate::world::y_sort::YSort;
 use crate::Game;
 use crate::{
     combat::{AttackTimer, HitEvent},
-    inputs::CursorPos,
+    cursor::CursorPos,
     player::Player,
     proto::proto_param::ProtoParam,
     GameParam,

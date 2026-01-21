@@ -1,4 +1,4 @@
-use crate::{inputs::CursorPos, world, Game};
+use crate::{cursor::CursorPos, world, Game};
 use bevy::{prelude::*, render::view::RenderLayers};
 use bevy_ecs_tilemap::tiles::TilePos;
 

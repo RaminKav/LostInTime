@@ -8,7 +8,7 @@ use crate::{
     blessings::{Blessing, OwnedBlessings},
     chaos::IncreaseChaosEvent,
     colors::{RED, WHITE},
-    inputs::CursorPos,
+    cursor::CursorPos,
     player::skills::{Heirloom, HeirloomWithRarity},
     ui::{
         damage_numbers::spawn_floating_text_with_shadow,

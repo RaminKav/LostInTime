@@ -10,7 +10,7 @@ use crate::{
         attribute_helpers::{create_new_random_item_stack_with_attributes, spawn_rarity_animation},
         ItemRarity,
     },
-    inputs::CursorPos,
+    cursor::CursorPos,
     inventory::ItemStack,
     item::WorldObject,
     juice::bounce::BounceOnHit,

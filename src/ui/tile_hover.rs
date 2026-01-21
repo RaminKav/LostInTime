@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     assets::Graphics,
-    inputs::CursorPos,
+    cursor::CursorPos,
     item::{
         item_actions::{ItemAction, ItemActions},
         EquipmentType, MainHand, RequiredEquipmentType, WorldObject,

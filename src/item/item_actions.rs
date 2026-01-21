@@ -7,7 +7,7 @@ use crate::{
     },
     chaos::IncreaseChaosEvent,
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
-    inputs::CursorPos,
+    cursor::CursorPos,
     inventory::Inventory,
     juice::UseItemEvent,
     night::NightTracker,

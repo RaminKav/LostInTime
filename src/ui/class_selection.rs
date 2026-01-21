@@ -11,7 +11,7 @@ use crate::{
     attributes::ItemAttributes,
     audio::{AudioSoundEffect, SoundSpawner},
     colors::{DARK_WOOD_BROWN, GREY, WHITE},
-    inputs::CursorPos,
+    cursor::CursorPos,
     inventory::ItemStack,
     item::{ItemDisplayMetaData, WorldObject},
     player::{

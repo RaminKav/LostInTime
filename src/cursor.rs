@@ -4,12 +4,28 @@ use bevy::sprite::{MaterialMesh2dBundle, Mesh2dHandle};
 use bevy::window::PrimaryWindow;
 
 use crate::assets::Graphics;
-use crate::inputs::CursorPos;
+use crate::inputs::{cursor_pos_in_ui, cursor_pos_in_world, player_move_inputs};
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::GameState;
-use crate::Player;
+use crate::{Player, TextureCamera};
 
+#[derive(Reflect, Resource, Debug)]
+#[reflect(Resource)]
+pub struct CursorPos {
+    pub world_coords: Vec3,
+    pub screen_coords: Vec3,
+    pub ui_coords: Vec3,
+}
+impl Default for CursorPos {
+    fn default() -> Self {
+        CursorPos {
+            world_coords: Vec3::new(999., 0., 0.),
+            screen_coords: Vec3::new(999., 0., 0.),
+            ui_coords: Vec3::new(999., 0., 0.),
+        }
+    }
+}
 /// Marker component for the custom cursor sprite
 #[derive(Component)]
 pub struct CustomCursor;
@@ -26,7 +42,7 @@ pub struct CustomCursorPlugin;
 
 impl Plugin for CustomCursorPlugin {
     fn build(&self, app: &mut App) {
-        app
+        app.add_system(update_cursor_pos.after(player_move_inputs))
             // Setup cursor once graphics are loaded (after Loading state)
             .add_system(setup_custom_cursor.in_schedule(OnEnter(GameState::MainMenu)))
             // Hide system cursor as soon as we leave loading
@@ -78,7 +94,7 @@ fn setup_custom_cursor(
         SpriteSheetBundle {
             texture_atlas: texture_atlas.clone(),
             sprite: cursor_sprite,
-            transform: Transform::from_xyz(0., 0., 999.), // Very high z to always be on top
+            transform: Transform::from_translation(Vec3::new(999., 0., 999.)),
             ..default()
         },
         CustomCursor,
@@ -262,6 +278,26 @@ fn update_reload_indicator(
             *visibility = Visibility::Visible;
         } else {
             *visibility = Visibility::Hidden;
+        }
+    }
+}
+
+pub fn update_cursor_pos(
+    windows: Query<&Window, With<PrimaryWindow>>,
+    camera_q: Query<(&Transform, &Camera), With<TextureCamera>>,
+    mut cursor_moved_events: EventReader<CursorMoved>,
+    mut cursor_pos: ResMut<CursorPos>,
+) {
+    for cursor_moved in cursor_moved_events.iter() {
+        // To get the mouse's world position, we have to transform its window position by
+        // any transforms on the camera. This is done by projecting the cursor position into
+        // camera space (world space).
+        for (cam_t, cam) in camera_q.iter() {
+            *cursor_pos = CursorPos {
+                world_coords: cursor_pos_in_world(&windows, cursor_moved.position, cam_t, cam),
+                ui_coords: cursor_pos_in_ui(&windows, cursor_moved.position, cam),
+                screen_coords: cursor_moved.position.extend(0.),
+            };
         }
     }
 }

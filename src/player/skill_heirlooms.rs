@@ -14,9 +14,9 @@ use crate::{
         status_effects::{RapidfireSlow, StatusEffect, StatusEffectEvent},
         HitEvent,
     },
+    cursor::CursorPos,
     custom_commands::CommandsExt,
     enemy::Mob,
-    inputs::CursorPos,
     item::{
         projectile::{BombTarget, Projectile, ProjectileState, RangedAttackEvent},
         WorldObject,

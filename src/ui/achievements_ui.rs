@@ -995,7 +995,7 @@ pub fn update_achievements_navigation_buttons(
 }
 
 pub fn handle_achievement_row_clicks(
-    cursor_pos: Res<crate::inputs::CursorPos>,
+    cursor_pos: Res<crate::cursor::CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut achievements: ResMut<Achievements>,

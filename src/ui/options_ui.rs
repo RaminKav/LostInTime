@@ -5,7 +5,7 @@ use bevy::sprite::Anchor;
 use crate::{
     assets::Graphics,
     audio::{AudioSoundEffect, SoundSpawner},
-    inputs::CursorPos,
+    cursor::CursorPos,
     keybinds::InputMappings,
     ui::{
         interactions::Interaction, spawn_back_button, ui_helpers, Interactable, UIElement, UIState,
