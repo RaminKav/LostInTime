@@ -126,7 +126,7 @@ use logs_wheel::LogFileInitializer;
 use std::sync::Mutex;
 
 const ZOOM_SCALE: f32 = 1.2;
-const PLAYER_MOVE_SPEED: f32 = 75.;
+const PLAYER_MOVE_SPEED: f32 = 85.;
 const PLAYER_DASH_SPEED: f32 = 375.;
 pub const TIME_STEP: f32 = 1.0 / 60.0;
 

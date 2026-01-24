@@ -15,7 +15,7 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     chaos::ChaosTracker,
     client::GameOverEvent,
-    colors::{BLACK, BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE, YELLOW},
+    colors::{BLACK, BLUE, LEVEL_BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE, YELLOW},
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
@@ -281,17 +281,18 @@ pub fn setup_xp_bar_ui(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
+    res: Res<ScreenResolution>,
 ) {
     let inner_xp_prog = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: YELLOW,
-                custom_size: Some(Vec2::new(0., 1.)), // Initialize to 0 width (0 XP at start)
+                color: LEVEL_BLUE,
+                custom_size: Some(Vec2::new(0., 10.)), // Initialize to 0 width (0 XP at start)
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-111. / 2., -6., -1.),
+                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 5., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -306,24 +307,24 @@ pub fn setup_xp_bar_ui(
         .insert(XPBar)
         .insert(Name::new("inner xp bar"))
         .id();
-    let xp_bar_frame = commands
-        .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(UIElement::XPBarFrame),
+    // let xp_bar_frame = commands
+    //     .spawn(SpriteBundle {
+    //         texture: graphics.get_ui_element_texture(UIElement::XPBarFrame),
 
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(119.5, 24.)),
-                ..Default::default()
-            },
-            transform: Transform {
-                translation: Vec3::new(10., -GAME_HEIGHT / 2. + 34., 5.),
-                scale: Vec3::new(1., 1., 1.),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert(Name::new("XP BAR"))
-        .insert(RenderLayers::from_layers(&[3]))
-        .id();
+    //         sprite: Sprite {
+    //             custom_size: Some(Vec2::new(119.5, 24.)),
+    //             ..Default::default()
+    //         },
+    //         transform: Transform {
+    //             translation: Vec3::new(10., -GAME_HEIGHT / 2. + 34., 5.),
+    //             scale: Vec3::new(1., 1., 1.),
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     })
+    //     .insert(Name::new("XP BAR"))
+    //     .insert(RenderLayers::from_layers(&[3]))
+    //     .id();
     let text = commands
         .spawn((
             Text2dBundle {
@@ -348,9 +349,9 @@ pub fn setup_xp_bar_ui(
             RenderLayers::from_layers(&[3]),
         ))
         .id();
-    commands
-        .entity(xp_bar_frame)
-        .push_children(&[inner_xp_prog, text]);
+    // commands
+    //     .entity(xp_bar_frame)
+    //     .push_children(&[inner_xp_prog, text]);
 }
 pub fn setup_currency_ui(
     mut commands: Commands,
@@ -747,14 +748,15 @@ pub fn update_xp_bar(
     mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
     mut flash_event: EventReader<FlashExpBarEvent>,
     mut commands: Commands,
+    res: Res<ScreenResolution>,
 ) {
     for event in flash_event.iter() {
         let level = player_xp_query.single();
 
         let (mut sprite, mut flash) = xp_bar_query.single_mut();
         sprite.custom_size = Some(Vec2 {
-            x: 111. * level.xp as f32 / level.next_level_xp as f32,
-            y: 1.,
+            x: res.game_width * level.xp as f32 / level.next_level_xp as f32,
+            y: 10.,
         });
         let (mut text, mut txfm) = xp_bar_text_query.single_mut();
         text.sections[0].value = format!("{:}", level.level);
