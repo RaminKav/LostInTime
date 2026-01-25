@@ -340,8 +340,8 @@ pub fn setup_xp_bar_ui(
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(
-                        res.game_width / 2. - 20.,
-                        res.game_height / 8. - 3.,
+                        res.game_width / 2. - 35.,
+                        res.game_height / 2. - 10.5,
                         1.,
                     ),
                     scale: Vec3::new(1., 1., 1.),
@@ -1257,7 +1257,7 @@ pub fn handle_update_player_skills(
 
                 let offset = Vec2::new(
                     col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
-                    (GAME_HEIGHT - 15.) / 2. - 6.5 - (row as f32 * ROW_SPACING),
+                    (GAME_HEIGHT - 15.) / 2. - 8.5 - (row as f32 * ROW_SPACING),
                 );
 
                 // Create the main icon with interactability directly attached

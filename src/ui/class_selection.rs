@@ -1931,7 +1931,7 @@ pub fn handle_portal_animation(
         &mut PortalAnimationState,
         &mut bevy_aseprite::anim::AsepriteAnimation,
     )>,
-    mut pending_game_start: Option<ResMut<PendingGameStart>>,
+    pending_game_start: Option<ResMut<PendingGameStart>>,
     mut next_state: ResMut<NextState<crate::GameState>>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     mut commands: Commands,
@@ -1939,10 +1939,10 @@ pub fn handle_portal_animation(
     mut run_unlock_state: ResMut<RunUnlockState>,
     screen_res: Res<ScreenResolution>,
 ) {
-    for (portal_entity, mut anim_state, mut anim) in portal_query.iter_mut() {
+    for (_portal_entity, mut anim_state, mut anim) in portal_query.iter_mut() {
         // Check if we have a pending game start resource and are still in Idle state
         if let Some(pending) = pending_game_start.as_deref() {
-            if matches!(anim_state.state, PortalAnimState::Idle) {
+            if matches!(anim_state.state, PortalAnimState::Idle) && anim.current_frame() == 0 {
                 // Start the TRANSITION animation
                 anim_state.state = PortalAnimState::Transition;
                 anim_state.pending_game_start = Some(pending.clone());

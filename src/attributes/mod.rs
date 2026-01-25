@@ -1897,7 +1897,13 @@ pub fn handle_cape_att_increase_on_level_up(
         if level.level == level.next_level {
             let mut cape_stack = proto.get_item_data(class.class.get_cape()).unwrap().clone();
             let level = level.level as i32 - 1;
-            let cape_attrs = class.class.compute_cape_stats(level);
+            let mut cape_attrs = class.class.compute_cape_stats(level);
+
+            // Add pet passive bonuses
+            for pet in class.pets.iter() {
+                let pet_stats = pet.compute_pet_stats(level);
+                cape_attrs = cape_attrs.combine(&pet_stats);
+            }
 
             // Convert ItemAttributes to BonusStatLines for tooltip display
             cape_stack.metadata.bonus_stat_lines = item_attributes_to_bonus_stat_lines(&cape_attrs);

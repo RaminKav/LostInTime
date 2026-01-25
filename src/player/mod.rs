@@ -18,7 +18,8 @@ use combat_heirlooms::{
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
-    handle_spear, handle_spear_gravity, tick_parried_timer, ParrySuccessEvent,
+    handle_spear, handle_spear_gravity, handle_spear_pull_delay, tick_parried_timer,
+    ParrySuccessEvent,
 };
 use rand::seq::SliceRandom;
 use rogue_skills::{
@@ -258,6 +259,12 @@ impl Plugin for PlayerPlugin {
             .add_system(handle_mob_death_out_of_run_currency.in_set(OnUpdate(GameState::Main)))
             .add_system(
                 skill_heirlooms::initialize_skill_charge_tracker
+                    .run_if(is_not_paused)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                handle_spear_pull_delay
+                    .after(handle_spear)
                     .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )

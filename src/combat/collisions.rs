@@ -29,7 +29,7 @@ use crate::{
     player::skill_heirlooms::Stealthed,
     player::{
         mage_skills::IceExplosionDmg,
-        melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack, SpearGravity},
+        melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack},
         skills::Heirloom,
     },
     ui::{damage_numbers::DodgeEvent, FlashExpBarEvent},
@@ -262,17 +262,8 @@ fn check_projectile_hit_mob_collisions(
             }
             let (_e, hit_txfm) = allowed_targets.get(*e2).unwrap();
             let enemy_pos = hit_txfm.translation().truncate();
-            if let Some(_) = spear_att {
-                for (mob_e, mob_txfm) in nearby_mobs.iter() {
-                    let delta = mob_txfm.translation().truncate() - enemy_pos;
-                    if delta.length() <= 70. {
-                        commands.entity(mob_e).insert(SpearGravity {
-                            target: enemy_pos,
-                            timer: Timer::from_seconds(0.5, TimerMode::Once),
-                        });
-                    }
-                }
-            }
+            // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
+            // The SpearAttack component is still used to identify the damage source
             if ice_aoe.is_some() {
                 try_add_slow_stacks(*e2, &mut commands, &mut status_event, slow.as_deref_mut());
             }
@@ -448,17 +439,8 @@ fn check_multihit_projectile_ongoing_collisions(
                     let (_e, hit_txfm) = allowed_targets.get(target_e).unwrap();
                     let enemy_pos = hit_txfm.translation().truncate();
 
-                    if let Some(_) = spear_att {
-                        for (mob_e, mob_txfm) in nearby_mobs.iter() {
-                            let delta = mob_txfm.translation().truncate() - enemy_pos;
-                            if delta.length() <= 70. {
-                                commands.entity(mob_e).insert(SpearGravity {
-                                    target: enemy_pos,
-                                    timer: Timer::from_seconds(0.5, TimerMode::Once),
-                                });
-                            }
-                        }
-                    }
+                    // Note: SpearAttack gravity pull is now handled proactively in handle_spear_pull_delay
+                    // The SpearAttack component is still used to identify the damage source
 
                     if ice_aoe.is_some() {
                         try_add_slow_stacks(
@@ -684,9 +666,6 @@ pub fn check_item_drop_collisions(
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
-    if !game.player().is_moving && !inv.single().is_empty() {
-        return;
-    }
     let (player_e, mana_regen) = player.single();
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
         for (e1, e2) in [(e1, e2), (e2, e1)] {

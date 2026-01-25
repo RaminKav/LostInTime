@@ -63,6 +63,33 @@ impl Pet {
             Pet::Fairy => FairyPetSprite::PATH,
         }
     }
+    
+    /// Compute pet passive stats based on level (similar to SkillClass::compute_cape_stats)
+    pub fn compute_pet_stats(&self, level: i32) -> crate::attributes::ItemAttributes {
+        use crate::attributes::{AttributeQuality, AttributeValue, ItemAttributes};
+        
+        let mut stats = ItemAttributes::default();
+        let quality = if level > 10 {
+            AttributeQuality::High
+        } else if level >= 5 {
+            AttributeQuality::Average
+        } else {
+            AttributeQuality::Low
+        };
+        
+        match self {
+            Pet::Slime => {
+                // +1 Defence per level
+                stats.defence = AttributeValue::new(level * 1, quality, 1.);
+            }
+            Pet::Fairy => {
+                // +1 Health Regen per level
+                stats.health_regen = AttributeValue::new(level * 1, quality, 1.);
+            }
+        }
+        
+        stats
+    }
 }
 
 #[derive(Component, Reflect, FromReflect, Schematic, Default)]

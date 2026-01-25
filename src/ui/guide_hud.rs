@@ -129,7 +129,7 @@ pub fn display_goal_text(
             text_anchor: bevy::sprite::Anchor::CenterLeft,
             transform: Transform::from_translation(Vec3::new(
                 -res.game_width / 2. + 5.5,
-                (GAME_HEIGHT - 15.) / 2. - 50.,
+                (GAME_HEIGHT - 15.) / 2. - 52.,
                 3.,
             )),
             ..Default::default()

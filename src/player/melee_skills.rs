@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
@@ -141,6 +139,12 @@ pub struct SpearState {
 }
 
 #[derive(Component)]
+pub struct SpearPullDelay {
+    pub delay_timer: Timer,
+    pub epicenter: Vec2,
+}
+
+#[derive(Component)]
 
 pub struct Parried {
     pub timer: Timer,
@@ -224,6 +228,18 @@ pub fn handle_spear(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.5));
             commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.5).with_delay(0.32));
 
+            // Calculate epicenter position in front of player
+            let player_pos_2d = player_pos.translation().truncate();
+            let direction =
+                (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
+            let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
+
+            // Add delay component to time with animation (brief delay before pull)
+            commands.entity(e).insert(SpearPullDelay {
+                delay_timer: Timer::from_seconds(0.45, TimerMode::Once), // Delay to sync with animation
+                epicenter,
+            });
+
             // ActiveSkillUsedEvent dispatched centrally
         }
     }
@@ -231,24 +247,8 @@ pub fn handle_spear(
         spear_state.spear_timer.tick(time.delta());
         if spear_state.spear_timer.just_finished() {
             spear_state.spear_timer.reset();
-            let player_pos = player_pos.translation();
-            let direction =
-                (cursor_pos.world_coords.truncate() - player_pos.truncate()).normalize_or_zero();
-            let distance = direction * 1.5 * TILE_SIZE.x;
-
-            let angle = f32::atan2(direction.y, direction.x) - PI / 2.;
-            let hit = spawn_temp_collider(
-                &mut commands,
-                Transform::from_translation(Vec3::new(distance.x / 2., distance.y / 2., 1.))
-                    .with_rotation(Quat::from_rotation_z(angle)),
-                0.5,
-                dmg.0,
-                Collider::cuboid(12., 1.5 * TILE_SIZE.x),
-                Projectile::Echo,
-            );
-            commands.entity(hit).insert(SpearAttack).set_parent(e);
         }
-
+        // Prevent player movement during spear throw
         mv.0 = mv.0 * 0.;
         kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
     }
@@ -338,6 +338,50 @@ pub fn spawn_echo_hitbox(
         vec![],       // No extra components needed
         Some(player), // Parent to player entity
     );
+}
+
+pub fn handle_spear_pull_delay(
+    mut player_query: Query<(Entity, &mut SpearPullDelay, &Attack), With<Player>>,
+    mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
+    time: Res<Time>,
+    mut commands: Commands,
+) {
+    for (player_e, mut pull_delay, attack) in player_query.iter_mut() {
+        pull_delay.delay_timer.tick(time.delta());
+        if !pull_delay.delay_timer.just_finished() {
+            continue;
+        }
+
+        // Pull all nearby enemies to the epicenter
+        let epicenter = pull_delay.epicenter;
+        let pull_radius = 128.0; // Radius to find enemies to pull
+
+        for (mob_e, mob_transform) in mobs.iter() {
+            let mob_pos = mob_transform.translation().truncate();
+            let distance = (mob_pos - epicenter).length();
+
+            if distance <= pull_radius {
+                commands.entity(mob_e).insert(SpearGravity {
+                    target: epicenter,
+                    timer: Timer::from_seconds(0.5, TimerMode::Once),
+                });
+            }
+        }
+
+        // Spawn 20px damage hitbox at epicenter
+        let hitbox = spawn_temp_collider(
+            &mut commands,
+            Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
+            0.5, // Very short duration, just for the hit
+            attack.0,
+            Collider::ball(18.0), // 20px radius
+            Projectile::Echo,
+        );
+        commands.entity(hitbox).insert(SpearAttack);
+
+        // Remove the delay component
+        commands.entity(player_e).remove::<SpearPullDelay>();
+    }
 }
 
 pub fn handle_spear_gravity(
