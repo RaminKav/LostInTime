@@ -115,7 +115,7 @@ use world::{
 };
 use world::{dimension::EraManager, WorldGeneration};
 
-use crate::player::ClassUnlockConfig;
+use crate::player::{skill_heirlooms::Stealthed, ClassUnlockConfig};
 use crate::{
     assets::{ClassPetData, SpriteAnchor},
     blessings::OwnedBlessings,
@@ -461,6 +461,7 @@ pub struct GameParam<'w, 's> {
         With<Player>,
     >,
     pub blessings_query: Query<'w, 's, &'static OwnedBlessings, With<Player>>,
+    pub stealth_query: Query<'w, 's, Option<&'static Stealthed>, With<Player>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -731,19 +732,27 @@ impl<'w, 's> GameParam<'w, 's> {
 
         let total_crit_chance = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
 
+        // Stealth: Force all damage to be crits
+        let is_stealthed = self
+            .stealth_query
+            .get_single()
+            .map(|s| s.is_some())
+            .unwrap_or(false);
+
         // Determine if we crit and if we overcrit
-        let (did_crit, did_overcrit) = if total_crit_chance >= 100 || self.player().next_hit_crit {
-            // Guaranteed crit if >= 100%
-            // Check for overcrit if crit > 100%
-            let overcrit_chance = total_crit_chance.saturating_sub(100);
-            let is_overcrit =
-                overcrit_chance > 0 && rng.gen_ratio(u32::min(100, overcrit_chance), 100);
-            (true, is_overcrit)
-        } else {
-            // Normal crit roll
-            let is_crit = rng.gen_ratio(total_crit_chance, 100);
-            (is_crit, false)
-        };
+        let (did_crit, did_overcrit) =
+            if total_crit_chance >= 100 || self.player().next_hit_crit || is_stealthed {
+                // Guaranteed crit if >= 100%
+                // Check for overcrit if crit > 100%
+                let overcrit_chance = total_crit_chance.saturating_sub(100);
+                let is_overcrit =
+                    overcrit_chance > 0 && rng.gen_ratio(u32::min(100, overcrit_chance), 100);
+                (true, is_overcrit)
+            } else {
+                // Normal crit roll
+                let is_crit = rng.gen_ratio(total_crit_chance, 100);
+                (is_crit, false)
+            };
 
         // Frail multiplier: 1.1x damage per stack (applied multiplicatively at the end)
         let frail_multiplier = if frail_stacks > 0 {

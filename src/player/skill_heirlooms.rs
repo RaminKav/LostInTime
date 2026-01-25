@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     ai::FollowState,
-    attributes::{Attack, BonusAttackSpeed, CurrentHealth, CurrentMana, MaxHealth},
+    attributes::{Attack, AttackCooldown, BonusAttackSpeed, CurrentHealth, CurrentMana, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
     combat::{
@@ -1251,8 +1251,9 @@ pub fn tick_new_skill_cooldowns(
     mut daggerthrow_cd: Query<(Entity, &mut DaggerThrowState)>,
     mut slash_cd: Query<(Entity, &mut SlashState)>,
     mut triplethrow_cd: Query<(Entity, &mut TripleThrowState)>,
-    mut fury_cd: Query<(Entity, &mut FuryState)>,
+    mut fury_cd: Query<(Entity, &mut FuryState), With<Player>>,
     mut bomb_cd: Query<(Entity, &mut BombState)>,
+    attack_cooldown: Query<&AttackCooldown, With<Player>>,
 ) {
     for (e, mut l) in lightning_cd.iter_mut() {
         l.cooldown_timer.tick(time.delta());
@@ -1281,7 +1282,24 @@ pub fn tick_new_skill_cooldowns(
     for (e, mut f) in fury_cd.iter_mut() {
         f.cooldown_timer.tick(time.delta());
         f.duration.tick(time.delta());
-        f.throw_timer.tick(time.delta());
+
+        // Scale throw timer based on attack speed
+        let attack_speed_mult = if let Ok(cooldown) = attack_cooldown.get_single() {
+            let reference_base_cooldown = 0.6;
+            info!(
+                "Current AttackCooldown: {:?} | {:?}",
+                cooldown.0,
+                (reference_base_cooldown / (2. * cooldown.0 - reference_base_cooldown)).max(0.1)
+            );
+            (reference_base_cooldown / (2. * cooldown.0 - reference_base_cooldown)).max(0.1)
+        } else {
+            1.0
+        };
+
+        // Higher attack speed = faster throws = timer ticks faster
+        let scaled_delta = time.delta().mul_f32(attack_speed_mult);
+        f.throw_timer.tick(scaled_delta);
+
         if f.cooldown_timer.finished() && f.duration.finished() {
             commands.entity(e).remove::<FuryState>();
         }
