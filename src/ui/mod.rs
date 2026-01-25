@@ -433,8 +433,11 @@ impl Plugin for UIPlugin {
             .add_system(
                     handle_update_player_skills.after(clamp_health).run_if(in_state(GameState::Main).or_else(in_state(GameState::BlessingChoice))),
             )
-            .add_system(
-                handle_heirloom_hud_tooltip
+            .add_systems(
+                (
+                    handle_heirloom_hud_tooltip,
+                    player_hud::handle_active_skill_hud_tooltip,
+                )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(

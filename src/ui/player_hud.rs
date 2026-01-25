@@ -16,14 +16,17 @@ use crate::{
     audio::{AudioSoundEffect, SoundSpawner},
     chaos::ChaosTracker,
     client::GameOverEvent,
-    colors::{BLACK, BLUE, LEVEL_BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE, YELLOW},
+    colors::{
+        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE,
+        YELLOW,
+    },
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
         levels::PlayerLevel,
-        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
+        skills::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     GameState, InputBinding, InputMappings, ScreenResolution, GAME_HEIGHT,
@@ -69,7 +72,10 @@ pub struct EraTimerText;
 pub struct EndlessElapsedText;
 
 #[derive(Component)]
-pub struct ActiveSkillIcon;
+pub struct ActiveSkillIcon {
+    pub skill: crate::player::skills::ActiveSkill,
+    pub slot_index: usize,
+}
 
 #[derive(Component)]
 pub struct ActiveSkillKeybindText {
@@ -999,6 +1005,9 @@ pub struct HeirloomCounterText;
 #[derive(Component)]
 pub struct HeirloomHudTooltip;
 
+#[derive(Component)]
+pub struct ActiveSkillHudTooltip;
+
 /// System to handle tooltips for heirloom icons in the HUD
 pub fn handle_heirloom_hud_tooltip(
     mut commands: Commands,
@@ -1114,6 +1123,196 @@ pub fn handle_heirloom_hud_tooltip(
     }
 
     *last_hovered = hovered_heirloom;
+}
+
+/// Helper function to spawn skill tooltip content (icon, title, description)
+/// Extracted from class selection UI for reuse
+pub fn spawn_skill_tooltip_content(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    active_skill: ActiveSkill,
+    parent_entity: Entity,
+) {
+    const ICONS_X_OFFSET: f32 = -24.;
+    const TEXT_Y_OFFSET: f32 = 12.;
+    const DESC_TEXT_X: f32 = ICONS_X_OFFSET + 12.;
+    const BODY_FONT: &str = "fonts/slkscr.ttf";
+    const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
+    const BODY_FONT_SIZE: f32 = 8.4;
+
+    let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
+    let active_skill_desc = active_skill.get_desc(1.).join("\n");
+    let active_skill_name = active_skill.get_title();
+
+    // Spawn skill icon
+    let _active_skill_icon = commands
+        .spawn(SpriteBundle {
+            texture: active_skill_icon,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(18., 18.)),
+                ..Default::default()
+            },
+            transform: Transform {
+                translation: Vec3::new(ICONS_X_OFFSET, 0., 2.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SKILL TOOLTIP ICON"))
+        .set_parent(parent_entity)
+        .id();
+
+    // Spawn skill name text
+    let _active_skill_name_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                active_skill_name,
+                TextStyle {
+                    font: asset_server.load(TITLE_FONT),
+                    font_size: BODY_FONT_SIZE,
+                    color: DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(DESC_TEXT_X, TEXT_Y_OFFSET + 6., 2.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SKILL TOOLTIP NAME"))
+        .set_parent(parent_entity)
+        .id();
+
+    // Spawn skill description text
+    let _active_skill_description_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                active_skill_desc,
+                TextStyle {
+                    font: asset_server.load(BODY_FONT),
+                    font_size: BODY_FONT_SIZE,
+                    color: DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: Anchor::TopLeft,
+            transform: Transform {
+                translation: Vec3::new(DESC_TEXT_X, TEXT_Y_OFFSET - 2., 2.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("SKILL TOOLTIP DESCRIPTION"))
+        .set_parent(parent_entity)
+        .id();
+}
+
+/// System to handle tooltips for active skill icons in the HUD
+pub fn handle_active_skill_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<crate::cursor::CursorPos>,
+    hit_detection_sprites: Query<
+        (Entity, &Sprite, &GlobalTransform),
+        With<super::interactions::Interactable>,
+    >,
+    mut skill_icons: Query<(
+        Entity,
+        &GlobalTransform,
+        &UIElement,
+        &mut super::interactions::Interactable,
+        &ActiveSkillIcon,
+    )>,
+    existing_tooltips: Query<Entity, With<ActiveSkillHudTooltip>>,
+    mut last_hovered: Local<Option<ActiveSkill>>,
+) {
+    use super::interactions::Interaction;
+
+    // First, do hit detection and update interactable states
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+
+    // Update all skill icons' interactable state based on cursor position
+    for (entity, _, ui_elem, mut interactable, _) in skill_icons.iter_mut() {
+        if *ui_elem == UIElement::HeirloomHudIcon {
+            let is_hit = hit_entity
+                .as_ref()
+                .map(|(e, _sprite, _transform)| *e == entity)
+                .unwrap_or(false);
+
+            if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::Hovering);
+            } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::None);
+            }
+        }
+    }
+
+    // Now find the currently hovered skill directly from the icon
+    let currently_hovered = skill_icons
+        .iter()
+        .filter(|(_, _, ui_elem, _, _)| **ui_elem == UIElement::HeirloomHudIcon)
+        .find(|(_, _, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(_, transform, _, _, skill_slot)| {
+            (skill_slot.skill.clone(), transform.translation())
+        });
+
+    let hovered_skill = currently_hovered.as_ref().map(|(s, _)| s.clone());
+
+    // Only update if the hover state changed
+    if *last_hovered == hovered_skill {
+        return;
+    }
+
+    // Despawn all existing tooltips
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    // Spawn new tooltip if hovering
+    if let Some((skill, icon_pos)) = currently_hovered {
+        // Position tooltip above the hovered icon
+        let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., 15.);
+        let container = commands
+            .spawn(RenderLayers::from_layers(&[3]))
+            .insert(ActiveSkillHudTooltip)
+            .insert(SpatialBundle::from_transform(Transform {
+                translation: tooltip_pos,
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            }))
+            .id();
+        // Spawn tooltip background using SkillTooltip asset
+        let _tooltip_bg = commands
+            .spawn(SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
+                sprite: Sprite {
+                    custom_size: Some(Vec2::new(246., 71.)),
+                    ..Default::default()
+                },
+                transform: Transform::from_translation(Vec3::new(72., -3., 1.)),
+                ..Default::default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(ActiveSkillHudTooltip)
+            .insert(Name::new("ACTIVE SKILL TOOLTIP"))
+            .set_parent(container)
+            .id();
+
+        // Spawn skill tooltip content (icon, title, description)
+        spawn_skill_tooltip_content(&mut commands, &graphics, &asset_server, skill, container);
+    }
+
+    *last_hovered = hovered_skill;
 }
 
 /// Helper function to get current scaling value for heirlooms that scale
@@ -1374,7 +1573,14 @@ pub fn handle_update_player_skills(
                     ..default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
-                .insert(ActiveSkillIcon)
+                .insert(ActiveSkillIcon {
+                    skill: active_skill_option
+                        .clone()
+                        .unwrap_or_default()
+                        .active_skill
+                        .clone(),
+                    slot_index: *slot_index,
+                })
                 .id();
             // Get the actual keybind for this slot
             let keybind = keybinds.get_active_skill_key(*slot_index);
@@ -1431,7 +1637,12 @@ pub fn handle_update_player_skills(
                         ..Default::default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(ActiveSkillIcon)
+                    .insert(ActiveSkillIcon {
+                        skill: active_skill.active_skill.clone(),
+                        slot_index: *slot_index,
+                    })
+                    .insert(super::interactions::Interactable::default())
+                    .insert(UIElement::HeirloomHudIcon) // Reuse this for hit detection
                     .insert(Name::new("HUD ICON!!"))
                     .set_parent(icon_bg);
             }

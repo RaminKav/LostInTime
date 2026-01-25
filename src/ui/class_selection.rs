@@ -38,6 +38,7 @@ use crate::{
 use super::{
     interactions::{Interactable, Interaction},
     inventory_ui::spawn_item_stack_icon,
+    player_hud::spawn_skill_tooltip_content,
     ui_helpers::spawn_ui_overlay,
 };
 
@@ -1501,88 +1502,30 @@ fn spawn_player_preview(
         .id();
 
     for (skill_index, active_skill) in class_data.active_skills.iter().enumerate() {
-        let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-        let active_skill_desc = active_skill.get_desc(1.).join("\n");
-        let active_skill_name = active_skill.get_title();
-
         let skill_y_offset = SKILL_Y_OFFSET
             + ICONS_Y_OFFSET
             + ICON_Y_SPACING * 2.
             + ((ICON_Y_SPACING - 4.) * skill_index as f32);
 
-        let _active_skill_icon = commands
-            .spawn(SpriteBundle {
-                texture: active_skill_icon,
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(18., 18.)),
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(ICONS_X_OFFSET, skill_y_offset, 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
+        let skill_container = commands
+            .spawn(SpatialBundle::from_transform(Transform {
+                translation: Vec3::new(0., skill_y_offset, 0.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            }))
             .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new(format!("ACTIVE SKILL ICON {}", skill_index)))
+            .insert(Name::new(format!("SKILL CONTAINER {}", skill_index)))
             .set_parent(player_container)
             .id();
 
-        // Active skill name text
-        let _active_skill_name_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    active_skill_name,
-                    TextStyle {
-                        font: asset_server.load(TITLE_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: DARK_WOOD_BROWN,
-                    },
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform {
-                    translation: Vec3::new(DESC_TEXT_X, skill_y_offset + TEXT_Y_OFFSET + 6., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new(format!(
-                "ACTIVE SKILL DESCRIPTION {}",
-                skill_index
-            )))
-            .set_parent(player_container)
-            .id();
-        // Active skill description text
-        let _active_skill_description_text = commands
-            .spawn(Text2dBundle {
-                text: Text::from_section(
-                    active_skill_desc,
-                    TextStyle {
-                        font: asset_server.load(BODY_FONT),
-                        font_size: BODY_FONT_SIZE,
-                        color: DARK_WOOD_BROWN,
-                    },
-                )
-                .with_alignment(TextAlignment::Left),
-                text_anchor: Anchor::TopLeft,
-                transform: Transform {
-                    translation: Vec3::new(DESC_TEXT_X, skill_y_offset + TEXT_Y_OFFSET - 2., 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new(format!(
-                "ACTIVE SKILL DESCRIPTION {}",
-                skill_index
-            )))
-            .set_parent(player_container)
-            .id();
+        // Use the shared helper function to spawn skill content
+        spawn_skill_tooltip_content(
+            commands,
+            graphics,
+            asset_server,
+            active_skill.clone(),
+            skill_container,
+        );
     }
 
     player_container

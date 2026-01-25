@@ -157,6 +157,7 @@ pub enum UIElement {
     SmallKey,
     MediumKey,
     HeirloomHudIcon,
+    SkillTooltip,
     LargeKey,
     XLKey,
     XLKeyHover,
