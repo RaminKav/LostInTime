@@ -30,7 +30,7 @@ use crate::{
         achievements_ui::{AchievementsPagination, ACHIEVEMENTS_PER_PAGE},
         class_selection::{
             persist_class_unlock_state, ClassSelectionState, ClassUnlockConfirmState,
-            ClassUnlockHoverState, PlayerSelectSlot,
+            ClassUnlockHoverState, PendingGameStart, PlayerSelectSlot,
         },
         ChestContainer, FurnaceContainer, UIState,
     },
@@ -244,61 +244,19 @@ pub fn handle_menu_button_click_events(
                 // Confirm button clicked
                 // Check if class is selected (pet is optional)
                 if let Some(class) = &extras.selection_state.selected_class {
-                    // Close the class selection UI and transition to loading state
-                    next_ui_state.set(UIState::Closed);
-                    next_state.set(crate::GameState::Initializing);
-                    // Add PlayerClass component to the game
-                    commands.insert_resource(PlayerClass {
+                    // Store the game start data - will be picked up by handle_portal_animation
+                    // We'll use a resource to pass this data to the portal animation system
+                    let pets = extras
+                        .selection_state
+                        .selected_pet
+                        .iter()
+                        .cloned()
+                        .collect();
+
+                    commands.insert_resource(PendingGameStart {
                         class: class.clone(),
-                        pets: extras
-                            .selection_state
-                            .selected_pet
-                            .iter()
-                            .cloned()
-                            .collect(),
+                        pets,
                     });
-
-                    // Initialize game resources
-                    commands.init_resource::<crate::Game>();
-                    commands.init_resource::<NightTracker>();
-                    commands.init_resource::<ChaosTracker>();
-                    commands.insert_resource(HeirloomChoiceQueue::default());
-                    commands.init_resource::<ContainerRegistry>();
-                    commands.init_resource::<PathfindingCache>();
-                    commands.init_resource::<CraftingTracker>();
-                    commands.init_resource::<EraManager>();
-
-                    extras
-                        .run_unlock_state
-                        .reset_for_run(&*extras.unlock_upgrades);
-
-                    // Start the game with fade-in overlay
-                    commands
-                        .spawn(SpriteBundle {
-                            sprite: Sprite {
-                                color: Color::rgba(0., 0., 0., 0.),
-                                custom_size: Some(Vec2::new(
-                                    extras.screen_res.game_width + 10.,
-                                    crate::GAME_HEIGHT + 20.,
-                                )),
-                                ..default()
-                            },
-                            transform: Transform {
-                                translation: Vec3::new(0., 0., 10.),
-                                scale: Vec3::new(1., 1., 1.),
-                                ..Default::default()
-                            },
-                            ..default()
-                        })
-                        .insert(RenderLayers::from_layers(&[3]))
-                        .insert(Name::new("overlay"))
-                        .insert(crate::ui::main_menu::GameStartFadein(Timer::from_seconds(
-                            3.0,
-                            TimerMode::Once,
-                        )));
-
-                    // Despawn the class selection UI
-                    // commands.entity(e).despawn_recursive();
                 } else {
                     info!("Please select a class before confirming");
                 }

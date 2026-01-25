@@ -8,6 +8,7 @@ use bevy_aseprite::aseprite;
 use std::collections::HashSet;
 
 aseprite!(pub Portal, "textures/portal/portal.ase");
+aseprite!(pub UIPortal, "textures/portal/portal_large.aseprite");
 
 pub fn handle_player_near_portal(
     player_query: Query<&Transform, With<Player>>,

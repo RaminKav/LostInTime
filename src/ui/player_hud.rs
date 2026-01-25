@@ -1,5 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite, AsepriteBundle};
+use rand::Rng;
 use std::collections::HashMap;
 
 use super::{
@@ -161,7 +162,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
             transform: Transform {
                 translation: Vec3::new(
                     (-res.game_width + 91.) / 2.,
-                    (GAME_HEIGHT - 15.) / 2. - 19.5,
+                    (GAME_HEIGHT - 15.) / 2. - 23.5,
                     5.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -287,12 +288,12 @@ pub fn setup_xp_bar_ui(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: LEVEL_BLUE,
-                custom_size: Some(Vec2::new(0., 10.)), // Initialize to 0 width (0 XP at start)
+                custom_size: Some(Vec2::new(0., 6.)), // Initialize to 0 width (0 XP at start)
                 anchor: Anchor::CenterLeft,
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 5., 1.),
+                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -329,7 +330,7 @@ pub fn setup_xp_bar_ui(
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
-                    "1",
+                    "Level 1",
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
@@ -338,7 +339,11 @@ pub fn setup_xp_bar_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-3., 3.5, 1.),
+                    translation: Vec3::new(
+                        res.game_width / 2. - 20.,
+                        res.game_height / 8. - 3.,
+                        1.,
+                    ),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -378,7 +383,7 @@ pub fn setup_currency_ui(
                 transform: Transform {
                     translation: Vec3::new(
                         -res.game_width / 2. + 16.5,
-                        GAME_HEIGHT / 2. - 43.5,
+                        GAME_HEIGHT / 2. - 47.5,
                         6.,
                     ),
                     scale: Vec3::new(1., 1., 1.),
@@ -419,7 +424,7 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 46., GAME_HEIGHT / 2. - 43.5, 6.),
+                    translation: Vec3::new(-res.game_width / 2. + 46., GAME_HEIGHT / 2. - 47.5, 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -749,17 +754,23 @@ pub fn update_xp_bar(
     mut flash_event: EventReader<FlashExpBarEvent>,
     mut commands: Commands,
     res: Res<ScreenResolution>,
+    ui_state: Res<State<UIState>>,
 ) {
+    // If we're in the skill choice UI, don't update the bar (keep it full)
+    if ui_state.0 == UIState::Skills {
+        return;
+    }
+
     for event in flash_event.iter() {
         let level = player_xp_query.single();
 
         let (mut sprite, mut flash) = xp_bar_query.single_mut();
         sprite.custom_size = Some(Vec2 {
             x: res.game_width * level.xp as f32 / level.next_level_xp as f32,
-            y: 10.,
+            y: 6.,
         });
         let (mut text, mut txfm) = xp_bar_text_query.single_mut();
-        text.sections[0].value = format!("{:}", level.level);
+        text.sections[0].value = format!("Level {:}", level.level);
         if level.level >= 10 {
             txfm.translation.x = -5.5;
         }
@@ -790,6 +801,179 @@ pub fn handle_flash_bars(mut query: Query<(&mut Sprite, &mut BarFlashTimer)>, ti
             flash.timer.tick(time.delta());
         }
     }
+}
+
+/// Updates XP bar to rainbow color when in skill choice UI and spawns decorative shards
+pub fn update_xp_bar_rainbow(
+    mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
+    ui_state: Res<State<UIState>>,
+    time: Res<Time>,
+    res: Res<ScreenResolution>,
+    graphics: Res<Graphics>,
+    mut commands: Commands,
+    mut spawn_timer: Local<Timer>,
+    existing_shards: Query<Entity, With<DecorativeXPShard>>,
+) {
+    if ui_state.0 != UIState::Skills {
+        // Clean up any remaining decorative shards when not in Skills UI
+        for shard_e in existing_shards.iter() {
+            commands.entity(shard_e).despawn_recursive();
+        }
+        return;
+    }
+
+    // Initialize spawn timer if needed
+    if spawn_timer.duration().as_secs_f32() == 0.0 {
+        *spawn_timer = Timer::from_seconds(0.13, TimerMode::Repeating); // Spawn every 0.15 seconds
+    }
+
+    spawn_timer.tick(time.delta());
+
+    // Keep bar full when in skill choice UI and apply rainbow color
+    for mut sprite in xp_bar_query.iter_mut() {
+        sprite.custom_size = Some(Vec2 {
+            x: res.game_width,
+            y: 6.,
+        });
+
+        // Rainbow color effect - smooth back-and-forth through blue hue spectrum
+        // Use sine wave to smoothly oscillate between blue tones (200-280 degrees)
+        let elapsed = time.elapsed().as_secs_f32();
+        let sine_wave = (elapsed * 3.).sin(); // Oscillates between -1 and 1
+        let hue_progress = (sine_wave + 1.0) / 2.0; // Normalize to 0-1 range
+        let hue = 200.0 + (hue_progress * 80.0); // Range from 200 (cyan-blue) to 280 (blue-purple)
+        let color = Color::hsl(hue, 0.8, 0.6); // Slightly reduced saturation and higher lightness for softer blue tones
+        sprite.color = color;
+    }
+
+    // Spawn decorative shards periodically
+    if spawn_timer.just_finished() {
+        let Some(spritesheet_map) = graphics.spritesheet_map.as_ref() else {
+            return;
+        };
+        let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+            return;
+        };
+
+        let mut rng = rand::thread_rng();
+
+        // Spawn 2-4 shards per spawn cycle
+        let num_shards = rng.gen_range(3..=4);
+
+        for _ in 0..num_shards {
+            // Choose shard type: 70% small, 25% medium, 5% large
+            let shard_type = match rng.gen_range(0..100) {
+                0..=69 => WorldObject::XPShard,
+                70..=93 => WorldObject::XPShardMedium,
+                _ => WorldObject::XPShardLarge,
+            };
+
+            let Some(sprite) = spritesheet_map.get(&shard_type).cloned() else {
+                continue;
+            };
+
+            // Random X position across screen width
+            let x_pos = rng.gen_range(-res.game_width / 2.0..res.game_width / 2.0);
+            let over_overlay = rng.gen_bool(0.5);
+            let z_pos = if over_overlay { 10.0 } else { 5.0 };
+            let start_y = res.game_height / 2.0;
+
+            // Random fall speed
+            let fall_speed = rng.gen_range(50.0..150.0);
+
+            commands
+                .spawn(SpriteSheetBundle {
+                    sprite,
+                    texture_atlas: texture_atlas.clone(),
+                    transform: Transform::from_translation(Vec3::new(x_pos, start_y, z_pos)),
+                    ..Default::default()
+                })
+                .insert(DecorativeXPShard {
+                    fall_speed,
+                    start_y,
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(Name::new("DecorativeXPShard"));
+        }
+    }
+}
+
+/// Updates decorative XP shards to fall down and fade out
+pub fn update_decorative_xp_shards(
+    mut shards: Query<
+        (
+            Entity,
+            &mut Transform,
+            &mut TextureAtlasSprite,
+            &DecorativeXPShard,
+        ),
+        With<DecorativeXPShard>,
+    >,
+    time: Res<Time>,
+    res: Res<ScreenResolution>,
+    mut commands: Commands,
+) {
+    let screen_bottom = -res.game_height / 2.0;
+
+    for (entity, mut transform, mut sprite, shard) in shards.iter_mut() {
+        // Move shard down
+        transform.translation.y -= shard.fall_speed * time.delta().as_secs_f32();
+
+        // Calculate alpha based on distance fallen
+        // Start at full opacity, fade to 0 as it approaches bottom of screen
+        let distance_fallen = shard.start_y - transform.translation.y;
+        let total_distance = shard.start_y - screen_bottom;
+        let alpha = (1.0 - (distance_fallen / total_distance).min(1.0)).max(0.0);
+
+        // Update sprite color with fading alpha
+        let current_color = sprite.color;
+        sprite.color = Color::rgba(
+            current_color.r(),
+            current_color.g(),
+            current_color.b(),
+            alpha,
+        );
+
+        // Despawn when off screen or fully transparent
+        if transform.translation.y < screen_bottom - 20.0 || alpha <= 0.0 {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
+/// Detects when skill choice UI closes and sends FlashExpBarEvent to update the bar
+pub fn handle_skill_choice_ui_close(
+    mut flash_event: EventWriter<FlashExpBarEvent>,
+    ui_state: Res<State<UIState>>,
+    mut prev_state: Local<UIState>,
+    player_xp_query: Query<&PlayerLevel, With<Player>>,
+    mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
+    decorative_shards: Query<Entity, With<DecorativeXPShard>>,
+    mut commands: Commands,
+) {
+    let current_state = ui_state.0.clone();
+
+    // If we just transitioned from Skills to something else, send update event and reset color
+    if *prev_state == UIState::Skills && current_state != UIState::Skills {
+        let level = player_xp_query.single();
+
+        // Reset bar color to default
+        for mut sprite in xp_bar_query.iter_mut() {
+            sprite.color = LEVEL_BLUE;
+        }
+
+        // Clean up all decorative shards
+        for shard_e in decorative_shards.iter() {
+            commands.entity(shard_e).despawn_recursive();
+        }
+
+        flash_event.send(FlashExpBarEvent {
+            amount: level.xp,
+            did_level: false,
+        });
+    }
+
+    *prev_state = current_state;
 }
 pub fn update_foodbar(
     player_hunger_query: Query<&Hunger, (With<Player>, Changed<Hunger>)>,
@@ -1073,7 +1257,7 @@ pub fn handle_update_player_skills(
 
                 let offset = Vec2::new(
                     col as f32 * ICON_SPACING + (-res.game_width) / 2. + 98.,
-                    (GAME_HEIGHT - 15.) / 2. - 2.5 - (row as f32 * ROW_SPACING),
+                    (GAME_HEIGHT - 15.) / 2. - 6.5 - (row as f32 * ROW_SPACING),
                 );
 
                 // Create the main icon with interactability directly attached
@@ -1178,8 +1362,10 @@ pub fn handle_update_player_skills(
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            -res.game_width / 2. + 18. + i as f32 * 31.,
-                            -GAME_HEIGHT / 2. + 14.,
+                            // -res.game_width / 2. + 18. + i as f32 * 31.,
+                            // -GAME_HEIGHT / 2. + 14.,
+                            -6. + (i as f32 - 1.) * 31.,
+                            -GAME_HEIGHT / 2. + 38.,
                             1.,
                         ),
                         scale: Vec3::new(1., 1., 1.),
@@ -1600,6 +1786,13 @@ pub fn handle_update_era_timer_hud(
 pub struct SkillCooldownOverlay {
     pub timer: Timer,
     pub index: usize,
+}
+
+/// Marker component for decorative XP shards that rain during skill choice UI
+#[derive(Component)]
+pub struct DecorativeXPShard {
+    pub fall_speed: f32,
+    pub start_y: f32,
 }
 
 pub fn spawn_skill_cooldown_overlay(

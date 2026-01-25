@@ -222,7 +222,10 @@ impl Plugin for UIPlugin {
                 (
                     add_previous_health,
                     handle_flash_bars,
+                    update_xp_bar_rainbow.before(update_xp_bar),
                     update_xp_bar,
+                    update_decorative_xp_shards.after(update_xp_bar_rainbow),
+                    handle_skill_choice_ui_close.after(update_xp_bar),
                     handle_enemy_health_bar_change,
                     add_ui_icon_for_elite_mobs,
                     handle_add_dodge_text,
@@ -533,6 +536,7 @@ impl Plugin for UIPlugin {
                 update_unlock_currency_text.run_if(in_state(UIState::ClassSelection)),
                 update_class_unlock_panel.run_if(in_state(UIState::ClassSelection)),
                 update_class_unlock_confirm_panel.run_if(in_state(UIState::ClassSelection)),
+                handle_portal_animation.run_if(in_state(UIState::ClassSelection)),
             ))
             .add_system(init_goal_state.run_if(run_once_per_run()).in_schedule(OnEnter(GameState::Main)))
             .add_system(display_goal_text.run_if(resource_added::<GoalState>()).in_schedule(OnEnter(GameState::Main)))

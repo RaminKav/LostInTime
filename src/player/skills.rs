@@ -295,101 +295,117 @@ impl ActiveSkill {
         }
     }
 
-    pub fn get_desc(&self) -> Vec<String> {
+    pub fn get_desc(&self, skill_power: f32) -> Vec<String> {
         match self {
-            ActiveSkill::Roll => vec!["Roll to dodge".to_string(), "attacks.".to_string()],
+            ActiveSkill::Roll => vec![
+                "Roll to dodge attacks. You are".to_string(),
+                "invulnerable while rolling.".to_string(),
+            ],
+            ActiveSkill::Shout => vec![
+                "SCREAM, releasing a shockwave".to_string(),
+                format!("around you, dealing {}% damage.", skill_power * 100.0),
+            ],
+            ActiveSkill::Heal => vec![
+                format!("Heal yourself for {}% of your", skill_power * 30.0),
+                "max health.".to_string(),
+            ],
             ActiveSkill::Parry => vec![
                 "Active: Time successfully".to_string(),
                 "to Parry attacks ignore".to_string(),
                 "damage and stunning.".to_string(),
             ],
             ActiveSkill::ParrySpear => vec![
-                "Active: Spear Attack that".to_string(),
-                "pulls, enemies towards ".to_string(),
-                "the impact.".to_string(),
+                "".to_string(),
+                "Launch a spear that pulls nearby".to_string(),
+                "enemies towards the impact area".to_string(),
+                format!("and deals {}% damage.", skill_power * 100.0),
             ],
             ActiveSkill::Sprint => vec![
-                "Active: Hold Sprint to".to_string(),
-                "move 60% faster.".to_string(),
+                "You are imbued with a burst of speed.".to_string(),
+                "Gain 60% speed temporarily.".to_string(),
             ],
             ActiveSkill::SprintLunge => vec![
-                "Active: dash through".to_string(),
-                "enemies with a quick".to_string(),
-                "lunge attack.".to_string(),
-            ],
-            ActiveSkill::Teleport => vec![
-                "Active: Teleport a short".to_string(),
-                "distance.".to_string(),
-            ],
-            ActiveSkill::Stealth => vec![
-                "Active: Enter stealth".to_string(),
-                "for 2 seconds, dodging".to_string(),
-                "all damage.".to_string(),
-            ],
-            ActiveSkill::Rapidfire => vec![
-                "Active: +80% attack".to_string(),
-                "speed and unlimited ammo".to_string(),
-                "for 3 seconds.".to_string(),
-            ],
-            ActiveSkill::FirePillar => {
-                vec!["Active: Summon a ring".to_string(), "of fire.".to_string()]
-            }
-            ActiveSkill::Heal => vec![
-                "Active: Heal yourself".to_string(),
-                "for a moderate".to_string(),
-                "amount.".to_string(),
-            ],
-            ActiveSkill::Buckshot => vec![
-                "Active: Fire a shotgun".to_string(),
-                "and bounce back.".to_string(),
-            ],
-            ActiveSkill::IceWall => {
-                vec!["Active: Summon an".to_string(), "ice pillar.".to_string()]
-            }
-            ActiveSkill::DruidTree => vec![
-                "Active: Summon a".to_string(),
-                "tree dummy that".to_string(),
-                "taunts enemies.".to_string(),
-            ],
-            ActiveSkill::Shout => vec![
-                "Active: Release an AoE".to_string(),
-                "burst of damage".to_string(),
-                "around you.".to_string(),
-            ],
-            ActiveSkill::PiercingStar => vec![
-                "Active: Throw a large".to_string(),
-                "piercing star projectile.".to_string(),
-            ],
-            ActiveSkill::LaserBeam => vec![
-                "Active: Fire a powerful".to_string(),
-                "laser beam that hits".to_string(),
-                "enemies multiple times.".to_string(),
-            ],
-            // New skills - placeholder descriptions
-            ActiveSkill::Lightning => vec![
-                "Active: Call down".to_string(),
-                "lightning on enemies.".to_string(),
+                "Lunge quickly through enemies in a".to_string(),
+                format!("line dealing {}% damage. You are", skill_power * 100.0),
+                "invulnerable during the attack.".to_string(),
             ],
             ActiveSkill::DaggerThrow => vec![
-                "Active: Throw a".to_string(),
-                "piercing dagger.".to_string(),
+                "Throw 3 daggers at random nearby".to_string(),
+                format!("enemies dealing {}% damage each.", skill_power * 100.0),
             ],
             ActiveSkill::DaggerSlash => vec![
-                "Active: Quick slash".to_string(),
-                "attack in front.".to_string(),
+                "Quickly slash in front of you,".to_string(),
+                format!("dealing {}% damage in an area.", skill_power * 100.0),
             ],
-            ActiveSkill::TripleThrow => vec![
-                "Active: Throw three".to_string(),
-                "projectiles at once.".to_string(),
+            ActiveSkill::Stealth => vec![
+                "Dissapear for a short duration,".to_string(),
+                "ignoring all damage. Attacks used".to_string(),
+                "during Stealth will always crit.".to_string(),
             ],
-            ActiveSkill::Fury => vec![
-                "Active: Enter a fury".to_string(),
-                "state with increased".to_string(),
-                "attack speed.".to_string(),
+            ActiveSkill::Teleport => vec![
+                format!("Teleport forwards, dealing {}%", skill_power * 33.0),
+                "damage to enemies you pass through.".to_string(),
+                // "through.".to_string(),
+            ],
+            ActiveSkill::Lightning => vec![
+                "Call down lighning on 3 nearby".to_string(),
+                format!("enemies, dealing {}% damage to each.", skill_power * 100.0),
+            ],
+            ActiveSkill::FirePillar => {
+                vec![
+                    "Scorch the earth at target area,".to_string(),
+                    format!("dealing {}% damage continuously.", skill_power * 100.0),
+                ]
+            }
+            ActiveSkill::IceWall => {
+                vec![
+                    "Summon an ice pillar at target".to_string(),
+                    format!("area dealing {}% damage.", skill_power * 200.0),
+                ]
+            }
+            ActiveSkill::Buckshot => vec![
+                "Fire a shotgun round dealing".to_string(),
+                format!("5x {}% damage spread in a cone.", skill_power * 100.0),
+                "Knocks you back a moderate amount.".to_string(),
             ],
             ActiveSkill::Bomb => vec![
-                "Active: Throw an".to_string(),
-                "explosive bomb.".to_string(),
+                "Throw a bomb at target area that".to_string(),
+                format!("explodes on impact, dealing {}%", skill_power * 100.0),
+                "damage and applying frail.".to_string(),
+            ],
+            ActiveSkill::DruidTree => vec![
+                "Place a target dummy at target area ".to_string(),
+                "that taunts enemies towards it".to_string(),
+                "for a short duration.".to_string(),
+            ],
+            ActiveSkill::Rapidfire => vec![
+                "Concentrate deeply. Enemies around ".to_string(),
+                "you move 50% slower briefly. Gain".to_string(),
+                format!("{}% attack speed and unlimited", skill_power * 80.0),
+                "ammo for the duration.".to_string(),
+            ],
+            ActiveSkill::PiercingStar => vec![
+                "Throw a large, piercing throwing".to_string(),
+                "star that travels in a line, dealing".to_string(),
+                format!("{}% damage.", skill_power * 100.0),
+            ],
+            ActiveSkill::TripleThrow => vec![
+                "Throw three small throwing stars".to_string(),
+                "in a cone shape in front, dealing".to_string(),
+                format!("{}% damage each.", skill_power * 100.0),
+            ],
+            ActiveSkill::Fury => vec![
+                "Enter fury for a short duration,".to_string(),
+                "throwing kunai rapidly at enemies".to_string(),
+                format!("around you, dealing {}% damage.", skill_power * 100.0),
+                "Kunai count scales with attack speed.".to_string(),
+            ],
+            ActiveSkill::LaserBeam => vec![
+                "Channel a powerful laser beam that deals".to_string(),
+                format!(
+                    "{}% damage rapidly to enemies in front.",
+                    skill_power * 100.0
+                ),
             ],
         }
     }

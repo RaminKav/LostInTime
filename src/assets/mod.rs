@@ -37,7 +37,7 @@ use crate::player::{
 };
 use crate::status_effects::StatusEffect;
 use crate::ui::{BlacksmithMerchant, UIElement};
-use crate::world::portal::Portal;
+use crate::world::portal::{Portal, UIPortal};
 use crate::{datafiles, GameState, ImageAssets};
 
 pub struct GameAssetsPlugin;
@@ -90,7 +90,10 @@ pub struct ClassData {
 #[derive(Clone, Debug, Deserialize)]
 pub struct PetData {
     pub name: String,
-    pub description: Vec<String>,
+    pub skill_description: Vec<String>,
+    pub skill_name: String,
+    // pub passive_name: String,
+    pub passive_description: Vec<String>,
     pub pet_icon: UIElement,
     pub skill_icon: UIElement,
 }
@@ -154,6 +157,7 @@ impl Plugin for GameAssetsPlugin {
                 active_skill_shrine: None,
                 heirloom_shrine_anim: None,
                 portal_ase: None,
+                ui_portal_ase: None,
                 class_pet_data: None,
                 ice_explosion_ase: None,
                 stone_pillar_ase: None,
@@ -225,6 +229,7 @@ pub struct Graphics {
     pub active_skill_shrine: Option<Handle<Aseprite>>,
     pub heirloom_shrine_anim: Option<Handle<Aseprite>>,
     pub portal_ase: Option<Handle<Aseprite>>,
+    pub ui_portal_ase: Option<Handle<Aseprite>>,
     pub class_pet_data: Option<ClassPetData>,
     pub ice_explosion_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
@@ -559,6 +564,7 @@ impl GameAssetsPlugin {
             heirloom_shrine_anim: Some(asset_server.load(HeirloomMerchantSprite::PATH)),
             ice_explosion_ase: Some(asset_server.load(IceExplosion::PATH)),
             portal_ase: Some(asset_server.load(Portal::PATH)),
+            ui_portal_ase: Some(asset_server.load(UIPortal::PATH)),
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
             class_pet_data: Some(class_pet_data.clone()),
         };

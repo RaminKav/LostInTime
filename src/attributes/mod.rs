@@ -914,6 +914,7 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
 }}
 
 #[derive(
+    Display,
     Component,
     Reflect,
     FromReflect,

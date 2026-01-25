@@ -32,6 +32,7 @@ pub fn setup_active_skill_shrine_ui(
     asset_server: Res<AssetServer>,
     shrine_selection: Res<ActiveSkillShrineSelection>,
     res: Res<ScreenResolution>,
+    skills: Query<&PlayerSkills>,
 ) {
     let skill_choice = &shrine_selection.skill_choice;
     let t_offset = Vec2::new(4., 4.);
@@ -78,7 +79,7 @@ pub fn setup_active_skill_shrine_ui(
         0.8,
         9.,
     );
-
+    let skills = skills.single();
     // Spawn the single active skill choice
     spawn_active_skill_shrine_choice(
         &graphics,
@@ -86,6 +87,7 @@ pub fn setup_active_skill_shrine_ui(
         &asset_server,
         skill_choice.clone(),
         t_offset,
+        skills.skill_power_multiplier(),
     );
 }
 
@@ -95,6 +97,7 @@ fn spawn_active_skill_shrine_choice(
     asset_server: &AssetServer,
     choice: ActiveSkillChoiceState,
     t_offset: Vec2,
+    skill_power_multiplier: f32,
 ) {
     let size = SKILLS_CHOICE_UI_SIZE;
     let translation = Vec2::new(0.1, 0.);
@@ -170,7 +173,12 @@ fn spawn_active_skill_shrine_choice(
     text_title.set_parent(skills_e);
 
     // Description text
-    for (j, desc) in choice.active_skill.get_desc().iter().enumerate() {
+    for (j, desc) in choice
+        .active_skill
+        .get_desc(skill_power_multiplier)
+        .iter()
+        .enumerate()
+    {
         let mut text_desc = commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -442,7 +450,12 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         text_title.set_parent(skills_e);
 
         // Description text
-        for (j, desc) in choice.active_skill.get_desc().iter().enumerate() {
+        for (j, desc) in choice
+            .active_skill
+            .get_desc(skills.skill_power_multiplier())
+            .iter()
+            .enumerate()
+        {
             let mut text_desc = commands.spawn((
                 Text2dBundle {
                     text: Text::from_section(

@@ -3,10 +3,10 @@
         Warrior: (
             name: "Warrior",
             weapon_description: [
-                "Melee weapons:\n\nSword, Spear, Hammer"
+                "Sword"
             ],
             stat_description: [
-                "+5 Health per Level."
+                "Gain +5 Health per level"
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
@@ -16,10 +16,10 @@
         Wizard: (
             name: "Wizard",
             weapon_description: [
-                "Magic weapons:\n\nFire, Ice, Basic Staff"
+                "Fire Staff"
             ],
             stat_description: [
-                "+5 Mana per Level."
+                "Gain +5 Mana per level"
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
@@ -29,10 +29,10 @@
         Rogue: (
             name: "Rogue",
             weapon_description: [
-                "Close range multi\n\nstrike dagger attack."
+                "Daggers"
             ],
             stat_description: [
-                "+3% Crit Chance per\n\nLevel."
+                "Gain +3% Crit Chance per level"
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritChanceIcon,
@@ -42,10 +42,10 @@
         Thief: (
             name: "Thief",
             weapon_description: [
-                "Fast claw attacks\n\nwith throwing stars."
+                "Claw"
             ],
             stat_description: [
-                "+3% Attack Speed per\n\nLevel."
+                "Gain +3% Attack Speed per level"
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
@@ -55,10 +55,10 @@
         Hunter: (
             name: "Hunter",
             weapon_description: [
-                "Ranged weapons:\n\nBow, Gun"
+                "Bow"
             ],
             stat_description: [
-                "+3% Crit Damage per\n\nLevel."
+                "Gain +3% Crit Damage per level"
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,
@@ -69,17 +69,22 @@
     pets: {
         Slime: (
             name: "Slime",
-            description: [
-                "Periodically covers you\n\nin slime, protecting you\n\nfrom damage."
+            skill_description: [
+                "Periodically covers you\nin slime, protecting you\nfrom damage."
             ],
+            skill_name: "Slime Shield",
             pet_icon: SlimePetIcon,
+            passive_description: ["Gain +1 Defence per\nlevel"],
             skill_icon: SlimeShieldIcon,
+
         ),
         Fairy: (
             name: "Fairy", 
-            description: [
-                "Heals you every once\n\nin a while."
+            skill_description: [
+                "Heals you every once\nin a while."
             ],
+            skill_name: "Healing Touch",
+            passive_description: ["Gain +1 Health Regen\nper level"],
             pet_icon: FairyPetIcon,
             skill_icon: HPRegenCooldownIcon,
         ),
