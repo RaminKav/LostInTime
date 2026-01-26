@@ -412,40 +412,51 @@ impl ItemAttributes {
     pub fn get_stats_summary(&self, curr_health: i32, curr_mana: i32) -> Vec<(String, String)> {
         let mut tooltips: Vec<(String, String)> = vec![];
         tooltips.push((
-            "Health:          ".to_string(),
+            "Health          ".to_string(),
             format!("{}/{}", curr_health, self.health),
         ));
         tooltips.push((
-            "Mana:          ".to_string(),
+            "Mana          ".to_string(),
             format!("{}/{}", curr_mana, self.mana),
         ));
         tooltips.push((
-            "Attack:             ".to_string(),
+            "Attack             ".to_string(),
             format!(
                 "{}",
                 f32::floor(self.attack.value as f32 * (1. + self.bonus_damage.value as f32 / 100.))
             ),
         ));
-        tooltips.push(("Defence:        ".to_string(), format!("{}", self.defence)));
+        tooltips.push(("Defence        ".to_string(), format!("{}", self.defence)));
         tooltips.push((
-            "Crit Chance:     ".to_string(),
+            "Crit Chance     ".to_string(),
             format!("{}", self.crit_chance),
         ));
         tooltips.push((
-            "Crit Damage:   ".to_string(),
+            "Crit Damage   ".to_string(),
             format!("{}", self.crit_damage),
         ));
         tooltips.push((
-            "Health Regen:  ".to_string(),
+            "Health Regen  ".to_string(),
             format!("{}", self.health_regen),
         ));
-        tooltips.push(("Healing:         ".to_string(), format!("{}", self.healing)));
-        tooltips.push(("Thorns:           ".to_string(), format!("{}", self.thorns)));
-        tooltips.push(("Dodge:            ".to_string(), format!("{}", self.dodge)));
-        tooltips.push(("Speed:          ".to_string(), format!("{}", self.speed)));
+        tooltips.push(("Healing         ".to_string(), format!("{}", self.healing)));
+        tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
+        tooltips.push(("Dodge            ".to_string(), format!("{}", self.dodge)));
+        tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));
 
-        tooltips.push(("XP: ".to_string(), format!("{}", self.xp_rate)));
-        tooltips.push(("Luck: ".to_string(), format!("{}", self.loot_rate)));
+        tooltips.push(("Size           ".to_string(), format!("{}", self.size)));
+        tooltips.push(("Shield           ".to_string(), format!("{}", self.shield)));
+        tooltips.push((
+            "Attack Speed           ".to_string(),
+            format!("{}", self.attack_speed),
+        ));
+        tooltips.push((
+            "Lifesteal           ".to_string(),
+            format!("{}", self.lifesteal),
+        ));
+
+        tooltips.push(("XP ".to_string(), format!("{}", self.xp_rate)));
+        tooltips.push(("Luck ".to_string(), format!("{}", self.loot_rate)));
 
         tooltips
     }

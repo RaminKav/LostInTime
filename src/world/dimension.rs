@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     attributes::AttributeChangeEvent,
-    enemy::Mob,
+    enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop},
     night::NightTracker,
     player::{MovePlayerEvent, Player},
@@ -162,6 +162,7 @@ impl DimensionPlugin {
         mut chaos_tracker: ResMut<crate::chaos::ChaosTracker>,
         mut era_timer: ResMut<crate::night::EraTimer>,
         mut infinite_mode: ResMut<crate::night::InfiniteMode>,
+        mut mob_spawning_paused: ResMut<MobSpawningPaused>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -221,6 +222,7 @@ impl DimensionPlugin {
                         crate::night::reset_era_timer_and_infinite_mode(
                             &mut era_timer,
                             &mut infinite_mode,
+                            &mut mob_spawning_paused,
                         );
                     } else {
                         info!("Returning from dungeon to {:?}, keeping era timer", new_era);

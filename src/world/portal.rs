@@ -1,5 +1,6 @@
 use crate::combat::EnemyDeathEvent;
-use crate::enemy::Mob;
+use crate::enemy::{spawner::MobSpawningPaused, Mob};
+use crate::night::EraTimer;
 use crate::player::Player;
 use crate::world::dimension::{Era, EraManager};
 use bevy::prelude::*;
@@ -57,6 +58,8 @@ pub fn track_boss_kills(
     mob_query: Query<&Mob>,
     era_manager: Res<EraManager>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
+    era_timer: Res<EraTimer>,
+    mut mob_spawning_paused: ResMut<MobSpawningPaused>,
 ) {
     for death_event in death_events.iter() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
@@ -66,10 +69,22 @@ pub fn track_boss_kills(
                 // Mark the current era's boss as killed
                 boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
                 info!("Boss killed in era {:?}", era_manager.current_era);
+
+                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
+                    && era_timer.remaining_seconds > 0.0
+                {
+                    mob_spawning_paused.paused = true;
+                }
             } else if mob.is_boss() && mob != &Mob::StoneGolem {
                 // Other bosses (for future eras) still count
                 boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
                 info!("Boss killed in era {:?}", era_manager.current_era);
+
+                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
+                    && era_timer.remaining_seconds > 0.0
+                {
+                    mob_spawning_paused.paused = true;
+                }
             }
         }
     }

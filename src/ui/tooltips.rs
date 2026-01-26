@@ -321,7 +321,7 @@ pub fn handle_spawn_inv_item_tooltip(
             } else {
                 Vec3::new(
                     -size.x / 2. + 8. + if item.is_recipe { 4. } else { 0. },
-                    size.y / 2. - 14. - (i as f32 * 10.) - props.offset,
+                    size.y / 2. - 14. - (i as f32 * 12.) - props.offset,
                     1.,
                 )
             };
@@ -335,8 +335,8 @@ pub fn handle_spawn_inv_item_tooltip(
                             text: Text::from_section(
                                 t,
                                 TextStyle {
-                                    font: asset_server.load("fonts/4x5.ttf"),
-                                    font_size: 5.0,
+                                    font: asset_server.load("fonts/slkscr.ttf"),
+                                    font_size: 8.4,
                                     color: if i == 0 {
                                         item.item_stack.rarity.get_color()
                                     } else if j == 1 {
@@ -685,27 +685,28 @@ pub fn handle_spawn_inv_player_stats(
         for (_i, a) in attributes.iter().enumerate().clone() {
             tooltip_text.push(((a.0.clone(), a.1.clone()), 0.));
         }
-        let total_tooltips = tooltip_text.len();
         for (i, (text, d)) in tooltip_text.iter().enumerate() {
             let text_pos = if i == 0 {
                 Vec3::new(
-                    -(f32::ceil((text.0.chars().count() * 5 - 1) as f32 / 2.)) + 0.5,
+                    -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
                     TOOLTIP_UI_SIZE.y / 2. - 12.,
                     1.,
                 )
-            } else if i == total_tooltips - 1 {
-                Vec3::new(
-                    -TOOLTIP_UI_SIZE.x / 2. + 46.,
-                    TOOLTIP_UI_SIZE.y / 2. - 12. - ((i as f32 - 1.) * 8.) - d - 2.,
-                    1.,
-                )
-            } else if i == total_tooltips - 2 {
-                Vec3::new(
-                    -TOOLTIP_UI_SIZE.x / 2. + 8.,
-                    TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
-                    1.,
-                )
-            } else {
+            }
+            // else if i == total_tooltips - 1 {
+            //     Vec3::new(
+            //         -TOOLTIP_UI_SIZE.x / 2. + 46.,
+            //         TOOLTIP_UI_SIZE.y / 2. - 12. - ((i as f32 - 1.) * 8.) - d - 2.,
+            //         1.,
+            //     )
+            // } else if i == total_tooltips - 2 {
+            //     Vec3::new(
+            //         -TOOLTIP_UI_SIZE.x / 2. + 8.,
+            //         TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
+            //         1.,
+            //     )
+            // }
+            else {
                 Vec3::new(
                     -TOOLTIP_UI_SIZE.x / 2. + 8.,
                     TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
@@ -719,8 +720,12 @@ pub fn handle_spawn_inv_player_stats(
                         text: Text::from_section(
                             text.0.to_string(),
                             TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
+                                font: if i == 0 {
+                                    asset_server.load("fonts/slkscrbold.ttf")
+                                } else {
+                                    asset_server.load("fonts/slkscr.ttf")
+                                },
+                                font_size: 8.4,
                                 color: if i == 0 { BLACK } else { GREY },
                             },
                         ),
@@ -743,25 +748,14 @@ pub fn handle_spawn_inv_player_stats(
                         text: Text::from_section(
                             text.1.to_string(),
                             TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 5.0,
+                                font: asset_server.load("fonts/slkscr.ttf"),
+                                font_size: 8.4,
                                 color: LIGHT_RED,
                             },
                         ),
                         text_anchor: Anchor::CenterRight,
                         transform: Transform {
-                            translation: text_pos
-                                + Vec3::new(
-                                    if i == total_tooltips - 2 {
-                                        20.
-                                    } else if i == total_tooltips - 1 {
-                                        39.
-                                    } else {
-                                        TOOLTIP_UI_SIZE.x - 16.
-                                    },
-                                    0.,
-                                    0.,
-                                ),
+                            translation: text_pos + Vec3::new(TOOLTIP_UI_SIZE.x - 16., 0., 0.),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },

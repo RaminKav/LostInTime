@@ -469,8 +469,8 @@ pub fn spawn_text(
             text: Text::from_section(
                 text,
                 TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0 * font_scale,
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.4 * font_scale,
                     color,
                 },
             ),

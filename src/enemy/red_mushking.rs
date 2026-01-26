@@ -1,9 +1,9 @@
 use crate::{
     custom_commands::CommandsExt,
-    enemy::spawn_helpers::can_spawn_mob_here,
+    enemy::{spawn_helpers::can_spawn_mob_here, spawner::MobSpawningPaused},
     item::{LootTable, WorldObject},
     juice::ShakeEffect,
-    night::InfiniteModeStartedEvent,
+    night::{EraTimer, InfiniteModeStartedEvent},
     player::levels::ExperienceReward,
     world::{
         dimension::{Era, EraManager},
@@ -509,6 +509,8 @@ pub fn handle_death(
     era_manager: Res<EraManager>,
     mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
     mut boss_kill_tracker: ResMut<BossKillTracker>,
+    era_timer: Res<EraTimer>,
+    mut mob_spawning_paused: ResMut<MobSpawningPaused>,
 ) {
     for (entity, mut anim, mob) in death.iter_mut() {
         // Only handle RedMushking death animations
@@ -534,6 +536,12 @@ pub fn handle_death(
                 // Mark the current era's boss as killed
                 boss_kill_tracker.mark_boss_killed(era_manager.current_era.clone());
                 info!("Boss killed in era {:?}", era_manager.current_era);
+
+                if (era_manager.current_era == Era::Main || era_manager.current_era == Era::Second)
+                    && era_timer.remaining_seconds > 0.0
+                {
+                    mob_spawning_paused.paused = true;
+                }
             }
             commands.entity(entity).despawn_recursive();
         }

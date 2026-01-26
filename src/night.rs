@@ -6,6 +6,7 @@ use crate::{
     chaos::ChaosTracker,
     client::is_not_paused,
     colors::{overwrite_alpha, NIGHT},
+    enemy::spawner::MobSpawningPaused,
     run_once_per_run,
     world::dimension::EraManager,
     GameState, ScreenResolution, GAME_HEIGHT,
@@ -454,11 +455,17 @@ pub fn handle_era_timer_expired(
     mut events: EventReader<EraTimerExpiredEvent>,
     mut infinite_mode_event: EventWriter<InfiniteModeStartedEvent>,
     infinite_mode: Res<InfiniteMode>,
+    mut mob_spawning_paused: ResMut<crate::enemy::spawner::MobSpawningPaused>,
 ) {
     for _ in events.iter() {
         if !infinite_mode.active {
             info!("ERA TIMER EXPIRED! Entering infinite mode!");
             infinite_mode_event.send_default();
+        }
+        // Resume mob spawning when timer expires
+        if mob_spawning_paused.paused {
+            info!("Era timer expired - resuming mob spawning");
+            mob_spawning_paused.paused = false;
         }
     }
 }
@@ -467,10 +474,10 @@ pub fn handle_era_timer_expired(
 pub fn reset_era_timer_and_infinite_mode(
     era_timer: &mut EraTimer,
     infinite_mode: &mut InfiniteMode,
+    mob_spawning_paused: &mut MobSpawningPaused,
 ) {
     era_timer.reset();
 
-    // Also reset infinite mode when entering a new era
     infinite_mode.active = false;
     infinite_mode.difficulty_level = 0;
     infinite_mode.chaos_timer = Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating);
@@ -478,6 +485,11 @@ pub fn reset_era_timer_and_infinite_mode(
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
     infinite_mode.chaos_bonus = 0.0;
     infinite_mode.elapsed_seconds = 0.0;
+
+    if mob_spawning_paused.paused {
+        info!("Era changed - resuming mob spawning");
+        mob_spawning_paused.paused = false;
+    }
 
     info!(
         "Era timer reset to {:02}:{:02}, infinite mode deactivated",
@@ -490,6 +502,7 @@ pub fn reset_era_timer_and_infinite_mode(
 fn reset_era_timer_on_new_run(
     mut era_timer: ResMut<EraTimer>,
     mut infinite_mode: ResMut<InfiniteMode>,
+    mut mob_spawning_paused: ResMut<MobSpawningPaused>,
 ) {
     // Reset era timer to full 12 minutes
     era_timer.reset();
@@ -502,6 +515,9 @@ fn reset_era_timer_on_new_run(
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
     infinite_mode.chaos_bonus = 0.0;
     infinite_mode.elapsed_seconds = 0.0;
+
+    // Reset mob spawning paused state
+    mob_spawning_paused.paused = false;
 
     info!("Era timer and infinite mode reset for new run");
 }

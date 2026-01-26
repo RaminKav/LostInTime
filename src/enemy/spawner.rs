@@ -22,10 +22,18 @@ use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
 
 pub const BASE_MAX_MOBS_TOTAL: i32 = 60;
 pub const ELITE_SPAWN_RATE: f32 = 0.06;
+
+/// Resource to track if mob spawning should be paused (e.g., after boss defeat with time remaining)
+#[derive(Resource, Default, Debug)]
+pub struct MobSpawningPaused {
+    pub paused: bool,
+}
+
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MobSpawnEvent>()
+            .init_resource::<MobSpawningPaused>()
             .add_systems(
                 (
                     handle_spawn_mobs,
@@ -168,8 +176,12 @@ fn handle_spawn_mobs(
     mut spawners: ResMut<GlobalSpawners>,
     maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
     infinite_mode: Res<InfiniteMode>,
+    mob_spawning_paused: Res<MobSpawningPaused>,
 ) {
     if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
+    if mob_spawning_paused.paused {
         return;
     }
     'outer: for e in spawner_trigger_event.iter() {
@@ -326,9 +338,13 @@ fn tick_spawner_timers(
     mut spawn_event: EventWriter<MobSpawnEvent>,
     mobs: Query<&Mob>,
     chaos_tracker: Res<ChaosTracker>,
+    mob_spawning_paused: Res<MobSpawningPaused>,
 ) {
     if !spawners.initial_spawn_delay.finished() {
         spawners.initial_spawn_delay.tick(time.delta());
+        return;
+    }
+    if mob_spawning_paused.paused {
         return;
     }
     // for each spawned chunk, check if mob count is < max
