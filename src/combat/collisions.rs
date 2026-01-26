@@ -781,6 +781,10 @@ pub fn check_object_trigger_collisions(
     items_query: Query<&TouchTriggerObjectAction>,
     game: GameParam,
     mut item_action_param: ItemActionParam,
+    mut flower_anim_query: Query<
+        &mut bevy_aseprite::anim::AsepriteAnimation,
+        (With<WorldObject>, Without<Player>),
+    >,
 ) {
     if !game.player().is_moving {
         return;
@@ -794,6 +798,13 @@ pub fn check_object_trigger_collisions(
                 continue;
             }
             let action = items_query.get(e2).unwrap();
+
+            if matches!(action, TouchTriggerObjectAction::Bounce) {
+                if let Ok(mut anim) = flower_anim_query.get_mut(e2) {
+                    anim.play();
+                }
+            }
+
             action.run_action(e2, &mut commands, &mut item_action_param);
         }
     }

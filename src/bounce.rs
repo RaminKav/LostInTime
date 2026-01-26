@@ -1,11 +1,12 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::{
     attributes::{hunger::Hunger, Speed},
     audio::{AudioSoundEffect, SoundSpawner},
     inputs::MovementVector,
-    item::Equipment,
+    item::{Equipment, WorldObject},
     player::Player,
     world::chunk::Chunk,
     GameParam, MainCamera, PLAYER_MOVE_SPEED,
@@ -289,6 +290,52 @@ pub fn bounce_player(
                 ))
                 .set_parent(player_e);
             commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+        }
+    }
+}
+
+aseprite!(pub PinkFlowerAseprite, "textures/pinkflower.ase");
+
+/// System to spawn Aseprite animation for pink flowers when they're created
+pub fn spawn_pink_flower_aseprite(
+    mut commands: Commands,
+    graphics: Res<crate::assets::Graphics>,
+    pink_flowers: Query<(Entity, &Transform, &WorldObject), Added<WorldObject>>,
+) {
+    for (entity, transform, world_obj) in pink_flowers.iter() {
+        if world_obj == &WorldObject::PinkFlower {
+            let mut animation = AsepriteAnimation::from(PinkFlowerAseprite::tags::BOUNCE);
+            animation.pause();
+
+            let Some(mut entity_commands) = commands.get_entity(entity) else {
+                continue;
+            };
+
+            entity_commands.insert(AsepriteBundle {
+                aseprite: graphics.pink_flower_ase.as_ref().unwrap().clone(),
+                animation,
+                transform: *transform,
+                ..Default::default()
+            });
+        }
+    }
+}
+
+pub fn handle_pink_flower_animation_loop(
+    mut flower_query: Query<
+        (&mut AsepriteAnimation, &WorldObject),
+        (Without<Player>, With<WorldObject>),
+    >,
+) {
+    for (mut anim, world_obj) in flower_query.iter_mut() {
+        if world_obj == &WorldObject::PinkFlower {
+            if !anim.is_paused() {
+                let current_frame = anim.current_frame();
+                if current_frame == 12 {
+                    anim.pause();
+                    anim.current_frame = 0;
+                }
+            }
         }
     }
 }

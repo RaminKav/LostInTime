@@ -29,7 +29,6 @@ pub enum Tip {
     EndlessMode,
     PeacefulPeriod,
     Night,
-    PinkFlowers,
 }
 
 impl Tip {
@@ -45,7 +44,6 @@ impl Tip {
             Tip::EndlessMode => "Pay attention to the timer.\nDefeat the era boss and return\nto the portal before it runs\nout. If time runs out, the chaos\nwill overcome you...",
             Tip::PeacefulPeriod => "Time left over after defeating\nan era boss grants a peaceful\nperiod, where mobs will not\nspawn! Explore, gather\nresources, get stronger, and\nprepare for the next era!",
             Tip::Night => "Night time on the island is\ndangerous! Mob swarms will\nspawn, so make sure to be\nprepared!",
-            Tip::PinkFlowers => "Pink flowers will bounce you\nin the direction you are moving\nin! Use them to traverse the\nisland quickly.",
         }
     }
 }

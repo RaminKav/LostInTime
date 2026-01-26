@@ -35,6 +35,7 @@ use crate::world::world_helpers::{
 };
 use crate::world::{TileMapPosition, CHUNK_SIZE};
 use crate::{custom_commands::CommandsExt, player::Limb, CustomFlush, GameParam, GameState};
+use crate::{handle_pink_flower_animation_loop, spawn_pink_flower_aseprite};
 use active_skill_shrine::{
     add_active_skill_shrine_visuals_on_spawn, handle_active_skill_shrine_completion,
     handle_active_skill_shrine_esc,
@@ -1007,6 +1008,13 @@ impl Plugin for ItemsPlugin {
             .add_system(
                 tick_reload
                     .run_if(is_not_paused)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    spawn_pink_flower_aseprite,
+                    handle_pink_flower_animation_loop,
+                )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(

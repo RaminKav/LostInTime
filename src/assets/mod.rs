@@ -13,6 +13,7 @@ use serde::Deserialize;
 use strum::IntoEnumIterator;
 
 use crate::attributes::ItemGlow;
+use crate::bounce::PinkFlowerAseprite;
 use crate::client::GameData;
 use crate::enemy::Mob;
 use crate::item::active_skill_shrine::ActiveSkillSprite;
@@ -160,6 +161,7 @@ impl Plugin for GameAssetsPlugin {
                 class_pet_data: None,
                 ice_explosion_ase: None,
                 stone_pillar_ase: None,
+                pink_flower_ase: None,
             })
             .add_system(
                 Self::update_graphics
@@ -232,6 +234,7 @@ pub struct Graphics {
     pub class_pet_data: Option<ClassPetData>,
     pub ice_explosion_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
+    pub pink_flower_ase: Option<Handle<Aseprite>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -551,7 +554,6 @@ impl GameAssetsPlugin {
             texture_atlas: Some(atlas_handle),
             wall_texture_atlas: Some(wall_atlas_handle),
             spritesheet_map: Some(spritesheet_map),
-
             ui_image_handles: Some(ui_image_handles),
             icons: Some(icon_map),
             mob_spritesheets: Some(mob_spritesheets),
@@ -572,6 +574,7 @@ impl GameAssetsPlugin {
             portal_ase: Some(asset_server.load(Portal::PATH)),
             ui_portal_ase: Some(asset_server.load(UIPortal::PATH)),
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
+            pink_flower_ase: Some(asset_server.load(PinkFlowerAseprite::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
         };
     }

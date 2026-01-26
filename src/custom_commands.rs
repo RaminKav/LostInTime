@@ -305,6 +305,7 @@ impl<'w, 's> CommandsExt<'w, 's> for ProtoCommands<'w, 's> {
                 if let Some(obj_type) = proto_param.get_component::<WorldObject, _>(obj.clone()) {
                     if obj_type != &WorldObject::CombatShrine
                         && obj_type != &WorldObject::CombatShrineDone
+                        && obj_type != &WorldObject::PinkFlower
                     {
                         if let Some(sprite) = sprite_map.get(obj_type) {
                             spawned_entity_commands
