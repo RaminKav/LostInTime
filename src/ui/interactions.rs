@@ -169,6 +169,7 @@ pub enum UIElement {
     MinimapStarIcon,
     MinimapSkullIcon,
     MinimapPortalIcon,
+    TipBox,
 }
 impl UIElement {
     pub fn get_hover_state(&self) -> Option<UIElement> {

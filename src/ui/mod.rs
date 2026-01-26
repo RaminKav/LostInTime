@@ -12,6 +12,8 @@ use class_selection::{ClassUnlockConfirmState, ClassUnlockHoverState};
 use guide_hud::*;
 use item_chest::*;
 pub mod ui_container_param;
+pub mod tips;
+use tips::*;
 use bevy::sprite::Material2dPlugin;
 use damage_numbers::FloatingTextQueue;
 use scrapper_ui::{
@@ -141,6 +143,7 @@ impl Plugin for UIPlugin {
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
+            .add_plugin(TipPlugin)
             .add_system(setup_loading_screen.in_schedule(OnEnter(GameState::Initializing)))
             .add_system(
                 check_initialization_complete
@@ -586,6 +589,7 @@ pub fn handle_new_ui_state(
     scrapper_option: Option<Res<ScrapperContainer>>,
     furnace_option: Option<Res<FurnaceContainer>>,
     mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
+    tip_boxes: Query<Entity, With<tips::TipBox>>,
 ) {
     if next_ui_state.0.is_none() {
         return;
@@ -653,7 +657,9 @@ pub fn handle_new_ui_state(
         }
     }
     info!("{:?}", next_ui);
-    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed {
+    let has_tip_boxes = !tip_boxes.is_empty();
+    
+    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed || has_tip_boxes {
         next_client_state.set(ClientState::Paused);
     } else {
         next_client_state.set(ClientState::Unpaused);

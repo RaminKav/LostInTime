@@ -12,10 +12,9 @@ use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 
-use crate::attributes::{add_item_glows, ItemGlow};
+use crate::attributes::ItemGlow;
 use crate::client::GameData;
 use crate::enemy::Mob;
-use crate::inventory::ItemStack;
 use crate::item::active_skill_shrine::ActiveSkillSprite;
 use crate::item::combat_shrine::CombatShrineAnim;
 use crate::item::dungeon_shrine::AccessoryShrineAnim;
@@ -24,8 +23,7 @@ use crate::item::dungeon_shrine::WeaponShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::heirloom_shrine::HeirloomMerchantSprite;
 use crate::item::{
-    Equipment, FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, Wall, WorldObject,
-    WorldObjectResource,
+    FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
 use crate::pets::state::Pet;
 use crate::player::mage_skills::IceExplosion;
@@ -36,6 +34,7 @@ use crate::player::{
     TimeFragmentCurrency, UnlockUpgrades, UnlockedClasses,
 };
 use crate::status_effects::StatusEffect;
+use crate::ui::tips::SeenTips;
 use crate::ui::{BlacksmithMerchant, UIElement};
 use crate::world::portal::{Portal, UIPortal};
 use crate::{datafiles, GameState, ImageAssets};
@@ -380,6 +379,8 @@ impl GameAssetsPlugin {
                     let unlock_upgrades = game_data.unlock_upgrades.clone();
                     let unlocked_classes_vec = game_data.unlocked_classes.clone();
                     let time_fragments = game_data.time_fragments;
+                    let seen_tips_set = game_data.seen_tips.clone();
+
                     commands.insert_resource(class_ranks);
                     commands.insert_resource(high_scores);
                     commands.insert_resource(achievements);
@@ -394,6 +395,9 @@ impl GameAssetsPlugin {
                         0,
                         time_fragments,
                     ));
+                    commands.insert_resource(SeenTips {
+                        seen: seen_tips_set,
+                    });
                 }
                 Err(err) => {
                     error!("Failed to load class ranks from game_data.json: {err:?}");
@@ -404,6 +408,7 @@ impl GameAssetsPlugin {
                     commands.insert_resource(unlocked);
                     commands.insert_resource(Achievements::default());
                     commands.insert_resource(TimeFragmentCurrency::default());
+                    commands.insert_resource(SeenTips::default());
                 }
             }
         } else {
@@ -414,6 +419,7 @@ impl GameAssetsPlugin {
             commands.insert_resource(unlocked);
             commands.insert_resource(Achievements::default());
             commands.insert_resource(TimeFragmentCurrency::default());
+            commands.insert_resource(SeenTips::default());
         }
         commands.insert_resource(CoinCurrency::default());
         let sprite_desc_handle: Handle<GraphicsDesc> = sprite_sheet.sprite_desc.clone();

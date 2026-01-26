@@ -45,7 +45,10 @@ use crate::{
         unlocks::{UnlockUpgrades, UnlockedClasses},
         Player,
     },
-    ui::{ChestContainer, FurnaceContainer},
+    ui::{
+        tips::{SeenTips, Tip},
+        ChestContainer, FurnaceContainer,
+    },
     vectorize::{vectorize, vectorize_inner},
     world::{
         chunk::{Chunk, ReflectedPos, TileEntityCollection, TileSpriteData},
@@ -228,6 +231,8 @@ pub struct GameData {
     pub player_name: Option<String>,
     #[serde(default)]
     pub bounce_tracker: crate::player::achievements::BounceAchievementTracker,
+    #[serde(default)]
+    pub seen_tips: std::collections::HashSet<Tip>,
 }
 pub fn handle_append_run_data_after_death(
     night: Res<NightTracker>,
@@ -661,8 +666,12 @@ pub fn load_game_data_for_ui(mut commands: Commands) {
             Ok(game_data) => {
                 // Insert bounce tracker as a resource
                 commands.insert_resource(game_data.bounce_tracker.clone());
+                let seen_tips_set = game_data.seen_tips.clone();
                 // Insert GameData as a resource so achievements UI can access cumulative_analytics
                 commands.insert_resource(game_data);
+                commands.insert_resource(SeenTips {
+                    seen: seen_tips_set,
+                });
             }
             Err(_) => {
                 // Insert default GameData if file can't be read

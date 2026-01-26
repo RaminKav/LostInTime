@@ -17,8 +17,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LIGHT_GREEN, ORANGE, RED, SHIELD_BLUE, WHITE,
-        YELLOW,
+        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, ORANGE, RED,
+        SHIELD_BLUE, WHITE, YELLOW,
     },
     inventory::{Inventory, ItemStack},
     item::WorldObject,
@@ -286,11 +286,11 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
 
 pub fn setup_xp_bar_ui(
     mut commands: Commands,
-    graphics: Res<Graphics>,
+    _graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     res: Res<ScreenResolution>,
 ) {
-    let inner_xp_prog = commands
+    let _inner_xp_prog = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: LEVEL_BLUE,
@@ -314,6 +314,24 @@ pub fn setup_xp_bar_ui(
         .insert(XPBar)
         .insert(Name::new("inner xp bar"))
         .id();
+    let _inner_xp_bg = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: *LEVEL_DARK_BLUE.clone().set_a(0.85),
+                custom_size: Some(Vec2::new(res.game_width, 6.)), // Initialize to 0 width (0 XP at start)
+                anchor: Anchor::CenterLeft,
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 9.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("inner xp bar"))
+        .id();
     // let xp_bar_frame = commands
     //     .spawn(SpriteBundle {
     //         texture: graphics.get_ui_element_texture(UIElement::XPBarFrame),
@@ -332,7 +350,7 @@ pub fn setup_xp_bar_ui(
     //     .insert(Name::new("XP BAR"))
     //     .insert(RenderLayers::from_layers(&[3]))
     //     .id();
-    let text = commands
+    let _text = commands
         .spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -346,7 +364,7 @@ pub fn setup_xp_bar_ui(
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(
-                        res.game_width / 2. - 35.,
+                        res.game_width / 2. - 40.,
                         res.game_height / 2. - 10.5,
                         1.,
                     ),
@@ -568,7 +586,7 @@ pub fn setup_chaos_ui(
         .id();
 
     // Chaos bar background (empty bar frame)
-    let bar_bg = commands
+    let _bar_bg = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.2, 0.2, 0.2, 0.8),
