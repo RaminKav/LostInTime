@@ -19,10 +19,10 @@ pub struct ActiveSkillShrineState {
 
 use crate::player::skills::ActiveSkillChoiceState;
 
-/// Resource to hold the active skill choice from a shrine interaction
+/// Resource to hold the active skill choices from a shrine interaction
 #[derive(Resource, Clone, Debug)]
 pub struct ActiveSkillShrineSelection {
-    pub skill_choice: ActiveSkillChoiceState,
+    pub skill_choices: Vec<ActiveSkillChoiceState>,
     pub shrine_entity: Entity,
 }
 

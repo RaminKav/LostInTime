@@ -577,19 +577,19 @@ impl ActiveSkill {
 
     pub fn get_ui_element(&self, rarity: HeirloomRarity) -> UIElement {
         match rarity {
-            HeirloomRarity::Common => UIElement::SkillChoice,
-            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogue,
-            HeirloomRarity::Rare => UIElement::SkillChoiceMagic,
-            HeirloomRarity::Legendary => UIElement::SkillChoiceMelee,
+            HeirloomRarity::Common => UIElement::SkillTooltipBanner,
+            HeirloomRarity::Uncommon => UIElement::SkillTooltipBanner,
+            HeirloomRarity::Rare => UIElement::SkillTooltipBanner,
+            HeirloomRarity::Legendary => UIElement::SkillTooltipBanner,
         }
     }
 
     pub fn get_ui_element_hover(&self, rarity: HeirloomRarity) -> UIElement {
         match rarity {
-            HeirloomRarity::Common => UIElement::SkillChoiceHover,
-            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogueHover,
-            HeirloomRarity::Rare => UIElement::SkillChoiceMagicHover,
-            HeirloomRarity::Legendary => UIElement::SkillChoiceMeleeHover,
+            HeirloomRarity::Common => UIElement::SkillTooltipBannerHover,
+            HeirloomRarity::Uncommon => UIElement::SkillTooltipBannerHover,
+            HeirloomRarity::Rare => UIElement::SkillTooltipBannerHover,
+            HeirloomRarity::Legendary => UIElement::SkillTooltipBannerHover,
         }
     }
 }

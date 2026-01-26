@@ -6,6 +6,7 @@ use rand::Rng;
 use crate::{
     assets::Graphics,
     attributes::AttributeChangeEvent,
+    colors::DARK_WOOD_BROWN,
     custom_commands::CommandsExt,
     inventory::ItemStack,
     item::WorldObject,
@@ -45,8 +46,8 @@ pub fn reset_blacksmith_tracker(mut tracker: ResMut<BlacksmithPurchaseTracker>) 
 use super::skill_choice_ui::spawn_heirloom_tooltip_card;
 
 use super::{
-    spawn_item_stack_icon, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
-    ESSENCE_UI_SIZE,
+    main_menu::spawn_back_button, spawn_item_stack_icon, ui_helpers::spawn_ui_overlay,
+    Interactable, UIElement, UIState, ESSENCE_UI_SIZE,
 };
 
 #[derive(Component)]
@@ -161,6 +162,28 @@ pub fn setup_essence_ui(
         0.8,
         -1.,
     );
+    let _title_text = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    "Buy an Heirloom".to_string(),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 30.0,
+                        color: DARK_WOOD_BROWN,
+                    },
+                ),
+                transform: Transform {
+                    translation: Vec3::new(0., resolution.game_height / 2. - 60., 10.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIState::Essence,
+        ))
+        .id();
 
     let essence_ui_e = commands
         .spawn(SpriteBundle {
@@ -299,6 +322,18 @@ pub fn setup_essence_ui(
             commands.entity(time_fragment_cost).set_parent(essence_ui_e);
         }
     }
+
+    let back_button = spawn_back_button(
+        Vec3::new(
+            resolution.game_width / 2. - 55.,
+            -resolution.game_height / 2. + 38.,
+            11.,
+        ),
+        &mut commands,
+        &graphics,
+        &asset_server,
+    );
+    commands.entity(back_button).insert(UIState::Essence);
 
     commands.entity(essence_ui_e).push_children(&[overlay]);
 }

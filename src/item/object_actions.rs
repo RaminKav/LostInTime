@@ -441,17 +441,25 @@ impl ObjectAction {
                     })
                     .collect();
 
-                // Pick a random active skill
-                let chosen_active_skill = active_skills.iter().choose(&mut rng).unwrap();
+                let mut available_skills = active_skills;
+                let mut chosen_skills = Vec::new();
+                for _ in 0..2 {
+                    if available_skills.is_empty() {
+                        break;
+                    }
+                    let chosen = available_skills.iter().choose(&mut rng).unwrap().clone();
+                    chosen_skills.push(chosen.clone());
+                    available_skills.retain(|s| *s != chosen);
+                }
 
-                let skill_choice = ActiveSkillChoiceState::new(
-                    chosen_active_skill.clone(),
-                    HeirloomRarity::Common,
-                );
+                // Create skill choices
+                let skill_choices: Vec<ActiveSkillChoiceState> = chosen_skills
+                    .iter()
+                    .map(|skill| ActiveSkillChoiceState::new(skill.clone(), HeirloomRarity::Common))
+                    .collect();
 
-                // Create a resource with the skill choice and shrine entity
                 commands.insert_resource(ActiveSkillShrineSelection {
-                    skill_choice: skill_choice.clone(),
+                    skill_choices: skill_choices.clone(),
                     shrine_entity: e,
                 });
 
