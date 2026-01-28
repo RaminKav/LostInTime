@@ -4,7 +4,10 @@ use crate::{
     blessings::{Blessing, HeirloomStatsBonuses},
     chaos::ChaosTracker,
     player::Player,
-    ui::damage_numbers::spawn_floating_text_with_shadow,
+    ui::{
+        damage_numbers::spawn_floating_text_with_shadow,
+        tips::{SeenTips, Tip, TipEvent},
+    },
 };
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
@@ -967,6 +970,7 @@ pub fn handle_interaction_clicks(
     }
 }
 
+//TODO: need to refactor this to send event when heirloom is gained, split out functionality
 pub fn handle_cursor_skills_buttons(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
@@ -992,8 +996,8 @@ pub fn handle_cursor_skills_buttons(
     mut att_event: EventWriter<AttributeChangeEvent>,
     graphics: Res<Graphics>,
     mut shrine_query: Query<&mut HeirloomShrineState>,
-    mut chaos_tracker: ResMut<ChaosTracker>,
     asset_server: Res<AssetServer>,
+    mut tips_param: ParamSet<(EventWriter<TipEvent>, Res<SeenTips>, ResMut<ChaosTracker>)>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -1038,11 +1042,22 @@ pub fn handle_cursor_skills_buttons(
 
                             // Add chaos if ChaosBoost heirloom was picked
                             if picked_skill.heirloom == Heirloom::ChaosBoost {
-                                chaos_tracker.add_chaos(1.5);
+                                tips_param.p2().add_chaos(1.5);
                             }
                             // Add chaos if ChaosStats heirloom was picked (+2 chaos)
                             if picked_skill.heirloom == Heirloom::ChaosStats {
-                                chaos_tracker.add_chaos(2.0);
+                                tips_param.p2().add_chaos(2.0);
+                            }
+
+                            // Chaos tip: when gaining ChaosBoost or ChaosStats heirlooms
+                            if (picked_skill.heirloom == Heirloom::ChaosBoost
+                                || picked_skill.heirloom == Heirloom::ChaosStats)
+                                && !tips_param.p1().has_seen(&Tip::Chaos)
+                            {
+                                tips_param.p0().send(TipEvent {
+                                    tip: Tip::Chaos,
+                                    pos: Vec3::new(0., 0., 100.),
+                                });
                             }
 
                             for mut shrine in shrine_query.iter_mut() {

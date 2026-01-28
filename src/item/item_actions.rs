@@ -14,7 +14,10 @@ use crate::{
     player::{stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
     proto::proto_param::ProtoParam,
     ui::{
-        item_chest::ItemChestState, minimap::UpdateMiniMapEvent, scrapper_ui::ScrapperContainer,
+        item_chest::ItemChestState,
+        minimap::UpdateMiniMapEvent,
+        scrapper_ui::ScrapperContainer,
+        tips::{SeenTips, TipEvent},
         ChestContainer, FurnaceContainer, InventorySlotState, InventorySlotType, UIState,
     },
     world::{
@@ -167,6 +170,8 @@ pub struct ItemActionParam<'w, 's> {
     pub player_skills:
         Query<'w, 's, &'static crate::player::skills::PlayerSkills, With<crate::player::Player>>,
     pub infinite_mode: Res<'w, crate::night::InfiniteMode>,
+    pub tip_event: EventWriter<'w, TipEvent>,
+    pub seen_tips: Option<Res<'w, SeenTips>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,

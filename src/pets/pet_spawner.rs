@@ -4,10 +4,10 @@ use crate::player::achievements::{Achievement, AchievementUnlockedEvent};
 use crate::player::Player;
 use crate::ui::damage_numbers::spawn_floating_text_with_shadow;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
+use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::y_sort::YSort;
 use crate::GameParam;
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::Collider;
 
 pub fn handle_pet_spawner_interaction(
     mut commands: Commands,
@@ -25,6 +25,7 @@ pub fn handle_pet_spawner_interaction(
     mut item_action_param: ItemActionParam,
     key_input: Res<Input<KeyCode>>,
     asset_server: Res<AssetServer>,
+    seen_tips: Res<SeenTips>,
 ) {
     if !key_input.just_pressed(KeyCode::F) {
         return;
@@ -97,6 +98,13 @@ pub fn handle_pet_spawner_interaction(
                         crate::colors::DMG_NUM_GREEN,
                         format!("{:?} Pet Found!", pet_type),
                     );
+
+                    if !seen_tips.has_seen(&Tip::Pets) {
+                        item_action_param.tip_event.send(TipEvent {
+                            tip: Tip::Pets,
+                            pos: Vec3::new(0., 0., 100.),
+                        });
+                    }
                 }
             }
 

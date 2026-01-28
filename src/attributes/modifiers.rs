@@ -5,7 +5,10 @@ use crate::{
         skills::{Heirloom, PlayerSkills},
         Player,
     },
-    ui::damage_numbers::spawn_floating_text_with_shadow,
+    ui::{
+        damage_numbers::spawn_floating_text_with_shadow,
+        tips::{SeenTips, Tip, TipEvent},
+    },
 };
 
 use super::{Attack, CurrentHealth, CurrentMana, Healing, MaxMana, ProjectileSize};
@@ -74,6 +77,9 @@ pub fn handle_modify_mana_event(
     mut query: Query<(&mut CurrentMana, &MaxMana, &GlobalTransform), With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    game: crate::GameParam,
+    mut tip_event: EventWriter<TipEvent>,
+    seen_tips: Res<SeenTips>,
 ) {
     for event in event.iter() {
         let (mut mana, max_mana, player_t) = query.single_mut();
@@ -89,6 +95,21 @@ pub fn handle_modify_mana_event(
                 BLUE,
                 format!("+{} MP", event.0),
             );
+        }
+
+        if max_mana.0 > 0 {
+            let mana_percentage = (mana.0 as f32 / max_mana.0 as f32) * 100.0;
+            if mana_percentage <= 50.0 {
+                if let Some(main_hand) = game.player().main_hand_slot.as_ref() {
+                    let weapon_obj = main_hand.get_obj();
+                    if weapon_obj.is_magic_weapon() && !seen_tips.has_seen(&Tip::MagicWeapons) {
+                        tip_event.send(TipEvent {
+                            tip: Tip::MagicWeapons,
+                            pos: Vec3::new(0., 0., 100.),
+                        });
+                    }
+                }
+            }
         }
     }
 }

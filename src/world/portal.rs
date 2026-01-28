@@ -2,6 +2,7 @@ use crate::combat::EnemyDeathEvent;
 use crate::enemy::{spawner::MobSpawningPaused, Mob};
 use crate::night::EraTimer;
 use crate::player::Player;
+use crate::ui::tips::{SeenTips, Tip, TipEvent};
 use crate::world::dimension::{Era, EraManager};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
@@ -60,6 +61,8 @@ pub fn track_boss_kills(
     mut boss_kill_tracker: ResMut<BossKillTracker>,
     era_timer: Res<EraTimer>,
     mut mob_spawning_paused: ResMut<MobSpawningPaused>,
+    mut tip_event: EventWriter<TipEvent>,
+    seen_tips: Res<SeenTips>,
 ) {
     for death_event in death_events.iter() {
         if let Ok(mob) = mob_query.get(death_event.entity) {
@@ -74,6 +77,13 @@ pub fn track_boss_kills(
                     && era_timer.remaining_seconds > 0.0
                 {
                     mob_spawning_paused.paused = true;
+
+                    if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
+                        tip_event.send(TipEvent {
+                            tip: Tip::PeacefulPeriod,
+                            pos: Vec3::new(0., 0., 100.),
+                        });
+                    }
                 }
             } else if mob.is_boss() && mob != &Mob::StoneGolem {
                 // Other bosses (for future eras) still count
@@ -84,6 +94,13 @@ pub fn track_boss_kills(
                     && era_timer.remaining_seconds > 0.0
                 {
                     mob_spawning_paused.paused = true;
+
+                    if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
+                        tip_event.send(TipEvent {
+                            tip: Tip::PeacefulPeriod,
+                            pos: Vec3::new(0., 0., 100.),
+                        });
+                    }
                 }
             }
         }

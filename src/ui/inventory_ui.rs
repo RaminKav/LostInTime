@@ -1,6 +1,6 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
-use crate::colors::UNCOMMON_GREEN;
+use crate::colors::{DARK_WOOD_BROWN, UNCOMMON_GREEN};
 use crate::item::ammo::Ammo;
 use crate::GameParam;
 use crate::{
@@ -116,7 +116,32 @@ pub fn setup_inv_ui(
     cur_inv_state: Res<State<UIState>>,
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     resolution: Res<ScreenResolution>,
+    asset_server: Res<AssetServer>,
 ) {
+    // Title
+    let _upgrade_text = commands
+        .spawn(Text2dBundle {
+            text: Text::from_section(
+                "Upgrade",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: DARK_WOOD_BROWN,
+                },
+            ),
+            text_anchor: Anchor::Center,
+            transform: Transform {
+                translation: Vec3::new(106., resolution.game_height / 2. - 100., 10.),
+                scale: Vec3::new(1., 1., 1.),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .insert(Name::new("CLASS TITLE"))
+        .insert(UIState::Inventory)
+        .id();
+
     let (size, texture, pos_offset) = match cur_inv_state.0 {
         UIState::Inventory => (
             INVENTORY_UI_SIZE,
@@ -428,7 +453,7 @@ pub fn spawn_inv_slot(
     }
 
     // Inv Slot Icon //
-    let slot_icon = match slot_type {
+    let mut slot_icon = match slot_type {
         InventorySlotType::Equipment => match slot_index {
             3 => Some("ui/icons/CapeSlotIcon.png"),
             2 => Some("ui/icons/ChestSlotIcon.png"),
@@ -442,8 +467,19 @@ pub fn spawn_inv_slot(
             0 => Some("ui/icons/NecklaceSlotIcon.png"),
             _ => None,
         },
+        InventorySlotType::Trash => Some("ui/icons/TrashSlotIcon.png"),
+        InventorySlotType::Furnace => match slot_index {
+            1 => Some("ui/icons/SwordSlotIcon.png"),
+            0 => Some("ui/icons/OrbSlotIcon.png"),
+            _ => None,
+        },
         _ => None,
     };
+
+    if item_icon_option.is_some() {
+        slot_icon = None;
+    }
+
     let icon_entity_option = slot_icon.map(|slot_icon| {
         commands
             .spawn(SpriteBundle {

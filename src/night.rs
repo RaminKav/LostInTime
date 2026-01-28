@@ -8,6 +8,7 @@ use crate::{
     colors::{overwrite_alpha, NIGHT},
     enemy::spawner::MobSpawningPaused,
     run_once_per_run,
+    ui::tips::{SeenTips, Tip, TipEvent},
     world::dimension::EraManager,
     GameState, ScreenResolution, GAME_HEIGHT,
 };
@@ -279,6 +280,8 @@ pub fn tick_night_color(
     mut new_day_event: EventWriter<NewDayEvent>,
     infinite_mode: Res<InfiniteMode>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    mut tip_event: EventWriter<TipEvent>,
+    seen_tips: Res<SeenTips>,
 ) {
     // In infinite mode, keep it always night
     if infinite_mode.active {
@@ -318,6 +321,13 @@ pub fn tick_night_color(
             bgm_track_event.send(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_night.ogg".to_owned(),
             });
+
+            if !seen_tips.has_seen(&Tip::Night) {
+                tip_event.send(TipEvent {
+                    tip: Tip::Night,
+                    pos: Vec3::new(0., 0., 100.),
+                });
+            }
         } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
             bgm_track_event.send(UpdateBGMTrackEvent {
                 asset_path: "sounds/bgm_day.ogg".to_owned(),
@@ -429,6 +439,8 @@ pub fn tick_era_timer(
     era_manager: Res<EraManager>,
     infinite_mode: Res<InfiniteMode>,
     mut expired_event: EventWriter<EraTimerExpiredEvent>,
+    mut tip_event: EventWriter<TipEvent>,
+    seen_tips: Res<SeenTips>,
 ) {
     // Don't tick if infinite mode is already active
     if infinite_mode.active {
@@ -440,8 +452,19 @@ pub fn tick_era_timer(
         return;
     }
 
+    let was_above_3min = era_timer.remaining_seconds > 180.0;
+
     // Tick the timer
     era_timer.remaining_seconds -= time.delta_seconds();
+
+    if was_above_3min && era_timer.remaining_seconds <= 180.0 {
+        if !seen_tips.has_seen(&Tip::EndlessMode) {
+            tip_event.send(TipEvent {
+                tip: Tip::EndlessMode,
+                pos: Vec3::new(0., 0., 100.),
+            });
+        }
+    }
 
     // Check if expired
     if era_timer.is_expired() {

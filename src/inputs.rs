@@ -2,6 +2,7 @@ use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
 use crate::item::potion_buffs::MovementSpeedBuff;
+use crate::ui::tips::SeenTips;
 use std::f32::consts::PI;
 use std::time::Duration;
 
@@ -49,7 +50,9 @@ use crate::item::projectile::{RangedAttack, RangedAttackEvent};
 use crate::item::{Equipment, WorldObject};
 use crate::proto::proto_param::ProtoParam;
 use crate::ui::{
-    change_hotbar_slot, EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
+    change_hotbar_slot,
+    tips::{Tip, TipEvent},
+    EssenceShopChoices, FlashExpBarEvent, InventoryState, UIState,
 };
 use crate::world::chunk::Chunk;
 
@@ -678,18 +681,79 @@ pub fn toggle_inventory(
     mut proto_commands: ProtoCommands,
     mut dim_event: EventWriter<DimensionSpawnEvent>,
     proto: ProtoParam,
-    _inv: Query<&mut Inventory>,
+    inv: Query<&Inventory>,
     mut next_ui_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
     cursor: Res<CursorPos>,
     mut flash_event: EventWriter<FlashExpBarEvent>,
     keybinds: Res<InputMappings>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    mut tip_event: EventWriter<TipEvent>,
+    seen_tips: Res<SeenTips>,
 ) {
     if keybinds.check_inv_input(&key_input, &mouse_input) {
         // Don't allow opening inventory while item chest is open
         if curr_ui_state.0 != UIState::ItemChest {
             next_ui_state.set(UIState::Inventory);
+
+            if let Ok(inventory) = inv.get_single() {
+                let occupied_slots = inventory
+                    .items
+                    .items
+                    .iter()
+                    .filter(|slot| slot.is_some())
+                    .count();
+                if occupied_slots >= 6 && !seen_tips.has_seen(&Tip::Recipes) {
+                    tip_event.send(TipEvent {
+                        tip: Tip::Recipes,
+                        pos: Vec3::new(0., 0., 100.),
+                    });
+                }
+
+                // UpgradingGear tip: has UpgradeTome or OrbOfTransformation
+                let has_upgrade_item = inventory.items.items.iter().any(|slot| {
+                    if let Some(item) = slot {
+                        let obj = item.get_obj();
+                        *obj == WorldObject::UpgradeTome || *obj == WorldObject::OrbOfTransformation
+                    } else {
+                        false
+                    }
+                });
+                if has_upgrade_item && !seen_tips.has_seen(&Tip::UpgradingGear) {
+                    tip_event.send(TipEvent {
+                        tip: Tip::UpgradingGear,
+                        pos: Vec3::new(0., 0., 100.),
+                    });
+                }
+
+                // InventoryStats tip: has gear in inventory slots (6+) that's not in hotbar
+                let has_inventory_gear =
+                    inventory.items.items.iter().enumerate().any(|(idx, slot)| {
+                        if idx >= 6 && slot.is_some() {
+                            if let Some(item) = slot {
+                                let obj = item.get_obj();
+                                // Check if it's equipment (weapon, armor, accessory)
+                                if let Some(equip_type) = obj.get_equip_type(&proto) {
+                                    equip_type.is_weapon()
+                                        || equip_type.is_armor()
+                                        || equip_type.is_accessory()
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    });
+                if has_inventory_gear && !seen_tips.has_seen(&Tip::InventoryStats) {
+                    tip_event.send(TipEvent {
+                        tip: Tip::InventoryStats,
+                        pos: Vec3::new(0., 0., 100.),
+                    });
+                }
+            }
         }
     }
     if *DEBUG {
@@ -897,6 +961,41 @@ pub fn mouse_click_system(
     let player_pos = game.player().position;
     let (player_e, attack_timer_option, player_anim, blessings, mut current_mana) =
         player_query.single_mut();
+
+    if mouse_button_input.just_pressed(MouseButton::Left) {
+        let hotbar_slot = inv_state.active_hotbar_slot;
+        let held_item_option = inv.single().items.items[hotbar_slot].clone();
+        if let Some(held_item) = held_item_option {
+            let held_obj = *held_item.get_obj();
+            if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
+                item_actions.run_action(
+                    held_obj,
+                    held_item.slot,
+                    &mut item_action_param,
+                    &mut game,
+                    &proto_param,
+                    &mut commands,
+                );
+                return;
+            }
+        }
+        if let Some((obj_e, obj)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
+            if let Ok(obj_action) = obj_actions.get(obj_e) {
+                obj_action.run_action(
+                    obj_e,
+                    cursor_tile_pos,
+                    obj,
+                    &mut game,
+                    &mut item_action_param,
+                    &mut commands,
+                    &mut proto_param,
+                    &mut inv.single_mut(),
+                );
+                return;
+            }
+        }
+    }
+
     // Hit Item, send attack event
     if mouse_button_input.pressed(MouseButton::Left) {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
@@ -1053,38 +1152,6 @@ pub fn mouse_click_system(
                 was_crit,
                 was_overcrit,
             });
-        }
-    }
-    // Attempt to place block in hand
-    if mouse_button_input.just_pressed(MouseButton::Right) {
-        let hotbar_slot = inv_state.active_hotbar_slot;
-        let held_item_option = inv.single().items.items[hotbar_slot].clone();
-        if let Some(held_item) = held_item_option {
-            let held_obj = *held_item.get_obj();
-            if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
-                item_actions.run_action(
-                    held_obj,
-                    held_item.slot,
-                    &mut item_action_param,
-                    &mut game,
-                    &proto_param,
-                    &mut commands,
-                );
-            }
-        }
-        if let Some((obj_e, obj)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
-            if let Ok(obj_action) = obj_actions.get(obj_e) {
-                obj_action.run_action(
-                    obj_e,
-                    cursor_tile_pos,
-                    obj,
-                    &mut game,
-                    &mut item_action_param,
-                    &mut commands,
-                    &mut proto_param,
-                    &mut inv.single_mut(),
-                );
-            }
         }
     }
 }

@@ -25,6 +25,7 @@ use crate::ui::damage_numbers::{
 use crate::ui::item_chest::ItemChestState;
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::ui::minimap::UpdateMiniMapEvent;
+use crate::ui::tips::{Tip, TipEvent};
 use crate::ui::UIState;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::world::world_helpers;
@@ -627,6 +628,15 @@ impl ObjectAction {
                     pos: Some(obj_pos),
                     new_tile: Some(WorldObject::ChaosTotemDone),
                 });
+
+                if let Some(seen_tips) = item_action_param.seen_tips.as_ref() {
+                    if !seen_tips.has_seen(&Tip::Chaos) {
+                        item_action_param.tip_event.send(TipEvent {
+                            tip: Tip::Chaos,
+                            pos: Vec3::new(0., 0., 100.),
+                        });
+                    }
+                }
 
                 let spawn_pos = pos + Vec2::new(0., -18.);
                 // We need both mutable proto_commands and immutable proto_param.
