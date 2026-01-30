@@ -26,7 +26,7 @@ use crate::status_effects::{
     handle_frozen_ticks, handle_slow_stack_ticks,
 };
 use crate::ui::minimap::UpdateMiniMapEvent;
-use crate::ui::{ChestContainer, InventorySlotType};
+use crate::ui::{ChestContainer, FlashExpBarEvent, InventorySlotType};
 use crate::world::dungeon::Dungeon;
 use crate::world::dungeon_generation::DUNGEON_GRID_SIZE;
 use crate::world::generation::WallBreakEvent;
@@ -1183,6 +1183,7 @@ pub fn handle_break_object(
     >,
     anchor: Query<&SpriteAnchor>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    mut flash_event: EventWriter<FlashExpBarEvent>,
 ) {
     for broken in obj_break_events.iter() {
         let mut rng = rand::thread_rng();
@@ -1275,6 +1276,10 @@ pub fn handle_break_object(
             let did_level = player_xp.add_xp(exp.0, &player_skills, &mut chaos_tracker);
             let t = tile_pos_to_world_pos(broken.pos, true);
             spawn_xp_particles(t, &mut commands, exp.0, did_level);
+            flash_event.send(FlashExpBarEvent {
+                amount: exp.0,
+                did_level: did_level,
+            });
         }
 
         // Analytics

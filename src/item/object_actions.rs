@@ -663,6 +663,9 @@ impl ObjectAction {
             ObjectAction::TimePortal => {
                 if !*DEBUG {
                     let current_era = game.era.current_era.clone();
+                    if current_era == Era::Third {
+                        return;
+                    }
 
                     if let Some(boss_kill_tracker) = item_action_param.boss_kill_tracker.as_ref() {
                         if !boss_kill_tracker.is_boss_killed(&current_era) {

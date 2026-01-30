@@ -103,11 +103,10 @@ pub fn handle_move_exp_particles(
         &mut Transform,
     )>,
     mut commands: Commands,
-    mut flash_event: EventWriter<FlashExpBarEvent>,
     time: Res<Time>,
 ) {
     // move exp particles to exp bar at the bottom centre of screen
-    let target_pos = Vec2::new(0., -75.);
+    let target_pos = Vec2::new(0., 175.);
     for (e, mut p, mut exp_state, g_txfm, mut txfm) in particles.iter_mut() {
         exp_state.delay.tick(time.delta());
         if exp_state.delay.finished() {
@@ -122,10 +121,6 @@ pub fn handle_move_exp_particles(
         txfm.translation += p.velocity.extend(0.);
         if g_txfm.translation().truncate().distance(target_pos) <= 3. {
             commands.entity(e).despawn();
-            flash_event.send(FlashExpBarEvent {
-                amount: exp_state.amount,
-                did_level: exp_state.did_level_up_as_result,
-            });
         }
     }
 }

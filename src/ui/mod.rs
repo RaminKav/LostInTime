@@ -227,6 +227,7 @@ impl Plugin for UIPlugin {
                     handle_flash_bars,
                     update_xp_bar_rainbow.before(update_xp_bar),
                     update_xp_bar,
+                    player_hud::drain_pending_xp.after(update_xp_bar),
                     update_decorative_xp_shards.after(update_xp_bar_rainbow),
                     handle_skill_choice_ui_close.after(update_xp_bar),
                     handle_enemy_health_bar_change,

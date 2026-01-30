@@ -38,7 +38,12 @@ pub fn handle_new_red_mushling_state_machine(
                 transform: *transform,
                 ..Default::default()
             })
-            .insert(WaitingToSproutState);
+            .insert(WaitingToSproutState)
+            .insert(MushlingWakeupState {
+                time_alive: Timer::from_seconds(15.0, TimerMode::Once),
+                wakeup_check_timer: Timer::from_seconds(2.0, TimerMode::Repeating), // Check every 2 seconds
+                is_awake: false,
+            });
         let state_machine = StateMachine::default()
             .with_state::<GasAttackState>()
             .set_trans_logging(false)
@@ -123,25 +128,52 @@ pub struct GasAttackState {
 #[component(storage = "SparseSet")]
 pub struct WaitingToSproutState;
 
+/// Component to track wakeup state for RedMushling
+#[derive(Component)]
+pub struct MushlingWakeupState {
+    pub time_alive: Timer,
+    pub wakeup_check_timer: Timer,
+    pub is_awake: bool,
+}
+
 pub fn sprout(
-    mut sprouts: Query<(Entity, &mut AsepriteAnimation), With<SproutingState>>,
+    mut sprouts: Query<
+        (Entity, &mut AsepriteAnimation, Option<&MushlingWakeupState>),
+        With<SproutingState>,
+    >,
     mut commands: Commands,
+    game: Res<Game>,
 ) {
-    for (entity, mut anim) in sprouts.iter_mut() {
+    for (entity, mut anim, wakeup_state_option) in sprouts.iter_mut() {
         if anim.is_paused() {
             anim.play();
         }
 
         if anim.current_frame() >= 16 {
-            commands
-                .entity(entity)
-                .remove::<SproutingState>()
-                .insert(GasAttackState {
-                    hitbox: None,
-                    speed_up_anim: false,
-                    cooldown: Timer::from_seconds(0.6, TimerMode::Once),
-                });
-            *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+            let has_wakeup_state = wakeup_state_option.is_some();
+
+            if has_wakeup_state {
+                commands
+                    .entity(entity)
+                    .remove::<SproutingState>()
+                    .insert(FollowState {
+                        target: game.player,
+                        curr_delta: None,
+                        curr_path: None,
+                        speed: 0.4,
+                    });
+                *anim = AsepriteAnimation::from(RedMushling::tags::IDLE_FRONT);
+            } else {
+                commands
+                    .entity(entity)
+                    .remove::<SproutingState>()
+                    .insert(GasAttackState {
+                        hitbox: None,
+                        speed_up_anim: false,
+                        cooldown: Timer::from_seconds(0.6, TimerMode::Once),
+                    });
+                *anim = AsepriteAnimation::from(RedMushling::tags::ATTACK);
+            }
         }
     }
 }
@@ -314,6 +346,54 @@ pub fn handle_mushling_rush_warnings(
                 999999.0, // Very long duration so it persists
             );
             commands.entity(warning_entity).insert(MushlingRushWarning);
+        }
+    }
+}
+
+/// System to handle RedMushling wakeup timers and random wakeup
+pub fn handle_mushling_wakeup_timers(
+    mut mushlings: Query<
+        (
+            Entity,
+            &Mob,
+            &mut MushlingWakeupState,
+            &mut AsepriteAnimation,
+            Option<&WaitingToSproutState>,
+        ),
+        Without<FollowState>,
+    >,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    for (entity, mob, mut wakeup_state, mut anim, waiting_state) in mushlings.iter_mut() {
+        if mob != &Mob::RedMushling {
+            continue;
+        }
+
+        if waiting_state.is_none() || wakeup_state.is_awake {
+            continue;
+        }
+
+        wakeup_state.time_alive.tick(time.delta());
+
+        if wakeup_state.time_alive.finished() {
+            wakeup_state.wakeup_check_timer.tick(time.delta());
+
+            if wakeup_state.wakeup_check_timer.just_finished() {
+                if rng.gen_bool(0.3) {
+                    wakeup_state.is_awake = true;
+                    commands
+                        .entity(entity)
+                        .remove::<WaitingToSproutState>()
+                        .insert(SproutingState);
+                    if anim.is_paused() {
+                        anim.play();
+                    }
+                }
+            }
         }
     }
 }

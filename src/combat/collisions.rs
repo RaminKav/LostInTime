@@ -723,7 +723,7 @@ pub fn check_item_drop_collisions(
 
                 // Send FlashExpBarEvent to update the XP bar UI
                 flash_event.send(FlashExpBarEvent {
-                    amount: 1,
+                    amount: xp_amount,
                     did_level,
                 });
 

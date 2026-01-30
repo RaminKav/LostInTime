@@ -77,6 +77,7 @@ impl Plugin for EnemyPlugin {
                     stone_golem::stone_golem_follow.run_if(is_not_paused),
                     stone_golem::update_stone_golem_walk_animation.run_if(is_not_paused),
                     stone_golem::handle_stone_golem_death.run_if(is_not_paused),
+                    red_mushling::handle_mushling_wakeup_timers.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

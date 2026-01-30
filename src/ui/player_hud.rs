@@ -46,6 +46,13 @@ pub struct ManaBar;
 pub struct XPBar;
 #[derive(Component)]
 pub struct XPBarText;
+
+/// Component to store pending XP that will be drained over time
+#[derive(Component, Default)]
+pub struct PendingXP {
+    pub stored: f32,
+    pub displayed: f32,
+}
 #[derive(Component)]
 pub struct CurrencyText;
 #[derive(Component)]
@@ -312,6 +319,7 @@ pub fn setup_xp_bar_ui(
         })
         .insert(RenderLayers::from_layers(&[3]))
         .insert(XPBar)
+        .insert(PendingXP::default())
         .insert(Name::new("inner xp bar"))
         .id();
     let _inner_xp_bg = commands
@@ -773,11 +781,11 @@ pub fn update_shieldbar(
 }
 pub fn update_xp_bar(
     player_xp_query: Query<&PlayerLevel, With<Player>>,
-    mut xp_bar_query: Query<(&mut Sprite, &mut BarFlashTimer), With<XPBar>>,
-    mut xp_bar_text_query: Query<(&mut Text, &mut Transform), With<XPBarText>>,
+    mut xp_bar_query: Query<(&mut PendingXP, &mut BarFlashTimer), With<XPBar>>,
+    mut xp_bar_text_query: Query<&mut Text, With<XPBarText>>,
     mut flash_event: EventReader<FlashExpBarEvent>,
     mut commands: Commands,
-    res: Res<ScreenResolution>,
+    _res: Res<ScreenResolution>,
     ui_state: Res<State<UIState>>,
 ) {
     // If we're in the skill choice UI, don't update the bar (keep it full)
@@ -788,20 +796,18 @@ pub fn update_xp_bar(
     for event in flash_event.iter() {
         let level = player_xp_query.single();
 
-        let (mut sprite, mut flash) = xp_bar_query.single_mut();
-        sprite.custom_size = Some(Vec2 {
-            x: res.game_width * level.xp as f32 / level.next_level_xp as f32,
-            y: 6.,
-        });
-        let (mut text, mut txfm) = xp_bar_text_query.single_mut();
+        let (mut pending_xp, _flash) = xp_bar_query.single_mut();
+
+        pending_xp.stored += event.amount as f32;
+
+        let mut text = xp_bar_text_query.single_mut();
         text.sections[0].value = format!("Level {:}", level.level);
-        if level.level >= 10 {
-            txfm.translation.x = -5.5;
-        }
-        // flash.timer.tick(Duration::from_nanos(1));
         if event.did_level {
             commands.spawn(SoundSpawner::new(AudioSoundEffect::LevelUp, 0.35));
+            pending_xp.displayed = level.xp as f32;
+            pending_xp.stored = 0.0;
         }
+
         if event.amount >= 50 {
             commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08));
             commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08).with_delay(0.15));
@@ -813,6 +819,55 @@ pub fn update_xp_bar(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.08));
         }
     }
+}
+
+/// System to drain pending XP and smoothly update the XP bar
+pub fn drain_pending_xp(
+    mut xp_bar_query: Query<(&mut PendingXP, &mut Sprite), With<XPBar>>,
+    player_xp_query: Query<&PlayerLevel, With<Player>>,
+    res: Res<ScreenResolution>,
+    time: Res<Time>,
+    ui_state: Res<State<UIState>>,
+) {
+    if ui_state.0 == UIState::Skills {
+        return;
+    }
+
+    let Ok(level) = player_xp_query.get_single() else {
+        return;
+    };
+
+    let Ok((mut pending_xp, mut sprite)) = xp_bar_query.get_single_mut() else {
+        return;
+    };
+
+    let drain_rate = if pending_xp.stored <= 0.0 {
+        0.0
+    } else {
+        let normalized = (pending_xp.stored / 500.0).min(1.0);
+        20.0 + (normalized * 500.0)
+    };
+
+    if pending_xp.stored > 0.0 {
+        let drain_amount = drain_rate * time.delta().as_secs_f32();
+        let actual_drain = drain_amount.min(pending_xp.stored);
+
+        pending_xp.stored -= actual_drain;
+        pending_xp.displayed += actual_drain;
+
+        pending_xp.displayed = pending_xp.displayed.min(level.next_level_xp as f32);
+    }
+
+    let bar_width = if level.next_level_xp > 0 {
+        res.game_width * pending_xp.displayed / level.next_level_xp as f32
+    } else {
+        0.0
+    };
+
+    sprite.custom_size = Some(Vec2 {
+        x: bar_width,
+        y: 6.,
+    });
 }
 
 pub fn handle_flash_bars(mut query: Query<(&mut Sprite, &mut BarFlashTimer)>, time: Res<Time>) {
@@ -971,7 +1026,7 @@ pub fn handle_skill_choice_ui_close(
     ui_state: Res<State<UIState>>,
     mut prev_state: Local<UIState>,
     player_xp_query: Query<&PlayerLevel, With<Player>>,
-    mut xp_bar_query: Query<&mut Sprite, With<XPBar>>,
+    mut xp_bar_query: Query<(&mut Sprite, &mut PendingXP), With<XPBar>>,
     decorative_shards: Query<Entity, With<DecorativeXPShard>>,
     mut commands: Commands,
 ) {
@@ -981,9 +1036,11 @@ pub fn handle_skill_choice_ui_close(
     if *prev_state == UIState::Skills && current_state != UIState::Skills {
         let level = player_xp_query.single();
 
-        // Reset bar color to default
-        for mut sprite in xp_bar_query.iter_mut() {
+        // Reset bar color to default and sync pending XP
+        for (mut sprite, mut pending_xp) in xp_bar_query.iter_mut() {
             sprite.color = LEVEL_BLUE;
+            // Sync displayed XP with actual level XP when exiting skill choice
+            pending_xp.displayed = level.xp as f32;
         }
 
         // Clean up all decorative shards
@@ -992,7 +1049,7 @@ pub fn handle_skill_choice_ui_close(
         }
 
         flash_event.send(FlashExpBarEvent {
-            amount: level.xp,
+            amount: 0, // No new XP, just syncing
             did_level: false,
         });
     }
