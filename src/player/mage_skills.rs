@@ -7,7 +7,7 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use crate::{
     animations::player_sprite::PlayerAnimation,
     assets::Graphics,
-    attributes::Attack,
+    attributes::{attribute_helpers::skill_power_multiplier, Attack, SkillPower},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider, DeferredComponent},
@@ -49,6 +49,7 @@ pub fn handle_teleport(
             &PlayerSkills,
             &mut MovementVector,
             &Attack,
+            &SkillPower,
             &AsepriteAnimation,
             &mut KinematicCharacterController,
             &mut TeleportState,
@@ -67,6 +68,7 @@ pub fn handle_teleport(
         skills,
         mut move_direction,
         dmg,
+        skill_power,
         aseprite,
         mut kcc,
         mut teleport_state,
@@ -105,7 +107,7 @@ pub fn handle_teleport(
     if move_direction.0.length() != 0. && teleport_state.timer.just_finished() {
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
-        let power_mult = skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
+        let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         let base_distance = 3.5 * TILE_SIZE.x;
         let distance = direction * base_distance;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);

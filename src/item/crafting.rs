@@ -259,7 +259,13 @@ pub fn get_crafting_inventory_item_stacks(
         let desc = recipe
             .0
             .iter()
-            .map(|ingredient| format!("{}x", ingredient.count,))
+            .map(|ingredient| {
+                format!(
+                    "{}x {}",
+                    ingredient.count,
+                    proto.get_item_data(ingredient.item).unwrap().metadata.name
+                )
+            })
             .collect();
         default_stack.metadata.desc = desc;
         if proto.get_component::<EquipmentType, _>(*obj).is_some() {

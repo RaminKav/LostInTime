@@ -12,7 +12,7 @@ use crate::{
     animations::DoneAnimation,
     attributes::{
         AttributeModifier, ItemAttributes, ItemRarity, RarityGlows, RawItemBaseAttributes,
-        RawItemBonusAttributes,
+        RawItemBonusAttributes, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     inventory::ItemStack,
@@ -212,6 +212,9 @@ pub fn select_random_inventory_buff_line(
     _equip_type: &EquipmentType,
     _proto: &ProtoParam,
 ) -> Option<usize> {
+    if stack.obj_type.is_accessory() {
+        return None;
+    }
     // Build a set of attribute names that are actually base attributes
     // This matches the logic in get_tooltips_from_stat_lines
     let mut base_attribute_names = std::collections::HashSet::new();
@@ -345,4 +348,8 @@ pub fn spawn_rarity_animation(
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop2, 0.3));
         commands.spawn(SoundSpawner::new(AudioSoundEffect::RareDrop1, 0.2).with_delay(0.4));
     }
+}
+
+pub fn skill_power_multiplier(skill_power: &SkillPower, blessing_bonus: f32) -> f32 {
+    (1.0 + (skill_power.0 as f32 / 100.0)) * blessing_bonus
 }

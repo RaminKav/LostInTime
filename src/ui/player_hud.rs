@@ -11,24 +11,29 @@ use super::{
 use crate::{
     assets::Graphics,
     attributes::{
-        hunger::Hunger, CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana, MaxShield,
+        attribute_helpers::skill_power_multiplier, hunger::Hunger, CurrentHealth, CurrentMana,
+        CurrentShield, MaxHealth, MaxMana, MaxShield, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::OwnedBlessings,
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
         BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, ORANGE, RED,
         SHIELD_BLUE, WHITE, YELLOW,
     },
+    cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
+        combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker},
         levels::PlayerLevel,
         skills::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
+    ui::Interactable,
     GameState, InputBinding, InputMappings, ScreenResolution, GAME_HEIGHT,
 };
 use bevy::utils::Duration;
@@ -306,7 +311,7 @@ pub fn setup_xp_bar_ui(
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 10.),
+                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 11.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -331,7 +336,7 @@ pub fn setup_xp_bar_ui(
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 9.),
+                translation: Vec3::new(-res.game_width / 2., res.game_height / 2. - 3., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -751,12 +756,12 @@ pub fn update_healthbar(
     let Ok((player_health, player_max_health)) = player_health_query.get_single() else {
         return;
     };
-    let (mut sprite, mut flash) = health_bar_query.single_mut();
+    let (mut sprite, mut _flash) = health_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
         x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
-    flash.timer.tick(Duration::from_nanos(1));
+    // flash.timer.tick(Duration::from_nanos(1));
 }
 pub fn update_shieldbar(
     player_health_query: Query<
@@ -771,7 +776,7 @@ pub fn update_shieldbar(
     let Ok((curr_shield, max_shield)) = player_health_query.get_single() else {
         return;
     };
-    let (mut sprite, mut flash) = health_bar_query.single_mut();
+    let (mut sprite, mut _flash) = health_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
         x: 65. * curr_shield.0 as f32 / max_shield.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
@@ -1208,6 +1213,7 @@ pub fn spawn_skill_tooltip_content(
     asset_server: &AssetServer,
     active_skill: ActiveSkill,
     parent_entity: Entity,
+    skill_power: f32,
 ) {
     const ICONS_X_OFFSET: f32 = -24.;
     const TEXT_Y_OFFSET: f32 = 12.;
@@ -1217,7 +1223,7 @@ pub fn spawn_skill_tooltip_content(
     const BODY_FONT_SIZE: f32 = 8.4;
 
     let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
-    let active_skill_desc = active_skill.get_desc(1.).join("\n");
+    let active_skill_desc = active_skill.get_desc(skill_power).join("\n");
     let active_skill_name = active_skill.get_title();
 
     // Spawn skill icon
@@ -1296,22 +1302,20 @@ pub fn handle_active_skill_hud_tooltip(
     mut commands: Commands,
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
-    cursor_pos: Res<crate::cursor::CursorPos>,
-    hit_detection_sprites: Query<
-        (Entity, &Sprite, &GlobalTransform),
-        With<super::interactions::Interactable>,
-    >,
+    cursor_pos: Res<CursorPos>,
+    hit_detection_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut skill_icons: Query<(
         Entity,
         &GlobalTransform,
         &UIElement,
-        &mut super::interactions::Interactable,
+        &mut Interactable,
         &ActiveSkillIcon,
     )>,
     existing_tooltips: Query<Entity, With<ActiveSkillHudTooltip>>,
     mut last_hovered: Local<Option<ActiveSkill>>,
+    skill_power: Query<(&SkillPower, &OwnedBlessings)>,
 ) {
-    use super::interactions::Interaction;
+    use Interaction;
 
     // First, do hit detection and update interactable states
     let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
@@ -1383,8 +1387,16 @@ pub fn handle_active_skill_hud_tooltip(
             .set_parent(container)
             .id();
 
+        let (skill_power, blessings) = skill_power.single();
         // Spawn skill tooltip content (icon, title, description)
-        spawn_skill_tooltip_content(&mut commands, &graphics, &asset_server, skill, container);
+        spawn_skill_tooltip_content(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            skill,
+            container,
+            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
+        );
     }
 
     *last_hovered = hovered_skill;
@@ -1396,8 +1408,8 @@ fn get_heirloom_scaling_text(
     skills: &PlayerSkills,
     coins: u32,
     max_health: i32,
-    hunt_tracker: Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
-    crate_tracker: Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
+    hunt_tracker: Option<&MaxHPHuntTracker>,
+    crate_tracker: Option<&CrateBreakDamageTracker>,
 ) -> Option<String> {
     match heirloom {
         Heirloom::GoldIntoDamage => {

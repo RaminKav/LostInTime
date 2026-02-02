@@ -2,6 +2,8 @@ use bevy::{prelude::*, render::view::RenderLayers};
 
 use crate::{
     assets::Graphics,
+    attributes::{attribute_helpers::skill_power_multiplier, SkillPower},
+    blessings::OwnedBlessings,
     colors::DARK_WOOD_BROWN,
     item::active_skill_shrine::{ActiveSkillShrineOverwrite, ActiveSkillShrineSelection},
     player::skills::{ActiveSkillChoiceState, PlayerSkills},
@@ -33,7 +35,7 @@ pub fn setup_active_skill_shrine_ui(
     asset_server: Res<AssetServer>,
     shrine_selection: Res<ActiveSkillShrineSelection>,
     res: Res<ScreenResolution>,
-    _skills: Query<&PlayerSkills>,
+    skill_power: Query<(&SkillPower, &OwnedBlessings)>,
 ) {
     spawn_ui_overlay(
         &mut commands,
@@ -147,13 +149,14 @@ pub fn setup_active_skill_shrine_ui(
             .insert(Name::new(format!("SKILL_BANNER_{}", index)))
             .set_parent(container)
             .id();
-
+        let (skill_power, blessings) = skill_power.single();
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
             &asset_server,
             skill_choice.active_skill.clone(),
             container,
+            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
         );
     }
 
@@ -265,7 +268,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
     asset_server: Res<AssetServer>,
     shrine_overwrite: Res<ActiveSkillShrineOverwrite>,
     res: Res<ScreenResolution>,
-    skills: Query<&PlayerSkills>,
+    skills: Query<(&PlayerSkills, &SkillPower, &OwnedBlessings)>,
 ) {
     spawn_ui_overlay(
         &mut commands,
@@ -315,7 +318,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
         .insert(Name::new("SKILL_VIEW4_BACKGROUND"))
         .id();
 
-    let skills = skills.single();
+    let (skills, skill_power, blessings) = skills.single();
     let choices = vec![
         skills.active_skill_slot_0.clone(),
         skills.active_skill_slot_1.clone(),
@@ -378,6 +381,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             &asset_server,
             choice.active_skill.clone(),
             container,
+            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
         );
     }
 

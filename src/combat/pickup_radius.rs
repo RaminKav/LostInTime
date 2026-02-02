@@ -1,33 +1,33 @@
 use bevy::prelude::*;
 
 use crate::{
+    attributes::PickupRange,
     item::ItemDrop,
-    player::{
-        skills::{Heirloom, PlayerSkills},
-        Player,
-    },
-    GameParam,
+    player::{skills::PlayerSkills, Player},
 };
 
 #[derive(Component, Debug, Clone)]
 pub struct PickupRadius(pub f32);
 
 pub const BASE_PICKUP_RADIUS: f32 = 30.0;
-const PICKUP_RADIUS_BONUS_PER_STACK: f32 = 0.25; // 25% per stack
 
-/// System that updates pickup radius based on ItemPickupRadius heirloom stacks
+/// System that updates pickup radius based on ItemPickupRadius heirloom stacks and equipment
 pub fn update_pickup_radius(
     mut pickup_radius_query: Query<&mut PickupRadius, With<Player>>,
-    mut game: GameParam,
+    pickup_range_attr: Query<&PickupRange, With<Player>>,
 ) {
     let Ok(mut pickup_radius) = pickup_radius_query.get_single_mut() else {
         return;
     };
-    let player_skills = game.get_player_skills();
+    let pickup_range_bonus = 1.0
+        + (pickup_range_attr
+            .get_single()
+            .cloned()
+            .unwrap_or_default()
+            .0 as f32
+            / 100.0);
 
-    let stacks = player_skills.get_count(Heirloom::ItemPickupRadius);
-    let bonus_multiplier = 1.0 + (stacks as f32 * PICKUP_RADIUS_BONUS_PER_STACK);
-    pickup_radius.0 = BASE_PICKUP_RADIUS * bonus_multiplier;
+    pickup_radius.0 = BASE_PICKUP_RADIUS * pickup_range_bonus;
 }
 
 /// System that pulls items toward the player when they're within pickup range

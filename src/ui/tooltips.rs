@@ -1,14 +1,16 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
+use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 
 use crate::{
     assets::{asset_helpers::spawn_sprite, Graphics},
     attributes::{
-        Attack, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
-        CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen, ItemAttributes,
-        ItemRarity, LootRateBonus, MaxHealth, MaxMana, RawItemBaseAttributes,
-        RawItemBonusAttributes, Speed, Thorns, XpRateBonus,
+        add_item_glows, Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage,
+        CritChance, CritDamage, CurrentHealth, CurrentMana, Defence, Dodge, Healing, HealthRegen,
+        ItemAttributes, ItemRarity, Lifesteal, LootRateBonus, MaxHealth, MaxMana, PickupRange,
+        ProjectileSize, RawItemBaseAttributes, RawItemBonusAttributes, SkillPower, Speed, Thorns,
+        XpRateBonus,
     },
-    colors::{BLACK, GREY, LIGHT_GREEN, LIGHT_GREY, LIGHT_RED},
+    colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED, ORANGE, TOOLTIP_BLACK, TOOLTIP_BLACK_2},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -22,6 +24,9 @@ use super::{
     CRAFTING_INVENTORY_UI_SIZE, ESSENCE_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, INVENTORY_UI_SIZE,
     SKILLS_CHOICE_UI_SIZE,
 };
+
+aseprite!(pub InventoryStatHighlight, "textures/effects/InventoryStatHighlight.ase");
+
 #[derive(Component)]
 pub struct PlayerStatsTooltip;
 #[derive(Component)]
@@ -50,19 +55,34 @@ pub struct ShowInvPlayerStatsEvent {
     pub ignore_timer: bool,
 }
 
+#[derive(Debug, Clone)]
 pub struct TooltipTextProps {
     pub text: Vec<String>,
     pub quality: AttributeQuality,
     pub offset: f32,
     pub anchor: Anchor,
+    pub font: String,
+    pub font_size: f32,
 }
 impl TooltipTextProps {
-    pub fn new(text: Vec<String>, offset: f32, quality: AttributeQuality, anchor: Anchor) -> Self {
+    pub fn new(
+        text: Vec<String>,
+        offset: f32,
+        quality: AttributeQuality,
+        anchor: Anchor,
+        font: String,
+    ) -> Self {
+        let font_size = match font.as_str() {
+            "fonts/alagard.ttf" => 15.0,
+            _ => 8.4,
+        };
         Self {
             text,
             quality,
             offset,
             anchor,
+            font,
+            font_size,
         }
     }
 }
@@ -133,11 +153,10 @@ pub fn handle_spawn_inv_item_tooltip(
             UIState::ItemChest => SKILLS_CHOICE_UI_SIZE,
             _ => continue,
         };
-        let raw_base_attributes =
-            proto.get_component::<RawItemBaseAttributes, _>(item.item_stack.obj_type);
-        let raw_bonus_attributes =
-            proto.get_component::<RawItemBonusAttributes, _>(item.item_stack.obj_type);
-        let equip_type = proto.get_component::<EquipmentType, _>(item.item_stack.obj_type);
+        let obj_type = item.item_stack.obj_type;
+        let raw_base_attributes = proto.get_component::<RawItemBaseAttributes, _>(obj_type);
+        let raw_bonus_attributes = proto.get_component::<RawItemBonusAttributes, _>(obj_type);
+        let equip_type = proto.get_component::<EquipmentType, _>(obj_type);
         let item_rarity = item.item_stack.rarity.clone();
         let level = item.item_stack.metadata.level;
         let (attributes, score, num_attributes) = ItemAttributes::get_tooltips_from_stat_lines(
@@ -147,23 +166,23 @@ pub fn handle_spawn_inv_item_tooltip(
             raw_base_attributes,
             raw_bonus_attributes,
             level.unwrap_or(0) as i32,
-            item.item_stack.obj_type,
+            obj_type,
             equip_type.unwrap_or(&EquipmentType::None),
         );
 
         //subtract 2 for the base attributes, only want bonus attributes
         let num_stars = get_num_stars(score, num_attributes, item_rarity.clone(), equip_type);
         // let durability = item.item_stack.attributes.get_durability_tooltip();
-        let item_actions = proto.get_component::<ItemActions, _>(item.item_stack.obj_type);
+        let item_actions = proto.get_component::<ItemActions, _>(obj_type);
         let should_show_attributes = !attributes.is_empty() && !item.is_recipe;
-        let size = Vec2::new(93., 120.5);
+        let size = Vec2::new(140., 184.5);
         let tooltip = commands
             .spawn((
                 SpriteBundle {
                     texture: graphics
                         .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
                     transform: Transform {
-                        translation: Vec3::new(-(parent_inv_size.x + size.x + 2.) / 2., 0., 4.),
+                        translation: Vec3::new(-(parent_inv_size.x + size.x + 2.) / 2., 0.5, 4.),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
@@ -181,38 +200,275 @@ pub fn handle_spawn_inv_item_tooltip(
             .id();
 
         let mut tooltip_text: Vec<TooltipTextProps> = vec![];
-        tooltip_text.push(TooltipTextProps::new(
-            vec![item.item_stack.metadata.name.clone()],
-            0.,
-            AttributeQuality::High,
-            Anchor::Center,
-        ));
+
+        let icon_e = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &ItemStack {
+                obj_type: obj_type,
+                count: 1,
+                ..Default::default()
+            },
+            &asset_server,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            3,
+        );
+        commands.entity(icon_e).insert(Transform {
+            translation: Vec3::new(-42., 46., 2.),
+            scale: Vec3::new(2., 2., 1.),
+            ..Default::default()
+        });
+        commands.entity(tooltip).add_child(icon_e);
+        // glow effect for rarity
+        if let Some(glow_e) = add_item_glows(
+            &mut commands,
+            &graphics,
+            icon_e,
+            item.item_stack.rarity.clone(),
+        ) {
+            commands
+                .entity(glow_e)
+                .insert(Name::new("Item Glow Effect"))
+                .insert(RenderLayers::from_layers(&[3]));
+        }
+        // ======== name ========
+        let _name_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        item.item_stack.metadata.name.clone(),
+                        TextStyle {
+                            font: asset_server.load("fonts/alagard.ttf"),
+                            font_size: 15.,
+                            color: item.item_stack.rarity.get_color(),
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(-60., 75., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                },
+                Name::new("TOOLTIP Rarity TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+        let mut is_item_action = false;
+        let is_upgrade_material =
+            obj_type == WorldObject::UpgradeTome || obj_type == WorldObject::OrbOfTransformation;
+        // ======== level ========
+        let level_string = if let Some(level) = level {
+            "Level ".to_string() + &level.to_string()
+        } else if let Some(item_actions) = item_actions {
+            let action_texts: Vec<String> = item_actions
+                .actions
+                .iter()
+                .flat_map(|a| a.get_tooltip())
+                .collect();
+
+            if !action_texts.is_empty() {
+                is_item_action = true;
+                let mut combined_actions = "".to_string();
+                for action_text in action_texts.iter() {
+                    combined_actions += action_text;
+                    combined_actions += " ";
+                }
+
+                combined_actions.to_string()
+            } else {
+                "".to_string()
+            }
+        } else {
+            "".to_string()
+        };
+
+        let _level_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        level_string,
+                        TextStyle {
+                            font: asset_server.load(if is_item_action {
+                                "fonts/slkscr.ttf"
+                            } else {
+                                "fonts/slkscrbold.ttf"
+                            }),
+                            font_size: 8.5,
+                            color: if is_item_action {
+                                ORANGE
+                            } else {
+                                item.item_stack.rarity.get_color()
+                            },
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(-16., 62., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                },
+                Name::new("TOOLTIP Rarity TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+
+        // ======== header ========
+        let header_text = if should_show_attributes {
+            "Base Stats".to_string()
+        } else if item.is_recipe {
+            "Recipe".to_string()
+        } else {
+            "Description".to_string()
+        };
+        let _header_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        header_text,
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscrbold.ttf"),
+                            font_size: 8.5,
+                            color: TOOLTIP_BLACK,
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(-57., 5., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                },
+                Name::new("TOOLTIP Rarity TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+        // ======== rarity ========
+        let _rarity_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        item.item_stack.rarity.get_name(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.5,
+                            color: item.item_stack.rarity.get_color(),
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(
+                            -16.,
+                            if is_upgrade_material { 58. } else { 52. },
+                            1.,
+                        ),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                },
+                Name::new("TOOLTIP Rarity TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+        // ======== type ========
+        let type_string = if obj_type.is_melee_weapon() {
+            "Melee Weapon"
+        } else if obj_type.is_magic_weapon() {
+            "Magic Weapon"
+        } else if obj_type.is_ranged_weapon() {
+            "Ranged Weapon"
+        } else if obj_type.is_armor() {
+            "Armor"
+        } else if obj_type.is_accessory() {
+            "Accessory"
+        } else if let Some(item_actions) = item_actions {
+            &item_actions.get_action_type()
+        } else if is_upgrade_material {
+            "Upgrade\nMaterial"
+        } else {
+            "Material"
+        };
+        let _type_text = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        type_string.to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.5,
+                            color: item.item_stack.rarity.get_color(),
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform {
+                        translation: Vec3::new(-16., 42., 1.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
+                    },
+                    ..default()
+                },
+                Name::new("TOOLTIP Rarity TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
 
         if should_show_attributes {
+            info!("SHOW ATTRIBUTES!");
+            //======== Header 2 ========
+            let _text = commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            "Bonus Stats".to_string(),
+                            TextStyle {
+                                font: asset_server.load("fonts/slkscrbold.ttf"),
+                                font_size: 8.5,
+                                color: TOOLTIP_BLACK,
+                            },
+                        ),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform {
+                            translation: Vec3::new(-58., -25., 1.),
+                            scale: Vec3::new(1., 1., 1.),
+                            ..Default::default()
+                        },
+                        ..default()
+                    },
+                    Name::new("TOOLTIP Rarity TEXT"),
+                    RenderLayers::from_layers(&[3]),
+                ))
+                .set_parent(tooltip)
+                .id();
+
             for (i, (a, range, q)) in attributes.iter().enumerate().clone() {
-                let d = if i >= 2 { 3. } else { 0. };
+                let d = if i >= 2 { 12. } else { 0. };
                 tooltip_text.push(TooltipTextProps::new(
                     vec![a.to_string(), range.to_string()],
                     d,
                     *q,
                     Anchor::CenterLeft,
+                    "fonts/slkscr.ttf".to_string(),
                 ));
             }
-            if let Some(level) = level {
-                tooltip_text.push(TooltipTextProps::new(
-                    vec!["Level ".to_string() + &level.to_string()],
-                    size.y - (tooltip_text.len() + 1) as f32 * 10. - 14.,
-                    AttributeQuality::Low,
-                    Anchor::CenterLeft,
-                ));
-            }
+
             // Tooltip Inspect ICON
             let tooltip_icon = spawn_item_stack_icon(
                 &mut commands,
                 &graphics,
                 &ItemStack::crate_icon_stack(WorldObject::TooltipInspect),
                 &asset_server,
-                Vec2::new(-6.5, -106.5),
+                Vec2::new(-7.5, -118.5),
                 Vec2::new(0., 0.),
                 3,
             );
@@ -232,99 +488,74 @@ pub fn handle_spawn_inv_item_tooltip(
         } else {
             if item.is_recipe {
                 tooltip_text.push(TooltipTextProps::new(
-                    vec!["".to_string()],
-                    0.,
+                    vec![proto
+                        .get_item_data(item.item_stack.obj_type)
+                        .unwrap()
+                        .metadata
+                        .desc
+                        .join("\n")
+                        .to_string()],
+                    50.,
                     AttributeQuality::Low,
-                    Anchor::CenterLeft,
+                    Anchor::TopLeft,
+                    "fonts/slkscr.ttf".to_string(),
                 ));
-                tooltip_text.push(TooltipTextProps::new(
-                    vec!["Recipe".to_string()],
-                    0.,
-                    AttributeQuality::Average,
-                    Anchor::CenterLeft,
-                ));
-            } else if let Some(item_actions) = item_actions {
-                let action_type = item_actions.get_action_type();
-                let action_texts: Vec<String> = item_actions
-                    .actions
-                    .iter()
-                    .flat_map(|a| a.get_tooltip())
-                    .collect();
-                if action_texts.is_empty() {
-                    tooltip_text.push(TooltipTextProps::new(
-                        vec!["".to_string()],
-                        0.,
-                        AttributeQuality::High,
-                        Anchor::CenterLeft,
-                    ));
-                }
-                tooltip_text.push(TooltipTextProps::new(
-                    vec![action_type],
-                    0.,
-                    AttributeQuality::Low,
-                    Anchor::CenterLeft,
-                ));
-                if !action_texts.is_empty() {
-                    let mut combined_actions = "".to_string();
-                    for action_text in action_texts.iter() {
-                        combined_actions += action_text;
-                        combined_actions += " ";
-                    }
-
-                    tooltip_text.push(TooltipTextProps::new(
-                        vec![combined_actions],
-                        0.,
-                        AttributeQuality::High,
-                        Anchor::CenterLeft,
-                    ));
-                }
+                //======== Header 2 ========
+                let _text = commands
+                    .spawn((
+                        Text2dBundle {
+                            text: Text::from_section(
+                                "Description".to_string(),
+                                TextStyle {
+                                    font: asset_server.load("fonts/slkscrbold.ttf"),
+                                    font_size: 8.5,
+                                    color: TOOLTIP_BLACK,
+                                },
+                            ),
+                            text_anchor: Anchor::CenterLeft,
+                            transform: Transform {
+                                translation: Vec3::new(-58., -50., 1.),
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
+                            },
+                            ..default()
+                        },
+                        Name::new("TOOLTIP Rarity TEXT"),
+                        RenderLayers::from_layers(&[3]),
+                    ))
+                    .set_parent(tooltip)
+                    .id();
             } else {
                 tooltip_text.push(TooltipTextProps::new(
                     vec!["".to_string()],
                     0.,
                     AttributeQuality::Low,
                     Anchor::CenterLeft,
-                ));
-                tooltip_text.push(TooltipTextProps::new(
-                    vec![format!(
-                        "{}Material",
-                        if item.item_stack.obj_type == WorldObject::UpgradeTome
-                            || item.item_stack.obj_type == WorldObject::OrbOfTransformation
-                        {
-                            "Upgrade "
-                        } else {
-                            ""
-                        }
-                    )],
-                    0.,
-                    AttributeQuality::Low,
-                    Anchor::CenterLeft,
+                    "fonts/slkscr.ttf".to_string(),
                 ));
             }
             for (i, desc_string) in item.item_stack.metadata.desc.iter().enumerate().clone() {
                 tooltip_text.push(TooltipTextProps::new(
                     vec![desc_string.to_string()],
-                    4. + if item.is_recipe {
-                        5. * (i + 1) as f32
+                    -10. + if item.is_recipe {
+                        3. + 6. * (i) as f32
                     } else {
                         0.
                     },
                     AttributeQuality::Average,
                     Anchor::CenterLeft,
+                    "fonts/slkscr.ttf".to_string(),
                 ));
             }
         }
 
         for (i, props) in tooltip_text.iter().enumerate() {
-            let text_pos = if i == 0 {
-                Vec3::new(-0.0, size.y / 2. - 12., 1.)
-            } else {
-                Vec3::new(
-                    -size.x / 2. + 8. + if item.is_recipe { 4. } else { 0. },
-                    size.y / 2. - 14. - (i as f32 * 12.) - props.offset,
-                    1.,
-                )
-            };
+            let text_pos = Vec3::new(
+                -size.x / 2. + 13. + if item.is_recipe && i != 0 { 16. } else { 0. },
+                size.y / 2. - 98. - (i as f32 * 9.) - props.offset,
+                2.,
+            );
+
             for (j, t) in props.text.clone().iter().enumerate() {
                 if !item.show_range && j == 1 {
                     continue;
@@ -335,16 +566,14 @@ pub fn handle_spawn_inv_item_tooltip(
                             text: Text::from_section(
                                 t,
                                 TextStyle {
-                                    font: asset_server.load("fonts/slkscr.ttf"),
-                                    font_size: 8.4,
-                                    color: if i == 0 {
-                                        item.item_stack.rarity.get_color()
-                                    } else if j == 1 {
+                                    font: asset_server.load(props.font.as_str()),
+                                    font_size: props.font_size,
+                                    color: if j == 1 {
                                         LIGHT_GREY
                                     } else {
                                         match props.quality {
-                                            AttributeQuality::Low => LIGHT_GREY,
-                                            AttributeQuality::Average => GREY,
+                                            AttributeQuality::Low => GREY,
+                                            AttributeQuality::Average => TOOLTIP_BLACK_2,
                                             AttributeQuality::High => props.quality.get_color(),
                                         }
                                     },
@@ -374,8 +603,6 @@ pub fn handle_spawn_inv_item_tooltip(
                 commands.entity(tooltip).add_child(text);
             }
 
-            // Draw green box around inventory buff line if this is the selected line
-            // Tooltip structure: [name (index 0), base_attrs..., attack_cooldown (if exists), bonus_stat_lines...]
             if let Some(buff_line_index) = item.item_stack.metadata.inventory_buff_line_index {
                 // Count base attributes that appear before bonus stat lines
                 // Base attributes have range text like "({}-{})", bonus stat lines have empty range text
@@ -415,7 +642,7 @@ pub fn handle_spawn_inv_item_tooltip(
                             } else {
                                 break;
                             }
-                        } else if attr_name.contains("Hits/s") {
+                        } else if attr_name.contains("Attacks / sec") {
                             // Hits/s is always a base attribute (attack_cooldown), no range text but it's base
                             count += 1;
                         } else {
@@ -445,7 +672,7 @@ pub fn handle_spawn_inv_item_tooltip(
                         {
                             base_attribute_names.insert("attack".to_string());
                         }
-                        if !has_range && !attr_name.contains("Hits/s") {
+                        if !has_range && !attr_name.contains("Attacks / sec") {
                             break;
                         }
                     }
@@ -465,77 +692,61 @@ pub fn handle_spawn_inv_item_tooltip(
                 };
 
                 // Tooltip index = 1 (name) + num_base_attrs + filtered_buff_line_index
-                let tooltip_index = 1 + num_base_attrs + filtered_buff_line_index;
+                let tooltip_index = num_base_attrs + filtered_buff_line_index;
                 if i == tooltip_index && i > 0 {
-                    // Spawn a green box behind the text line (7px height)
-                    // Position it at the same Y as the text line, centered horizontally
-                    let box_width = size.x - 14.0; // Full width minus padding (8px on each side)
-                    let box_height = 7.0;
-                    // Box is centered horizontally in the tooltip
                     let box_x = 0.0;
-                    // Use the same Y position as the text line
-                    let box_y = size.y / 2. - 14. - (i as f32 * 10.) - props.offset;
-                    let box_pos = Vec3::new(box_x, box_y, 0.9); // Slightly behind text
-
-                    let green_box = commands
-                        .spawn((
-                            SpriteBundle {
-                                sprite: Sprite {
-                                    color: LIGHT_GREEN,
-                                    custom_size: Some(Vec2::new(box_width, box_height)),
-                                    ..Default::default()
-                                },
-                                transform: Transform {
-                                    translation: box_pos,
-                                    ..Default::default()
-                                },
-                                ..Default::default()
-                            },
-                            RenderLayers::from_layers(&[3]),
-                            Name::new("INVENTORY_BUFF_BOX"),
-                        ))
-                        .id();
-                    commands.entity(tooltip).add_child(green_box);
+                    let box_y = size.y / 2. - 99. - (i as f32 * 9.) - props.offset;
+                    let box_pos = Vec3::new(box_x, box_y, 1.);
+                    let anim = AsepriteAnimation::from(InventoryStatHighlight::tags::IDLE);
+                    commands
+                        .spawn(AsepriteBundle {
+                            aseprite: asset_server.load(InventoryStatHighlight::PATH),
+                            animation: anim,
+                            transform: Transform::from_translation(box_pos),
+                            ..Default::default()
+                        })
+                        .insert(RenderLayers::from_layers(&[3]))
+                        .set_parent(tooltip);
                 }
             }
 
-            if item.is_recipe && i > 2 {
+            if item.is_recipe && i > 0 {
                 let ingredient_world_obj: Vec<WorldObject> = recipes
                     .crafting_list
-                    .get(&item.item_stack.obj_type)
+                    .get(&obj_type)
                     .unwrap()
                     .0
                     .iter()
                     .map(|r| r.item)
                     .collect();
-                let icon_e = spawn_item_stack_icon(
-                    &mut commands,
-                    &graphics,
-                    &ItemStack {
-                        obj_type: ingredient_world_obj[i - 3],
-                        count: 1,
-                        ..Default::default()
-                    },
-                    &asset_server,
-                    Vec2::ZERO,
-                    Vec2::new(0., 0.),
-                    3,
-                );
-                commands
-                    .entity(icon_e)
-                    .insert(RecipeIngredientTooltipIcon)
-                    .insert(Transform {
-                        translation: text_pos + Vec3::new(22., 0., 0.),
-                        ..Default::default()
-                    });
-                commands.entity(tooltip).add_child(icon_e);
+                if i <= ingredient_world_obj.len() {
+                    let icon_e = spawn_item_stack_icon(
+                        &mut commands,
+                        &graphics,
+                        &ItemStack {
+                            obj_type: ingredient_world_obj[i - 1],
+                            count: 1,
+                            ..Default::default()
+                        },
+                        &asset_server,
+                        Vec2::ZERO,
+                        Vec2::new(0., 0.),
+                        3,
+                    );
+                    commands
+                        .entity(icon_e)
+                        .insert(RecipeIngredientTooltipIcon)
+                        .insert(Transform {
+                            translation: text_pos + Vec3::new(-8., 0., 1.),
+                            ..Default::default()
+                        });
+                    commands.entity(tooltip).add_child(icon_e);
 
-                // bounce - only bounce actual inventory items, not tooltip ingredient icons
-                for (e, stack) in item_stacks.iter() {
-                    if stack.obj_type == ingredient_world_obj[i - 3] {
-                        // Check if entity still exists before inserting components
-                        if let Some(mut entity_commands) = commands.get_entity(e) {
-                            entity_commands.insert(BounceOnHit::new());
+                    for (e, stack) in item_stacks.iter() {
+                        if stack.obj_type == ingredient_world_obj[i - 1] {
+                            if let Some(mut entity_commands) = commands.get_entity(e) {
+                                entity_commands.insert(BounceOnHit::new());
+                            }
                         }
                     }
                 }
@@ -544,7 +755,7 @@ pub fn handle_spawn_inv_item_tooltip(
         for i in 0..num_stars {
             let star = spawn_sprite(
                 &mut commands,
-                Vec3::new(36. - i as f32 * 7., -size.y / 2. + 10., 1.),
+                Vec3::new(-12.5 + i as f32 * 9., size.y / 2. - 62., 1.),
                 graphics.get_ui_element_texture(UIElement::StarIcon),
                 3,
             );
@@ -587,6 +798,11 @@ pub fn handle_spawn_inv_player_stats(
                 &XpRateBonus,
             ),
             &LootRateBonus,
+            &ProjectileSize,
+            &SkillPower,
+            &Lifesteal,
+            &PickupRange,
+            &AttackSpeed,
         ),
         With<Player>,
     >,
@@ -637,6 +853,11 @@ pub fn handle_spawn_inv_player_stats(
                 xp_rate_bonus,
             ),
             loot_rate_bonus,
+            size,
+            skill_power,
+            lifesteal,
+            pickup_range,
+            attack_speed,
         ) = player_stats.single();
 
         let attributes = ItemAttributes {
@@ -654,7 +875,12 @@ pub fn handle_spawn_inv_player_stats(
             speed: AttributeValue::new(speed.0, AttributeQuality::Low, 0.),
             xp_rate: AttributeValue::new(xp_rate_bonus.0, AttributeQuality::Low, 0.),
             loot_rate: AttributeValue::new(loot_rate_bonus.0, AttributeQuality::Low, 0.),
-            ..default()
+            size: AttributeValue::new(size.0, AttributeQuality::Low, 0.),
+            skill_power: AttributeValue::new(skill_power.0, AttributeQuality::Low, 0.),
+            lifesteal: AttributeValue::new(lifesteal.0, AttributeQuality::Low, 0.),
+            pickup_range: AttributeValue::new(pickup_range.0, AttributeQuality::Low, 0.),
+            attack_speed: AttributeValue::new(attack_speed.0, AttributeQuality::Low, 0.),
+            ..Default::default()
         }
         .get_stats_summary(curr_health.0, curr_mana.0);
 

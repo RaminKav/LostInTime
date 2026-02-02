@@ -86,6 +86,8 @@ pub struct ItemAttributes {
     pub size: AttributeValue,
     pub attack_speed: AttributeValue,
     pub mana_regen: AttributeValue,
+    pub pickup_range: AttributeValue,
+    pub skill_power: AttributeValue,
 }
 
 #[derive(PartialEq, Clone, Copy, Reflect, FromReflect, Default, Debug, Serialize, Deserialize)]
@@ -206,6 +208,8 @@ impl ItemAttributes {
             "size" | "projectile_size" => format!("{}{}% Size", sign, value),
             "xp_rate" => format!("{}{}% XP", sign, value),
             "mana_regen" => format!("{}{} MP Regen", sign, value),
+            "pickup_range" => format!("{}{}% Pickup Range", sign, value),
+            "skill_power" => format!("{}{}% Skill Power", sign, value),
             "durability" => format!("{}{} Durability", sign, value),
             "max_durability" => format!("{}{} Max Durability", sign, value),
             _ => format!("{}{} {}", sign, value, attribute_name),
@@ -365,7 +369,7 @@ impl ItemAttributes {
         // Add attack cooldown (Hits/s) if it exists
         if combined_attrs.attack_cooldown != 0. {
             tooltips.push((
-                format!("{:.2} Hits/s", 1. / combined_attrs.attack_cooldown),
+                format!("{:.2} Attacks / sec", 1. / combined_attrs.attack_cooldown),
                 "".to_string(),
                 AttributeQuality::Average,
             ));
@@ -436,16 +440,18 @@ impl ItemAttributes {
             format!("{}", self.crit_damage),
         ));
         tooltips.push((
+            "Skill Power     ".to_string(),
+            format!("{}", self.skill_power),
+        ));
+        tooltips.push((
             "Health Regen  ".to_string(),
             format!("{}", self.health_regen),
         ));
-        tooltips.push(("Healing         ".to_string(), format!("{}", self.healing)));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
         tooltips.push(("Dodge            ".to_string(), format!("{}", self.dodge)));
         tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));
 
         tooltips.push(("Size           ".to_string(), format!("{}", self.size)));
-        tooltips.push(("Shield           ".to_string(), format!("{}", self.shield)));
         tooltips.push((
             "Attack Speed           ".to_string(),
             format!("{}", self.attack_speed),
@@ -457,6 +463,10 @@ impl ItemAttributes {
 
         tooltips.push(("XP ".to_string(), format!("{}", self.xp_rate)));
         tooltips.push(("Luck ".to_string(), format!("{}", self.loot_rate)));
+        tooltips.push((
+            "Pickup Range    ".to_string(),
+            format!("{}", self.pickup_range),
+        ));
 
         tooltips
     }
@@ -524,21 +534,23 @@ impl ItemAttributes {
         if skills.get_count(Heirloom::Shield) * 10 != old_shield {
             entity.insert(MaxShield(skills.get_count(Heirloom::Shield) * 10));
         }
+
+        let total_attack_speed =
+            self.attack_speed.value + skills.get_count(Heirloom::AttackSpeed) * 15;
+        entity.insert(AttackSpeed(total_attack_speed));
+
         if self.attack_cooldown > 0. {
-            let attack_speed_mod = 1. + self.attack_speed.value as f32 / 100.;
             let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
             let bonus_attack_speed_multiplier = bonus_attack_speed
                 .map(|b| b.get_multiplier())
                 .unwrap_or(1.0);
             let bonus_tiny_attack_speed = if has_tiny_blessing { 1.5 } else { 1.0 };
-            entity.insert(AttackCooldown(
-                self.attack_cooldown
-                    * (1.0 - skills.get_count(Heirloom::AttackSpeed) as f32 * 0.15)
-                    / attack_speed_mod
-                    / dodge_crit_attack_speed_mod
-                    / bonus_attack_speed_multiplier
-                    / bonus_tiny_attack_speed,
-            ));
+            let attack_speed_mod = (1.0 + total_attack_speed as f32 / 100.0)
+                / dodge_crit_attack_speed_mod
+                / bonus_tiny_attack_speed
+                * bonus_attack_speed_multiplier;
+
+            entity.insert(AttackCooldown(self.attack_cooldown / attack_speed_mod));
         } else {
             entity.remove::<AttackCooldown>();
         }
@@ -639,6 +651,12 @@ impl ItemAttributes {
         entity.insert(ProjectileSize(
             self.size.value + skills.get_count(Heirloom::Gigantify) * 10,
         ));
+        entity.insert(PickupRange(
+            self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25,
+        ));
+        entity.insert(SkillPower(
+            self.skill_power.value + skills.get_count(Heirloom::SkillPower) * 15,
+        ));
     }
     pub fn get_random_existing_bonus_attribute_string(
         &self,
@@ -678,6 +696,8 @@ impl ItemAttributes {
             "size" => self.size.value += modifier.delta,
             "xp_rate" => self.xp_rate.value += modifier.delta,
             "mana_regen" => self.mana_regen.value += modifier.delta,
+            "pickup_range" => self.pickup_range.value += modifier.delta,
+            "skill_power" => self.skill_power.value += modifier.delta,
             "durability" => self.durability.value += modifier.delta,
             "max_durability" => self.max_durability.value += modifier.delta,
             "attack_cooldown" => self.attack_cooldown += modifier.delta as f32,
@@ -717,6 +737,8 @@ impl ItemAttributes {
                 "size" | "projectile_size" => attrs.size = attrs.size + attr_value,
                 "xp_rate" => attrs.xp_rate = attrs.xp_rate + attr_value,
                 "mana_regen" => attrs.mana_regen = attrs.mana_regen + attr_value,
+                "pickup_range" => attrs.pickup_range = attrs.pickup_range + attr_value,
+                "skill_power" => attrs.skill_power = attrs.skill_power + attr_value,
                 "durability" => attrs.durability = attrs.durability + attr_value,
                 "max_durability" => attrs.max_durability = attrs.max_durability + attr_value,
                 _ => warn!(
@@ -752,6 +774,8 @@ impl ItemAttributes {
             mana: self.mana + other.mana,
             mana_regen: self.mana_regen + other.mana_regen,
             size: self.size + other.size,
+            pickup_range: self.pickup_range + other.pickup_range,
+            skill_power: self.skill_power + other.skill_power,
         }
     }
 }
@@ -898,6 +922,8 @@ setup_raw_bonus_attributes! { struct RawItemBonusAttributes {
      mana_regen: Option<RangeInclusive<i32>>,
      size: Option<RangeInclusive<i32>>,
      attack_speed: Option<RangeInclusive<i32>>,
+     pickup_range: Option<RangeInclusive<i32>>,
+     skill_power: Option<RangeInclusive<i32>>,
 }}
 
 setup_raw_base_attributes! { struct RawItemBaseAttributes {
@@ -922,6 +948,8 @@ setup_raw_base_attributes! { struct RawItemBaseAttributes {
      mana_regen: Option<RangeInclusive<i32>>,
      size: Option<RangeInclusive<i32>>,
      attack_speed: Option<RangeInclusive<i32>>,
+     pickup_range: Option<RangeInclusive<i32>>,
+     skill_power: Option<RangeInclusive<i32>>,
 }}
 
 #[derive(
@@ -961,7 +989,7 @@ impl ItemRarity {
             ItemRarity::Common => (2 + acc_offset)..=(2 + acc_offset),
             ItemRarity::Uncommon => (3 + acc_offset)..=(3 + acc_offset),
             ItemRarity::Rare => (4 + acc_offset)..=(4 + acc_offset),
-            ItemRarity::Legendary => (5 + acc_offset)..=(6 + acc_offset),
+            ItemRarity::Legendary => (5 + acc_offset)..=(5 + acc_offset),
         };
         if eqp_type.is_accessory() {
             // max of 2
@@ -1012,6 +1040,14 @@ impl ItemRarity {
             ItemRarity::Uncommon => Some(ItemGlow::Green),
             ItemRarity::Rare => Some(ItemGlow::Blue),
             ItemRarity::Legendary => Some(ItemGlow::Red),
+        }
+    }
+    pub fn get_name(&self) -> &'static str {
+        match self {
+            ItemRarity::Common => "Common",
+            ItemRarity::Uncommon => "Uncommon",
+            ItemRarity::Rare => "Rare",
+            ItemRarity::Legendary => "Legendary",
         }
     }
     pub fn get_scrap(&self) -> ScrapsInto {
@@ -1068,6 +1104,7 @@ pub struct PlayerAttributeBundle {
     pub mana: MaxMana,
     pub attack: Attack,
     pub attack_cooldown: AttackCooldown,
+    pub attack_speed: AttackSpeed,
     pub defence: Defence,
     pub crit_chance: CritChance,
     pub crit_damage: CritDamage,
@@ -1115,9 +1152,6 @@ pub struct MaxHealth(pub i32);
 #[derive(Reflect, FromReflect, Default, Schematic, Component, Clone, Debug, Copy)]
 #[reflect(Component, Schematic)]
 pub struct Attack(pub i32);
-#[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
-#[reflect(Component)]
-pub struct Durability(pub i32);
 
 #[derive(Reflect, FromReflect, Default, Component, Clone, Debug, Copy)]
 #[reflect(Component)]
@@ -1151,6 +1185,18 @@ pub struct ProjectileSize(pub i32);
 impl ProjectileSize {
     pub fn get_multiplier(&self) -> f32 {
         1. + self.0 as f32 / 100.
+    }
+}
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct PickupRange(pub i32);
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct SkillPower(pub i32);
+
+#[derive(Default, Component, Clone, Debug, Copy)]
+pub struct AttackSpeed(pub i32);
+impl AttackSpeed {
+    pub fn _get_multiplier(&self) -> f32 {
+        1.0 + self.0 as f32 / 100.0
     }
 }
 
@@ -1408,6 +1454,8 @@ fn extract_inventory_buff_attribute(
             "mana_regen" => buff_att.mana_regen = attr_value,
             "durability" => buff_att.durability = attr_value,
             "max_durability" => buff_att.max_durability = attr_value,
+            "skill_power" => buff_att.skill_power = attr_value,
+            "pickup_range" => buff_att.pickup_range = attr_value,
             _ => return None, // Unknown attribute
         }
 
@@ -1552,7 +1600,6 @@ pub fn add_current_shield_with_max_shield(
     mut shield: Query<(Entity, &MaxShield), Or<(Changed<MaxShield>, Without<CurrentShield>)>>,
 ) {
     for (entity, max_shield) in shield.iter_mut() {
-        info!("Adding CurrentShield component with value {}", max_shield.0);
         // Check if entity still exists before inserting components
         if let Some(mut entity_commands) = commands.get_entity(entity) {
             entity_commands.insert(CurrentShield(max_shield.0));

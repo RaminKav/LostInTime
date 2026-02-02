@@ -2,7 +2,7 @@ use std::{f32::consts::PI, time::Duration};
 
 use crate::{
     animations::{player_sprite::PlayerAnimation, AttackEvent, DoneAnimation},
-    attributes::{Attack, CurrentMana},
+    attributes::{attribute_helpers::skill_power_multiplier, Attack, CurrentMana, SkillPower},
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
     colors::BLACK,
@@ -129,6 +129,7 @@ pub fn handle_lunge(
         &Attack,
         &OwnedBlessings,
         &mut CurrentMana,
+        &SkillPower,
     )>,
     key_inputs: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
@@ -137,8 +138,18 @@ pub fn handle_lunge(
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
 ) {
-    for (e, mut lunge_state, mut kcc, mut mv, skills, dir, dmg, blessings, mut current_mana) in
-        query.iter_mut()
+    for (
+        e,
+        mut lunge_state,
+        mut kcc,
+        mut mv,
+        skills,
+        dir,
+        dmg,
+        blessings,
+        mut current_mana,
+        skill_power,
+    ) in query.iter_mut()
     {
         if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
             if keybinds.check_skill_input(lunge_slot, &key_inputs, &mouse_input)
@@ -157,7 +168,7 @@ pub fn handle_lunge(
                     FacingDirection::Right => PI / 2.,
                 };
                 let skill_power_mult =
-                    skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
+                    skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
                 let lunge_e = spawn_temp_collider(
                     &mut commands,
                     Transform::from_translation(Vec3::new(0., 0., 0.))
@@ -224,7 +235,6 @@ pub fn handle_lunge(
 }
 
 pub fn handle_sprinting_cooldown(
-    time: Res<Time>,
     mut query: Query<(Entity, &mut SprintState, &PlayerAnimation), Without<Sprinting>>,
     mut commands: Commands,
 ) {

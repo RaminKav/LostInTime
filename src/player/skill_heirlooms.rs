@@ -7,7 +7,10 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     ai::FollowState,
-    attributes::{Attack, AttackCooldown, BonusAttackSpeed, CurrentHealth, CurrentMana, MaxHealth},
+    attributes::{
+        attribute_helpers::skill_power_multiplier, Attack, AttackCooldown, BonusAttackSpeed,
+        CurrentHealth, CurrentMana, MaxHealth, SkillPower,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::{Blessing, OwnedBlessings},
     combat::{
@@ -85,6 +88,7 @@ pub fn handle_active_skill_event(
             &MaxHealth,
             &OwnedBlessings,
             &mut CurrentMana,
+            &SkillPower,
         ),
         With<Player>,
     >,
@@ -108,6 +112,7 @@ pub fn handle_active_skill_event(
             max_health,
             blessings,
             mut current_mana,
+            skill_power,
         ) in players.iter_mut()
         {
             // Get optional states from separate queries
@@ -202,7 +207,7 @@ pub fn handle_active_skill_event(
                     }
                 }
                 let power_mult =
-                    skills.skill_power_multiplier() * blessings.get_skill_power_bonus();
+                    skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
                 let skill_cd = ev.cooldown * skills.skill_cooldown_multiplier() * blessing_cd_mult;
                 match active.active_skill {
                     ActiveSkill::Stealth => {
@@ -1807,8 +1812,7 @@ pub fn handle_crit_heal(
 pub fn handle_fury_skill(
     fury_states: Query<(&FuryState, &GlobalTransform), With<Player>>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    player_skills: Query<&PlayerSkills, With<Player>>,
-    attack_query: Query<&Attack, With<Player>>,
+    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings), With<Player>>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
 ) {
     for (fury_state, player_transform) in fury_states.iter() {
@@ -1818,11 +1822,12 @@ pub fn handle_fury_skill(
 
         if fury_state.throw_timer.just_finished() {
             let player_pos = player_transform.translation().truncate();
-            let power_mult = player_skills
-                .get_single()
-                .map(|s| s.skill_power_multiplier())
-                .unwrap_or(1.0);
-            let base_dmg: i32 = attack_query.get_single().map(|a| a.0).unwrap_or(10);
+            let Ok((skill_power, attack, blessings)) = player_skills.get_single() else {
+                continue;
+            };
+
+            let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+            let base_dmg: i32 = attack.0;
             let dmg = (base_dmg as f32 * power_mult) as i32;
 
             let range = 10.0 * TILE_SIZE.x;
@@ -1899,15 +1904,15 @@ pub fn handle_bomb_explosion(
     projectiles: Query<&Projectile>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
-    attack_query: Query<&Attack, With<Player>>,
-    player_skills: Query<&PlayerSkills, With<Player>>,
+    player_skills: Query<(&SkillPower, &Attack, &OwnedBlessings, &Attack), With<Player>>,
     mut status_event: EventWriter<StatusEffectEvent>,
 ) {
-    let power_mult = player_skills
-        .get_single()
-        .map(|s| s.skill_power_multiplier())
-        .unwrap_or(1.0);
-    let base_dmg: i32 = attack_query.get_single().map(|a| a.0).unwrap_or(10);
+    let Ok((skill_power, attack, blessings, _)) = player_skills.get_single() else {
+        return;
+    };
+    let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+
+    let base_dmg: i32 = attack.0;
     let dmg = (base_dmg as f32 * power_mult) as i32;
 
     for (bomb_entity, bomb_txfm, bomb_target_opt) in bomb_projectiles.iter_mut() {

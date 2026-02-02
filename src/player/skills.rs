@@ -964,7 +964,7 @@ impl Heirloom {
                 "active class skill.".to_string(),
             ],
             Heirloom::SkillPower => {
-                vec!["Skills gain +15%".to_string(), "effectivness.".to_string()]
+                vec!["Increases skill".to_string(), "power by +15%".to_string()]
             }
             Heirloom::CritSkillCooldownReduction => vec![
                 "Landing a critical".to_string(),
@@ -1923,11 +1923,6 @@ impl PlayerSkills {
     }
     pub fn skill_extra_charges(&self) -> u32 {
         self.get_count(Heirloom::SkillChargeIncrease).max(0) as u32
-    }
-    pub fn skill_power_multiplier(&self) -> f32 {
-        // 15% additive increase per item: 1.0 + 0.15 * count
-        let count = self.get_count(Heirloom::SkillPower).max(0) as f32;
-        1.0 + (0.15 * count)
     }
     pub fn calculate_freeze_chance(&self) -> f64 {
         let mut chance = 0.0;
