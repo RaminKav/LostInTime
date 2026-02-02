@@ -324,7 +324,7 @@ pub fn handle_active_skill_event(
                         });
                         // spawn fire ring projectile at cursor world position with player's attack as damage
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 0.55) as i32;
                         let pos = cursor.world_coords.truncate();
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::FireRing,
@@ -360,7 +360,7 @@ pub fn handle_active_skill_event(
                             hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                         });
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 0.6) as i32;
                         let player_pos = player_txfm.translation().truncate();
                         let direction =
                             (cursor.world_coords.truncate() - player_pos).normalize_or_zero();
@@ -526,7 +526,7 @@ pub fn handle_active_skill_event(
                             .insert(IceWallSkillState { cooldown_timer: cd });
                         // Placeholder: spawn ice explosion at cursor for now
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 2.) as i32; // ice wall does double base dmg
+                        let dmg = (base_dmg as f32 * power_mult * 3.) as i32; // ice wall does double base dmg
                         let pos = cursor.world_coords.truncate() + Vec2::new(0., 32.); // slight offset so it appears below cursor
 
                         ranged_attack_events.send(RangedAttackEvent {
@@ -607,7 +607,7 @@ pub fn handle_active_skill_event(
                             .insert(ShoutSkillState { cooldown_timer: cd });
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.3) as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::Shout,
@@ -660,7 +660,7 @@ pub fn handle_active_skill_event(
                             .insert(PiercingStarSkillState { cooldown_timer: cd });
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.5) as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::ThrowingStarLarge,
@@ -836,7 +836,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn lightning at each enemy (using IceExplosionAOE as placeholder)
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.8) as i32;
                         for (_, enemy_pos, _) in enemy_distances {
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Lightning,
@@ -888,7 +888,7 @@ pub fn handle_active_skill_event(
 
                         // Throw 3 throwing stars towards nearest enemies
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.75) as i32;
                         for (_, enemy_pos, _) in enemy_distances {
                             let direction = (enemy_pos - player_pos).normalize_or_zero();
                             ranged_attack_events.send(RangedAttackEvent {
@@ -932,7 +932,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn sword projectile in front of player
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 2.75) as i32;
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::DaggerSlash,
                             direction,
@@ -974,7 +974,7 @@ pub fn handle_active_skill_event(
                         // Throw 3 throwing stars in a cone (15 degree spread)
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 2.35) as i32;
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let angle = base_angle + angle_offset;
@@ -1044,7 +1044,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn bomb projectile toward cursor position
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 2.2) as i32;
 
                         // Store the target position for later attachment to the bomb projectile
                         // We'll attach it after the projectile spawns
@@ -1828,7 +1828,7 @@ pub fn handle_fury_skill(
 
             let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
             let base_dmg: i32 = attack.0;
-            let dmg = (base_dmg as f32 * power_mult) as i32;
+            let dmg = (base_dmg as f32 * power_mult * 1.65) as i32;
 
             let range = 10.0 * TILE_SIZE.x;
             let nearby_enemies: Vec<(Entity, Vec2, f32)> = enemies

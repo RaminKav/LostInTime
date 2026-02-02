@@ -5,10 +5,11 @@ use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
 use crate::{
     animations::player_sprite::PlayerAnimation,
     attributes::{
-        modifiers::ModifyHealthEvent, Attack, CurrentHealth, CurrentMana, HealthRegen,
-        ProjectileSize,
+        attribute_helpers::skill_power_multiplier, modifiers::ModifyHealthEvent, Attack,
+        CurrentHealth, CurrentMana, HealthRegen, ProjectileSize, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    blessings::OwnedBlessings,
     colors::LIGHT_RED,
     combat_helpers::{spawn_deferred_aseprite_collider, spawn_temp_collider},
     cursor::CursorPos,
@@ -341,12 +342,21 @@ pub fn spawn_echo_hitbox(
 }
 
 pub fn handle_spear_pull_delay(
-    mut player_query: Query<(Entity, &mut SpearPullDelay, &Attack), With<Player>>,
+    mut player_query: Query<
+        (
+            Entity,
+            &mut SpearPullDelay,
+            &Attack,
+            &SkillPower,
+            &OwnedBlessings,
+        ),
+        With<Player>,
+    >,
     mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
     time: Res<Time>,
     mut commands: Commands,
 ) {
-    for (player_e, mut pull_delay, attack) in player_query.iter_mut() {
+    for (player_e, mut pull_delay, attack, skill_power, blessings) in player_query.iter_mut() {
         pull_delay.delay_timer.tick(time.delta());
         if !pull_delay.delay_timer.just_finished() {
             continue;
@@ -367,13 +377,14 @@ pub fn handle_spear_pull_delay(
                 });
             }
         }
-
+        let skill_power_mult =
+            skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         // Spawn 20px damage hitbox at epicenter
         let hitbox = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
             0.5, // Very short duration, just for the hit
-            attack.0,
+            (attack.0 as f32 * skill_power_mult * 1.85) as i32,
             Collider::ball(18.0), // 20px radius
             Projectile::Echo,
         );
