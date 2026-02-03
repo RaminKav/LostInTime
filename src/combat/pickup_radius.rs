@@ -30,11 +30,35 @@ pub fn update_pickup_radius(
     pickup_radius.0 = BASE_PICKUP_RADIUS * pickup_range_bonus;
 }
 
-/// System that pulls items toward the player when they're within pickup range
-pub fn handle_item_pickup_radius(
-    mut item_query: Query<(Entity, &mut Transform), (With<ItemDrop>, Without<Player>)>,
+/// Component that marks an item drop as being pulled to the player
+/// Tracks how long it's been pulled to increase speed over time
+#[derive(Component, Debug, Clone)]
+pub struct BeingPulledToPlayer {
+    /// Time elapsed since the item started being pulled
+    pub time_pulled: f32,
+}
+
+impl Default for BeingPulledToPlayer {
+    fn default() -> Self {
+        Self { time_pulled: 0.0 }
+    }
+}
+
+pub const MIN_PULL_SPEED: f32 = 10.0;
+pub const MAX_PULL_SPEED: f32 = 500.0;
+pub const PULL_ACCELERATION: f32 = 200.0;
+
+pub fn mark_items_in_pickup_range(
+    mut commands: Commands,
+    item_query: Query<
+        (Entity, &Transform),
+        (
+            With<ItemDrop>,
+            Without<Player>,
+            Without<BeingPulledToPlayer>,
+        ),
+    >,
     player_query: Query<(&Transform, &PickupRadius), With<Player>>,
-    time: Res<Time>,
 ) {
     let Ok((player_transform, pickup_radius)) = player_query.get_single() else {
         return;
@@ -43,23 +67,51 @@ pub fn handle_item_pickup_radius(
     let player_pos = player_transform.translation.truncate();
     let pickup_range = pickup_radius.0;
 
-    for (_item_entity, mut item_transform) in item_query.iter_mut() {
+    for (item_entity, item_transform) in item_query.iter() {
         let item_pos = item_transform.translation.truncate();
         let distance = player_pos.distance(item_pos);
 
-        // If item is within pickup range, pull it toward the player
         if distance <= pickup_range && distance > 0.0 {
-            // Calculate direction from item to player
-            let direction = (player_pos - item_pos).normalize();
-
-            // Pull speed increases as item gets closer (faster when closer)
-            // 20 /(4000)
-            let pull_speed = 10.0 + (pickup_range - distance) / pickup_range * 100.0; // 10.0 to 12.0 speed
-
-            // Move item toward player
-            let movement = direction * pull_speed * time.delta().as_secs_f32();
-            item_transform.translation += movement.extend(0.0);
+            commands
+                .entity(item_entity)
+                .insert(BeingPulledToPlayer::default());
         }
+    }
+}
+
+pub fn handle_item_pickup_radius(
+    mut item_query: Query<
+        (Entity, &mut Transform, &mut BeingPulledToPlayer),
+        With<BeingPulledToPlayer>,
+    >,
+    player_query: Query<&Transform, (With<Player>, Without<BeingPulledToPlayer>)>,
+    mut commands: Commands,
+    time: Res<Time>,
+) {
+    let Ok(player_transform) = player_query.get_single() else {
+        return;
+    };
+
+    let player_pos = player_transform.translation.truncate();
+
+    for (item_entity, mut item_transform, mut pull_state) in item_query.iter_mut() {
+        let item_pos = item_transform.translation.truncate();
+        let distance = player_pos.distance(item_pos);
+
+        if distance <= 0.1 {
+            commands.entity(item_entity).remove::<BeingPulledToPlayer>();
+            continue;
+        }
+
+        pull_state.time_pulled += time.delta_seconds();
+
+        let pull_speed =
+            (MIN_PULL_SPEED + pull_state.time_pulled * PULL_ACCELERATION).min(MAX_PULL_SPEED);
+
+        let direction = (player_pos - item_pos).normalize_or_zero();
+
+        let movement = direction * pull_speed * time.delta_seconds();
+        item_transform.translation += movement.extend(0.0);
     }
 }
 

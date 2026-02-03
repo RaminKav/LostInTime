@@ -97,14 +97,14 @@ impl PlayerAnimation {
                     | WorldObject::FireStaff
                     | WorldObject::IceStaff
                     | WorldObject::MagicWhip => return 0.5,
-                    WorldObject::Sword => return 0.4,
+                    WorldObject::Sword => return 0.45,
                     WorldObject::Dagger => return 0.85,
-                    WorldObject::Hammer => return 0.1,
-                    WorldObject::Blowdart => return 0.6,
+                    WorldObject::Hammer => return 0.2,
+                    WorldObject::Blowdart => return 0.95,
                     WorldObject::Gun => return 0.7,
-                    WorldObject::WoodBow => return 0.25,
+                    WorldObject::WoodBow => return 0.37,
                     WorldObject::Claw => return 0.8,
-                    WorldObject::Spear => return 0.15,
+                    WorldObject::Spear => return 0.3,
                     _ => return 1.,
                 }
             }

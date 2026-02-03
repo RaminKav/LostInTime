@@ -124,6 +124,7 @@ impl Plugin for CombatPlugin {
         .add_systems(
             (
                 pickup_radius::update_pickup_radius.run_if(is_not_paused),
+                pickup_radius::mark_items_in_pickup_range.run_if(is_not_paused),
                 pickup_radius::handle_item_pickup_radius.run_if(is_not_paused),
                 pickup_radius::handle_magnet_pull.run_if(is_not_paused),
             )
@@ -392,9 +393,8 @@ pub fn handle_hits(
                     let lethal_blow_count =
                         game.get_player_skills().get_count(Heirloom::LethalBlow);
                     if lethal_blow_count > 0 && !mob.is_boss() {
-                        // 2% flat chance to execute (works on all weapons)
                         let mut rng = rand::thread_rng();
-                        if rng.gen_bool(0.02 * lethal_blow_count as f64) {
+                        if rng.gen_bool(0.005 * lethal_blow_count as f64) {
                             hit_health.0 = 0;
 
                             // Hallucination effect: grant random stat buff
@@ -689,7 +689,9 @@ pub fn cleanup_marked_for_death_entities(
                             );
                         }
                     }
-                    if skills.has(Heirloom::FrozenMPRegen) {
+                    let rng = &mut rand::thread_rng();
+                    let mirror_count = skills.get_count(Heirloom::FrozenMPRegen);
+                    if mirror_count > 0 && rng.gen_bool((0.2 * mirror_count as f64).min(1.0)) {
                         modify_mana_event.send(ModifyManaEvent(
                             mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
                         ));

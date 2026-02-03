@@ -951,7 +951,7 @@ impl Heirloom {
                 "time.".to_string(),
             ],
             Heirloom::LethalBlow => vec![
-                "2% chance to".to_string(),
+                "0.5% chance to".to_string(),
                 "execute enemies.".to_string(),
                 "Executes cause".to_string(),
                 "hallucinations,".to_string(),
@@ -1152,7 +1152,8 @@ impl Heirloom {
             ],
             Heirloom::FrozenMPRegen => vec![
                 "Killing a frozen".to_string(),
-                "enemy triggers".to_string(),
+                "enemy has a 20%".to_string(),
+                "chance to trigger".to_string(),
                 "mana regeneration.".to_string(),
                 "+25% freeze chance.".to_string(),
             ],
@@ -1617,7 +1618,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
-                HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Common),
+                HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),

@@ -487,7 +487,8 @@ fn juice_up_spawned_mobs_per_day(
         att.0 = (att.0 as f32 * attack_multiplier) as i32;
         exp.0 = (exp.0 as f32 * 1. * infinite_mode_xp_scaling) as u32;
         info!(
-            "chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}) |||| {:?} {:?}",
+            "[{}] chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}) |||| {:?} {:?}",
+            _mob,
             chaos_factor,
             night_tracker.days,
             player_level.single().level as f32 * 0.2,
