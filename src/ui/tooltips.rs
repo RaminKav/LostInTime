@@ -692,7 +692,7 @@ pub fn handle_spawn_inv_item_tooltip(
                 };
 
                 // Tooltip index = 1 (name) + num_base_attrs + filtered_buff_line_index
-                let tooltip_index = num_base_attrs + filtered_buff_line_index;
+                let tooltip_index = 1 + num_base_attrs + filtered_buff_line_index;
                 if i == tooltip_index && i > 0 {
                     let box_x = 0.0;
                     let box_y = size.y / 2. - 99. - (i as f32 * 9.) - props.offset;

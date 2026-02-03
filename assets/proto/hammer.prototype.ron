@@ -5,7 +5,7 @@
   "survival_rogue_like::item::WorldObject": Hammer,
   "survival_rogue_like::item::EquipmentType": Weapon,
  "survival_rogue_like::attributes::RawItemBaseAttributes": (
-        attack: Some((start: 12, end: 15)),
+        attack: Some((start: 11, end: 14)),
   ),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
        crit_damage: Some((start: 10, end: 14)),

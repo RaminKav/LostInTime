@@ -609,7 +609,7 @@ pub fn handle_active_skill_event(
                             .insert(ShoutSkillState { cooldown_timer: cd });
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.3) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.6) as i32;
 
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::Shout,

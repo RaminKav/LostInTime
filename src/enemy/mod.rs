@@ -439,16 +439,7 @@ fn juice_up_spawned_elite_mobs(
 }
 
 fn juice_up_spawned_mobs_per_day(
-    mut elites: Query<
-        (
-            Entity,
-            &mut MaxHealth,
-            &mut Attack,
-            &mut ExperienceReward,
-            &Mob,
-        ),
-        Added<Mob>,
-    >,
+    mut elites: Query<(Entity, &mut MaxHealth, &mut Attack, &Mob), Added<Mob>>,
     night_tracker: Res<NightTracker>,
     chaos_tracker: Option<Res<ChaosTracker>>,
     infinite_mode: Res<crate::night::InfiniteMode>,
@@ -459,11 +450,11 @@ fn juice_up_spawned_mobs_per_day(
     let global_chaos = chaos_tracker.as_ref().map(|c| c.get_chaos()).unwrap_or(0.0);
     // Get infinite mode chaos bonus (only applies during infinite mode, not carried to next era)
     let infinite_chaos = infinite_mode.get_chaos_bonus();
-    let is_infinite_mode = infinite_mode.active;
-    let infinite_mode_xp_scaling = if is_infinite_mode { 0.25 } else { 1.0 };
+    // let is_infinite_mode = infinite_mode.active;
+    // let infinite_mode_xp_scaling = if is_infinite_mode { 0.25 } else { 1.0 };
     let total_chaos = global_chaos + infinite_chaos;
 
-    for (e, mut hp, mut att, mut exp, _mob) in elites.iter_mut() {
+    for (e, mut hp, mut att, mob) in elites.iter_mut() {
         // 1. per day, 0.2 per level, 1 per heirloom, 1 per totem,
         let chaos_factor = 1. + total_chaos;
 
@@ -485,10 +476,10 @@ fn juice_up_spawned_mobs_per_day(
 
         hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
         att.0 = (att.0 as f32 * attack_multiplier) as i32;
-        exp.0 = (exp.0 as f32 * 1. * infinite_mode_xp_scaling) as u32;
+        // exp.0 = (exp.0 as f32 * 1. * infinite_mode_xp_scaling) as u32;
         info!(
             "[{}] chaos_factor: {} (days: {}, level: {}, global_chaos: {:.1}, infinite_chaos: {:.1}) |||| {:?} {:?}",
-            _mob,
+            mob,
             chaos_factor,
             night_tracker.days,
             player_level.single().level as f32 * 0.2,

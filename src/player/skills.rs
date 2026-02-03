@@ -315,7 +315,7 @@ impl ActiveSkill {
             ],
             ActiveSkill::Shout => vec![
                 "SCREAM, releasing a shockwave".to_string(),
-                format!("around you, dealing {}% damage.", skill_power * 130.0),
+                format!("around you, dealing {}% damage.", skill_power * 160.0),
             ],
             ActiveSkill::Heal => vec![
                 format!("Heal yourself for {}% of your", skill_power * 30.0),
