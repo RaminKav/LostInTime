@@ -31,7 +31,7 @@ use crate::{
     custom_commands::CommandsExt,
     enemy::{
         red_mushking::{AoEAttackState, DeathState, ReturnToShrineState, SummonAttackState},
-        stone_golem::SpikeAttackState,
+        stone_golem::{SpikeAttackState, SpikeWarning},
         Mob, MobLevel,
     },
     item::{
@@ -635,14 +635,17 @@ pub fn cleanup_marked_for_death_entities(
     mut status_event: EventWriter<StatusEffectEvent>,
     spike_attack_states: Query<&SpikeAttackState>,
     aoe_attack_states: Query<&AoEAttackState>,
+    spike_warnings: Query<(Entity, &SpikeWarning)>,
 ) {
     for (e, mob, slow_option, poison_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
         if mob.is_boss() {
             // Clean up preview entities before removing attack states
-            // StoneGolem spike attack preview
-            if let Ok(spike_state) = spike_attack_states.get(e) {
-                if let Some(preview_entity) = spike_state.preview_entity {
-                    commands.entity(preview_entity).despawn_recursive();
+            // StoneGolem spike attack warnings - despawn all warnings for this golem
+            if mob == &Mob::StoneGolem {
+                for (warning_entity, warning) in spike_warnings.iter() {
+                    if warning.golem_entity == e {
+                        commands.entity(warning_entity).despawn_recursive();
+                    }
                 }
             }
 

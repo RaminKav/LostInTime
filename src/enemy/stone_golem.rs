@@ -27,15 +27,26 @@ aseprite!(pub StoneGolem, "textures/stonegolem/StoneGolem.ase");
 aseprite!(pub StonePillar, "textures/stonegolem/StonePillar.ase");
 
 // Constants
-const SPIKE_ATTACK_COUNT: usize = 5;
-const SPIKE_ATTACK_INTERVAL: f32 = 0.15;
+const SPIKE_ATTACK_COUNT_MAX: usize = 7;
+const SPIKE_ATTACK_COUNT_MIN: usize = 4;
+const SPIKE_ATTACK_INTERVAL_MAX: f32 = 1.;
+const SPIKE_ATTACK_INTERVAL_MIN: f32 = 0.1;
 const SPIKE_WARNING_DELAY: f32 = 0.65; // Time between warning and damage
 const SPIKE_DAMAGE: i32 = 20;
 const SPIKE_DURATION: f32 = 10.0; // How long the spike hitbox lasts
+const SPIKE_DISTANCE_OFFSET_MAX: f32 = 40.0; // Maximum random distance offset from player
 
 #[derive(Component)]
 pub struct SpikeAttackTimer {
     pub random_timer: Timer,
+}
+
+/// Component for individual spike warnings that track their own timer
+#[derive(Component)]
+pub struct SpikeWarning {
+    pub timer: Timer,
+    pub target_pos: Vec2,
+    pub golem_entity: Entity,
 }
 
 #[derive(Clone, Component, Reflect)]
@@ -43,9 +54,7 @@ pub struct SpikeAttackTimer {
 pub struct SpikeAttackState {
     pub num_spikes_left: usize,
     pub attack_timer: Timer, // Controls interval between spikes
-    pub current_target_pos: Option<Vec2>,
-    pub preview_entity: Option<Entity>,
-    pub active_spike_delay_timer: Option<Timer>, // For the currently spawning spike delay
+    pub initialized: bool, // Track if we've initialized the spike count (for randomization on state entry)
 }
 
 #[derive(Clone, Copy, Reflect)]
@@ -109,11 +118,9 @@ pub fn handle_new_stone_golem_state_machine(
             .trans::<FollowState>(
                 SpikeAttackTimerTrigger,
                 SpikeAttackState {
-                    num_spikes_left: SPIKE_ATTACK_COUNT,
-                    attack_timer: Timer::from_seconds(0.0, TimerMode::Once), // Start immediately
-                    current_target_pos: None,
-                    preview_entity: None,
-                    active_spike_delay_timer: None,
+                    num_spikes_left: 0,
+                    attack_timer: Timer::from_seconds(0.0, TimerMode::Once),
+                    initialized: false,
                 },
             )
             .trans::<SpikeAttackState>(
@@ -176,20 +183,36 @@ pub fn spawn_golem_spike_hitbox(
     );
 }
 
+/// Initialize spike attack state with random spike count when first entered
+pub fn initialize_spike_attack_state(
+    mut attacks: Query<
+        (Entity, &mut SpikeAttackState),
+        (
+            Added<SpikeAttackState>,
+            Without<crate::combat::MarkedForDeath>,
+        ),
+    >,
+) {
+    let mut rng = rand::thread_rng();
+    for (_entity, mut state) in attacks.iter_mut() {
+        if !state.initialized {
+            state.num_spikes_left = rng.gen_range(SPIKE_ATTACK_COUNT_MIN..=SPIKE_ATTACK_COUNT_MAX);
+            state.initialized = true;
+        }
+    }
+}
+
+/// Handle spawning spike warnings - can spawn multiple simultaneously
 pub fn handle_spike_attack(
     mut commands: Commands,
     mut attacks: Query<
         (Entity, &mut SpikeAttackState, &mut AsepriteAnimation),
         Without<crate::combat::MarkedForDeath>,
     >,
-    mut timers: Query<&mut SpikeAttackTimer>,
     player_query: Query<&Transform, With<Player>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    graphics: Res<Graphics>,
     time: Res<Time>,
-    game: GameParam,
-    follow_speed_query: Query<&FollowSpeed>,
 ) {
     for (entity, mut state, mut anim) in attacks.iter_mut() {
         // Set animation to Attack
@@ -205,105 +228,113 @@ pub fn handle_spike_attack(
 
         state.attack_timer.tick(time.delta());
 
-        if state.active_spike_delay_timer.is_none()
-            && state.num_spikes_left > 0
-            && state.attack_timer.finished()
-        {
-            // Start new spike sequence
+        // Spawn new warning when timer finishes and we still have spikes left
+        if state.attack_timer.finished() && state.num_spikes_left > 0 {
             if let Ok(player_txfm) = player_query.get_single() {
-                info!(
-                    "StoneGolem starting spike sequence. Spikes left: {}",
-                    state.num_spikes_left
-                );
-                let target_pos = player_txfm.translation.truncate();
-                state.current_target_pos = Some(target_pos);
+                let mut rng = rand::thread_rng();
 
-                // Spawn Warning
-                let preview_entity = commands
-                    .spawn((
-                        MaterialMesh2dBundle {
-                            mesh: meshes
-                                .add(bevy::prelude::shape::Circle::new(16.).into())
-                                .into(),
-                            material: materials
-                                .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))),
-                            transform: Transform {
-                                translation: target_pos.extend(990.0),
-                                ..default()
-                            },
+                let offset_distance = rng.gen_range(7.0..=SPIKE_DISTANCE_OFFSET_MAX);
+                let offset_angle = rng.gen_range(0.0..std::f32::consts::TAU);
+                let offset = Vec2::from_angle(offset_angle) * offset_distance;
+
+                let target_pos = player_txfm.translation.truncate() + offset;
+
+                commands.spawn((
+                    MaterialMesh2dBundle {
+                        mesh: meshes
+                            .add(bevy::prelude::shape::Circle::new(16.).into())
+                            .into(),
+                        material: materials
+                            .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))),
+                        transform: Transform {
+                            translation: target_pos.extend(990.0),
                             ..default()
                         },
-                        BossAttackPreview,
-                    ))
-                    .id();
-                state.preview_entity = Some(preview_entity);
-
-                // Set delay timer for actual damage
-                state.active_spike_delay_timer =
-                    Some(Timer::from_seconds(SPIKE_WARNING_DELAY, TimerMode::Once));
-                info!(
-                    "StoneGolem preparing spike attack. Spikes left: {}",
-                    state.num_spikes_left
-                );
-            }
-        }
-
-        // Handle active spike delay
-        if let Some(timer) = &mut state.active_spike_delay_timer {
-            timer.tick(time.delta());
-            if timer.finished() {
-                // Spawn Spike Hitbox
-                if let Some(target_pos) = state.current_target_pos {
-                    info!("StoneGolem spawning spike at {:?}", target_pos);
-                    spawn_golem_spike_hitbox(
-                        &mut commands,
-                        graphics.stone_pillar_ase.as_ref().unwrap().clone(),
-                        target_pos.extend(0.0),
-                        SPIKE_DAMAGE,
-                        entity,
-                    );
-                }
-
-                // Cleanup Preview
-                if let Some(preview_entity) = state.preview_entity {
-                    commands.entity(preview_entity).despawn_recursive();
-                    state.preview_entity = None;
-                }
+                        ..default()
+                    },
+                    BossAttackPreview,
+                    SpikeWarning {
+                        timer: Timer::from_seconds(SPIKE_WARNING_DELAY, TimerMode::Once),
+                        target_pos,
+                        golem_entity: entity,
+                    },
+                ));
 
                 state.num_spikes_left -= 1;
-                state.active_spike_delay_timer = None;
 
-                // Reset attack timer for next spike
-                state.attack_timer = Timer::from_seconds(SPIKE_ATTACK_INTERVAL, TimerMode::Once);
+                if state.num_spikes_left > 0 {
+                    state.attack_timer = Timer::from_seconds(
+                        rng.gen_range(SPIKE_ATTACK_INTERVAL_MIN..=SPIKE_ATTACK_INTERVAL_MAX),
+                        TimerMode::Once,
+                    );
+                }
             }
         }
+    }
+}
 
-        // Check completion
-        if state.num_spikes_left == 0 && state.active_spike_delay_timer.is_none() {
-            info!("StoneGolem spike attack complete. Returning to Follow.");
-            // Transition back to Follow
-            let follow_speed = follow_speed_query.get(entity).map(|f| f.0).unwrap_or(0.65);
+/// Handle spike warnings - tick timers and spawn spikes when warnings complete
+pub fn handle_spike_warnings(
+    mut commands: Commands,
+    mut warnings: Query<(Entity, &mut SpikeWarning)>,
+    graphics: Res<Graphics>,
+    time: Res<Time>,
+) {
+    for (warning_entity, mut warning) in warnings.iter_mut() {
+        warning.timer.tick(time.delta());
 
-            // Safety check: ensure entity still exists before modifying state machine
-            if let Some(mut entity_commands) = commands.get_entity(entity) {
-                entity_commands
-                    .remove::<SpikeAttackState>()
-                    .insert(FollowState {
-                        target: game.game.player,
-                        curr_delta: None,
-                        curr_path: None,
-                        speed: follow_speed,
-                    });
+        if warning.timer.finished() {
+            spawn_golem_spike_hitbox(
+                &mut commands,
+                graphics.stone_pillar_ase.as_ref().unwrap().clone(),
+                warning.target_pos.extend(0.0),
+                SPIKE_DAMAGE,
+                warning.golem_entity,
+            );
+
+            commands.entity(warning_entity).despawn_recursive();
+        }
+    }
+}
+
+/// Check if spike attack is complete and transition back to FollowState
+pub fn check_spike_attack_completion(
+    mut commands: Commands,
+    attacks: Query<(Entity, &SpikeAttackState), Without<crate::combat::MarkedForDeath>>,
+    warnings: Query<&SpikeWarning>,
+    mut timers: Query<&mut SpikeAttackTimer>,
+    mut anims: Query<&mut AsepriteAnimation>,
+    game: GameParam,
+    follow_speed_query: Query<&FollowSpeed>,
+) {
+    for (entity, state) in attacks.iter() {
+        if state.num_spikes_left == 0 && state.attack_timer.finished() {
+            let has_active_warnings = warnings.iter().any(|w| w.golem_entity == entity);
+
+            if !has_active_warnings {
+                let follow_speed = follow_speed_query.get(entity).map(|f| f.0).unwrap_or(0.65);
+
+                if let Some(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands
+                        .remove::<SpikeAttackState>()
+                        .insert(FollowState {
+                            target: game.game.player,
+                            curr_delta: None,
+                            curr_path: None,
+                            speed: follow_speed,
+                        });
+                }
+
+                if let Ok(mut timer) = timers.get_mut(entity) {
+                    let mut rng = rand::thread_rng();
+                    timer.random_timer =
+                        Timer::from_seconds(rng.gen_range(3.0..5.0), TimerMode::Once);
+                }
+
+                if let Ok(mut anim) = anims.get_mut(entity) {
+                    *anim = AsepriteAnimation::from("WalkFront");
+                }
             }
-
-            // Reset Timer
-            if let Ok(mut timer) = timers.get_mut(entity) {
-                let mut rng = rand::thread_rng();
-                timer.random_timer = Timer::from_seconds(rng.gen_range(3.0..5.0), TimerMode::Once);
-            }
-
-            // Reset Animation to Walk
-            *anim = AsepriteAnimation::from("WalkFront");
         }
     }
 }

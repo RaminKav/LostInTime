@@ -73,7 +73,14 @@ impl Plugin for EnemyPlugin {
                     red_mushking::tick_leap_attack_timer.run_if(is_not_paused),
                     red_mushking::handle_aoe_attack.run_if(is_not_paused),
                     stone_golem::tick_spike_attack_timer.run_if(is_not_paused),
+                    stone_golem::initialize_spike_attack_state.run_if(is_not_paused),
                     stone_golem::handle_spike_attack.run_if(is_not_paused),
+                    stone_golem::handle_spike_warnings
+                        .run_if(is_not_paused)
+                        .after(stone_golem::handle_spike_attack),
+                    stone_golem::check_spike_attack_completion
+                        .run_if(is_not_paused)
+                        .after(stone_golem::handle_spike_warnings),
                     stone_golem::stone_golem_follow.run_if(is_not_paused),
                     stone_golem::update_stone_golem_walk_animation.run_if(is_not_paused),
                     stone_golem::handle_stone_golem_death.run_if(is_not_paused),
