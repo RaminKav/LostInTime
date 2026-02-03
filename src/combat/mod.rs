@@ -402,7 +402,7 @@ pub fn handle_hits(
                                 hallucination_query.get_single_mut()
                             {
                                 let stat_type = HallucinationStatType::random();
-                                let amount = rng.gen_range(1..=5);
+                                let amount = rng.gen_range(1..=4);
                                 hallucination_stats.add_stat(stat_type, amount);
 
                                 // Show floating text with stat gain at player position (like item pickups)

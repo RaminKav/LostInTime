@@ -1,13 +1,12 @@
 (
-  name: "IceWall",
+  name: "SpearGravity",
   templates: ["projectile.prototype.ron"],
   schematics: {
-        "survival_rogue_like::item::projectile::Projectile": IceWall,
-        "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -28., x2: 0., y2: 0., r: 24.),
+        "survival_rogue_like::item::projectile::Projectile": SpearGravity,
         "survival_rogue_like::world::y_sort::YSort": (10.),
         "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: false),
         "survival_rogue_like::animations::DoneAnimation": (),
-        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/icepillar.png", size: (x: 111., y: 111.), cols: 13, rows: 1),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/speargravity.png", size: (x: 48., y: 55.), cols: 24, rows: 1),
         "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.045),
   }
 )

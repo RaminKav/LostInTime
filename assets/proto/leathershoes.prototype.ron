@@ -18,7 +18,7 @@
         xp_rate: Some((start: 7, end: 15)),
         mana: Some((start: 15, end: 24)),
         mana_regen: Some((start: 5, end: 12)),
-        attack_speed: Some((start: 8, end: 15)),
+        attack_speed: Some((start: 6, end: 10)),
         size: Some((start: 8, end: 15)),
         lifesteal: Some((start: 2, end: 5)),
         bonus_damage: Some((start: 5, end: 10)),

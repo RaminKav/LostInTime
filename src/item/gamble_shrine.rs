@@ -5,13 +5,14 @@ use rand::{seq::IteratorRandom, Rng};
 
 use crate::{
     assets::{Graphics, SpriteAnchor},
+    combat::pickup_radius::BeingPulledToPlayer,
     custom_commands::CommandsExt,
     inventory::ItemStack,
-    item::object_actions::ObjectAction,
+    item::{object_actions::ObjectAction, ItemDrop},
     proto::proto_param::ProtoParam,
     ui::{
-        key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent,
-        BlacksmithMerchant, EssenceShopChoices,
+        key_input_guide::InteractionGuideTrigger, minimap::UpdateMiniMapEvent, BlacksmithMerchant,
+        EssenceShopChoices,
     },
     world::{world_helpers::world_pos_to_tile_pos, TileMapPosition},
     GameParam,
@@ -42,11 +43,12 @@ pub fn handle_gamble_shrine_rewards(
         &GambleShrine,
         &mut AsepriteAnimation,
     )>,
-    mut proto_commands: ProtoCommands,
+    // mut proto_commands: ProtoCommands,
     proto: ProtoParam,
     mut commands: Commands,
     mut game: GameParam,
     mut minimap_event: EventWriter<UpdateMiniMapEvent>,
+    item_drop_query: Query<Entity, (With<ItemDrop>, Without<BeingPulledToPlayer>)>,
 ) {
     for (e, t, shrine, mut anim) in shrines.iter_mut() {
         if shrine.success {
@@ -54,21 +56,29 @@ pub fn handle_gamble_shrine_rewards(
                 *anim = AsepriteAnimation::from(GambleShrineAnim::tags::DONE);
                 commands.entity(e).remove::<GambleShrine>();
 
-                let drop_list = [WorldObject::ChestBlock, WorldObject::Coin];
-                // give rewards
-                let picked_drop = *drop_list.iter().choose(&mut rand::thread_rng()).unwrap();
-                let mut rng = rand::thread_rng();
-                let count = match picked_drop {
-                    WorldObject::Coin => rng.gen_range(34..53),
-                    _ => 1,
-                };
-                proto_commands.spawn_item_from_proto(
-                    picked_drop,
-                    &proto,
-                    t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
-                    count,
-                    Some(game.get_player_level()),
-                );
+                // let drop_list = [WorldObject::ChestBlock, WorldObject::Coin];
+                // // give rewards
+                // let picked_drop = *drop_list.iter().choose(&mut rand::thread_rng()).unwrap();
+                // let mut rng = rand::thread_rng();
+                // let count = match picked_drop {
+                //     WorldObject::Coin => rng.gen_range(34..53),
+                //     _ => 1,
+                // };
+                // proto_commands.spawn_item_from_proto(
+                //     picked_drop,
+                //     &proto,
+                //     t.translation().truncate() + Vec2::new(0., -78.), // offset so it doesn't spawn on the shrine
+                //     count,
+                //     Some(game.get_player_level()),
+                // );
+
+                // Pull all items on the map by adding BeingPulledToPlayer component
+                for item_entity in item_drop_query.iter() {
+                    commands
+                        .entity(item_entity)
+                        .insert(BeingPulledToPlayer::default());
+                }
+
                 commands
                     .entity(e)
                     .insert(WorldObject::GambleShrineDone)

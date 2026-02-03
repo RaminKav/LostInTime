@@ -10,7 +10,7 @@
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 15, end: 26)),
         crit_chance: Some((start: 9, end: 18)),
-        speed: Some((start: 18, end: 32)),
+        speed: Some((start: 18, end: 26)),
         health_regen: Some((start: 4, end: 8)),
         thorns: Some((start: 16, end: 32)),
         dodge: Some((start: 16, end: 22)),

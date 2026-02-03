@@ -55,6 +55,7 @@ pub enum PlayerAnimation {
     Lunge,
     RunAttack2,
     Teleport,
+    SpinAttack,
 }
 impl PlayerAnimation {
     pub fn get_str(&self, dir: FacingDirection) -> String {
@@ -72,6 +73,7 @@ impl PlayerAnimation {
             PlayerAnimation::Lunge => format!("Lunge{}", dir_str),
             PlayerAnimation::RunAttack2 => format!("RunAttack2{}", dir_str),
             PlayerAnimation::Teleport => format!("Teleport{}", dir_str),
+            PlayerAnimation::SpinAttack => "SpinAttackFront".to_string(),
         }
     }
     pub fn is_dir_locked(&self) -> bool {
@@ -85,6 +87,7 @@ impl PlayerAnimation {
             PlayerAnimation::Bow => true,
             PlayerAnimation::RunAttack2 => true,
             PlayerAnimation::Teleport => true,
+            PlayerAnimation::SpinAttack => true,
             _ => false,
         }
     }
@@ -142,6 +145,7 @@ impl PlayerAnimation {
             PlayerAnimation::Lunge => true,
             PlayerAnimation::RunAttack2 => true,
             PlayerAnimation::Teleport => true,
+            PlayerAnimation::SpinAttack => true,
             _ => false,
         }
     }

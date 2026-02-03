@@ -90,6 +90,8 @@ pub enum Projectile {
     BombExplosion,
     Lightning,
     FuryKunai,
+    SpearGravity,
+    SpinAttack,
 }
 
 impl Projectile {
@@ -112,6 +114,8 @@ impl Projectile {
             Projectile::ThornsProjectile => true,
             Projectile::LaserBeam => true,
             Projectile::DaggerSlash => true,
+            Projectile::SpinAttack => true,
+            Projectile::HealHearts => true,
             _ => false,
         }
     }
@@ -137,6 +141,8 @@ impl Projectile {
             Projectile::DaggerThrow => true,
             Projectile::Lightning => true,
             Projectile::FuryKunai => true,
+            Projectile::SpinAttack => true,
+            Projectile::SpearGravity => true,
             _ => false,
         }
     }

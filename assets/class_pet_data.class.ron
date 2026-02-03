@@ -10,7 +10,7 @@
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
-            active_skills: (Roll, Shout, Heal, ParrySpear),
+            active_skills: (SpinAttack, Shout, Heal, ParrySpear),
             starting_weapons: [Sword, Spear, Hammer],
         ),
         Wizard: (
@@ -49,7 +49,7 @@
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
-            active_skills: (Roll, PiercingStar, TripleThrow, Fury),
+            active_skills: (Roll, TripleThrow, PiercingStar, Fury),
             starting_weapons: [Claw],
         ),
         Hunter: (

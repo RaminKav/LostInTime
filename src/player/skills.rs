@@ -161,6 +161,7 @@ pub enum ActiveSkill {
     TripleThrow, // Thief - NEW
     Fury,        // Thief - NEW
     Bomb,        // Hunter - NEW
+    SpinAttack,
 }
 
 impl ActiveSkill {
@@ -190,6 +191,7 @@ impl ActiveSkill {
             ActiveSkill::TripleThrow => 4.0,
             ActiveSkill::Fury => 13.0,
             ActiveSkill::Bomb => 5.5,
+            ActiveSkill::SpinAttack => 5.,
         }
     }
 }
@@ -265,6 +267,10 @@ pub struct FuryState {
 pub struct BombState {
     pub cooldown_timer: Timer,
 }
+#[derive(Component, Clone)]
+pub struct SpinAttackState {
+    pub cooldown_timer: Timer,
+}
 
 impl ActiveSkill {
     pub fn get_title(&self) -> String {
@@ -292,6 +298,7 @@ impl ActiveSkill {
             ActiveSkill::TripleThrow => "Triple Throw".to_string(),
             ActiveSkill::Fury => "Fury".to_string(),
             ActiveSkill::Bomb => "Bomb".to_string(),
+            ActiveSkill::SpinAttack => "Spin Attack".to_string(),
         }
     }
 
@@ -300,6 +307,11 @@ impl ActiveSkill {
             ActiveSkill::Roll => vec![
                 "Roll to dodge attacks. You are".to_string(),
                 "invulnerable while rolling.".to_string(),
+            ],
+            ActiveSkill::SpinAttack => vec![
+                "Gain a burst of speed and dash".to_string(),
+                "forwards while spinning a sword".to_string(),
+                format!("dealing {}% damage around you.", skill_power * 80.0),
             ],
             ActiveSkill::Shout => vec![
                 "SCREAM, releasing a shockwave".to_string(),
@@ -349,7 +361,7 @@ impl ActiveSkill {
             ],
             ActiveSkill::Lightning => vec![
                 "Call down lighning on 3 nearby".to_string(),
-                format!("enemies, dealing {}% damage to each.", skill_power * 180.0),
+                format!("enemies, dealing {}% damage to each.", skill_power * 85.0),
             ],
             ActiveSkill::FirePillar => {
                 vec![
@@ -571,6 +583,7 @@ impl ActiveSkill {
             | ActiveSkill::DaggerSlash
             | ActiveSkill::TripleThrow
             | ActiveSkill::Fury
+            | ActiveSkill::SpinAttack
             | ActiveSkill::Bomb => {}
         }
     }

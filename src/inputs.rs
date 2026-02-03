@@ -20,7 +20,7 @@ use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
     DruidTreeSkillState, FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-    LightningState, PlayerSkills, SlashState, TripleThrowState,
+    LightningState, PlayerSkills, SlashState, SpinAttackState, TripleThrowState,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -446,6 +446,7 @@ pub fn dispatch_active_skill_events(
             Option<&TripleThrowState>,
             Option<&FuryState>,
             Option<&BombState>,
+            Option<&SpinAttackState>,
         ),
         With<Player>,
     >,
@@ -480,6 +481,7 @@ pub fn dispatch_active_skill_events(
         triple_throw_state,
         fury_state,
         bomb_state,
+        spin_attack_state,
     )) = player_q2.get_single()
     else {
         return;
@@ -600,6 +602,9 @@ pub fn dispatch_active_skill_events(
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
                 ActiveSkill::Bomb => bomb_state
+                    .map(|s| !s.cooldown_timer.finished())
+                    .unwrap_or(false),
+                ActiveSkill::SpinAttack => spin_attack_state
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
             };

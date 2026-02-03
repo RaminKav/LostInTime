@@ -7,6 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     ai::FollowState,
+    animations::player_sprite::PlayerAnimation,
     attributes::{
         attribute_helpers::skill_power_multiplier, Attack, AttackCooldown, BonusAttackSpeed,
         CurrentHealth, CurrentMana, MaxHealth, SkillPower,
@@ -33,7 +34,7 @@ use crate::{
             DruidTreeSkillState, FirePillarState, FuryState, HealSkillState, Heirloom,
             IceWallSkillState, LaserBeamState, LightningState, PiercingStarSkillState,
             PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
-            Slot2ChargeTracker, StealthState, TripleThrowState,
+            Slot2ChargeTracker, SpinAttackState, StealthState, TripleThrowState,
         },
         Player,
     },
@@ -73,6 +74,7 @@ pub struct SkillStateQueries<'w, 's> {
     pub triplethrow_states: Query<'w, 's, &'static TripleThrowState, With<Player>>,
     pub fury_states: Query<'w, 's, &'static FuryState, With<Player>>,
     pub bomb_states: Query<'w, 's, &'static BombState, With<Player>>,
+    pub spinattack_states: Query<'w, 's, &'static SpinAttackState, With<Player>>,
 }
 
 pub fn handle_active_skill_event(
@@ -155,6 +157,7 @@ pub fn handle_active_skill_event(
             let triplethrow_state = skill_states.triplethrow_states.get(player_e).ok();
             let fury_state = skill_states.fury_states.get(player_e).ok();
             let bomb_state = skill_states.bomb_states.get(player_e).ok();
+            let spinattack_state = skill_states.spinattack_states.get(player_e).ok();
             // Apply multiplicative cooldown logic is handled in skills when inserted
             let slot_skill = match ev.slot {
                 0 => skills.active_skill_slot_0.as_ref(),
@@ -405,7 +408,6 @@ pub fn handle_active_skill_event(
                         health.0 = (health.0 + heal_amount).min(max_health.0);
 
                         // Spawn cosmetic heal hearts effect on top of player
-                        let player_pos = player_txfm.translation().truncate();
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::HealHearts,
                             direction: Vec2::ZERO, // Doesn't move
@@ -414,7 +416,7 @@ pub fn handle_active_skill_event(
                             from_entity: Some(player_e),
                             is_followup_proj: false,
                             dmg_override: Some(0), // Cosmetic only, no damage
-                            pos_override: Some(player_pos + Vec2::new(0., 16.)),
+                            pos_override: Some(Vec2::new(0., 16.)),
                             spawn_delay: 0.0,
                         });
 
@@ -836,7 +838,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn lightning at each enemy (using IceExplosionAOE as placeholder)
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.8) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 0.85) as i32;
                         for (_, enemy_pos, _) in enemy_distances {
                             ranged_attack_events.send(RangedAttackEvent {
                                 projectile: Projectile::Lightning,
@@ -846,7 +848,7 @@ pub fn handle_active_skill_event(
                                 from_entity: None,
                                 is_followup_proj: false,
                                 dmg_override: Some(dmg),
-                                pos_override: Some(enemy_pos + Vec2::new(0., 26.)),
+                                pos_override: Some(enemy_pos + Vec2::new(0., 48.)),
                                 spawn_delay: 0.0,
                             });
                         }
@@ -1064,6 +1066,50 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
                     }
+                    ActiveSkill::SpinAttack => {
+                        if should_start_cooldown {
+                            if let Some(s) = spinattack_state {
+                                if !s.cooldown_timer.finished() {
+                                    continue;
+                                }
+                            }
+                        } else {
+                            if spinattack_state.is_some() {
+                                commands.entity(player_e).remove::<SpinAttackState>();
+                            }
+                        }
+                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
+                        if !should_start_cooldown {
+                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                        }
+                        commands
+                            .entity(player_e)
+                            .insert(SpinAttackState { cooldown_timer: cd });
+
+                        commands
+                            .entity(player_e)
+                            .insert(crate::item::potion_buffs::MovementSpeedBuff::new(0.45, 2.6));
+
+                        let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
+                        let dmg = (base_dmg as f32 * power_mult * 0.8) as i32;
+                        commands
+                            .entity(player_e)
+                            .insert(PlayerAnimation::SpinAttack);
+
+                        ranged_attack_events.send(RangedAttackEvent {
+                            projectile: Projectile::SpinAttack,
+                            direction: Vec2::ZERO,
+                            mana_cost: None,
+                            from_enemy: false,
+                            from_entity: Some(player_e),
+                            is_followup_proj: false,
+                            dmg_override: Some(dmg),
+                            pos_override: Some(Vec2::ZERO),
+                            spawn_delay: 0.0,
+                        });
+
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
+                    }
                     _ => {}
                 }
                 // Skill Echo trigger: spawn an echo AoE at player position when using any skill
@@ -1258,6 +1304,7 @@ pub fn tick_new_skill_cooldowns(
     mut triplethrow_cd: Query<(Entity, &mut TripleThrowState)>,
     mut fury_cd: Query<(Entity, &mut FuryState), With<Player>>,
     mut bomb_cd: Query<(Entity, &mut BombState)>,
+    mut spinattack_cd: Query<(Entity, &mut SpinAttackState)>,
     attack_cooldown: Query<&AttackCooldown, With<Player>>,
 ) {
     for (e, mut l) in lightning_cd.iter_mut() {
@@ -1313,6 +1360,12 @@ pub fn tick_new_skill_cooldowns(
         b.cooldown_timer.tick(time.delta());
         if b.cooldown_timer.finished() {
             commands.entity(e).remove::<BombState>();
+        }
+    }
+    for (e, mut s) in spinattack_cd.iter_mut() {
+        s.cooldown_timer.tick(time.delta());
+        if s.cooldown_timer.finished() {
+            commands.entity(e).remove::<SpinAttackState>();
         }
     }
 }
@@ -1610,6 +1663,7 @@ pub fn reduce_skill_cooldown_on_crit(
     mut lunge_states: Query<&mut LungeState, With<Player>>,
     mut teleport_states: Query<&mut TeleportState, With<Player>>,
     mut laser_beam_states: Query<&mut LaserBeamState, With<Player>>,
+    mut spinattack_states: Query<&mut SpinAttackState, With<Player>>,
 ) {
     for hit in hit_events.iter() {
         // Only process crits from player attacks (not from mobs hitting player)
@@ -1727,6 +1781,13 @@ pub fn reduce_skill_cooldown_on_crit(
                 }
             }
             if let Ok(mut state) = laser_beam_states.get_single_mut() {
+                if !state.cooldown_timer.finished() {
+                    state
+                        .cooldown_timer
+                        .tick(Duration::from_secs_f32(reduction));
+                }
+            }
+            if let Ok(mut state) = spinattack_states.get_single_mut() {
                 if !state.cooldown_timer.finished() {
                     state
                         .cooldown_timer

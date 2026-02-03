@@ -126,14 +126,21 @@ pub const MAGNET_COOLDOWN_REDUCTION_PER_STACK: f32 = 2.5;
 pub const MIN_MAGNET_COOLDOWN: f32 = 5.0;
 
 /// System that periodically pulls all item drops to the player
+/// Adds BeingPulledToPlayer component to all items when the timer triggers
 pub fn handle_magnet_pull(
-    mut magnet_timer_query: Query<(&mut MagnetPullTimer, &Transform, &PlayerSkills), With<Player>>,
-    mut item_query: Query<&mut Transform, (With<ItemDrop>, Without<Player>)>,
+    mut magnet_timer_query: Query<(&mut MagnetPullTimer, &PlayerSkills), With<Player>>,
+    item_query: Query<
+        Entity,
+        (
+            With<ItemDrop>,
+            Without<Player>,
+            Without<BeingPulledToPlayer>,
+        ),
+    >,
+    mut commands: Commands,
     time: Res<Time>,
 ) {
-    let Ok((mut magnet_timer, player_transform, player_skills)) =
-        magnet_timer_query.get_single_mut()
-    else {
+    let Ok((mut magnet_timer, player_skills)) = magnet_timer_query.get_single_mut() else {
         return;
     };
 
@@ -145,22 +152,14 @@ pub fn handle_magnet_pull(
 
     magnet_timer.cooldown_timer.tick(time.delta());
 
-    if magnet_timer.cooldown_timer.finished()
-        || (!magnet_timer.duration_timer.finished() && magnet_timer.duration_timer.percent() > 0.)
-    {
-        magnet_timer.duration_timer.tick(time.delta());
-        if magnet_timer.duration_timer.finished() {
-            magnet_timer.duration_timer.reset();
-        }
-        let player_pos = player_transform.translation.truncate();
+    if magnet_timer.cooldown_timer.finished() {
+        magnet_timer.cooldown_timer.reset();
+        magnet_timer.duration_timer.reset();
 
-        for mut item_transform in item_query.iter_mut() {
-            let item_pos = item_transform.translation.truncate();
-            let direction = (player_pos - item_pos).normalize_or_zero();
-
-            let pull_speed = 200.0;
-            let movement = direction * pull_speed * time.delta().as_secs_f32();
-            item_transform.translation += movement.extend(0.0);
+        for item_entity in item_query.iter() {
+            commands
+                .entity(item_entity)
+                .insert(BeingPulledToPlayer::default());
         }
     }
 }

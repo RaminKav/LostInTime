@@ -10,7 +10,7 @@
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 8, end: 18)),
         crit_chance: Some((start: 9, end: 18)),
-        speed: Some((start: 8, end: 13)),
+        speed: Some((start: 7, end: 11)),
         health_regen: Some((start: 2, end: 5)),
         thorns: Some((start: 9, end: 15)),
         dodge: Some((start: 10, end: 20)),
@@ -20,7 +20,7 @@
         bonus_damage: Some((start: 6, end: 12)),
       //   pickup_range: Some((start: 11, end: 20)),
         skill_power: Some((start: 8, end: 13)),
-        attack_speed: Some((start: 12, end: 20)),
+        attack_speed: Some((start: 8, end: 16)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::item::projectile::RangedAttack": (ThrowingStar),

@@ -5,8 +5,6 @@
   "survival_rogue_like::item::WorldObject": Pendant,
   "survival_rogue_like::attributes::RawItemBaseAttributes": (),
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
-        attack_speed: Some((start: 9, end: 14)),
-
         health: Some((start: 20, end: 30)),
         defence: Some((start: 16, end: 28)),
         crit_damage: Some((start: 16, end: 28)),

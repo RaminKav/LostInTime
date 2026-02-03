@@ -376,32 +376,19 @@ impl ObjectAction {
                         dir,
                     });
                 }
-                let mut rng = rand::thread_rng();
+
+                // Instantly go to ACTIVATE_SUCCESS animation
                 commands
                     .entity(e)
                     .remove::<InteractionGuideTrigger>()
-                    .remove::<ObjectAction>();
-                if rng.gen_bool(0.35) {
-                    commands
-                        .entity(e)
-                        .insert(GambleShrine {
-                            success: true,
-                            tile_pos: obj_pos,
-                        })
-                        .insert(AsepriteAnimation::from(
-                            GambleShrineAnim::tags::ACTIVATE_SUCCESS,
-                        ));
-                } else {
-                    commands
-                        .entity(e)
-                        .insert(GambleShrine {
-                            success: false,
-                            tile_pos: obj_pos,
-                        })
-                        .insert(AsepriteAnimation::from(
-                            GambleShrineAnim::tags::ACTIVATE_FAIL,
-                        ));
-                }
+                    .remove::<ObjectAction>()
+                    .insert(GambleShrine {
+                        success: true,
+                        tile_pos: obj_pos,
+                    })
+                    .insert(AsepriteAnimation::from(
+                        GambleShrineAnim::tags::ACTIVATE_SUCCESS,
+                    ));
             }
             ObjectAction::ActiveSkillShrine => {
                 // Generate a random active skill choice

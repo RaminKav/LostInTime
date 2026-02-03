@@ -62,7 +62,7 @@
       // WorldObjects spawned per-chunk with given probability
       schematic_frequencies: {
         CombatShrine: 0.05,
-        GambleShrine: 0.025,
+        GambleShrine: 0.03,
         // ActiveSkillShrine: 0.1,
         HeirloomShrine: 0.15,
         BlacksmithMerchant: 0.07,

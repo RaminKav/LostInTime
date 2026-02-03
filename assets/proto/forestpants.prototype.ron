@@ -10,7 +10,7 @@
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 15, end: 26)),
         crit_chance: Some((start: 9, end: 18)),
-        speed: Some((start: 16, end: 26)),
+        speed: Some((start: 12, end: 20)),
         health_regen: Some((start: 4, end: 8)),
         thorns: Some((start: 16, end: 32)),
         dodge: Some((start: 16, end: 22)),
@@ -18,7 +18,7 @@
         xp_rate: Some((start: 7, end: 15)),
       //   mana: Some((start: 15, end: 24)),
       //   mana_regen: Some((start: 5, end: 12)),
-        attack_speed: Some((start: 12, end: 20)),
+        attack_speed: Some((start: 8, end: 14)),
         size: Some((start: 8, end: 15)),
         lifesteal: Some((start: 2, end: 5)),
         bonus_damage: Some((start: 5, end: 10)),

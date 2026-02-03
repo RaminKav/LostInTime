@@ -4,9 +4,9 @@
   schematics: {
         "survival_rogue_like::item::projectile::Projectile": DaggerSlash,
         "survival_rogue_like::proto::ColliderProto": (x: 40., y: 40.),
-        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -40., y: -40.), hit_entities: [], despawn_on_hit: false),
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 0., direction: (x: 0., y: 0.), spawn_offset: (x: -70., y: -70.), hit_entities: [], despawn_on_hit: false),
         "survival_rogue_like::animations::DoneAnimation": (),
-        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/DaggerSlash.png", size: (x: 80., y: 80.), cols: 3, rows: 1),
-        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.1),
+        "survival_rogue_like::proto::SpriteSheetProto": (asset: "textures/effects/DaggerSlash.png", size: (x: 95., y: 96.), cols: 12, rows: 1),
+        "survival_rogue_like::proto::AnimationTimerProto": (secs: 0.0315),
   }
 )

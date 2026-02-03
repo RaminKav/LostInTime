@@ -10,7 +10,7 @@
   "survival_rogue_like::attributes::RawItemBonusAttributes": (
         crit_damage: Some((start: 8, end: 16)),
         crit_chance: Some((start: 6, end: 12)),
-        speed: Some((start: 9, end: 14)),
+        speed: Some((start: 6, end: 10)),
         health_regen: Some((start: 2, end: 5)),
         thorns: Some((start: 9, end: 15)),
         dodge: Some((start: 8, end: 16)),
@@ -22,7 +22,7 @@
         skill_power: Some((start: 12, end: 20)),
         mana: Some((start: 18, end: 30)),
         mana_regen: Some((start: 7, end: 18)),
-        attack_speed: Some((start: 8, end: 15)),
+        attack_speed: Some((start: 6, end: 10)),
   ),
   "survival_rogue_like::item::melee::MeleeAttack": (),
   "survival_rogue_like::item::item_actions::ManaCost": (15),

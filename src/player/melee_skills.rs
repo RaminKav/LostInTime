@@ -15,7 +15,10 @@ use crate::{
     cursor::CursorPos,
     enemy::Mob,
     inputs::MovementVector,
-    item::{projectile::Projectile, WorldObject},
+    item::{
+        projectile::{Projectile, RangedAttackEvent},
+        WorldObject,
+    },
     status_effects::Frail,
     ui::damage_numbers::{spawn_floating_text_with_shadow, PreviousHealth},
     world::TILE_SIZE,
@@ -212,6 +215,7 @@ pub fn handle_spear(
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    mut ranged_attack_events: EventWriter<RangedAttackEvent>,
 ) {
     let Ok((e, player_pos, skills, dmg, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
@@ -239,6 +243,17 @@ pub fn handle_spear(
             commands.entity(e).insert(SpearPullDelay {
                 delay_timer: Timer::from_seconds(0.45, TimerMode::Once), // Delay to sync with animation
                 epicenter,
+            });
+            ranged_attack_events.send(RangedAttackEvent {
+                projectile: Projectile::SpearGravity,
+                direction: Vec2::ZERO,
+                mana_cost: None,
+                from_enemy: false,
+                from_entity: None,
+                is_followup_proj: false,
+                dmg_override: None,
+                pos_override: Some(epicenter),
+                spawn_delay: 0.2,
             });
 
             // ActiveSkillUsedEvent dispatched centrally
