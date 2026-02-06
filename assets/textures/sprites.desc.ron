@@ -1362,6 +1362,31 @@
             size: (16., 16.),
             anchor: None,
         ),
+        CoinLightning: WorldObjectData(
+            texture_pos: (2., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        KillLightning: WorldObjectData(
+            texture_pos: (3., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornsSpikes: WorldObjectData(
+            texture_pos: (4., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornsOnDamage: WorldObjectData(
+            texture_pos: (5., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornsLifesteal: WorldObjectData(
+            texture_pos: (6., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

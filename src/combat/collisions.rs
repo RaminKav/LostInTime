@@ -3,9 +3,12 @@ use super::{
     StatusEffectEvent,
 };
 use crate::attributes::ManaRegen;
-use crate::blessings::{Blessing, OwnedBlessings};
+use crate::blessings::OwnedBlessings;
 use crate::client::is_not_paused;
+use crate::combat::LifestealEvent;
+use crate::player::combat_heirlooms::ThornsOnDamageTracker;
 use crate::player::skill_heirlooms::{handle_fire_pillar_hit_clear, handle_laser_beam_hit_clear};
+use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::ui::damage_numbers::FloatingTextQueue;
 use crate::{
     animations::{player_sprite::PlayerAnimation, ui_animaitons::UIIconMover},
@@ -30,7 +33,6 @@ use crate::{
     player::{
         mage_skills::IceExplosionDmg,
         melee_skills::{Parried, ParryState, ParrySuccessEvent, SpearAttack},
-        skills::Heirloom,
     },
     ui::{damage_numbers::DodgeEvent, FlashExpBarEvent},
     CustomFlush, GameParam, GameState, Player, ScreenResolution,
@@ -194,6 +196,8 @@ fn check_projectile_hit_mob_collisions(
     game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    mut lifesteal_events: EventWriter<LifestealEvent>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
@@ -288,6 +292,19 @@ fn check_projectile_hit_mob_collisions(
             // Check if this projectile is from a heirloom on-kill effect
             let is_from_heirloom =
                 vec![Projectile::IceExplosionAOE, Projectile::Echo].contains(proj);
+
+            // ThornsLifesteal: Apply lifesteal for ThornsProjectile hits
+            let is_thorns_projectile = *proj == Projectile::ThornsProjectile;
+            if is_thorns_projectile {
+                if let Ok(skills) = player_skills.get_single() {
+                    let thorns_lifesteal_stacks = skills.get_count(Heirloom::ThornsLifesteal);
+                    if thorns_lifesteal_stacks > 0 {
+                        lifesteal_events.send(LifestealEvent {
+                            thorns_lifesteal_stacks,
+                        });
+                    }
+                }
+            }
 
             hit_event.send(HitEvent {
                 hit_by_pet: pet_check.get(*e1).ok(),
@@ -824,6 +841,8 @@ fn check_mob_to_player_collisions(
             Option<&LungeState>,
             &Attack, // Player's attack for thorns calculation
             &OwnedBlessings,
+            &PlayerSkills,
+            Option<&mut ThornsOnDamageTracker>,
         ),
         With<Player>,
     >,
@@ -837,6 +856,7 @@ fn check_mob_to_player_collisions(
     in_i_frame: Query<&InvincibilityTimer>,
     mut parry_events: EventWriter<ParrySuccessEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut lifesteal_events: EventWriter<LifestealEvent>,
 ) {
     let (
         player_e,
@@ -850,6 +870,8 @@ fn check_mob_to_player_collisions(
         lunge_opt,
         player_attack,
         owned_blessings,
+        player_skills,
+        mut thorns_tracker_opt,
     ) = player.single_mut();
     let mut hit_this_frame = false;
     for (e1, e2, _) in rapier_context.intersections_with(player_e) {
@@ -938,10 +960,21 @@ fn check_mob_to_player_collisions(
             // Thorns deals a percentage of PLAYER's damage back to the attacker
             // e.g., 100 thorns = 100% of player damage reflected
             if thorns.0 > 0 && in_i_frame.get(e1).is_err() {
+                let thorns_damage =
+                    f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
+
+                // ThornsLifesteal: thorns damage has +25% chance to lifesteal per stack
+                let thorns_lifesteal_stacks = player_skills.get_count(Heirloom::ThornsLifesteal);
+                if thorns_lifesteal_stacks > 0 {
+                    lifesteal_events.send(LifestealEvent {
+                        thorns_lifesteal_stacks,
+                    });
+                }
+
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e2,
-                    damage: f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32,
+                    damage: thorns_damage,
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,
@@ -953,16 +986,20 @@ fn check_mob_to_player_collisions(
                 });
             }
 
-            // ThornsSpikes blessing: spawn 5 stationary projectiles in a circle around the player
-            let has_thorns_spikes = owned_blessings.has_blessing(Blessing::ThornsSpikes);
+            // ThornsSpikes heirloom: spawn 2 spikes per stack in a circle around the player
+            let thorns_spikes_stacks = player_skills.get_count(Heirloom::ThornsSpikes);
 
-            if has_thorns_spikes && in_i_frame.get(e1).is_err() {
+            if thorns_spikes_stacks > 0 && in_i_frame.get(e1).is_err() {
                 let spike_damage =
                     f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
-                let num_spikes = 5;
+                let num_spikes = thorns_spikes_stacks * 2;
 
+                let mut rng = rand::thread_rng();
                 for i in 0..num_spikes {
-                    let angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
+                    let base_angle = (i as f32 / num_spikes as f32) * std::f32::consts::TAU;
+                    let angle_offset =
+                        rng.gen_range(-std::f32::consts::PI / 6.0..std::f32::consts::PI / 6.0);
+                    let angle = base_angle + angle_offset;
                     let direction = Vec2::new(angle.cos(), angle.sin());
 
                     ranged_attack_event.send(RangedAttackEvent {

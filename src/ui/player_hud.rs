@@ -1113,6 +1113,7 @@ pub fn handle_heirloom_hud_tooltip(
             &crate::attributes::MaxHealth,
             Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
             Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
+            Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
         ),
         With<Player>,
     >,
@@ -1160,7 +1161,7 @@ pub fn handle_heirloom_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((heirloom, icon_pos)) = currently_hovered {
-        let Ok((skills, max_health, hunt_tracker, crate_tracker)) = player_query.get_single()
+        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker)) = player_query.get_single()
         else {
             return;
         };
@@ -1181,6 +1182,7 @@ pub fn handle_heirloom_hud_tooltip(
             max_health.0,
             hunt_tracker,
             crate_tracker,
+            thorns_tracker,
         );
 
         // Position tooltip below the hovered icon
@@ -1410,6 +1412,7 @@ fn get_heirloom_scaling_text(
     max_health: i32,
     hunt_tracker: Option<&MaxHPHuntTracker>,
     crate_tracker: Option<&CrateBreakDamageTracker>,
+    thorns_tracker: Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
 ) -> Option<String> {
     match heirloom {
         Heirloom::GoldIntoDamage => {
@@ -1446,6 +1449,18 @@ fn get_heirloom_scaling_text(
             // Show current damage bonus from crate breaks
             if let Some(tracker) = crate_tracker {
                 Some(format!("(+{:.1}% damage)", tracker.bonus_damage_percent))
+            } else {
+                None
+            }
+        }
+        Heirloom::ThornsOnDamage => {
+            // Show total thorns gained from taking damage
+            if let Some(tracker) = thorns_tracker {
+                if tracker.thorns_gained > 0 {
+                    Some(format!("(+{}% Thorns)", tracker.thorns_gained))
+                } else {
+                    None
+                }
             } else {
                 None
             }

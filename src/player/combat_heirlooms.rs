@@ -957,6 +957,12 @@ pub struct CrateBreakDamageTracker {
     pub bonus_damage_percent: f32,
 }
 
+/// Tracks thorns gained from taking damage
+#[derive(Component, Default)]
+pub struct ThornsOnDamageTracker {
+    pub thorns_gained: i32,
+}
+
 pub fn handle_crate_break_damage(
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut player_query: Query<(&mut CrateBreakDamageTracker, &PlayerSkills), With<Player>>,

@@ -24,7 +24,9 @@ use crate::{
     item::{BonusStatLine, Equipment, EquipmentType, WorldObject},
     juice::ShakeEffect,
     player::{
-        combat_heirlooms::{DodgeCritState, HallucinationStats, MaxHPHuntTracker},
+        combat_heirlooms::{
+            DodgeCritState, HallucinationStats, MaxHPHuntTracker, ThornsOnDamageTracker,
+        },
         levels::{handle_level_up, PlayerLevel},
         skills::{Heirloom, PlayerClass, PlayerSkills},
         stats::StatType,
@@ -480,7 +482,8 @@ impl ItemAttributes {
         blessings: &OwnedBlessings,
         dodge_crit_buff_active: bool,
         coins: u32,
-        max_hp_hunt_bonus: i32, // Max HP gained from MaxHPHunt heirloom
+        max_hp_hunt_bonus: i32,      // Max HP gained from MaxHPHunt heirloom
+        thorns_on_damage_bonus: i32, // Thorns gained from ThornsOnDamage heirloom
         bonus_attack_speed: Option<&BonusAttackSpeed>,
     ) {
         // ChaosStats: +10 to many stats per stack
@@ -598,7 +601,8 @@ impl ItemAttributes {
         // ThornArmor: +10 defence per stack, +20% thorns per 10 defence per stack
         // Thorns now work as a percentage of player damage reflected back
         let thorn_armor_stacks = skills.get_count(Heirloom::ThornArmor);
-        let base_thorns = self.thorns.value + skills.get_count(Heirloom::Thorns) * 15;
+        let base_thorns =
+            self.thorns.value + skills.get_count(Heirloom::Thorns) * 15 + thorns_on_damage_bonus;
         // Calculate defence first (including ThornArmor bonus) to compute thorn bonus
         let total_defence = self.defence.value
             + skills.get_count(Heirloom::Defence) * 10
@@ -637,6 +641,7 @@ impl ItemAttributes {
         entity.insert(Lifesteal(
             self.lifesteal.value
                 + regen_lifesteal_stacks * 5
+                + skills.get_count(Heirloom::Lifesteal) * 2
                 + skills.get_count(Heirloom::LifestealCoins) * 5,
         ));
         // Defence already calculated above for ThornArmor
@@ -1483,6 +1488,7 @@ fn handle_player_item_attribute_change_events(
             Option<&HallucinationStats>,
             Option<&HeirloomStatsBonuses>,
             Option<&MaxHPHuntTracker>,
+            Option<&ThornsOnDamageTracker>,
             Option<&BonusAttackSpeed>,
         ),
         With<Player>,
@@ -1506,6 +1512,7 @@ fn handle_player_item_attribute_change_events(
             hallucination_stats,
             heirloom_stats_bonuses,
             max_hp_hunt_tracker,
+            thorns_on_damage_tracker,
             bonus_attack_speed,
         ) = player_atts.single();
         let mut new_att = att.clone();
@@ -1548,6 +1555,11 @@ fn handle_player_item_attribute_change_events(
             .map(|tracker| tracker.total_hp_gained)
             .unwrap_or(0);
 
+        // Get ThornsOnDamage bonus
+        let thorns_on_damage_bonus = thorns_on_damage_tracker
+            .map(|tracker| tracker.thorns_gained)
+            .unwrap_or(0);
+
         new_att.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
@@ -1558,6 +1570,7 @@ fn handle_player_item_attribute_change_events(
             dodge_crit_buff_active,
             coins.coins,
             max_hp_hunt_bonus,
+            thorns_on_damage_bonus,
             bonus_attack_speed,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {

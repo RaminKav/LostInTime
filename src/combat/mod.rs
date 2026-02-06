@@ -2,13 +2,13 @@ use bevy::prelude::*;
 
 use bevy_proto::prelude::ProtoCommands;
 use combat_helpers::{handle_deferred_aseprite_spawns, tick_despawn_timer};
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
 pub mod pickup_radius;
-use crate::attributes::{add_item_glows, CurrentMana, ProjectileSize};
+use crate::attributes::{add_item_glows, CurrentMana, Lifesteal, ProjectileSize};
 
 pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
@@ -20,8 +20,9 @@ use crate::{
     animations::{AttackEvent, HitAnimationTracker},
     assets::{Graphics, SpriteAnchor},
     attributes::{
-        modifiers::ModifyManaEvent, Attack, AttackCooldown, AttributeChangeEvent, CurrentHealth,
-        CurrentShield, InvincibilityCooldown, ManaRegen, MaxHealth, ShieldRegen,
+        modifiers::{ModifyHealthEvent, ModifyManaEvent},
+        Attack, AttackCooldown, AttributeChangeEvent, CurrentHealth, CurrentShield,
+        InvincibilityCooldown, ManaRegen, MaxHealth, ShieldRegen,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     client::{
@@ -34,6 +35,7 @@ use crate::{
         stone_golem::{SpikeAttackState, SpikeWarning},
         Mob, MobLevel,
     },
+    item::projectile::RangedAttackEvent,
     item::{
         combat_shrine::{CombatShrineMob, CombatShrineMobDeathEvent},
         dungeon_shrine::{DungeonShrineMob, DungeonShrineMobDeathEvent},
@@ -94,6 +96,13 @@ pub struct ObjBreakEvent {
     pub give_drops_and_xp: bool,
 }
 
+/// Event to trigger lifesteal calculation and healing
+/// `thorns_lifesteal_stacks` should be the number of ThornsLifesteal heirloom stacks (0 if not thorns damage)
+#[derive(Debug, Clone)]
+pub struct LifestealEvent {
+    pub thorns_lifesteal_stacks: i32,
+}
+
 #[derive(Component)]
 pub struct WasHitWithCrit;
 
@@ -117,7 +126,8 @@ impl Plugin for CombatPlugin {
         app.with_default_schedule(CoreSchedule::FixedUpdate, |app| {
             app.add_event::<HitEvent>()
                 .add_event::<EnemyDeathEvent>()
-                .add_event::<StatusEffectEvent>();
+                .add_event::<StatusEffectEvent>()
+                .add_event::<LifestealEvent>();
         })
         .add_event::<ObjBreakEvent>()
         .add_plugin(CollisionPlugion)
@@ -151,6 +161,8 @@ impl Plugin for CombatPlugin {
                 // spawn_hit_spark_effect.after(handle_hits),
                 handle_invincibility_frames.after(handle_hits),
                 handle_enemy_death.after(handle_hits),
+                handle_lifesteal,
+                handle_thorns_on_damage_tracker.after(handle_hits),
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -189,17 +201,20 @@ fn handle_enemy_death(
     mut death_events: EventReader<EnemyDeathEvent>,
     loot_tables: Query<&LootTable>,
     mob_data: Query<(&Mob, &MobLevel, Option<&EliteMob>)>,
-    mut player_xp: Query<(&mut PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
+    mut player_xp: Query<(&PlayerLevel, &PlayerSkills, &OwnedBlessings)>,
     mut proto_commands: ProtoCommands,
     mut commands: Commands,
     graphics: Res<Graphics>,
     infinite_mode: Res<InfiniteMode>,
+    enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
+    player_query: Query<(&GlobalTransform, &Attack), With<Player>>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
             continue;
         };
-        let (mut player_level, player_skills, blessings) = player_xp.single_mut();
+        let (player_level, player_skills, blessings) = player_xp.single_mut();
         let is_infinite_mode = infinite_mode.active;
 
         let has_double_gold = blessings.has_double_gold_drops();
@@ -265,6 +280,53 @@ fn handle_enemy_death(
                 1,
                 Some(player_level.level),
             );
+        }
+
+        // KillLightning: Killing an enemy has a 1% chance per stack to spawn a lightning strike on a random nearby enemy
+        let kill_lightning_stacks =
+            player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
+        if kill_lightning_stacks > 0 {
+            let mut rng = rand::thread_rng();
+            if rng.gen_ratio(kill_lightning_stacks as u32, 100) {
+                // Find nearby enemies (within 200 units)
+                let death_pos = death_event.enemy_pos;
+                let nearby_enemies: Vec<(Entity, Vec2)> = enemies
+                    .iter()
+                    .filter_map(|(e, txfm)| {
+                        let enemy_pos = txfm.translation().truncate();
+                        let distance = death_pos.distance(enemy_pos);
+                        if distance <= 200.0 && distance > 0.0 {
+                            Some((e, enemy_pos))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                if !nearby_enemies.is_empty() {
+                    // Pick a random nearby enemy
+                    if let Some((_, target_pos)) = nearby_enemies.choose(&mut rng) {
+                        if let Ok((_, attack)) = player_query.get_single() {
+                            let lightning_damage = attack.0; // 100% damage
+                            ranged_attack_event.send(RangedAttackEvent {
+                                projectile: crate::item::projectile::Projectile::Lightning,
+                                direction: Vec2::ZERO,
+                                mana_cost: Some(5),
+                                from_enemy: false,
+                                from_entity: None,
+                                is_followup_proj: false,
+                                dmg_override: Some(lightning_damage),
+                                pos_override: Some(*target_pos + Vec2::new(0., 48.)),
+                                spawn_delay: 0.0,
+                            });
+                            commands.spawn(SoundSpawner::new(
+                                AudioSoundEffect::LightningStaffCast,
+                                0.4,
+                            ));
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -733,5 +795,105 @@ pub fn cleanup_marked_for_death_entities(
         analytics.send(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::MobKilled(mob.clone()),
         });
+    }
+}
+
+/// Handles lifesteal calculation and healing based on LifestealEvent
+/// This centralizes all lifesteal logic to avoid duplication
+pub fn handle_lifesteal(
+    mut lifesteal_events: EventReader<LifestealEvent>,
+    player_query: Query<(&PlayerSkills, &Lifesteal, &GlobalTransform), With<Player>>,
+    mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+) {
+    let Ok((skills, lifesteal, player_txfm)) = player_query.get_single() else {
+        return;
+    };
+    let player_pos = player_txfm.translation().truncate();
+
+    for event in lifesteal_events.iter() {
+        // ThornsLifesteal bonus: +25% per stack for thorns damage specifically
+        let thorns_bonus = event.thorns_lifesteal_stacks * 25;
+        let total_lifesteal = lifesteal.0 + thorns_bonus;
+
+        if total_lifesteal > 0 {
+            // Lifesteal can go over 100%
+            // >= 100% = guaranteed 1 HP heal
+            // For each additional 100% over 100%, guaranteed another HP
+            // Remainder is a random chance for +1 more HP
+            let mut rng = rand::thread_rng();
+            let mut heal_amount = 0;
+            let mut remaining_lifesteal = total_lifesteal;
+
+            // Process full 100% chunks
+            while remaining_lifesteal >= 100 {
+                heal_amount += 1;
+                remaining_lifesteal -= 100;
+            }
+
+            // Random roll for remainder
+            if remaining_lifesteal > 0
+                && rng.gen_bool((remaining_lifesteal as f64 / 100.0).clamp(0.0, 1.0))
+            {
+                heal_amount += 1;
+            }
+
+            if heal_amount > 0 {
+                modify_health_events.send(ModifyHealthEvent(heal_amount));
+
+                // LifestealCoins: Spawn a coin for each lifesteal proc
+                if skills.has(Heirloom::LifestealCoins) {
+                    let d = 32.0;
+                    let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+                    proto_commands.spawn_item_from_proto(
+                        WorldObject::Coin,
+                        &proto,
+                        player_pos + drop_offset,
+                        1,
+                        None,
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Handles ThornsOnDamage tracker increment when player takes damage
+/// This runs after handle_hits to ensure we only increment when damage is actually applied
+/// Uses a Local HashSet to track which mobs have already triggered the increment this frame
+pub fn handle_thorns_on_damage_tracker(
+    mut hit_events: EventReader<HitEvent>,
+    mut thorns_tracker: Query<
+        &mut crate::player::combat_heirlooms::ThornsOnDamageTracker,
+        With<Player>,
+    >,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    health: Query<(Entity, &CurrentHealth), With<Player>>,
+    mut attribute_events: EventWriter<AttributeChangeEvent>,
+    in_i_frame: Query<&InvincibilityTimer>,
+) {
+    let Ok((player_entity, _)) = health.get_single() else {
+        return;
+    };
+
+    for hit in hit_events.iter() {
+        if in_i_frame.get(hit.hit_entity).is_ok() {
+            continue;
+        }
+        if hit.hit_entity == player_entity {
+            if hit.hit_by_mob.is_some() {
+                if let Ok(mut tracker) = thorns_tracker.get_single_mut() {
+                    if let Ok(skills) = player_skills.get_single() {
+                        let stacks =
+                            skills.get_count(crate::player::skills::Heirloom::ThornsOnDamage);
+                        if stacks > 0 {
+                            tracker.thorns_gained += stacks;
+                            attribute_events.send(AttributeChangeEvent);
+                        }
+                    }
+                }
+            }
+        }
     }
 }

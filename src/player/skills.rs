@@ -723,6 +723,15 @@ pub enum Heirloom {
     ManaOrbAttack,    // Mana regen shoots mana orb projectiles
     ItemPickupRadius, // Increases pickup radius by 25%
     MagnetPull,       // Periodically pulls all item drops to player
+
+    // Thorns build heirlooms
+    ThornsSpikes,    // Taking damage shoots out spikes (from blessings)
+    ThornsOnDamage,  // Gain 1% thorns each time you take damage
+    ThornsLifesteal, // Thorns damage has +25% chance to lifesteal
+
+    // Lightning strikes archetype
+    CoinLightning, // Picking up a coin causes a lightning strike
+    KillLightning, // Killing an enemy has a 1% chance to spawn lightning
 }
 
 pub enum HeirloomTrait {
@@ -851,6 +860,15 @@ impl Heirloom {
             Heirloom::ManaOrbAttack => "Wizard Hat".to_string(),
             Heirloom::ItemPickupRadius => "Magnet".to_string(),
             Heirloom::MagnetPull => "Gravitation Tome".to_string(),
+
+            // Thorns build heirlooms
+            Heirloom::ThornsSpikes => "Spiked Club".to_string(),
+            Heirloom::ThornsOnDamage => "Spiked Helmet".to_string(),
+            Heirloom::ThornsLifesteal => "Spiked Ring".to_string(),
+
+            // Lightning strikes archetype
+            Heirloom::CoinLightning => "Lightning Belt".to_string(),
+            Heirloom::KillLightning => "Lightning Ring".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1317,6 +1335,39 @@ impl Heirloom {
                 "Cooldown reduces".to_string(),
                 "with more copies.".to_string(),
             ],
+
+            // Thorns build heirlooms
+            Heirloom::ThornsSpikes => vec![
+                "Taking damage shoots".to_string(),
+                "out 2 spikes. Damage".to_string(),
+                "scales with thorns".to_string(),
+                "stat.".to_string(),
+            ],
+            Heirloom::ThornsOnDamage => vec![
+                "Gain +1 Thorns each".to_string(),
+                "time you take damage".to_string(),
+            ],
+            Heirloom::ThornsLifesteal => vec![
+                "Your thorns damage".to_string(),
+                "has +25% lifesteal.".to_string(),
+            ],
+
+            // Lightning strikes archetype
+            Heirloom::CoinLightning => vec![
+                "Picking up coins".to_string(),
+                "spawns a lightning".to_string(),
+                "strike on a random".to_string(),
+                "nearby enemy.".to_string(),
+                format!("Costs {} mana.", 5),
+            ],
+            Heirloom::KillLightning => vec![
+                "Killing an enemy".to_string(),
+                "has a 1% chance".to_string(),
+                "to spawn a lightning".to_string(),
+                "strike on a random".to_string(),
+                "nearby enemy.".to_string(),
+                format!("Costs {} mana.", 5),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1406,6 +1457,14 @@ impl Heirloom {
                     commands.entity(entity).insert(
                         crate::player::combat_heirlooms::CrateBreakDamageTracker::default(),
                     );
+                }
+            }
+            Heirloom::ThornsOnDamage => {
+                // Only add tracker if this is the first one
+                if skills.get_count(Heirloom::ThornsOnDamage) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::ThornsOnDamageTracker::default());
                 }
             }
             Heirloom::DodgeCrit => {
@@ -1658,6 +1717,14 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ChaosStats, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ItemPickupRadius, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::MagnetPull, HeirloomRarity::Rare),
+                // Thorns build heirlooms
+                HeirloomChoiceState::new(Heirloom::ThornsSpikes, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::ThornsOnDamage, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::ThornsLifesteal, HeirloomRarity::Uncommon),
+                // Lightning strikes archetype
+                // HeirloomChoiceState::new(Heirloom::CoinLightning, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::CoinLightning, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
             ],
             banned: HashSet::default(),
         }

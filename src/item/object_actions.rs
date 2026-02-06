@@ -39,7 +39,7 @@ use crate::{
     attributes::modifiers::ModifyHealthEvent, player::MovePlayerEvent,
     world::world_helpers::world_pos_to_tile_pos,
 };
-use crate::{BounceEvent, GameParam, GameState, DEBUG};
+use crate::{BounceEvent, GameParam, DEBUG};
 use bevy::prelude::*;
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -662,9 +662,22 @@ impl ObjectAction {
                         return;
                     }
                 }
-                item_action_param
-                    .next_game_state
-                    .set(GameState::BlessingChoice);
+
+                // Determine next era based on current era
+                let current_era = game.era.current_era.clone();
+                let next_era = match current_era {
+                    Era::Main => Some(Era::Second),
+                    Era::Second => Some(Era::Third),
+                    Era::Third => None,
+                    Era::DungeonMain => None, // Shouldn't be able to use portal in dungeon
+                };
+
+                if let Some(era) = next_era {
+                    item_action_param.dim_event.send(DimensionSpawnEvent {
+                        swap_to_dim_now: true,
+                        new_era: Some(era),
+                    });
+                }
             }
             _ => {}
         }

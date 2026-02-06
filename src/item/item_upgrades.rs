@@ -3,8 +3,9 @@ use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::assets::Graphics;
-use crate::attributes::modifiers::ModifyHealthEvent;
-use crate::attributes::{CurrentHealth, CurrentMana, ItemAttributes, ProjectileSize};
+use crate::attributes::{
+    modifiers::ModifyHealthEvent, CurrentHealth, CurrentMana, ItemAttributes, ProjectileSize,
+};
 use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::blessings::OwnedBlessings;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
@@ -19,7 +20,7 @@ use crate::status_effects::{
 use crate::world::y_sort::YSort;
 use crate::Game;
 use crate::{
-    combat::{AttackTimer, HitEvent},
+    combat::{AttackTimer, HitEvent, LifestealEvent},
     cursor::CursorPos,
     player::Player,
     proto::proto_param::ProtoParam,
@@ -169,7 +170,6 @@ pub fn handle_on_hit_upgrades(
         (
             Entity,
             &PlayerSkills,
-            &GlobalTransform,
             &ProjectileSize,
             Option<&AttackTimer>,
             &mut CurrentMana,
@@ -189,19 +189,21 @@ pub fn handle_on_hit_upgrades(
     )>,
     mut elec_count: Local<u8>,
     graphics: Res<Graphics>,
-    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut status_event: EventWriter<StatusEffectEvent>,
-    asset_server: Res<AssetServer>,
     player_att_blessings: Query<(&ItemAttributes, &OwnedBlessings, &CurrentHealth), With<Player>>,
-    mut modify_health_events: EventWriter<ModifyHealthEvent>,
+    asset_server: Res<AssetServer>,
+    mut events: ParamSet<(
+        EventWriter<RangedAttackEvent>,
+        EventWriter<StatusEffectEvent>,
+        EventWriter<LifestealEvent>,
+        EventWriter<ModifyHealthEvent>,
+    )>,
     mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
 ) {
     // Reset counters at start of frame
     throttle.count = 0;
     throttle.sound_played = false;
 
-    let (player_e, skills, player_txfm, projectile_size, att_cooldown, mut current_mana) =
-        upgrades.single_mut();
+    let (player_e, skills, projectile_size, att_cooldown, mut current_mana) = upgrades.single_mut();
     if *elec_count > 0 && att_cooldown.is_none() {
         *elec_count = 0;
     }
@@ -209,7 +211,6 @@ pub fn handle_on_hit_upgrades(
     else {
         return;
     };
-    let player_pos = player_txfm.translation().truncate();
     for hit in hits.iter() {
         // Skip damage from heirloom effects (e.g., poison, burning)
         if hit.from_heirloom_effect {
@@ -225,7 +226,7 @@ pub fn handle_on_hit_upgrades(
         };
         let kevin_chance = player_blessings.get_kevin_self_damage_chance();
         if current_hp.0 > 1 && kevin_chance > 0.0 && rng.gen_bool(kevin_chance as f64) {
-            modify_health_events.send(ModifyHealthEvent(-1));
+            events.p3().send(ModifyHealthEvent(-1));
         }
         if let Some(proj) = &hit.hit_with_projectile {
             if proj.is_skill_projectile() {
@@ -255,7 +256,7 @@ pub fn handle_on_hit_upgrades(
                 &asset_server,
                 1. + player_attributes.size.value as f32 / 100.,
             );
-            ranged_attack_event.send(RangedAttackEvent {
+            events.p0().send(RangedAttackEvent {
                 projectile: Projectile::Electricity,
                 direction: (nearest_mob_t.1.translation().truncate()
                     - hit_entity_txfm.translation().truncate())
@@ -337,7 +338,7 @@ pub fn handle_on_hit_upgrades(
                 // Increment stacks and reset duration
                 burning.stacks += 1 + bonus_stack;
                 burning.duration_timer.reset();
-                status_event.send(StatusEffectEvent {
+                events.p1().send(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
                     num_stacks: burning.stacks as i32,
@@ -354,7 +355,7 @@ pub fn handle_on_hit_upgrades(
                     duration_timer: Timer::from_seconds(3.0 * duration_bonus, TimerMode::Once),
                     stacks: 1,
                 });
-                status_event.send(StatusEffectEvent {
+                events.p1().send(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Poison,
                     num_stacks: 1,
@@ -373,7 +374,7 @@ pub fn handle_on_hit_upgrades(
                 {
                     frail_stacks.num_stacks += 1;
                     frail_stacks.timer.reset();
-                    status_event.send(StatusEffectEvent {
+                    events.p1().send(StatusEffectEvent {
                         entity: hit_e,
                         effect: StatusEffect::Frail,
                         num_stacks: frail_stacks.num_stacks as i32,
@@ -384,7 +385,7 @@ pub fn handle_on_hit_upgrades(
                     num_stacks: 1,
                     timer: Timer::from_seconds(1.2, TimerMode::Repeating),
                 });
-                status_event.send(StatusEffectEvent {
+                events.p1().send(StatusEffectEvent {
                     entity: hit_e,
                     effect: StatusEffect::Frail,
                     num_stacks: 1,
@@ -397,53 +398,13 @@ pub fn handle_on_hit_upgrades(
             try_add_slow_stacks(
                 hit_e,
                 &mut commands,
-                &mut status_event,
+                &mut events.p1(),
                 slowed_option.as_deref_mut(),
             );
         }
 
-        // Calculate total lifesteal: base from heirloom (10% per stack) + equipment lifesteal attribute
-        let heirloom_lifesteal = skills.get_count(Heirloom::Lifesteal) * 10; // 10% per stack
-        let equipment_lifesteal = player_attributes.lifesteal.value;
-        let total_lifesteal = heirloom_lifesteal + equipment_lifesteal;
-
-        if total_lifesteal > 0 {
-            // Lifesteal can go over 100%
-            // >= 100% = guaranteed 1 HP heal
-            // For each additional 100% over 100%, guaranteed another HP
-            // Remainder is a random chance for +1 more HP
-            let mut heal_amount = 0;
-            let mut remaining_lifesteal = total_lifesteal;
-
-            // Process full 100% chunks
-            while remaining_lifesteal >= 100 {
-                heal_amount += 1;
-                remaining_lifesteal -= 100;
-            }
-
-            // Random roll for remainder
-            if remaining_lifesteal > 0
-                && rng.gen_bool((remaining_lifesteal as f64 / 100.0).clamp(0.0, 1.0))
-            {
-                heal_amount += 1;
-            }
-
-            if heal_amount > 0 {
-                modify_health_events.send(ModifyHealthEvent(heal_amount));
-
-                // LifestealCoins: Spawn a coin for each lifesteal proc
-                if skills.has(Heirloom::LifestealCoins) {
-                    let d = 32.0;
-                    let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                    proto_commands.spawn_item_from_proto(
-                        WorldObject::Coin,
-                        &proto,
-                        player_pos + drop_offset,
-                        1,
-                        None,
-                    );
-                }
-            }
-        }
+        events.p2().send(LifestealEvent {
+            thorns_lifesteal_stacks: 0,
+        });
     }
 }

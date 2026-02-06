@@ -2,11 +2,18 @@ use bevy::prelude::*;
 use rand::Rng;
 
 use crate::{
-    attributes::{modifiers::ModifyHealthEvent, AttributeChangeEvent},
+    attributes::{
+        modifiers::{ModifyHealthEvent, ModifyManaEvent},
+        Attack, AttributeChangeEvent, CurrentMana,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     client::persist_time_fragments,
     combat::EnemyDeathEvent,
-    item::WorldObject,
+    enemy::Mob,
+    item::{
+        projectile::{Projectile, RangedAttackEvent},
+        WorldObject,
+    },
     player::{
         skills::{Heirloom, PlayerSkills},
         Player,
@@ -69,8 +76,12 @@ pub fn handle_modify_currency(
     mut commands: Commands,
     mut coins: ResMut<CoinCurrency>,
     player_skills: Query<&PlayerSkills, With<Player>>,
+    player_query: Query<(&GlobalTransform, &Attack, &CurrentMana), With<Player>>,
+    enemies: Query<(&GlobalTransform, &Mob), (With<Mob>, Without<Player>)>,
     mut modify_health_event: EventWriter<ModifyHealthEvent>,
     mut attribute_change_event: EventWriter<AttributeChangeEvent>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
 ) {
     let skills = player_skills.get_single().ok();
     let mut rng = rand::thread_rng();
@@ -86,7 +97,7 @@ pub fn handle_modify_currency(
             }
         } else if event.obj == WorldObject::Coin {
             coins.coins = (coins.coins as i32 + event.delta).max(0) as u32;
-            
+
             // Trigger attribute recalculation if player has GoldIntoDamage
             if let Some(skills) = skills {
                 if skills.has(Heirloom::GoldIntoDamage) {
@@ -95,6 +106,7 @@ pub fn handle_modify_currency(
             }
 
             // CoinHeal: Picking up coins has a chance to heal
+            // CoinLightning: Picking up a coin causes a lightning strike
             if event.delta > 0 {
                 if let Some(skills) = skills {
                     let stacks = skills.get_count(Heirloom::CoinHeal);
@@ -117,6 +129,46 @@ pub fn handle_modify_currency(
                             };
                             if heal_amount > 0 {
                                 modify_health_event.send(ModifyHealthEvent(heal_amount));
+                            }
+                        }
+                    }
+
+                    // CoinLightning: Picking up a coin causes a lightning strike
+                    if skills.has(Heirloom::CoinLightning) {
+                        if let Ok((player_txfm, attack, current_mana)) = player_query.get_single() {
+                            const MANA_COST: i32 = 5;
+                            if current_mana.0 >= MANA_COST {
+                                // Find nearest enemy for lightning target
+                                let player_pos = player_txfm.translation().truncate();
+                                let mut enemy_distances: Vec<(Vec2, f32)> = enemies
+                                    .iter()
+                                    .map(|(e_txfm, _)| {
+                                        let enemy_pos = e_txfm.translation().truncate();
+                                        let dist = player_pos.distance(enemy_pos);
+                                        (enemy_pos, dist)
+                                    })
+                                    .collect();
+                                enemy_distances.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+                                if let Some((target_pos, _)) = enemy_distances.first() {
+                                    let lightning_damage = attack.0; // 100% damage
+                                    ranged_attack_event.send(RangedAttackEvent {
+                                        projectile: Projectile::Lightning,
+                                        direction: Vec2::ZERO,
+                                        mana_cost: Some(MANA_COST),
+                                        from_enemy: false,
+                                        from_entity: None,
+                                        is_followup_proj: false,
+                                        dmg_override: Some(lightning_damage),
+                                        pos_override: Some(*target_pos + Vec2::new(0., 48.)),
+                                        spawn_delay: 0.0,
+                                    });
+                                    modify_mana_event.send(ModifyManaEvent(-MANA_COST));
+                                    commands.spawn(SoundSpawner::new(
+                                        AudioSoundEffect::LightningStaffCast,
+                                        0.4,
+                                    ));
+                                }
                             }
                         }
                     }
