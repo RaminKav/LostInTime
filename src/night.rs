@@ -236,6 +236,7 @@ impl Plugin for NightPlugin {
                     tick_infinite_mode_difficulty.run_if(is_not_paused),
                     tick_era_timer.run_if(is_not_paused),
                     handle_era_timer_expired,
+                    transition_to_daytime_on_peaceful_mode,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );
@@ -543,4 +544,34 @@ fn reset_era_timer_on_new_run(
     mob_spawning_paused.paused = false;
 
     info!("Era timer and infinite mode reset for new run");
+}
+
+/// Transition to daytime when peaceful mode is activated (boss defeated)
+/// Only transitions if currently in night time
+fn transition_to_daytime_on_peaceful_mode(
+    mob_spawning_paused: Res<MobSpawningPaused>,
+    mut night_tracker: ResMut<NightTracker>,
+    mut bgm_track_event: EventWriter<UpdateBGMTrackEvent>,
+    infinite_mode: Res<InfiniteMode>,
+    mut night_query: Query<&mut Sprite, With<Night>>,
+) {
+    if infinite_mode.active {
+        return;
+    }
+
+    if mob_spawning_paused.paused && night_tracker.is_night() {
+        night_tracker.time = 12.0;
+        info!(
+            "Peaceful mode activated - transitioning to daytime (time: {})",
+            night_tracker.time
+        );
+
+        for mut sprite in night_query.iter_mut() {
+            sprite.color = overwrite_alpha(NIGHT, night_tracker.get_alpha());
+        }
+
+        bgm_track_event.send(UpdateBGMTrackEvent {
+            asset_path: "sounds/bgm_day.ogg".to_owned(),
+        });
+    }
 }

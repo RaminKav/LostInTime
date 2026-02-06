@@ -934,7 +934,7 @@ pub fn handle_active_skill_event(
 
                         // Spawn sword projectile in front of player
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 2.75) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.75) as i32;
                         ranged_attack_events.send(RangedAttackEvent {
                             projectile: Projectile::DaggerSlash,
                             direction,

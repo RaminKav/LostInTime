@@ -3,7 +3,7 @@ use bevy_proto::prelude::{ProtoCommands, Prototypes};
 use rand::Rng;
 
 use crate::{
-    chaos::ChaosTracker,
+    chaos::{ChaosTracker, EraTransitionState},
     client::is_not_paused,
     custom_commands::CommandsExt,
     night::{InfiniteMode, InfiniteModeMob, NightTracker},
@@ -339,6 +339,7 @@ fn tick_spawner_timers(
     mobs: Query<&Mob>,
     chaos_tracker: Res<ChaosTracker>,
     mob_spawning_paused: Res<MobSpawningPaused>,
+    transition_state: Res<EraTransitionState>,
 ) {
     if !spawners.initial_spawn_delay.finished() {
         spawners.initial_spawn_delay.tick(time.delta());
@@ -392,6 +393,11 @@ fn tick_spawner_timers(
     for spawner in spawners.spawners.iter_mut() {
         debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
         if day < spawner.min_days_to_spawn {
+            continue;
+        }
+
+        // Check if this mob is unlocked in the current era transition
+        if !transition_state.is_mob_unlocked(&spawner.enemy) {
             continue;
         }
 

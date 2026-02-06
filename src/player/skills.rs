@@ -106,28 +106,28 @@ impl SkillClass {
             AttributeQuality::Low
         };
         // Base damage bonus for all classes
-        stats.bonus_damage = AttributeValue::new(f32::floor(level as f32 * 3.) as i32, quality, 1.);
+        stats.bonus_damage = AttributeValue::new(f32::floor(level as f32 * 1.) as i32, quality, 1.);
 
         match self {
             SkillClass::Warrior => {
                 // +5 HP per level
-                stats.health = AttributeValue::new(level * 5, quality, 1.);
+                stats.health = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Wizard => {
                 // +5 MP per level
-                stats.mana = AttributeValue::new(level * 5, quality, 1.);
+                stats.mana = AttributeValue::new(level * 3, quality, 1.);
             }
             SkillClass::Rogue => {
                 // +3% crit chance per level
-                stats.crit_chance = AttributeValue::new(level * 3, quality, 1.);
+                stats.crit_chance = AttributeValue::new(level * 1, quality, 1.);
             }
             SkillClass::Thief => {
                 // +3% attack speed per level
-                stats.attack_speed = AttributeValue::new(level * 3, quality, 1.);
+                stats.attack_speed = AttributeValue::new(level * 2, quality, 1.);
             }
             SkillClass::Hunter => {
                 // +3% crit dmg per level
-                stats.crit_damage = AttributeValue::new(level * 3, quality, 1.);
+                stats.crit_damage = AttributeValue::new(level * 1, quality, 1.);
             }
             _ => (),
         }
@@ -347,7 +347,7 @@ impl ActiveSkill {
             ],
             ActiveSkill::DaggerSlash => vec![
                 "Quickly slash in front of you,".to_string(),
-                format!("dealing {}% damage in an area.", skill_power * 275.0),
+                format!("dealing {}% damage in an area.", skill_power * 175.0),
             ],
             ActiveSkill::Stealth => vec![
                 "Dissapear for a short duration,".to_string(),

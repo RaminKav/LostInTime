@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     attributes::AttributeChangeEvent,
+    chaos::EraTransitionState,
     enemy::{spawner::MobSpawningPaused, Mob},
     item::{Equipment, ItemDrop},
     night::NightTracker,
@@ -163,6 +164,7 @@ impl DimensionPlugin {
         mut era_timer: ResMut<crate::night::EraTimer>,
         mut infinite_mode: ResMut<crate::night::InfiniteMode>,
         mut mob_spawning_paused: ResMut<MobSpawningPaused>,
+        mut transition_state: ResMut<EraTransitionState>,
     ) {
         for new_dim in spawn_event.iter() {
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
@@ -243,6 +245,25 @@ impl DimensionPlugin {
                     let new_era_chaos = new_era.get_chaos_modifier();
                     // Update chaos tracker: remove old era's chaos, add new era's chaos
                     chaos_tracker.add_chaos(new_era_chaos - old_era_chaos);
+
+                    // Set up mob unlock timers for new mobs in this era (skip for Era::Main)
+                    transition_state.mob_unlock_timers.clear();
+                    if new_era != &Era::Main {
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::StingFly, Timer::from_seconds(90.0, TimerMode::Once));
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::Bushling, Timer::from_seconds(45.0, TimerMode::Once));
+                        transition_state
+                            .mob_unlock_timers
+                            .insert(Mob::SpikeSlime, Timer::from_seconds(160.0, TimerMode::Once));
+
+                        info!(
+                            "Initialized era transition for {:?}: mobs will unlock gradually",
+                            new_era
+                        );
+                    }
                 }
                 game.era.current_era = new_era.clone();
 
