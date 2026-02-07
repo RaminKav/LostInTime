@@ -127,6 +127,12 @@ pub struct ItemChestUI;
 #[derive(Component)]
 pub struct ItemChestFinalItem;
 
+/// Component to store heirloom data on the final heirloom entity in chest
+#[derive(Component)]
+pub struct ItemChestFinalHeirloom {
+    pub heirloom: HeirloomChoiceState,
+}
+
 #[derive(Component)]
 pub struct ItemChestButton;
 
@@ -627,8 +633,6 @@ pub fn handle_anim_events(
                     }
                     ChestType::Heirloom => {
                         let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
-                        // For heirlooms, we just show the icon - no tooltip needed
-                        // The actual heirloom data is stored in ItemChestState
                         commands
                             .spawn(SpriteBundle {
                                 sprite: Sprite {
@@ -648,6 +652,9 @@ pub fn handle_anim_events(
                             .insert(UIState::ItemChest)
                             .insert(RenderLayers::from_layers(&[3]))
                             .insert(ItemChestFinalItem)
+                            .insert(ItemChestFinalHeirloom {
+                                heirloom: picked_heirloom.clone(),
+                            })
                             .insert(Interactable::default())
                             .insert(Name::new("Chest Final Heirloom"));
                     }
@@ -663,7 +670,10 @@ pub fn handle_anim_events(
 pub fn handle_item_chest_final_item_hover(
     cursor_pos: Res<CursorPos>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut final_items: Query<(Entity, &mut Interactable, &ItemStack), With<ItemChestFinalItem>>,
+    mut final_items: Query<
+        (Entity, &mut Interactable, &ItemStack),
+        (With<ItemChestFinalItem>, Without<ItemChestFinalHeirloom>),
+    >,
     mut tooltip_update_events: EventWriter<ToolTipUpdateEvent>,
     mut tooltip_teardown_events: EventWriter<TooltipTeardownEvent>,
 ) {
@@ -697,3 +707,72 @@ pub fn handle_item_chest_final_item_hover(
         }
     }
 }
+
+/// Handle hovering on the final heirloom in the heirloom chest to show tooltip
+pub fn handle_heirloom_chest_final_item_hover(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    cursor_pos: Res<CursorPos>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut final_heirlooms: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &mut Interactable,
+            &ItemChestFinalHeirloom,
+        ),
+        With<ItemChestFinalItem>,
+    >,
+    existing_tooltips: Query<Entity, With<HeirloomChestTooltip>>,
+) {
+    use super::interactions::Interaction;
+    use super::skill_choice_ui::spawn_heirloom_tooltip_card;
+
+    let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+
+    for (e, transform, mut interactable, heirloom_data) in final_heirlooms.iter_mut() {
+        match hit_test {
+            Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
+                Interaction::None => {
+                    interactable.change(Interaction::Hovering);
+
+                    for tooltip_e in existing_tooltips.iter() {
+                        commands.entity(tooltip_e).despawn_recursive();
+                    }
+
+                    let icon_pos = transform.translation();
+                    let tooltip_pos = Vec3::new(icon_pos.x - 98., icon_pos.y - 25., 15.);
+
+                    let tooltip_e = spawn_heirloom_tooltip_card(
+                        &graphics,
+                        &mut commands,
+                        &asset_server,
+                        heirloom_data.heirloom.heirloom.clone(),
+                        heirloom_data.heirloom.rarity.clone(),
+                        tooltip_pos,
+                        None,
+                    );
+
+                    commands
+                        .entity(tooltip_e)
+                        .insert(HeirloomChestTooltip)
+                        .insert(RenderLayers::from_layers(&[3]));
+                }
+                Interaction::Hovering => {}
+                _ => {}
+            },
+            _ => {
+                if matches!(interactable.current(), Interaction::Hovering) {
+                    interactable.change(Interaction::None);
+                    for tooltip_e in existing_tooltips.iter() {
+                        commands.entity(tooltip_e).despawn_recursive();
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct HeirloomChestTooltip;

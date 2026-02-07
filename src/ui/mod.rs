@@ -461,6 +461,11 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(UIState::ItemChest))
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(
+                handle_heirloom_chest_final_item_hover
+                    .run_if(in_state(UIState::ItemChest))
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_systems(
                 (
                     setup_active_skill_shrine_ui.before(CustomFlush).run_if(

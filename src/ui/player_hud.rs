@@ -1161,7 +1161,8 @@ pub fn handle_heirloom_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((heirloom, icon_pos)) = currently_hovered {
-        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker)) = player_query.get_single()
+        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker)) =
+            player_query.get_single()
         else {
             return;
         };

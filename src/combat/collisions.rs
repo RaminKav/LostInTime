@@ -1006,11 +1006,11 @@ fn check_mob_to_player_collisions(
                         projectile: Projectile::ThornsProjectile,
                         direction,
                         from_enemy: false,
-                        is_followup_proj: true,
+                        is_followup_proj: false,
                         mana_cost: None,
                         from_entity: Some(player_e),
                         dmg_override: Some(spike_damage),
-                        pos_override: Some(player_txfm.translation.truncate() + direction * 10.0),
+                        pos_override: Some(direction * 10.0),
                         spawn_delay: 0.0,
                     });
                 }
