@@ -1484,6 +1484,7 @@ pub fn handle_update_player_skills(
     _counter_texts: Query<&mut Text, With<HeirloomCounterText>>, // Query counter texts to update
     existing_cooldown_overlays: Query<(Entity, &SkillCooldownOverlay)>, // Query existing cooldown overlays to preserve state
     keybinds: Res<crate::keybinds::InputMappings>,
+    mut prev_active_skills: Local<Vec<Option<ActiveSkill>>>, // Track previous active skills per slot to detect swaps
 ) {
     if !game_over.is_empty() {
         prev_icons_tracker.clear();
@@ -1626,10 +1627,43 @@ pub fn handle_update_player_skills(
         //     0  // magic_skill_count - removed
         // );
 
+        // Build list of active skill slots to display
+        let mut active_skill_slots = vec![
+            (new_skills.active_skill_slot_0.clone(), 0),
+            (new_skills.active_skill_slot_1.clone(), 1),
+            (new_skills.active_skill_slot_2.clone(), 2),
+            (new_skills.active_skill_slot_3.clone(), 3),
+        ];
+
+        if new_skills.active_skill_slot_4.is_some() {
+            active_skill_slots.push((new_skills.active_skill_slot_4.clone(), 4));
+        }
+
+        // Initialize prev_active_skills if needed
+        if prev_active_skills.len() < active_skill_slots.len() {
+            prev_active_skills.resize(active_skill_slots.len(), None);
+        }
+
+        // Detect which slots had skill changes (swaps) BEFORE preserving cooldowns
+        let mut skill_changed_slots = std::collections::HashSet::new();
+        for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
+            let current_skill = active_skill_option.as_ref().map(|s| s.active_skill.clone());
+            let prev_skill = prev_active_skills.get(i).cloned().flatten();
+
+            // If the skill changed (not just None -> Some or Some -> None, but actual different skill)
+            if current_skill != prev_skill && (current_skill.is_some() || prev_skill.is_some()) {
+                skill_changed_slots.insert(*slot_index);
+            }
+        }
+
         // Active Skill Icons
-        // Preserve cooldown overlay state before despawning
+        // Preserve cooldown overlay state before despawning, but EXCLUDE slots where skill changed
         let mut preserved_cooldowns: Vec<(usize, f32, f32)> = Vec::new(); // (index, elapsed, duration)
         for (_, overlay) in existing_cooldown_overlays.iter() {
+            // Don't preserve cooldown if the skill in this slot was swapped
+            if skill_changed_slots.contains(&overlay.index) {
+                continue;
+            }
             let elapsed = overlay.timer.elapsed().as_secs_f32();
             let duration = overlay.timer.duration().as_secs_f32();
             if duration > 0.0 && elapsed < duration {
@@ -1642,16 +1676,12 @@ pub fn handle_update_player_skills(
             commands.entity(e).despawn_recursive();
         });
 
-        // Build list of active skill slots to display
-        let mut active_skill_slots = vec![
-            (new_skills.active_skill_slot_0.clone(), 0),
-            (new_skills.active_skill_slot_1.clone(), 1),
-            (new_skills.active_skill_slot_2.clone(), 2),
-            (new_skills.active_skill_slot_3.clone(), 3),
-        ];
-
-        if new_skills.active_skill_slot_4.is_some() {
-            active_skill_slots.push((new_skills.active_skill_slot_4.clone(), 4));
+        // Update prev_active_skills for next time
+        for (i, (active_skill_option, _)) in active_skill_slots.iter().enumerate() {
+            if i < prev_active_skills.len() {
+                prev_active_skills[i] =
+                    active_skill_option.as_ref().map(|s| s.active_skill.clone());
+            }
         }
 
         for (i, (active_skill_option, slot_index)) in active_skill_slots.iter().enumerate() {
@@ -1750,10 +1780,11 @@ pub fn handle_update_player_skills(
                     .set_parent(icon_bg);
             }
 
-            // Preserve cooldown state if it exists for this slot
+            // Preserve cooldown state if it exists for this slot (we already filtered out changed slots)
             if let Some((_, elapsed, original_duration)) =
                 preserved_cooldowns.iter().find(|(idx, _, _)| *idx == i)
             {
+                // Skill didn't change - preserve cooldown state
                 // Apply cooldown multiplier to get the new remaining time
                 let multiplier = new_skills.skill_cooldown_multiplier();
                 // Calculate what percentage of the original cooldown was elapsed
@@ -1775,6 +1806,7 @@ pub fn handle_update_player_skills(
                     i,
                 );
             } else {
+                // No preserved cooldown (either skill changed or no cooldown was active)
                 spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
             }
 

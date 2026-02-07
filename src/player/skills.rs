@@ -172,13 +172,13 @@ impl ActiveSkill {
             ActiveSkill::Parry => 1.2,
             ActiveSkill::ParrySpear => 12.,
             ActiveSkill::Sprint => 8.0,
-            ActiveSkill::SprintLunge => 3.5,
-            ActiveSkill::Teleport => 2.0,
+            ActiveSkill::SprintLunge => 1.2,
+            ActiveSkill::Teleport => 1.2,
             ActiveSkill::Stealth => 11.0,
             ActiveSkill::Rapidfire => 12.0,
             ActiveSkill::FirePillar => 12.0,
-            ActiveSkill::Heal => 60.0,
-            ActiveSkill::Buckshot => 6.0,
+            ActiveSkill::Heal => 45.0,
+            ActiveSkill::Buckshot => 3.0,
             ActiveSkill::IceWall => 10.0,
             ActiveSkill::DruidTree => 11.0,
             ActiveSkill::Shout => 7.0,
@@ -191,7 +191,7 @@ impl ActiveSkill {
             ActiveSkill::TripleThrow => 4.0,
             ActiveSkill::Fury => 13.0,
             ActiveSkill::Bomb => 5.5,
-            ActiveSkill::SpinAttack => 5.,
+            ActiveSkill::SpinAttack => 2.5,
         }
     }
 }

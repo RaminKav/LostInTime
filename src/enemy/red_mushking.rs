@@ -145,7 +145,7 @@ pub fn handle_new_red_mushking_state_machine(
             .trans::<FollowState>(
                 AoEAttackTimerTrigger,
                 AoEAttackState {
-                    delay_timer: Timer::from_seconds(0.65, TimerMode::Once),
+                    delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
                     target_position: None,
                     preview_entity: None,
                     second_preview_entity: None,
@@ -155,7 +155,7 @@ pub fn handle_new_red_mushking_state_machine(
             .trans::<LeapAttackState>(
                 AoEAttackTimerTrigger,
                 AoEAttackState {
-                    delay_timer: Timer::from_seconds(0.65, TimerMode::Once),
+                    delay_timer: Timer::from_seconds(0.85, TimerMode::Once),
                     target_position: None,
                     preview_entity: None,
                     second_preview_entity: None,
@@ -264,7 +264,7 @@ pub fn new_leap_attack(
         let startup_duration = leap_attack.attack_startup_timer.duration().as_secs_f32();
         let startup_finished = leap_attack.attack_startup_timer.finished();
         let duration_finished = leap_attack.attack_duration_timer.finished();
-        const SLAM_TIME: f32 = 0.45;
+        const SLAM_TIME: f32 = 0.55;
         let has_slammed = leap_attack.attack_duration_timer.percent() >= SLAM_TIME;
 
         // PHASE 1: Startup (wind-up animation)
