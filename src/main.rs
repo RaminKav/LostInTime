@@ -840,14 +840,116 @@ pub struct UITextureMaterial {
     pub source_texture: Option<Handle<Image>>,
 }
 
-#[derive(Resource, Copy, Clone)]
+#[derive(Resource, Clone)]
 pub struct ScreenResolution {
     pub width: f32,
     pub height: f32,
     pub game_width: f32,
     pub game_height: f32,
     pub aspect_ratio: f32,
+    /// Integer scale factor used for pixel-perfect rendering
+    pub scale: u32,
+    /// Actual render texture width (base width * scale)
+    pub render_width: u32,
+    /// Actual render texture height (base height * scale)
+    pub render_height: u32,
+    /// Letterbox/pillarbox offset for centering the game view
+    pub viewport_offset: Vec2,
+    /// Size of the actual viewport (may be smaller than window due to letterboxing)
+    pub viewport_size: Vec2,
 }
+/// Calculate integer scale factor and viewport for pixel-perfect rendering
+/// Adjusts the game's aspect ratio to better match the monitor for optimal scaling
+fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> ScreenResolution {
+    let base_height = GAME_HEIGHT;
+    let window_aspect = window_width / window_height;
+    let default_aspect = ASPECT_RATIO;
+
+    // Allow adjusting the aspect ratio to better match the monitor
+    // Limit adjustment to ±10% to avoid breaking gameplay/UI
+    let max_aspect_adjustment = 0.10;
+    let min_aspect = default_aspect * (1.0 - max_aspect_adjustment);
+    let max_aspect = default_aspect * (1.0 + max_aspect_adjustment);
+
+    // Use the window's aspect ratio (clamped) to minimize black bars
+    // This ensures the game's aspect ratio matches the monitor as closely as possible
+    // within the allowed adjustment range
+    let aspect_ratio = window_aspect.clamp(min_aspect, max_aspect);
+
+    // Calculate base width based on adjusted aspect ratio
+    // Keep height fixed to maintain consistent vertical gameplay
+    // Round to nearest integer for pixel-perfect rendering
+    let base_width = (base_height * aspect_ratio).round();
+
+    // Debug logging
+    info!(
+        "Resolution calculation: window={}x{} (aspect={:.3}), default_aspect={:.3}, adjusted_aspect={:.3}, base={}x{}",
+        window_width, window_height, window_aspect, default_aspect, aspect_ratio, base_width, base_height
+    );
+
+    // Calculate the maximum integer scale that fits in each dimension
+    let scale_x = (window_width / base_width).floor() as u32;
+    let scale_y = (window_height / base_height).floor() as u32;
+
+    // For pixel-perfect rendering, we need to maintain the adjusted aspect ratio
+    // Start with the smaller scale to ensure everything fits within the window
+    let mut scale = scale_x.min(scale_y).max(1);
+
+    // If both dimensions give the same scale, we'll have black bars on all sides.
+    // Try using scale+1 to fill one dimension completely (the other will be cropped by window edges).
+    // This ensures we only have black bars on one axis, not both.
+    if scale_x == scale_y && scale > 0 {
+        let test_scale = scale + 1;
+        let test_width = base_width * test_scale as f32;
+        let test_height = base_height * test_scale as f32;
+
+        // Use the larger scale if at least one dimension still fits
+        // This will fill one dimension completely, with the other being cropped
+        if test_width <= window_width || test_height <= window_height {
+            scale = test_scale;
+            info!(
+                "Using larger scale {} to fill one dimension completely",
+                scale
+            );
+        }
+    }
+
+    // Calculate actual render texture size (must be integer)
+    let render_width = (base_width * scale as f32) as u32;
+    let render_height = (base_height * scale as f32) as u32;
+
+    // Debug logging
+    info!(
+        "Scale calculation: scale_x={}, scale_y={}, scale={}, render={}x{}, black_bars_h={:.1}, black_bars_v={:.1}",
+        scale_x, scale_y, scale, render_width, render_height,
+        window_width - render_width as f32,
+        window_height - render_height as f32
+    );
+
+    // Calculate viewport size (the actual displayed area)
+    let viewport_width = render_width as f32;
+    let viewport_height = render_height as f32;
+
+    // Calculate letterbox/pillarbox offset to center the viewport
+    // In world coordinates (center origin), the viewport should be centered at (0, 0)
+    // So the offset is 0 - the quad will be positioned at the origin
+    // The letterboxing happens automatically because the quad is smaller than the window
+    let viewport_offset = Vec2::ZERO;
+
+    ScreenResolution {
+        width: window_width,
+        height: window_height,
+        game_width: base_width,
+        game_height: base_height,
+        aspect_ratio: aspect_ratio, // Use adjusted aspect ratio, not window aspect
+        scale,
+        render_width,
+        render_height,
+        viewport_offset,
+        viewport_size: Vec2::new(viewport_width, viewport_height),
+    }
+}
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -856,30 +958,31 @@ fn setup(
     mut images: ResMut<Assets<Image>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-    let mut resolution = ScreenResolution {
-        width: WIDTH,
-        height: HEIGHT,
-        game_width: GAME_WIDTH,
-        game_height: GAME_HEIGHT,
-        aspect_ratio: ASPECT_RATIO,
+    let window = window_query.get_single().ok();
+    let resolution = if let Some(window) = window {
+        let win_width = window.width();
+        let win_height = window.height();
+        info!("Window detected: {}x{}", win_width, win_height);
+        calculate_pixel_perfect_resolution(win_width, win_height)
+    } else {
+        info!("No window found, using default resolution");
+        calculate_pixel_perfect_resolution(WIDTH, HEIGHT)
     };
-    if let Ok(window) = window_query.get_single() {
-        resolution = ScreenResolution {
-            width: window.width(),
-            game_width: GAME_HEIGHT * window.width() / window.height(),
-            game_height: GAME_HEIGHT,
-            height: window.height(),
-            aspect_ratio: window.width() / window.height(),
-        };
-    }
-    commands.insert_resource(resolution);
+    info!(
+        "Final resolution resource: game_size={}x{}, render={}x{}, scale={}",
+        resolution.game_width,
+        resolution.game_height,
+        resolution.render_width,
+        resolution.render_height,
+        resolution.scale
+    );
+    commands.insert_resource(resolution.clone());
 
     let img_size = Extent3d {
-        width: (GAME_HEIGHT * resolution.aspect_ratio) as u32,
-        height: GAME_HEIGHT as u32,
+        width: resolution.render_width,
+        height: resolution.render_height,
         ..default()
     };
-    let game_size = Vec2::new(HEIGHT * resolution.aspect_ratio, HEIGHT);
 
     // This is the texture that will be rendered to.
     let mut game_image = Image {
@@ -932,6 +1035,11 @@ fn setup(
                 target: RenderTarget::Image(game_image_handle.clone()),
                 ..default()
             },
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
+                scale: 1.0,
+                ..default()
+            },
             ..default()
         },
         DoNotDespawnOnGameOver,
@@ -949,6 +1057,11 @@ fn setup(
             camera_2d: Camera2d {
                 clear_color: ClearColorConfig::Custom(Color::rgba(0., 0., 0., 0.)),
             },
+            projection: OrthographicProjection {
+                scaling_mode: ScalingMode::FixedVertical(resolution.game_height),
+                scale: 1.0,
+                ..default()
+            },
             ..default()
         },
         DoNotDespawnOnGameOver,
@@ -963,19 +1076,28 @@ fn setup(
     });
 
     // Main pass cube, with material containing the rendered first pass texture.
+    // The quad should be sized to match the render texture and centered at origin
+    // Since camera uses FixedVertical(resolution.height), world units = pixels when camera is at origin
     let _game_texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
                     .add(
                         shape::Quad {
-                            size: Vec2::new(game_size.x, game_size.y),
+                            size: Vec2::new(
+                                resolution.render_width as f32,
+                                resolution.render_height as f32,
+                            ),
                             ..Default::default()
                         }
                         .into(),
                     )
                     .into(),
-                transform: Transform::from_scale(Vec3::new(1., 1., 1.)),
+                transform: Transform {
+                    translation: Vec3::ZERO, // Centered at origin
+                    scale: Vec3::new(1., 1., 1.),
+                    ..default()
+                },
                 material: game_render_material_handle,
                 ..default()
             },
@@ -990,14 +1112,17 @@ fn setup(
                 mesh: meshes
                     .add(
                         shape::Quad {
-                            size: Vec2::new(game_size.x, game_size.y),
+                            size: Vec2::new(
+                                resolution.render_width as f32,
+                                resolution.render_height as f32,
+                            ),
                             ..Default::default()
                         }
                         .into(),
                     )
                     .into(),
                 transform: Transform {
-                    translation: Vec3::new(0., 0., 1.),
+                    translation: Vec3::new(0., 0., 1.), // Slightly in front, centered at origin
                     scale: Vec3::new(1., 1., 1.),
                     ..default()
                 },
@@ -1021,15 +1146,15 @@ fn setup(
                 clear_color: ClearColorConfig::None,
             },
             projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(HEIGHT),
-                scale: 0.99,
+                scaling_mode: ScalingMode::FixedVertical(resolution.height),
+                scale: 1.0,
                 ..default()
             },
             ..default()
         },
         DoNotDespawnOnGameOver,
         MainCamera,
-        GameUpscale(HEIGHT / img_size.height as f32),
+        GameUpscale(1.0), // No additional scaling needed - integer scale is handled in render texture
         first_pass_layer,
     ));
     commands.spawn((
@@ -1042,14 +1167,15 @@ fn setup(
                 clear_color: ClearColorConfig::None,
             },
             projection: OrthographicProjection {
-                scaling_mode: ScalingMode::FixedVertical(HEIGHT),
+                scaling_mode: ScalingMode::FixedVertical(resolution.height),
+                scale: 1.0,
                 ..default()
             },
             ..default()
         },
         UICamera,
         DoNotDespawnOnGameOver,
-        GameUpscale(HEIGHT / img_size.height as f32),
+        GameUpscale(1.0), // No additional scaling needed - integer scale is handled in render texture
         second_pass_layer,
     ));
 }
