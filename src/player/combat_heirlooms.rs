@@ -1389,7 +1389,6 @@ pub fn handle_mana_regen_lightning(
     mut player_query: Query<(&PlayerSkills, &GlobalTransform, &Attack, &CurrentMana), With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
-    mut modify_mana_event: EventWriter<ModifyManaEvent>,
     mut commands: Commands,
 ) {
     let Ok((skills, player_transform, attack, current_mana)) = player_query.get_single_mut() else {
@@ -1449,7 +1448,6 @@ pub fn handle_mana_regen_lightning(
                     pos_override: Some(target_pos + Vec2::new(0., 48.)),
                     spawn_delay: 0.0,
                 });
-                modify_mana_event.send(ModifyManaEvent(-MANA_COST));
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
             }
         }
