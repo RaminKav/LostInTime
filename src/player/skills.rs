@@ -1711,10 +1711,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
-                HeirloomChoiceState::new(
-                    Heirloom::IncreaseProjectileCount,
-                    HeirloomRarity::Legendary,
-                ),
+                HeirloomChoiceState::new(Heirloom::IncreaseProjectileCount, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),

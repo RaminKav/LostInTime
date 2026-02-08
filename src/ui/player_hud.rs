@@ -1719,10 +1719,10 @@ pub fn handle_update_player_skills(
             let (key_element, key_width) = get_key_size_and_element(keybind);
 
             // Spawn generic key background
-            let key_bg = commands
+            let _key_bg = commands
                 .spawn(SpriteBundle {
                     texture: graphics.get_ui_element_texture(key_element),
-                    transform: Transform::from_translation(Vec3::new(0., 13., 2. + i as f32)),
+                    transform: Transform::from_translation(Vec3::new(0., 13., 2.)),
                     sprite: Sprite {
                         custom_size: Some(Vec2::new(key_width, 10.)),
                         ..Default::default()
@@ -1747,12 +1747,12 @@ pub fn handle_update_player_skills(
                     )
                     .with_alignment(TextAlignment::Center),
                     text_anchor: bevy::sprite::Anchor::Center,
-                    transform: Transform::from_translation(Vec3::new(1., 0., 1.)),
+                    transform: Transform::from_translation(Vec3::new(0., 14., 3.)),
                     ..Default::default()
                 })
                 .insert(RenderLayers::from_layers(&[3]))
                 .insert(ActiveSkillKeybindText { slot: i })
-                .set_parent(key_bg);
+                .set_parent(icon_bg);
             if let Some(active_skill) = active_skill_option.clone() {
                 commands
                     .spawn(SpriteBundle {
