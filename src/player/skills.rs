@@ -21,6 +21,7 @@ use crate::{
     custom_commands::CommandsExt,
     item::{
         item_upgrades::{ArrowSpeedUpgrade, BowUpgradeSpread, ClawUpgradeMultiThrow},
+        projectile::Projectile,
         WorldObject,
     },
     proto::proto_param::ProtoParam,
@@ -249,6 +250,19 @@ pub struct LightningState {
 pub struct DaggerThrowState {
     pub cooldown_timer: Timer,
 }
+
+/// Tracks kills since last dagger throw cast (max 10)
+/// Kills from dagger throw projectiles themselves don't count
+#[derive(Component, Default)]
+pub struct DaggerThrowKillTracker {
+    pub kill_count: i32,
+}
+
+/// Tracks the last projectile that hit an enemy (used to exclude dagger throw kills)
+#[derive(Component)]
+pub struct LastHitProjectile {
+    pub projectile: Option<Projectile>,
+}
 #[derive(Component, Clone)]
 pub struct SlashState {
     pub cooldown_timer: Timer,
@@ -342,8 +356,9 @@ impl ActiveSkill {
                 "invulnerable during the attack.".to_string(),
             ],
             ActiveSkill::DaggerThrow => vec![
-                "Throw 3 daggers at random nearby".to_string(),
-                format!("enemies dealing {}% damage each.", skill_power * 175.0),
+                "Throw a dagger at a nearby enemy".to_string(),
+                format!("dealing {}% damage. Throw one more", skill_power * 115.0),
+                "per mob killed since the last cast.".to_string(),
             ],
             ActiveSkill::DaggerSlash => vec![
                 "Quickly slash in front of you,".to_string(),

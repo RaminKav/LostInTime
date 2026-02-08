@@ -12,10 +12,9 @@ use combat_heirlooms::{
     break_crates_with_roll, handle_ant_farm_state, handle_boss_hit_mana_orb_drops,
     handle_crate_break_damage, handle_death_defiance_freeze, handle_dodge_crit_activation,
     handle_dodge_crit_next_hit_reset, handle_mana_charge_damage, handle_mana_charge_damage_reset,
-    handle_mana_orb_attack, handle_mana_orb_drops, handle_max_hp_hunt, handle_reaper_soul_spawns,
-    handle_mana_regen_lightning,
-    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_reaper_souls,
-    update_stone_tooth,
+    handle_mana_orb_attack, handle_mana_orb_drops, handle_mana_regen_lightning, handle_max_hp_hunt,
+    handle_reaper_soul_spawns, tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants,
+    update_reaper_souls, update_stone_tooth,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
@@ -212,6 +211,8 @@ impl Plugin for PlayerPlugin {
                         .after(handle_hits),
                     handle_mana_orb_attack.run_if(is_not_paused),
                     handle_mana_regen_lightning.run_if(is_not_paused),
+                    skill_heirlooms::track_enemy_hit_projectiles.run_if(is_not_paused),
+                    skill_heirlooms::track_dagger_throw_kills.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

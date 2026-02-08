@@ -16,7 +16,7 @@ use crate::{
     blessings::{Blessing, OwnedBlessings},
     combat::{
         status_effects::{RapidfireSlow, StatusEffect, StatusEffectEvent},
-        HitEvent,
+        EnemyDeathEvent, HitEvent,
     },
     cursor::CursorPos,
     custom_commands::CommandsExt,
@@ -30,12 +30,13 @@ use crate::{
         melee_skills::{spawn_echo_hitbox, SpearState},
         rogue_skills::{LungeState, SprintState},
         skills::{
-            ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
-            DruidTreeSkillState, FirePillarState, FuryState, HealSkillState, Heirloom,
-            IceWallSkillState, LaserBeamState, LightningState, PiercingStarSkillState,
-            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
-            Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState,
-            StealthState, TripleThrowState,
+            ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState,
+            DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
+            FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
+            LastHitProjectile, LightningState, PiercingStarSkillState, PlayerSkills,
+            RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker, Slot2ChargeTracker,
+            Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, StealthState,
+            TripleThrowState,
         },
         Player,
     },
@@ -98,6 +99,7 @@ pub fn handle_active_skill_event(
         With<Player>,
     >,
     mut skill_states: SkillStateQueries,
+    mut kill_trackers: Query<&mut DaggerThrowKillTracker, With<Player>>,
     time: Res<Time>,
     cursor: Res<CursorPos>,
     asset_server: Res<AssetServer>,
@@ -885,35 +887,52 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(DaggerThrowState { cooldown_timer: cd });
 
-                        // Find 3 nearest enemies
-                        let player_pos = player_txfm.translation().truncate();
-                        let mut enemy_distances: Vec<(Entity, Vec2, f32)> = enemies
-                            .iter()
-                            .map(|(e, t)| {
-                                let pos = t.translation().truncate();
-                                let dist = player_pos.distance(pos);
-                                (e, pos, dist)
-                            })
-                            .collect();
-                        enemy_distances.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap());
-                        enemy_distances.truncate(3);
+                        // Get kill tracker and reset it after use
+                        let kill_count = if let Ok(mut tracker) = kill_trackers.get_mut(player_e) {
+                            let count = tracker.kill_count.min(10);
+                            tracker.kill_count = 0; // Reset after use
+                            count
+                        } else {
+                            // Initialize tracker if it doesn't exist
+                            commands
+                                .entity(player_e)
+                                .insert(DaggerThrowKillTracker::default());
+                            0
+                        };
 
-                        // Throw 3 throwing stars towards nearest enemies
+                        // Find all enemies
+                        let player_pos = player_txfm.translation().truncate();
+                        let all_enemies: Vec<(Entity, Vec2)> = enemies
+                            .iter()
+                            .map(|(e, t)| (e, t.translation().truncate()))
+                            .collect();
+
+                        if all_enemies.is_empty() {
+                            continue;
+                        }
+
+                        // Throw 1 dagger at a random enemy, plus extra daggers based on kill count
+                        let total_daggers = 1 + kill_count;
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 1.75) as i32;
-                        for (_, enemy_pos, _) in enemy_distances {
-                            let direction = (enemy_pos - player_pos).normalize_or_zero();
-                            ranged_attack_events.send(RangedAttackEvent {
-                                projectile: Projectile::DaggerThrow,
-                                direction,
-                                mana_cost: None,
-                                from_enemy: false,
-                                from_entity: Some(player_e),
-                                is_followup_proj: false,
-                                dmg_override: Some(dmg),
-                                pos_override: None,
-                                spawn_delay: 0.0,
-                            });
+                        let dmg = (base_dmg as f32 * power_mult * 1.15) as i32;
+                        let mut rng = rand::thread_rng();
+
+                        for i in 0..total_daggers {
+                            // Pick a random enemy for each dagger
+                            if let Some((_, enemy_pos)) = all_enemies.choose(&mut rng) {
+                                let direction = (*enemy_pos - player_pos).normalize_or_zero();
+                                ranged_attack_events.send(RangedAttackEvent {
+                                    projectile: Projectile::DaggerThrow,
+                                    direction,
+                                    mana_cost: None,
+                                    from_enemy: false,
+                                    from_entity: Some(player_e),
+                                    is_followup_proj: false,
+                                    dmg_override: Some(dmg),
+                                    pos_override: None,
+                                    spawn_delay: i as f32 * 0.02, // Slight delay between daggers
+                                });
+                            }
                         }
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
@@ -2267,6 +2286,57 @@ pub fn handle_bomb_explosion(
 
                 commands.entity(bomb_entity).despawn_recursive();
             }
+        }
+    }
+}
+
+/// Tracks the last projectile that hit each enemy (for dagger throw kill tracking)
+pub fn track_enemy_hit_projectiles(
+    mut commands: Commands,
+    mut hit_events: EventReader<HitEvent>,
+    mut enemies: Query<&mut LastHitProjectile>,
+    mobs: Query<Entity, With<Mob>>,
+) {
+    for hit in hit_events.iter() {
+        // Only track hits on enemies
+        if !mobs.contains(hit.hit_entity) {
+            continue;
+        }
+
+        // Get or insert the LastHitProjectile component
+        if let Ok(mut last_hit) = enemies.get_mut(hit.hit_entity) {
+            last_hit.projectile = hit.hit_with_projectile.clone();
+        } else {
+            // Insert the component if it doesn't exist
+            commands.entity(hit.hit_entity).insert(LastHitProjectile {
+                projectile: hit.hit_with_projectile.clone(),
+            });
+        }
+    }
+}
+
+/// Tracks enemy deaths and increments dagger throw kill tracker (excluding dagger throw kills)
+pub fn track_dagger_throw_kills(
+    mut death_events: EventReader<EnemyDeathEvent>,
+    mut kill_trackers: Query<&mut DaggerThrowKillTracker, With<Player>>,
+    last_hit_projectiles: Query<&LastHitProjectile>,
+) {
+    let Ok(mut tracker) = kill_trackers.get_single_mut() else {
+        return;
+    };
+
+    for death_event in death_events.iter() {
+        // Check if this enemy was killed by a dagger throw
+        let was_killed_by_dagger_throw =
+            if let Ok(last_hit) = last_hit_projectiles.get(death_event.entity) {
+                last_hit.projectile == Some(Projectile::DaggerThrow)
+            } else {
+                false
+            };
+
+        // Only count kills that weren't from dagger throw
+        if !was_killed_by_dagger_throw {
+            tracker.kill_count = (tracker.kill_count + 1).min(10);
         }
     }
 }

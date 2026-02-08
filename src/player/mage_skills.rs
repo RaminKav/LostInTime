@@ -108,7 +108,7 @@ pub fn handle_teleport(
         teleport_state.timer.reset();
         let direction = move_direction.0.normalize();
         let power_mult = skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
-        let base_distance = 3.5 * TILE_SIZE.x;
+        let base_distance = 4. * TILE_SIZE.x;
         let distance = direction * base_distance;
         let pos = world_pos_to_tile_pos(player_pos.truncate() + distance);
         if let Some(tile_data) = game.get_tile_data(pos) {

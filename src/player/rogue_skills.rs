@@ -214,13 +214,13 @@ pub fn handle_lunge(
                         .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
                     kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
                     mv.0 = mv.0 * lunge_state.lunge_speed;
+                } else if lunge_state.lunge_duration.percent() < 0.20 {
+                    mv.0 = mv.0 * 0.;
                 } else {
                     commands
                         .entity(e)
                         .insert(CollisionGroups::new(Group::ALL, Group::ALL));
                     kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
-
-                    mv.0 = mv.0 * 0.;
                 }
 
                 if lunge_state.lunge_duration.finished() {
