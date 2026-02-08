@@ -1154,7 +1154,7 @@ fn setup(
         },
         DoNotDespawnOnGameOver,
         MainCamera,
-        GameUpscale(1.0), // No additional scaling needed - integer scale is handled in render texture
+        GameUpscale(resolution.scale as f32),
         first_pass_layer,
     ));
     commands.spawn((
@@ -1175,7 +1175,7 @@ fn setup(
         },
         UICamera,
         DoNotDespawnOnGameOver,
-        GameUpscale(1.0), // No additional scaling needed - integer scale is handled in render texture
+        GameUpscale(resolution.scale as f32),
         second_pass_layer,
     ));
 }

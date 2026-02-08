@@ -157,7 +157,7 @@ pub struct SkillChargeText {
     pub slot: usize, // Which skill slot this text is for (1 or 2)
 }
 
-const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(65.0, 3.0);
+const INNER_HUD_BAR_SIZE: Vec2 = Vec2::new(66.0, 4.0);
 
 #[derive(Component)]
 pub struct BarFlashTimer {
@@ -177,13 +177,13 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
             texture: graphics.get_ui_element_texture(UIElement::PlayerHUDBars),
 
             sprite: Sprite {
-                custom_size: Some(Vec2::new(84.5, 48.)),
+                custom_size: Some(Vec2::new(85., 48.)),
                 ..Default::default()
             },
             transform: Transform {
                 translation: Vec3::new(
-                    (-res.game_width + 91.) / 2.,
-                    (GAME_HEIGHT - 15.) / 2. - 23.5,
+                    (-res.game_width + 90.) / 2.,
+                    (res.game_height - 15.) / 2. - 23.,
                     5.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
@@ -372,8 +372,8 @@ pub fn setup_xp_bar_ui(
                 text: Text::from_section(
                     "Level 1",
                     TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
                         color: BLACK,
                     },
                 ),
@@ -414,18 +414,14 @@ pub fn setup_currency_ui(
                 text: Text::from_section(
                     format!("{:}", time_fragments.time_fragments.max(0)),
                     TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
                         color: BLACK,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(
-                        -res.game_width / 2. + 16.5,
-                        GAME_HEIGHT / 2. - 47.5,
-                        6.,
-                    ),
+                    translation: Vec3::new(-res.game_width / 2. + 13., GAME_HEIGHT / 2. - 46., 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -442,7 +438,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::TimeFragment),
         &asset_server,
-        Vec2::new(-6.5, 1.),
+        Vec2::new(-5., 0.),
         Vec2::new(0., 0.),
         3,
     );
@@ -457,14 +453,14 @@ pub fn setup_currency_ui(
                 text: Text::from_section(
                     format!("{:}", coins.coins),
                     TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
                         color: BLACK,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 46., GAME_HEIGHT / 2. - 47.5, 6.),
+                    translation: Vec3::new(-res.game_width / 2. + 44., GAME_HEIGHT / 2. - 46., 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -481,7 +477,7 @@ pub fn setup_currency_ui(
         &graphics,
         &ItemStack::crate_icon_stack(WorldObject::Coin),
         &asset_server,
-        Vec2::new(-6., 0.5),
+        Vec2::new(-5., -1.),
         Vec2::new(0., 0.),
         3,
     );
@@ -496,8 +492,8 @@ pub fn setup_currency_ui(
             text: Text::from_section(
                 format!("Score: {:}", 0),
                 TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.4,
                     color: BLACK,
                 },
             ),
@@ -551,8 +547,8 @@ pub fn setup_currency_ui(
             text: Text::from_section(
                 crate::keybinds::get_key_display_name(inventory_key),
                 TextStyle {
-                    font: asset_server.load("fonts/4x5.ttf"),
-                    font_size: 5.0,
+                    font: asset_server.load("fonts/slkscr.ttf"),
+                    font_size: 8.4,
                     color: crate::colors::DARK_WOOD_BROWN,
                 },
             )
@@ -583,8 +579,8 @@ pub fn setup_chaos_ui(
                         chaos_tracker.get_chaos() + infinite_mode.chaos_bonus
                     ),
                     TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
                         color: BLACK,
                     },
                 ),
@@ -1596,8 +1592,8 @@ pub fn handle_update_player_skills(
                             text: Text::from_section(
                                 count.to_string(),
                                 TextStyle {
-                                    font: asset_server.load("fonts/4x5.ttf"),
-                                    font_size: 5.0,
+                                    font: asset_server.load("fonts/slkscr.ttf"),
+                                    font_size: 8.4,
                                     color: BLACK,
                                 },
                             ),
@@ -1744,8 +1740,8 @@ pub fn handle_update_player_skills(
                     text: Text::from_section(
                         crate::keybinds::get_key_display_name(keybind),
                         TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.4,
                             color: crate::colors::DARK_WOOD_BROWN,
                         },
                     )
@@ -1824,8 +1820,8 @@ pub fn handle_update_player_skills(
                         text: Text::from_section(
                             "",
                             TextStyle {
-                                font: asset_server.load("fonts/4x5.ttf"),
-                                font_size: 10.0,
+                                font: asset_server.load("fonts/slkscr.ttf"),
+                                font_size: 8.4,
                                 color: WHITE,
                             },
                         ),
@@ -2059,8 +2055,8 @@ pub fn setup_era_timer_hud(
                 text: Text::from_section(
                     "00:00",
                     TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
                         color: WHITE.with_a(0.), // Hidden initially
                     },
                 ),

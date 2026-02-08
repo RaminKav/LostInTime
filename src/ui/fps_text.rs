@@ -4,7 +4,7 @@ use bevy::{
     render::view::RenderLayers,
 };
 
-use crate::{ScreenResolution, GAME_HEIGHT};
+use crate::ScreenResolution;
 const VERSION: &str = "v0.14.0";
 #[derive(Component)]
 pub struct FPSText;
@@ -34,7 +34,7 @@ pub fn spawn_fps_text(
             transform: Transform {
                 translation: Vec3::new(
                     resolution.game_width / 2. - 28.5,
-                    -GAME_HEIGHT / 2. + 10.5,
+                    -resolution.game_height / 2. + 10.5,
                     1.,
                 ),
                 scale: Vec3::new(1., 1., 1.),
