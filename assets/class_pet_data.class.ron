@@ -6,7 +6,7 @@
                 "Sword"
             ],
             stat_description: [
-                "Gain +5 Health per level"
+                "Gain +3 Health per level"
             ],
             class_icon: RedPlayerSelectIcon,
             skill_icon: HealthIcon,
@@ -19,7 +19,7 @@
                 "Fire Staff"
             ],
             stat_description: [
-                "Gain +5 Mana per level"
+                "Gain +3 Mana per level"
             ],
             class_icon: BluePlayerSelectIcon,
             skill_icon: ManaIcon,
@@ -32,7 +32,7 @@
                 "Daggers"
             ],
             stat_description: [
-                "Gain +3% Crit Chance per level"
+                "Gain +1% Crit Chance per level"
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritChanceIcon,
@@ -45,7 +45,7 @@
                 "Claw"
             ],
             stat_description: [
-                "Gain +3% Attack Speed per level"
+                "Gain +2% Attack Speed per level"
             ],
             class_icon: GreyPlayerSelectIcon,
             skill_icon: AttackSpeedIcon,
@@ -58,7 +58,7 @@
                 "Bow"
             ],
             stat_description: [
-                "Gain +3% Crit Damage per level"
+                "Gain +1% Crit Damage per level"
             ],
             class_icon: GreenPlayerSelectIcon,
             skill_icon: CritDamageIcon,

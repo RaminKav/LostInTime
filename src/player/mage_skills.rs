@@ -95,7 +95,7 @@ pub fn handle_teleport(
 
     if should_activate {
         commands.entity(e).insert(PlayerAnimation::Teleport);
-        commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.25));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::Teleport, 0.1));
         // Cooldown is managed by handle_active_skill_event, so we don't set it here
         teleport_state.timer.reset();
         teleport_state.timer.tick(time.delta());

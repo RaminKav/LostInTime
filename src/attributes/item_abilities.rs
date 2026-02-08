@@ -64,7 +64,7 @@ pub fn handle_item_abilitiy_on_attack(
                     pos_override: None,
                     spawn_delay: 0.1,
                 });
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.4));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::AirWaveAttack, 0.2));
             }
         }
     }

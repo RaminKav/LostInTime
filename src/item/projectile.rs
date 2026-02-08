@@ -412,17 +412,17 @@ fn handle_spawn_projectiles_after_delay(
                 }
                 // AUDIO
                 if proj.proj == Projectile::Fireball || proj.proj == Projectile::FireRing {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffCast, 0.2));
                 } else if proj.proj == Projectile::Arrow {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.2));
                 } else if proj.proj == Projectile::ThrowingStar
                     || proj.proj == Projectile::ThrowingStarLarge
                 {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.2));
                 } else if proj.proj == Projectile::Electricity
                     || proj.proj == Projectile::PlasmaBall
                 {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
                 }
 
                 if proj.from_enemy {

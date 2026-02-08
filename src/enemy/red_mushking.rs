@@ -1,4 +1,5 @@
 use crate::{
+    combat::combat_helpers::DespawnTimer,
     custom_commands::CommandsExt,
     enemy::{spawn_helpers::can_spawn_mob_here, spawner::MobSpawningPaused},
     item::{LootTable, WorldObject},
@@ -931,6 +932,7 @@ pub fn handle_aoe_attack(
                             ..default()
                         },
                         BossAttackPreview,
+                        DespawnTimer(Timer::from_seconds(2.0, TimerMode::Once)),
                     ))
                     .id();
                 aoe_state.preview_entity = Some(preview_entity);

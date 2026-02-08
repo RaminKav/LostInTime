@@ -34,7 +34,8 @@ use crate::{
             DruidTreeSkillState, FirePillarState, FuryState, HealSkillState, Heirloom,
             IceWallSkillState, LaserBeamState, LightningState, PiercingStarSkillState,
             PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
-            Slot2ChargeTracker, SpinAttackState, StealthState, TripleThrowState,
+            Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState,
+            StealthState, TripleThrowState,
         },
         Player,
     },
@@ -66,6 +67,8 @@ pub struct SkillStateQueries<'w, 's> {
     pub teleport_states: Query<'w, 's, &'static mut TeleportState, With<Player>>,
     pub slot1_trackers: Query<'w, 's, &'static mut Slot1ChargeTracker, With<Player>>,
     pub slot2_trackers: Query<'w, 's, &'static mut Slot2ChargeTracker, With<Player>>,
+    pub slot3_trackers: Query<'w, 's, &'static mut Slot3ChargeTracker, With<Player>>,
+    pub slot4_trackers: Query<'w, 's, &'static mut Slot4ChargeTracker, With<Player>>,
     pub player_projectile_size:
         Query<'w, 's, &'static crate::attributes::ProjectileSize, With<Player>>,
     pub lightning_states: Query<'w, 's, &'static LightningState, With<Player>>,
@@ -168,15 +171,16 @@ pub fn handle_active_skill_event(
                 _ => None,
             };
             if let Some(active) = slot_skill {
+                info!("USED SLOT {}: {:?}", ev.slot, active.active_skill);
                 let blessing_cd_mult = blessings.get_skill_cooldown_increase();
                 if blessings.has_blessing(Blessing::SkillAttackSpeed) {
                     commands
                         .entity(player_e)
                         .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
                 }
-                // For slot 1 and 2 (class skills), handle charge consumption from their independent trackers
+                // For slots 1-4 (class skills), handle charge consumption from their independent trackers
                 let mut should_start_cooldown = true;
-                if ev.slot == 1 {
+                if ev.slot == 0 {
                     // Use slot 1's independent tracker
                     if let Ok(mut tracker) = skill_states.slot1_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
@@ -192,9 +196,41 @@ pub fn handle_active_skill_event(
                             }
                         }
                     }
-                } else if ev.slot == 2 {
+                } else if ev.slot == 1 {
                     // Use slot 2's independent tracker
                     if let Ok(mut tracker) = skill_states.slot2_trackers.get_mut(player_e) {
+                        if tracker.0.current_charges > 0 {
+                            tracker.0.current_charges -= 1;
+                            should_start_cooldown = tracker.0.current_charges == 0;
+                            if tracker.0.current_charges < tracker.0.max_charges {
+                                tracker.0.cooldown_timer = Timer::from_seconds(
+                                    tracker.0.base_cooldown
+                                        * skills.skill_cooldown_multiplier()
+                                        * blessing_cd_mult,
+                                    TimerMode::Once,
+                                );
+                            }
+                        }
+                    }
+                } else if ev.slot == 2 {
+                    // Use slot 3's independent tracker
+                    if let Ok(mut tracker) = skill_states.slot3_trackers.get_mut(player_e) {
+                        if tracker.0.current_charges > 0 {
+                            tracker.0.current_charges -= 1;
+                            should_start_cooldown = tracker.0.current_charges == 0;
+                            if tracker.0.current_charges < tracker.0.max_charges {
+                                tracker.0.cooldown_timer = Timer::from_seconds(
+                                    tracker.0.base_cooldown
+                                        * skills.skill_cooldown_multiplier()
+                                        * blessing_cd_mult,
+                                    TimerMode::Once,
+                                );
+                            }
+                        }
+                    }
+                } else if ev.slot == 3 {
+                    // Use slot 4's independent tracker
+                    if let Ok(mut tracker) = skill_states.slot4_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
@@ -340,7 +376,7 @@ pub fn handle_active_skill_event(
                             pos_override: Some(pos),
                             spawn_delay: 0.0,
                         });
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::LaserBeam => {
                         if should_start_cooldown {
@@ -379,7 +415,7 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
                         commands
-                            .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.5));
+                            .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
                     }
                     ActiveSkill::Heal => {
                         if should_start_cooldown {
@@ -542,7 +578,7 @@ pub fn handle_active_skill_event(
                             pos_override: Some(pos),
                             spawn_delay: 0.0,
                         });
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::DruidTree => {
                         if should_start_cooldown {
@@ -675,7 +711,7 @@ pub fn handle_active_skill_event(
                             pos_override: None,
                             spawn_delay: 0.0,
                         });
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.4));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.2));
                     }
                     ActiveSkill::Sprint => {
                         if should_start_cooldown {
@@ -721,32 +757,6 @@ pub fn handle_active_skill_event(
                                 let cooldown = skill_cd;
                                 teleport.cooldown_timer =
                                     Timer::from_seconds(cooldown, TimerMode::Once);
-                            } else {
-                                // We have charges remaining, reset cooldown to start charge regeneration
-                                // Get the appropriate tracker based on which slot teleport is in
-                                if ev.slot == 1 {
-                                    if let Ok(tracker) = skill_states.slot1_trackers.get(player_e) {
-                                        if tracker.0.current_charges < tracker.0.max_charges {
-                                            teleport.cooldown_timer = Timer::from_seconds(
-                                                tracker.0.base_cooldown
-                                                    * skills.skill_cooldown_multiplier()
-                                                    * blessing_cd_mult,
-                                                TimerMode::Once,
-                                            );
-                                        }
-                                    }
-                                } else if ev.slot == 2 {
-                                    if let Ok(tracker) = skill_states.slot2_trackers.get(player_e) {
-                                        if tracker.0.current_charges < tracker.0.max_charges {
-                                            teleport.cooldown_timer = Timer::from_seconds(
-                                                tracker.0.base_cooldown
-                                                    * skills.skill_cooldown_multiplier()
-                                                    * blessing_cd_mult,
-                                                TimerMode::Once,
-                                            );
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -1017,7 +1027,7 @@ pub fn handle_active_skill_event(
                             duration: Timer::from_seconds(2.5, TimerMode::Once),
                             throw_timer: Timer::from_seconds(0.3, TimerMode::Repeating),
                         });
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.3));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.2));
                     }
                     ActiveSkill::Bomb => {
                         if should_start_cooldown {
@@ -1108,7 +1118,7 @@ pub fn handle_active_skill_event(
                             spawn_delay: 0.0,
                         });
 
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.2));
                     }
                     _ => {}
                 }
@@ -1492,6 +1502,8 @@ pub fn regenerate_skill_charges(
     time: Res<Time>,
     mut slot1_trackers: Query<&mut Slot1ChargeTracker, With<Player>>,
     mut slot2_trackers: Query<&mut Slot2ChargeTracker, With<Player>>,
+    mut slot3_trackers: Query<&mut Slot3ChargeTracker, With<Player>>,
+    mut slot4_trackers: Query<&mut Slot4ChargeTracker, With<Player>>,
 ) {
     // Regenerate charges for slot 1
     for mut tracker in slot1_trackers.iter_mut() {
@@ -1515,16 +1527,40 @@ pub fn regenerate_skill_charges(
             }
         }
     }
+    // Regenerate charges for slot 3
+    for mut tracker in slot3_trackers.iter_mut() {
+        if tracker.0.current_charges < tracker.0.max_charges {
+            tracker.0.cooldown_timer.tick(time.delta());
+            if tracker.0.cooldown_timer.finished() {
+                tracker.0.current_charges += 1;
+                tracker.0.cooldown_timer =
+                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+            }
+        }
+    }
+    // Regenerate charges for slot 4
+    for mut tracker in slot4_trackers.iter_mut() {
+        if tracker.0.current_charges < tracker.0.max_charges {
+            tracker.0.cooldown_timer.tick(time.delta());
+            if tracker.0.cooldown_timer.finished() {
+                tracker.0.current_charges += 1;
+                tracker.0.cooldown_timer =
+                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+            }
+        }
+    }
 }
 
 /// Initializes or updates the skill charge trackers when PlayerSkills changes
-/// Creates separate trackers for slot 1 and slot 2 class skills
+/// Creates separate trackers for slots 1-4 class skills
 pub fn initialize_skill_charge_tracker(
     mut commands: Commands,
     players: Query<Entity, (With<Player>, Changed<PlayerSkills>)>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut slot1_trackers: Query<&mut Slot1ChargeTracker>,
     mut slot2_trackers: Query<&mut Slot2ChargeTracker>,
+    mut slot3_trackers: Query<&mut Slot3ChargeTracker>,
+    mut slot4_trackers: Query<&mut Slot4ChargeTracker>,
 ) {
     for player_e in players.iter() {
         let Ok(skills) = player_skills.get(player_e) else {
@@ -1532,22 +1568,49 @@ pub fn initialize_skill_charge_tracker(
         };
         let max_charges = 1 + skills.skill_extra_charges();
 
-        // Manage tracker for slot 1 (active_skill_slot_2)
-        if let Some(slot_2_skill) = &skills.active_skill_slot_1 {
-            let base_cooldown = slot_2_skill.active_skill.get_base_cooldown();
+        // Manage tracker for slot 1 (active_skill_slot_1)
+        if let Some(slot_1_skill) = &skills.active_skill_slot_0 {
+            let base_cooldown = slot_1_skill.active_skill.get_base_cooldown();
+            let current_skill = slot_1_skill.active_skill.clone();
 
             if let Ok(mut tracker) = slot1_trackers.get_mut(player_e) {
-                // Update existing tracker - preserve current charges and timer
-                let elapsed = tracker.0.cooldown_timer.elapsed();
-                tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                tracker.0.max_charges = max_charges;
-                tracker.0.base_cooldown = base_cooldown;
-                // Only update duration if it changed
-                if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs() > 0.01
-                {
-                    let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    new_timer.tick(elapsed);
-                    tracker.0.cooldown_timer = new_timer;
+                // Check if the skill changed
+                let skill_changed = tracker.0.tracked_skill != current_skill;
+
+                if skill_changed {
+                    // Skill changed - reset tracker completely with new skill
+                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    tracker.0.current_charges = max_charges;
+                    tracker.0.max_charges = max_charges;
+                    tracker.0.base_cooldown = base_cooldown;
+                    tracker.0.cooldown_timer = init_timer;
+                    tracker.0.tracked_skill = current_skill;
+                } else {
+                    // Same skill - update max_charges and grant extra charges if heirloom was acquired
+                    let old_max = tracker.0.max_charges;
+                    tracker.0.max_charges = max_charges;
+
+                    // If max_charges increased, grant the extra charges immediately
+                    if max_charges > old_max {
+                        let extra_charges = max_charges - old_max;
+                        tracker.0.current_charges =
+                            (tracker.0.current_charges + extra_charges).min(max_charges);
+                    } else {
+                        // Cap current charges at new max (in case max decreased)
+                        tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
+                    }
+
+                    tracker.0.base_cooldown = base_cooldown;
+                    // Only update duration if it changed (and skill didn't change)
+                    if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
+                        > 0.01
+                    {
+                        let elapsed = tracker.0.cooldown_timer.elapsed();
+                        let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                        new_timer.tick(elapsed);
+                        tracker.0.cooldown_timer = new_timer;
+                    }
                 }
             } else {
                 // Create new tracker with max charges
@@ -1559,6 +1622,7 @@ pub fn initialize_skill_charge_tracker(
                         max_charges,
                         cooldown_timer: init_timer,
                         base_cooldown,
+                        tracked_skill: current_skill,
                     },
                 ));
             }
@@ -1569,22 +1633,49 @@ pub fn initialize_skill_charge_tracker(
             }
         }
 
-        // Manage tracker for slot 2 (active_skill_slot_3)
-        if let Some(slot_3_skill) = &skills.active_skill_slot_2 {
-            let base_cooldown = slot_3_skill.active_skill.get_base_cooldown();
+        // Manage tracker for slot 2 (active_skill_slot_2)
+        if let Some(slot_2_skill) = &skills.active_skill_slot_1 {
+            let base_cooldown = slot_2_skill.active_skill.get_base_cooldown();
+            let current_skill = slot_2_skill.active_skill.clone();
 
             if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
-                // Update existing tracker - preserve current charges and timer
-                let elapsed = tracker.0.cooldown_timer.elapsed();
-                tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                tracker.0.max_charges = max_charges;
-                tracker.0.base_cooldown = base_cooldown;
-                // Only update duration if it changed
-                if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs() > 0.01
-                {
-                    let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    new_timer.tick(elapsed);
-                    tracker.0.cooldown_timer = new_timer;
+                // Check if the skill changed
+                let skill_changed = tracker.0.tracked_skill != current_skill;
+
+                if skill_changed {
+                    // Skill changed - reset tracker completely with new skill
+                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    tracker.0.current_charges = max_charges;
+                    tracker.0.max_charges = max_charges;
+                    tracker.0.base_cooldown = base_cooldown;
+                    tracker.0.cooldown_timer = init_timer;
+                    tracker.0.tracked_skill = current_skill;
+                } else {
+                    // Same skill - update max_charges and grant extra charges if heirloom was acquired
+                    let old_max = tracker.0.max_charges;
+                    tracker.0.max_charges = max_charges;
+
+                    // If max_charges increased, grant the extra charges immediately
+                    if max_charges > old_max {
+                        let extra_charges = max_charges - old_max;
+                        tracker.0.current_charges =
+                            (tracker.0.current_charges + extra_charges).min(max_charges);
+                    } else {
+                        // Cap current charges at new max (in case max decreased)
+                        tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
+                    }
+
+                    tracker.0.base_cooldown = base_cooldown;
+                    // Only update duration if it changed (and skill didn't change)
+                    if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
+                        > 0.01
+                    {
+                        let elapsed = tracker.0.cooldown_timer.elapsed();
+                        let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                        new_timer.tick(elapsed);
+                        tracker.0.cooldown_timer = new_timer;
+                    }
                 }
             } else {
                 // Create new tracker with max charges
@@ -1596,6 +1687,7 @@ pub fn initialize_skill_charge_tracker(
                         max_charges,
                         cooldown_timer: init_timer,
                         base_cooldown,
+                        tracked_skill: current_skill,
                     },
                 ));
             }
@@ -1603,6 +1695,136 @@ pub fn initialize_skill_charge_tracker(
             // Remove tracker if skill no longer exists
             if slot2_trackers.get(player_e).is_ok() {
                 commands.entity(player_e).remove::<Slot2ChargeTracker>();
+            }
+        }
+
+        // Manage tracker for slot 3 (active_skill_slot_3)
+        if let Some(slot_3_skill) = &skills.active_skill_slot_2 {
+            let base_cooldown = slot_3_skill.active_skill.get_base_cooldown();
+            let current_skill = slot_3_skill.active_skill.clone();
+
+            if let Ok(mut tracker) = slot3_trackers.get_mut(player_e) {
+                // Check if the skill changed
+                let skill_changed = tracker.0.tracked_skill != current_skill;
+
+                if skill_changed {
+                    // Skill changed - reset tracker completely with new skill
+                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    tracker.0.current_charges = max_charges;
+                    tracker.0.max_charges = max_charges;
+                    tracker.0.base_cooldown = base_cooldown;
+                    tracker.0.cooldown_timer = init_timer;
+                    tracker.0.tracked_skill = current_skill;
+                } else {
+                    // Same skill - update max_charges and grant extra charges if heirloom was acquired
+                    let old_max = tracker.0.max_charges;
+                    tracker.0.max_charges = max_charges;
+
+                    // If max_charges increased, grant the extra charges immediately
+                    if max_charges > old_max {
+                        let extra_charges = max_charges - old_max;
+                        tracker.0.current_charges =
+                            (tracker.0.current_charges + extra_charges).min(max_charges);
+                    } else {
+                        // Cap current charges at new max (in case max decreased)
+                        tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
+                    }
+
+                    tracker.0.base_cooldown = base_cooldown;
+                    // Only update duration if it changed (and skill didn't change)
+                    if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
+                        > 0.01
+                    {
+                        let elapsed = tracker.0.cooldown_timer.elapsed();
+                        let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                        new_timer.tick(elapsed);
+                        tracker.0.cooldown_timer = new_timer;
+                    }
+                }
+            } else {
+                // Create new tracker with max charges
+                let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                commands.entity(player_e).insert(Slot3ChargeTracker(
+                    crate::player::skills::SkillChargeTracker {
+                        current_charges: max_charges,
+                        max_charges,
+                        cooldown_timer: init_timer,
+                        base_cooldown,
+                        tracked_skill: current_skill,
+                    },
+                ));
+            }
+        } else {
+            // Remove tracker if skill no longer exists
+            if slot3_trackers.get(player_e).is_ok() {
+                commands.entity(player_e).remove::<Slot3ChargeTracker>();
+            }
+        }
+
+        // Manage tracker for slot 4 (active_skill_slot_4)
+        if let Some(slot_4_skill) = &skills.active_skill_slot_3 {
+            let base_cooldown = slot_4_skill.active_skill.get_base_cooldown();
+            let current_skill = slot_4_skill.active_skill.clone();
+
+            if let Ok(mut tracker) = slot4_trackers.get_mut(player_e) {
+                // Check if the skill changed
+                let skill_changed = tracker.0.tracked_skill != current_skill;
+
+                if skill_changed {
+                    // Skill changed - reset tracker completely with new skill
+                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    tracker.0.current_charges = max_charges;
+                    tracker.0.max_charges = max_charges;
+                    tracker.0.base_cooldown = base_cooldown;
+                    tracker.0.cooldown_timer = init_timer;
+                    tracker.0.tracked_skill = current_skill;
+                } else {
+                    // Same skill - update max_charges and grant extra charges if heirloom was acquired
+                    let old_max = tracker.0.max_charges;
+                    tracker.0.max_charges = max_charges;
+
+                    // If max_charges increased, grant the extra charges immediately
+                    if max_charges > old_max {
+                        let extra_charges = max_charges - old_max;
+                        tracker.0.current_charges =
+                            (tracker.0.current_charges + extra_charges).min(max_charges);
+                    } else {
+                        // Cap current charges at new max (in case max decreased)
+                        tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
+                    }
+
+                    tracker.0.base_cooldown = base_cooldown;
+                    // Only update duration if it changed (and skill didn't change)
+                    if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
+                        > 0.01
+                    {
+                        let elapsed = tracker.0.cooldown_timer.elapsed();
+                        let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                        new_timer.tick(elapsed);
+                        tracker.0.cooldown_timer = new_timer;
+                    }
+                }
+            } else {
+                // Create new tracker with max charges
+                let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                commands.entity(player_e).insert(Slot4ChargeTracker(
+                    crate::player::skills::SkillChargeTracker {
+                        current_charges: max_charges,
+                        max_charges,
+                        cooldown_timer: init_timer,
+                        base_cooldown,
+                        tracked_skill: current_skill,
+                    },
+                ));
+            }
+        } else {
+            // Remove tracker if skill no longer exists
+            if slot4_trackers.get(player_e).is_ok() {
+                commands.entity(player_e).remove::<Slot4ChargeTracker>();
             }
         }
     }
@@ -1658,6 +1880,8 @@ pub fn reduce_skill_cooldown_on_crit(
     >,
     mut slot1_trackers: Query<&mut Slot1ChargeTracker>,
     mut slot2_trackers: Query<&mut Slot2ChargeTracker>,
+    mut slot3_trackers: Query<&mut Slot3ChargeTracker>,
+    mut slot4_trackers: Query<&mut Slot4ChargeTracker>,
     mut sprint_states: Query<&mut SprintState, With<Player>>,
     mut spear_states: Query<&mut SpearState, With<Player>>,
     mut lunge_states: Query<&mut LungeState, With<Player>>,
@@ -1809,6 +2033,28 @@ pub fn reduce_skill_cooldown_on_crit(
             }
             // Reduce charge regeneration cooldown for slot 2
             if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
+                if tracker.0.current_charges < tracker.0.max_charges {
+                    if !tracker.0.cooldown_timer.finished() {
+                        tracker
+                            .0
+                            .cooldown_timer
+                            .tick(Duration::from_secs_f32(reduction));
+                    }
+                }
+            }
+            // Reduce charge regeneration cooldown for slot 3
+            if let Ok(mut tracker) = slot3_trackers.get_mut(player_e) {
+                if tracker.0.current_charges < tracker.0.max_charges {
+                    if !tracker.0.cooldown_timer.finished() {
+                        tracker
+                            .0
+                            .cooldown_timer
+                            .tick(Duration::from_secs_f32(reduction));
+                    }
+                }
+            }
+            // Reduce charge regeneration cooldown for slot 4
+            if let Ok(mut tracker) = slot4_trackers.get_mut(player_e) {
                 if tracker.0.current_charges < tracker.0.max_charges {
                     if !tracker.0.cooldown_timer.finished() {
                         tracker

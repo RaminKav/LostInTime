@@ -230,8 +230,8 @@ pub fn handle_spear(
             spear_state.cooldown_timer.reset();
             spear_state.spear_timer.tick(time.delta());
             commands.entity(e).insert(PlayerAnimation::Spear);
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.5));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.5).with_delay(0.32));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.2));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.3).with_delay(0.32));
 
             // Calculate epicenter position in front of player
             let player_pos_2d = player_pos.translation().truncate();

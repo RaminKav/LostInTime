@@ -20,7 +20,8 @@ use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
     DruidTreeSkillState, FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-    LightningState, PlayerSkills, SlashState, SpinAttackState, TripleThrowState,
+    LightningState, PlayerSkills, SlashState, Slot1ChargeTracker, Slot2ChargeTracker,
+    Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, TripleThrowState,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -387,7 +388,9 @@ pub fn player_move_inputs(
         }
 
         if run_dust_timer.0.percent() == 0. {
-            particle.single_mut().reset();
+            if let Ok(mut p) = particle.get_single_mut() {
+                p.reset();
+            }
             run_dust_timer.0.tick(time.delta());
         } else {
             run_dust_timer.0.tick(time.delta());
@@ -450,8 +453,10 @@ pub fn dispatch_active_skill_events(
         ),
         With<Player>,
     >,
-    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
+    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
+    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     let Ok((
@@ -515,7 +520,7 @@ pub fn dispatch_active_skill_events(
             // And gate dispatch by cooldown state if present
             let base_cooldown = skill.get_base_cooldown();
 
-            // For slot 1 and 2 (class skills), check charges first
+            // For slots 1-4 (class skills), check charges first
             if slot == 1 {
                 if let Ok(tracker) = slot1_trackers.get_single() {
                     // If we have charges available, allow activation regardless of cooldown
@@ -529,6 +534,28 @@ pub fn dispatch_active_skill_events(
                 }
             } else if slot == 2 {
                 if let Ok(tracker) = slot2_trackers.get_single() {
+                    // If we have charges available, allow activation regardless of cooldown
+                    if tracker.0.current_charges > 0 {
+                        ev.send(ActiveSkillUsedEvent {
+                            slot,
+                            cooldown: base_cooldown,
+                        });
+                        return; // Exit early after handling this key press
+                    }
+                }
+            } else if slot == 3 {
+                if let Ok(tracker) = slot3_trackers.get_single() {
+                    // If we have charges available, allow activation regardless of cooldown
+                    if tracker.0.current_charges > 0 {
+                        ev.send(ActiveSkillUsedEvent {
+                            slot,
+                            cooldown: base_cooldown,
+                        });
+                        return; // Exit early after handling this key press
+                    }
+                }
+            } else if slot == 4 {
+                if let Ok(tracker) = slot4_trackers.get_single() {
                     // If we have charges available, allow activation regardless of cooldown
                     if tracker.0.current_charges > 0 {
                         ev.send(ActiveSkillUsedEvent {

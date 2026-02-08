@@ -158,7 +158,7 @@ fn check_melee_hit_collisions(
                 from_heirloom_effect: false,
             });
 
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.2));
         }
     }
 }
@@ -324,11 +324,11 @@ fn check_projectile_hit_mob_collisions(
                     || proj.clone() == Projectile::IceExplosionAOE
                     || proj.clone() == Projectile::FireRing
                 {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::IceStaffHit, 0.2));
                 } else if proj.clone() == Projectile::Electricity {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffHit, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffHit, 0.2));
                 } else {
-                    commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.4));
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.2));
                 }
             }
 
@@ -498,7 +498,7 @@ fn check_multihit_projectile_ongoing_collisions(
                             Projectile::LaserBeam => AudioSoundEffect::LightningStaffHit,
                             _ => AudioSoundEffect::IceStaffHit,
                         };
-                        commands.spawn(SoundSpawner::new(sound, 0.4));
+                        commands.spawn(SoundSpawner::new(sound, 0.2));
                     }
                 }
             }
@@ -635,7 +635,7 @@ fn check_projectile_hit_player_collisions(
                 // Apply defense reduction if the target is a player with defense stat
                 let final_damage = if let Some(defence) = defence_opt {
                     // Same formula as mob-to-player collisions: damage * (0.99 ^ defense)
-                    f32::round(att.0 as f32 * (0.995_f32.powi(defence.0))) as i32
+                    f32::round(att.0 as f32 * (0.997_f32.powi(defence.0))) as i32
                 } else {
                     att.0
                 };
@@ -722,7 +722,7 @@ pub fn check_item_drop_collisions(
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
                 commands.entity(e2).despawn_recursive();
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
                 continue;
             } else if obj == WorldObject::XPShard
                 || obj == WorldObject::XPShardMedium
@@ -748,7 +748,7 @@ pub fn check_item_drop_collisions(
                     update_type: AnalyticsTrigger::ItemCollected(obj),
                 });
                 commands.entity(e2).despawn_recursive();
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
                 continue;
             }
             // ...and the entity is an item stack...
@@ -779,7 +779,7 @@ pub fn check_item_drop_collisions(
             analytics.send(AnalyticsUpdateEvent {
                 update_type: AnalyticsTrigger::ItemCollected(obj),
             });
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.35));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::ItemPickup, 0.15));
         }
     }
 }
@@ -945,7 +945,7 @@ fn check_mob_to_player_collisions(
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e1,
-                    damage: f32::round(attack.0 as f32 * (0.995_f32.powi(defence.0))) as i32,
+                    damage: f32::round(attack.0 as f32 * (0.997_f32.powi(defence.0))) as i32,
                     dir: delta.normalize_or_zero().truncate(),
                     hit_with_melee: None,
                     hit_with_projectile: None,

@@ -445,10 +445,7 @@ impl ItemAttributes {
             "Skill Power     ".to_string(),
             format!("{}", self.skill_power),
         ));
-        tooltips.push((
-            "Health Regen  ".to_string(),
-            format!("{}", self.health_regen),
-        ));
+        tooltips.push(("Mana Regen  ".to_string(), format!("{}", self.mana_regen)));
         tooltips.push(("Thorns           ".to_string(), format!("{}", self.thorns)));
         tooltips.push(("Dodge            ".to_string(), format!("{}", self.dodge)));
         tooltips.push(("Speed          ".to_string(), format!("{}", self.speed)));

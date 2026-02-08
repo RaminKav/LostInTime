@@ -1372,18 +1372,23 @@
             size: (16., 16.),
             anchor: None,
         ),
-        ThornsSpikes: WorldObjectData(
+        ManaRegenLightning: WorldObjectData(
             texture_pos: (4., 23.),
             size: (16., 16.),
             anchor: None,
         ),
-        ThornsOnDamage: WorldObjectData(
+        ThornsSpikes: WorldObjectData(
             texture_pos: (5., 23.),
             size: (16., 16.),
             anchor: None,
         ),
-        ThornsLifesteal: WorldObjectData(
+        ThornsOnDamage: WorldObjectData(
             texture_pos: (6., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        ThornsLifesteal: WorldObjectData(
+            texture_pos: (7., 23.),
             size: (16., 16.),
             anchor: None,
         ),

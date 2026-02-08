@@ -185,7 +185,7 @@ pub fn handle_modify_currency(
                 }
             }
 
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::CurrencyPickup, 0.75));
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::CurrencyPickup, 0.25));
         }
     }
 }

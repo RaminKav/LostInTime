@@ -294,7 +294,7 @@ pub fn handle_on_hit_upgrades(
                     // Only play sound once per frame to avoid audio spam
                     if !throttle.sound_played {
                         throttle.sound_played = true;
-                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.4));
+                        commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                 }
             }

@@ -719,6 +719,8 @@ impl WorldObject {
             WorldObject::Era2BerryBush => true,
             WorldObject::Era2DeadBranch => true,
             WorldObject::Era2Pebble => true,
+            WorldObject::XPJug => true,
+
             _ => false,
         }
     }

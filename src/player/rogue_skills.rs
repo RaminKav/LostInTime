@@ -159,7 +159,7 @@ pub fn handle_lunge(
 
                 // LUNGE
                 commands.entity(e).insert(PlayerAnimation::Lunge);
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.5));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.2));
 
                 let angle = match dir {
                     FacingDirection::Up => 0.,

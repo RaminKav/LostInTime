@@ -30,7 +30,10 @@ use crate::{
     player::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker},
         levels::PlayerLevel,
-        skills::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills},
+        skills::{
+            ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills,
+            Slot1ChargeTracker, Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker,
+        },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
     ui::Interactable,
@@ -1781,8 +1784,10 @@ pub fn handle_update_player_skills(
             }
 
             // Preserve cooldown state if it exists for this slot (we already filtered out changed slots)
-            if let Some((_, elapsed, original_duration)) =
-                preserved_cooldowns.iter().find(|(idx, _, _)| *idx == i)
+            // Use slot_index to match preserved cooldowns (they're stored by slot_index, not loop index)
+            if let Some((_, elapsed, original_duration)) = preserved_cooldowns
+                .iter()
+                .find(|(idx, _, _)| *idx == *slot_index)
             {
                 // Skill didn't change - preserve cooldown state
                 // Apply cooldown multiplier to get the new remaining time
@@ -1803,15 +1808,15 @@ pub fn handle_update_player_skills(
                     &mut commands,
                     new_duration,
                     new_elapsed,
-                    i,
+                    *slot_index,
                 );
             } else {
                 // No preserved cooldown (either skill changed or no cooldown was active)
-                spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, i);
+                spawn_skill_cooldown_overlay(icon_bg, &mut commands, 0.0, *slot_index);
             }
 
-            // For slots 1 and 2 (class skills), add charge count text (both share the charge system)
-            if i == 1 || i == 2 {
+            // For slots 1-4 (class skills), add charge count text (all use the charge system)
+            if *slot_index == 0 || *slot_index == 1 || *slot_index == 2 || *slot_index == 3 {
                 // Query for charge tracker to get current charges
                 // We'll update this in a separate system that runs after this
                 let _charge_text = commands
@@ -1833,7 +1838,7 @@ pub fn handle_update_player_skills(
                         ..default()
                     })
                     .insert(RenderLayers::from_layers(&[3]))
-                    .insert(SkillChargeText { slot: i })
+                    .insert(SkillChargeText { slot: *slot_index })
                     .insert(Name::new("SKILL CHARGE TEXT"))
                     .set_parent(icon_bg)
                     .id();
@@ -1842,17 +1847,21 @@ pub fn handle_update_player_skills(
     }
 }
 
-/// Updates skill charge text display for slot 1
+/// Updates skill charge text display for slots 1-4
 pub fn update_skill_charge_text(
     slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
     slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    slot3_trackers: Query<&crate::player::skills::Slot3ChargeTracker, With<Player>>,
+    slot4_trackers: Query<&crate::player::skills::Slot4ChargeTracker, With<Player>>,
     mut charge_texts: Query<(&SkillChargeText, &mut Text)>,
 ) {
     for (charge_text, mut text) in charge_texts.iter_mut() {
         // Get the tracker for this text's slot
         let tracker_opt = match charge_text.slot {
-            1 => slot1_trackers.get_single().ok().map(|t| &t.0),
-            2 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            0 => slot1_trackers.get_single().ok().map(|t| &t.0),
+            1 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            2 => slot3_trackers.get_single().ok().map(|t| &t.0),
+            3 => slot4_trackers.get_single().ok().map(|t| &t.0),
             _ => None,
         };
 
@@ -2195,15 +2204,19 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
 
 pub fn tick_skill_cooldown_overlays(
     mut overlays: Query<(&mut Sprite, &mut SkillCooldownOverlay), With<SkillCooldownOverlay>>,
-    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
+    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
+    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
     time: Res<Time>,
 ) {
     for (mut sprite, mut timer) in overlays.iter_mut() {
         // Each slot uses its own independent charge tracker
         let tracker_opt = match timer.index {
-            1 => slot1_trackers.get_single().ok().map(|t| &t.0),
-            2 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            0 => slot1_trackers.get_single().ok().map(|t| &t.0),
+            1 => slot2_trackers.get_single().ok().map(|t| &t.0),
+            2 => slot3_trackers.get_single().ok().map(|t| &t.0),
+            3 => slot4_trackers.get_single().ok().map(|t| &t.0),
             _ => None,
         };
 
@@ -2236,12 +2249,16 @@ pub fn handle_active_skill_event(
     mut overlays: Query<&mut SkillCooldownOverlay>,
     slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
     slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
+    slot3_trackers: Query<&crate::player::skills::Slot3ChargeTracker, With<Player>>,
+    slot4_trackers: Query<&crate::player::skills::Slot4ChargeTracker, With<Player>>,
 ) {
     for e in active_skill_used.iter() {
         // Check if this slot has a charge tracker
         let has_tracker = match e.slot {
-            1 => slot1_trackers.get_single().is_ok(),
-            2 => slot2_trackers.get_single().is_ok(),
+            0 => slot1_trackers.get_single().is_ok(),
+            1 => slot2_trackers.get_single().is_ok(),
+            2 => slot3_trackers.get_single().is_ok(),
+            3 => slot4_trackers.get_single().is_ok(),
             _ => false,
         };
 

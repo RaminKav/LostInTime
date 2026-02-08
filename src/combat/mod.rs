@@ -287,7 +287,7 @@ fn handle_enemy_death(
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
         if kill_lightning_stacks > 0 {
             let mut rng = rand::thread_rng();
-            if rng.gen_ratio(kill_lightning_stacks as u32, 100) {
+            if rng.gen_ratio(kill_lightning_stacks as u32 * 3, 100) {
                 // Find nearby enemies (within 200 units)
                 let death_pos = death_event.enemy_pos;
                 let nearby_enemies: Vec<(Entity, Vec2)> = enemies
@@ -321,7 +321,7 @@ fn handle_enemy_death(
                             });
                             commands.spawn(SoundSpawner::new(
                                 AudioSoundEffect::LightningStaffCast,
-                                0.4,
+                                0.2,
                             ));
                         }
                     }

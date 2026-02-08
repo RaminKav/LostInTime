@@ -7,11 +7,15 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     assets::Graphics,
-    attributes::{modifiers::ModifyManaEvent, CurrentHealth, CurrentMana, MaxHealth},
+    attributes::{modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, MaxHealth},
+    audio::{AudioSoundEffect, SoundSpawner},
     combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
-    item::{projectile::RangedAttackEvent, WorldObject},
+    item::{
+        projectile::{Projectile, RangedAttackEvent},
+        WorldObject,
+    },
     player::{
         skills::{Heirloom, PlayerSkills},
         Player,
@@ -1371,6 +1375,82 @@ pub fn handle_mana_orb_attack(
                     pos_override: Some(player_pos),
                     spawn_delay: i as f32 * 0.1, // Slight delay between orbs
                 });
+            }
+        }
+    }
+}
+
+// ManaRegenLightning - Mana regen has a 10% chance per stack to trigger lightning
+// ============================================================================
+
+/// System to spawn lightning strikes when mana is regenerated
+pub fn handle_mana_regen_lightning(
+    mut mana_events: EventReader<ModifyManaEvent>,
+    mut player_query: Query<(&PlayerSkills, &GlobalTransform, &Attack, &CurrentMana), With<Player>>,
+    mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
+    mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut commands: Commands,
+) {
+    let Ok((skills, player_transform, attack, current_mana)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::ManaRegenLightning);
+    if stacks <= 0 {
+        return;
+    }
+
+    let player_pos = player_transform.translation().truncate();
+    let mut rng = rand::thread_rng();
+
+    for event in mana_events.iter() {
+        // Only trigger on positive mana changes (regen, not consumption)
+        if event.0 <= 0 {
+            continue;
+        }
+
+        // 10% chance per stack
+        let chance_per_stack = 10;
+        let total_chance = (stacks * chance_per_stack).min(100);
+        if !rng.gen_ratio(total_chance as u32, 100) {
+            continue;
+        }
+
+        // Find nearby enemies (within 400 units)
+        let nearby_mobs: Vec<_> = mobs
+            .iter()
+            .filter(|(_, mob_transform, health)| {
+                health.0 > 0
+                    && (mob_transform.translation().truncate() - player_pos).length() <= 200.0
+            })
+            .collect();
+
+        if nearby_mobs.is_empty() {
+            continue;
+        }
+
+        // Pick a random nearby enemy
+        if let Some((_, target_transform, _)) = nearby_mobs.choose(&mut rng) {
+            let target_pos = target_transform.translation().truncate();
+            const MANA_COST: i32 = 5;
+
+            // Check if player has enough mana
+            if current_mana.0 >= MANA_COST {
+                let lightning_damage = attack.0; // 100% damage
+                ranged_attack_event.send(RangedAttackEvent {
+                    projectile: Projectile::Lightning,
+                    direction: Vec2::ZERO,
+                    mana_cost: Some(MANA_COST),
+                    from_enemy: false,
+                    from_entity: None,
+                    is_followup_proj: false,
+                    dmg_override: Some(lightning_damage),
+                    pos_override: Some(target_pos + Vec2::new(0., 48.)),
+                    spawn_delay: 0.0,
+                });
+                modify_mana_event.send(ModifyManaEvent(-MANA_COST));
+                commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
             }
         }
     }

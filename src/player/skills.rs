@@ -730,8 +730,9 @@ pub enum Heirloom {
     ThornsLifesteal, // Thorns damage has +25% chance to lifesteal
 
     // Lightning strikes archetype
-    CoinLightning, // Picking up a coin causes a lightning strike
-    KillLightning, // Killing an enemy has a 1% chance to spawn lightning
+    CoinLightning,      // Picking up a coin causes a lightning strike
+    KillLightning,      // Killing an enemy has a 1% chance to spawn lightning
+    ManaRegenLightning, // Mana regen has a 10% chance per stack to trigger lightning
 }
 
 pub enum HeirloomTrait {
@@ -869,6 +870,7 @@ impl Heirloom {
             // Lightning strikes archetype
             Heirloom::CoinLightning => "Lightning Belt".to_string(),
             Heirloom::KillLightning => "Lightning Ring".to_string(),
+            Heirloom::ManaRegenLightning => "Lightning Cape".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1362,8 +1364,16 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 1% chance".to_string(),
+                "has a 3% chance".to_string(),
                 "to spawn a lightning".to_string(),
+                "strike on a random".to_string(),
+                "nearby enemy.".to_string(),
+                format!("Costs {} mana.", 5),
+            ],
+            Heirloom::ManaRegenLightning => vec![
+                "Mana regeneration".to_string(),
+                "has a 10% chance to".to_string(),
+                "spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
                 format!("Costs {} mana.", 5),
@@ -1534,15 +1544,24 @@ pub struct SkillChargeTracker {
     pub max_charges: u32,
     pub cooldown_timer: Timer,
     pub base_cooldown: f32,
+    pub tracked_skill: ActiveSkill, // Track which skill this tracker is for
 }
 
-/// Charge tracker for slot 1 (active_skill_slot_2)
+/// Charge tracker for slot 1 (active_skill_slot_1)
 #[derive(Component, Clone, Debug)]
 pub struct Slot1ChargeTracker(pub SkillChargeTracker);
 
-/// Charge tracker for slot 2 (active_skill_slot_3)
+/// Charge tracker for slot 2 (active_skill_slot_2)
 #[derive(Component, Clone, Debug)]
 pub struct Slot2ChargeTracker(pub SkillChargeTracker);
+
+/// Charge tracker for slot 3 (active_skill_slot_3)
+#[derive(Component, Clone, Debug)]
+pub struct Slot3ChargeTracker(pub SkillChargeTracker);
+
+/// Charge tracker for slot 4 (active_skill_slot_4)
+#[derive(Component, Clone, Debug)]
+pub struct Slot4ChargeTracker(pub SkillChargeTracker);
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
@@ -1725,6 +1744,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::CoinLightning, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::CoinLightning, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::ManaRegenLightning, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
         }
