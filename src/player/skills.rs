@@ -419,7 +419,7 @@ impl ActiveSkill {
             ActiveSkill::TripleThrow => vec![
                 "Throw three small throwing stars".to_string(),
                 "in a cone shape in front, dealing".to_string(),
-                format!("{}% damage each.", skill_power * 235.0),
+                format!("{}% damage each.", skill_power * 135.0),
             ],
             ActiveSkill::Fury => vec![
                 "Enter fury for a short duration,".to_string(),

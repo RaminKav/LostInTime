@@ -1002,7 +1002,7 @@ pub fn handle_active_skill_event(
                         // Throw 3 throwing stars in a cone (15 degree spread)
                         let spread_angle = 15.0_f32.to_radians();
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
-                        let dmg = (base_dmg as f32 * power_mult * 2.35) as i32;
+                        let dmg = (base_dmg as f32 * power_mult * 1.35) as i32;
                         for i in 0..3 {
                             let angle_offset = (i as f32 - 1.0) * spread_angle;
                             let angle = base_angle + angle_offset;
