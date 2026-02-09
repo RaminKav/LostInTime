@@ -81,7 +81,7 @@ pub fn track_boss_kills(
                     if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
                         tip_event.send(TipEvent {
                             tip: Tip::PeacefulPeriod,
-                            pos: Vec3::new(0., 0., 100.),
+                            pos: Vec3::new(-184., -116., 95.),
                         });
                     }
                 }
@@ -98,7 +98,7 @@ pub fn track_boss_kills(
                     if !seen_tips.has_seen(&Tip::PeacefulPeriod) {
                         tip_event.send(TipEvent {
                             tip: Tip::PeacefulPeriod,
-                            pos: Vec3::new(0., 0., 100.),
+                            pos: Vec3::new(-184., -116., 90.),
                         });
                     }
                 }

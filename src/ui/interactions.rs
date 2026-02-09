@@ -1056,7 +1056,7 @@ pub fn handle_cursor_skills_buttons(
                             {
                                 tips_param.p0().send(TipEvent {
                                     tip: Tip::Chaos,
-                                    pos: Vec3::new(0., 0., 100.),
+                                    pos: Vec3::new(-184., -116., 45.),
                                 });
                             }
 

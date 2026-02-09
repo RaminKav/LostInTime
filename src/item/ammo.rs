@@ -61,7 +61,7 @@ pub fn tick_reload(
                 if !seen_tips.has_seen(&Tip::ProjectileWeapons) {
                     tip_event.send(TipEvent {
                         tip: Tip::ProjectileWeapons,
-                        pos: Vec3::new(0., 0., 100.),
+                        pos: Vec3::new(-184., -116., 60.),
                     });
                 }
             }

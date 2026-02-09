@@ -325,18 +325,18 @@ pub fn handle_tip_box_pause_state(
     curr_ui_state: Res<State<UIState>>,
     curr_client_state: Res<State<ClientState>>,
 ) {
-    let has_tip_boxes = !tip_boxes.is_empty();
-    let ui_is_closed = curr_ui_state.0 == UIState::Closed;
+    // let has_tip_boxes = !tip_boxes.is_empty();
+    // let ui_is_closed = curr_ui_state.0 == UIState::Closed;
 
-    // Pause if tip boxes are visible
-    if has_tip_boxes {
-        if curr_client_state.0 != ClientState::Paused {
-            next_client_state.set(ClientState::Paused);
-        }
-    } else if ui_is_closed {
-        // Unpause only if UI is also closed (don't override UI pause state)
-        if curr_client_state.0 != ClientState::Unpaused {
-            next_client_state.set(ClientState::Unpaused);
-        }
-    }
+    // // Pause if tip boxes are visible
+    // if has_tip_boxes {
+    //     if curr_client_state.0 != ClientState::Paused {
+    //         next_client_state.set(ClientState::Paused);
+    //     }
+    // } else if ui_is_closed {
+    //     // Unpause only if UI is also closed (don't override UI pause state)
+    //     if curr_client_state.0 != ClientState::Unpaused {
+    //         next_client_state.set(ClientState::Unpaused);
+    //     }
+    // }
 }

@@ -102,7 +102,7 @@ pub fn handle_pet_spawner_interaction(
                     if !seen_tips.has_seen(&Tip::Pets) {
                         item_action_param.tip_event.send(TipEvent {
                             tip: Tip::Pets,
-                            pos: Vec3::new(0., 0., 100.),
+                            pos: Vec3::new(-184., -116., 50.),
                         });
                     }
                 }

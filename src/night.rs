@@ -326,7 +326,7 @@ pub fn tick_night_color(
             if !seen_tips.has_seen(&Tip::Night) {
                 tip_event.send(TipEvent {
                     tip: Tip::Night,
-                    pos: Vec3::new(0., 0., 100.),
+                    pos: Vec3::new(-184., -116., 70.),
                 });
             }
         } else if !night_tracker.is_night() && bgm_tracker.current_track != *"sounds/bgm_day.ogg" {
@@ -462,7 +462,7 @@ pub fn tick_era_timer(
         if !seen_tips.has_seen(&Tip::EndlessMode) {
             tip_event.send(TipEvent {
                 tip: Tip::EndlessMode,
-                pos: Vec3::new(0., 0., 100.),
+                pos: Vec3::new(-184., -116., 65.),
             });
         }
     }

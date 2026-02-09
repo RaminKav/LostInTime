@@ -739,7 +739,7 @@ pub fn toggle_inventory(
                 if occupied_slots >= 6 && !seen_tips.has_seen(&Tip::Recipes) {
                     tip_event.send(TipEvent {
                         tip: Tip::Recipes,
-                        pos: Vec3::new(0., 0., 100.),
+                        pos: Vec3::new(-184., -116., 85.),
                     });
                 }
 
@@ -755,7 +755,7 @@ pub fn toggle_inventory(
                 if has_upgrade_item && !seen_tips.has_seen(&Tip::UpgradingGear) {
                     tip_event.send(TipEvent {
                         tip: Tip::UpgradingGear,
-                        pos: Vec3::new(0., 0., 100.),
+                        pos: Vec3::new(-184., -116., 80.),
                     });
                 }
 
@@ -783,7 +783,7 @@ pub fn toggle_inventory(
                 if has_inventory_gear && !seen_tips.has_seen(&Tip::InventoryStats) {
                     tip_event.send(TipEvent {
                         tip: Tip::InventoryStats,
-                        pos: Vec3::new(0., 0., 100.),
+                        pos: Vec3::new(-184., -116., 75.),
                     });
                 }
             }

@@ -105,7 +105,7 @@ pub fn handle_modify_mana_event(
                     if weapon_obj.is_magic_weapon() && !seen_tips.has_seen(&Tip::MagicWeapons) {
                         tip_event.send(TipEvent {
                             tip: Tip::MagicWeapons,
-                            pos: Vec3::new(0., 0., 100.),
+                            pos: Vec3::new(-184., -116., 100.),
                         });
                     }
                 }

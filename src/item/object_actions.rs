@@ -620,7 +620,7 @@ impl ObjectAction {
                     if !seen_tips.has_seen(&Tip::Chaos) {
                         item_action_param.tip_event.send(TipEvent {
                             tip: Tip::Chaos,
-                            pos: Vec3::new(0., 0., 100.),
+                            pos: Vec3::new(-184., -116., 55.),
                         });
                     }
                 }
