@@ -1392,6 +1392,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        ManaRegenPoison: WorldObjectData(
+            texture_pos: (14., 22.),
+            size: (16., 16.),
+            anchor: None,
+        ),
     },
     icons : {
         StoneWallBlock: SpriteData(

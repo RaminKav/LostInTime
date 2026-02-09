@@ -39,9 +39,10 @@ use bevy::{
     reflect::TypeUuid,
     render::{
         camera::{RenderTarget, ScalingMode},
+        mesh::Indices,
         render_resource::{
-            AsBindGroup, Extent3d, ShaderRef, TextureDescriptor, TextureDimension, TextureFormat,
-            TextureUsages,
+            AsBindGroup, Extent3d, PrimitiveTopology, ShaderRef, TextureDescriptor,
+            TextureDimension, TextureFormat, TextureUsages,
         },
         view::RenderLayers,
     },
@@ -858,6 +859,44 @@ pub struct ScreenResolution {
     /// Size of the actual viewport (may be smaller than window due to letterboxing)
     pub viewport_size: Vec2,
 }
+/// Creates a quad mesh with padding around the edges to prevent flickering artifacts
+/// from sub-pixel camera shifts. The inner area (width × height) maps to UV (0,0)→(1,1).
+/// The padding area uses UVs outside 0-1, which with ClampToEdge texture wrapping
+/// repeats the edge texels seamlessly — no stretching, no gaps.
+fn create_padded_quad(width: f32, height: f32, padding: f32) -> Mesh {
+    let total_w = width + 2.0 * padding;
+    let total_h = height + 2.0 * padding;
+    let hw = total_w / 2.0;
+    let hh = total_h / 2.0;
+
+    // UV padding ratios — how far beyond 0-1 the UVs extend
+    let u_pad = padding / width;
+    let v_pad = padding / height;
+
+    // Vertex layout matches Bevy's Quad: positions in 2D plane, UV y-axis flipped
+    let positions: Vec<[f32; 3]> = vec![
+        [-hw, -hh, 0.0], // bottom-left
+        [-hw, hh, 0.0],  // top-left
+        [hw, hh, 0.0],   // top-right
+        [hw, -hh, 0.0],  // bottom-right
+    ];
+    let normals: Vec<[f32; 3]> = vec![[0.0, 0.0, 1.0]; 4];
+    let uvs: Vec<[f32; 2]> = vec![
+        [-u_pad, 1.0 + v_pad],      // bottom-left
+        [-u_pad, -v_pad],           // top-left
+        [1.0 + u_pad, -v_pad],      // top-right
+        [1.0 + u_pad, 1.0 + v_pad], // bottom-right
+    ];
+    let indices = vec![0u32, 1, 2, 0, 2, 3];
+
+    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.set_indices(Some(Indices::U32(indices)));
+    mesh
+}
+
 /// Calculate integer scale factor and viewport for pixel-perfect rendering
 /// Adjusts the game's aspect ratio to better match the monitor for optimal scaling
 fn calculate_pixel_perfect_resolution(window_width: f32, window_height: f32) -> ScreenResolution {
@@ -1075,23 +1114,22 @@ fn setup(
         source_texture: Some(ui_image_handle),
     });
 
-    // Main pass cube, with material containing the rendered first pass texture.
-    // The quad should be sized to match the render texture and centered at origin
-    // Since camera uses FixedVertical(resolution.height), world units = pixels when camera is at origin
+    // Padding for the display quads — prevents edge flickering from sub-pixel camera shifts.
+    // The max sub-pixel shift is (scale - epsilon) pixels, so we pad by `scale` on each side.
+    let quad_padding = resolution.scale as f32;
+
+    // Main pass quad, with material containing the rendered first pass texture.
+    // The padded quad extends slightly into the letterbox area. The padding uses
+    // ClampToEdge UV wrapping to repeat edge texels — no stretching, no gaps.
     let _game_texture_image = commands
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(
-                                resolution.render_width as f32,
-                                resolution.render_height as f32,
-                            ),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
+                    .add(create_padded_quad(
+                        resolution.render_width as f32,
+                        resolution.render_height as f32,
+                        quad_padding,
+                    ))
                     .into(),
                 transform: Transform {
                     translation: Vec3::ZERO, // Centered at origin
@@ -1110,16 +1148,11 @@ fn setup(
         .spawn((
             MaterialMesh2dBundle {
                 mesh: meshes
-                    .add(
-                        shape::Quad {
-                            size: Vec2::new(
-                                resolution.render_width as f32,
-                                resolution.render_height as f32,
-                            ),
-                            ..Default::default()
-                        }
-                        .into(),
-                    )
+                    .add(create_padded_quad(
+                        resolution.render_width as f32,
+                        resolution.render_height as f32,
+                        quad_padding,
+                    ))
                     .into(),
                 transform: Transform {
                     translation: Vec3::new(0., 0., 1.), // Slightly in front, centered at origin
@@ -1143,7 +1176,7 @@ fn setup(
                 ..default()
             },
             camera_2d: Camera2d {
-                clear_color: ClearColorConfig::None,
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
             },
             projection: OrthographicProjection {
                 scaling_mode: ScalingMode::FixedVertical(resolution.height),

@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::render::view::RenderLayers;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
@@ -111,6 +112,7 @@ pub fn update_status_effect_icons(
     >,
     mut commands: Commands,
     graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
     prev_status_icons: Query<(Entity, &StatusEffectIcon)>,
 ) {
     for (entity, maybe_children, tracker) in query.iter_mut() {
@@ -124,18 +126,14 @@ pub fn update_status_effect_icons(
         }
         for (height, effect) in tracker.effects.iter().enumerate() {
             let total_stacks = effect.num_stacks as f32;
-            for i in 0..effect.num_stacks {
+            let h = height as f32;
+
+            // For poison stacks > 5, show 1 icon + text count
+            if effect.effect == StatusEffect::Poison && effect.num_stacks > 5 {
                 let icon = graphics.get_status_effect_icon(effect.effect.clone());
-                let d = 1.;
                 let s = 5.;
-                let i = i as f32;
-                let h = height as f32;
-                let translation = Vec3::new(
-                    i * (s + d) - (total_stacks - 1.) * (s / 2.) - d,
-                    7. * h + 12.,
-                    1.,
-                );
-                commands
+                let translation = Vec3::new(-s / 2., 7. * h + 12., 1.);
+                let icon_entity = commands
                     .spawn(SpriteBundle {
                         texture: icon,
                         sprite: Sprite {
@@ -150,7 +148,58 @@ pub fn update_status_effect_icons(
                         ..Default::default()
                     })
                     .insert(StatusEffectIcon)
-                    .set_parent(entity);
+                    .set_parent(entity)
+                    .id();
+
+                // Add text count next to the icon
+                commands
+                    .spawn(Text2dBundle {
+                        text: Text::from_section(
+                            effect.num_stacks.to_string(),
+                            TextStyle {
+                                font: asset_server.load("fonts/slkscr.ttf"),
+                                font_size: 8.4,
+                                color: Color::WHITE,
+                            },
+                        ),
+                        transform: Transform {
+                            translation: Vec3::new(3.0, 0., 1.),
+                            ..Default::default()
+                        },
+                        text_anchor: bevy::sprite::Anchor::CenterLeft,
+                        ..Default::default()
+                    })
+                    // .insert(RenderLayers::from_layers(&[1]))
+                    .set_parent(icon_entity);
+            } else {
+                // Original behavior: show one icon per stack
+                for i in 0..effect.num_stacks {
+                    let icon = graphics.get_status_effect_icon(effect.effect.clone());
+                    let d = 1.;
+                    let s = 5.;
+                    let i = i as f32;
+                    let translation = Vec3::new(
+                        i * (s + d) - (total_stacks - 1.) * (s / 2.) - d,
+                        7. * h + 12.,
+                        1.,
+                    );
+                    commands
+                        .spawn(SpriteBundle {
+                            texture: icon,
+                            sprite: Sprite {
+                                custom_size: Some(Vec2::new(5., 5.)),
+                                ..Default::default()
+                            },
+                            transform: Transform {
+                                translation,
+                                scale: Vec3::new(1., 1., 1.),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        })
+                        .insert(StatusEffectIcon)
+                        .set_parent(entity);
+                }
             }
         }
     }

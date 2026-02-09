@@ -9,7 +9,10 @@ use crate::{
     assets::Graphics,
     attributes::{modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, MaxHealth},
     audio::{AudioSoundEffect, SoundSpawner},
-    combat::{EnemyDeathEvent, HitEvent, ObjBreakEvent},
+    combat::{
+        status_effects::{Burning, StatusEffect, StatusEffectEvent},
+        EnemyDeathEvent, HitEvent, ObjBreakEvent,
+    },
     custom_commands::CommandsExt,
     enemy::{EliteMob, Mob},
     item::{
@@ -1375,6 +1378,102 @@ pub fn handle_mana_orb_attack(
                     pos_override: Some(player_pos),
                     spawn_delay: i as f32 * 0.1, // Slight delay between orbs
                 });
+            }
+        }
+    }
+}
+
+// ============================================================================
+// ManaRegenPoison - Every 100 mana regen applies poison to all enemies
+// ============================================================================
+
+/// Tracks accumulated mana regen for the ManaRegenPoison heirloom.
+/// When mana is regenerated, the amount is accumulated here.
+/// When it reaches 100, poison is applied to all enemies and the tracker resets with the remainder.
+#[derive(Component, Default)]
+pub struct ManaRegenPoisonTracker {
+    pub accumulated_mana: f32,
+}
+
+impl ManaRegenPoisonTracker {
+    /// Add mana regen to the tracker and return how many times poison should be applied
+    pub fn add_mana(&mut self, amount: i32) -> u32 {
+        if amount <= 0 {
+            return 0;
+        }
+        self.accumulated_mana += amount as f32;
+
+        // Calculate how many times we've reached 100
+        let poison_count = (self.accumulated_mana / 100.0).floor() as u32;
+
+        // Keep the remainder
+        self.accumulated_mana = self.accumulated_mana % 100.0;
+
+        poison_count
+    }
+}
+
+/// System to track mana regen and apply poison to all enemies when 100 is reached
+pub fn handle_mana_regen_poison(
+    mut mana_events: EventReader<ModifyManaEvent>,
+    mut player_query: Query<(&PlayerSkills, Option<&mut ManaRegenPoisonTracker>), With<Player>>,
+    mut commands: Commands,
+    enemies: Query<Entity, (With<Mob>, Without<Player>)>,
+    mut burning_enemies: Query<&mut Burning>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    mut status_event: EventWriter<StatusEffectEvent>,
+) {
+    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    // Only process if player has the heirloom
+    let heirloom_count = skills.get_count(Heirloom::ManaRegenPoison);
+    if heirloom_count <= 0 {
+        return;
+    }
+
+    let poison_duration_bonus = player_skills
+        .get_single()
+        .map(|s| s.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.)
+        .unwrap_or(1.0);
+
+    let mut tracker = if let Some(state) = state_option {
+        state
+    } else {
+        return;
+    };
+
+    for event in mana_events.iter() {
+        if event.0 > 0 {
+            let poison_count = tracker.add_mana(event.0);
+
+            for _ in 0..poison_count {
+                for enemy_entity in enemies.iter() {
+                    if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
+                        burning.stacks += heirloom_count as u8;
+                        burning.duration_timer.reset();
+                        status_event.send(StatusEffectEvent {
+                            entity: enemy_entity,
+                            effect: StatusEffect::Poison,
+                            num_stacks: burning.stacks as i32,
+                        });
+                    } else {
+                        commands.entity(enemy_entity).insert(Burning {
+                            tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+                            duration_timer: Timer::from_seconds(
+                                3.0 * poison_duration_bonus,
+                                TimerMode::Once,
+                            ),
+                            stacks: 1,
+                        });
+                        status_event.send(StatusEffectEvent {
+                            entity: enemy_entity,
+                            effect: StatusEffect::Poison,
+                            num_stacks: 1,
+                        });
+                    }
+                }
             }
         }
     }

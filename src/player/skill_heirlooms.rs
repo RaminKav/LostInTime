@@ -135,9 +135,6 @@ pub fn handle_active_skill_event(
             // Credit Card
             let credit_card_count = skills.get_count(Heirloom::CreditCard);
             for _ in 0..credit_card_count {
-                if ev.slot != 1 && ev.slot != 2 {
-                    continue; // only trigger on class skills (slots 1 and 2)
-                }
                 //spawn a coin for each
                 let mut rng = rand::thread_rng();
                 let d = 15.0;

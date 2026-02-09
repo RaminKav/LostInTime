@@ -81,7 +81,16 @@ pub fn handle_delayed_ranged_attack(
     if ranged_attack.0 == Projectile::Arrow || ranged_attack.0 == Projectile::Electricity {
         return;
     }
+    let num_bonus_projs = delayed_ranged_attack.1
+        + if ranged_attack.0 == Projectile::ThrowingStar {
+            1
+        } else {
+            0
+        };
     // TODO: add custom delays per proj type
+    if num_bonus_projs == 0 {
+        return;
+    }
     if mouse_button_input.pressed(MouseButton::Left) || delayed_ranged_attack.0.percent() != 0. {
         delayed_ranged_attack.0.tick(time.delta());
         if delayed_ranged_attack.0.just_finished() {
@@ -100,7 +109,7 @@ pub fn handle_delayed_ranged_attack(
             });
 
             delayed_ranged_attack.0.reset();
-            if *count < delayed_ranged_attack.1 {
+            if *count < num_bonus_projs as u8 {
                 delayed_ranged_attack.0.tick(Duration::from_millis(10));
             }
         }
@@ -344,11 +353,7 @@ pub fn handle_on_hit_upgrades(
                     num_stacks: burning.stacks as i32,
                 });
             } else if Heirloom::PoisonStacks.is_obj_valid(main_hand.get_obj()) {
-                let duration_bonus = if skills.has(Heirloom::PoisonDuration) {
-                    1.5
-                } else {
-                    1.
-                };
+                let duration_bonus = skills.get_count(Heirloom::PoisonDuration) as f32 * 0.5 + 1.;
                 // Start with 1 stack
                 commands.entity(hit_e).insert(Burning {
                     tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),

@@ -189,7 +189,7 @@ impl ActiveSkill {
             ActiveSkill::Lightning => 5.0,
             ActiveSkill::DaggerThrow => 7.0,
             ActiveSkill::DaggerSlash => 5.0,
-            ActiveSkill::TripleThrow => 4.0,
+            ActiveSkill::TripleThrow => 1.5,
             ActiveSkill::Fury => 13.0,
             ActiveSkill::Bomb => 5.5,
             ActiveSkill::SpinAttack => 2.5,
@@ -748,6 +748,7 @@ pub enum Heirloom {
     CoinLightning,      // Picking up a coin causes a lightning strike
     KillLightning,      // Killing an enemy has a 1% chance to spawn lightning
     ManaRegenLightning, // Mana regen has a 10% chance per stack to trigger lightning
+    ManaRegenPoison,    // Every 100 mana regen applies poison to all enemies
 }
 
 pub enum HeirloomTrait {
@@ -765,7 +766,7 @@ impl Heirloom {
         match self {
             Heirloom::OnHitEcho => 10,
             Heirloom::ChanceToProcExtraAttack => 5,
-            Heirloom::IncreaseProjectileCount => 5,
+            // Heirloom::IncreaseProjectileCount => 5,
             Heirloom::IceStaffAoE => 5,
             Heirloom::FrozenAoE => 5,
             Heirloom::IceStaffFloor => 3,
@@ -886,6 +887,7 @@ impl Heirloom {
             Heirloom::CoinLightning => "Lightning Belt".to_string(),
             Heirloom::KillLightning => "Lightning Ring".to_string(),
             Heirloom::ManaRegenLightning => "Lightning Cape".to_string(),
+            Heirloom::ManaRegenPoison => "Toxic Tome".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -912,7 +914,7 @@ impl Heirloom {
             Heirloom::Mana => vec!["Gain +25 Mana,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
             Heirloom::Speed => vec!["Gain +10 Speed,".to_string(), "permanently.".to_string()],
-            Heirloom::Thorns => vec!["Gain +15% Thorns, ".to_string(), "permanently.".to_string()],
+            Heirloom::Thorns => vec!["Gain +15 Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
                 vec![
                     "Gain +2% Lifesteal,".to_string(),
@@ -1063,10 +1065,10 @@ impl Heirloom {
                 "Increase all weapon".to_string(),
                 "projectile count".to_string(),
                 "by 1.".to_string(),
-                format!(
-                    "Costs {} mana.",
-                    Heirloom::IncreaseProjectileCount.get_mana_cost()
-                ),
+                // format!(
+                //     "Costs {} mana.",
+                //     Heirloom::IncreaseProjectileCount.get_mana_cost()
+                // ),
             ],
 
             Heirloom::IceStaffAoE => vec![
@@ -1284,7 +1286,7 @@ impl Heirloom {
                 "rapidly.".to_string(),
             ],
             Heirloom::ThornArmor => vec![
-                "Gain +20% Thorns".to_string(),
+                "Gain +10 Thorns".to_string(),
                 "for every 10".to_string(),
                 "Defence you have.".to_string(),
                 "Gain +10 Defence.".to_string(),
@@ -1393,6 +1395,13 @@ impl Heirloom {
                 "nearby enemy.".to_string(),
                 format!("Costs {} mana.", 5),
             ],
+            Heirloom::ManaRegenPoison => vec![
+                "Every time you".to_string(),
+                "regenerate 100 mana,".to_string(),
+                "apply a poison".to_string(),
+                "stack to all".to_string(),
+                "enemies.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1412,12 +1421,16 @@ impl Heirloom {
             Heirloom::IncreaseProjectileCount => {
                 commands.entity(entity).insert(ClawUpgradeMultiThrow(
                     Timer::from_seconds(0.12, TimerMode::Once),
-                    1,
+                    skills.get_count(self.clone()) as u8,
                 ));
-                commands.entity(entity).insert(BowUpgradeSpread(1));
+                commands
+                    .entity(entity)
+                    .insert(BowUpgradeSpread(skills.get_count(self.clone()) as u8));
             }
             Heirloom::BowArrowSpeed => {
-                commands.entity(entity).insert(ArrowSpeedUpgrade(1.25));
+                commands.entity(entity).insert(ArrowSpeedUpgrade(
+                    1. + skills.get_count(self.clone()) as f32 * 0.25,
+                ));
             }
             &Heirloom::TeleportCount => {
                 // TeleportCount heirloom is deprecated - use SkillChargeIncrease instead
@@ -1512,6 +1525,14 @@ impl Heirloom {
                     commands
                         .entity(entity)
                         .insert(crate::player::combat_heirlooms::ManaChargeDamageState::default());
+                }
+            }
+            Heirloom::ManaRegenPoison => {
+                // Add mana regen poison tracker (only once)
+                if skills.get_count(Heirloom::ManaRegenPoison) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::ManaRegenPoisonTracker::default());
                 }
             }
 
@@ -1710,12 +1731,12 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::PoisonDuration, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::PoisonStrength, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ViralVenum, HeirloomRarity::Legendary),
-                HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
-                HeirloomChoiceState::new(Heirloom::IncreaseProjectileCount, HeirloomRarity::Common),
+                // HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::IncreaseProjectileCount, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
+                // HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary),
@@ -1729,7 +1750,7 @@ impl Default for HeirloomChoiceQueue {
                     Heirloom::CritSkillCooldownReduction,
                     HeirloomRarity::Rare,
                 ),
-                HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Legendary),
                 // New heirlooms
                 HeirloomChoiceState::new(Heirloom::MaxHPHunt, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::MaxHPDamage, HeirloomRarity::Rare),
@@ -1757,6 +1778,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::CoinLightning, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::ManaRegenLightning, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::ManaRegenPoison, HeirloomRarity::Rare),
             ],
             banned: HashSet::default(),
         }

@@ -612,7 +612,7 @@ impl ItemAttributes {
             }
             + if has_giant_blessing { 50 } else { 0 };
         let thorn_armor_bonus = if thorn_armor_stacks > 0 {
-            (total_defence / 10) * 20 * thorn_armor_stacks // 20% thorns per 10 defence per stack
+            (total_defence / 10) * 10 * thorn_armor_stacks // 10 thorns per 10 defence per stack
         } else {
             0
         };

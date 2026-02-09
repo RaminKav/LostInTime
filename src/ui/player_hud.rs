@@ -203,7 +203,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 17., -2.),
+                translation: Vec3::new(-26., 17., -2.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -227,7 +227,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 17., -1.),
+                translation: Vec3::new(-26., 17., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -251,7 +251,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 9., -1.),
+                translation: Vec3::new(-26., 9., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -275,7 +275,7 @@ pub fn setup_bars_ui(mut commands: Commands, graphics: Res<Graphics>, res: Res<S
                 ..default()
             },
             transform: Transform {
-                translation: Vec3::new(-25., 1., -1.),
+                translation: Vec3::new(-26., 1., -1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -366,6 +366,24 @@ pub fn setup_xp_bar_ui(
     //     .insert(Name::new("XP BAR"))
     //     .insert(RenderLayers::from_layers(&[3]))
     //     .id();
+    let level_frame = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
+                custom_size: Some(Vec2::new(46., 11.)),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::new(
+                    20., -1., // Right of the clock
+                    -1.,
+                ),
+                ..Default::default()
+            },
+            ..default()
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
     let _text = commands
         .spawn((
             Text2dBundle {
@@ -374,13 +392,13 @@ pub fn setup_xp_bar_ui(
                     TextStyle {
                         font: asset_server.load("fonts/slkscr.ttf"),
                         font_size: 8.4,
-                        color: BLACK,
+                        color: WHITE,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
                     translation: Vec3::new(
-                        res.game_width / 2. - 40.,
+                        res.game_width / 2. - 44.,
                         res.game_height / 2. - 10.5,
                         1.,
                     ),
@@ -393,6 +411,7 @@ pub fn setup_xp_bar_ui(
             XPBarText,
             RenderLayers::from_layers(&[3]),
         ))
+        .add_child(level_frame)
         .id();
     // commands
     //     .entity(xp_bar_frame)
@@ -487,28 +506,48 @@ pub fn setup_currency_ui(
         .set_parent(coin_text);
 
     // SCORE TEXT
-    commands.spawn((
-        Text2dBundle {
-            text: Text::from_section(
-                format!("Score: {:}", 0),
-                TextStyle {
-                    font: asset_server.load("fonts/slkscr.ttf"),
-                    font_size: 8.4,
-                    color: BLACK,
-                },
-            ),
-            text_anchor: Anchor::CenterLeft,
+    let score_timer_frame = commands
+        .spawn(SpriteBundle {
+            sprite: Sprite {
+                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
+                custom_size: Some(Vec2::new(70., 26.)),
+                ..default()
+            },
             transform: Transform {
-                translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 97.5, 6.),
-                scale: Vec3::new(1., 1., 1.),
+                translation: Vec3::new(
+                    32., -8., // Right of the clock
+                    -1.,
+                ),
                 ..Default::default()
             },
             ..default()
-        },
-        Name::new("SCORE TEXT"),
-        ScoreText,
-        RenderLayers::from_layers(&[3]),
-    ));
+        })
+        .insert(RenderLayers::from_layers(&[3]))
+        .id();
+    commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Score: {:}", 0),
+                    TextStyle {
+                        font: asset_server.load("fonts/slkscr.ttf"),
+                        font_size: 8.4,
+                        color: WHITE,
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform {
+                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 97.5, 6.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            },
+            Name::new("SCORE TEXT"),
+            ScoreText,
+            RenderLayers::from_layers(&[3]),
+        ))
+        .add_child(score_timer_frame);
 
     // INVENTORY ICON
     let bag_icon = spawn_item_stack_icon(
@@ -581,7 +620,7 @@ pub fn setup_chaos_ui(
                     TextStyle {
                         font: asset_server.load("fonts/slkscr.ttf"),
                         font_size: 8.4,
-                        color: BLACK,
+                        color: WHITE,
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
@@ -757,7 +796,7 @@ pub fn update_healthbar(
     };
     let (mut sprite, mut _flash) = health_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
-        x: 65. * player_health.0 as f32 / player_max_health.0 as f32,
+        x: INNER_HUD_BAR_SIZE.x * player_health.0 as f32 / player_max_health.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
     // flash.timer.tick(Duration::from_nanos(1));
@@ -777,7 +816,7 @@ pub fn update_shieldbar(
     };
     let (mut sprite, mut _flash) = health_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
-        x: 65. * curr_shield.0 as f32 / max_shield.0 as f32,
+        x: INNER_HUD_BAR_SIZE.x * curr_shield.0 as f32 / max_shield.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
 
@@ -1069,7 +1108,7 @@ pub fn update_foodbar(
     };
     let (mut sprite, mut flash) = food_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
-        x: 53. * hunger.current as f32 / hunger.max as f32,
+        x: 54. * hunger.current as f32 / hunger.max as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
     // flash.timer.tick(Duration::from_nanos(1));
@@ -1912,7 +1951,7 @@ pub fn update_mana_bar(
     };
     let (mut sprite, mut flash) = mana_bar_query.single_mut();
     sprite.custom_size = Some(Vec2 {
-        x: 60. * current_mana.0 as f32 / max_mana.0 as f32,
+        x: 61. * current_mana.0 as f32 / max_mana.0 as f32,
         y: INNER_HUD_BAR_SIZE.y,
     });
     // flash.timer.tick(Duration::from_nanos(1));
@@ -1946,7 +1985,7 @@ pub fn setup_clock_hud(
     let text = spawn_text(
         &mut commands,
         &asset_server,
-        Vec3::new(10.5, -8., 1.),
+        Vec3::new(10.5, -7., 1.),
         BLACK,
         format!("{}:00", night_tracker.get_hour()),
         Anchor::CenterRight,
@@ -2007,13 +2046,13 @@ pub fn setup_era_timer_hud(
         .spawn(SpriteBundle {
             sprite: Sprite {
                 color: Color::rgba(0.1, 0.1, 0.1, 0.7),
-                custom_size: Some(Vec2::new(42., 14.)),
+                custom_size: Some(Vec2::new(42., 16.)),
                 ..default()
             },
             transform: Transform {
                 translation: Vec3::new(
                     -res.game_width / 2. + 50.5,
-                    (GAME_HEIGHT - 15.) / 2. - 70.5, // Right of the clock
+                    (GAME_HEIGHT - 16.) / 2. - 74., // Right of the clock
                     5.,
                 ),
                 ..Default::default()
@@ -2126,9 +2165,9 @@ pub fn handle_update_era_timer_hud(
             sprite.color = Color::rgba(0.4 + pulse, 0.1, 0.1, 0.8);
         } else {
             // Normal timer size
-            sprite.custom_size = Some(Vec2::new(40., 14.));
+            sprite.custom_size = Some(Vec2::new(40., 16.));
             sprite.color = Color::rgba(0.1, 0.1, 0.1, 0.7);
-            transform.translation.x = -res.game_width / 2. + 50.5;
+            transform.translation.x = -res.game_width / 2. + 52.;
         }
     }
 }

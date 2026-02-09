@@ -67,7 +67,8 @@ use crate::player::skills::{
 };
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
-    GameUpscale, InputMappings, Player, UpdatePetWeaponEvent, DEBUG, PLAYER_DASH_SPEED, TIME_STEP,
+    GameUpscale, InputMappings, Player, ScreenResolution, UpdatePetWeaponEvent, DEBUG,
+    PLAYER_DASH_SPEED, TIME_STEP,
 };
 use crate::{
     custom_commands::CommandsExt, AppExt, CustomFlush, GameParam, GameState, MainCamera,
@@ -1264,6 +1265,7 @@ pub fn move_camera_with_player(
         (With<MainCamera>, Without<UICamera>, Without<TextureCamera>),
     >,
     time: Res<Time>,
+    resolution: Res<ScreenResolution>,
 ) {
     let (mut game_camera_transform, mut raw_camera_pos) = game_camera.single_mut();
     let Ok((_player_pos, raw_player_pos, _player_movement_vec)) = player_query.get_single() else {
@@ -1274,17 +1276,19 @@ pub fn move_camera_with_player(
     let delta = raw_player_pos.0 - raw_camera_pos.0;
     raw_camera_pos.0 += delta * camera_lookahead_scale * time.delta_seconds();
 
-    let decimals = 10i32.pow(3) as f32;
+    // Snap camera to the screen-pixel grid: 1 screen pixel = 1/scale game units.
+    // This ensures:
+    //   - Sprites at integer game positions always land at exact render texture pixels
+    //     (offset * scale = integer, since offset is a multiple of 1/scale)
+    //   - Camera movement is smooth at screen-pixel granularity (finest visible unit)
+    //   - Display camera stays at (0,0), so letterbox bars are perfectly stable
+    let pixel_step = 1.0 / resolution.scale as f32;
+    game_camera_transform.translation.x = (raw_camera_pos.x / pixel_step).round() * pixel_step;
+    game_camera_transform.translation.y = (raw_camera_pos.y / pixel_step).round() * pixel_step;
 
-    let camera_final_pos = Vec2::new(raw_camera_pos.x, raw_camera_pos.y);
-    let camera_final_pos = Vec2::new(
-        (camera_final_pos.x * decimals).round() / decimals,
-        (camera_final_pos.y * decimals).round() / decimals,
-    );
-
-    game_camera_transform.translation.x = camera_final_pos.x.trunc();
-    game_camera_transform.translation.y = camera_final_pos.y.trunc();
-    let (mut screen_camera_transform, game_upscale) = screen_camera.single_mut();
-    screen_camera_transform.translation.x = camera_final_pos.x.fract() * game_upscale.0;
-    screen_camera_transform.translation.y = camera_final_pos.y.fract() * game_upscale.0;
+    // Display camera stays fixed at origin — sub-pixel smoothing is fully handled
+    // by the texture camera's 1/scale quantization. No frame shift, no letterbox jitter.
+    let (mut screen_camera_transform, _game_upscale) = screen_camera.single_mut();
+    screen_camera_transform.translation.x = 0.0;
+    screen_camera_transform.translation.y = 0.0;
 }
