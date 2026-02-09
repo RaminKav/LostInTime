@@ -741,7 +741,10 @@ pub fn cleanup_marked_for_death_entities(
 
             if can_trigger_heirloom_effects {
                 if let Some(_) = slow_option {
-                    if skills.has(Heirloom::FrozenAoE) {
+                    let heirloomc_count = skills.get_count(Heirloom::FrozenAoE) as f64;
+                    let mut rng = rand::thread_rng();
+                    if heirloomc_count > 0. && rng.gen_bool((heirloomc_count * 0.25).clamp(0., 1.))
+                    {
                         let mana_cost = Heirloom::FrozenAoE.get_mana_cost();
                         if current_mana.0 >= mana_cost {
                             current_mana.0 -= mana_cost;

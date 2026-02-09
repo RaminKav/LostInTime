@@ -1073,7 +1073,7 @@ impl Heirloom {
 
             Heirloom::IceStaffAoE => vec![
                 "Your Attacks have".to_string(),
-                "a chance to ".to_string(),
+                "a 3% chance to ".to_string(),
                 "trigger an ice".to_string(),
                 "explosion that".to_string(),
                 "damages enemies. ".to_string(),
@@ -1167,9 +1167,9 @@ impl Heirloom {
 
             Heirloom::FrozenAoE => vec![
                 "Killing a frozen".to_string(),
-                "enemy triggers an".to_string(),
-                "ice explosion that".to_string(),
-                "damages enemies.".to_string(),
+                "enemy has a 25% chance".to_string(),
+                "to trigger an ice".to_string(),
+                "explosion.".to_string(),
                 "+25% freeze chance.".to_string(),
                 format!("Costs {} mana.", Heirloom::FrozenAoE.get_mana_cost()),
             ],
@@ -1389,7 +1389,7 @@ impl Heirloom {
             ],
             Heirloom::ManaRegenLightning => vec![
                 "Mana regeneration".to_string(),
-                "has a 10% chance to".to_string(),
+                "has a 20% chance to".to_string(),
                 "spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
@@ -1723,7 +1723,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::IceStaffFloor, HeirloomRarity::Legendary),
@@ -1734,7 +1734,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::ChanceToProcExtraAttack, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::IncreaseProjectileCount, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::BowArrowSpeed, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::IceStaffAoE, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::FullStomach, HeirloomRarity::Uncommon),
                 // HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary),

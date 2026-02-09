@@ -1509,7 +1509,7 @@ pub fn handle_mana_regen_lightning(
         }
 
         // 10% chance per stack
-        let chance_per_stack = 10;
+        let chance_per_stack = 20;
         let total_chance = (stacks * chance_per_stack).min(100);
         if !rng.gen_ratio(total_chance as u32, 100) {
             continue;
