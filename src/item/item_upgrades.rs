@@ -11,6 +11,7 @@ use crate::blessings::OwnedBlessings;
 use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
+use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
 use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
 use crate::player::skills::{Heirloom, PlayerSkills};
@@ -57,7 +58,7 @@ pub struct IceExplosionThrottle {
 }
 
 pub fn handle_delayed_ranged_attack(
-    wep_query: Query<&RangedAttack, With<MainHand>>,
+    wep_query: Query<(&RangedAttack, Option<&Ammo>), With<MainHand>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     game: GameParam,
     mouse_button_input: Res<Input<MouseButton>>,
@@ -66,9 +67,14 @@ pub fn handle_delayed_ranged_attack(
     mut att_cooldown_query: Query<(&mut ClawUpgradeMultiThrow, Option<&AttackTimer>), With<Player>>,
     mut count: Local<u8>,
 ) {
-    let Ok(ranged_attack) = wep_query.get_single() else {
+    let Ok((ranged_attack, ammo_option)) = wep_query.get_single() else {
         return;
     };
+    if let Some(ammo) = ammo_option {
+        if ammo.reloading {
+            return;
+        }
+    }
 
     let Ok((mut delayed_ranged_attack, cooldown_option)) = att_cooldown_query.get_single_mut()
     else {
