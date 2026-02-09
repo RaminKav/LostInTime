@@ -180,7 +180,9 @@ impl InventoryItemStack {
         );
         // despawn old held item if it exists
         if let Some(main_hand_data) = &player_state.main_hand_slot {
-            commands.entity(main_hand_data.entity).despawn();
+            if let Some(mut entity_commands) = commands.get_entity(main_hand_data.entity) {
+                entity_commands.despawn();
+            }
         }
 
         //spawn new item entity

@@ -1215,7 +1215,9 @@ pub fn handle_break_object(
             }
         }
 
-        commands.entity(broken.entity).despawn_recursive();
+        if let Some(entity_commands) = commands.get_entity(broken.entity) {
+            entity_commands.despawn_recursive();
+        }
         game.remove_object_from_chunk_cache(broken.pos);
 
         if let Some(_wall) = proto_param.get_component::<Wall, _>(broken.obj) {

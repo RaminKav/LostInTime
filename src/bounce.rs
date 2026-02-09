@@ -3,6 +3,7 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 
 use crate::{
+    animations::player_sprite::PlayerAnimation,
     attributes::{hunger::Hunger, Speed},
     audio::{AudioSoundEffect, SoundSpawner},
     inputs::MovementVector,
@@ -198,7 +199,14 @@ pub fn update_shadow(
 pub fn bounce_player(
     mut game: GameParam,
     mut player_query: Query<
-        (Entity, &Transform, Option<&BounceEffect>, &Speed, &Hunger),
+        (
+            Entity,
+            &Transform,
+            Option<&BounceEffect>,
+            &Speed,
+            &Hunger,
+            &PlayerAnimation,
+        ),
         (
             With<Player>,
             Without<MainCamera>,
@@ -213,8 +221,10 @@ pub fn bounce_player(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut bounce_events: EventReader<BounceEvent>,
 ) {
-    let (player_e, transform, bounce_opt, speed, hunger) = player_query.single_mut();
-
+    let (player_e, transform, bounce_opt, speed, hunger, anim) = player_query.single_mut();
+    if anim == &PlayerAnimation::Lunge {
+        return;
+    }
     let player = game.player_mut();
     let mut d = Vec2::ZERO;
 

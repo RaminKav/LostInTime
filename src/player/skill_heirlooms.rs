@@ -886,7 +886,7 @@ pub fn handle_active_skill_event(
 
                         // Get kill tracker and reset it after use
                         let kill_count = if let Ok(mut tracker) = kill_trackers.get_mut(player_e) {
-                            let count = tracker.kill_count.min(10);
+                            let count = tracker.kill_count.min(50);
                             tracker.kill_count = 0; // Reset after use
                             count
                         } else {
@@ -1364,12 +1364,15 @@ pub fn tick_new_skill_cooldowns(
         // Scale throw timer based on attack speed
         let attack_speed_mult = if let Ok(cooldown) = attack_cooldown.get_single() {
             let reference_base_cooldown = 0.6;
-            info!(
-                "Current AttackCooldown: {:?} | {:?}",
-                cooldown.0,
-                (reference_base_cooldown / (2. * cooldown.0 - reference_base_cooldown)).max(0.1)
-            );
-            (reference_base_cooldown / (2. * cooldown.0 - reference_base_cooldown)).max(0.1)
+            let denom = 2. * cooldown.0 - reference_base_cooldown;
+            let raw = if denom > 0.001 {
+                reference_base_cooldown / denom
+            } else {
+                // Denominator near zero or negative means very fast attack speed;
+                // cap the multiplier to avoid infinity/NaN
+                10.0
+            };
+            raw.clamp(0.1, 10.0)
         } else {
             1.0
         };

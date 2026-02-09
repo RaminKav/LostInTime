@@ -617,7 +617,9 @@ pub fn handle_new_ui_state(
     }
     for (e, ui) in old_ui.iter() {
         if *ui != next_ui || should_close_self {
-            commands.entity(e).despawn_recursive();
+            if let Some(entity_commands) = commands.get_entity(e) {
+                entity_commands.despawn_recursive();
+            }
         }
     }
     if let Some(chest) = chest_option {

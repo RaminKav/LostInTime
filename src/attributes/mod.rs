@@ -1655,15 +1655,20 @@ fn update_attributes_with_held_item_change(
     if let Some(new_item) = active_hotbar_item {
         let new_item_stack = new_item.item_stack.clone();
         if let Some(current_item) = prev_held_item_data {
-            let curr_attributes = item_stack_query.get(current_item.entity).unwrap();
+            let Ok(curr_attributes) = item_stack_query.get(current_item.entity) else {
+                // Entity no longer exists, respawn the item
+                new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
+                att_event.send(AttributeChangeEvent);
+                return;
+            };
             let new_attributes = &(new_item.item_stack.attributes);
             if new_item_stack != current_item.item_stack {
                 new_item.spawn_item_on_hand(&mut commands, &mut game_param, &proto);
                 att_event.send(AttributeChangeEvent);
             } else if curr_attributes != new_attributes {
-                commands
-                    .entity(current_item.entity)
-                    .insert(new_attributes.clone());
+                if let Some(mut ec) = commands.get_entity(current_item.entity) {
+                    ec.insert(new_attributes.clone());
+                }
                 att_event.send(AttributeChangeEvent);
             }
         } else {
@@ -1671,7 +1676,9 @@ fn update_attributes_with_held_item_change(
             att_event.send(AttributeChangeEvent);
         }
     } else if let Some(current_item) = prev_held_item_data {
-        commands.entity(current_item.entity).despawn();
+        if let Some(mut entity_commands) = commands.get_entity(current_item.entity) {
+            entity_commands.despawn();
+        }
         player_data.main_hand_slot = None;
         att_event.send(AttributeChangeEvent);
     }

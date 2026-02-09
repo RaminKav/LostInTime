@@ -371,7 +371,9 @@ pub fn spawn_obj_hit_particles(
             },
         ));
 
-        commands.entity(hit.hit_entity).remove::<JustGotHit>();
+        if let Some(mut entity_commands) = commands.get_entity(hit.hit_entity) {
+            entity_commands.remove::<JustGotHit>();
+        }
     }
 }
 pub fn spawn_use_item_particles(
