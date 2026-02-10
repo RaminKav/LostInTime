@@ -299,8 +299,8 @@ fn spawn_leaderboard_entries(
             ));
 
             // Class (truncated to 4 chars)
-            let class_short = if entry.class.len() > 4 {
-                &entry.class[..4]
+            let class_short = if entry.class.len() > 5 {
+                &entry.class[..5]
             } else {
                 &entry.class
             };

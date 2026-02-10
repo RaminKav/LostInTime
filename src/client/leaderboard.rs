@@ -14,13 +14,14 @@ use crate::{
 
 /// Configuration for leaderboard server
 /// Uses localhost in debug builds, production URL in release builds
+/// Configuration for leaderboard server
 #[cfg(debug_assertions)]
 const LEADERBOARD_API_URL: &str =
-    "https://lost-in-time-leaderboard-d1sc.shuttle.app/api/leaderboard"; // Temporarily using production to test
+    "https://lost-in-time-leaderboard-production.up.railway.app/api/leaderboard";
 
 #[cfg(not(debug_assertions))]
 const LEADERBOARD_API_URL: &str =
-    "https://lost-in-time-leaderboard-d1sc.shuttle.app/api/leaderboard";
+    "https://lost-in-time-leaderboard-production.up.railway.app/api/leaderboard";
 
 // Alternative: Use environment variable with fallback
 // const LEADERBOARD_API_URL: &str = env!("LEADERBOARD_URL", "http://localhost:3000/api/leaderboard");
