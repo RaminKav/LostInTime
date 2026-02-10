@@ -169,7 +169,7 @@ impl ActiveSkill {
     /// Returns the base cooldown in seconds for this skill
     pub fn get_base_cooldown(&self) -> f32 {
         match self {
-            ActiveSkill::Roll => 0.0, // Handled separately in player_move_inputs
+            ActiveSkill::Roll => 1.2, // Cooldown matches player_dash_cooldown duration
             ActiveSkill::Parry => 1.2,
             ActiveSkill::ParrySpear => 12.,
             ActiveSkill::Sprint => 8.0,
@@ -752,6 +752,7 @@ pub enum Heirloom {
     KillLightning,      // Killing an enemy has a 1% chance to spawn lightning
     ManaRegenLightning, // Mana regen has a 10% chance per stack to trigger lightning
     ManaRegenPoison,    // Every 100 mana regen applies poison to all enemies
+    SkillManaRegen,     // Using a skill has a 20% chance to trigger mana regen
 }
 
 pub enum HeirloomTrait {
@@ -891,6 +892,7 @@ impl Heirloom {
             Heirloom::KillLightning => "Lightning Ring".to_string(),
             Heirloom::ManaRegenLightning => "Lightning Cape".to_string(),
             Heirloom::ManaRegenPoison => "Toxic Tome".to_string(),
+            Heirloom::SkillManaRegen => "Brown Card".to_string(),
         }
     }
     pub fn get_desc(&self) -> Vec<String> {
@@ -1405,6 +1407,12 @@ impl Heirloom {
                 "stack to all".to_string(),
                 "enemies.".to_string(),
             ],
+            Heirloom::SkillManaRegen => vec![
+                "Using a skill has".to_string(),
+                "a 20% chance to".to_string(),
+                "trigger mana".to_string(),
+                "regeneration.".to_string(),
+            ],
         }
     }
     pub fn get_instant_drop(&self) -> Option<(WorldObject, usize)> {
@@ -1782,6 +1790,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::KillLightning, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::ManaRegenLightning, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::ManaRegenPoison, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::SkillManaRegen, HeirloomRarity::Uncommon),
             ],
             banned: HashSet::default(),
         }

@@ -2243,9 +2243,31 @@ pub fn tick_skill_cooldown_overlays(
     slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
     slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
     slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    game: Res<crate::Game>,
     time: Res<Time>,
 ) {
+    // Check which slot has Roll (if any)
+    let roll_slot = player_skills
+        .get_single()
+        .ok()
+        .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
+
     for (mut sprite, mut timer) in overlays.iter_mut() {
+        // Special handling for Roll: use actual player_dash_cooldown timer
+        if Some(timer.index) == roll_slot {
+            let dash_cooldown = &game.player_state.player_dash_cooldown;
+            let elapsed = dash_cooldown.elapsed().as_secs_f32();
+            let duration = dash_cooldown.duration().as_secs_f32();
+            let percent = if duration > 0.0 {
+                elapsed / duration
+            } else {
+                1.0
+            };
+            sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
+            continue;
+        }
+
         // Each slot uses its own independent charge tracker
         let tracker_opt = match timer.index {
             0 => slot1_trackers.get_single().ok().map(|t| &t.0),
@@ -2286,8 +2308,20 @@ pub fn handle_active_skill_event(
     slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
     slot3_trackers: Query<&crate::player::skills::Slot3ChargeTracker, With<Player>>,
     slot4_trackers: Query<&crate::player::skills::Slot4ChargeTracker, With<Player>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
+    // Check which slot has Roll (if any)
+    let roll_slot = player_skills
+        .get_single()
+        .ok()
+        .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
+
     for e in active_skill_used.iter() {
+        // Skip overlay update for Roll - it uses the actual player_dash_cooldown timer
+        if Some(e.slot) == roll_slot {
+            continue;
+        }
+
         // Check if this slot has a charge tracker
         let has_tracker = match e.slot {
             0 => slot1_trackers.get_single().is_ok(),

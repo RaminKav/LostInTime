@@ -7,7 +7,9 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     assets::Graphics,
-    attributes::{modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, MaxHealth},
+    attributes::{
+        modifiers::ModifyManaEvent, Attack, CurrentHealth, CurrentMana, ManaRegen, MaxHealth,
+    },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
         status_effects::{Burning, StatusEffect, StatusEffectEvent},
@@ -20,7 +22,7 @@ use crate::{
         WorldObject,
     },
     player::{
-        skills::{Heirloom, PlayerSkills},
+        skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills},
         Player,
     },
     proto::proto_param::ProtoParam,
@@ -1475,6 +1477,37 @@ pub fn handle_mana_regen_poison(
                     }
                 }
             }
+        }
+    }
+}
+
+// SkillManaRegen - Using a skill has a 20% chance to trigger mana regen
+// ============================================================================
+
+/// System to trigger mana regen when a skill is used
+pub fn handle_skill_mana_regen(
+    mut skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut player_query: Query<(&PlayerSkills, &ManaRegen), With<Player>>,
+    mut modify_mana_event: EventWriter<ModifyManaEvent>,
+) {
+    let Ok((skills, mana_regen)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    let stacks = skills.get_count(Heirloom::SkillManaRegen);
+    if stacks <= 0 {
+        return;
+    }
+
+    let mut rng = rand::thread_rng();
+
+    for _event in skill_events.iter() {
+        // 20% chance per stack (capped at 100%)
+        let chance_per_stack = 20;
+        let total_chance = (stacks * chance_per_stack).min(100);
+        if rng.gen_ratio(total_chance as u32, 100) {
+            // Trigger mana regen (same amount as normal regen)
+            modify_mana_event.send(ModifyManaEvent(mana_regen.0));
         }
     }
 }

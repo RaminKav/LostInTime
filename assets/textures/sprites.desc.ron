@@ -1166,6 +1166,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        SkillManaRegen: WorldObjectData(
+            texture_pos: (5., 19.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         FrozenMPRegen: WorldObjectData(
             texture_pos: (10., 19.),
             size: (16., 16.),

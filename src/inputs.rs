@@ -324,10 +324,17 @@ pub fn player_move_inputs(
             && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
         {
             player.is_dashing = true;
+            // Apply cooldown reduction multiplier to Roll
+            let base_cooldown = ActiveSkill::Roll.get_base_cooldown();
+            let adjusted_cooldown = base_cooldown * skills.skill_cooldown_multiplier();
             active_skill_event.send(ActiveSkillUsedEvent {
                 slot: roll_slot,
-                cooldown: player.player_dash_cooldown.duration().as_secs_f32(),
+                cooldown: adjusted_cooldown,
             });
+            // Update the timer duration to match the adjusted cooldown
+            player
+                .player_dash_cooldown
+                .set_duration(Duration::from_secs_f32(adjusted_cooldown));
             player.player_dash_cooldown.reset();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
         }
@@ -570,7 +577,7 @@ pub fn dispatch_active_skill_events(
 
             // Otherwise, check cooldown as normal
             let on_cooldown = match skill {
-                ActiveSkill::Roll => true, // handled in player_move_inputs
+                ActiveSkill::Roll => true, // Handled entirely in player_move_inputs
                 ActiveSkill::Sprint => sprint_state
                     .map(|s| !s.sprint_cooldown_timer.finished())
                     .unwrap_or(false),
