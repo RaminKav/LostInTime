@@ -147,7 +147,7 @@ fn add_spawners_to_new_chunks(
         spawners.push(Spawner {
             enemy: Mob::StingFly,
             weight: 100.,
-            spawn_timer: Timer::from_seconds(11., TimerMode::Once),
+            spawn_timer: Timer::from_seconds(14., TimerMode::Once),
             min_days_to_spawn: 1,
             num_to_spawn: Some(2),
         });
