@@ -9,3 +9,8 @@ notes.md
 .shuttle*
 Secrets*.toml
 *.log
+
+# Profiling trace files
+trace-*.json
+trace_*.tracy
+*.tracy

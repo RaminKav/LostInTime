@@ -22,7 +22,13 @@ pub struct AIPlugin;
 
 impl Plugin for AIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_event::<DebugPathResetEvent>()
+        app.init_resource::<EnemyAICacheMap>()
+            .add_system(
+                update_enemy_ai_cache
+                    .in_base_set(CoreSet::PreUpdate)
+                    .run_if(in_state(GameState::Main)),
+            )
+            .add_event::<DebugPathResetEvent>()
             .add_plugin(StateMachinePlugin)
             .add_systems((spawn_new_debug_path,).in_set(OnUpdate(GameState::Main)))
             .add_systems(

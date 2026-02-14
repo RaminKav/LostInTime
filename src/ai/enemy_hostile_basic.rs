@@ -6,15 +6,13 @@ use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterControlle
 use rand::Rng;
 use seldom_state::prelude::*;
 
+use crate::Game;
 use crate::{
     ai::pathfinding::{world_pos_to_AIPos, AIPos_to_world_pos},
     animations::enemy_sprites::{
         spawn_attack_warning_aseprite, CharacterAnimationSpriteSheetData, EnemyAnimationState,
     },
-    combat::{
-        status_effects::{Frozen, RapidfireSlow},
-        HitEvent,
-    },
+    combat::{status_effects::Frozen, HitEvent},
     enemy::{FollowSpeed, Mob, MobIsAttacking},
     inputs::FacingDirection,
     item::projectile::{Projectile, RangedAttackEvent},
@@ -27,6 +25,96 @@ use crate::{
     world::TILE_SIZE,
     PLAYER_MOVE_SPEED,
 };
+
+/// Per-enemy AI data computed once per frame to avoid redundant work in seldom_state transitions.
+#[derive(Resource, Default)]
+pub struct EnemyAICacheMap {
+    pub map: std::collections::HashMap<bevy::prelude::Entity, EnemyAICache>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct EnemyAICache {
+    pub distance_to_player_sq: f32,
+    pub attack_cooldown_active: bool,
+}
+
+/// Populates `EnemyAICacheMap` once per frame in PreUpdate so transition triggers can read from cache
+/// instead of doing repeated Transform queries (reduces cost of seldom_state::machine::transition).
+pub fn update_enemy_ai_cache(
+    game: Res<Game>,
+    transforms: Query<&Transform>,
+    mobs: Query<(Entity, &Transform, Option<&EnemyAttackCooldown>), With<crate::enemy::Mob>>,
+    mut cache: ResMut<EnemyAICacheMap>,
+) {
+    let Ok(player_t) = transforms.get(game.player) else {
+        return;
+    };
+    let player_pos = player_t.translation.truncate();
+    cache.map.clear();
+    for (entity, transform, cooldown) in mobs.iter() {
+        let delta = player_pos - transform.translation.truncate();
+        cache.map.insert(
+            entity,
+            EnemyAICache {
+                distance_to_player_sq: delta.length_squared(),
+                attack_cooldown_active: cooldown.is_some(),
+            },
+        );
+    }
+}
+
+/// Cached version of LineOfSight: reads from EnemyAICacheMap (one distance calc per enemy per frame).
+#[derive(Clone, Copy, Reflect)]
+pub struct CachedLineOfSight {
+    pub range_sq: f32,
+}
+
+impl Trigger for CachedLineOfSight {
+    type Param<'w, 's> = Res<'w, EnemyAICacheMap>;
+    type Ok = f32;
+    type Err = f32;
+
+    fn trigger(&self, entity: Entity, cache: Self::Param<'_, '_>) -> Result<f32, f32> {
+        let Some(entry) = cache.map.get(&entity) else {
+            return Err(0.);
+        };
+        let d_sq = entry.distance_to_player_sq;
+        let d = d_sq.sqrt();
+        if d_sq <= self.range_sq {
+            Ok(d)
+        } else {
+            Err(d)
+        }
+    }
+}
+
+/// Cached version of AttackDistance: reads from EnemyAICacheMap (avoids per-transition queries).
+#[derive(Clone, Copy, Reflect)]
+pub struct CachedAttackDistance {
+    pub range_sq: f32,
+}
+
+impl Trigger for CachedAttackDistance {
+    type Param<'w, 's> = Res<'w, EnemyAICacheMap>;
+    type Ok = f32;
+    type Err = f32;
+
+    fn trigger(&self, entity: Entity, cache: Self::Param<'_, '_>) -> Result<f32, f32> {
+        let Some(entry) = cache.map.get(&entity) else {
+            return Err(0.);
+        };
+        if entry.attack_cooldown_active {
+            return Err(0.);
+        }
+        let d_sq = entry.distance_to_player_sq;
+        let d = d_sq.sqrt();
+        if d_sq <= self.range_sq {
+            Ok(d)
+        } else {
+            Err(d)
+        }
+    }
+}
 
 // This trigger checks if the enemy is within the the given range of the target
 #[derive(Clone, Copy, Reflect)]

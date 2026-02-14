@@ -162,6 +162,7 @@ impl Plugin for GameAssetsPlugin {
                 ice_explosion_ase: None,
                 stone_pillar_ase: None,
                 pink_flower_ase: None,
+                foliage_textures: None,
             })
             .add_system(
                 Self::update_graphics
@@ -235,6 +236,9 @@ pub struct Graphics {
     pub ice_explosion_ase: Option<Handle<Aseprite>>,
     pub stone_pillar_ase: Option<Handle<Aseprite>>,
     pub pink_flower_ase: Option<Handle<Aseprite>>,
+    /// Foliage (tree) texture handles: normal and fade, keyed by WorldObject. Populated lazily
+    /// so we load each image path once instead of every frame in animate_foliage_opacity.
+    pub foliage_textures: Option<HashMap<WorldObject, (Handle<Image>, Handle<Image>)>>,
 }
 impl Graphics {
     pub fn get_ui_element_texture(&self, element: UIElement) -> Handle<Image> {
@@ -576,6 +580,7 @@ impl GameAssetsPlugin {
             stone_pillar_ase: Some(asset_server.load("textures/stonegolem/StonePillar.ase")),
             pink_flower_ase: Some(asset_server.load(PinkFlowerAseprite::PATH)),
             class_pet_data: Some(class_pet_data.clone()),
+            foliage_textures: None, // populated lazily in animate_foliage_opacity
         };
     }
     /// Keeps the graphics up to date for things that are spawned from proto, or change Obj type

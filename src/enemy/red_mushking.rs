@@ -1000,48 +1000,54 @@ pub fn handle_aoe_attack(
                     });
                 }
 
-                // Despawn previews
+                // Despawn previews (they may already be despawned by DespawnTimer or elsewhere)
                 if let Some(preview_e) = aoe_state.preview_entity {
-                    commands.entity(preview_e).despawn_recursive();
+                    if let Some(entity_commands) = commands.get_entity(preview_e) {
+                        entity_commands.despawn_recursive();
+                    }
                 }
                 if let Some(second_preview_e) = aoe_state.second_preview_entity {
-                    commands.entity(second_preview_e).despawn_recursive();
+                    if let Some(entity_commands) = commands.get_entity(second_preview_e) {
+                        entity_commands.despawn_recursive();
+                    }
                 }
 
-                // Return to FollowState and reset random timer for next attack
-                let mut rng = rand::thread_rng();
+                // Return to FollowState and reset random timer for next attack (only if boss still exists)
+                if let Some(mut entity_commands) = commands.get_entity(boss_entity) {
+                    let mut rng = rand::thread_rng();
 
-                // Check if boss is below half health - if so, use half the timer range (twice as fast)
-                let is_below_half_health = boss_health
-                    .get(boss_entity)
-                    .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
-                    .unwrap_or(false);
+                    // Check if boss is below half health - if so, use half the timer range (twice as fast)
+                    let is_below_half_health = boss_health
+                        .get(boss_entity)
+                        .map(|(current, max)| (current.0 as f32 / max.0 as f32) < 0.5)
+                        .unwrap_or(false);
 
-                let random_duration = if is_below_half_health {
-                    // Half the normal range: 0.15..1.25 (twice as fast)
-                    rng.gen_range(0.15..1.25)
-                } else {
-                    // Normal range: 0.3..2.5
-                    rng.gen_range(0.3..2.5)
-                };
+                    let random_duration = if is_below_half_health {
+                        // Half the normal range: 0.15..1.25 (twice as fast)
+                        rng.gen_range(0.15..1.25)
+                    } else {
+                        // Normal range: 0.3..2.5
+                        rng.gen_range(0.3..2.5)
+                    };
 
-                commands
-                    .entity(boss_entity)
-                    .remove::<AoEAttackState>() // Remove current state first
-                    .insert(FollowState {
-                        target: game.game.player,
-                        curr_delta: None,
-                        curr_path: None,
-                        speed: 1.0, // Default speed, will be overridden by FollowSpeed
-                    })
-                    .insert(EnemyAttackCooldown(Timer::from_seconds(
-                        1.0,
-                        TimerMode::Once,
-                    )));
+                    entity_commands
+                        .remove::<AoEAttackState>() // Remove current state first
+                        .insert(FollowState {
+                            target: game.game.player,
+                            curr_delta: None,
+                            curr_path: None,
+                            speed: 1.0, // Default speed, will be overridden by FollowSpeed
+                        })
+                        .insert(EnemyAttackCooldown(Timer::from_seconds(
+                            1.0,
+                            TimerMode::Once,
+                        )));
 
-                // Reset the timer component for next attack
-                if let Ok(mut aoe_timer) = aoe_timers.get_mut(boss_entity) {
-                    aoe_timer.random_timer = Timer::from_seconds(random_duration, TimerMode::Once);
+                    // Reset the timer component for next attack
+                    if let Ok(mut aoe_timer) = aoe_timers.get_mut(boss_entity) {
+                        aoe_timer.random_timer =
+                            Timer::from_seconds(random_duration, TimerMode::Once);
+                    }
                 }
             }
         }

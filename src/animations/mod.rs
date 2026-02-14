@@ -8,6 +8,7 @@ pub mod ui_animaitons;
 use bevy::reflect::TypeUuid;
 use bevy::render::render_resource::ShaderRef;
 use bevy::sprite::{Material2d, Material2dPlugin};
+use bevy::utils::HashMap;
 use bevy::{prelude::*, render::render_resource::AsBindGroup};
 use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
@@ -412,30 +413,57 @@ fn animate_spritesheet_animations(
 #[reflect(Component, Schematic)]
 pub struct FadeOpacity;
 
+/// Current foliage opacity state so we only update the texture when it changes.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default, Reflect, FromReflect)]
+#[reflect(Component)]
+pub enum FoliageOpacityState {
+    #[default]
+    Normal,
+    Faded,
+}
+
 fn animate_foliage_opacity(
     mut commands: Commands,
-    mut tree_query: Query<
-        (Entity, &GlobalTransform, &WorldObject),
+    tree_query: Query<
+        (Entity, &GlobalTransform, &WorldObject, Option<&FoliageOpacityState>),
         (With<FadeOpacity>, Without<Sapling>),
     >,
     player: Query<&GlobalTransform, With<Player>>,
     asset_server: Res<AssetServer>,
+    mut graphics: ResMut<crate::assets::Graphics>,
 ) {
-    for (e, txfm, obj) in tree_query.iter_mut() {
-        let p_txfm = player.single();
-        // check if player is behind tree
+    let p_txfm = match player.get_single() {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+    let cache = graphics.foliage_textures.get_or_insert_with(HashMap::default);
+    for (e, txfm, obj, current_state) in tree_query.iter() {
         let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-        if delta_t.x <= 65. && delta_t.x >= -65. && delta_t.y <= 80. && delta_t.y >= -26. {
-            commands.entity(e).insert(
-                asset_server
-                    .load::<Image, _>(format!("{}_fade.png", obj.to_string().to_lowercase())),
-            );
-            // sprite.color = sprite.color.with_a(0.0);
+        let desired = if delta_t.x <= 65.
+            && delta_t.x >= -65.
+            && delta_t.y <= 80.
+            && delta_t.y >= -26.
+        {
+            FoliageOpacityState::Faded
         } else {
-            commands.entity(e).insert(
-                asset_server.load::<Image, _>(format!("{}.png", obj.to_string().to_lowercase())),
-            );
-            // sprite.color = sprite.color.with_a(1.0);
+            FoliageOpacityState::Normal
+        };
+        if current_state.map_or(true, |s| *s != desired) {
+            let (normal, fade) = cache.entry(*obj).or_insert_with(|| {
+                let stem = obj.to_string().to_lowercase();
+                (
+                    asset_server.load::<Image, _>(format!("{stem}.png")),
+                    asset_server.load::<Image, _>(format!("{stem}_fade.png")),
+                )
+            });
+            let handle = match desired {
+                FoliageOpacityState::Faded => fade.clone(),
+                FoliageOpacityState::Normal => normal.clone(),
+            };
+            commands
+                .entity(e)
+                .insert(handle)
+                .insert(desired);
         }
     }
 }

@@ -14,8 +14,8 @@ use strum_macros::{Display, EnumIter, IntoStaticStr};
 
 use crate::{
     ai::{
-        AttackDistance, FollowState, HurtByPlayer, IdleState, LeapAttackState, LineOfSight,
-        NightTimeAggro, ProjectileAttackState,
+        CachedAttackDistance, CachedLineOfSight, FollowState, HurtByPlayer, IdleState,
+        LeapAttackState, NightTimeAggro, ProjectileAttackState,
     },
     attributes::{add_current_health_with_max_health, Attack, MaxHealth},
     chaos::ChaosTracker,
@@ -263,9 +263,8 @@ pub fn handle_new_mob_state_machine(
                         },
                     )
                     .trans::<FollowState>(
-                        Trigger::not(LineOfSight {
-                            target: game.game.player,
-                            range: 130.,
+                        Trigger::not(CachedLineOfSight {
+                            range_sq: 130. * 130.,
                         }),
                         IdleState {
                             walk_timer: Timer::from_seconds(2., TimerMode::Repeating),
@@ -277,9 +276,8 @@ pub fn handle_new_mob_state_machine(
             }
             CombatAlignment::Hostile => {
                 state_machine = state_machine.trans::<IdleState>(
-                    LineOfSight {
-                        target: game.game.player,
-                        range: 130.,
+                    CachedLineOfSight {
+                        range_sq: 130. * 130.,
                     },
                     FollowState {
                         target: game.game.player,
@@ -296,9 +294,8 @@ pub fn handle_new_mob_state_machine(
         if let Some(leap_attack) = leap_attack_option {
             state_machine = state_machine
                 .trans::<FollowState>(
-                    AttackDistance {
-                        target: game.game.player,
-                        range: leap_attack.activation_distance,
+                    CachedAttackDistance {
+                        range_sq: leap_attack.activation_distance * leap_attack.activation_distance,
                     },
                     LeapAttackState {
                         target: game.game.player,
@@ -320,9 +317,8 @@ pub fn handle_new_mob_state_machine(
                     },
                 )
                 .trans::<LeapAttackState>(
-                    Trigger::not(AttackDistance {
-                        target: game.game.player,
-                        range: leap_attack.activation_distance + 32.,
+                    Trigger::not(CachedAttackDistance {
+                        range_sq: (leap_attack.activation_distance + 32.).powi(2),
                     }),
                     FollowState {
                         target: game.game.player,
@@ -335,9 +331,8 @@ pub fn handle_new_mob_state_machine(
         if let Some(proj_attack) = proj_attack_option {
             state_machine = state_machine
                 .trans::<FollowState>(
-                    AttackDistance {
-                        target: game.game.player,
-                        range: proj_attack.activation_distance,
+                    CachedAttackDistance {
+                        range_sq: proj_attack.activation_distance * proj_attack.activation_distance,
                     },
                     ProjectileAttackState {
                         target: game.game.player,
@@ -351,9 +346,8 @@ pub fn handle_new_mob_state_machine(
                     },
                 )
                 .trans::<ProjectileAttackState>(
-                    Trigger::not(AttackDistance {
-                        target: game.game.player,
-                        range: proj_attack.activation_distance + 30.,
+                    Trigger::not(CachedAttackDistance {
+                        range_sq: (proj_attack.activation_distance + 30.).powi(2),
                     }),
                     FollowState {
                         target: game.game.player,
@@ -364,9 +358,8 @@ pub fn handle_new_mob_state_machine(
                 );
             if let Some(leap_attack) = leap_attack_option {
                 state_machine = state_machine.trans::<ProjectileAttackState>(
-                    AttackDistance {
-                        target: game.game.player,
-                        range: leap_attack.activation_distance,
+                    CachedAttackDistance {
+                        range_sq: leap_attack.activation_distance * leap_attack.activation_distance,
                     },
                     FollowState {
                         target: game.game.player,
