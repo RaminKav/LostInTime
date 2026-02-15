@@ -1387,7 +1387,7 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 3% chance".to_string(),
+                "has a 5% chance".to_string(),
                 "to spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),

@@ -5,7 +5,7 @@ use bevy::{
 };
 
 use crate::ScreenResolution;
-const VERSION: &str = "v0.14.1";
+const VERSION: &str = "v0.14.2";
 #[derive(Component)]
 pub struct FPSText;
 
