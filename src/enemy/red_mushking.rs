@@ -326,6 +326,7 @@ pub fn new_leap_attack(
                         ..default()
                     },
                     BossAttackPreview,
+                    DespawnTimer(Timer::from_seconds(4.0, TimerMode::Once)),
                 ))
                 .id();
             leap_attack.attack_preview_entity = Some(preview_entity);

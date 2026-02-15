@@ -273,7 +273,7 @@ pub fn toggle_item_chest_visibility(
     mut next_inv_state: ResMut<NextState<UIState>>,
     curr_ui_state: Res<State<UIState>>,
 ) {
-    if curr_ui_state.0 == UIState::ActiveSkills {
+    if curr_ui_state.0 == UIState::ActiveSkills || curr_ui_state.0 == UIState::ItemChest {
         return;
     }
     next_inv_state.set(UIState::ItemChest);

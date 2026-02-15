@@ -3,7 +3,6 @@
   templates: ["item_drop.prototype.ron"],
   schematics: {
   "survival_rogue_like::item::WorldObject": ChestBlock,
-  "survival_rogue_like::item::item_actions::ItemActions": (actions: [ItemChest]),
   "survival_rogue_like::item::object_actions::TouchTriggerObjectAction": ItemChest,
   "survival_rogue_like::item::item_actions::ConsumableItem": (),
   "survival_rogue_like::inventory::ItemStack": (

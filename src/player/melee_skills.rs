@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, Aseprite};
 use bevy_rapier2d::prelude::{Collider, KinematicCharacterController};
+use rand::Rng;
 
 use crate::{
     animations::player_sprite::PlayerAnimation,
@@ -107,8 +108,9 @@ pub fn handle_echo_after_heal(
         if delta <= 0 {
             continue;
         }
-
-        if skills.has(Heirloom::HealEcho) {
+        let rng = &mut rand::thread_rng();
+        let count = skills.get_count(Heirloom::HealEcho);
+        if count > 0 && rng.gen_bool((count as f64 * 0.25).clamp(0.0, 1.0)) {
             let mana_cost = Heirloom::HealEcho.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;

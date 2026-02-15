@@ -516,7 +516,7 @@ impl Plugin for UIPlugin {
                     spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,
                     toggle_skills_visibility,
-                    toggle_item_chest_visibility.run_if(resource_added::<ItemChestState>()),
+                    toggle_item_chest_visibility.run_if(resource_exists::<ItemChestState>()),
                     update_mana_bar,
                     spawn_tile_hover_on_cursor_move,
                 )

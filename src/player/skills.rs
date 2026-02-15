@@ -768,7 +768,7 @@ pub enum HeirloomTrait {
 impl Heirloom {
     pub fn get_mana_cost(&self) -> i32 {
         match self {
-            Heirloom::OnHitEcho => 10,
+            Heirloom::OnHitEcho => 5,
             Heirloom::ChanceToProcExtraAttack => 5,
             // Heirloom::IncreaseProjectileCount => 5,
             Heirloom::IceStaffAoE => 5,
@@ -992,8 +992,9 @@ impl Heirloom {
             ],
             Heirloom::SkillEcho => {
                 vec![
-                    "Using a skill".to_string(),
-                    "summons an echo.".to_string(),
+                    "Using a skill triggers".to_string(),
+                    "an echo that damages".to_string(),
+                    "enemies around you".to_string(),
                     format!("Costs {} mana.", Heirloom::SkillEcho.get_mana_cost()),
                 ]
             }
@@ -1237,10 +1238,10 @@ impl Heirloom {
                 format!("Costs {} mana.", Heirloom::ViralVenum.get_mana_cost()),
             ],
             Heirloom::HealEcho => vec![
-                "Healing triggers".to_string(),
-                "an echo that".to_string(),
-                "damages enemies ".to_string(),
-                "around you.".to_string(),
+                "Healing has a 25%".to_string(),
+                "chance to trigger an".to_string(),
+                "echo that damages".to_string(),
+                "enemies around you.".to_string(),
                 "+20 Health regen.".to_string(),
                 format!("Costs {} mana.", Heirloom::HealEcho.get_mana_cost()),
             ],
@@ -1716,7 +1717,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::Knockback, HeirloomRarity::Common),
                 // HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
-                HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
@@ -1755,7 +1756,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
-                HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),
                 HeirloomChoiceState::new(
                     Heirloom::CritSkillCooldownReduction,

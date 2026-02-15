@@ -61,7 +61,8 @@ impl Plugin for CollisionPlugion {
                 check_projectile_hit_player_collisions.run_if(is_not_paused),
                 check_object_trigger_collisions
                     .run_if(is_not_paused)
-                    .after(CustomFlush),
+                    .after(CustomFlush)
+                    .before(check_item_drop_collisions),
             )
                 .in_set(OnUpdate(GameState::Main)),
         )

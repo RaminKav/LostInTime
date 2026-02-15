@@ -52,8 +52,6 @@ pub enum ItemAction {
     Essence,
     DungeonKey,
     GrantSkillPoint(u8),
-    ItemChest,
-    HeirloomChest,
     BeaconPortal,
     BeaconDungeonEntrance,
     BeaconBossShrine,
@@ -274,12 +272,6 @@ impl ItemActions {
                     sp.count += *amount;
 
                     item_action_param.use_item_event.send(UseItemEvent(obj));
-                }
-                ItemAction::ItemChest => {
-                    commands.insert_resource(ItemChestState::new_item_chest());
-                }
-                ItemAction::HeirloomChest => {
-                    commands.insert_resource(ItemChestState::new_heirloom_chest());
                 }
                 ItemAction::BeaconPortal => {
                     if let Some(e) = item_action_param.beacon_guidance.portal.take() {
