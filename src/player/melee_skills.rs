@@ -26,6 +26,7 @@ use crate::{
     GameParam, HitEvent,
 };
 
+use super::combat_heirlooms::TriggerSummonsEvent;
 use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoE.aseprite");
 
@@ -100,6 +101,7 @@ pub fn handle_echo_after_heal(
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
+    mut trigger_summons_events: EventWriter<TriggerSummonsEvent>,
 ) {
     for (e, changed_health, prev_health, skills, attack, projectile_size, mut current_mana) in
         changed_health.iter_mut()
@@ -122,6 +124,11 @@ pub fn handle_echo_after_heal(
                     projectile_size.get_multiplier(),
                 );
             }
+        }
+        // HealSummons: 20% chance to trigger all summons once (Ant Farm, Stone Orbit)
+        let count = skills.get_count(Heirloom::HealSummons);
+        if count > 0 && rng.gen_bool((0.2 * count as f64).clamp(0.0, 1.0)) {
+            trigger_summons_events.send(TriggerSummonsEvent(e));
         }
     }
 }

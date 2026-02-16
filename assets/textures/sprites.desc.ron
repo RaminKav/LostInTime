@@ -1211,6 +1211,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        HealSummons: WorldObjectData(
+            texture_pos: (8., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         FullStomach: WorldObjectData(
             texture_pos: (11., 19.),
             size: (16., 16.),

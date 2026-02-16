@@ -14,8 +14,9 @@ use combat_heirlooms::{
     handle_dodge_crit_next_hit_reset, handle_mana_charge_damage, handle_mana_charge_damage_reset,
     handle_mana_orb_attack, handle_mana_orb_drops, handle_mana_regen_lightning,
     handle_mana_regen_poison, handle_max_hp_hunt, handle_reaper_soul_spawns,
-    handle_skill_mana_regen, tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants,
-    update_reaper_souls, update_stone_tooth,
+    handle_skill_mana_regen, handle_trigger_summons_on_heal, tick_dodge_crit_buff,
+    tick_stand_still_state, update_ant_farm_ants, update_reaper_souls, update_stone_tooth,
+    TriggerSummonsEvent,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
@@ -149,7 +150,8 @@ impl Plugin for PlayerPlugin {
                 app.add_event::<MovePlayerEvent>()
                     .add_event::<ModifyCurencyEvent>()
                     .add_event::<ActiveSkillUsedEvent>()
-                    .add_event::<ParrySuccessEvent>();
+                    .add_event::<ParrySuccessEvent>()
+                    .add_event::<TriggerSummonsEvent>();
             })
             .add_system(spawn_player.in_schedule(OnExit(GameState::MainMenu)))
             .add_systems(
@@ -283,9 +285,12 @@ impl Plugin for PlayerPlugin {
             )
             .add_systems((handle_modify_currency,))
             .add_systems(
-                (handle_echo_after_heal
-                    .after(handle_modify_health_event)
-                    .before(handle_add_damage_numbers_after_hit),)
+                (
+                    handle_echo_after_heal
+                        .after(handle_modify_health_event)
+                        .before(handle_add_damage_numbers_after_hit),
+                    handle_trigger_summons_on_heal.after(handle_echo_after_heal),
+                )
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(

@@ -12,7 +12,7 @@ use crate::{
     },
     audio::{AudioSoundEffect, SoundSpawner},
     combat::{
-        status_effects::{Burning, StatusEffect, StatusEffectEvent},
+        status_effects::{Burning, Frail, StatusEffect, StatusEffectEvent},
         EnemyDeathEvent, HitEvent, ObjBreakEvent,
     },
     custom_commands::CommandsExt,
@@ -30,13 +30,17 @@ use crate::{
     GameParam,
 };
 
-const ANT_FARM_COOLDOWN: f32 = 4.0;
+const ANT_FARM_COOLDOWN: f32 = 2.2;
 const ANT_SPEED: f32 = 180.0;
 const ANT_CONTACT_DISTANCE: f32 = 8.0;
-const ANT_LIFETIME: f32 = 6.0;
+const ANT_LIFETIME: f32 = 4.0;
 const ANT_CHAIN_DELAY: f32 = 0.25;
 
-const STONE_TOOTH_PERIOD: f32 = 1.5;
+/// Time for one full orbit (rotation speed).
+const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.5;
+/// Delay between spawning the next batch: orbit (1.5s) + extra delay (~3s).
+const STONE_TOOTH_SPAWN_INTERVAL: f32 = 4.5;
+const STONE_TOOTH_ROCK_LIFETIME: f32 = 1.5;
 const STONE_TOOTH_RADIUS: f32 = 28.0;
 const STONE_CONTACT_DISTANCE: f32 = 20.0;
 
@@ -87,8 +91,19 @@ pub struct StoneToothState {
 pub struct OrbitingStone {
     pub owner: Entity,
     pub base_angle: f32,
+    /// If true, rock is visible and can deal damage. Always true for pierce rocks; lifespan controls despawn.
     pub active: bool,
 }
+
+/// Tracks lifetime and which enemies this rock has already hit (pierce: hit each once).
+#[derive(Component)]
+pub struct StoneToothRockLifetime {
+    pub lifetime: Timer,
+    pub hit_entities: HashSet<Entity>,
+}
+
+/// Fired when healing triggers "all summons once" (e.g. HealSummons heirloom).
+pub struct TriggerSummonsEvent(pub Entity);
 
 #[derive(Component, Default)]
 pub struct ReaperState;
@@ -161,24 +176,17 @@ fn pick_target(
     best
 }
 
-fn calculate_percent_damage(
+/// Summon damage = player damage (same calculation as skills: attack, crit, bonuses, frail, etc).
+/// Returns (damage, was_crit, was_overcrit).
+fn calculate_summon_damage(
     commands: &mut Commands,
     game: &GameParam,
     target: Entity,
-    max_health: i32,
-    is_boss: bool,
-    percent: f32,
-) -> i32 {
-    // if is_boss {
-    //     let (damage, _, _) =
-    //         game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
-    //     i32::max(1, damage as i32)
-    // } else {
-    //     ((max_health as f32) * percent).ceil().max(1.0) as i32
-    // }
-    let (damage, _, _) =
-        game.calculate_player_damage(commands, target, 0, Some(percent), 0, None, 0);
-    i32::max(1, damage as i32)
+    frail_stacks: u8,
+) -> (i32, bool, bool) {
+    let (damage, was_crit, was_overcrit) =
+        game.calculate_player_damage(commands, target, 0, None, 0, None, frail_stacks);
+    (i32::max(1, damage as i32), was_crit, was_overcrit)
 }
 
 fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<TextureAtlasSprite> {
@@ -187,6 +195,115 @@ fn get_world_object_sprite(graphics: &Graphics, object: WorldObject) -> Option<T
         .as_ref()
         .and_then(|map| map.get(&object))
         .cloned()
+}
+
+// ----- Summon helpers: shared spawn logic for timer-based and on-heal triggers -----
+
+/// Spawns up to `count` Ant Farm ants. Deducts mana per ant if `mana_value` is `Some`.
+/// Returns the number actually spawned.
+pub fn spawn_ant_farm_ants(
+    commands: &mut Commands,
+    texture_atlas: &Handle<TextureAtlas>,
+    graphics: &Graphics,
+    player_pos: Vec3,
+    count: usize,
+    mana_value: &mut Option<&mut i32>,
+    mana_cost_per: i32,
+) -> usize {
+    let mut rng = rand::thread_rng();
+    let mut spawned = 0;
+    for i in 0..count {
+        if let Some(mana) = mana_value.as_mut() {
+            let current = **mana;
+            if current < mana_cost_per {
+                break;
+            }
+            **mana = current - mana_cost_per;
+        }
+        let angle = rng.gen_range(0.0..TAU);
+        let distance = rng.gen_range(0.0..6.0);
+        let offset = Vec2::from_angle(angle) * distance;
+        let mut sprite = graphics.get_heirloom_icon(Heirloom::AntFarm);
+        sprite.custom_size = Some(Vec2::splat(12.0));
+        commands.spawn((
+            SpriteSheetBundle {
+                texture_atlas: texture_atlas.clone(),
+                sprite,
+                transform: Transform::from_translation(
+                    player_pos + Vec3::new(offset.x, offset.y, 0.2),
+                ),
+                ..default()
+            },
+            AntFarmAnt {
+                target: None,
+                damage_fraction: 2.0,
+                speed: ANT_SPEED,
+                lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
+                spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
+            },
+            YSort(-0.2),
+            Name::new("AntFarmAnt"),
+        ));
+        spawned += 1;
+    }
+    spawned
+}
+
+/// Spawns up to `count` Stone Tooth rocks (orbit, pierce, 2s lifespan). Deducts mana per rock if `mana_value` is `Some`.
+/// Returns the number actually spawned.
+pub fn spawn_stone_tooth_rocks(
+    commands: &mut Commands,
+    texture_atlas: &Handle<TextureAtlas>,
+    graphics: &Graphics,
+    player_e: Entity,
+    player_pos: Vec3,
+    count: usize,
+    mana_value: &mut Option<&mut i32>,
+    mana_cost_per: i32,
+) -> usize {
+    let mut spawned = 0;
+    for index in 0..count {
+        if let Some(mana) = mana_value.as_mut() {
+            let current = **mana;
+            if current < mana_cost_per {
+                break;
+            }
+            **mana = current - mana_cost_per;
+        }
+        let base_angle = if count > 0 {
+            TAU * index as f32 / count as f32
+        } else {
+            0.0
+        };
+        let offset = Vec2::from_angle(base_angle) * STONE_TOOTH_RADIUS;
+        let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
+        if sprite.custom_size.is_none() {
+            sprite.custom_size = Some(Vec2::splat(16.0));
+        }
+        let transform =
+            Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
+        commands.spawn((
+            SpriteSheetBundle {
+                texture_atlas: texture_atlas.clone(),
+                sprite,
+                transform,
+                ..default()
+            },
+            OrbitingStone {
+                owner: player_e,
+                base_angle,
+                active: true,
+            },
+            StoneToothRockLifetime {
+                lifetime: Timer::from_seconds(STONE_TOOTH_ROCK_LIFETIME, TimerMode::Once),
+                hit_entities: HashSet::new(),
+            },
+            YSort(-0.1),
+            Name::new("StoneToothRock"),
+        ));
+        spawned += 1;
+    }
+    spawned
 }
 
 pub fn handle_ant_farm_state(
@@ -239,43 +356,17 @@ pub fn handle_ant_farm_state(
         return;
     };
 
-    let mut rng = rand::thread_rng();
     let count_usize = count_i32.max(0) as usize;
-    for i in 0..count_usize {
-        let mana_cost = Heirloom::AntFarm.get_mana_cost();
-        if curr_mana.0 >= mana_cost {
-            curr_mana.0 -= mana_cost;
-        } else {
-            break;
-        }
-        let angle = rng.gen_range(0.0..TAU);
-        let distance = rng.gen_range(0.0..6.0);
-        let offset = Vec2::from_angle(angle) * distance;
-
-        let mut sprite = graphics.get_heirloom_icon(Heirloom::AntFarm);
-        sprite.custom_size = Some(Vec2::splat(12.0));
-
-        let transform =
-            Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.2));
-
-        commands.spawn((
-            SpriteSheetBundle {
-                texture_atlas: texture_atlas.clone(),
-                sprite,
-                transform,
-                ..default()
-            },
-            AntFarmAnt {
-                target: None,
-                damage_fraction: 2.0,
-                speed: ANT_SPEED,
-                lifetime: Timer::from_seconds(ANT_LIFETIME, TimerMode::Once),
-                spawn_delay: Timer::from_seconds(i as f32 * ANT_CHAIN_DELAY, TimerMode::Once),
-            },
-            YSort(-0.2),
-            Name::new("AntFarmAnt"),
-        ));
-    }
+    let mut mana_opt = Some(&mut curr_mana.0);
+    spawn_ant_farm_ants(
+        &mut commands,
+        texture_atlas,
+        &graphics,
+        player_pos,
+        count_usize,
+        &mut mana_opt,
+        Heirloom::AntFarm.get_mana_cost(),
+    );
 }
 
 pub fn update_ant_farm_ants(
@@ -283,6 +374,7 @@ pub fn update_ant_farm_ants(
     time: Res<Time>,
     mut ants: Query<(Entity, &mut Transform, &mut AntFarmAnt)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
+    frail_query: Query<&Frail>,
     mut hit_events: EventWriter<HitEvent>,
     game: GameParam,
 ) {
@@ -333,14 +425,12 @@ pub fn update_ant_farm_ants(
         transform.translation += (direction * step).extend(0.0);
 
         if transform.translation.truncate().distance(snapshot.position) <= ANT_CONTACT_DISTANCE {
-            let damage = calculate_percent_damage(
-                &mut commands,
-                &game,
-                snapshot.entity,
-                snapshot.max_health,
-                snapshot.kind.is_boss(),
-                ant.damage_fraction,
-            );
+            let frail_stacks = frail_query
+                .get(snapshot.entity)
+                .map(|f| f.num_stacks)
+                .unwrap_or(0);
+            let (damage, was_crit, was_overcrit) =
+                calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
             hit_events.send(HitEvent {
                 hit_entity: snapshot.entity,
                 damage,
@@ -349,8 +439,8 @@ pub fn update_ant_farm_ants(
                 hit_with_projectile: None,
                 hit_by_mob: None,
                 hit_by_pet: None,
-                was_crit: false,
-                was_overcrit: false,
+                was_crit,
+                was_overcrit,
                 ignore_tool: true,
                 from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
             });
@@ -372,8 +462,14 @@ pub fn update_stone_tooth(
         ),
         With<Player>,
     >,
-    mut stones: Query<(Entity, &mut OrbitingStone, &mut Transform, &mut Visibility)>,
+    mut stones: Query<(
+        Entity,
+        &OrbitingStone,
+        &mut Transform,
+        Option<&mut StoneToothRockLifetime>,
+    )>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
+    frail_query: Query<&Frail>,
     mut hit_events: EventWriter<HitEvent>,
     graphics: Res<Graphics>,
     game: GameParam,
@@ -386,22 +482,20 @@ pub fn update_stone_tooth(
 
     let stacks = skills.get_count(Heirloom::StoneTooth);
     let player_pos = player_txfm.translation();
+    let player_xy = player_pos.truncate();
     let had_state = state_option.is_some();
 
-    let mut elapsed = 0.0;
-    let mut respawn_stones = false;
+    let mut should_spawn_stones = false;
 
     if stacks > 0 {
         if let Some(state) = state_option.as_mut() {
             state.elapsed += time.delta_seconds();
-            if state.elapsed >= STONE_TOOTH_PERIOD {
-                state.elapsed %= STONE_TOOTH_PERIOD;
-                respawn_stones = true;
+            if state.elapsed >= STONE_TOOTH_SPAWN_INTERVAL {
+                state.elapsed %= STONE_TOOTH_SPAWN_INTERVAL;
+                should_spawn_stones = true;
             }
-            elapsed = state.elapsed;
         } else {
-            respawn_stones = true;
-            elapsed = 0.0;
+            should_spawn_stones = true;
         }
     }
 
@@ -412,7 +506,7 @@ pub fn update_stone_tooth(
     }
 
     if stacks <= 0 {
-        for (entity, stone, _, _) in stones.iter_mut() {
+        for (entity, stone, _, _) in stones.iter() {
             if stone.owner == player_e {
                 commands.entity(entity).despawn_recursive();
             }
@@ -426,109 +520,44 @@ pub fn update_stone_tooth(
 
     let mob_snapshots = gather_live_mobs(&mobs);
 
-    let mut owned_entities: Vec<Entity> = {
-        let mut owned = Vec::new();
-        for (entity, stone, _, _) in stones.iter_mut() {
-            if stone.owner == player_e {
-                owned.push(entity);
-            }
+    // Tick lifetime, despawn expired rocks, update position and hit (pierce, hit each enemy once)
+    let mut to_despawn = Vec::new();
+    for (entity, stone, mut transform, lifetime_option) in stones.iter_mut() {
+        if stone.owner != player_e {
+            continue;
         }
-        owned
-    };
-
-    if owned_entities.len() < stacks as usize {
-        for index in owned_entities.len()..stacks as usize {
-            let mana_cost = Heirloom::StoneTooth.get_mana_cost();
-            if curr_mana.0 >= mana_cost {
-                curr_mana.0 -= mana_cost;
-            } else {
-                break;
-            }
-            let base_angle = TAU * index as f32 / stacks as f32;
-            let offset = Vec2::from_angle(base_angle) * STONE_TOOTH_RADIUS;
-            let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
-            if sprite.custom_size.is_none() {
-                sprite.custom_size = Some(Vec2::splat(16.0));
-            }
-
-            let transform =
-                Transform::from_translation(player_pos + Vec3::new(offset.x, offset.y, 0.25));
-
-            let entity = commands
-                .spawn((
-                    SpriteSheetBundle {
-                        texture_atlas: texture_atlas.clone(),
-                        sprite,
-                        transform,
-                        ..default()
-                    },
-                    OrbitingStone {
-                        owner: player_e,
-                        base_angle,
-                        active: true,
-                    },
-                    YSort(-0.1),
-                    Name::new("StoneToothRock"),
-                ))
-                .id();
-            owned_entities.push(entity);
-        }
-    } else if owned_entities.len() > stacks as usize {
-        while owned_entities.len() > stacks as usize {
-            if let Some(entity) = owned_entities.pop() {
-                commands.entity(entity).despawn_recursive();
-            }
-        }
-    }
-
-    let rotation_progress = (elapsed / STONE_TOOTH_PERIOD).clamp(0.0, 1.0);
-    let player_xy = player_pos.truncate();
-
-    for (index, entity) in owned_entities.iter().enumerate() {
-        let Ok((_entity_id, mut stone, mut transform, mut visibility)) = stones.get_mut(*entity)
-        else {
+        let Some(mut lifetime) = lifetime_option else {
             continue;
         };
-
-        let base_angle = TAU * index as f32 / stacks as f32;
-        stone.base_angle = base_angle;
-
-        if respawn_stones && stone.active == false {
-            let mana_cost = Heirloom::StoneTooth.get_mana_cost();
-            if curr_mana.0 >= mana_cost {
-                curr_mana.0 -= mana_cost;
-                stone.active = true;
-                *visibility = Visibility::Inherited;
-            }
+        lifetime.lifetime.tick(time.delta());
+        if lifetime.lifetime.finished() {
+            to_despawn.push(entity);
+            continue;
         }
-
-        let angle = base_angle + rotation_progress * TAU;
+        let elapsed = lifetime.lifetime.elapsed().as_secs_f32();
+        let angle = stone.base_angle + (elapsed / STONE_TOOTH_ORBIT_PERIOD) * TAU;
         let offset = Vec2::from_angle(angle) * STONE_TOOTH_RADIUS;
         transform.translation = Vec3::new(
             player_xy.x + offset.x,
             player_xy.y + offset.y,
             player_pos.z + 0.25,
         );
-
-        if !stone.active {
-            continue;
-        }
-
         let stone_pos = transform.translation.truncate();
         for snapshot in mob_snapshots.iter() {
+            if lifetime.hit_entities.contains(&snapshot.entity) {
+                continue;
+            }
             let mob_pos = snapshot.position;
             if mob_pos.distance_squared(stone_pos)
                 <= STONE_CONTACT_DISTANCE * STONE_CONTACT_DISTANCE
             {
                 let dir = (mob_pos - stone_pos).normalize_or_zero();
-                let damage = calculate_percent_damage(
-                    &mut commands,
-                    &game,
-                    snapshot.entity,
-                    snapshot.max_health,
-                    snapshot.kind.is_boss(),
-                    2.5,
-                );
+                let frail_stacks = frail_query
+                    .get(snapshot.entity)
+                    .map(|f| f.num_stacks)
+                    .unwrap_or(0);
+                let (damage, was_crit, was_overcrit) =
+                    calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
                 hit_events.send(HitEvent {
                     hit_entity: snapshot.entity,
                     damage,
@@ -537,15 +566,80 @@ pub fn update_stone_tooth(
                     hit_with_projectile: None,
                     hit_by_mob: None,
                     hit_by_pet: None,
-                    was_crit: false,
-                    was_overcrit: false,
+                    was_crit,
+                    was_overcrit,
                     ignore_tool: true,
-                    from_heirloom_effect: true, // Stone heirloom effect shouldn't chain
+                    from_heirloom_effect: true,
                 });
-                stone.active = false;
-                *visibility = Visibility::Hidden;
-                break;
+                lifetime.hit_entities.insert(snapshot.entity);
             }
+        }
+    }
+    for entity in to_despawn {
+        commands.entity(entity).despawn_recursive();
+    }
+
+    // On timer: spawn a batch of rocks (orbit 1.5s, then ~3s delay before next batch)
+    if !should_spawn_stones {
+        return;
+    }
+    let mut mana_opt = Some(&mut curr_mana.0);
+    spawn_stone_tooth_rocks(
+        &mut commands,
+        texture_atlas,
+        &graphics,
+        player_e,
+        player_pos,
+        stacks as usize,
+        &mut mana_opt,
+        Heirloom::StoneTooth.get_mana_cost(),
+    );
+}
+
+pub fn handle_trigger_summons_on_heal(
+    mut commands: Commands,
+    mut trigger_events: EventReader<TriggerSummonsEvent>,
+    mut player_query: Query<
+        (Entity, &GlobalTransform, &PlayerSkills, &mut CurrentMana),
+        With<Player>,
+    >,
+    graphics: Res<Graphics>,
+) {
+    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+        return;
+    };
+    for event in trigger_events.iter() {
+        let Ok((player_e, player_txfm, skills, mut curr_mana)) = player_query.get_mut(event.0)
+        else {
+            continue;
+        };
+        let player_pos = player_txfm.translation();
+
+        // Spawn one of each summon type if player has at least one of the required heirloom
+        if skills.get_count(Heirloom::AntFarm) >= 1 {
+            let mut mana_opt = Some(&mut curr_mana.0);
+            spawn_ant_farm_ants(
+                &mut commands,
+                texture_atlas,
+                &graphics,
+                player_pos,
+                1,
+                &mut mana_opt,
+                0,
+            );
+        }
+        if skills.get_count(Heirloom::StoneTooth) >= 1 {
+            let mut mana_opt = Some(&mut curr_mana.0);
+            spawn_stone_tooth_rocks(
+                &mut commands,
+                texture_atlas,
+                &graphics,
+                player_e,
+                player_pos,
+                1,
+                &mut mana_opt,
+                0,
+            );
         }
     }
 }
@@ -697,6 +791,7 @@ pub fn update_reaper_souls(
     time: Res<Time>,
     mut souls: Query<(Entity, &mut Transform, &mut ReaperSoul)>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
+    frail_query: Query<&Frail>,
     mut hit_events: EventWriter<HitEvent>,
     game: GameParam,
 ) {
@@ -745,14 +840,12 @@ pub fn update_reaper_souls(
         transform.translation += (steering * step).extend(0.0);
 
         if transform.translation.truncate().distance(snapshot.position) <= REAPER_CONTACT_DISTANCE {
-            let damage = calculate_percent_damage(
-                &mut commands,
-                &game,
-                snapshot.entity,
-                snapshot.max_health,
-                snapshot.kind.is_boss(),
-                soul.damage_fraction,
-            );
+            let frail_stacks = frail_query
+                .get(snapshot.entity)
+                .map(|f| f.num_stacks)
+                .unwrap_or(0);
+            let (damage, was_crit, was_overcrit) =
+                calculate_summon_damage(&mut commands, &game, snapshot.entity, frail_stacks);
             hit_events.send(HitEvent {
                 hit_entity: snapshot.entity,
                 damage,
@@ -761,8 +854,8 @@ pub fn update_reaper_souls(
                 hit_with_projectile: None,
                 hit_by_mob: None,
                 hit_by_pet: None,
-                was_crit: false,
-                was_overcrit: false,
+                was_crit,
+                was_overcrit,
                 ignore_tool: true,
                 from_heirloom_effect: true, // Reaper heirloom effect shouldn't chain
             });

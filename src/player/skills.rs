@@ -683,6 +683,7 @@ pub enum Heirloom {
 
     //melee
     HealEcho,                   // chalice
+    HealSummons,                // 20% on heal trigger all summons once (ant farm, stone orbit)
     FullStomach,                //jam
     SkillEcho,                  // placeholder
     ReinforcedArmor,            // Scale
@@ -805,7 +806,7 @@ impl Heirloom {
             Heirloom::FrailStacks => "Skull".to_string(),
             Heirloom::SlowStacks => "Sea Shell".to_string(),
             Heirloom::AntFarm => "Ant Farm".to_string(),
-            Heirloom::StoneTooth => "Stone Tooth".to_string(),
+            Heirloom::StoneTooth => "Boulder".to_string(),
             Heirloom::Reaper => "Reaper".to_string(),
             Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
             Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
@@ -854,6 +855,7 @@ impl Heirloom {
             Heirloom::PoisonStrength => "Green Ring".to_string(),
             Heirloom::ViralVenum => "Poison Sceptor".to_string(),
             Heirloom::HealEcho => "Chalice".to_string(),
+            Heirloom::HealSummons => "Summoning Wand".to_string(),
             Heirloom::FullStomach => "Jam".to_string(),
 
             Heirloom::ReinforcedArmor => "Scales".to_string(),
@@ -1244,6 +1246,12 @@ impl Heirloom {
                 "+20 Health regen.".to_string(),
                 format!("Costs {} mana.", Heirloom::HealEcho.get_mana_cost()),
             ],
+            Heirloom::HealSummons => vec![
+                "Healing has a 20%".to_string(),
+                "chance to trigger".to_string(),
+                "all summons once".to_string(),
+                "(Ant Farm, Boulder".to_string(),
+            ],
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
                 "at a slower rate.".to_string(),
@@ -1346,6 +1354,7 @@ impl Heirloom {
                 "shoots a mana orb".to_string(),
                 "at an enemy. It does".to_string(),
                 "damage equal to the".to_string(),
+                "amount regenerated.".to_string(),
             ],
             Heirloom::ItemPickupRadius => vec![
                 "Increases item".to_string(),
@@ -1716,6 +1725,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::HealSummons, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
