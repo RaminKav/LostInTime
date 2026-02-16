@@ -13,15 +13,33 @@ use crate::{
     InputBinding, ScreenResolution,
 };
 
-/// Resource to track cheat settings
+/// Resource to track cheat settings and accessibility options
 #[derive(Resource, Default, Debug, Clone)]
 pub struct CheatSettings {
     /// When true, all classes and pets are selectable regardless of unlock status
     pub bypass_class_unlocks: bool,
+    /// When true, boss damage warning indicators use a color-blind friendly color (dark purple) instead of red
+    pub color_blind_mode: bool,
+}
+
+/// Identifies which option an options-screen checkbox controls
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum OptionsCheckboxType {
+    UnlockAllClasses,
+    ColorBlindMode,
 }
 
 #[derive(Component)]
-pub struct CheatCheckbox;
+pub struct OptionsCheckbox(pub OptionsCheckboxType);
+
+/// Color for boss damage warning indicators. When color blind mode is on, uses dark purple (visible on green/blue backgrounds).
+pub fn boss_warning_indicator_color(settings: &CheatSettings) -> Color {
+    if settings.color_blind_mode {
+        Color::rgba(0.35, 0.0, 0.5, 0.3)
+    } else {
+        Color::rgba(1.0, 0.0, 0.0, 0.3)
+    }
+}
 
 #[derive(Component)]
 pub struct OptionsUI;
@@ -370,14 +388,28 @@ pub fn setup_options_ui(
 
     // Unlock all classes checkbox
     let checkbox_y = 50.;
-    spawn_cheat_checkbox(
+    spawn_options_checkbox(
         &mut commands,
         &graphics,
         &asset_server,
         "Unlock All Classes:",
         Vec3::new(right_side_x, checkbox_y, 11.),
         Vec3::new(right_side_x + 100.5, checkbox_y + 0.5, 11.),
+        OptionsCheckboxType::UnlockAllClasses,
         cheat_settings.bypass_class_unlocks,
+    );
+
+    // Color blind mode checkbox (boss damage indicators use dark purple instead of red)
+    let color_blind_checkbox_y = checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Color Blind Mode:",
+        Vec3::new(right_side_x, color_blind_checkbox_y, 11.),
+        Vec3::new(right_side_x + 100.5, color_blind_checkbox_y + 0.5, 11.),
+        OptionsCheckboxType::ColorBlindMode,
+        cheat_settings.color_blind_mode,
     );
 
     //TODO: fix restart button
@@ -535,13 +567,14 @@ fn spawn_keybind_row(
         .set_parent(button_entity);
 }
 
-fn spawn_cheat_checkbox(
+fn spawn_options_checkbox(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
     label: &str,
     label_pos: Vec3,
     checkbox_pos: Vec3,
+    option_type: OptionsCheckboxType,
     is_checked: bool,
 ) {
     // Label
@@ -563,19 +596,18 @@ fn spawn_cheat_checkbox(
         RenderLayers::from_layers(&[3]),
         OptionsUI,
         UIState::Options,
-        Name::new("Cheat Checkbox Label"),
+        Name::new("Options Checkbox Label"),
     ));
 
     // Checkbox - uses same assets as achievements UI (CheckBox / CheckBoxSelected)
-    // Use the current state to determine initial texture
-    let checkbox_type = if is_checked {
+    let ui_checkbox = if is_checked {
         UIElement::CheckBoxSelected
     } else {
         UIElement::CheckBox
     };
     commands
         .spawn(SpriteBundle {
-            texture: graphics.get_ui_element_texture(checkbox_type).clone(),
+            texture: graphics.get_ui_element_texture(ui_checkbox).clone(),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(9., 9.)),
                 ..Default::default()
@@ -587,16 +619,19 @@ fn spawn_cheat_checkbox(
         .insert(RenderLayers::from_layers(&[3]))
         .insert(UIState::Options)
         .insert(OptionsUI)
-        .insert(CheatCheckbox)
+        .insert(OptionsCheckbox(option_type))
         .insert(Interactable::default())
-        .insert(Name::new("Cheat Checkbox"));
+        .insert(Name::new("Options Checkbox"));
 }
 
 pub fn handle_cheat_checkbox_click(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
-    mut checkboxes: Query<(Entity, &mut Interactable, &mut Handle<Image>), With<CheatCheckbox>>,
+    mut checkboxes: Query<
+        (Entity, &OptionsCheckbox, &mut Interactable, &mut Handle<Image>),
+        With<OptionsCheckbox>,
+    >,
     mut cheat_settings: ResMut<CheatSettings>,
     mut commands: Commands,
     graphics: Res<Graphics>,
@@ -604,7 +639,7 @@ pub fn handle_cheat_checkbox_click(
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_released = mouse_input.just_released(MouseButton::Left);
 
-    for (entity, mut interactable, mut texture) in checkboxes.iter_mut() {
+    for (entity, options_checkbox, mut interactable, mut texture) in checkboxes.iter_mut() {
         match hit_test {
             Some(hit) if hit.0 == entity => match interactable.current() {
                 Interaction::None => {
@@ -612,21 +647,37 @@ pub fn handle_cheat_checkbox_click(
                 }
                 Interaction::Hovering => {
                     if left_mouse_released {
-                        // Toggle the cheat setting
-                        cheat_settings.bypass_class_unlocks = !cheat_settings.bypass_class_unlocks;
-
-                        // Update checkbox texture
-                        let checkbox_type = if cheat_settings.bypass_class_unlocks {
-                            UIElement::CheckBoxSelected
-                        } else {
-                            UIElement::CheckBox
+                        let (setting, checkbox_ui) = match options_checkbox.0 {
+                            OptionsCheckboxType::UnlockAllClasses => {
+                                cheat_settings.bypass_class_unlocks =
+                                    !cheat_settings.bypass_class_unlocks;
+                                (
+                                    cheat_settings.bypass_class_unlocks,
+                                    if cheat_settings.bypass_class_unlocks {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
+                            OptionsCheckboxType::ColorBlindMode => {
+                                cheat_settings.color_blind_mode =
+                                    !cheat_settings.color_blind_mode;
+                                (
+                                    cheat_settings.color_blind_mode,
+                                    if cheat_settings.color_blind_mode {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
-                        *texture = graphics.get_ui_element_texture(checkbox_type).clone();
-
+                        *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                         info!(
-                            "Cheat: bypass_class_unlocks = {}",
-                            cheat_settings.bypass_class_unlocks
+                            "Options: {:?} = {}",
+                            options_checkbox.0, setting
                         );
                     }
                 }
@@ -644,22 +695,30 @@ pub fn handle_cheat_checkbox_click(
 
 pub fn update_cheat_checkbox_visual(
     cheat_settings: Res<CheatSettings>,
-    mut checkboxes: Query<&mut Handle<Image>, With<CheatCheckbox>>,
+    mut checkboxes: Query<(&OptionsCheckbox, &mut Handle<Image>)>,
     graphics: Res<Graphics>,
 ) {
     if !cheat_settings.is_changed() {
         return;
     }
 
-    let checkbox_type = if cheat_settings.bypass_class_unlocks {
-        UIElement::CheckBoxSelected
-    } else {
-        UIElement::CheckBox
-    };
-
-    for mut texture in checkboxes.iter_mut() {
-        *texture = graphics
-            .get_ui_element_texture(checkbox_type.clone())
-            .clone();
+    for (options_checkbox, mut texture) in checkboxes.iter_mut() {
+        let checkbox_ui = match options_checkbox.0 {
+            OptionsCheckboxType::UnlockAllClasses => {
+                if cheat_settings.bypass_class_unlocks {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::ColorBlindMode => {
+                if cheat_settings.color_blind_mode {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+        };
+        *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
     }
 }

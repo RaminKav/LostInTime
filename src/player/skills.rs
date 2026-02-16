@@ -480,8 +480,7 @@ impl ActiveSkill {
                         cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
                             .tick(Duration::from_secs(99))
                             .clone(),
-                        timer: Timer::from_seconds(0.17, TimerMode::Once),
-                        second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
+                        timer: Timer::from_seconds(0.06, TimerMode::Once),
                     });
             }
             ActiveSkill::Parry => {
@@ -1450,8 +1449,7 @@ impl Heirloom {
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
                     cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
-                    timer: Timer::from_seconds(0.27, TimerMode::Once),
-                    second_explosion_timer: Timer::from_seconds(0.4, TimerMode::Once),
+                    timer: Timer::from_seconds(0.06, TimerMode::Once),
                 });
             }
             &Heirloom::DaggerCombo => {

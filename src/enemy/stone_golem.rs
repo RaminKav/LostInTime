@@ -6,6 +6,7 @@ use crate::{
     item::projectile::Projectile,
     player::Player,
     status_effects::Slow,
+    ui::{boss_warning_indicator_color, CheatSettings},
     GameParam, PLAYER_MOVE_SPEED,
 };
 use bevy::prelude::*;
@@ -213,6 +214,7 @@ pub fn handle_spike_attack(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     time: Res<Time>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     for (entity, mut state, mut anim) in attacks.iter_mut() {
         // Set animation to Attack
@@ -244,8 +246,9 @@ pub fn handle_spike_attack(
                         mesh: meshes
                             .add(bevy::prelude::shape::Circle::new(16.).into())
                             .into(),
-                        material: materials
-                            .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))),
+                        material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
+                            &cheat_settings,
+                        ))),
                         transform: Transform {
                             translation: target_pos.extend(990.0),
                             ..default()

@@ -30,7 +30,6 @@ pub struct TeleportState {
     pub just_teleported_timer: Timer,
     pub cooldown_timer: Timer,
     pub timer: Timer,
-    pub second_explosion_timer: Timer,
 }
 
 #[derive(Component)]
@@ -99,8 +98,6 @@ pub fn handle_teleport(
         // Cooldown is managed by handle_active_skill_event, so we don't set it here
         teleport_state.timer.reset();
         teleport_state.timer.tick(time.delta());
-        teleport_state.second_explosion_timer.reset();
-        teleport_state.second_explosion_timer.tick(time.delta());
     }
 
     let player_pos = player_pos.translation();
@@ -150,16 +147,12 @@ pub fn handle_teleport(
     if teleport_state.timer.percent() != 0. {
         teleport_state.timer.tick(time.delta());
     }
-    if teleport_state.second_explosion_timer.percent() != 0. {
-        teleport_state.second_explosion_timer.tick(time.delta());
-    }
 
     if teleport_state.timer.percent() != 0. && teleport_state.timer.percent() < 1. {
         move_direction.0 = Vec2::ZERO;
         kcc.translation = Some(Vec2::new(move_direction.0.x, move_direction.0.y));
     } else if aseprite.just_finished() {
         teleport_state.timer.reset();
-        teleport_state.second_explosion_timer.reset();
     }
 }
 

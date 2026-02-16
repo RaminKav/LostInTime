@@ -33,6 +33,7 @@ use crate::{
     item::projectile::{Projectile, RangedAttackEvent},
     player::Player,
     proto::proto_param::ProtoParam,
+    ui::{boss_warning_indicator_color, CheatSettings},
     PLAYER_MOVE_SPEED,
 };
 use bevy::prelude::shape;
@@ -249,6 +250,7 @@ pub fn new_leap_attack(
     mut game_camera: Query<Entity, With<TextureCamera>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    cheat_settings: Res<CheatSettings>,
 ) {
     for (
         entity,
@@ -318,7 +320,7 @@ pub fn new_leap_attack(
                             )
                             .into(),
                         material: materials
-                            .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))), // Red with low alpha
+                            .add(ColorMaterial::from(boss_warning_indicator_color(&cheat_settings))),
                         transform: Transform {
                             translation: target_translation + Vec3::new(0., -15., 100.),
                             ..default()
@@ -876,6 +878,7 @@ pub fn handle_aoe_attack(
     time: Res<Time>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
     game: GameParam,
+    cheat_settings: Res<CheatSettings>,
 ) {
     for (boss_entity, mut aoe_state, attack, _boss_txfm) in aoe_attacks.iter_mut() {
         // If target position not set yet, capture player position when attack starts
@@ -911,7 +914,6 @@ pub fn handle_aoe_attack(
         if let Some(target_pos) = aoe_state.target_position {
             // Spawn first preview if it doesn't exist
             if aoe_state.preview_entity.is_none() {
-                // Use MaterialMesh2dBundle with Circle shape for a circular preview
                 let preview_entity = commands
                     .spawn((
                         MaterialMesh2dBundle {
@@ -925,7 +927,9 @@ pub fn handle_aoe_attack(
                                 )
                                 .into(),
                             material: materials
-                                .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))), // Red with low alpha
+                                .add(ColorMaterial::from(boss_warning_indicator_color(
+                                    &cheat_settings,
+                                ))),
                             transform: Transform {
                                 translation: target_pos.extend(990.0), // High Z to be visible
                                 ..default()
@@ -955,7 +959,9 @@ pub fn handle_aoe_attack(
                                     )
                                     .into(),
                                 material: materials
-                                    .add(ColorMaterial::from(Color::rgba(1.0, 0.0, 0.0, 0.3))), // Red with low alpha
+                                    .add(ColorMaterial::from(boss_warning_indicator_color(
+                                        &cheat_settings,
+                                    ))),
                                 transform: Transform {
                                     translation: second_pos.extend(990.0), // High Z to be visible
                                     ..default()
