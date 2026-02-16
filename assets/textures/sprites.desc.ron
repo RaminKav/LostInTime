@@ -435,6 +435,16 @@
             size: (16., 16.),
             anchor: None,
         ),
+        Blueberries: WorldObjectData(
+            texture_pos: (12., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        BlueberryBush: WorldObjectData(
+            texture_pos: (13., 13.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Boulder: WorldObjectData(
             texture_pos: (4., 9.),
             size: (32., 32.),

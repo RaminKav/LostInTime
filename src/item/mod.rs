@@ -385,6 +385,8 @@ pub enum WorldObject {
     BrownMushroom,
     RedMushroomBlock,
     BrownMushroomBlock,
+    BlueberryBush,
+    Blueberries,
     BerryBush,
     Berries,
     MetalBar,
