@@ -1,10 +1,10 @@
 use bevy::prelude::*;
-use bevy::render::view::RenderLayers;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
+use crate::attributes::BonusDamage;
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::Player;
 
@@ -211,13 +211,15 @@ pub fn handle_burning_ticks(
     mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut hit_event: EventWriter<HitEvent>,
-    player_skills: Query<&PlayerSkills, With<Player>>,
+    player_skills: Query<(&PlayerSkills, &BonusDamage), With<Player>>,
 ) {
     // Get poison strength bonus from player skills (if player exists)
-    let poison_strength_bonus = player_skills
-        .get_single()
-        .map(|skills| skills.get_count(Heirloom::PoisonStrength) as i32)
-        .unwrap_or(0);
+    let Ok((skills, bonus_damage)) = player_skills.get_single() else {
+        return;
+    };
+
+    let poison_strength_bonus =
+        1. + skills.get_count(Heirloom::PoisonStrength) as f32 + bonus_damage.0 as f32 / 100.;
 
     for (e, mut burning) in burning.iter_mut() {
         burning.duration_timer.tick(time.delta());
@@ -226,7 +228,7 @@ pub fn handle_burning_ticks(
             if burning.tick_timer.just_finished() {
                 // Damage = stacks + bonus damage from PoisonStrength heirloom
                 let base_damage = burning.stacks as i32;
-                let damage = base_damage + poison_strength_bonus;
+                let damage = base_damage + poison_strength_bonus.round() as i32;
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e,

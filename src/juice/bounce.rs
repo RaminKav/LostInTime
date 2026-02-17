@@ -59,5 +59,7 @@ pub fn bounce_on_hit(
             t.scale.y = 1.0;
             commands.entity(e).remove::<BounceOnHit>();
         }
+        t.scale.x = t.scale.x.clamp(1., 2.5);
+        t.scale.y = t.scale.y.clamp(1., 2.5);
     }
 }

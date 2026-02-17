@@ -244,9 +244,9 @@ pub fn handle_on_hit_upgrades(
             events.p3().send(ModifyHealthEvent(-1));
         }
         if let Some(proj) = &hit.hit_with_projectile {
-            if proj.is_skill_projectile() {
-                continue;
-            }
+            // if proj.is_skill_projectile() {
+            //     continue;
+            // }
         }
 
         if skills.has(Heirloom::IncreaseProjectileCount)

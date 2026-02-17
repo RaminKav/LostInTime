@@ -569,7 +569,7 @@ pub fn update_stone_tooth(
                     was_crit,
                     was_overcrit,
                     ignore_tool: true,
-                    from_heirloom_effect: true,
+                    from_heirloom_effect: false,
                 });
                 lifetime.hit_entities.insert(snapshot.entity);
             }
@@ -1499,10 +1499,10 @@ impl ManaRegenPoisonTracker {
         self.accumulated_mana += amount as f32;
 
         // Calculate how many times we've reached 100
-        let poison_count = (self.accumulated_mana / 100.0).floor() as u32;
+        let poison_count = (self.accumulated_mana / 75.0).floor() as u32;
 
         // Keep the remainder
-        self.accumulated_mana = self.accumulated_mana % 100.0;
+        self.accumulated_mana = self.accumulated_mana % 75.0;
 
         poison_count
     }

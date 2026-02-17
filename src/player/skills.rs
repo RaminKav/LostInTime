@@ -1411,7 +1411,7 @@ impl Heirloom {
             ],
             Heirloom::ManaRegenPoison => vec![
                 "Every time you".to_string(),
-                "regenerate 100 mana,".to_string(),
+                "regenerate 75 mana,".to_string(),
                 "apply a poison".to_string(),
                 "stack to all".to_string(),
                 "enemies.".to_string(),
