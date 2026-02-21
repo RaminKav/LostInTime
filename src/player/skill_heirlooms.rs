@@ -171,82 +171,63 @@ pub fn handle_active_skill_event(
             };
             if let Some(active) = slot_skill {
                 info!("USED SLOT {}: {:?}", ev.slot, active.active_skill);
-                let blessing_cd_mult = blessings.get_skill_cooldown_increase();
                 if blessings.has_blessing(Blessing::SkillAttackSpeed) {
                     commands
                         .entity(player_e)
                         .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
                 }
+                // ev.cooldown is already the effective cooldown (base * heirloom reduction * blessing mult)
+                let skill_cd = ev.cooldown;
+
                 // For slots 1-4 (class skills), handle charge consumption from their independent trackers
                 let mut should_start_cooldown = true;
                 if ev.slot == 0 {
-                    // Use slot 1's independent tracker
                     if let Ok(mut tracker) = skill_states.slot1_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown
-                                        * skills.skill_cooldown_multiplier()
-                                        * blessing_cd_mult,
-                                    TimerMode::Once,
-                                );
+                                tracker.0.cooldown_timer =
+                                    Timer::from_seconds(skill_cd, TimerMode::Once);
                             }
                         }
                     }
                 } else if ev.slot == 1 {
-                    // Use slot 2's independent tracker
                     if let Ok(mut tracker) = skill_states.slot2_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown
-                                        * skills.skill_cooldown_multiplier()
-                                        * blessing_cd_mult,
-                                    TimerMode::Once,
-                                );
+                                tracker.0.cooldown_timer =
+                                    Timer::from_seconds(skill_cd, TimerMode::Once);
                             }
                         }
                     }
                 } else if ev.slot == 2 {
-                    // Use slot 3's independent tracker
                     if let Ok(mut tracker) = skill_states.slot3_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown
-                                        * skills.skill_cooldown_multiplier()
-                                        * blessing_cd_mult,
-                                    TimerMode::Once,
-                                );
+                                tracker.0.cooldown_timer =
+                                    Timer::from_seconds(skill_cd, TimerMode::Once);
                             }
                         }
                     }
                 } else if ev.slot == 3 {
-                    // Use slot 4's independent tracker
                     if let Ok(mut tracker) = skill_states.slot4_trackers.get_mut(player_e) {
                         if tracker.0.current_charges > 0 {
                             tracker.0.current_charges -= 1;
                             should_start_cooldown = tracker.0.current_charges == 0;
                             if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer = Timer::from_seconds(
-                                    tracker.0.base_cooldown
-                                        * skills.skill_cooldown_multiplier()
-                                        * blessing_cd_mult,
-                                    TimerMode::Once,
-                                );
+                                tracker.0.cooldown_timer =
+                                    Timer::from_seconds(skill_cd, TimerMode::Once);
                             }
                         }
                     }
                 }
                 let power_mult =
                     skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
-                let skill_cd = ev.cooldown * skills.skill_cooldown_multiplier() * blessing_cd_mult;
                 match active.active_skill {
                     ActiveSkill::Stealth => {
                         // respect cooldown if state exists and we're not using a charge
@@ -1523,48 +1504,57 @@ pub fn regenerate_skill_charges(
     mut slot2_trackers: Query<&mut Slot2ChargeTracker, With<Player>>,
     mut slot3_trackers: Query<&mut Slot3ChargeTracker, With<Player>>,
     mut slot4_trackers: Query<&mut Slot4ChargeTracker, With<Player>>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    blessings_q: Query<&crate::blessings::OwnedBlessings, With<Player>>,
 ) {
-    // Regenerate charges for slot 1
+    let cd_mult = player_skills
+        .get_single()
+        .ok()
+        .map(|s| s.skill_cooldown_multiplier())
+        .unwrap_or(1.0);
+    let blessing_mult = blessings_q
+        .get_single()
+        .ok()
+        .map(|b| b.get_skill_cooldown_increase())
+        .unwrap_or(1.0);
+
     for mut tracker in slot1_trackers.iter_mut() {
         if tracker.0.current_charges < tracker.0.max_charges {
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                tracker.0.cooldown_timer =
-                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
     }
-    // Regenerate charges for slot 2
     for mut tracker in slot2_trackers.iter_mut() {
         if tracker.0.current_charges < tracker.0.max_charges {
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                tracker.0.cooldown_timer =
-                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
     }
-    // Regenerate charges for slot 3
     for mut tracker in slot3_trackers.iter_mut() {
         if tracker.0.current_charges < tracker.0.max_charges {
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                tracker.0.cooldown_timer =
-                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
     }
-    // Regenerate charges for slot 4
     for mut tracker in slot4_trackers.iter_mut() {
         if tracker.0.current_charges < tracker.0.max_charges {
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                tracker.0.cooldown_timer =
-                    Timer::from_seconds(tracker.0.base_cooldown, TimerMode::Once);
+                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
     }

@@ -2073,9 +2073,17 @@ impl PlayerSkills {
         self.heirlooms.iter().any(|h| h.heirloom == heirloom)
     }
     pub fn skill_cooldown_multiplier(&self) -> f32 {
-        // 10% multiplicative reduction per item: 0.9^count
         let count = self.get_count(Heirloom::SkillCDReduction).max(0) as i32;
         (0..count).fold(1.0f32, |acc, _| acc * 0.85)
+    }
+    pub fn effective_skill_cooldown(
+        &self,
+        skill: &ActiveSkill,
+        blessings: &crate::blessings::OwnedBlessings,
+    ) -> f32 {
+        skill.get_base_cooldown()
+            * self.skill_cooldown_multiplier()
+            * blessings.get_skill_cooldown_increase()
     }
     pub fn skill_extra_charges(&self) -> u32 {
         self.get_count(Heirloom::SkillChargeIncrease).max(0) as u32

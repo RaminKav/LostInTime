@@ -251,6 +251,7 @@ pub fn player_move_inputs(
             &PlayerSkills,
             Option<&BounceEffect>,
             Option<&MovementSpeedBuff>,
+            &OwnedBlessings,
         ),
         (
             With<Player>,
@@ -285,6 +286,7 @@ pub fn player_move_inputs(
         skills,
         bounce_option,
         movement_speed_buff,
+        blessings,
     ) = player_query.single_mut();
     if bounce_option.is_some() {
         return;
@@ -324,17 +326,15 @@ pub fn player_move_inputs(
             && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
         {
             player.is_dashing = true;
-            // Apply cooldown reduction multiplier to Roll
-            let base_cooldown = ActiveSkill::Roll.get_base_cooldown();
-            let adjusted_cooldown = base_cooldown * skills.skill_cooldown_multiplier();
+            let effective_cd =
+                skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
             active_skill_event.send(ActiveSkillUsedEvent {
                 slot: roll_slot,
-                cooldown: adjusted_cooldown,
+                cooldown: effective_cd,
             });
-            // Update the timer duration to match the adjusted cooldown
             player
                 .player_dash_cooldown
-                .set_duration(Duration::from_secs_f32(adjusted_cooldown));
+                .set_duration(Duration::from_secs_f32(effective_cd));
             player.player_dash_cooldown.reset();
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
         }
@@ -465,6 +465,7 @@ pub fn dispatch_active_skill_events(
     slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
     slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
     slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    blessings_q: Query<&OwnedBlessings, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
 ) {
     let Ok((
@@ -499,8 +500,9 @@ pub fn dispatch_active_skill_events(
     else {
         return;
     };
-    // Only handle ONE key per frame to prevent multiple slots from triggering
-    // Check all keys first, then handle only the highest priority one
+    let Ok(blessings) = blessings_q.get_single() else {
+        return;
+    };
 
     let slot_4_pressed = keybinds.check_skill_input(4, &key_input, &mouse_input);
     let slot_3_pressed = keybinds.check_skill_input(3, &key_input, &mouse_input);
@@ -524,55 +526,38 @@ pub fn dispatch_active_skill_events(
 
     if let Some(slot) = pressed_slot {
         if let Some(skill) = skills.get_active_skill_in_slot(slot) {
-            // Determine base cooldown from skill definition
-            // And gate dispatch by cooldown state if present
-            let base_cooldown = skill.get_base_cooldown();
+            let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
 
-            // For slots 1-4 (class skills), check charges first
-            if slot == 1 {
-                if let Ok(tracker) = slot1_trackers.get_single() {
-                    // If we have charges available, allow activation regardless of cooldown
-                    if tracker.0.current_charges > 0 {
-                        ev.send(ActiveSkillUsedEvent {
-                            slot,
-                            cooldown: base_cooldown,
-                        });
-                        return; // Exit early after handling this key press
-                    }
-                }
-            } else if slot == 2 {
-                if let Ok(tracker) = slot2_trackers.get_single() {
-                    // If we have charges available, allow activation regardless of cooldown
-                    if tracker.0.current_charges > 0 {
-                        ev.send(ActiveSkillUsedEvent {
-                            slot,
-                            cooldown: base_cooldown,
-                        });
-                        return; // Exit early after handling this key press
-                    }
-                }
-            } else if slot == 3 {
-                if let Ok(tracker) = slot3_trackers.get_single() {
-                    // If we have charges available, allow activation regardless of cooldown
-                    if tracker.0.current_charges > 0 {
-                        ev.send(ActiveSkillUsedEvent {
-                            slot,
-                            cooldown: base_cooldown,
-                        });
-                        return; // Exit early after handling this key press
-                    }
-                }
-            } else if slot == 4 {
-                if let Ok(tracker) = slot4_trackers.get_single() {
-                    // If we have charges available, allow activation regardless of cooldown
-                    if tracker.0.current_charges > 0 {
-                        ev.send(ActiveSkillUsedEvent {
-                            slot,
-                            cooldown: base_cooldown,
-                        });
-                        return; // Exit early after handling this key press
-                    }
-                }
+            // Check charges — slot index maps to tracker: 0→Slot1, 1→Slot2, 2→Slot3, 3→Slot4
+            let has_charge = match slot {
+                0 => slot1_trackers
+                    .get_single()
+                    .ok()
+                    .map(|t| t.0.current_charges > 0)
+                    .unwrap_or(false),
+                1 => slot2_trackers
+                    .get_single()
+                    .ok()
+                    .map(|t| t.0.current_charges > 0)
+                    .unwrap_or(false),
+                2 => slot3_trackers
+                    .get_single()
+                    .ok()
+                    .map(|t| t.0.current_charges > 0)
+                    .unwrap_or(false),
+                3 => slot4_trackers
+                    .get_single()
+                    .ok()
+                    .map(|t| t.0.current_charges > 0)
+                    .unwrap_or(false),
+                _ => false,
+            };
+            if has_charge {
+                ev.send(ActiveSkillUsedEvent {
+                    slot,
+                    cooldown: effective_cd,
+                });
+                return;
             }
 
             // Otherwise, check cooldown as normal
@@ -643,10 +628,10 @@ pub fn dispatch_active_skill_events(
                     .map(|s| !s.cooldown_timer.finished())
                     .unwrap_or(false),
             };
-            if !on_cooldown && base_cooldown > 0.0 {
+            if !on_cooldown && effective_cd > 0.0 {
                 ev.send(ActiveSkillUsedEvent {
                     slot,
-                    cooldown: base_cooldown,
+                    cooldown: effective_cd,
                 });
             }
         }

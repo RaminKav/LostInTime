@@ -20,7 +20,7 @@ use crate::{
     client::GameOverEvent,
     colors::{
         BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, ORANGE, RED,
-        SHIELD_BLUE, WHITE, YELLOW,
+        SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -1861,12 +1861,12 @@ pub fn handle_update_player_skills(
                             TextStyle {
                                 font: asset_server.load("fonts/slkscr.ttf"),
                                 font_size: 8.4,
-                                color: WHITE,
+                                color: TOOLTIP_BLACK,
                             },
                         ),
                         text_anchor: Anchor::Center,
                         transform: Transform {
-                            translation: Vec3::new(1., -6., 4.), // Center bottom of icon
+                            translation: Vec3::new(1., -10., 4.), // Center bottom of icon
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
