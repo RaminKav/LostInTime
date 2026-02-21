@@ -16,6 +16,7 @@ use crate::{
     chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
     colors::{overwrite_alpha, WHITE},
+    combat::damage_tracker::DamageTracker,
     container::ContainerRegistry,
     datafiles,
     item::CraftingTracker,
@@ -716,4 +717,5 @@ pub fn cleanup_run_state(
     commands.insert_resource(CraftingTracker::default());
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
+    commands.insert_resource(DamageTracker::default());
 }

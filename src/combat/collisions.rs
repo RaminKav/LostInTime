@@ -156,7 +156,7 @@ fn check_melee_hit_collisions(
                 was_overcrit,
                 hit_by_mob: None,
                 ignore_tool: false,
-                from_heirloom_effect: false,
+                from_heirloom_effect: None,
             });
 
             commands.spawn(SoundSpawner::new(AudioSoundEffect::DefaultEnemyHit, 0.2));
@@ -291,8 +291,11 @@ fn check_projectile_hit_mob_collisions(
             };
 
             // Check if this projectile is from a heirloom on-kill effect
-            let is_from_heirloom =
-                vec![Projectile::IceExplosionAOE, Projectile::Echo].contains(proj);
+            let heirloom_source = match proj {
+                Projectile::IceExplosionAOE => Some(Heirloom::FrozenAoE),
+                Projectile::Echo => Some(Heirloom::OnHitEcho),
+                _ => None,
+            };
 
             // ThornsLifesteal: Apply lifesteal for ThornsProjectile hits
             let is_thorns_projectile = *proj == Projectile::ThornsProjectile;
@@ -318,7 +321,7 @@ fn check_projectile_hit_mob_collisions(
                 hit_by_mob: None,
                 was_crit,
                 was_overcrit,
-                from_heirloom_effect: is_from_heirloom,
+                from_heirloom_effect: heirloom_source,
             });
             if nearby_mobs.get(*e2).is_ok() {
                 if proj.clone() == Projectile::IceShard
@@ -477,7 +480,10 @@ fn check_multihit_projectile_ongoing_collisions(
                     let delta = enemy_pos - proj_pos;
                     let knockback_dir = delta.normalize_or_zero();
 
-                    let is_from_heirloom = matches!(proj, Projectile::IceExplosionAOE);
+                    let heirloom_source = match proj {
+                        Projectile::IceExplosionAOE => Some(Heirloom::FrozenAoE),
+                        _ => None,
+                    };
 
                     hit_event.send(HitEvent {
                         hit_by_pet: pet_check.get(collider_entity).ok(),
@@ -490,7 +496,7 @@ fn check_multihit_projectile_ongoing_collisions(
                         hit_by_mob: None,
                         was_crit,
                         was_overcrit,
-                        from_heirloom_effect: is_from_heirloom,
+                        from_heirloom_effect: heirloom_source,
                     });
 
                     if nearby_mobs.get(target_e).is_ok() {
@@ -652,7 +658,7 @@ fn check_projectile_hit_player_collisions(
                     hit_by_mob: Some(enemy_proj.mob.clone()),
                     was_crit: false,
                     was_overcrit: false,
-                    from_heirloom_effect: false,
+                    from_heirloom_effect: None,
                 });
             }
             if state.despawn_on_hit {
@@ -954,7 +960,7 @@ fn check_mob_to_player_collisions(
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
                     was_overcrit: false,
-                    from_heirloom_effect: false,
+                    from_heirloom_effect: None,
                 });
             }
             // hit back to attacker if we have Thorns
@@ -983,7 +989,7 @@ fn check_mob_to_player_collisions(
                     hit_by_mob: None,
                     was_crit: false,
                     was_overcrit: false,
-                    from_heirloom_effect: false,
+                    from_heirloom_effect: None,
                 });
             }
 
@@ -1062,7 +1068,7 @@ fn check_boss_to_objects_collisions(
                     hit_by_mob: Some(is_attacking.unwrap().0.clone()),
                     was_crit: false,
                     was_overcrit: false,
-                    from_heirloom_effect: false,
+                    from_heirloom_effect: None,
                 });
             }
         }

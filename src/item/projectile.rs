@@ -92,6 +92,7 @@ pub enum Projectile {
     FuryKunai,
     SpearGravity,
     SpinAttack,
+    IceFloor,
 }
 
 impl Projectile {

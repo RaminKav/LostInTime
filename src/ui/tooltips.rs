@@ -10,7 +10,10 @@ use crate::{
         PickupRange, ProjectileSize, RawItemBaseAttributes, RawItemBonusAttributes, SkillPower,
         Speed, Thorns, XpRateBonus,
     },
-    colors::{BLACK, GREY, LIGHT_GREY, LIGHT_RED, ORANGE, TOOLTIP_BLACK, TOOLTIP_BLACK_2},
+    colors::{
+        BLACK, GREY, LIGHT_GREY, LIGHT_RED, ORANGE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE, YELLOW_2,
+    },
+    combat::damage_tracker::{DamageTracker, spawn_damage_tracker_ui},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -994,6 +997,51 @@ pub fn handle_spawn_inv_player_stats(
             commands.entity(tooltip).add_child(text_att_value);
         }
         commands.entity(parent_e).add_child(tooltip);
+    }
+}
+
+#[derive(Component)]
+pub struct DamageTrackerPanel;
+
+pub fn spawn_damage_tracker_in_inventory(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut updates: EventReader<ShowInvPlayerStatsEvent>,
+    inv: Query<Entity, With<InventoryUI>>,
+    ui_state: Res<State<UIState>>,
+    old_panels: Query<Entity, With<DamageTrackerPanel>>,
+    tracker: Res<DamageTracker>,
+) {
+    if ui_state.0 != UIState::Inventory {
+        return;
+    }
+    if updates.iter().next().is_none() {
+        return;
+    }
+
+    for e in old_panels.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    let Ok(inv_entity) = inv.get_single() else {
+        return;
+    };
+
+    let panel_x = (INVENTORY_UI_SIZE.x + 82. + 2.) / 2.;
+    let start_y = INVENTORY_UI_SIZE.y / 2. - 8.;
+
+    if let Some(entities) = spawn_damage_tracker_ui(
+        &mut commands,
+        &asset_server,
+        &tracker,
+        Transform::from_translation(Vec3::new(panel_x, start_y, 2.)),
+        1.0,
+        80.0,
+    ) {
+        if let Some(panel) = entities.first() {
+            commands.entity(*panel).insert(DamageTrackerPanel);
+            commands.entity(inv_entity).add_child(*panel);
+        }
     }
 }
 

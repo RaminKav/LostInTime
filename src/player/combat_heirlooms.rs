@@ -442,7 +442,7 @@ pub fn update_ant_farm_ants(
                 was_crit,
                 was_overcrit,
                 ignore_tool: true,
-                from_heirloom_effect: true, // Ant heirloom effect shouldn't chain
+                from_heirloom_effect: Some(Heirloom::AntFarm),
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -569,7 +569,7 @@ pub fn update_stone_tooth(
                     was_crit,
                     was_overcrit,
                     ignore_tool: true,
-                    from_heirloom_effect: false,
+                    from_heirloom_effect: Some(Heirloom::StoneTooth),
                 });
                 lifetime.hit_entities.insert(snapshot.entity);
             }
@@ -857,7 +857,7 @@ pub fn update_reaper_souls(
                 was_crit,
                 was_overcrit,
                 ignore_tool: true,
-                from_heirloom_effect: true, // Reaper heirloom effect shouldn't chain
+                from_heirloom_effect: Some(Heirloom::Reaper),
             });
             commands.entity(entity).despawn_recursive();
         }
@@ -1393,7 +1393,7 @@ pub fn handle_mana_charge_damage_reset(
     for event in hit_events.iter() {
         // Player weapon hits have hit_with_melee or hit_with_projectile set
         // Exclude heirloom effect damage (like echoes) to only consume on weapon attacks
-        if !event.from_heirloom_effect
+        if event.from_heirloom_effect.is_none()
             && (event.hit_with_melee.is_some() || event.hit_with_projectile.is_some())
             && event.hit_by_mob.is_none()
         {

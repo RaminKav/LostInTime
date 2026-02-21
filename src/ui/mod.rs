@@ -303,6 +303,10 @@ impl Plugin for UIPlugin {
                     .run_if(in_state(GameState::Main)),
             )
             .add_system(handle_spawn_inv_player_stats.in_base_set(CoreSet::PostUpdate))
+            .add_system(
+                spawn_damage_tracker_in_inventory
+                    .in_base_set(CoreSet::PostUpdate),
+            )
             .add_systems(
                 (
                     setup_unlocks_ui

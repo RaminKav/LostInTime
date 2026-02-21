@@ -7,6 +7,7 @@ pub mod status_effects;
 use status_effects::*;
 
 pub mod collisions;
+pub mod damage_tracker;
 pub mod pickup_radius;
 use crate::attributes::{add_item_glows, CurrentMana, Lifesteal, ProjectileSize};
 
@@ -71,8 +72,8 @@ pub struct HitEvent {
     /// True if crit chance was >100% and second crit roll succeeded (overcrit does 30% extra damage)
     pub was_overcrit: bool,
     pub ignore_tool: bool,
-    /// If true, this damage came from a heirloom effect (explosion, etc) and should not trigger other heirloom effects
-    pub from_heirloom_effect: bool,
+    /// If Some, this damage came from a specific heirloom effect and should not trigger other heirloom effects
+    pub from_heirloom_effect: Option<Heirloom>,
 }
 
 #[derive(Component, Debug, Clone)]
@@ -130,6 +131,7 @@ impl Plugin for CombatPlugin {
                 .add_event::<LifestealEvent>();
         })
         .add_event::<ObjBreakEvent>()
+        .init_resource::<damage_tracker::DamageTracker>()
         .add_plugin(CollisionPlugion)
         .add_systems(
             (
@@ -163,6 +165,7 @@ impl Plugin for CombatPlugin {
                 handle_enemy_death.after(handle_hits),
                 handle_lifesteal,
                 handle_thorns_on_damage_tracker.after(handle_hits),
+                damage_tracker::track_player_damage,
             )
                 .in_set(OnUpdate(GameState::Main)),
         )
@@ -627,7 +630,7 @@ pub fn handle_hits(
                     commands.entity(e).insert(MarkedForDeath);
 
                     // Mark if killed by heirloom effect to prevent chaining
-                    if hit.from_heirloom_effect {
+                    if hit.from_heirloom_effect.is_some() {
                         commands.entity(e).insert(KilledByHeirloomEffect);
                     }
 

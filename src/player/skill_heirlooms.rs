@@ -2141,7 +2141,7 @@ pub fn handle_crit_heal(
         // Treat crit and overcrit the same
         if (!hit.was_crit && !hit.was_overcrit)
             || hit.hit_by_mob.is_some()
-            || hit.from_heirloom_effect
+            || hit.from_heirloom_effect.is_some()
         {
             continue;
         }

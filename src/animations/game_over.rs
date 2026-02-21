@@ -7,7 +7,8 @@ use rand::seq::IteratorRandom;
 use crate::{
     assets::Graphics,
     client::{leaderboard::LastSubmittedScore, GameData, GameOverEvent},
-    colors::{overwrite_alpha, WHITE},
+    colors::{overwrite_alpha, GREY, WHITE, YELLOW_2},
+    combat::damage_tracker::{format_damage, DamageTracker, spawn_damage_tracker_ui},
     datafiles,
     inputs::FacingDirection,
     inventory::ItemStack,
@@ -61,6 +62,7 @@ pub fn handle_game_over_fadeout(
     resolution: Res<ScreenResolution>,
     run_score: Res<RunScore>,
     last_submitted: Res<LastSubmittedScore>,
+    damage_tracker: Res<DamageTracker>,
     // Cleanup queries
     boss_health_bars: Query<
         Entity,
@@ -174,6 +176,23 @@ pub fn handle_game_over_fadeout(
             RenderLayers::from_layers(&[3]),
             Name::new("Score Text"),
         ));
+
+        // DAMAGE BREAKDOWN - left side list with category headers
+        let panel_x = -resolution.game_width / 2. + 10.;
+        let start_y = resolution.game_height / 2. - 60.;
+        
+        if let Some(entities) = spawn_damage_tracker_ui(
+            &mut commands,
+            &asset_server,
+            &damage_tracker,
+            Transform::from_translation(Vec3::new(panel_x + 42.0, start_y, 21.0)),
+            0.0,
+            84.0,
+        ) {
+            for e in entities {
+                commands.entity(e).insert(GameOverText);
+            }
+        }
 
         // OK BUTTON - spawn like main menu buttons
         let button_entity = commands

@@ -228,7 +228,7 @@ pub fn handle_on_hit_upgrades(
     };
     for hit in hits.iter() {
         // Skip damage from heirloom effects (e.g., poison, burning)
-        if hit.from_heirloom_effect {
+        if hit.from_heirloom_effect.is_some() {
             continue;
         }
         let mut rng = rand::thread_rng();
@@ -329,7 +329,7 @@ pub fn handle_on_hit_upgrades(
                     asset_server.load::<Aseprite, _>(IceFloor::PATH),
                     AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
                     true,
-                    Projectile::IceExplosionAOE,
+                    Projectile::IceFloor,
                 );
                 commands
                     .entity(ice)

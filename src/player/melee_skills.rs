@@ -80,7 +80,7 @@ pub fn handle_second_split_attack(
             was_overcrit,
             hit_by_mob: None,
             ignore_tool: false,
-            from_heirloom_effect: false, // Split attack is a player skill, should trigger heirlooms
+                from_heirloom_effect: None,
         });
         commands.entity(e).remove::<SecondHitDelay>();
     }
@@ -404,13 +404,13 @@ pub fn handle_spear_pull_delay(
         let skill_power_mult =
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         // Spawn 20px damage hitbox at epicenter
-        let hitbox = spawn_temp_collider(
+            let hitbox = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
             0.5, // Very short duration, just for the hit
             (attack.0 as f32 * skill_power_mult * 1.85) as i32,
             Collider::ball(18.0), // 20px radius
-            Projectile::Echo,
+            Projectile::SpearGravity,
         );
         commands.entity(hitbox).insert(SpearAttack);
 
