@@ -147,8 +147,8 @@ impl Plugin for ClientPlugin {
             )
             .add_systems(
                 (
-                    save_state.run_if(resource_exists::<AnalyticsData>()),
-                    tick_save_timer,
+                    // save_state.run_if(resource_exists::<AnalyticsData>()),
+                    // tick_save_timer,
                     handle_append_run_data_after_death
                         .run_if(resource_exists::<AnalyticsData>())
                         .after(check_first_run_achievement),

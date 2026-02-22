@@ -158,7 +158,11 @@ impl RenderChunk2dStorage {
     }
 
     pub fn remove_map(&mut self, entity: Entity) {
-        self.chunks.remove(&entity.index());
+        let map_id = entity.index();
+        self.chunks.remove(&map_id);
+        self.entity_to_chunk_tile
+            .retain(|_, (tilemap_id, _, _)| *tilemap_id != map_id);
+        self.entity_to_chunk.remove(&entity);
     }
 }
 

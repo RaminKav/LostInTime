@@ -7,7 +7,6 @@ use super::wall_auto_tile::{handle_wall_break, handle_wall_placed, update_wall, 
 use super::world_helpers::tile_pos_to_world_pos;
 use super::y_sort::YSort;
 use super::{WorldGeneration, ISLAND_SIZE};
-use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{Graphics, SpriteAnchor};
 use crate::enemy::spawn_helpers::is_tile_water;
 use crate::item::{handle_break_object, object_actions::ObjectAction, PlaceItemEvent, WorldObject};
@@ -468,16 +467,14 @@ impl GenerationPlugin {
                 .insert(Name::new("Time Portal"));
             for y in 3..9 {
                 for x in 0..2 {
-                    for pos in vec![
-                        (8. * x as f32 + 4., y as f32 * 8. + 4.),
-                        (8. * x as f32 + 4., y as f32 * 8. - 4.),
-                        (8. * x as f32 + -4., y as f32 * 8. + 4.),
-                        (8. * x as f32 + -4., y as f32 * 8. + -4.),
-                    ] {
-                        let pos = Vec2::new(pos.0, pos.1);
-                        let ai_pos = world_pos_to_AIPos(pos);
-                        game.set_pos_validity_for_pathfinding(ai_pos, false);
-                        if *DEBUG_AI {
+                    if *DEBUG_AI {
+                        for pos in vec![
+                            (8. * x as f32 + 4., y as f32 * 8. + 4.),
+                            (8. * x as f32 + 4., y as f32 * 8. - 4.),
+                            (8. * x as f32 + -4., y as f32 * 8. + 4.),
+                            (8. * x as f32 + -4., y as f32 * 8. + -4.),
+                        ] {
+                            let pos = Vec2::new(pos.0, pos.1);
                             commands
                                 .spawn(MaterialMesh2dBundle {
                                     mesh: meshes

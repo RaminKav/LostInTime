@@ -5,12 +5,11 @@ use std::{
 
 use bevy::ecs::system::SystemParam;
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
-use bevy_rapier2d::prelude::Collider;
+use bevy_rapier2d::prelude::{Collider, RapierContext};
 use strum::IntoEnumIterator;
 use strum_macros::Display;
 
 use crate::{
-    ai::pathfinding::PathfindingCache,
     assets::Graphics,
     audio::UpdateBGMTrackEvent,
     chaos::ChaosTracker,
@@ -42,7 +41,11 @@ use crate::{
     DoNotDespawnOnGameOver, Game, GameState, ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
-use super::{scrapper_ui::ScrapperEvent, Interactable, UIElement};
+use super::{
+    minimap::{FogOfWarData, MinimapTileCache},
+    scrapper_ui::ScrapperEvent,
+    Interactable, UIElement,
+};
 
 #[derive(SystemParam)]
 pub struct MenuButtonExtras<'w, 's> {
@@ -718,4 +721,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
     commands.insert_resource(DamageTracker::default());
+
+    // Reset Rapier physics world to free accumulated internal arena allocations
+    commands.insert_resource(RapierContext::default());
 }

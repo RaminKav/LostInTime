@@ -6,8 +6,6 @@ use crate::ui::tips::SeenTips;
 use std::f32::consts::PI;
 use std::time::Duration;
 
-use crate::ai::pathfinding::world_pos_to_AIPos;
-
 use crate::animations::player_sprite::PlayerAnimation;
 use crate::animations::AttackEvent;
 use crate::assets::SpriteAnchor;
@@ -1025,12 +1023,8 @@ pub fn mouse_click_system(
     if mouse_button_input.pressed(MouseButton::Left) {
         if *DEBUG && mouse_button_input.just_pressed(MouseButton::Left) {
             let obj = game.get_object_from_chunk_cache(cursor_tile_pos);
-            let ai_pos = world_pos_to_AIPos(cursor_pos.world_coords.truncate());
-            let is_valid = game
-                .get_pos_validity_for_pathfinding(ai_pos)
-                .unwrap_or(true);
             info!(
-                "C: {cursor_tile_pos:?} -> {obj:?} {is_valid:?} {:?} || {ai_pos:?}",
+                "C: {cursor_tile_pos:?} -> {obj:?} {:?}",
                 cursor_pos.ui_coords,
             );
         }

@@ -149,33 +149,38 @@ fn animate_enemies(
     )>,
 ) {
     for (mut tracker, mut timer, enemy_handle, _enemy, att_option) in enemy_query.iter_mut() {
-        let enemy_material = materials.get_mut(enemy_handle);
         timer.tick(time.delta());
-        if let Some(mat) = enemy_material {
-            if timer.just_finished() {
-                tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
+
+        let frame_changed = timer.just_finished();
+        if frame_changed {
+            tracker.0 = max((tracker.0 + 1) % (tracker.1 - 1), 0);
+        }
+
+        let new_attacking = att_option.map_or(0., |attack| {
+            if attack.attack_startup_timer.finished() && !attack.attack_duration_timer.finished() {
+                1.
+            } else {
+                0.
             }
+        });
+
+        let needs_material_update = frame_changed
+            || materials
+                .get(enemy_handle)
+                .map_or(false, |m| m.is_attacking != new_attacking);
+
+        if !needs_material_update {
+            continue;
+        }
+
+        if let Some(mat) = materials.get_mut(enemy_handle) {
             mat.source_texture = Some(asset_server.load(format!(
                 "textures/slime/{}-move-{}.png",
                 "slime",
-                //enemy.to_string().to_lowercase(),
                 tracker.0
             )));
-            if let Some(attack) = att_option {
-                mat.is_attacking = if attack.attack_startup_timer.finished()
-                    && !attack.attack_duration_timer.finished()
-                {
-                    1.
-                } else {
-                    0.
-                };
-            }
+            mat.is_attacking = new_attacking;
         }
-
-        // else if let Ok(mut t) = eq_query.get_mut(*l) {
-        //     // t.translation.y = (t.translation.y + 1.) % 2.;
-        //     // t.translation.x = (t.translation.y + 1.) % 2.;
-        // }
     }
 }
 fn animate_dropped_items(

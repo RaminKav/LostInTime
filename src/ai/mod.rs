@@ -15,7 +15,6 @@ use crate::{
 
 use bevy::prelude::*;
 pub use enemy_hostile_basic::*;
-use pathfinding::{cache_ai_path_on_new_obj_spawn, spawn_new_debug_path, DebugPathResetEvent};
 use seldom_state::StateMachinePlugin;
 
 pub struct AIPlugin;
@@ -28,9 +27,7 @@ impl Plugin for AIPlugin {
                     .in_base_set(CoreSet::PreUpdate)
                     .run_if(in_state(GameState::Main)),
             )
-            .add_event::<DebugPathResetEvent>()
             .add_plugin(StateMachinePlugin)
-            .add_systems((spawn_new_debug_path,).in_set(OnUpdate(GameState::Main)))
             .add_systems(
                 (
                     follow.run_if(is_not_paused),
@@ -49,11 +46,6 @@ impl Plugin for AIPlugin {
                     idle.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
-            )
-            .add_system(
-                cache_ai_path_on_new_obj_spawn
-                    .run_if(in_state(GameState::Main))
-                    .in_base_set(CoreSet::PostUpdate),
             );
     }
 }

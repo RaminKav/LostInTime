@@ -4,7 +4,6 @@ use bevy_aseprite::{anim::AsepriteAnimation, AsepriteBundle};
 use strum::IntoEnumIterator;
 
 use crate::{
-    ai::pathfinding::PathfindingCache,
     animations::{
         enemy_sprites::spawn_attack_warning_aseprite, player_sprite::PlayerSpriteHandles,
     },
@@ -1925,7 +1924,6 @@ pub fn handle_portal_animation(
                         commands.init_resource::<ChaosTracker>();
                         commands.insert_resource(HeirloomChoiceQueue::default());
                         commands.init_resource::<ContainerRegistry>();
-                        commands.init_resource::<PathfindingCache>();
                         commands.init_resource::<CraftingTracker>();
                         commands.init_resource::<EraManager>();
 

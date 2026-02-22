@@ -1,4 +1,3 @@
-use crate::ai::pathfinding::world_pos_to_AIPos;
 use crate::assets::{SpriteAnchor, SpriteSize, WorldObjectData};
 use crate::attributes::item_abilities::ItemAbility;
 use crate::chaos::ChaosTracker;
@@ -717,6 +716,7 @@ impl WorldObject {
             WorldObject::Crate2 => true,
             WorldObject::Pebble => true,
             WorldObject::BerryBush => true,
+            WorldObject::BlueberryBush => true,
             WorldObject::DeadSapling => true,
             WorldObject::Era2BerryBush => true,
             WorldObject::Era2DeadBranch => true,
@@ -1293,21 +1293,6 @@ pub fn handle_break_object(
             update_type: AnalyticsTrigger::ObjectBroken(broken.obj),
         });
 
-        // AI Pos Cache
-        for quads in &[(-4., -4.), (-4., 4.), (4., 4.), (4., -4.)] {
-            let anchor_offset = if let Ok(anchor) = anchor.get(broken.entity) {
-                if broken.obj.is_tree() {
-                    anchor.0
-                } else {
-                    Vec2::new(0., 0.)
-                }
-            } else {
-                Vec2::new(0., 0.)
-            };
-            let offset_pos = world_pos + Vec2::new(quads.0, quads.1) - anchor_offset;
-            let ai_pos = world_pos_to_AIPos(offset_pos);
-            game.set_pos_validity_for_pathfinding(ai_pos, true);
-        }
     }
 }
 

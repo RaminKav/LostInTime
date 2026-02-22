@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle, utils::HashMap};
 use bevy_rapier2d::prelude::Collider;
 use itertools::Itertools;
@@ -8,13 +10,22 @@ use crate::{
     inventory::ItemStack,
     item::WorldObject,
     world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition},
-    GameParam, DEBUG_AI,
+    DEBUG_AI,
 };
 use pathfinding::prelude::astar;
 
 #[derive(Default, Resource)]
 pub struct PathfindingCache {
     pub tile_valid_cache: HashMap<AIPos, bool>,
+}
+
+impl PathfindingCache {
+    pub fn set_validity(&mut self, pos: AIPos, validity: bool) {
+        self.tile_valid_cache.insert(pos, validity);
+    }
+    pub fn get_validity(&self, pos: AIPos) -> Option<bool> {
+        self.tile_valid_cache.get(&pos).copied()
+    }
 }
 
 #[derive(Default, Eq, PartialEq, Hash, Clone, Reflect, FromReflect, Copy)]
@@ -54,7 +65,7 @@ pub fn cache_ai_path_on_new_obj_spawn(
         (&GlobalTransform, &SpriteAnchor, &WorldObject),
         (With<WorldObject>, Added<Collider>, Without<ItemStack>),
     >,
-    mut game: GameParam,
+    mut cache: ResMut<PathfindingCache>,
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
@@ -69,7 +80,7 @@ pub fn cache_ai_path_on_new_obj_spawn(
         for quads in &[(-4., -4.), (-4., 4.), (4., 4.), (4., -4.)] {
             let offset_pos = pos + Vec2::new(quads.0, quads.1) - anchor_offset;
             let ai_pos = world_pos_to_AIPos(offset_pos);
-            game.set_pos_validity_for_pathfinding(ai_pos, false);
+            cache.set_validity(ai_pos, false);
             if *DEBUG_AI {
                 commands
                     .spawn(MaterialMesh2dBundle {
@@ -140,7 +151,7 @@ pub fn spawn_new_debug_path(
         }
     }
 }
-pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -> Option<Vec2> {
+pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, cache: &PathfindingCache) -> Option<Vec2> {
     let target_tile: AIPos = world_pos_to_AIPos(*target);
     let start_tile: AIPos = world_pos_to_AIPos(*start);
 
@@ -148,7 +159,7 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
     if let Some(result) = astar(
         &start_tile,
         |p| {
-            get_valid_adjacent_tiles(p, &target_tile, game)
+            get_valid_adjacent_tiles(p, &target_tile, cache)
                 .iter()
                 .map(|p| (*p, 1))
                 .collect_vec()
@@ -169,9 +180,6 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
         }
         if *DEBUG_AI {
             debug!("Result len {:?} {max_iteration:?}", result.0.len());
-            // game.debug_ai_path_event.send(DebugPathResetEvent {
-            //     path: result.0.clone(),
-            // });
         }
         Some(AIPos_to_world_pos(result.0[1]))
     } else {
@@ -180,10 +188,9 @@ pub fn get_next_tile_A_star(target: &Vec2, start: &Vec2, game: &mut GameParam) -
     }
 }
 
-pub fn get_valid_adjacent_tiles(pos: &AIPos, _target: &AIPos, game: &GameParam) -> Vec<AIPos> {
+pub fn get_valid_adjacent_tiles(pos: &AIPos, _target: &AIPos, cache: &PathfindingCache) -> Vec<AIPos> {
     let mut valid_tiles = Vec::new();
     let mut valid_offsets = Vec::new();
-    // println!("  -> pos: {pos:?} {target:?}");
     for offset in &[
         (0, 1),
         (0, -1),
@@ -196,8 +203,7 @@ pub fn get_valid_adjacent_tiles(pos: &AIPos, _target: &AIPos, game: &GameParam) 
     ] {
         let neighbour_tile = get_neighbour_AIPos_tile(*pos, *offset);
 
-        //then search for tile in cache
-        if let Some(is_valid) = game.get_pos_validity_for_pathfinding(neighbour_tile) {
+        if let Some(is_valid) = cache.get_validity(neighbour_tile) {
             if is_valid {
                 valid_tiles.push(neighbour_tile);
                 valid_offsets.push(*offset);
@@ -257,7 +263,7 @@ pub fn _AIPos_to_tile_pos(pos: AIPos) -> TileMapPosition {
 
 pub fn _flood_fill(
     pos: AIPos,
-    game: &mut GameParam,
+    cache: &PathfindingCache,
     visited: &mut Vec<AIPos>,
     max_depth: i32,
     depth: i32,
@@ -280,12 +286,12 @@ pub fn _flood_fill(
         if visited.contains(&neighbour_tile) {
             continue;
         }
-        if let Some(is_valid) = game.get_pos_validity_for_pathfinding(neighbour_tile) {
+        if let Some(is_valid) = cache.get_validity(neighbour_tile) {
             if is_valid {
-                _flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
+                _flood_fill(neighbour_tile, cache, visited, max_depth, depth + 1);
             }
         } else {
-            _flood_fill(neighbour_tile, game, visited, max_depth, depth + 1);
+            _flood_fill(neighbour_tile, cache, visited, max_depth, depth + 1);
         }
     }
 }

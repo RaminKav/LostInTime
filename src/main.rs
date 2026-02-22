@@ -6,10 +6,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use ai::{
-    pathfinding::{AIPos, DebugPathResetEvent, PathfindingCache},
-    AIPlugin,
-};
+use ai::AIPlugin;
 use attributes::{
     Attack, AttributesPlugin, BonusDamage, CritChance, CritDamage, CurrentHealth, Defence, Dodge,
     Healing, HealthRegen, Lifesteal, LootRateBonus, MaxHealth, Speed, Thorns, XpRateBonus,
@@ -388,10 +385,8 @@ pub struct GameParam<'w, 's> {
     pub resolution: Res<'w, ScreenResolution>,
     pub era: ResMut<'w, EraManager>,
     pub world_generation_params: ResMut<'w, WorldGeneration>,
-    pub pathfinding_cache: ResMut<'w, PathfindingCache>,
     pub world_obj_data: ResMut<'w, WorldObjectResource>,
     pub world_obj_cache: ResMut<'w, WorldObjectCache>,
-    pub debug_ai_path_event: EventWriter<'w, DebugPathResetEvent>,
 
     //TODO: remove this to use Bevy_Save
     pub player_query:
@@ -501,14 +496,6 @@ impl<'w, 's> GameParam<'w, 's> {
 
     pub fn add_object_to_chunk_cache(&mut self, pos: TileMapPosition, obj: WorldObject) {
         self.world_obj_cache.objects.insert(pos, obj);
-    }
-    pub fn set_pos_validity_for_pathfinding(&mut self, pos: AIPos, validity: bool) {
-        self.pathfinding_cache
-            .tile_valid_cache
-            .insert(pos, validity);
-    }
-    pub fn get_pos_validity_for_pathfinding(&self, pos: AIPos) -> Option<bool> {
-        self.pathfinding_cache.tile_valid_cache.get(&pos).copied()
     }
     pub fn remove_object_from_chunk_cache(&mut self, pos: TileMapPosition) {
         self.world_obj_cache.objects.remove(&pos);

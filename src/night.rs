@@ -342,7 +342,6 @@ pub fn handle_infinite_mode_started(
     mut events: EventReader<InfiniteModeStartedEvent>,
     mut infinite_mode: ResMut<InfiniteMode>,
     world_obj_cache: Res<crate::world::generation::WorldObjectCache>,
-    pathfinding_cache: Res<crate::ai::pathfinding::PathfindingCache>,
     chunk_query: Query<&crate::world::chunk::Chunk>,
 ) {
     for _ in events.iter() {
@@ -359,7 +358,6 @@ pub fn handle_infinite_mode_started(
                 infinite_mode.get_tint_alpha()
             );
 
-            // Debug: Log cache sizes to identify performance issues
             info!(
                 "DEBUG: WorldObjectCache sizes - objects: {}, unique_objs: {}, dungeon_objects: {}, generated_chunks: {}, tile_data_cache: {}",
                 world_obj_cache.objects.len(),
@@ -367,10 +365,6 @@ pub fn handle_infinite_mode_started(
                 world_obj_cache.dungeon_objects.len(),
                 world_obj_cache.generated_chunks.len(),
                 world_obj_cache.tile_data_cache.len()
-            );
-            info!(
-                "DEBUG: PathfindingCache size - tile_valid_cache: {}",
-                pathfinding_cache.tile_valid_cache.len()
             );
             info!("DEBUG: Active chunks count: {}", chunk_query.iter().count());
         }
