@@ -53,6 +53,7 @@ use dungeon_shrine::{
 };
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
 use heirloom_shrine::{add_heirloom_shrine_visuals_on_spawn, handle_heirloom_shrine_completion};
+use microwave_shrine::{add_microwave_shrine_visuals_on_spawn, handle_microwave_shrine_completion, handle_microwave_shrine_esc};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
 
@@ -66,6 +67,7 @@ pub mod combat_shrine;
 pub mod dungeon_shrine;
 pub mod gamble_shrine;
 pub mod heirloom_shrine;
+pub mod microwave_shrine;
 pub mod potion_buffs;
 use boss_shrine::*;
 pub mod item_upgrades;
@@ -517,6 +519,8 @@ pub enum WorldObject {
     BlacksmithMerchantDone,
     HeirloomShrine,
     HeirloomShrineDone,
+    MicrowaveShrine,
+    MicrowaveShrineDone,
     ChaosTotem,
     ChaosTotemDone,
     Coin,
@@ -903,6 +907,8 @@ impl WorldObject {
             WorldObject::ActiveSkillShrineDone => GREY,
             WorldObject::HeirloomShrine => SHRINE_GREEN,
             WorldObject::HeirloomShrineDone => GREY,
+            WorldObject::MicrowaveShrine => SHRINE_GREEN,
+            WorldObject::MicrowaveShrineDone => GREY,
             WorldObject::BlacksmithMerchant => SHRINE_GREEN,
             WorldObject::BlacksmithMerchantDone => GREY,
             WorldObject::BossShrine => RED,
@@ -1031,6 +1037,9 @@ impl Plugin for ItemsPlugin {
                     handle_dungeon_shrine_activation,
                     add_heirloom_shrine_visuals_on_spawn,
                     handle_heirloom_shrine_completion,
+                    add_microwave_shrine_visuals_on_spawn,
+                    handle_microwave_shrine_completion,
+                    handle_microwave_shrine_esc,
                     tick_potion_buffs.run_if(is_not_paused),
                     add_attack_speed_buff_to_bonus,
                 )

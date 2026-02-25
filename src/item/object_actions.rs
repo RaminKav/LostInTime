@@ -4,6 +4,7 @@ use super::dungeon_shrine::{DungeonShrine, DungeonShrineType};
 use super::gamble_shrine::{GambleShrine, GambleShrineAnim};
 use super::heirloom_shrine::HeirloomShrineState;
 use super::item_actions::ItemActionParam;
+use super::microwave_shrine::MicrowaveShrineState;
 use super::{get_crafting_inventory_item_stacks, PlaceItemEvent, WorldObject};
 
 use crate::assets::SpriteAnchor;
@@ -64,6 +65,7 @@ pub enum ObjectAction {
     GambleShrine,
     ActiveSkillShrine,
     HeirloomShrine,
+    MicrowaveShrine,
     WeaponShrine,
     ArmorShrine,
     AccessoryShrine,
@@ -479,6 +481,16 @@ impl ObjectAction {
 
                 // Open skills choice UI - will be populated by handle_heirloom_shrine_interaction
                 item_action_param.next_inv_state.set(UIState::Skills);
+            }
+            ObjectAction::MicrowaveShrine => {
+                commands.entity(e).insert(MicrowaveShrineState {
+                    is_used: false,
+                    tile_pos: obj_pos,
+                });
+
+                item_action_param
+                    .next_inv_state
+                    .set(UIState::MicrowaveShrine);
             }
             ObjectAction::WeaponShrine => {
                 // Screen Shake

@@ -23,6 +23,7 @@ use crate::item::dungeon_shrine::ArmorShrineAnim;
 use crate::item::dungeon_shrine::WeaponShrineAnim;
 use crate::item::gamble_shrine::GambleShrineAnim;
 use crate::item::heirloom_shrine::HeirloomMerchantSprite;
+use crate::item::microwave_shrine::MicrowaveShrineAnim;
 use crate::item::{
     FurnaceRecipeList, RecipeList, RecipeListProto, Recipes, WorldObject, WorldObjectResource,
 };
@@ -149,6 +150,7 @@ impl Plugin for GameAssetsPlugin {
                 heirloom_sprites: None,
                 item_glows: None,
                 combat_shrine_anim: None,
+                microwave_anim: None,
                 gamble_shrine_anim: None,
                 weapon_shrine_anim: None,
                 armor_shrine_anim: None,
@@ -227,6 +229,7 @@ pub struct Graphics {
     pub armor_shrine_anim: Option<Handle<Aseprite>>,
     pub accessory_shrine_anim: Option<Handle<Aseprite>>,
     pub gamble_shrine_anim: Option<Handle<Aseprite>>,
+    pub microwave_anim: Option<Handle<Aseprite>>,
     pub blacksmith_merchant: Option<Handle<Aseprite>>,
     pub active_skill_shrine: Option<Handle<Aseprite>>,
     pub heirloom_shrine_anim: Option<Handle<Aseprite>>,
@@ -568,6 +571,7 @@ impl GameAssetsPlugin {
             item_glows: Some(item_glow_handles),
             combat_shrine_anim: Some(asset_server.load(CombatShrineAnim::PATH)),
             gamble_shrine_anim: Some(asset_server.load(GambleShrineAnim::PATH)),
+            microwave_anim: Some(asset_server.load(MicrowaveShrineAnim::PATH)),
             weapon_shrine_anim: Some(asset_server.load(WeaponShrineAnim::PATH)),
             armor_shrine_anim: Some(asset_server.load(ArmorShrineAnim::PATH)),
             accessory_shrine_anim: Some(asset_server.load(AccessoryShrineAnim::PATH)),

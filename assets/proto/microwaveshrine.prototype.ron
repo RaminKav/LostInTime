@@ -1,0 +1,12 @@
+(
+  name: "MicrowaveShrine",
+  templates: [],
+  schematics: {
+    "survival_rogue_like::item::WorldObject": MicrowaveShrine,
+    "survival_rogue_like::item::object_actions::ObjectAction": MicrowaveShrine,
+    "survival_rogue_like::assets::SpriteSize": Small,
+  "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 40.)),
+  "survival_rogue_like::world::y_sort::YSort": (0.02),
+  "survival_rogue_like::proto::ColliderCapsulProto": (x1: -10., y1: -55., x2: 10., y2: -55., r: 7.5),
+  }
+)

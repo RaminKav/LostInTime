@@ -29,6 +29,7 @@ pub enum UIState {
     ItemChest,
     ActiveSkills,
     ActiveSkillShrine,
+    MicrowaveShrine,
     Crafting,
     Furnace,
     Essence,

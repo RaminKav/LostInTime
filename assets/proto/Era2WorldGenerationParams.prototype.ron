@@ -158,10 +158,11 @@
         // WaterBoulder2: 0.02,
       },
       schematic_frequencies: {
-   CombatShrine: 0.05,
+        CombatShrine: 0.05,
         GambleShrine: 0.025,
         // ActiveSkillShrine: 0.1,
-        HeirloomShrine: 0.11,
+        HeirloomShrine: 0.1,
+        MicrowaveShrine: 0.026,
         BlacksmithMerchant: 0.07,
       },
       obj_allowed_tiles_map: {
@@ -206,6 +207,7 @@
         GambleShrine: [GrassTile, ],
         ActiveSkillShrine: [GrassTile, ],
         HeirloomShrine: [GrassTile, ],
+        MicrowaveShrine: [GrassTile, ],
         ChaosTotem: [GrassTile, ],
            Era2Grass: [GrassTile],
         Era2Grass2: [GrassTile],

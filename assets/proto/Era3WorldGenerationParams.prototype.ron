@@ -161,6 +161,7 @@
       CombatShrine: 0.05,
         GambleShrine: 0.025,
         // ActiveSkillShrine: 0.1,
+        MicrowaveShrine: 0.026,
         HeirloomShrine: 0.11,
         BlacksmithMerchant: 0.07,
       },

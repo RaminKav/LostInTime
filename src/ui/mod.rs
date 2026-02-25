@@ -40,6 +40,8 @@ pub mod stats_ui;
 pub use active_skill_shrine_ui::*;
 mod tile_hover;
 mod tooltips;
+pub mod microwave_shrine_ui;
+pub use microwave_shrine_ui::*;
 pub mod ui_helpers;
 pub use chest_ui::*;
 pub use enemy_health_bar::*;
@@ -70,6 +72,10 @@ use crate::ui::damage_numbers::{
     handle_clamp_screen_locked_icons_worldpos, BeaconGuidanceRegistry,
 };
 pub use achievements_ui::*;
+
+pub fn reset_microwave_shrine_usages(mut usages: ResMut<MicrowaveShrineUsages>) {
+    usages.0 = 0;
+}
 use loading_screen::*;
 
 use crate::{
@@ -118,6 +124,7 @@ impl Plugin for UIPlugin {
             .init_resource::<CheatSettings>()
             .insert_resource(RunUnlockState::default())
             .init_resource::<AchievementsPagination>()
+            .init_resource::<MicrowaveShrineUsages>()
             .insert_resource(crate::keybinds::InputMappings::load())
             .init_resource::<CurrentNameInput>()
             .init_resource::<CursorBlinkTimer>()
@@ -157,6 +164,7 @@ impl Plugin for UIPlugin {
             )
             .add_system(cleanup_leaderboard_ui.in_schedule(OnExit(GameState::MainMenu)))
             .add_system(reset_blacksmith_tracker.in_schedule(OnEnter(GameState::MainMenu)))
+            .add_system(reset_microwave_shrine_usages.in_schedule(OnEnter(GameState::MainMenu)))
             .add_system(cleanup_run_state.in_base_set(CoreSet::PreUpdate).run_if(not(in_state(GameState::MainMenu))))
             .add_systems((
                 // Clean up leaderboard when entering other UI states to avoid duplicates
@@ -475,8 +483,15 @@ impl Plugin for UIPlugin {
                     setup_active_skill_shrine_ui.before(CustomFlush).run_if(
                         state_changed::<UIState>().and_then(in_state(UIState::ActiveSkillShrine)),
                     ),
+                    setup_microwave_shrine_ui.before(CustomFlush).run_if(
+                        state_changed::<UIState>().and_then(in_state(UIState::MicrowaveShrine)),
+                    ),
                     tick_active_skill_shrine_ui_interaction_lock_timers
                         .run_if(in_state(UIState::ActiveSkillShrine)),
+                    handle_microwave_shrine_rarity_click
+                        .run_if(in_state(UIState::MicrowaveShrine)),
+                    handle_microwave_shrine_heirloom_click
+                        .run_if(in_state(UIState::MicrowaveShrine)),
                     handle_active_skill_shrine_ui_interaction
                         .run_if(in_state(UIState::ActiveSkillShrine)),
                     active_skill_shrine_ui::tick_active_skill_slot_choice_ui_interaction_lock_timers
