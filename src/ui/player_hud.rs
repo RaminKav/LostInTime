@@ -2202,10 +2202,12 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
     index: usize,
 ) -> Entity {
     use bevy::utils::Duration;
+    let duration = duration.max(0.001); // avoid negative/zero Duration panic
     let mut timer = Timer::from_seconds(duration, TimerMode::Once);
     // Tick the timer to the preserved elapsed time to maintain visual state
+    let elapsed = elapsed.max(0.0);
     if elapsed > 0.0 && duration > 0.0 {
-        timer.tick(Duration::from_secs_f32(elapsed));
+        timer.tick(Duration::from_secs_f32(elapsed.min(duration)));
     }
 
     // Calculate initial overlay size based on timer progress
@@ -2341,9 +2343,10 @@ pub fn handle_active_skill_event(
 
                 // Standard cooldown behavior for slots without charge trackers
                 overlay.timer.reset();
+                let cooldown_secs = e.cooldown.max(0.0); // avoid negative Duration panic
                 overlay
                     .timer
-                    .set_duration(Duration::from_secs_f32(e.cooldown));
+                    .set_duration(Duration::from_secs_f32(cooldown_secs));
             }
         }
     }

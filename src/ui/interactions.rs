@@ -1555,29 +1555,22 @@ fn handle_chest_opening_click(
         .shuffle_duration_timer
         .duration()
         .as_secs_f32();
-    match item_chest_state.shuffle_duration_timer.percent() {
-        0.0..=0.25 => {
-            item_chest_state
-                .shuffle_duration_timer
-                .tick(Duration::from_secs_f32(duration * 0.25 - elapsed));
-        }
-        0.25..=0.48 => {
-            item_chest_state
-                .shuffle_duration_timer
-                .tick(Duration::from_secs_f32(duration * 0.48 - elapsed));
-        }
-        0.5..=0.7 => {
-            item_chest_state
-                .shuffle_duration_timer
-                .tick(Duration::from_secs_f32(duration * 0.70 - elapsed));
-        }
+    // Advance timer to next threshold; clamp to avoid negative Duration (e.g. at boundary or frame timing)
+    let tick_secs = match item_chest_state.shuffle_duration_timer.percent() {
+        0.0..=0.25 => (duration * 0.25 - elapsed).max(0.0),
+        0.25..=0.48 => (duration * 0.48 - elapsed).max(0.0),
+        0.5..=0.7 => (duration * 0.70 - elapsed).max(0.0),
         _ => {
             chest_event.send(ItemChestAnimChangeEvent {
                 state: ItemChestAnimState::Done,
                 set_ui_rarity: None,
             });
+            return;
         }
-    }
+    };
+    item_chest_state
+        .shuffle_duration_timer
+        .tick(Duration::from_secs_f32(tick_secs));
 }
 
 pub fn handle_cursor_main_menu_buttons(

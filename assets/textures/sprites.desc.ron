@@ -600,6 +600,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        CrowFeather: WorldObjectData(
+            texture_pos: (7., 2.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         Leather: WorldObjectData(
             texture_pos: (15., 5.),
             size: (16., 16.),

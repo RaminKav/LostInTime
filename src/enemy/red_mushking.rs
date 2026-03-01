@@ -319,8 +319,9 @@ pub fn new_leap_attack(
                                 .into(),
                             )
                             .into(),
-                        material: materials
-                            .add(ColorMaterial::from(boss_warning_indicator_color(&cheat_settings))),
+                        material: materials.add(ColorMaterial::from(boss_warning_indicator_color(
+                            &cheat_settings,
+                        ))),
                         transform: Transform {
                             translation: target_translation + Vec3::new(0., -15., 100.),
                             ..default()
@@ -567,13 +568,15 @@ pub fn new_follow(
 ) {
     for (entity, follow, att_cooldown, mut anim, mut mover, mob_option) in follows.iter_mut() {
         if att_cooldown.is_some() && att_cooldown.unwrap().0.percent() <= 0.5 {
-            return;
+            continue;
         }
         // Get the positions of the follower and target
-        let target_translation = transforms.get(follow.target).unwrap().translation;
         let follow_transform = &mut transforms.get_mut(entity).unwrap();
         let follow_translation = follow_transform.translation;
-        let delta = (target_translation - follow_translation)
+        let Ok(target_transform) = transforms.get(follow.target) else {
+            continue;
+        };
+        let delta = (target_transform.translation - follow_translation)
             .normalize_or_zero()
             .truncate();
         // Find the direction from the follower to the target and go that way
@@ -926,10 +929,9 @@ pub fn handle_aoe_attack(
                                     .into(),
                                 )
                                 .into(),
-                            material: materials
-                                .add(ColorMaterial::from(boss_warning_indicator_color(
-                                    &cheat_settings,
-                                ))),
+                            material: materials.add(ColorMaterial::from(
+                                boss_warning_indicator_color(&cheat_settings),
+                            )),
                             transform: Transform {
                                 translation: target_pos.extend(990.0), // High Z to be visible
                                 ..default()
@@ -958,10 +960,9 @@ pub fn handle_aoe_attack(
                                         .into(),
                                     )
                                     .into(),
-                                material: materials
-                                    .add(ColorMaterial::from(boss_warning_indicator_color(
-                                        &cheat_settings,
-                                    ))),
+                                material: materials.add(ColorMaterial::from(
+                                    boss_warning_indicator_color(&cheat_settings),
+                                )),
                                 transform: Transform {
                                     translation: second_pos.extend(990.0), // High Z to be visible
                                     ..default()

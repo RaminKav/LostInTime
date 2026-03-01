@@ -31,6 +31,7 @@ use crate::{
     AppExt, GameParam, GameState,
 };
 
+pub mod aseprite_enemy;
 pub mod fairy;
 pub mod red_mushking;
 pub mod red_mushling;
@@ -38,6 +39,7 @@ pub mod spawn_helpers;
 pub mod spawner;
 pub mod stone_golem;
 use self::spawner::SpawnerPlugin;
+use aseprite_enemy::*;
 use fairy::*;
 use red_mushking::*;
 use red_mushling::*;
@@ -59,6 +61,8 @@ impl Plugin for EnemyPlugin {
                     stone_golem::handle_new_stone_golem_state_machine,
                     handle_new_fairy_state_machine,
                     handle_new_mob_state_machine,
+                    aseprite_enemy_setup,
+                    handle_new_aseprite_enemy_state_machine,
                     red_mushling::handle_mushling_rush_warnings.run_if(is_not_paused),
                     juice_up_spawned_elite_mobs.before(add_current_health_with_max_health),
                     juice_up_spawned_mobs_per_day.before(add_current_health_with_max_health),
@@ -123,6 +127,7 @@ pub enum Mob {
     RedMushling,
     RedMushking,
     StoneGolem,
+    Crow,
 }
 
 impl Mob {
@@ -139,6 +144,8 @@ impl Mob {
             Mob::RedMushking => RED,
             Mob::Hog => LIGHT_BROWN,
             Mob::StoneGolem => GREY,
+            Mob::Crow => BLACK,
+            _ => BLACK,
         }
     }
     pub fn get_base_kb(&self) -> f32 {
@@ -150,9 +157,10 @@ impl Mob {
             Mob::StingFly => 50.,
             Mob::Fairy => 50.,
             Mob::FurDevil => 50.,
+            Mob::Crow => 50.,
             Mob::RedMushling => 0.,
             Mob::RedMushking => 0.,
-            Mob::StoneGolem => 0.,
+            Mob::StoneGolem => 10.,
             Mob::Hog => 50.,
         }
     }
@@ -212,12 +220,28 @@ pub struct LeapAttack {
 #[derive(Component)]
 pub struct MobIsAttacking(pub Mob);
 
-#[derive(FromReflect, Default, Reflect, Clone, Component, Schematic)]
+#[derive(FromReflect, Reflect, Clone, Component, Schematic)]
 #[reflect(Component, Schematic, Default)]
 pub struct ProjectileAttack {
     pub activation_distance: f32,
     pub cooldown: f32,
     pub projectile: Projectile,
+    /// Delay before the attack animation starts (enemy stays in walk anim; attack warning shows).
+    pub attack_startup: f32,
+    /// Delay after the attack animation starts before the projectile actually spawns.
+    pub projectile_delay: f32,
+}
+
+impl Default for ProjectileAttack {
+    fn default() -> Self {
+        Self {
+            activation_distance: 0.,
+            cooldown: 0.,
+            projectile: Projectile::default(),
+            attack_startup: 0.3,
+            projectile_delay: 0.,
+        }
+    }
 }
 pub fn handle_new_mob_state_machine(
     mut commands: Commands,
@@ -245,7 +269,12 @@ pub fn handle_new_mob_state_machine(
         if dungeon_check.get_single().is_ok() {
             alignment = CombatAlignment::Hostile;
         }
-        if mob == &Mob::RedMushling || mob.is_boss() || mob == &Mob::Fairy {
+        // Skip enemies handled by dedicated state machine systems
+        if mob == &Mob::RedMushling
+            || mob.is_boss()
+            || mob == &Mob::Fairy
+            || aseprite_enemy::is_aseprite_basic_mob(mob)
+        {
             continue;
         }
         let mut e_cmds = commands.entity(e);
@@ -336,9 +365,16 @@ pub fn handle_new_mob_state_machine(
                     },
                     ProjectileAttackState {
                         target: game.game.player,
-                        attack_startup_timer: Timer::from_seconds(0.3, TimerMode::Once),
+                        attack_startup_timer: Timer::from_seconds(
+                            proj_attack.attack_startup,
+                            TimerMode::Once,
+                        ),
                         attack_cooldown_timer: Timer::from_seconds(
                             proj_attack.cooldown,
+                            TimerMode::Once,
+                        ),
+                        projectile_delay_timer: Timer::from_seconds(
+                            proj_attack.projectile_delay,
                             TimerMode::Once,
                         ),
                         dir: None,
@@ -576,20 +612,25 @@ fn enhance_infinite_mode_leap_attack_startup(
     }
 
     let speed_multiplier = infinite_mode.get_speed_multiplier();
+    let speed_multiplier = speed_multiplier.max(0.001); // avoid division by zero / negative
     for mut leap_state in leap_attack_states.iter_mut() {
         // Scale down the startup timer duration (faster startup = shorter duration)
         // Divide by speed multiplier to make it faster
         let original_duration = leap_state.attack_startup_timer.duration();
         let original_elapsed = leap_state.attack_startup_timer.elapsed();
-        let scaled_duration_secs = original_duration.as_secs_f32() / speed_multiplier;
+        let orig_dur_secs = original_duration.as_secs_f32();
+        if orig_dur_secs <= 0.0 {
+            continue; // skip invalid timer
+        }
+        let scaled_duration_secs = orig_dur_secs / speed_multiplier;
 
         // Create new timer with scaled duration
         let mut new_timer = Timer::from_seconds(scaled_duration_secs, TimerMode::Once);
         // Preserve the elapsed time proportionally (scale elapsed by the same factor)
-        let elapsed_ratio = original_elapsed.as_secs_f32() / original_duration.as_secs_f32();
-        let scaled_elapsed_secs = scaled_duration_secs * elapsed_ratio;
-        // Tick the new timer by the scaled elapsed time
-        new_timer.tick(Duration::from_secs_f32(scaled_elapsed_secs));
+        let elapsed_ratio = (original_elapsed.as_secs_f32() / orig_dur_secs).clamp(0.0, 1.0);
+        let scaled_elapsed_secs = (scaled_duration_secs * elapsed_ratio).min(scaled_duration_secs);
+        let tick_secs = scaled_elapsed_secs.max(0.0); // Duration::from_secs_f32 panics on negative
+        new_timer.tick(Duration::from_secs_f32(tick_secs));
 
         leap_state.attack_startup_timer = new_timer;
 

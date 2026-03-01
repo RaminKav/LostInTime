@@ -4,6 +4,7 @@ pub mod pathfinding;
 use crate::{
     client::is_not_paused,
     enemy::{
+        aseprite_enemy,
         fairy::{new_idle, trade_anim},
         red_mushking::{
             handle_death, new_follow, new_leap_attack, return_to_shrine, summon_attack,
@@ -44,6 +45,15 @@ impl Plugin for AIPlugin {
                     projectile_attack.run_if(is_not_paused),
                     tick_enemy_attack_cooldowns.run_if(is_not_paused),
                     idle.run_if(is_not_paused),
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (
+                    aseprite_enemy::aseprite_follow.run_if(is_not_paused),
+                    aseprite_enemy::aseprite_idle.run_if(is_not_paused),
+                    aseprite_enemy::aseprite_leap_attack.run_if(is_not_paused),
+                    aseprite_enemy::aseprite_projectile_attack.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             );

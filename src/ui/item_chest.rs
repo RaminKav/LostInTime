@@ -388,6 +388,8 @@ pub fn shuffle_items(
                     .pool
                     .iter()
                     .filter(|choice| {
+                        // Never show Heirloom::None (banish placeholder has no icon)
+                        let valid_heirloom = choice.heirloom != Heirloom::None;
                         // Don't show the same heirloom twice in a row
                         let not_same = item_chest_state
                             .current_heirloom
@@ -401,7 +403,7 @@ pub fn shuffle_items(
                             .unwrap_or(true);
                         // Not banned
                         let not_banned = !choices_queue.banned.contains(&choice.heirloom);
-                        not_same && matches_rarity && not_banned
+                        valid_heirloom && not_same && matches_rarity && not_banned
                     })
                     .collect_vec();
 
@@ -413,11 +415,12 @@ pub fn shuffle_items(
                         .pool
                         .iter()
                         .filter(|choice| {
-                            item_chest_state
-                                .current_heirloom
-                                .as_ref()
-                                .map(|old| *old != choice.heirloom)
-                                .unwrap_or(true)
+                            choice.heirloom != Heirloom::None
+                                && item_chest_state
+                                    .current_heirloom
+                                    .as_ref()
+                                    .map(|old| *old != choice.heirloom)
+                                    .unwrap_or(true)
                                 && !choices_queue.banned.contains(&choice.heirloom)
                         })
                         .collect();
@@ -527,9 +530,12 @@ pub fn handle_anim_events(
                             ) {
                                 item_chest_state.picked_heirloom = Some(picked_heirloom);
                             } else {
-                                // Fallback: if no heirloom of target rarity exists, pick any available
-                                let available_heirlooms: Vec<&HeirloomChoiceState> =
-                                    choices_queue.pool.iter().collect_vec();
+                                // Fallback: if no heirloom of target rarity exists, pick any available (excluding None)
+                                let available_heirlooms: Vec<&HeirloomChoiceState> = choices_queue
+                                    .pool
+                                    .iter()
+                                    .filter(|c| c.heirloom != Heirloom::None)
+                                    .collect_vec();
                                 if let Some(pick_new_heirloom) =
                                     available_heirlooms.choose(&mut rng)
                                 {
@@ -633,30 +639,33 @@ pub fn handle_anim_events(
                     }
                     ChestType::Heirloom => {
                         let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
-                        commands
-                            .spawn(SpriteBundle {
-                                sprite: Sprite {
-                                    color: Color::NONE,
-                                    custom_size: Some(Vec2::new(32., 32.)),
-                                    ..default()
-                                },
-                                transform: Transform {
-                                    translation: Vec3::new(0., 25., 15.),
-                                    scale: Vec3::new(1., 1., 1.),
+                        // Defensive: Heirloom::None has no icon and must not be shown (e.g. from contaminated pool)
+                        if picked_heirloom.heirloom != Heirloom::None {
+                            commands
+                                .spawn(SpriteBundle {
+                                    sprite: Sprite {
+                                        color: Color::NONE,
+                                        custom_size: Some(Vec2::new(32., 32.)),
+                                        ..default()
+                                    },
+                                    transform: Transform {
+                                        translation: Vec3::new(0., 25., 15.),
+                                        scale: Vec3::new(1., 1., 1.),
+                                        ..Default::default()
+                                    },
                                     ..Default::default()
-                                },
-                                ..Default::default()
-                            })
-                            .insert(graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()))
-                            .insert(graphics.texture_atlas.as_ref().unwrap().clone())
-                            .insert(UIState::ItemChest)
-                            .insert(RenderLayers::from_layers(&[3]))
-                            .insert(ItemChestFinalItem)
-                            .insert(ItemChestFinalHeirloom {
-                                heirloom: picked_heirloom.clone(),
-                            })
-                            .insert(Interactable::default())
-                            .insert(Name::new("Chest Final Heirloom"));
+                                })
+                                .insert(graphics.get_heirloom_icon(picked_heirloom.heirloom.clone()))
+                                .insert(graphics.texture_atlas.as_ref().unwrap().clone())
+                                .insert(UIState::ItemChest)
+                                .insert(RenderLayers::from_layers(&[3]))
+                                .insert(ItemChestFinalItem)
+                                .insert(ItemChestFinalHeirloom {
+                                    heirloom: picked_heirloom.clone(),
+                                })
+                                .insert(Interactable::default())
+                                .insert(Name::new("Chest Final Heirloom"));
+                        }
                     }
                 }
             }

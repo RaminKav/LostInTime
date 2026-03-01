@@ -1,0 +1,10 @@
+(
+  name: "CrowFeather",
+  templates: ["projectile.prototype.ron"],
+  schematics: {
+        "survival_rogue_like::item::WorldObject": CrowFeather,
+        "survival_rogue_like::proto::ColliderProto": (x: 8., y: 8.),
+        "survival_rogue_like::item::projectile::Projectile": CrowFeather,
+        "survival_rogue_like::item::projectile::ProjectileState": (speed: 180, direction: (x: 0., y: 0.), hit_entities: [], despawn_on_hit: true),
+  }
+)

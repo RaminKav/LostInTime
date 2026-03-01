@@ -53,7 +53,10 @@ use dungeon_shrine::{
 };
 use gamble_shrine::{add_gamble_visuals_on_spawn, handle_gamble_shrine_rewards, GambleShrineEvent};
 use heirloom_shrine::{add_heirloom_shrine_visuals_on_spawn, handle_heirloom_shrine_completion};
-use microwave_shrine::{add_microwave_shrine_visuals_on_spawn, handle_microwave_shrine_completion, handle_microwave_shrine_esc};
+use microwave_shrine::{
+    add_microwave_shrine_visuals_on_spawn, handle_microwave_shrine_completion,
+    handle_microwave_shrine_esc,
+};
 use projectile::handle_reset_proj_hit_enemies_state;
 use rand::Rng;
 
@@ -527,6 +530,7 @@ pub enum WorldObject {
     DaggerThrow,
     Bomb,
     FuryKunai,
+    CrowFeather,
 }
 
 #[derive(
@@ -1301,7 +1305,6 @@ pub fn handle_break_object(
         analytics_events.send(AnalyticsUpdateEvent {
             update_type: AnalyticsTrigger::ObjectBroken(broken.obj),
         });
-
     }
 }
 

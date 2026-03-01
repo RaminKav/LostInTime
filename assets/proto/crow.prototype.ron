@@ -1,0 +1,15 @@
+(
+  name: "Crow",
+  templates: ["aseprite_mob_basic.prototype.ron"],
+  schematics: {
+    "survival_rogue_like::enemy::Mob": Crow,
+    "survival_rogue_like::enemy::CombatAlignment": Hostile,
+    "survival_rogue_like::enemy::FollowSpeed": (0.5),
+    "survival_rogue_like::enemy::ProjectileAttack": (activation_distance: 55., cooldown: 2.0, projectile: CrowFeather, attack_startup: 0.1, projectile_delay: 0.3),
+    "survival_rogue_like::proto::ColliderCapsulProto": (x1: 0., y1: -1., x2: 0., y2: -1.5, r: 5.),
+    "survival_rogue_like::attributes::MaxHealth": (20),
+    "survival_rogue_like::attributes::Attack": (12),
+    "survival_rogue_like::player::levels::ExperienceReward": (25),
+    "survival_rogue_like::item::loot_table::LootTable": (drops: []),
+  }
+)

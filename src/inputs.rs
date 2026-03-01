@@ -326,6 +326,7 @@ pub fn player_move_inputs(
             player.is_dashing = true;
             let effective_cd =
                 skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
+            let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
             active_skill_event.send(ActiveSkillUsedEvent {
                 slot: roll_slot,
                 cooldown: effective_cd,

@@ -93,6 +93,7 @@ pub enum Projectile {
     SpearGravity,
     SpinAttack,
     IceFloor,
+    CrowFeather,
 }
 
 impl Projectile {
@@ -120,10 +121,12 @@ impl Projectile {
             _ => false,
         }
     }
+    /// Rotation offset in radians for projectiles whose sprite is drawn at 45° in the sheet (e.g. kunai, feathers).
     pub fn get_custom_rotation(&self) -> Option<f32> {
         match self {
-            Projectile::FuryKunai => Some(-0.7853982),
-            Projectile::DaggerThrow => Some(-0.7853982),
+            Projectile::FuryKunai => Some(-0.7853982),   // -45°
+            Projectile::DaggerThrow => Some(-0.7853982), // -45°
+            Projectile::CrowFeather => Some(-0.7853982), // -45°
             _ => None,
         }
     }
@@ -448,11 +451,16 @@ fn handle_spawn_projectiles_after_delay(
                     "Spawned projectile {:?} with dmg {}",
                     proj.proj, computed_dmg
                 );
+                let despawn_secs = if proj.from_enemy && proj.proj == Projectile::CrowFeather {
+                    0.3
+                } else {
+                    5.0
+                };
                 commands
                     .entity(p)
                     .insert(Attack(computed_dmg))
                     .insert(ItemDropDespawnTimer(Timer::from_seconds(
-                        5.0,
+                        despawn_secs,
                         TimerMode::Once,
                     )));
             }

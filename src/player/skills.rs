@@ -1901,7 +1901,10 @@ impl HeirloomChoiceQueue {
         let mut remaining_choices = self.queue.remove(0).to_vec();
         remaining_choices.retain(|x| x != &skill);
         for choice in remaining_choices.iter() {
-            self.pool.push(choice.clone());
+            // Never push the banish placeholder (Heirloom::None) back to the pool
+            if choice.heirloom != Heirloom::default() {
+                self.pool.push(choice.clone());
+            }
         }
 
         for child in skill.child_heirlooms.iter() {
@@ -1997,7 +2000,10 @@ impl HeirloomChoiceQueue {
                 self.pool.retain(|x| x != &picked_skill);
             }
 
-            self.pool.push(old_skill);
+            // Never push the banish placeholder (Heirloom::None) back to the pool
+            if old_skill.heirloom != Heirloom::default() {
+                self.pool.push(old_skill);
+            }
             self.queue[0][slot] = picked_skill;
         }
     }

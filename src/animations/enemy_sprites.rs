@@ -10,7 +10,10 @@ use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
 use crate::{
-    assets::Graphics, combat_helpers::DespawnTimer, enemy::Mob, inputs::FacingDirection,
+    assets::Graphics,
+    combat_helpers::DespawnTimer,
+    enemy::{aseprite_enemy::AsepriteBasicEnemy, Mob},
+    inputs::FacingDirection,
     player::melee_skills::Parried,
 };
 
@@ -94,6 +97,8 @@ pub fn change_anim_offset_when_character_action_state_changes(
         }
     }
 }
+/// Only runs for legacy sprite-sheet mobs. Aseprite-based mobs (AsepriteBasicEnemy) are excluded
+/// so their atlas is not overwritten with mob_spritesheets data they don't have.
 pub fn change_character_anim_direction(
     mut mob_query: Query<
         (
@@ -103,7 +108,7 @@ pub fn change_character_anim_direction(
             &Mob,
             Option<&LeftFacingSideProfile>,
         ),
-        Changed<FacingDirection>,
+        (Changed<FacingDirection>, Without<AsepriteBasicEnemy>),
     >,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     _asset_server: Res<AssetServer>,

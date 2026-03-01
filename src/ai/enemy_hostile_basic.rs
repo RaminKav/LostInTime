@@ -263,6 +263,7 @@ pub struct ProjectileAttackState {
     pub target: Entity,
     pub attack_startup_timer: Timer,
     pub attack_cooldown_timer: Timer,
+    pub projectile_delay_timer: Timer,
     pub dir: Option<Vec2>,
     pub projectile: Projectile,
 }
