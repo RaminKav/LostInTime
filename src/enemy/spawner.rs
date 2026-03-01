@@ -11,7 +11,7 @@ use crate::{
     proto::proto_param::ProtoParam,
     run_once_per_run,
     world::{
-        dimension::{ActiveDimension, DimensionSpawnEvent},
+        dimension::{ActiveDimension, DimensionSpawnEvent, Era},
         dungeon::Dungeon,
         TILE_SIZE,
     },
@@ -212,13 +212,19 @@ fn handle_spawn_mobs(
             picked_mob_to_spawn = Some((e.mob.clone(), pos));
         }
         if let Some((mob, pos)) = picked_mob_to_spawn {
+            // Temporary: in era 2, spawn Crow instead of SpikeSlime
+            let mob_to_spawn = if mob == Mob::SpikeSlime && game.era.current_era == Era::Second {
+                Mob::Crow
+            } else {
+                mob
+            };
             if let Some(spawned_mob) =
-                proto_commands.spawn_from_proto(mob.clone(), &prototypes, pos)
+                proto_commands.spawn_from_proto(mob_to_spawn.clone(), &prototypes, pos)
             {
                 debug!("SPAWNED A MOB!!! {spawned_mob:?}");
                 if rng.gen::<f32>() < ELITE_SPAWN_RATE
                     && !(proto_param
-                        .get_component::<CombatAlignment, _>(mob)
+                        .get_component::<CombatAlignment, _>(mob_to_spawn)
                         .expect("mob has no alignment")
                         == &CombatAlignment::Passive)
                 {
