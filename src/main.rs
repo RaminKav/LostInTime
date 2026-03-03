@@ -153,6 +153,12 @@ lazy_static! {
 fn main() {
     init_global_logger();
 
+    // Export heirloom card data for asset pipeline (run with EXPORT_HEIRLOOMS=1)
+    if std::env::var("EXPORT_HEIRLOOMS").is_ok() {
+        export_heirloom_cards_data();
+        return;
+    }
+
     // migrate old save files
     let old_game_data = std::path::Path::new("game_data.json");
     if old_game_data.is_file() {
@@ -1241,4 +1247,38 @@ pub fn set_start_of_run_action_resource_true(mut res: ResMut<StartOfRunActionsHa
 
 pub fn set_start_of_run_action_resource_false(mut res: ResMut<StartOfRunActionsHappened>) {
     res.0 = false;
+}
+
+/// Exports heirloom card data (id, title, description_lines, rarity) to JSON for the
+/// asset pipeline script. Run with: EXPORT_HEIRLOOMS=1 cargo run
+fn export_heirloom_cards_data() {
+    use player::skills::HeirloomChoiceQueue;
+
+    let pool = HeirloomChoiceQueue::default().pool;
+    let export: Vec<serde_json::Value> = pool
+        .iter()
+        .map(|s| {
+            serde_json::json!({
+                "id": format!("{:?}", s.heirloom),
+                "title": s.heirloom.get_title(),
+                "description_lines": s.heirloom.get_desc(),
+                "rarity": format!("{:?}", s.rarity),
+            })
+        })
+        .collect();
+
+    let out_path = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("assets")
+        .join("heirloom_cards_export.json");
+    if let Some(parent) = out_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match std::fs::write(
+        &out_path,
+        serde_json::to_string_pretty(&export).expect("serialize"),
+    ) {
+        Ok(()) => println!("Exported {} heirlooms to {:?}", export.len(), out_path),
+        Err(e) => eprintln!("Failed to write heirloom export: {}", e),
+    }
 }

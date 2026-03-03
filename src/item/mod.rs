@@ -531,6 +531,20 @@ pub enum WorldObject {
     Bomb,
     FuryKunai,
     CrowFeather,
+
+    // Snow biome
+    SnowTree1,
+    SnowTree2,
+    SnowTree3,
+    SnowGrass1,
+    SnowGrass2,
+    SnowGrass3,
+    SnowMushroom,
+    SnowMushroomBlock,
+    SnowBerryBush,
+    SnowBerries,
+    SnowCrate,
+    SnowDeadSapling,
 }
 
 #[derive(

@@ -1,0 +1,842 @@
+[
+  {
+    "description_lines": [
+      "Gain +10 Defence,",
+      "permanently."
+    ],
+    "id": "Defence",
+    "rarity": "Common",
+    "title": "Coal"
+  },
+  {
+    "description_lines": [
+      "Mana Orbs drop",
+      "from mobs with a.",
+      "+10% chance. They",
+      "trigger mana regen."
+    ],
+    "id": "ManaOrbs",
+    "rarity": "Common",
+    "title": "Mana Dust"
+  },
+  {
+    "description_lines": [
+      "Mana regeneration",
+      "shoots a mana orb",
+      "at an enemy. It does",
+      "damage equal to the",
+      "amount regenerated."
+    ],
+    "id": "ManaOrbAttack",
+    "rarity": "Uncommon",
+    "title": "Wizard Hat"
+  },
+  {
+    "description_lines": [
+      "Gain +10% Damage,",
+      "permanently."
+    ],
+    "id": "Attack",
+    "rarity": "Common",
+    "title": "Anvil "
+  },
+  {
+    "description_lines": [
+      "Your Attacks gain",
+      "+10% Size",
+      "permanently."
+    ],
+    "id": "Gigantify",
+    "rarity": "Common",
+    "title": "Sappling"
+  },
+  {
+    "description_lines": [
+      "Gain a Loot Chest"
+    ],
+    "id": "Chest",
+    "rarity": "Uncommon",
+    "title": "Loot Bag"
+  },
+  {
+    "description_lines": [
+      "Gain +5 Health",
+      "regeneration, ",
+      "permanently."
+    ],
+    "id": "HPRegen",
+    "rarity": "Common",
+    "title": "Red Book "
+  },
+  {
+    "description_lines": [
+      "Gain +7% XP",
+      "permanently. "
+    ],
+    "id": "XPGain",
+    "rarity": "Common",
+    "title": "Microchip"
+  },
+  {
+    "description_lines": [
+      "Your Health",
+      "regeneration",
+      "cooldown is.",
+      "reduced."
+    ],
+    "id": "HPRegenCooldown",
+    "rarity": "Uncommon",
+    "title": "Red Phone"
+  },
+  {
+    "description_lines": [
+      "Your Mana",
+      "regeneration",
+      "cooldown is.",
+      "reduced."
+    ],
+    "id": "MPRegenCooldown",
+    "rarity": "Uncommon",
+    "title": "Blue Phone"
+  },
+  {
+    "description_lines": [
+      "Gain +5 Mana ",
+      "regeneration,",
+      "permanently."
+    ],
+    "id": "MPRegen",
+    "rarity": "Common",
+    "title": "Blue Book"
+  },
+  {
+    "description_lines": [
+      "Dodging grants",
+      "+30% atk speed,",
+      "+30 speed, next",
+      "hit does 2x dmg."
+    ],
+    "id": "DodgeCrit",
+    "rarity": "Rare",
+    "title": "Telescope"
+  },
+  {
+    "description_lines": [
+      "Your attacks",
+      "knockback enemies",
+      "further. "
+    ],
+    "id": "Knockback",
+    "rarity": "Common",
+    "title": "Horse Shoe"
+  },
+  {
+    "description_lines": [
+      "After taking ",
+      "damage, trigger ",
+      "an echo that",
+      "damages enemies ",
+      "around you.",
+      "Costs 5 mana."
+    ],
+    "id": "OnHitEcho",
+    "rarity": "Rare",
+    "title": "Ancient Fossil "
+  },
+  {
+    "description_lines": [
+      "Healing has a 25%",
+      "chance to trigger an",
+      "echo that damages",
+      "enemies around you.",
+      "+20 Health regen.",
+      "Costs 5 mana."
+    ],
+    "id": "HealEcho",
+    "rarity": "Uncommon",
+    "title": "Chalice"
+  },
+  {
+    "description_lines": [
+      "Healing has a 20%",
+      "chance to trigger",
+      "all summons once",
+      "(Ant Farm, Boulder"
+    ],
+    "id": "HealSummons",
+    "rarity": "Rare",
+    "title": "Summoning Wand"
+  },
+  {
+    "description_lines": [
+      "Gain +7% Critical",
+      "Chance, ",
+      "permanantly."
+    ],
+    "id": "CritChance",
+    "rarity": "Common",
+    "title": "Tusk"
+  },
+  {
+    "description_lines": [
+      "Gain +15% Critical",
+      "Damage, permanently"
+    ],
+    "id": "CritDamage",
+    "rarity": "Common",
+    "title": "Flint"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a chance to apply",
+      "a Frail stack that",
+      "gives +10% Damage",
+      "on hits."
+    ],
+    "id": "FrailStacks",
+    "rarity": "Uncommon",
+    "title": "Skull"
+  },
+  {
+    "description_lines": [
+      "Gain +25 Health,",
+      "permanently."
+    ],
+    "id": "Health",
+    "rarity": "Common",
+    "title": "Red Mushroom"
+  },
+  {
+    "description_lines": [
+      "Gain +25 Mana,",
+      "permanently."
+    ],
+    "id": "Mana",
+    "rarity": "Common",
+    "title": "Blue Mushroom"
+  },
+  {
+    "description_lines": [
+      "Gain +10 Shield,",
+      "permanently."
+    ],
+    "id": "Shield",
+    "rarity": "Uncommon",
+    "title": "CDz"
+  },
+  {
+    "description_lines": [
+      "Gain +2% Lifesteal,",
+      "permanently."
+    ],
+    "id": "Lifesteal",
+    "rarity": "Common",
+    "title": "Rose"
+  },
+  {
+    "description_lines": [
+      "Gain +15 Thorns, ",
+      "permanently."
+    ],
+    "id": "Thorns",
+    "rarity": "Common",
+    "title": "Bushling Scales"
+  },
+  {
+    "description_lines": [
+      "Gain +10 Speed,",
+      "permanently."
+    ],
+    "id": "Speed",
+    "rarity": "Common",
+    "title": "Feather"
+  },
+  {
+    "description_lines": [
+      "Gain +15% Attack",
+      "Speed, permanently. "
+    ],
+    "id": "AttackSpeed",
+    "rarity": "Uncommon",
+    "title": "Red Soda"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a chance to send a",
+      "sonic wave attack",
+      "that travels a",
+      "short distance.",
+      "Costs 5 mana."
+    ],
+    "id": "WaveAttack",
+    "rarity": "Rare",
+    "title": "Hero Sword"
+  },
+  {
+    "description_lines": [
+      "Mana regeneration",
+      "is stored, adding",
+      "bonus damage on",
+      "your next attack."
+    ],
+    "id": "MPBarDMG",
+    "rarity": "Rare",
+    "title": "Purple Card"
+  },
+  {
+    "description_lines": [
+      "0.5% chance to",
+      "execute enemies.",
+      "Executes cause",
+      "hallucinations,",
+      "granting random",
+      "stat buffs."
+    ],
+    "id": "LethalBlow",
+    "rarity": "Legendary",
+    "title": "Deadly Mushroom"
+  },
+  {
+    "description_lines": [
+      "Gain +7% Dodge",
+      "Chance,",
+      "permanently."
+    ],
+    "id": "DodgeChance",
+    "rarity": "Common",
+    "title": "Leather"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a chance to apply",
+      "a Slow stack to",
+      "enemies, reducing",
+      "speed by 15%."
+    ],
+    "id": "SlowStacks",
+    "rarity": "Uncommon",
+    "title": "Sea Shell"
+  },
+  {
+    "description_lines": [
+      "Spawn ants that",
+      "rush towards",
+      "enemies, dealing",
+      "damage.",
+      "Costs 4 mana."
+    ],
+    "id": "AntFarm",
+    "rarity": "Uncommon",
+    "title": "Ant Farm"
+  },
+  {
+    "description_lines": [
+      "Killing a frozen",
+      "enemy has a 25% chance",
+      "to trigger an ice",
+      "explosion.",
+      "+25% freeze chance.",
+      "Costs 5 mana."
+    ],
+    "id": "FrozenAoE",
+    "rarity": "Rare",
+    "title": "Ice Lantern"
+  },
+  {
+    "description_lines": [
+      "Attacking frozen",
+      "enemies gives you",
+      "+15% critical hit",
+      "chance.",
+      "+25% freeze chance."
+    ],
+    "id": "FrozenCrit",
+    "rarity": "Rare",
+    "title": "Diamond"
+  },
+  {
+    "description_lines": [
+      "Killing a frozen",
+      "enemy has a 20%",
+      "chance to trigger",
+      "mana regeneration.",
+      "+25% freeze chance."
+    ],
+    "id": "FrozenMPRegen",
+    "rarity": "Rare",
+    "title": "Mirror"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a chance to leave",
+      "a trail of ice that",
+      "damages enemies. ",
+      "+25% freeze chance.",
+      "Costs 3 mana."
+    ],
+    "id": "IceStaffFloor",
+    "rarity": "Legendary",
+    "title": "Ice Wand"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a chance to apply",
+      "Poison to enemies.",
+      "Poisoned enemies",
+      "lose health over",
+      "time."
+    ],
+    "id": "PoisonStacks",
+    "rarity": "Uncommon",
+    "title": "Grandma's Recipe"
+  },
+  {
+    "description_lines": [
+      "Your poison effect",
+      "lasts longer.",
+      "+25% poison chance."
+    ],
+    "id": "PoisonDuration",
+    "rarity": "Rare",
+    "title": "Cursed Belt"
+  },
+  {
+    "description_lines": [
+      "Your poison effect",
+      "does more damage.",
+      "+25% poison chance."
+    ],
+    "id": "PoisonStrength",
+    "rarity": "Rare",
+    "title": "Green Ring"
+  },
+  {
+    "description_lines": [
+      "Killing a poisoned",
+      "enemy spreads it's",
+      "poison to nearby",
+      "enemies.",
+      "+25% poison chance.",
+      "Costs 5 mana."
+    ],
+    "id": "ViralVenum",
+    "rarity": "Legendary",
+    "title": "Poison Sceptor"
+  },
+  {
+    "description_lines": [
+      "Increase all weapon",
+      "projectile count",
+      "by 1."
+    ],
+    "id": "IncreaseProjectileCount",
+    "rarity": "Rare",
+    "title": "Whip"
+  },
+  {
+    "description_lines": [
+      "Your Projectiles",
+      "move faster."
+    ],
+    "id": "BowArrowSpeed",
+    "rarity": "Uncommon",
+    "title": "Thread"
+  },
+  {
+    "description_lines": [
+      "Your Attacks have",
+      "a 3% chance to ",
+      "trigger an ice",
+      "explosion that",
+      "damages enemies. ",
+      "Costs 5 mana."
+    ],
+    "id": "IceStaffAoE",
+    "rarity": "Uncommon",
+    "title": "Frozen Tear"
+  },
+  {
+    "description_lines": [
+      "You get hungry",
+      "at a slower rate."
+    ],
+    "id": "FullStomach",
+    "rarity": "Uncommon",
+    "title": "Jam"
+  },
+  {
+    "description_lines": [
+      "Attacks chained",
+      "together build ",
+      "Combo, increasing ",
+      "your critical ",
+      "damage."
+    ],
+    "id": "DaggerCombo",
+    "rarity": "Legendary",
+    "title": "Lost Dagger"
+  },
+  {
+    "description_lines": [
+      "Spawn rocks that",
+      "orbit you and deal",
+      "damage to enemies",
+      "they hit.",
+      "Costs 4 mana."
+    ],
+    "id": "StoneTooth",
+    "rarity": "Uncommon",
+    "title": "Boulder"
+  },
+  {
+    "description_lines": [
+      "Soul fragments",
+      "chase enemies",
+      "after each kill,",
+      "damaging them.",
+      "Costs 5 mana."
+    ],
+    "id": "Reaper",
+    "rarity": "Legendary",
+    "title": "Reaper"
+  },
+  {
+    "description_lines": [
+      "Increases chaos,",
+      "making enemies",
+      "stronger and",
+      "more rewarding."
+    ],
+    "id": "ChaosBoost",
+    "rarity": "Uncommon",
+    "title": "Cursed Mask"
+  },
+  {
+    "description_lines": [
+      "Reduce skill",
+      "cooldowns by 15%."
+    ],
+    "id": "SkillCDReduction",
+    "rarity": "Common",
+    "title": "Stanley"
+  },
+  {
+    "description_lines": [
+      "Gain +7 Luck,",
+      "permanently."
+    ],
+    "id": "LoadedDice",
+    "rarity": "Uncommon",
+    "title": "Loaded Dice"
+  },
+  {
+    "description_lines": [
+      "Gain +1 extra",
+      "charge of your",
+      "active class skill."
+    ],
+    "id": "SkillChargeIncrease",
+    "rarity": "Legendary",
+    "title": "Paintbrush"
+  },
+  {
+    "description_lines": [
+      "Using a skill triggers",
+      "an echo that damages",
+      "enemies around you",
+      "Costs 5 mana."
+    ],
+    "id": "SkillEcho",
+    "rarity": "Legendary",
+    "title": "Dragon Eye"
+  },
+  {
+    "description_lines": [
+      "Increases skill",
+      "power by +15%"
+    ],
+    "id": "SkillPower",
+    "rarity": "Common",
+    "title": "Blue Scroll"
+  },
+  {
+    "description_lines": [
+      "Landing a critical",
+      "hit reduces your",
+      "active skill cooldown",
+      "by 0.1 seconds."
+    ],
+    "id": "CritSkillCooldownReduction",
+    "rarity": "Rare",
+    "title": "Bob's Bell"
+  },
+  {
+    "description_lines": [
+      "Gain 1 Coin when",
+      "you use your active",
+      "skill."
+    ],
+    "id": "CreditCard",
+    "rarity": "Legendary",
+    "title": "Credit Card"
+  },
+  {
+    "description_lines": [
+      "Every 5 kills",
+      "gain +1 Max HP."
+    ],
+    "id": "MaxHPHunt",
+    "rarity": "Legendary",
+    "title": "Ripe Tomato"
+  },
+  {
+    "description_lines": [
+      "Gain +10% Damage",
+      "for every 100",
+      "Max HP you have."
+    ],
+    "id": "MaxHPDamage",
+    "rarity": "Rare",
+    "title": "Crusader Shield"
+  },
+  {
+    "description_lines": [
+      "Gain +1% Damage",
+      "for every 10",
+      "coins you have."
+    ],
+    "id": "GoldIntoDamage",
+    "rarity": "Rare",
+    "title": "Red Envelope"
+  },
+  {
+    "description_lines": [
+      "Survive death once,",
+      "restore 50% HP,",
+      "freeze all enemies",
+      "for 3 seconds."
+    ],
+    "id": "DeathDefiance",
+    "rarity": "Legendary",
+    "title": "Cooked Cross"
+  },
+  {
+    "description_lines": [
+      "Lose 5 HP Regen,",
+      "gain 5% Lifesteal."
+    ],
+    "id": "RegenLifesteal",
+    "rarity": "Uncommon",
+    "title": "Dark Blade"
+  },
+  {
+    "description_lines": [
+      "Standing still",
+      "increases damage",
+      "rapidly."
+    ],
+    "id": "StandStill",
+    "rarity": "Legendary",
+    "title": "Tent"
+  },
+  {
+    "description_lines": [
+      "Gain +10 Thorns",
+      "for every 10",
+      "Defence you have.",
+      "Gain +10 Defence."
+    ],
+    "id": "ThornArmor",
+    "rarity": "Rare",
+    "title": "Spikey Shield"
+  },
+  {
+    "description_lines": [
+      "Lifesteal triggers",
+      "give you a coin.",
+      "Gain +5% Lifesteal."
+    ],
+    "id": "LifestealCoins",
+    "rarity": "Legendary",
+    "title": "Cursed Crown"
+  },
+  {
+    "description_lines": [
+      "Picking up coins",
+      "has a 25% chance",
+      "to heal 1 HP."
+    ],
+    "id": "CoinHeal",
+    "rarity": "Common",
+    "title": "Lucky Penny"
+  },
+  {
+    "description_lines": [
+      "Breaking crates",
+      "permanently gives",
+      "+1% damage."
+    ],
+    "id": "CrateBreakDamage",
+    "rarity": "Legendary",
+    "title": "Sturdy Crate"
+  },
+  {
+    "description_lines": [
+      "Upgrade Tomes",
+      "level up gear",
+      "an extra time."
+    ],
+    "id": "TomeDoubleUpgrade",
+    "rarity": "Legendary",
+    "title": "Ancient Tome"
+  },
+  {
+    "description_lines": [
+      "Critical hits",
+      "have a 25% chance",
+      "to heal 1 HP."
+    ],
+    "id": "CritHeal",
+    "rarity": "Uncommon",
+    "title": "Vampiric Ring"
+  },
+  {
+    "description_lines": [
+      "Deal more damage",
+      "the lower your",
+      "HP is (up to",
+      "+75% at 0 HP)."
+    ],
+    "id": "LowHPDamage",
+    "rarity": "Rare",
+    "title": "Beer!"
+  },
+  {
+    "description_lines": [
+      "+2 Chaos. +10 HP,",
+      "+10 MP, +10% dmg,",
+      "+10 def, +10% crit",
+      "+10 spd, +10 dodge"
+    ],
+    "id": "ChaosStats",
+    "rarity": "Rare",
+    "title": "Chaotic Candle"
+  },
+  {
+    "description_lines": [
+      "Increases item",
+      "pickup radius by",
+      "+25%."
+    ],
+    "id": "ItemPickupRadius",
+    "rarity": "Common",
+    "title": "Magnet"
+  },
+  {
+    "description_lines": [
+      "Periodically pulls",
+      "all item drops on",
+      "the map to you.",
+      "Cooldown reduces",
+      "with more copies."
+    ],
+    "id": "MagnetPull",
+    "rarity": "Rare",
+    "title": "Gravitation Tome"
+  },
+  {
+    "description_lines": [
+      "Taking damage shoots",
+      "out 2 spikes. Damage",
+      "scales with thorns",
+      "stat."
+    ],
+    "id": "ThornsSpikes",
+    "rarity": "Uncommon",
+    "title": "Spiked Club"
+  },
+  {
+    "description_lines": [
+      "Gain +1 Thorns each",
+      "time you take damage"
+    ],
+    "id": "ThornsOnDamage",
+    "rarity": "Rare",
+    "title": "Spiked Helmet"
+  },
+  {
+    "description_lines": [
+      "Your thorns damage",
+      "has +25% lifesteal."
+    ],
+    "id": "ThornsLifesteal",
+    "rarity": "Uncommon",
+    "title": "Spiked Ring"
+  },
+  {
+    "description_lines": [
+      "Picking up coins",
+      "spawns a lightning",
+      "strike on a random",
+      "nearby enemy.",
+      "Costs 5 mana."
+    ],
+    "id": "CoinLightning",
+    "rarity": "Legendary",
+    "title": "Lightning Belt"
+  },
+  {
+    "description_lines": [
+      "Killing an enemy",
+      "has a 5% chance",
+      "to spawn a lightning",
+      "strike on a random",
+      "nearby enemy.",
+      "Costs 5 mana."
+    ],
+    "id": "KillLightning",
+    "rarity": "Uncommon",
+    "title": "Lightning Ring"
+  },
+  {
+    "description_lines": [
+      "Mana regeneration",
+      "has a 20% chance to",
+      "spawn a lightning",
+      "strike on a random",
+      "nearby enemy.",
+      "Costs 5 mana."
+    ],
+    "id": "ManaRegenLightning",
+    "rarity": "Rare",
+    "title": "Lightning Cape"
+  },
+  {
+    "description_lines": [
+      "Every time you",
+      "regenerate 75 mana,",
+      "apply a poison",
+      "stack to all",
+      "enemies."
+    ],
+    "id": "ManaRegenPoison",
+    "rarity": "Rare",
+    "title": "Toxic Tome"
+  },
+  {
+    "description_lines": [
+      "Using a skill has",
+      "a 20% chance to",
+      "trigger mana",
+      "regeneration."
+    ],
+    "id": "SkillManaRegen",
+    "rarity": "Uncommon",
+    "title": "Brown Card"
+  }
+]
