@@ -470,14 +470,17 @@ impl ChunkPlugin {
             return;
         }
         info!("BEGIN STARTUP CHUNK GENERATION!!");
-        // Use ISLAND_SIZE to determine startup chunk radius instead of hardcoded 6
+        // Use ISLAND_SIZE to determine startup chunk radius instead of hardcoded 6.
+        // Always request chunk entities for positions that don't have one (e.g. after dimension
+        // despawn). When data is cached (is_chunk_generated), handle_new_chunk_event will still
+        // spawn the entity and fill from cache — otherwise we'd never create entities and the
+        // loading screen would wait forever for chunks_created > 0.
         let num_chunks =
             ((crate::world::ISLAND_SIZE / crate::world::CHUNK_SIZE as f32) + 1.) as i32;
         for y in -num_chunks..=num_chunks {
             for x in -num_chunks..=num_chunks {
                 let chunk_pos = IVec2::new(x, y);
-                if game.get_chunk_entity(chunk_pos).is_none() && !game.is_chunk_generated(chunk_pos)
-                {
+                if game.get_chunk_entity(chunk_pos).is_none() {
                     create_chunk_event.send(CreateChunkEvent { chunk_pos });
                 }
             }

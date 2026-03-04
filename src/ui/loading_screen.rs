@@ -57,9 +57,14 @@ pub fn setup_loading_screen(
         .id();
 }
 
+/// Time to wait in Initializing after the main timer finishes before forcing transition if no chunks exist (fallback for stuck state).
+const STUCK_FALLBACK_SECS: f32 = 10.0;
+
 pub struct InitializationTimer {
     timer: Timer,
     done_chunk_event_received: bool,
+    /// When we're waiting for chunks after timer finished; after STUCK_FALLBACK_SECS we force transition.
+    stuck_fallback_timer: Option<Timer>,
 }
 
 pub fn check_initialization_complete(
@@ -78,6 +83,7 @@ pub fn check_initialization_complete(
         *init_timer = Some(InitializationTimer {
             timer: Timer::from_seconds(2.0, TimerMode::Once), // Wait 2 seconds after chunks start generating to allow objects to spawn
             done_chunk_event_received: false,
+            stuck_fallback_timer: None,
         });
         info!("Initialization timer started");
     }
@@ -103,6 +109,23 @@ pub fn check_initialization_complete(
     // Count how many chunks have been created (at least a few should exist)
     let chunks_created = chunk_query.iter().count();
 
+    // Start stuck fallback when we have player + done event + main timer finished but still 0 chunks
+    let waiting_for_chunks_stuck = player_exists
+        && timer.done_chunk_event_received
+        && timer.timer.finished()
+        && chunks_created == 0;
+    if waiting_for_chunks_stuck {
+        if timer.stuck_fallback_timer.is_none() {
+            timer.stuck_fallback_timer =
+                Some(Timer::from_seconds(STUCK_FALLBACK_SECS, TimerMode::Once));
+        }
+        if let Some(ref mut t) = timer.stuck_fallback_timer {
+            t.tick(time.delta());
+        }
+    } else {
+        timer.stuck_fallback_timer = None;
+    }
+
     // Debug logging
     if !player_exists {
         info!("Waiting for player to spawn...");
@@ -121,6 +144,29 @@ pub fn check_initialization_complete(
             "Waiting for timer to finish ({}%)...",
             (timer.timer.elapsed_secs() / timer.timer.duration().as_secs_f32() * 100.0) as u32
         );
+    }
+
+    // Force transition if we've been stuck with 0 chunks for too long (safety fallback)
+    let force_transition_stuck = waiting_for_chunks_stuck
+        && timer
+            .stuck_fallback_timer
+            .as_ref()
+            .map(|t| t.finished())
+            .unwrap_or(false);
+    if force_transition_stuck {
+        warn!(
+            "Initialization stuck with 0 chunks after {:.0}s fallback; forcing transition to Main",
+            STUCK_FALLBACK_SECS
+        );
+        for entity in loading_screens.iter() {
+            commands.entity(entity).despawn_recursive();
+        }
+        next_state.set(GameState::Main);
+        *init_timer = None;
+        if let Some(mut spawners) = spawners {
+            spawners.initial_spawn_delay.reset();
+        }
+        return;
     }
 
     // Transition when player exists, chunk generation has started, we've waited for objects to spawn,

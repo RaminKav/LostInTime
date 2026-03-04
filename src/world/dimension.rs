@@ -166,7 +166,19 @@ impl DimensionPlugin {
         mut mob_spawning_paused: ResMut<MobSpawningPaused>,
         mut transition_state: ResMut<EraTransitionState>,
     ) {
+        // Process only the first dimension spawn per frame to avoid double-firing when the portal
+        // is triggered by both click and interact key (F), or by rapid double input.
+        let mut processed_one = false;
         for new_dim in spawn_event.iter() {
+            if processed_one {
+                warn!(
+                    "Ignoring duplicate DimensionSpawnEvent for {:?} (portal was likely triggered twice)",
+                    new_dim.new_era
+                );
+                continue;
+            }
+            processed_one = true;
+
             info!("SPAWNING NEW DIMENSION {:?}", new_dim.new_era);
 
             let dim_e = commands.spawn((Dimension,)).id();
