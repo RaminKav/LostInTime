@@ -727,6 +727,7 @@ pub fn cleanup_marked_for_death_entities(
             commands
                 .entity(e)
                 .insert(DeathState)
+                .remove::<Burning>()
                 .remove::<FollowState>()
                 .remove::<SummonAttackState>()
                 .remove::<LeapAttackState>()

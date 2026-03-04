@@ -6,6 +6,7 @@ use strum_macros::{Display, EnumIter};
 use crate::assets::Graphics;
 use crate::attributes::BonusDamage;
 use crate::player::skills::{Heirloom, PlayerSkills};
+use crate::enemy::red_mushking::DeathState;
 use crate::Player;
 
 use super::HitEvent;
@@ -206,7 +207,7 @@ pub fn update_status_effect_icons(
 }
 
 pub fn handle_burning_ticks(
-    mut burning: Query<(Entity, &mut Burning)>,
+    mut burning: Query<(Entity, &mut Burning), Without<DeathState>>,
     time: Res<Time>,
     mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,

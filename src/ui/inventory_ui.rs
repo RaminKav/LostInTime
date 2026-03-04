@@ -10,6 +10,7 @@ use crate::item::ammo::Ammo;
 use crate::night::EraTimer;
 use crate::proto::proto_param::ProtoParam;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
+use crate::player::ModifyCurencyEvent;
 use crate::GameParam;
 use crate::{
     assets::Graphics,
@@ -77,6 +78,9 @@ pub enum DevButtonAction {
     TeleportEra2,
     TeleportEra3,
     TriggerEndless,
+    AddChaos,
+    AddGold,
+    DropDungeonKey,
 }
 #[derive(Component, FromReflect, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
@@ -262,7 +266,7 @@ pub fn setup_inv_ui(
         // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
         let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 130.;
         let start_y = 48.0f32;
-        let labels: [(DevButtonAction, &str); 8] = [
+        let labels: [(DevButtonAction, &str); 11] = [
             (DevButtonAction::GrantXp, "+250 xp"),
             (DevButtonAction::GrantMoreXp, "+1000 xp"),
             (DevButtonAction::SpawnChest, "chest"),
@@ -271,6 +275,9 @@ pub fn setup_inv_ui(
             (DevButtonAction::TeleportEra2, "era2"),
             (DevButtonAction::TeleportEra3, "era3"),
             (DevButtonAction::TriggerEndless, "endless"),
+            (DevButtonAction::AddChaos, "+chaos"),
+            (DevButtonAction::AddGold, "+50 gold"),
+            (DevButtonAction::DropDungeonKey, "key"),
         ];
         for (i, (action, label)) in labels.iter().enumerate() {
             let y = start_y - i as f32 * DEV_BUTTON_SPACING;
@@ -922,6 +929,7 @@ pub fn handle_dev_button_clicks(
     mut dimension_spawn: EventWriter<DimensionSpawnEvent>,
     mut era_timer: ResMut<EraTimer>,
     mut chaos_tracker: ResMut<ChaosTracker>,
+    mut currency_event: EventWriter<ModifyCurencyEvent>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -999,6 +1007,24 @@ pub fn handle_dev_button_clicks(
                     }
                     DevButtonAction::TriggerEndless => {
                         era_timer.remaining_seconds = 5.0;
+                    }
+                    DevButtonAction::AddChaos => {
+                        chaos_tracker.add_chaos(1.0);
+                    }
+                    DevButtonAction::AddGold => {
+                        currency_event.send(ModifyCurencyEvent {
+                            delta: 50,
+                            obj: WorldObject::Coin,
+                        });
+                    }
+                    DevButtonAction::DropDungeonKey => {
+                        let _ = proto_commands.spawn_item_from_proto(
+                            WorldObject::Key,
+                            &proto,
+                            spawn_pos,
+                            1,
+                            None,
+                        );
                     }
                 }
                 commands.spawn(crate::audio::SoundSpawner::new(
