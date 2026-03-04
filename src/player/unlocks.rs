@@ -85,7 +85,6 @@ pub enum UnlockUpgradeKind {
     StartTome,
     StartOrb,
     StartingTools,
-    SecondActiveSkillSlot,
 }
 
 impl UnlockUpgradeKind {
@@ -97,7 +96,6 @@ impl UnlockUpgradeKind {
             UnlockUpgradeKind::StartTome => "Start with Tomes",
             UnlockUpgradeKind::StartOrb => "Start with Orbs",
             UnlockUpgradeKind::StartingTools => "Starting Tools",
-            UnlockUpgradeKind::SecondActiveSkillSlot => "Third Active Skill Slot",
         }
     }
 }
@@ -122,7 +120,6 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => 15,
             UnlockUpgradeKind::StartOrb => 20,
             UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
-            UnlockUpgradeKind::SecondActiveSkillSlot => 100, // Will be set separately
         }
     }
 
@@ -134,13 +131,6 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartTome => self.tome_tier,
             UnlockUpgradeKind::StartOrb => self.orb_tier,
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier,
-            UnlockUpgradeKind::SecondActiveSkillSlot => {
-                if self.second_active_skill_slot_unlocked {
-                    1
-                } else {
-                    0
-                }
-            }
         }
     }
 
@@ -155,15 +145,11 @@ impl UnlockUpgrades {
                 // Cap at tier 3 (SalvageBin)
                 self.starting_tools_tier = (self.starting_tools_tier + 1).min(2);
             }
-            UnlockUpgradeKind::SecondActiveSkillSlot => {
-                self.second_active_skill_slot_unlocked = true
-            }
         }
     }
 
     pub fn is_unlocked(&self, kind: UnlockUpgradeKind) -> bool {
         match kind {
-            UnlockUpgradeKind::SecondActiveSkillSlot => self.second_active_skill_slot_unlocked,
             _ => self.tier(kind) > 0,
         }
     }
@@ -186,13 +172,7 @@ impl UnlockUpgrades {
                     _ => 0,   // Max tier reached
                 }
             }
-            UnlockUpgradeKind::SecondActiveSkillSlot => {
-                if self.second_active_skill_slot_unlocked {
-                    0
-                } else {
-                    100 // Will be set separately
-                }
-            }
+
             _ => {
                 let base = Self::base_cost(kind) as f32;
                 let tier = self.tier(kind) as i32;
@@ -226,7 +206,6 @@ impl UnlockUpgrades {
     pub fn is_maxed(&self, kind: UnlockUpgradeKind) -> bool {
         match kind {
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 3,
-            UnlockUpgradeKind::SecondActiveSkillSlot => self.second_active_skill_slot_unlocked,
             _ => false, // Other unlocks have no max (infinite tiers)
         }
     }

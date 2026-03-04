@@ -389,6 +389,8 @@ fn setup_island_map(
                                     | WorldObject::BlacksmithMerchant
                                     | WorldObject::BlacksmithMerchantDone
                                     | WorldObject::DungeonEntrance
+                                    | WorldObject::MicrowaveShrine
+                                    | WorldObject::MicrowaveShrineDone
                                     | WorldObject::TimeGate
                             ) {
                                 let c = obj.get_obj_color();

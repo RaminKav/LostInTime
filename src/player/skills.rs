@@ -116,7 +116,7 @@ impl SkillClass {
             }
             SkillClass::Wizard => {
                 // +5 MP per level
-                stats.mana = AttributeValue::new(level * 3, quality, 1.);
+                stats.mana_regen = AttributeValue::new(level * 1, quality, 1.);
             }
             SkillClass::Rogue => {
                 // +3% crit chance per level

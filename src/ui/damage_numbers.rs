@@ -116,8 +116,11 @@ pub fn handle_add_damage_numbers_after_hit(
         changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
+        let was_over_max = prev_health.0 > max_health.map_or(i32::MAX, |mh| mh.0);
 
-        if delta == 0 || prev_health.0 > max_health.map_or(i32::MAX, |mh| mh.0) {
+        prev_health.0 = changed_health.0;
+
+        if delta == 0 || was_over_max {
             continue;
         }
         let mut rng = rand::thread_rng();
@@ -131,7 +134,6 @@ pub fn handle_add_damage_numbers_after_hit(
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
         let is_overcrit = overcrit_option.is_some();
-        prev_health.0 = changed_health.0;
         spawn_floating_text_with_shadow(
             &mut commands,
             &asset_server,

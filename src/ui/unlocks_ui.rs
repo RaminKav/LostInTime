@@ -44,14 +44,13 @@ pub struct UnlockButtonLabel;
 #[derive(Component)]
 pub struct UnlocksCurrencyText;
 
-const UNLOCK_ROWS: [UnlockUpgradeKind; 7] = [
+const UNLOCK_ROWS: [UnlockUpgradeKind; 6] = [
     UnlockUpgradeKind::Reroll,
     UnlockUpgradeKind::Banish,
     UnlockUpgradeKind::StartFood,
     UnlockUpgradeKind::StartTome,
     UnlockUpgradeKind::StartOrb,
     UnlockUpgradeKind::StartingTools,
-    UnlockUpgradeKind::SecondActiveSkillSlot,
 ];
 
 fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> String {
@@ -99,13 +98,6 @@ fn unlock_effect_summary(kind: UnlockUpgradeKind, upgrades: &UnlockUpgrades) -> 
             2 => "Tier 3: Start with Wood Axe and Pickaxe".to_string(),
             _ => format!("Unlocked: Start with Wood Axe and Pickaxe",),
         },
-        UnlockUpgradeKind::SecondActiveSkillSlot => {
-            if upgrades.second_active_skill_slot_unlocked {
-                "Unlocked: Gain a third active skill slot.".to_string()
-            } else {
-                "Gain a third active skill slot.".to_string()
-            }
-        }
     }
 }
 
