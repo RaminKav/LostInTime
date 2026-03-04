@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     assets::Graphics,
     player::{score::RunScore, skills::PlayerClass},
+    ui::CheatSettings,
     GameState,
 };
 
@@ -319,7 +320,9 @@ pub fn auto_submit_score_on_game_over(
     class: Res<PlayerClass>,
     graphics: Res<Graphics>,
     mut last_submitted: ResMut<LastSubmittedScore>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
+    let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
     for _ in game_over_events.iter() {
         // Get player name from game data or use default
         let player_name = game_data
@@ -343,16 +346,17 @@ pub fn auto_submit_score_on_game_over(
         last_submitted.score = score;
         last_submitted.rank = None; // Clear previous rank
         last_submitted.is_personal_best = false;
-
-        submit_events.send(SubmitScoreEvent {
-            user_id: game_data.user_id.to_string(),
-            player_name: player_name.clone(),
-            score,
-            class: class_name.clone(),
-            chaos_level: total_chaos.trunc() as i32,
-            mobs_killed: run_score.mobs_killed as i32,
-            objs_destroyed: run_score.objs_destroyed as i32,
-        });
+        if !dev_mode {
+            submit_events.send(SubmitScoreEvent {
+                user_id: game_data.user_id.to_string(),
+                player_name: player_name.clone(),
+                score,
+                class: class_name.clone(),
+                chaos_level: total_chaos.trunc() as i32,
+                mobs_killed: run_score.mobs_killed as i32,
+                objs_destroyed: run_score.objs_destroyed as i32,
+            });
+        }
     }
 }
 
