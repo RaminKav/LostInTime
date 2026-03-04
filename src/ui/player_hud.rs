@@ -615,7 +615,7 @@ pub fn setup_chaos_ui(
                 text: Text::from_section(
                     format!(
                         "Chaos: {:.1}",
-                        chaos_tracker.get_chaos() + infinite_mode.chaos_bonus
+                        chaos_tracker.get_chaos() + infinite_mode.get_chaos_bonus()
                     ),
                     TextStyle {
                         font: asset_server.load("fonts/slkscr.ttf"),
@@ -696,14 +696,15 @@ pub fn setup_chaos_ui(
 
 pub fn update_chaos_ui(
     chaos_tracker: Res<ChaosTracker>,
+    infinite_chaos: Res<InfiniteMode>,
     mut chaos_text_query: Query<&mut Text, With<ChaosText>>,
     mut chaos_bar_query: Query<&mut Sprite, With<ChaosBar>>,
 ) {
-    if !chaos_tracker.is_changed() {
+    if !chaos_tracker.is_changed() && !infinite_chaos.is_changed() {
         return;
     }
 
-    let chaos_value = chaos_tracker.get_chaos();
+    let chaos_value = chaos_tracker.get_chaos() + infinite_chaos.get_chaos_bonus();
 
     // Update text
     for mut text in chaos_text_query.iter_mut() {

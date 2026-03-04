@@ -1,7 +1,15 @@
 use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 
+use bevy_proto::prelude::ProtoCommands;
+
+use crate::chaos::ChaosTracker;
 use crate::colors::{DARK_WOOD_BROWN, UNCOMMON_GREEN};
+use crate::cursor::CursorPos;
+use crate::custom_commands::CommandsExt;
 use crate::item::ammo::Ammo;
+use crate::night::EraTimer;
+use crate::proto::proto_param::ProtoParam;
+use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::GameParam;
 use crate::{
     assets::Graphics,
@@ -13,9 +21,13 @@ use crate::{
 };
 
 use super::{
-    crafting_ui::CraftingContainer, interactions::Interaction, ui_helpers::spawn_ui_overlay,
-    Interactable, ShowInvPlayerStatsEvent, UIContainersParam, UIElement,
-    CRAFTING_INVENTORY_UI_SIZE, FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
+    crafting_ui::CraftingContainer,
+    interactions::{Interactable, Interaction},
+    options_ui::CheatSettings,
+    player_hud::FlashExpBarEvent,
+    ui_helpers::spawn_ui_overlay,
+    ShowInvPlayerStatsEvent, UIContainersParam, UIElement, CRAFTING_INVENTORY_UI_SIZE,
+    FURNACE_INVENTORY_UI_SIZE, UI_SLOT_SIZE,
 };
 
 #[derive(Clone, Eq, PartialEq, Debug, Hash, Default, States, Component)]
@@ -53,6 +65,19 @@ impl UIState {
 
 #[derive(Component, Default, Clone)]
 pub struct InventoryUI;
+
+/// Dev-only button shown in inventory when dev mode is enabled (Options > Dev Mode).
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DevButtonAction {
+    GrantXp,
+    GrantMoreXp,
+    SpawnChest,
+    SpawnTome,
+    SpawnOrb,
+    TeleportEra2,
+    TeleportEra3,
+    TriggerEndless,
+}
 #[derive(Component, FromReflect, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
     pub slot_index: usize,
@@ -118,6 +143,7 @@ pub fn setup_inv_ui(
     mut stats_event: EventWriter<ShowInvPlayerStatsEvent>,
     resolution: Res<ScreenResolution>,
     asset_server: Res<AssetServer>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     // Title
     let _upgrade_text = commands
@@ -226,6 +252,69 @@ pub fn setup_inv_ui(
             .id();
         commands.entity(inv).push_children(&[upgrade_button]);
     }
+
+    // Dev mode buttons (far left of inventory, only when Options > Dev Mode is on)
+    let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
+    if cur_inv_state.0 == UIState::Inventory && dev_mode {
+        const DEV_BUTTON_WIDTH: f32 = 38.;
+        const DEV_BUTTON_HEIGHT: f32 = 11.;
+        const DEV_BUTTON_SPACING: f32 = 14.;
+        // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
+        let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 130.;
+        let start_y = 48.0f32;
+        let labels: [(DevButtonAction, &str); 8] = [
+            (DevButtonAction::GrantXp, "+250 xp"),
+            (DevButtonAction::GrantMoreXp, "+1000 xp"),
+            (DevButtonAction::SpawnChest, "chest"),
+            (DevButtonAction::SpawnTome, "tome"),
+            (DevButtonAction::SpawnOrb, "orb"),
+            (DevButtonAction::TeleportEra2, "era2"),
+            (DevButtonAction::TeleportEra3, "era3"),
+            (DevButtonAction::TriggerEndless, "endless"),
+        ];
+        for (i, (action, label)) in labels.iter().enumerate() {
+            let y = start_y - i as f32 * DEV_BUTTON_SPACING;
+            let btn = commands
+                .spawn(SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::XLKey).clone(),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::new(DEV_BUTTON_WIDTH, DEV_BUTTON_HEIGHT)),
+                        ..Default::default()
+                    },
+                    transform: Transform::from_xyz(dev_x, y, 10.),
+                    ..Default::default()
+                })
+                .insert(RenderLayers::from_layers(&[3]))
+                .insert(UIState::Inventory)
+                .insert(Interactable::default())
+                .insert(*action)
+                .insert(Name::new(format!("Dev Button {:?}", action)))
+                .id();
+            commands
+                .spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            *label,
+                            TextStyle {
+                                font: asset_server.load("fonts/4x5.ttf"),
+                                font_size: 5.0,
+                                color: DARK_WOOD_BROWN,
+                            },
+                        )
+                        .with_alignment(TextAlignment::Center),
+                        text_anchor: Anchor::Center,
+                        transform: Transform::from_xyz(0., 0.5, 1.),
+                        ..Default::default()
+                    },
+                    RenderLayers::from_layers(&[3]),
+                    UIState::Inventory,
+                    Name::new("Dev Button Label"),
+                ))
+                .set_parent(btn);
+            commands.entity(inv).add_child(btn);
+        }
+    }
+
     stats_event.send(ShowInvPlayerStatsEvent {
         stat: None,
         ignore_timer: true,
@@ -815,6 +904,110 @@ pub fn mark_slot_dirty(
         if state.slot_index == slot_index && (state.r#type == slot_type || state.r#type.is_hotbar())
         {
             state.dirty = true;
+        }
+    }
+}
+
+/// Handles clicks on dev mode buttons (only runs when inventory is open and dev mode is on).
+pub fn handle_dev_button_clicks(
+    cursor_pos: Res<CursorPos>,
+    mouse_input: Res<Input<MouseButton>>,
+    ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut dev_buttons: Query<(Entity, &DevButtonAction, &mut Interactable)>,
+    mut commands: Commands,
+    mut flash_event: EventWriter<FlashExpBarEvent>,
+    mut game: GameParam,
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+    mut dimension_spawn: EventWriter<DimensionSpawnEvent>,
+    mut era_timer: ResMut<EraTimer>,
+    mut chaos_tracker: ResMut<ChaosTracker>,
+) {
+    let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
+    let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
+
+    for (e, action, mut interactable) in dev_buttons.iter_mut() {
+        let hit = match &hit_test {
+            Some((hit_ent, _, _)) => *hit_ent == e,
+            None => false,
+        };
+        if hit {
+            interactable.change(Interaction::Hovering);
+            if left_mouse_pressed {
+                let player_pos = game.player().position.truncate();
+                let spawn_pos = player_pos + Vec2::new(0., -20.);
+
+                match action {
+                    DevButtonAction::GrantXp => {
+                        let player_skills = game.get_player_skills();
+                        let mut player_level = game.get_player_level_mut();
+                        let did_level =
+                            player_level.add_xp(250, &player_skills, &mut chaos_tracker);
+                        flash_event.send(FlashExpBarEvent {
+                            amount: 250,
+                            did_level,
+                        });
+                    }
+                    DevButtonAction::GrantMoreXp => {
+                        let player_skills = game.get_player_skills();
+                        let mut player_level = game.get_player_level_mut();
+                        let did_level =
+                            player_level.add_xp(1000, &player_skills, &mut chaos_tracker);
+                        flash_event.send(FlashExpBarEvent {
+                            amount: 1000,
+                            did_level,
+                        });
+                    }
+                    DevButtonAction::SpawnChest => {
+                        let _ = proto_commands.spawn_item_from_proto(
+                            WorldObject::ChestBlock,
+                            &proto,
+                            spawn_pos,
+                            1,
+                            None,
+                        );
+                    }
+                    DevButtonAction::SpawnTome => {
+                        let _ = proto_commands.spawn_item_from_proto(
+                            WorldObject::UpgradeTome,
+                            &proto,
+                            spawn_pos,
+                            1,
+                            None,
+                        );
+                    }
+                    DevButtonAction::SpawnOrb => {
+                        let _ = proto_commands.spawn_item_from_proto(
+                            WorldObject::OrbOfTransformation,
+                            &proto,
+                            spawn_pos,
+                            1,
+                            None,
+                        );
+                    }
+                    DevButtonAction::TeleportEra2 => {
+                        dimension_spawn.send(DimensionSpawnEvent {
+                            swap_to_dim_now: true,
+                            new_era: Some(Era::Second),
+                        });
+                    }
+                    DevButtonAction::TeleportEra3 => {
+                        dimension_spawn.send(DimensionSpawnEvent {
+                            swap_to_dim_now: true,
+                            new_era: Some(Era::Third),
+                        });
+                    }
+                    DevButtonAction::TriggerEndless => {
+                        era_timer.remaining_seconds = 5.0;
+                    }
+                }
+                commands.spawn(crate::audio::SoundSpawner::new(
+                    crate::audio::AudioSoundEffect::ButtonClick,
+                    0.2,
+                ));
+            }
+        } else if matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
         }
     }
 }

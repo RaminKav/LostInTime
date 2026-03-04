@@ -11,6 +11,7 @@ use crate::{
         unlocks::RunUnlockState,
         Player,
     },
+    ui::CheatSettings,
     ScreenResolution, DEBUG, GAME_HEIGHT,
 };
 
@@ -581,12 +582,14 @@ pub fn toggle_skills_visibility(
     graphics: Res<Graphics>,
     asset_server: Res<AssetServer>,
     player_atts: Query<&LootRateBonus, With<Player>>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     if curr_ui_state.0 == UIState::ActiveSkills {
         return;
     }
+    let dev_mode = cheat_settings.map(|c| c.dev_mode).unwrap_or(false);
 
-    if *DEBUG && key_input.just_pressed(KeyCode::N) {
+    if (*DEBUG || dev_mode) && key_input.just_pressed(KeyCode::N) {
         if queue.queue.is_empty() {
             return;
         }

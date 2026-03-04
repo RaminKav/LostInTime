@@ -942,8 +942,8 @@ pub fn handle_max_hp_hunt(
         tracker.kill_count += 1;
 
         // Every 3 kills grants +1 max hp per stack
-        if tracker.kill_count >= 5 {
-            tracker.kill_count -= 5;
+        if tracker.kill_count >= 25 {
+            tracker.kill_count -= 25;
             let hp_gained = stacks; // Each stack gives +1 hp per trigger
             tracker.total_hp_gained += hp_gained; // Track total HP gained
             hp_was_gained = true;

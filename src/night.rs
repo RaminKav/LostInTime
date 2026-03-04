@@ -20,15 +20,11 @@ pub struct Night(Timer);
 #[derive(Default, Resource, Clone, Debug)]
 pub struct InfiniteMode {
     pub active: bool,
-    pub chaos_timer: Timer,
     /// Difficulty level (0-5), increases every 2 minutes
     pub difficulty_level: u8,
     /// Timer for difficulty scaling (1.5 minutes per level, max 5 levels)
     pub difficulty_timer: Timer,
-    /// Chaos bonus accumulated during infinite mode (increases every 30s)
-    /// This is separate from the global chaos tracker and only applies during infinite mode
-    pub chaos_bonus: f32,
-    /// Elapsed time in endless mode (seconds)
+    /// Elapsed time in endless mode (seconds); chaos bonus is computed from this
     pub elapsed_seconds: f32,
 }
 
@@ -36,9 +32,10 @@ pub struct InfiniteMode {
 pub const MAX_DIFFICULTY_LEVEL: u8 = 10;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
-/// Seconds between chaos threshold increases in endless mode (noticeable jumps every 60-90s)
-pub const CHAOS_THRESHOLD_INTERVAL: f32 = 75.0; // 75 seconds for noticeable difficulty ramps
-const CHAOS_TIMER_SECONDS: f32 = CHAOS_THRESHOLD_INTERVAL;
+/// Endless chaos: smooth power-law chaos(elapsed) = COEFFICIENT * elapsed_seconds^EXPONENT.
+/// Tuned for ~40 @ 5min, ~136 @ 10min, ~462 @ 20min (smooth, slightly super-linear).
+pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.001_85;
+pub const ENDLESS_CHAOS_EXPONENT: f32 = 1.75;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.
 pub const ERA_TIMER_SECONDS: f32 = 11.0 * 60.0; // 10 minutes
@@ -47,16 +44,21 @@ impl InfiniteMode {
     pub fn new() -> Self {
         Self {
             active: true,
-            chaos_timer: Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating),
-            // Start at difficulty level 1 so mobs immediately get some enhancement
             difficulty_level: 1,
             difficulty_timer: Timer::from_seconds(
                 DIFFICULTY_INCREASE_INTERVAL,
                 TimerMode::Repeating,
             ),
-            chaos_bonus: 0.0,
             elapsed_seconds: 0.0,
         }
+    }
+
+    /// Raw endless chaos from elapsed time (before tier multiplier). Smooth power-law.
+    pub fn chaos_from_elapsed(elapsed_seconds: f32) -> f32 {
+        if elapsed_seconds <= 0.0 {
+            return 0.0;
+        }
+        ENDLESS_CHAOS_COEFFICIENT * elapsed_seconds.powf(ENDLESS_CHAOS_EXPONENT)
     }
 
     /// Get the elapsed time formatted as MM:SS
@@ -70,7 +72,7 @@ impl InfiniteMode {
     /// Tier 1: 1x multiplier, Tier 2: 3x multiplier (triple chaos)
     pub fn get_chaos_bonus(&self) -> f32 {
         if self.active {
-            self.chaos_bonus * self.get_chaos_multiplier()
+            Self::chaos_from_elapsed(self.elapsed_seconds) * self.get_chaos_multiplier()
         } else {
             0.0
         }
@@ -371,33 +373,12 @@ pub fn handle_infinite_mode_started(
     }
 }
 
-/// Tick the chaos timer in infinite mode and increase internal chaos bonus at thresholds
-/// This chaos is stored in InfiniteMode and only applies during infinite mode (not carried to next era)
-/// Uses exponential growth per threshold to create noticeable difficulty jumps every 75s
+/// Tick endless mode elapsed time; chaos is computed smoothly from elapsed_seconds (power-law).
 pub fn tick_infinite_mode_chaos(time: Res<Time>, mut infinite_mode: ResMut<InfiniteMode>) {
     if !infinite_mode.active {
         return;
     }
-
-    // Tick elapsed time
     infinite_mode.elapsed_seconds += time.delta_seconds();
-
-    infinite_mode.chaos_timer.tick(time.delta());
-    if infinite_mode.chaos_timer.just_finished() {
-        // Calculate which threshold we're at (0-indexed)
-        let threshold_number =
-            (infinite_mode.elapsed_seconds / CHAOS_THRESHOLD_INTERVAL).floor() as u32;
-
-        let base_chaos_per_threshold = 3.0;
-        let growth_rate = 1.15_f32;
-        let chaos_to_add = base_chaos_per_threshold * growth_rate.powf(threshold_number as f32);
-
-        infinite_mode.chaos_bonus += chaos_to_add;
-        info!(
-            "Infinite mode: Chaos bonus increased by {:.1} to {:.1}! (Threshold {}, {:.0}s elapsed)",
-            chaos_to_add, infinite_mode.chaos_bonus, threshold_number, infinite_mode.elapsed_seconds
-        );
-    }
 }
 
 /// Tick the difficulty timer in infinite mode - increases difficulty every 1.5 minutes (up to level 10)
@@ -498,10 +479,8 @@ pub fn reset_era_timer_and_infinite_mode(
 
     infinite_mode.active = false;
     infinite_mode.difficulty_level = 0;
-    infinite_mode.chaos_timer = Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating);
     infinite_mode.difficulty_timer =
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
-    infinite_mode.chaos_bonus = 0.0;
     infinite_mode.elapsed_seconds = 0.0;
 
     if mob_spawning_paused.paused {
@@ -527,11 +506,9 @@ fn reset_era_timer_on_new_run(
 
     // Reset infinite mode completely
     infinite_mode.active = false;
-    infinite_mode.chaos_timer = Timer::from_seconds(CHAOS_TIMER_SECONDS, TimerMode::Repeating);
     infinite_mode.difficulty_level = 0;
     infinite_mode.difficulty_timer =
         Timer::from_seconds(DIFFICULTY_INCREASE_INTERVAL, TimerMode::Repeating);
-    infinite_mode.chaos_bonus = 0.0;
     infinite_mode.elapsed_seconds = 0.0;
 
     // Reset mob spawning paused state

@@ -1271,7 +1271,7 @@ impl Heirloom {
 
             // New heirlooms
             Heirloom::MaxHPHunt => {
-                vec!["Every 5 kills".to_string(), "gain +1 Max HP.".to_string()]
+                vec!["Every 25 kills".to_string(), "gain +1 Max HP.".to_string()]
             }
             Heirloom::MaxHPDamage => vec![
                 "Gain +10% Damage".to_string(),
@@ -1869,9 +1869,9 @@ impl HeirloomChoiceQueue {
 
         let loot_bonus_f = loot_bonus as f32;
         // Calculate adjusted thresholds (lower threshold = more chance for that rarity)
-        let legendary_threshold = (99.0 - loot_bonus_f * 0.08).max(0.0);
-        let rare_threshold = (92.0 - loot_bonus_f * 0.12).max(0.0);
-        let uncommon_threshold = (68.0 - loot_bonus_f * 0.1).max(0.0);
+        let legendary_threshold = (99.5 - loot_bonus_f * 0.05).max(0.0);
+        let rare_threshold = (95.5 - loot_bonus_f * 0.08).max(0.0);
+        let uncommon_threshold = (78.0 - loot_bonus_f * 0.12).max(0.0);
         let roll = rng.gen_range(0_f32..100_f32);
 
         if roll >= legendary_threshold {

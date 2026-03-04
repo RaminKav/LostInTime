@@ -361,9 +361,9 @@ fn tick_spawner_timers(
         .filter(|m| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
         .count() as i32;
 
-    // In infinite mode, allow more mobs to spawn
+    // In endless mode use base cap (gauge damage output, not mobbing); otherwise scale with days
     let max_mobs = if infinite_mode.active {
-        BASE_MAX_MOBS_TOTAL * 2 + night_tracker.days as i32 * 10
+        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     } else {
         BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
     };
@@ -386,16 +386,8 @@ fn tick_spawner_timers(
         (chaos / 5.).floor() as u32
     };
     let day = night_tracker.days;
-    let endless_mode_spawn_count_increase = if infinite_mode.active {
-        match infinite_mode.difficulty_level {
-            0..=3 => 1,
-            4..=7 => 2,
-            8..=10 => 3,
-            _ => 0,
-        }
-    } else {
-        0
-    };
+    // Endless: no extra spawns per tick (base spawn rates only)
+    let endless_mode_spawn_count_increase = 0u32;
     for spawner in spawners.spawners.iter_mut() {
         debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
         if day < spawner.min_days_to_spawn {
@@ -409,16 +401,12 @@ fn tick_spawner_timers(
 
         spawner.spawn_timer.tick(time.delta());
 
-        // Speed up spawns during night OR infinite mode
+        // Speed up spawns during night or endless mode
         if night_tracker.is_night() || infinite_mode.active {
-            // 3x spawn rate at night / infinite mode
+            // 3x spawn rate at night
             spawner.spawn_timer.tick(time.delta());
             spawner.spawn_timer.tick(time.delta());
             spawner.spawn_timer.tick(time.delta());
-            // tick extra time in infinite mode
-            if infinite_mode.active {
-                spawner.spawn_timer.tick(time.delta());
-            }
         }
         if spawner.spawn_timer.finished() {
             spawner.spawn_timer.reset();

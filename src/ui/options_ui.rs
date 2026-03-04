@@ -20,6 +20,8 @@ pub struct CheatSettings {
     pub bypass_class_unlocks: bool,
     /// When true, boss damage warning indicators use a color-blind friendly color (dark purple) instead of red
     pub color_blind_mode: bool,
+    /// When true, dev tools (XP, spawn chest/tome/orb, era teleport, endless) are shown in the inventory
+    pub dev_mode: bool,
 }
 
 /// Identifies which option an options-screen checkbox controls
@@ -27,6 +29,7 @@ pub struct CheatSettings {
 pub enum OptionsCheckboxType {
     UnlockAllClasses,
     ColorBlindMode,
+    DevMode,
 }
 
 #[derive(Component)]
@@ -412,6 +415,19 @@ pub fn setup_options_ui(
         cheat_settings.color_blind_mode,
     );
 
+    // Dev mode checkbox (shows dev tools in inventory)
+    let dev_mode_checkbox_y = color_blind_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Dev Mode:",
+        Vec3::new(right_side_x, dev_mode_checkbox_y, 11.),
+        Vec3::new(right_side_x + 100.5, dev_mode_checkbox_y + 0.5, 11.),
+        OptionsCheckboxType::DevMode,
+        cheat_settings.dev_mode,
+    );
+
     //TODO: fix restart button
     if game_state.0 == crate::GameState::Main {
         // // Restart button
@@ -672,6 +688,17 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::DevMode => {
+                                cheat_settings.dev_mode = !cheat_settings.dev_mode;
+                                (
+                                    cheat_settings.dev_mode,
+                                    if cheat_settings.dev_mode {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -713,6 +740,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::ColorBlindMode => {
                 if cheat_settings.color_blind_mode {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::DevMode => {
+                if cheat_settings.dev_mode {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox
