@@ -781,6 +781,9 @@ impl Heirloom {
             Heirloom::AntFarm => 4,
             Heirloom::StoneTooth => 4,
             Heirloom::Reaper => 5,
+            Heirloom::CoinLightning => 5,
+            Heirloom::KillLightning => 5,
+            Heirloom::ManaRegenLightning => 5,
             _ => 0,
         }
     }
@@ -1391,7 +1394,7 @@ impl Heirloom {
                 "spawns a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
-                format!("Costs {} mana.", 5),
+                format!("Costs {} mana.", Heirloom::CoinLightning.get_mana_cost()),
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
@@ -1399,7 +1402,7 @@ impl Heirloom {
                 "to spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
-                format!("Costs {} mana.", 5),
+                format!("Costs {} mana.", Heirloom::KillLightning.get_mana_cost()),
             ],
             Heirloom::ManaRegenLightning => vec![
                 "Mana regeneration".to_string(),
@@ -1407,7 +1410,10 @@ impl Heirloom {
                 "spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
-                format!("Costs {} mana.", 5),
+                format!(
+                    "Costs {} mana.",
+                    Heirloom::ManaRegenLightning.get_mana_cost()
+                ),
             ],
             Heirloom::ManaRegenPoison => vec![
                 "Every time you".to_string(),
