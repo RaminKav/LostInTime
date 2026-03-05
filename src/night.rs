@@ -33,9 +33,10 @@ pub const MAX_DIFFICULTY_LEVEL: u8 = 10;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
 /// Endless chaos: smooth power-law chaos(elapsed) = COEFFICIENT * elapsed_seconds^EXPONENT.
-/// Tuned for ~40 @ 5min, ~136 @ 10min, ~462 @ 20min (smooth, slightly super-linear).
-pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.001_85;
-pub const ENDLESS_CHAOS_EXPONENT: f32 = 1.75;
+/// Kept gentle (exponent 1.2) so mob HP scaling (1.4^(late_chaos/10)) doesn't blow up.
+/// Roughly ~8 @ 5min, ~22 @ 10min, ~47 @ 20min raw (before tier mult).
+pub const ENDLESS_CHAOS_COEFFICIENT: f32 = 0.011;
+pub const ENDLESS_CHAOS_EXPONENT: f32 = 1.5;
 
 /// Era timer - 10 minutes per era. Timer pauses in dungeons.
 pub const ERA_TIMER_SECONDS: f32 = 11.0 * 60.0; // 10 minutes
@@ -130,7 +131,7 @@ impl InfiniteMode {
         if self.difficulty_level <= 5 {
             1.0
         } else {
-            2.0
+            1.25
         }
     }
 }

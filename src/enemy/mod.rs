@@ -504,11 +504,11 @@ fn juice_up_spawned_mobs_per_day(
             let early_base = early_cutoff.powf(0.7); // ~12.0
             let late_chaos = chaos_factor - early_cutoff;
             // Each 10 chaos = 1.4x multiplier (adjustable for tuning)
-            let exponential_part = 1.4_f32.powf(late_chaos / 10.0);
+            let exponential_part = 1.23_f32.powf(late_chaos / 10.0);
             early_base * exponential_part
         };
 
-        let attack_multiplier = chaos_factor.powf(0.5);
+        let attack_multiplier = chaos_factor.powf(0.35);
 
         hp.0 = (hp.0 as f32 * hp_multiplier) as i32;
         att.0 = (att.0 as f32 * attack_multiplier) as i32;

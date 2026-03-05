@@ -387,7 +387,7 @@ fn tick_spawner_timers(
     };
     let day = night_tracker.days;
     // Endless: no extra spawns per tick (base spawn rates only)
-    let endless_mode_spawn_count_increase = 0u32;
+    let endless_mode_spawn_count_increase = 2u32;
     for spawner in spawners.spawners.iter_mut() {
         debug!("spawner check: {:?} {:?}", spawner.min_days_to_spawn, day);
         if day < spawner.min_days_to_spawn {
