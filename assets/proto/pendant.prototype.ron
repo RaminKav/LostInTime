@@ -18,7 +18,7 @@
         xp_rate: Some((start: 14, end: 28)),
         loot_rate: Some((start: 10, end: 18)),
         mana: Some((start: 20, end: 36)),
-        mana_regen: Some((start: 10, end: 20)),
+        mana_regen: Some((start: 8, end: 16)),
         lifesteal: Some((start: 8, end: 16)),
         bonus_damage: Some((start: 18, end: 28)),
         pickup_range: Some((start: 28, end: 44)),

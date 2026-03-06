@@ -18,8 +18,8 @@ use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
     ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
     DruidTreeSkillState, FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-    LightningState, PlayerSkills, SlashState, Slot1ChargeTracker, Slot2ChargeTracker,
-    Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, TripleThrowState,
+    LightningState, PhasingThroughEnemies, PlayerSkills, SlashState, Slot1ChargeTracker,
+    Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, TripleThrowState,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -31,7 +31,7 @@ use bevy::window::PrimaryWindow;
 use bevy_hanabi::EffectSpawner;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
-use bevy_rapier2d::prelude::{KinematicCharacterController, PhysicsSet};
+use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController, PhysicsSet};
 use interpolation::Lerp;
 use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
@@ -108,6 +108,7 @@ impl Plugin for InputsPlugin {
                     dispatch_active_skill_events.run_if(is_not_paused),
                     handle_hotbar_key_input,
                     tick_dash_timer.run_if(is_not_paused),
+                    manage_ability_phasing.run_if(is_not_paused),
                     handle_open_essence_ui,
                     diagnostics,
                     handle_quick_hotbar_consume.before(handle_hotbar_key_input),
@@ -324,8 +325,7 @@ pub fn player_move_inputs(
             && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
         {
             player.is_dashing = true;
-            let effective_cd =
-                skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
+            let effective_cd = skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
             let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
             active_skill_event.send(ActiveSkillUsedEvent {
                 slot: roll_slot,
@@ -335,6 +335,9 @@ pub fn player_move_inputs(
                 .player_dash_cooldown
                 .set_duration(Duration::from_secs_f32(effective_cd));
             player.player_dash_cooldown.reset();
+            commands
+                .entity(player_e)
+                .insert(PhasingThroughEnemies::new(0.28));
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
         }
     }
@@ -649,6 +652,41 @@ pub fn tick_dash_timer(mut game: GameParam, time: Res<Time>) {
         player.player_dash_cooldown.tick(time.delta());
     }
 }
+
+pub fn manage_ability_phasing(
+    mut commands: Commands,
+    mut player_query: Query<
+        (
+            Entity,
+            &mut KinematicCharacterController,
+            Option<&mut PhasingThroughEnemies>,
+        ),
+        With<Player>,
+    >,
+    time: Res<Time>,
+) {
+    let Ok((entity, mut kcc, phasing_opt)) = player_query.get_single_mut() else {
+        return;
+    };
+
+    if let Some(mut phasing) = phasing_opt {
+        phasing.timer.tick(time.delta());
+
+        if phasing.timer.finished() {
+            commands
+                .entity(entity)
+                .insert(CollisionGroups::new(Group::ALL, Group::ALL))
+                .remove::<PhasingThroughEnemies>();
+            kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
+        } else {
+            commands
+                .entity(entity)
+                .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+            kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+        }
+    }
+}
+
 pub fn close_container(
     key_input: ResMut<Input<KeyCode>>,
     mut next_inv_state: ResMut<NextState<UIState>>,
@@ -974,7 +1012,6 @@ pub fn mouse_click_system(
     ranged_query: Query<(&WorldObject, &RangedAttack), With<Equipment>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
-    obj_actions: Query<&ObjectAction>,
     ammo_query_any: Query<&Ammo>,
 ) {
     if ui_state.0 != UIState::Closed {
@@ -999,21 +1036,6 @@ pub fn mouse_click_system(
                     &mut game,
                     &proto_param,
                     &mut commands,
-                );
-                return;
-            }
-        }
-        if let Some((obj_e, obj)) = game.get_obj_entity_at_tile(cursor_tile_pos, &proto_param) {
-            if let Ok(obj_action) = obj_actions.get(obj_e) {
-                obj_action.run_action(
-                    obj_e,
-                    cursor_tile_pos,
-                    obj,
-                    &mut game,
-                    &mut item_action_param,
-                    &mut commands,
-                    &mut proto_param,
-                    &mut inv.single_mut(),
                 );
                 return;
             }

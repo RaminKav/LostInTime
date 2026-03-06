@@ -7,6 +7,7 @@ use crate::{
     colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
     inventory::ItemStack,
     item::WorldObject,
+    ui::CheatSettings,
     world::{world_helpers, TILE_SIZE},
     Game, TextureCamera, WasHitWithCrit, WasHitWithOvercrit,
 };
@@ -111,6 +112,7 @@ pub fn handle_add_damage_numbers_after_hit(
     asset_server: Res<AssetServer>,
     raw_dmg: Query<(&Attack, &BonusDamage)>,
     game: Res<Game>,
+    cheat_settings: Option<Res<CheatSettings>>,
 ) {
     for (e, changed_health, mut prev_health, max_health, crit_option, overcrit_option) in
         changed_health.iter_mut()
@@ -123,6 +125,15 @@ pub fn handle_add_damage_numbers_after_hit(
         if delta == 0 || was_over_max {
             continue;
         }
+        let is_player = e == game.player;
+        // Skip spawning enemy damage numbers when the option is off (player damage numbers always show)
+        if !is_player {
+            if let Some(ref settings) = cheat_settings {
+                if !settings.show_enemy_damage_numbers {
+                    continue;
+                }
+            }
+        }
         let mut rng = rand::thread_rng();
         let drop_spread = 16.;
         let pos_offset = Vec3::new(
@@ -130,7 +141,6 @@ pub fn handle_add_damage_numbers_after_hit(
             rng.gen_range(0_f64..drop_spread) as f32,
             2.,
         );
-        let is_player = e == game.player;
         let dmg = raw_dmg.get(game.player).unwrap().0 .0 + raw_dmg.get(game.player).unwrap().1 .0;
         let is_crit = crit_option.is_some() || (!is_player && delta.abs() > dmg && dmg != 0);
         let is_overcrit = overcrit_option.is_some();

@@ -764,9 +764,7 @@ pub fn cleanup_marked_for_death_entities(
                     let rng = &mut rand::thread_rng();
                     let mirror_count = skills.get_count(Heirloom::FrozenMPRegen);
                     if mirror_count > 0 && rng.gen_bool((0.2 * mirror_count as f64).min(1.0)) {
-                        modify_mana_event.send(ModifyManaEvent(
-                            mana_regen.0 + skills.get_count(Heirloom::MPRegen) * 5,
-                        ));
+                        modify_mana_event.send(ModifyManaEvent(mana_regen.0));
                     }
                 }
                 if let Some(p) = poison_option {

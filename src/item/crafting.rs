@@ -298,15 +298,15 @@ pub fn handle_furnace_slot_update(
 
         if inv_state.furnace_state.upgrade_timer.just_finished() {
             // Check for TomeDoubleUpgrade heirloom
-            let has_tome_double = player_skills
+            let tome_double_count = player_skills
                 .get_single()
-                .map(|s| s.has(crate::player::skills::Heirloom::TomeDoubleUpgrade))
-                .unwrap_or(false);
+                .map(|s| s.get_count(crate::player::skills::Heirloom::TomeDoubleUpgrade))
+                .unwrap_or(0);
 
             match inv_state.furnace_state.current_fuel_type {
                 WorldObject::UpgradeTome => {
                     // Upgrade Stats (do it twice if TomeDoubleUpgrade is active)
-                    let upgrade_count = if has_tome_double { 2 } else { 1 };
+                    let upgrade_count = 1 + tome_double_count;
 
                     let mut current_stack = inv.furnace_items.items[1]
                         .as_ref()

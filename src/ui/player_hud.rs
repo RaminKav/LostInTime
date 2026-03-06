@@ -537,7 +537,7 @@ pub fn setup_currency_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 97.5, 6.),
+                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 101., 6.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -625,7 +625,7 @@ pub fn setup_chaos_ui(
                 ),
                 text_anchor: Anchor::CenterLeft,
                 transform: Transform {
-                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 107.5, 6.),
+                    translation: Vec3::new(-res.game_width / 2. + 4., GAME_HEIGHT / 2. - 111., 6.),
                     ..Default::default()
                 },
                 ..default()
@@ -1226,7 +1226,7 @@ pub fn handle_heirloom_hud_tooltip(
         );
 
         // Position tooltip below the hovered icon
-        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 70., 15.);
+        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 70., 25.);
 
         let tooltip_e = spawn_heirloom_tooltip_card(
             &graphics,
@@ -1971,7 +1971,7 @@ pub fn setup_clock_hud(
             transform: Transform {
                 translation: Vec3::new(
                     -res.game_width / 2. + 17.5,
-                    (GAME_HEIGHT - 15.) / 2. - 68.5,
+                    (GAME_HEIGHT - 15.) / 2. - 72.5,
                     6.,
                 ),
                 scale: Vec3::new(1., 1., 1.),

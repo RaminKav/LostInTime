@@ -20,8 +20,8 @@ use combat_heirlooms::{
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
-    handle_spear, handle_spear_gravity, handle_spear_pull_delay, tick_parried_timer,
-    ParrySuccessEvent,
+    handle_spear, handle_spear_gravity, handle_spear_pull_delay, tick_heirloom_trigger_cooldowns,
+    tick_parried_timer, ParrySuccessEvent,
 };
 use rand::seq::SliceRandom;
 use rogue_skills::{
@@ -286,7 +286,9 @@ impl Plugin for PlayerPlugin {
             .add_systems((handle_modify_currency,))
             .add_systems(
                 (
+                    tick_heirloom_trigger_cooldowns,
                     handle_echo_after_heal
+                        .after(tick_heirloom_trigger_cooldowns)
                         .after(handle_modify_health_event)
                         .before(handle_add_damage_numbers_after_hit),
                     handle_trigger_summons_on_heal.after(handle_echo_after_heal),
@@ -396,7 +398,7 @@ fn spawn_player(
             },
             Hunger::new(100),
             HungerTracker::new(7., 8),
-            InvincibilityCooldown(1.),
+            InvincibilityCooldown(0.5),
             HealthRegenTimer(Timer::from_seconds(10., TimerMode::Once)),
             MovementVector::default(),
             YSort(0.001),

@@ -590,8 +590,8 @@ impl ItemAttributes {
         entity.insert(HealthRegen(
             self.health_regen.value
                 + skills.get_count(Heirloom::HPRegen) * 5
-                + skills.get_count(Heirloom::HealEcho) * 20
-                - regen_lifesteal_stacks * 5,
+                + skills.get_count(Heirloom::HealEcho) * 5
+                - regen_lifesteal_stacks * 10,
         ));
         entity.insert(Healing(self.healing.value));
 
@@ -637,8 +637,8 @@ impl ItemAttributes {
         // Lifesteal: base + RegenLifesteal (+5% per stack) + LifestealCoins (+5% per stack)
         entity.insert(Lifesteal(
             self.lifesteal.value
-                + regen_lifesteal_stacks * 5
-                + skills.get_count(Heirloom::Lifesteal) * 2
+                + regen_lifesteal_stacks * 10
+                + skills.get_count(Heirloom::Lifesteal) * 4
                 + skills.get_count(Heirloom::LifestealCoins) * 5,
         ));
         // Defence already calculated above for ThornArmor
@@ -1006,9 +1006,9 @@ impl ItemRarity {
     fn get_rarity_attributes_bonus(&self) -> f32 {
         match self {
             ItemRarity::Common => 1.0,
-            ItemRarity::Uncommon => 1.2,
-            ItemRarity::Rare => 1.45,
-            ItemRarity::Legendary => 1.8,
+            ItemRarity::Uncommon => 1.15,
+            ItemRarity::Rare => 1.27,
+            ItemRarity::Legendary => 1.45,
         }
     }
 

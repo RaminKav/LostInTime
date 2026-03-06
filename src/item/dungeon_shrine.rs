@@ -78,18 +78,21 @@ pub fn handle_dungeon_shrine_activation(
 
                 if can_spawn_mob_here(spawn_pos, &game, &proto_param, fallback_count >= 10) {
                     if let Some(mob) = proto_param.proto_commands.spawn_from_proto(
-                        possible_spawns[choice_mob].clone(),
+                        if num_to_spawn == 1 {
+                            Mob::StoneGolem
+                        } else {
+                            possible_spawns[choice_mob].clone()
+                        },
                         &proto_param.prototypes,
                         spawn_pos,
                     ) {
-                        fallback_count = 0;
-                        num_to_spawn -= 1;
-
                         // Make 5 of them elite
-                        if elite_count < 7 {
+                        if elite_count < 7 && num_to_spawn != 1 {
                             commands.entity(mob).insert(EliteMob);
                             elite_count += 1;
                         }
+                        fallback_count = 0;
+                        num_to_spawn -= 1;
 
                         proto_param
                             .proto_commands
@@ -153,13 +156,17 @@ pub fn handle_dungeon_shrine_rewards(
                     DungeonShrineType::Armor => get_armor_reward(),
                     DungeonShrineType::Accessory => get_accessory_reward(),
                 };
+                let mut rng = rand::thread_rng();
+                let max_item_level = ((game.get_player_level() as i32 / 2) - 5).clamp(1, 5) as u8
+                    + (game.get_player_level() as i32 / 10).clamp(0, 10) as u8;
+                let level = rng.gen_range(1..=max_item_level) + 3;
 
                 proto_commands.spawn_item_from_proto(
                     reward_item,
                     &proto,
                     t.translation().truncate() + Vec2::new(0., -44.),
                     1,
-                    Some(game.get_player_level()),
+                    Some(level),
                 );
 
                 // Mark shrine as done

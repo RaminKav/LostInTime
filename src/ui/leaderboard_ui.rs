@@ -62,12 +62,13 @@ pub fn setup_leaderboard_ui(
         cache.last_error.is_some()
     );
 
-    let panel_width = 102.0;
+    let panel_width = 120.0;
     let panel_height = 75.0;
 
     // Position in top left corner
     let panel_x = -resolution.game_width / 2. + panel_width / 2. + 5.;
     let panel_y = resolution.game_height / 2. - panel_height / 2. - 5.;
+    info!("LEADER BOARD {:?}", panel_x);
 
     // Background panel
     commands.spawn((
@@ -134,17 +135,17 @@ fn spawn_leaderboard_entries(
     panel_width: f32,
     panel_height: f32,
 ) {
-    info!(
-        "spawn_leaderboard_entries - is_loading: {}, entries: {}, error: {}",
-        cache.is_loading,
-        cache.entries.len(),
-        cache.last_error.is_some()
-    );
-
-    let text_x = panel_x - panel_width / 2.;
+    let text_x = panel_x - panel_width / 2. + 5.;
     let start_y = panel_y + panel_height / 2. - 18.5;
     let row_spacing = -12.0;
 
+    info!(
+        "spawn_leaderboard_entries - is_loading: {}, entries: {}, error: {} {}",
+        cache.is_loading,
+        cache.entries.len(),
+        cache.last_error.is_some(),
+        text_x
+    );
     // Loading or entries
     if cache.is_loading {
         info!("Spawning LOADING text");
@@ -298,17 +299,10 @@ fn spawn_leaderboard_entries(
                 UIState::Closed,
             ));
 
-            // Class (truncated to 4 chars)
-            let class_short = if entry.class.len() > 5 {
-                &entry.class[..5]
-            } else {
-                &entry.class
-            };
-
             commands.spawn((
                 Text2dBundle {
                     text: Text::from_section(
-                        class_short,
+                        &entry.class,
                         TextStyle {
                             font: asset_server.load("fonts/4x5.ttf"),
                             font_size: 5.0,
@@ -355,7 +349,7 @@ pub fn update_leaderboard_display(
 
     // Get panel position
     if let Ok(panel_transform) = panel_query.get_single() {
-        let panel_width = 90.0;
+        let panel_width = 120.0;
         let panel_height = 75.0;
         let panel_x = panel_transform.translation.x;
         let panel_y = panel_transform.translation.y;

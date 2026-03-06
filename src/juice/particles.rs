@@ -9,6 +9,7 @@ use crate::{
     enemy::Mob,
     inputs::MovementVector,
     item::WorldObject,
+    night::InfiniteMode,
     player::Player,
     proto::proto_param::ProtoParam,
     world::{world_helpers::tile_pos_to_world_pos, y_sort::YSort},
@@ -317,7 +318,11 @@ pub fn spawn_obj_hit_particles(
     particles: Res<Particles>,
     mob_query: Query<&Mob>,
     world_object: Query<(&WorldObject, &SpriteAnchor)>,
+    infinite_mode: Res<InfiniteMode>,
 ) {
+    if infinite_mode.active {
+        return;
+    }
     // add spark animation entity as child, will animate once and remove itself.
     for hit in hit_events.iter() {
         if hit.hit_entity == game.player {

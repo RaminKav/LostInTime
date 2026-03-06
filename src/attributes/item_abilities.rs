@@ -48,7 +48,7 @@ pub fn handle_item_abilitiy_on_attack(
     for attack in attacks.iter() {
         let mut rng = rand::thread_rng();
         if skills.has(Heirloom::WaveAttack)
-            && rng.gen_bool((skills.get_count(Heirloom::WaveAttack) as f64 * 0.25).clamp(0., 1.))
+            && rng.gen_bool((skills.get_count(Heirloom::WaveAttack) as f64 * 0.33).clamp(0., 1.))
         {
             let mana_cost = Heirloom::WaveAttack.get_mana_cost();
             if current_mana.0 >= mana_cost {

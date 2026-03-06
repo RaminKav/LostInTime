@@ -116,7 +116,7 @@ impl SkillClass {
             }
             SkillClass::Wizard => {
                 // +5 MP per level
-                stats.mana_regen = AttributeValue::new(level * 1, quality, 1.);
+                stats.mana_regen = AttributeValue::new((level as f32 * 0.5) as i32, quality, 1.);
             }
             SkillClass::Rogue => {
                 // +3% crit chance per level
@@ -284,6 +284,19 @@ pub struct BombState {
 #[derive(Component, Clone)]
 pub struct SpinAttackState {
     pub cooldown_timer: Timer,
+}
+
+#[derive(Component, Clone)]
+pub struct PhasingThroughEnemies {
+    pub timer: Timer,
+}
+
+impl PhasingThroughEnemies {
+    pub fn new(duration: f32) -> Self {
+        Self {
+            timer: Timer::from_seconds(duration, TimerMode::Once),
+        }
+    }
 }
 
 impl ActiveSkill {
@@ -926,7 +939,7 @@ impl Heirloom {
             Heirloom::Thorns => vec!["Gain +15 Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
                 vec![
-                    "Gain +2% Lifesteal,".to_string(),
+                    "Gain +4% Lifesteal,".to_string(),
                     "permanently.".to_string(),
                 ]
             }
@@ -1246,7 +1259,7 @@ impl Heirloom {
                 "chance to trigger an".to_string(),
                 "echo that damages".to_string(),
                 "enemies around you.".to_string(),
-                "+20 Health regen.".to_string(),
+                "+5 Health regen.".to_string(),
                 format!("Costs {} mana.", Heirloom::HealEcho.get_mana_cost()),
             ],
             Heirloom::HealSummons => vec![
@@ -1293,8 +1306,8 @@ impl Heirloom {
                 "for 3 seconds.".to_string(),
             ],
             Heirloom::RegenLifesteal => vec![
-                "Lose 5 HP Regen,".to_string(),
-                "gain 5% Lifesteal.".to_string(),
+                "Lose 10 HP Regen,".to_string(),
+                "gain 10% Lifesteal.".to_string(),
             ],
             Heirloom::StandStill => vec![
                 "Standing still".to_string(),
@@ -1583,9 +1596,9 @@ impl Heirloom {
 
     pub fn is_obj_valid(&self, obj: WorldObject) -> bool {
         match self {
-            Heirloom::WaveAttack => obj.is_melee_weapon(),
-            Heirloom::FrailStacks => obj.is_melee_weapon(),
-            Heirloom::LethalBlow => obj.is_melee_weapon(),
+            // Heirloom::WaveAttack => obj.is_melee_weapon(),
+            // Heirloom::FrailStacks => obj.is_melee_weapon(),
+            // Heirloom::LethalBlow => obj.is_melee_weapon(),
             _ => true,
         }
     }
@@ -1745,7 +1758,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::WaveAttack, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::MPBarDMG, HeirloomRarity::Rare),
                 // HeirloomChoiceState::new(Heirloom::MPBarCrit, HeirloomRarity::Rare),
-                HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
+                // HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon),

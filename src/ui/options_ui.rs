@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Resource to track cheat settings and accessibility options
-#[derive(Resource, Default, Debug, Clone)]
+#[derive(Resource, Debug, Clone)]
 pub struct CheatSettings {
     /// When true, all classes and pets are selectable regardless of unlock status
     pub bypass_class_unlocks: bool,
@@ -22,6 +22,19 @@ pub struct CheatSettings {
     pub color_blind_mode: bool,
     /// When true, dev tools (XP, spawn chest/tome/orb, era teleport, endless) are shown in the inventory
     pub dev_mode: bool,
+    /// When true, damage numbers are shown when enemies take damage (player damage numbers always show)
+    pub show_enemy_damage_numbers: bool,
+}
+
+impl Default for CheatSettings {
+    fn default() -> Self {
+        Self {
+            bypass_class_unlocks: false,
+            color_blind_mode: false,
+            dev_mode: false,
+            show_enemy_damage_numbers: true,
+        }
+    }
 }
 
 /// Identifies which option an options-screen checkbox controls
@@ -30,6 +43,7 @@ pub enum OptionsCheckboxType {
     UnlockAllClasses,
     ColorBlindMode,
     DevMode,
+    ShowEnemyDamageNumbers,
 }
 
 #[derive(Component)]
@@ -428,6 +442,19 @@ pub fn setup_options_ui(
         cheat_settings.dev_mode,
     );
 
+    // Enemy damage numbers checkbox (when off, only player damage numbers show)
+    let enemy_damage_checkbox_y = dev_mode_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Damage Numbers:",
+        Vec3::new(right_side_x, enemy_damage_checkbox_y, 11.),
+        Vec3::new(right_side_x + 100.5, enemy_damage_checkbox_y + 0.5, 11.),
+        OptionsCheckboxType::ShowEnemyDamageNumbers,
+        cheat_settings.show_enemy_damage_numbers,
+    );
+
     //TODO: fix restart button
     if game_state.0 == crate::GameState::Main {
         // // Restart button
@@ -645,7 +672,12 @@ pub fn handle_cheat_checkbox_click(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut checkboxes: Query<
-        (Entity, &OptionsCheckbox, &mut Interactable, &mut Handle<Image>),
+        (
+            Entity,
+            &OptionsCheckbox,
+            &mut Interactable,
+            &mut Handle<Image>,
+        ),
         With<OptionsCheckbox>,
     >,
     mut cheat_settings: ResMut<CheatSettings>,
@@ -677,8 +709,7 @@ pub fn handle_cheat_checkbox_click(
                                 )
                             }
                             OptionsCheckboxType::ColorBlindMode => {
-                                cheat_settings.color_blind_mode =
-                                    !cheat_settings.color_blind_mode;
+                                cheat_settings.color_blind_mode = !cheat_settings.color_blind_mode;
                                 (
                                     cheat_settings.color_blind_mode,
                                     if cheat_settings.color_blind_mode {
@@ -699,13 +730,22 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::ShowEnemyDamageNumbers => {
+                                cheat_settings.show_enemy_damage_numbers =
+                                    !cheat_settings.show_enemy_damage_numbers;
+                                (
+                                    cheat_settings.show_enemy_damage_numbers,
+                                    if cheat_settings.show_enemy_damage_numbers {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
-                        info!(
-                            "Options: {:?} = {}",
-                            options_checkbox.0, setting
-                        );
+                        info!("Options: {:?} = {}", options_checkbox.0, setting);
                     }
                 }
                 _ => {}
@@ -747,6 +787,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::DevMode => {
                 if cheat_settings.dev_mode {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::ShowEnemyDamageNumbers => {
+                if cheat_settings.show_enemy_damage_numbers {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox

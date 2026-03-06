@@ -1309,18 +1309,19 @@ pub fn handle_cursor_inventory_upgrade_button(
     mouse_input: Res<Input<MouseButton>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut upgrade_button: Query<
-        (Entity, &mut Interactable, &UpgradeButton),
+        (Entity, &mut Interactable, &UpgradeButton, &GlobalTransform),
         Without<InventorySlotState>,
     >,
     mut commands: Commands,
     mut inv_state: ResMut<InventoryState>,
     mut inv: Query<&mut Inventory>,
     graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
 ) {
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
-    for (e, mut interactable, _) in upgrade_button.iter_mut() {
+    for (e, mut interactable, _, button_transform) in upgrade_button.iter_mut() {
         match hit_test {
             Some(hit_ent) if hit_ent.0 == e => match interactable.current() {
                 Interaction::None => {
@@ -1336,6 +1337,35 @@ pub fn handle_cursor_inventory_upgrade_button(
                         let mut inv = inv.single_mut();
 
                         if !inv_state.furnace_state.ready_to_upgrade {
+                            if inv.furnace_items.items[1].is_none() {
+                                continue;
+                            }
+
+                            let gear_level = inv.furnace_items.items[1]
+                                .as_ref()
+                                .and_then(|g| g.item_stack.metadata.level)
+                                .unwrap_or(0);
+                            let fuel_type = inv.furnace_items.items[0]
+                                .as_ref()
+                                .map(|f| f.item_stack.obj_type);
+
+                            if fuel_type == Some(crate::item::WorldObject::UpgradeTome)
+                                && gear_level >= 30
+                            {
+                                let btn_pos = button_transform.translation();
+                                let text = spawn_floating_text_with_shadow(
+                                    &mut commands,
+                                    &asset_server,
+                                    btn_pos + Vec3::new(0., 10., 10.),
+                                    RED,
+                                    "Max Level Reached".to_string(),
+                                );
+                                commands
+                                    .entity(text)
+                                    .insert(bevy::render::view::RenderLayers::from_layers(&[3]));
+                                continue;
+                            }
+
                             if let Some(fuel) = inv.furnace_items.items[0].as_mut() {
                                 inv_state.furnace_state.ready_to_upgrade = true;
                                 inv_state.furnace_state.current_fuel_type =
@@ -1368,6 +1398,7 @@ pub fn handle_cursor_inventory_upgrade_button(
 pub fn handle_cursor_item_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<Input<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut item_chest_button: Query<
         (Entity, &mut Interactable, &ItemChestButton),
@@ -1382,6 +1413,18 @@ pub fn handle_cursor_item_chest_button(
 ) {
     // Only handle Item chests in this system
     if item_chest_state.chest_type != ChestType::Item {
+        return;
+    }
+
+    // F key advances the chest state directly, bypassing hover
+    if key_input.just_pressed(KeyCode::F) {
+        advance_item_chest_state(
+            &mut item_chest_state,
+            &mut chest_event,
+            &mut game,
+            &mut commands,
+            &mut next_ui_state,
+        );
         return;
     }
 
@@ -1401,28 +1444,13 @@ pub fn handle_cursor_item_chest_button(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        let state = item_chest_state.state.clone();
-                        match state {
-                            ItemChestAnimState::Closed => {
-                                chest_event.send(ItemChestAnimChangeEvent {
-                                    state: ItemChestAnimState::Opening,
-                                    set_ui_rarity: None,
-                                });
-                            }
-                            ItemChestAnimState::Opening => {
-                                handle_chest_opening_click(&mut item_chest_state, &mut chest_event);
-                            }
-                            ItemChestAnimState::Done => {
-                                let pos = game.player().position.truncate();
-                                item_chest_state.picked_item.clone().unwrap().spawn_as_drop(
-                                    &mut commands,
-                                    &mut game,
-                                    pos,
-                                );
-                                next_ui_state.set(UIState::Closed);
-                                commands.remove_resource::<ItemChestState>();
-                            }
-                        }
+                        advance_item_chest_state(
+                            &mut item_chest_state,
+                            &mut chest_event,
+                            &mut game,
+                            &mut commands,
+                            &mut next_ui_state,
+                        );
                     }
                 }
                 _ => (),
@@ -1443,10 +1471,42 @@ pub fn handle_cursor_item_chest_button(
     }
 }
 
+fn advance_item_chest_state(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    chest_event: &mut EventWriter<ItemChestAnimChangeEvent>,
+    game: &mut GameParam,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+) {
+    let state = item_chest_state.state.clone();
+    match state {
+        ItemChestAnimState::Closed => {
+            chest_event.send(ItemChestAnimChangeEvent {
+                state: ItemChestAnimState::Opening,
+                set_ui_rarity: None,
+            });
+        }
+        ItemChestAnimState::Opening => {
+            handle_chest_opening_click(item_chest_state, chest_event);
+        }
+        ItemChestAnimState::Done => {
+            let pos = game.player().position.truncate();
+            item_chest_state
+                .picked_item
+                .clone()
+                .unwrap()
+                .spawn_as_drop(commands, game, pos);
+            next_ui_state.set(UIState::Closed);
+            commands.remove_resource::<ItemChestState>();
+        }
+    }
+}
+
 /// Handles heirloom chest button interactions (for ChestType::Heirloom)
 pub fn handle_cursor_heirloom_chest_button(
     cursor_pos: Res<CursorPos>,
     mouse_input: Res<Input<MouseButton>>,
+    key_input: Res<Input<KeyCode>>,
     ui_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
     mut item_chest_button: Query<
         (Entity, &mut Interactable, &ItemChestButton),
@@ -1468,6 +1528,22 @@ pub fn handle_cursor_heirloom_chest_button(
         return;
     }
 
+    // F key advances the chest state directly, bypassing hover
+    if key_input.just_pressed(KeyCode::F) {
+        advance_heirloom_chest_state(
+            &mut item_chest_state,
+            &mut chest_event,
+            &mut commands,
+            &mut next_ui_state,
+            &mut skill_queue,
+            &mut player_query,
+            &proto,
+            &mut proto_commands,
+            &mut att_event,
+        );
+        return;
+    }
+
     let hit_test = ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
 
@@ -1484,44 +1560,17 @@ pub fn handle_cursor_heirloom_chest_button(
                 }
                 Interaction::Hovering => {
                     if left_mouse_pressed {
-                        let state = item_chest_state.state.clone();
-                        match state {
-                            ItemChestAnimState::Closed => {
-                                chest_event.send(ItemChestAnimChangeEvent {
-                                    state: ItemChestAnimState::Opening,
-                                    set_ui_rarity: None,
-                                });
-                            }
-                            ItemChestAnimState::Opening => {
-                                handle_chest_opening_click(&mut item_chest_state, &mut chest_event);
-                            }
-                            ItemChestAnimState::Done => {
-                                if let Ok((player_entity, transform, mut skills, level)) =
-                                    player_query.get_single_mut()
-                                {
-                                    let picked_heirloom =
-                                        item_chest_state.picked_heirloom.clone().unwrap();
-                                    // Use grant_heirloom_from_pool instead of handle_pick_skill
-                                    // since chest heirlooms come from the pool, not the queue
-                                    skill_queue.grant_heirloom_from_pool(
-                                        picked_heirloom.clone(),
-                                        &mut proto_commands,
-                                        &proto,
-                                        transform.translation.truncate(),
-                                        &mut skills,
-                                        level.level,
-                                    );
-                                    picked_heirloom.heirloom.add_heirloom_components(
-                                        player_entity,
-                                        &mut commands,
-                                        skills.clone(),
-                                    );
-                                    att_event.send(AttributeChangeEvent);
-                                }
-                                next_ui_state.set(UIState::Closed);
-                                commands.remove_resource::<ItemChestState>();
-                            }
-                        }
+                        advance_heirloom_chest_state(
+                            &mut item_chest_state,
+                            &mut chest_event,
+                            &mut commands,
+                            &mut next_ui_state,
+                            &mut skill_queue,
+                            &mut player_query,
+                            &proto,
+                            &mut proto_commands,
+                            &mut att_event,
+                        );
                     }
                 }
                 _ => (),
@@ -1538,6 +1587,53 @@ pub fn handle_cursor_heirloom_chest_button(
                     .insert(ui_element.clone())
                     .insert(graphics.get_ui_element_texture(ui_element));
             }
+        }
+    }
+}
+
+fn advance_heirloom_chest_state(
+    item_chest_state: &mut ResMut<ItemChestState>,
+    chest_event: &mut EventWriter<ItemChestAnimChangeEvent>,
+    commands: &mut Commands,
+    next_ui_state: &mut ResMut<NextState<UIState>>,
+    skill_queue: &mut ResMut<HeirloomChoiceQueue>,
+    player_query: &mut Query<(Entity, &Transform, &mut PlayerSkills, &PlayerLevel), With<Player>>,
+    proto: &ProtoParam,
+    proto_commands: &mut ProtoCommands,
+    att_event: &mut EventWriter<AttributeChangeEvent>,
+) {
+    let state = item_chest_state.state.clone();
+    match state {
+        ItemChestAnimState::Closed => {
+            chest_event.send(ItemChestAnimChangeEvent {
+                state: ItemChestAnimState::Opening,
+                set_ui_rarity: None,
+            });
+        }
+        ItemChestAnimState::Opening => {
+            handle_chest_opening_click(item_chest_state, chest_event);
+        }
+        ItemChestAnimState::Done => {
+            if let Ok((player_entity, transform, mut skills, level)) = player_query.get_single_mut()
+            {
+                let picked_heirloom = item_chest_state.picked_heirloom.clone().unwrap();
+                skill_queue.grant_heirloom_from_pool(
+                    picked_heirloom.clone(),
+                    proto_commands,
+                    proto,
+                    transform.translation.truncate(),
+                    &mut skills,
+                    level.level,
+                );
+                picked_heirloom.heirloom.add_heirloom_components(
+                    player_entity,
+                    commands,
+                    skills.clone(),
+                );
+                att_event.send(AttributeChangeEvent);
+            }
+            next_ui_state.set(UIState::Closed);
+            commands.remove_resource::<ItemChestState>();
         }
     }
 }

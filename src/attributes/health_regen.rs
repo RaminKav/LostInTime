@@ -40,11 +40,11 @@ pub fn handle_health_regen(
 
     // Multiplicatively reduce regen cooldown per stack (0.75^stacks)
     let hp_regen_stacks = skills.get_count(Heirloom::HPRegenCooldown);
-    let multiplier = get_regen_cooldown_multiplier(hp_regen_stacks);
+    let multiplier = get_regen_cooldown_multiplier(hp_regen_stacks).max(0.01);
 
     timer.0.tick(Duration::new(
-        (d.as_secs() as f32 * multiplier) as u64,
-        (d.subsec_nanos() as f32 * multiplier) as u32,
+        (d.as_secs() as f32 / multiplier) as u64,
+        (d.subsec_nanos() as f32 / multiplier) as u32,
     ));
     if timer.0.just_finished() {
         if hunger.is_starving() {
@@ -70,11 +70,11 @@ pub fn handle_mana_regen(
 
     // Multiplicatively reduce regen cooldown per stack (0.75^stacks)
     let mp_regen_stacks = skills.get_count(Heirloom::MPRegenCooldown);
-    let multiplier = get_regen_cooldown_multiplier(mp_regen_stacks);
+    let multiplier = get_regen_cooldown_multiplier(mp_regen_stacks).max(0.01);
 
     timer.0.tick(Duration::new(
-        (d.as_secs() as f32 * multiplier) as u64,
-        (d.subsec_nanos() as f32 * multiplier) as u32,
+        (d.as_secs() as f32 / multiplier) as u64,
+        (d.subsec_nanos() as f32 / multiplier) as u32,
     ));
     if timer.0.finished() {
         if hunger.is_starving() {

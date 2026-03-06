@@ -27,16 +27,18 @@ use crate::{
     },
     player::{
         mage_skills::TeleportState,
-        melee_skills::{spawn_echo_hitbox, SpearState},
+        melee_skills::{
+            spawn_echo_hitbox, HeirloomTriggerCooldowns, SpearState, HEIRLOOM_TRIGGER_COOLDOWN_SECS,
+        },
         rogue_skills::{LungeState, SprintState},
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
             FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-            LastHitProjectile, LightningState, PiercingStarSkillState, PlayerSkills,
-            RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker, Slot2ChargeTracker,
-            Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, StealthState,
-            TripleThrowState,
+            LastHitProjectile, LightningState, PhasingThroughEnemies, PiercingStarSkillState,
+            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
+            Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState,
+            StealthState, TripleThrowState,
         },
         Player,
     },
@@ -518,6 +520,9 @@ pub fn handle_active_skill_event(
                             0.35,  // duration
                             20.0,  // max_height
                         ));
+                        commands
+                            .entity(player_e)
+                            .insert(PhasingThroughEnemies::new(0.35));
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
                     }
                     ActiveSkill::IceWall => {
@@ -1096,6 +1101,9 @@ pub fn handle_active_skill_event(
                         commands
                             .entity(player_e)
                             .insert(crate::item::potion_buffs::MovementSpeedBuff::new(0.45, 2.6));
+                        commands
+                            .entity(player_e)
+                            .insert(PhasingThroughEnemies::new(0.45));
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 0.8) as i32;
@@ -1901,13 +1909,16 @@ pub fn remove_rapidfire_speed_from_bonus(
 }
 
 /// Reduces class skill cooldown when player lands a crit
-/// Reduces by 0.1s per stack of CritSkillCooldownReduction heirloom
+/// Reduces by 0.1s per stack of CritSkillCooldownReduction heirloom (Bob's Bell).
+/// Rate-limited to once per 0.1s via HeirloomTriggerCooldowns.
 pub fn reduce_skill_cooldown_on_crit(
     mut hit_events: EventReader<HitEvent>,
+    mut commands: Commands,
     mut players: Query<
         (
             Entity,
             &PlayerSkills,
+            Option<&mut HeirloomTriggerCooldowns>,
             Option<&mut StealthState>,
             Option<&mut RapidfireState>,
             Option<&mut FirePillarState>,
@@ -1939,6 +1950,7 @@ pub fn reduce_skill_cooldown_on_crit(
         for (
             player_e,
             skills,
+            mut heirloom_cooldowns,
             stealth_state,
             rapid_state,
             pillar_state,
@@ -1952,6 +1964,15 @@ pub fn reduce_skill_cooldown_on_crit(
             let heirloom_count = skills.get_count(Heirloom::CritSkillCooldownReduction);
             if heirloom_count == 0 {
                 continue;
+            }
+            if let Some(ref cooldowns) = heirloom_cooldowns {
+                if cooldowns
+                    .bobs_bell
+                    .as_ref()
+                    .map_or(false, |t| !t.finished())
+                {
+                    continue;
+                }
             }
 
             let reduction = 0.1 * heirloom_count as f32;
@@ -2104,6 +2125,18 @@ pub fn reduce_skill_cooldown_on_crit(
                             .tick(Duration::from_secs_f32(reduction));
                     }
                 }
+            }
+
+            // Set Bob's Bell trigger cooldown so it can only apply once per 0.1s
+            let bobs_bell_timer =
+                Timer::from_seconds(HEIRLOOM_TRIGGER_COOLDOWN_SECS, TimerMode::Once);
+            if let Some(ref mut cooldowns) = heirloom_cooldowns {
+                cooldowns.bobs_bell = Some(bobs_bell_timer);
+            } else {
+                commands.entity(player_e).insert(HeirloomTriggerCooldowns {
+                    chalice_echo: None,
+                    bobs_bell: Some(bobs_bell_timer),
+                });
             }
         }
     }

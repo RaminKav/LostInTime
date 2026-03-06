@@ -251,27 +251,27 @@ pub fn gen_new_room_dungeon(grid_size: usize) -> Vec<Vec<i8>> {
         }
     }
 
-    // Add a few internal pillars for visual interest
-    let num_pillars = rng.gen_range(6..=10);
-    for _ in 0..num_pillars {
-        let pillar_angle = rng.gen_range(0.0..std::f32::consts::PI * 2.0);
-        let pillar_distance_x = rng.gen_range(3..=room_radius - 3);
-        let pillar_distance_y = rng.gen_range(2..=10);
-        let pillar_size = rng.gen_range(2..=4);
+    // // Add a few internal pillars for visual interest
+    // let num_pillars = rng.gen_range(6..=10);
+    // for _ in 0..num_pillars {
+    //     let pillar_angle = rng.gen_range(0.0..std::f32::consts::PI * 2.0);
+    //     let pillar_distance_x = rng.gen_range(3..=room_radius - 3);
+    //     let pillar_distance_y = rng.gen_range(2..=10);
+    //     let pillar_size = rng.gen_range(2..=4);
 
-        let pillar_center_x = center_x as f32 + pillar_angle.cos() * pillar_distance_x as f32;
-        let pillar_center_y = center_y as f32 + pillar_angle.sin() * pillar_distance_y as f32;
+    //     let pillar_center_x = center_x as f32 + pillar_angle.cos() * pillar_distance_x as f32;
+    //     let pillar_center_y = center_y as f32 + pillar_angle.sin() * pillar_distance_y as f32;
 
-        let start_x = (pillar_center_x - pillar_size as f32 / 2.0) as usize;
-        let start_y = usize::max((pillar_center_y - pillar_size as f32 / 2.0) as usize, 60);
-        for px in start_x..(start_x + pillar_size) {
-            for py in start_y..(start_y + pillar_size) {
-                if px < grid_size && py < grid_size {
-                    grid[py][px] = 0;
-                }
-            }
-        }
-    }
+    //     let start_x = (pillar_center_x - pillar_size as f32 / 2.0) as usize;
+    //     let start_y = usize::max((pillar_center_y - pillar_size as f32 / 2.0) as usize, 60);
+    //     for px in start_x..(start_x + pillar_size) {
+    //         for py in start_y..(start_y + pillar_size) {
+    //             if px < grid_size && py < grid_size {
+    //                 grid[py][px] = 0;
+    //             }
+    //         }
+    //     }
+    // }
 
     grid
 }

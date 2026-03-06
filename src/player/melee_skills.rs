@@ -80,10 +80,39 @@ pub fn handle_second_split_attack(
             was_overcrit,
             hit_by_mob: None,
             ignore_tool: false,
-                from_heirloom_effect: None,
+            from_heirloom_effect: None,
         });
         commands.entity(e).remove::<SecondHitDelay>();
     }
+}
+
+/// Per-heirloom trigger rate limits (e.g. Chalice echo, Bob's Bell) so they can only trigger once per 0.1s.
+#[derive(Component)]
+pub struct HeirloomTriggerCooldowns {
+    pub chalice_echo: Option<Timer>,
+    pub bobs_bell: Option<Timer>,
+}
+
+/// Shared cooldown duration for heirloom trigger effects (Chalice, Bob's Bell).
+pub const HEIRLOOM_TRIGGER_COOLDOWN_SECS: f32 = 0.1;
+
+/// Ticks all heirloom trigger cooldowns so they can trigger again after their duration.
+pub fn tick_heirloom_trigger_cooldowns(
+    time: Res<Time>,
+    mut query: Query<&mut HeirloomTriggerCooldowns, With<Player>>,
+) {
+    for mut cooldowns in query.iter_mut() {
+        if let Some(ref mut t) = cooldowns.chalice_echo {
+            t.tick(time.delta());
+        }
+        if let Some(ref mut t) = cooldowns.bobs_bell {
+            t.tick(time.delta());
+        }
+    }
+}
+
+fn new_heirloom_trigger_timer() -> Timer {
+    Timer::from_seconds(HEIRLOOM_TRIGGER_COOLDOWN_SECS, TimerMode::Once)
 }
 
 pub fn handle_echo_after_heal(
@@ -97,14 +126,23 @@ pub fn handle_echo_after_heal(
             &Attack,
             &ProjectileSize,
             &mut CurrentMana,
+            Option<&mut HeirloomTriggerCooldowns>,
         ),
         Changed<CurrentHealth>,
     >,
     asset_server: Res<AssetServer>,
     mut trigger_summons_events: EventWriter<TriggerSummonsEvent>,
 ) {
-    for (e, changed_health, prev_health, skills, attack, projectile_size, mut current_mana) in
-        changed_health.iter_mut()
+    for (
+        e,
+        changed_health,
+        prev_health,
+        skills,
+        attack,
+        projectile_size,
+        mut current_mana,
+        mut cooldowns,
+    ) in changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
         if delta <= 0 {
@@ -113,6 +151,15 @@ pub fn handle_echo_after_heal(
         let rng = &mut rand::thread_rng();
         let count = skills.get_count(Heirloom::HealEcho);
         if count > 0 && rng.gen_bool((count as f64 * 0.25).clamp(0.0, 1.0)) {
+            if let Some(ref cooldowns) = cooldowns {
+                if cooldowns
+                    .chalice_echo
+                    .as_ref()
+                    .map_or(false, |t| !t.finished())
+                {
+                    continue;
+                }
+            }
             let mana_cost = Heirloom::HealEcho.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
@@ -123,6 +170,14 @@ pub fn handle_echo_after_heal(
                     attack.0,
                     projectile_size.get_multiplier(),
                 );
+                if let Some(ref mut cooldowns) = cooldowns {
+                    cooldowns.chalice_echo = Some(new_heirloom_trigger_timer());
+                } else {
+                    commands.entity(e).insert(HeirloomTriggerCooldowns {
+                        chalice_echo: Some(new_heirloom_trigger_timer()),
+                        bobs_bell: None,
+                    });
+                }
             }
         }
         // HealSummons: 20% chance to trigger all summons once (Ant Farm, Stone Orbit)
@@ -404,7 +459,7 @@ pub fn handle_spear_pull_delay(
         let skill_power_mult =
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
         // Spawn 20px damage hitbox at epicenter
-            let hitbox = spawn_temp_collider(
+        let hitbox = spawn_temp_collider(
             &mut commands,
             Transform::from_translation(Vec3::new(epicenter.x, epicenter.y, 1.0)),
             0.5, // Very short duration, just for the hit
