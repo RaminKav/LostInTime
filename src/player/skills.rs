@@ -884,7 +884,7 @@ impl Heirloom {
 
             // New heirlooms
             Heirloom::MaxHPHunt => "Ripe Tomato".to_string(),
-            Heirloom::SkillPowerHunt => "Arcane Dust".to_string(),
+            Heirloom::SkillPowerHunt => "Arcane Tome".to_string(),
             Heirloom::MaxHPDamage => "Crusader Shield".to_string(),
             Heirloom::GoldIntoDamage => "Red Envelope".to_string(),
             Heirloom::DeathDefiance => "Cooked Cross".to_string(),
