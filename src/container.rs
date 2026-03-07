@@ -42,6 +42,12 @@ impl Container {
     pub fn get_first_empty_hotbar_slot(&self) -> Option<usize> {
         (0..6).find(|&i| self.items[i].is_none())
     }
+
+    /// First empty hotbar slot excluding quick-use slots (1, 2, 3). Used so shift-click
+    /// and auto-moves do not place items into slots the player reserves for quick keys.
+    pub fn get_first_empty_hotbar_slot_excluding_quick_use(&self) -> Option<usize> {
+        [0, 4, 5].into_iter().find(|&i| self.items[i].is_none())
+    }
     pub fn get_first_empty_non_hotbar_slot(&self) -> Option<usize> {
         (6..self.items.len()).find(|&i| self.items[i].is_none())
     }
@@ -161,7 +167,9 @@ impl Container {
                     self.items[slot] = None;
                 }
             } else if !is_from_hotbar {
-                if let Some(next_avail_slot) = Self::get_first_empty_hotbar_slot(self) {
+                if let Some(next_avail_slot) =
+                    Self::get_first_empty_hotbar_slot_excluding_quick_use(self)
+                {
                     self.items[next_avail_slot] = Some(inv_item_stack.modify_slot(next_avail_slot));
                     self.items[slot] = None;
                 }

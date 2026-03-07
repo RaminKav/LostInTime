@@ -155,6 +155,7 @@ pub fn setup_active_skill_shrine_ui(
             &graphics,
             &asset_server,
             skill_choice.active_skill.clone(),
+            None,
             container,
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
         );
@@ -380,6 +381,7 @@ pub fn setup_active_skill_shrine_overwrite_ui(
             &graphics,
             &asset_server,
             choice.active_skill.clone(),
+            None,
             container,
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
         );

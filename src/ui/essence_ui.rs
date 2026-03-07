@@ -43,6 +43,13 @@ pub fn reset_blacksmith_tracker(mut tracker: ResMut<BlacksmithPurchaseTracker>) 
     tracker.purchases_made = 0;
 }
 
+/// Caches shop contents by tile position so they persist across chunk load/unload.
+/// Cleared between runs and between non-dungeon era transitions.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct EssenceShopCache {
+    pub shops: std::collections::HashMap<crate::world::TileMapPosition, Vec<EssenceOption>>,
+}
+
 use super::skill_choice_ui::spawn_heirloom_tooltip_card;
 
 use super::{
@@ -452,36 +459,47 @@ pub fn handle_populate_essence_shop_on_new_spawn(
     player_atts: Query<&crate::attributes::LootRateBonus, With<crate::player::Player>>,
     heirloom_queue: Res<crate::player::skills::HeirloomChoiceQueue>,
     purchase_tracker: Res<BlacksmithPurchaseTracker>,
+    mut shop_cache: ResMut<EssenceShopCache>,
 ) {
     for (entity, mut shop, transform) in new_spawns.iter_mut() {
-        let mut shop_choices = vec![];
         let mut rng = rand::thread_rng();
 
-        // Store tile position for chunk cache updates
-        // Account for sprite anchor offset (y: 12.0) to get the correct base tile position
         let world_pos = transform.translation().truncate() - bevy::math::Vec2::new(0., 12.);
         let tile_pos = crate::world::world_helpers::world_pos_to_tile_pos(world_pos);
         shop.tile_pos = Some(tile_pos);
 
-        // Get the price multiplier based on previous purchases
         let purchase_multiplier = purchase_tracker.get_price_multiplier();
 
-        while shop_choices.len() < 3 {
-            // Determine rarity based on luck/randomness
+        // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms
+        let mut shop_choices: Vec<EssenceOption> =
+            if let Some(cached) = shop_cache.shops.get(&tile_pos) {
+                cached
+                    .iter()
+                    .filter(|opt| !heirloom_queue.banned.contains(&opt.heirloom))
+                    .cloned()
+                    .collect()
+            } else {
+                vec![]
+            };
+
+        let mut attempts = 0;
+        while shop_choices.len() < 3 && attempts < 30 {
+            attempts += 1;
             let loot_bonus = player_atts.get_single().map(|a| a.0).unwrap_or(0);
             let rarity =
                 crate::player::skills::HeirloomChoiceQueue::gen_rarity(&mut rng, loot_bonus);
 
-            // Pick a heirloom from the pool that matches this rarity
+            let already_chosen: Vec<Heirloom> =
+                shop_choices.iter().map(|o| o.heirloom.clone()).collect();
             let picked_heirloom_choice =
-                heirloom_queue.get_skill_of_rarity(rarity.clone(), &mut rng, &|_| true);
+                heirloom_queue.get_skill_of_rarity(rarity.clone(), &mut rng, &|h| {
+                    !already_chosen.contains(&h.heirloom)
+                });
 
             let Some(heirloom_choice) = picked_heirloom_choice else {
-                // If no heirloom of this rarity is available, try a different rarity
                 continue;
             };
 
-            // Calculate cost based on rarity
             let rarity_cost_inc = match heirloom_choice.rarity {
                 HeirloomRarity::Common => 1.,
                 HeirloomRarity::Uncommon => 1.2,
@@ -494,11 +512,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 _ => 0,
             };
 
-            // Base cost (level 1 equivalent: 1 * 4 + 3 = 7)
             let base_cost = 7.;
             let random_adjustment = rand::thread_rng().gen_range(2.0..7.0) * rarity_cost_inc * 2.;
-
-            // Apply purchase multiplier to scale prices
             let final_cost =
                 (base_cost * rarity_cost_inc + random_adjustment) * purchase_multiplier;
 
@@ -509,6 +524,8 @@ pub fn handle_populate_essence_shop_on_new_spawn(
                 time_fragment_cost: time_frag_cost,
             });
         }
+
+        shop_cache.shops.insert(tile_pos, shop_choices.clone());
         shop.choices = shop_choices;
         shop.owner_entity = Some(entity);
     }

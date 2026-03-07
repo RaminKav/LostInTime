@@ -142,6 +142,7 @@ impl Plugin for UIPlugin {
             .add_event::<ToolTipUpdateEvent>()
             .init_resource::<BeaconGuidanceRegistry>()
             .init_resource::<BlacksmithPurchaseTracker>()
+            .init_resource::<EssenceShopCache>()
             .add_event::<TooltipTeardownEvent>()
             .add_event::<ShowInvPlayerStatsEvent>()
             .add_event::<SubmitEssenceChoice>()
@@ -453,6 +454,7 @@ impl Plugin for UIPlugin {
                 (
                     handle_heirloom_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
+                    player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

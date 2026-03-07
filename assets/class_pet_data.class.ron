@@ -88,5 +88,25 @@
             pet_icon: FairyPetIcon,
             skill_icon: HPRegenCooldownIcon,
         ),
+        Porkipine: (
+            name: "Porkipine",
+            skill_description: [
+                "Damages you for 1 HP\nevery 1.5s when above\n30% health."
+            ],
+            skill_name: "Spiky Burden",
+            passive_description: ["Gain +1% Lifesteal\nper level"],
+            pet_icon: SlimePetIcon,
+            skill_icon: SlimeShieldIcon,
+        ),
+        GoldenPig: (
+            name: "Golden Pig",
+            skill_description: [
+                "Drops coins every 15s.\n $$$"
+            ],
+            skill_name: "Coin Drop",
+            passive_description: ["Gain +1.5% Pickup Range\nper level"],
+            pet_icon: SlimePetIcon,
+            skill_icon: SlimeShieldIcon,
+        ),
     },
 )

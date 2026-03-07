@@ -19,8 +19,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, ORANGE, RED,
-        SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
+        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, LIGHT_GREY, ORANGE,
+        RED, SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -28,9 +28,7 @@ use crate::{
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
-        combat_heirlooms::{
-            CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker,
-        },
+        combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills,
@@ -1129,6 +1127,13 @@ pub struct HeirloomHudTooltip;
 #[derive(Component)]
 pub struct ActiveSkillHudTooltip;
 
+/// Stores which skill and slot the HUD tooltip is for (used to show remaining cooldown).
+#[derive(Component)]
+pub struct ActiveSkillHudTooltipSkill(pub usize);
+
+#[derive(Component)]
+pub struct SkillTooltipCooldownText;
+
 /// System to handle tooltips for heirloom icons in the HUD
 pub fn handle_heirloom_hud_tooltip(
     mut commands: Commands,
@@ -1203,8 +1208,14 @@ pub fn handle_heirloom_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((heirloom, icon_pos)) = currently_hovered {
-        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker, skill_power_hunt_tracker)) =
-            player_query.get_single()
+        let Ok((
+            skills,
+            max_health,
+            hunt_tracker,
+            crate_tracker,
+            thorns_tracker,
+            skill_power_hunt_tracker,
+        )) = player_query.get_single()
         else {
             return;
         };
@@ -1252,12 +1263,14 @@ pub fn handle_heirloom_hud_tooltip(
 }
 
 /// Helper function to spawn skill tooltip content (icon, title, description)
-/// Extracted from class selection UI for reuse
+/// Extracted from class selection UI for reuse.
+/// If `slot_index` is `Some`, also spawns a cooldown text placeholder (updated by system when in HUD).
 pub fn spawn_skill_tooltip_content(
     commands: &mut Commands,
     graphics: &Graphics,
     asset_server: &AssetServer,
     active_skill: ActiveSkill,
+    slot_index: Option<usize>,
     parent_entity: Entity,
     skill_power: f32,
 ) {
@@ -1267,6 +1280,9 @@ pub fn spawn_skill_tooltip_content(
     const BODY_FONT: &str = "fonts/slkscr.ttf";
     const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
     const BODY_FONT_SIZE: f32 = 8.4;
+    // Cooldown text: top right, same y as title (TEXT_Y_OFFSET + 6)
+    const COOLDOWN_TEXT_X: f32 = 187.;
+    const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
 
     let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
     let active_skill_desc = active_skill.get_desc(skill_power).join("\n");
@@ -1306,7 +1322,7 @@ pub fn spawn_skill_tooltip_content(
             .with_alignment(TextAlignment::Left),
             text_anchor: Anchor::TopLeft,
             transform: Transform {
-                translation: Vec3::new(DESC_TEXT_X, TEXT_Y_OFFSET + 6., 2.),
+                translation: Vec3::new(DESC_TEXT_X, TITLE_Y, 2.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -1316,6 +1332,34 @@ pub fn spawn_skill_tooltip_content(
         .insert(Name::new("SKILL TOOLTIP NAME"))
         .set_parent(parent_entity)
         .id();
+
+    // Spawn cooldown remaining text (top right, same y as title); only for HUD tooltips with a slot
+    if slot_index.is_some() {
+        let _ = commands
+            .spawn(Text2dBundle {
+                text: Text::from_section(
+                    "",
+                    TextStyle {
+                        font: asset_server.load(BODY_FONT),
+                        font_size: BODY_FONT_SIZE,
+                        color: LIGHT_GREY,
+                    },
+                )
+                .with_alignment(TextAlignment::Right),
+                text_anchor: Anchor::TopRight,
+                transform: Transform {
+                    translation: Vec3::new(COOLDOWN_TEXT_X, TITLE_Y, 2.),
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                ..default()
+            })
+            .insert(RenderLayers::from_layers(&[3]))
+            .insert(SkillTooltipCooldownText)
+            .insert(Name::new("SKILL TOOLTIP COOLDOWN"))
+            .set_parent(parent_entity)
+            .id();
+    }
 
     // Spawn skill description text
     let _active_skill_description_text = commands
@@ -1388,10 +1432,14 @@ pub fn handle_active_skill_hud_tooltip(
         .filter(|(_, _, ui_elem, _, _)| **ui_elem == UIElement::HeirloomHudIcon)
         .find(|(_, _, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
         .map(|(_, transform, _, _, skill_slot)| {
-            (skill_slot.skill.clone(), transform.translation())
+            (
+                skill_slot.skill.clone(),
+                skill_slot.slot_index,
+                transform.translation(),
+            )
         });
 
-    let hovered_skill = currently_hovered.as_ref().map(|(s, _)| s.clone());
+    let hovered_skill = currently_hovered.as_ref().map(|(s, _, _)| s.clone());
 
     // Only update if the hover state changed
     if *last_hovered == hovered_skill {
@@ -1404,12 +1452,13 @@ pub fn handle_active_skill_hud_tooltip(
     }
 
     // Spawn new tooltip if hovering
-    if let Some((skill, icon_pos)) = currently_hovered {
+    if let Some((skill, slot_index, icon_pos)) = currently_hovered {
         // Position tooltip above the hovered icon
         let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., 15.);
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))
             .insert(ActiveSkillHudTooltip)
+            .insert(ActiveSkillHudTooltipSkill(slot_index))
             .insert(SpatialBundle::from_transform(Transform {
                 translation: tooltip_pos,
                 scale: Vec3::new(1., 1., 1.),
@@ -1434,12 +1483,13 @@ pub fn handle_active_skill_hud_tooltip(
             .id();
 
         let (skill_power, blessings) = skill_power.single();
-        // Spawn skill tooltip content (icon, title, description)
+        // Spawn skill tooltip content (icon, title, description, cooldown placeholder)
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,
             &asset_server,
             skill,
+            Some(slot_index),
             container,
             skill_power_multiplier(skill_power, blessings.get_skill_power_bonus()),
         );
@@ -2366,6 +2416,69 @@ pub fn handle_active_skill_event(
                     .set_duration(Duration::from_secs_f32(cooldown_secs));
             }
         }
+    }
+}
+
+/// Updates the "Xs" cooldown text on active skill HUD tooltips.
+pub fn update_skill_tooltip_cooldown(
+    mut cooldown_texts: Query<(&Parent, &mut Text), With<SkillTooltipCooldownText>>,
+    tooltip_containers: Query<&ActiveSkillHudTooltipSkill>,
+    game: Res<crate::Game>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
+    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
+    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
+    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    overlays: Query<&SkillCooldownOverlay>,
+) {
+    let roll_slot = player_skills
+        .get_single()
+        .ok()
+        .and_then(|s| s.has_active_skill(ActiveSkill::Roll));
+
+    for (parent, mut text) in cooldown_texts.iter_mut() {
+        let Ok(tooltip_skill) = tooltip_containers.get(parent.get()) else {
+            continue;
+        };
+        let slot_index = tooltip_skill.0;
+
+        let remaining = if Some(slot_index) == roll_slot {
+            let dash = &game.player_state.player_dash_cooldown;
+            (dash.duration().as_secs_f32() - dash.elapsed().as_secs_f32()).max(0.0)
+        } else {
+            let tracker_opt = match slot_index {
+                0 => slot1_trackers.get_single().ok().map(|t| &t.0),
+                1 => slot2_trackers.get_single().ok().map(|t| &t.0),
+                2 => slot3_trackers.get_single().ok().map(|t| &t.0),
+                3 => slot4_trackers.get_single().ok().map(|t| &t.0),
+                _ => None,
+            };
+            if let Some(tracker) = tracker_opt {
+                if tracker.current_charges < tracker.max_charges {
+                    let d = tracker.cooldown_timer.duration().as_secs_f32();
+                    let e = tracker.cooldown_timer.elapsed().as_secs_f32();
+                    (d - e).max(0.0)
+                } else {
+                    0.0
+                }
+            } else {
+                overlays
+                    .iter()
+                    .find(|o| o.index == slot_index)
+                    .map(|o| {
+                        let d = o.timer.duration().as_secs_f32();
+                        let e = o.timer.elapsed().as_secs_f32();
+                        (d - e).max(0.0)
+                    })
+                    .unwrap_or(0.0)
+            }
+        };
+
+        text.sections[0].value = if remaining > 0.05 {
+            format!("{:.1}s", remaining)
+        } else {
+            String::new()
+        };
     }
 }
 

@@ -553,7 +553,10 @@ pub fn update_summon_ring(
     mut rings: Query<(Entity, &mut Transform, &mut SummonRingProjectile)>,
     player_transforms: Query<&GlobalTransform, With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
-    world_objects: Query<(Entity, &GlobalTransform, &WorldObject), (Without<Mob>, Without<ItemDrop>)>,
+    world_objects: Query<
+        (Entity, &GlobalTransform, &WorldObject),
+        (Without<Mob>, Without<ItemDrop>),
+    >,
     player_entity: Query<Entity, With<Player>>,
     frail_query: Query<&Frail>,
     mut hit_events: EventWriter<HitEvent>,
@@ -1165,7 +1168,8 @@ pub fn handle_boss_hit_mana_orb_drops(
 
         let skills = heirlooms.single();
 
-        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1;
+        // one fourth of the odds for boss/elites
+        let mana_orb_chance = skills.get_count(Heirloom::ManaOrbs) as f64 * 0.1 / 4.;
         if !rng.gen_bool(mana_orb_chance.clamp(0.0, 1.0)) {
             continue;
         }

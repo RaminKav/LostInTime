@@ -1505,9 +1505,10 @@ impl Heirloom {
                 });
             }
             &Heirloom::DaggerCombo => {
+                // Reset time halved: stacks decay after 0.5s without a hit
                 commands.entity(entity).insert(ComboCounter {
                     counter: 0,
-                    reset_timer: Timer::from_seconds(1., TimerMode::Once),
+                    reset_timer: Timer::from_seconds(0.5, TimerMode::Once),
                 });
             }
             Heirloom::AntFarm => {

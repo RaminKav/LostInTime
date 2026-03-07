@@ -317,15 +317,17 @@ pub fn handle_add_combo_counter(
         return;
     }
 
+    // Only count direct attacks (no status/heirloom damage like poison)
     let mut combo_increment = 0;
     for hit in hits.iter() {
-        if mobs.get(hit.hit_entity).is_ok() {
+        if hit.from_heirloom_effect.is_none() && mobs.get(hit.hit_entity).is_ok() {
             combo_increment += 1;
         }
     }
+    let combo_cap = (500 * skills.get_count(Heirloom::DaggerCombo).max(1)) as u32;
     for mut c in combo.iter_mut() {
         if combo_increment > 0 {
-            c.counter += combo_increment;
+            c.counter = (c.counter + combo_increment).min(combo_cap);
             c.reset_timer.reset();
             for (e, anim) in old_combo_anims.iter() {
                 if anim.is_some() {

@@ -398,6 +398,8 @@ pub fn handle_item_action_success(
                     WorldObject::Berries,
                 ];
                 let consumable_slot = item_action_item.slot;
+                // Don't auto-refill quick-use hotbar slots (1, 2, 3); player manages those manually
+                let is_quick_use_slot = matches!(consumable_slot, 1 | 2 | 3);
                 let mut was_food = false;
                 let mut was_healing = false;
                 let item_actions = proto_param
@@ -409,7 +411,7 @@ pub fn handle_item_action_success(
                     _ => {}
                 });
                 let mut inv = inv.single_mut();
-                if was_food {
+                if was_food && !is_quick_use_slot {
                     // find another food item in inv and place it in this slot
                     for food in FOOD.iter() {
                         if let Some(matching_slot) = inv.items.get_slot_for_item_in_container(food)
@@ -428,8 +430,8 @@ pub fn handle_item_action_success(
                         }
                     }
                 }
-                if was_healing {
-                    // find another food item in inv and place it in this slot
+                if was_healing && !is_quick_use_slot {
+                    // find another healing item in inv and place it in this slot
                     for healing_item in HEALING.iter() {
                         if let Some(matching_slot) =
                             inv.items.get_slot_for_item_in_container(healing_item)

@@ -653,8 +653,9 @@ impl<'w, 's> GameParam<'w, 's> {
         let mut rng = rand::thread_rng();
         let dmg_mult = dmg_mult.unwrap_or(1.);
         let dmg = attack_override.unwrap_or(attack.0);
+        // DaggerCombo: counter is capped at increment time; 500 stacks = +100% crit damage
         let crit_dmb_bonus = if let Some(combo) = combo_option {
-            combo.counter as i32
+            (combo.counter as f32 * 100.0 / 500.0).round() as i32
         } else {
             0
         };
@@ -724,7 +725,10 @@ impl<'w, 's> GameParam<'w, 's> {
             }
         };
 
-        let total_crit_chance = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
+        // Cap crit chance at 200%; excess is converted to crit damage at 1:1
+        let total_crit_chance_raw = crit_chance.0.try_into().unwrap_or(0_u32) + bonus_crit;
+        let effective_crit_chance = total_crit_chance_raw.min(200);
+        let overflow_crit_damage = total_crit_chance_raw.saturating_sub(200) as i32;
 
         // Stealth: Force all damage to be crits
         let is_stealthed = self
@@ -735,16 +739,16 @@ impl<'w, 's> GameParam<'w, 's> {
 
         // Determine if we crit and if we overcrit
         let (did_crit, did_overcrit) =
-            if total_crit_chance >= 100 || self.player().next_hit_crit || is_stealthed {
+            if effective_crit_chance >= 100 || self.player().next_hit_crit || is_stealthed {
                 // Guaranteed crit if >= 100%
                 // Check for overcrit if crit > 100%
-                let overcrit_chance = total_crit_chance.saturating_sub(100);
+                let overcrit_chance = effective_crit_chance.saturating_sub(100);
                 let is_overcrit =
                     overcrit_chance > 0 && rng.gen_ratio(u32::min(100, overcrit_chance), 100);
                 (true, is_overcrit)
             } else {
                 // Normal crit roll
-                let is_crit = rng.gen_ratio(total_crit_chance, 100);
+                let is_crit = rng.gen_ratio(effective_crit_chance, 100);
                 (is_crit, false)
             };
 
@@ -763,8 +767,9 @@ impl<'w, 's> GameParam<'w, 's> {
             if did_overcrit {
                 commands.entity(hit_entity).insert(WasHitWithOvercrit);
             }
-            // Base crit damage
-            let crit_multiplier = f32::abs((crit_dmg.0 + crit_dmb_bonus) as f32) / 100.;
+            // Base crit damage (includes overflow from crit chance > 200% at 1:1 ratio)
+            let crit_multiplier =
+                f32::abs((crit_dmg.0 + crit_dmb_bonus + overflow_crit_damage) as f32) / 100.;
             // Overcrit adds an extra 50% on top
             let overcrit_multiplier = if did_overcrit { 1.5 } else { 1.0 };
             (

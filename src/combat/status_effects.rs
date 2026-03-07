@@ -4,12 +4,13 @@ use serde::Deserialize;
 use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
-use crate::attributes::BonusDamage;
+use crate::attributes::{BonusDamage, CritChance, CritDamage};
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::enemy::red_mushking::DeathState;
 use crate::Player;
+use rand::Rng;
 
-use super::HitEvent;
+use super::{HitEvent, MarkedForDeath};
 
 #[derive(
     Deserialize, Debug, EnumIter, Display, Hash, Clone, Reflect, FromReflect, Eq, PartialEq,
@@ -207,29 +208,57 @@ pub fn update_status_effect_icons(
 }
 
 pub fn handle_burning_ticks(
-    mut burning: Query<(Entity, &mut Burning), Without<DeathState>>,
+    mut burning: Query<
+        (Entity, &mut Burning, Option<&Frail>),
+        (Without<DeathState>, Without<MarkedForDeath>),
+    >,
     time: Res<Time>,
     mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut hit_event: EventWriter<HitEvent>,
-    player_skills: Query<(&PlayerSkills, &BonusDamage), With<Player>>,
+    player_skills: Query<
+        (&PlayerSkills, &BonusDamage, &CritChance, &CritDamage),
+        With<Player>,
+    >,
 ) {
-    // Get poison strength bonus from player skills (if player exists)
-    let Ok((skills, bonus_damage)) = player_skills.get_single() else {
+    // Get poison strength and crit from player (if player exists)
+    let Ok((skills, bonus_damage, crit_chance, crit_damage)) = player_skills.get_single() else {
         return;
     };
 
     let poison_strength_bonus =
         1. + skills.get_count(Heirloom::PoisonStrength) as f32 + bonus_damage.0 as f32 / 100.;
 
-    for (e, mut burning) in burning.iter_mut() {
+    // Cap crit chance at 200%; excess converts to crit damage at 1:1
+    let total_crit_chance_raw = crit_chance.0.try_into().unwrap_or(0_u32);
+    let effective_crit_chance = total_crit_chance_raw.min(200);
+    let overflow_crit_damage = total_crit_chance_raw.saturating_sub(200) as i32;
+    let crit_multiplier =
+        f32::abs((crit_damage.0 + overflow_crit_damage) as f32) / 100.0;
+
+    let mut rng = rand::thread_rng();
+
+    for (e, mut burning, frail_option) in burning.iter_mut() {
         burning.duration_timer.tick(time.delta());
         if !burning.duration_timer.just_finished() {
             burning.tick_timer.tick(time.delta());
             if burning.tick_timer.just_finished() {
                 // Damage = stacks + bonus damage from PoisonStrength heirloom
                 let base_damage = burning.stacks as i32;
-                let damage = base_damage + poison_strength_bonus.round() as i32;
+                let mut damage = base_damage + poison_strength_bonus.round() as i32;
+
+                // Frail multiplier: 1.1x per stack (same as other damage)
+                let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);
+                if frail_stacks > 0 {
+                    damage = (damage as f32 * 1.1_f32.powi(frail_stacks as i32)).round() as i32;
+                }
+
+                // Poison can crit internally (extra damage) but we don't set was_crit so other systems don't react
+                if effective_crit_chance > 0 && rng.gen_ratio(effective_crit_chance.min(100), 100) {
+                    damage = (damage as f32 * crit_multiplier).round().max(1.) as i32;
+                }
+                damage = damage.max(1);
+
                 hit_event.send(HitEvent {
                     hit_by_pet: None,
                     hit_entity: e,
@@ -246,12 +275,24 @@ pub fn handle_burning_ticks(
                 burning.tick_timer.reset();
             }
         } else {
-            commands.entity(e).remove::<Burning>();
-            status_event.send(StatusEffectEvent {
-                entity: e,
-                effect: StatusEffect::Poison,
-                num_stacks: 0,
-            });
+            // Reduce half the stacks and reset the timer instead of clearing all
+            burning.stacks = (burning.stacks / 2).max(0);
+            burning.duration_timer.reset();
+
+            if burning.stacks == 0 {
+                commands.entity(e).remove::<Burning>();
+                status_event.send(StatusEffectEvent {
+                    entity: e,
+                    effect: StatusEffect::Poison,
+                    num_stacks: 0,
+                });
+            } else {
+                status_event.send(StatusEffectEvent {
+                    entity: e,
+                    effect: StatusEffect::Poison,
+                    num_stacks: burning.stacks as i32,
+                });
+            }
         }
     }
 }

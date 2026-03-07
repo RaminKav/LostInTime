@@ -1523,6 +1523,7 @@ fn spawn_player_preview(
             graphics,
             asset_server,
             active_skill.clone(),
+            None,
             skill_container,
             1.,
         );

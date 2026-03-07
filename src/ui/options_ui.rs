@@ -71,6 +71,7 @@ pub enum KeyBindType {
     ActiveSkill(usize),
     Inventory,
     Minimap,
+    QuickConsume(usize),
 }
 
 #[derive(Component)]
@@ -169,6 +170,9 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Inventory => keybinds.set_inventory_key(InputBinding::KeyBinding(key)),
                 KeyBindType::Minimap => keybinds.set_minimap_key(InputBinding::KeyBinding(key)),
+                KeyBindType::QuickConsume(slot) => {
+                    keybinds.set_quick_consume_key(slot, InputBinding::KeyBinding(key))
+                }
             }
             keybinds.save();
             commands.entity(entity).remove::<WaitingForKeyInput>();
@@ -194,6 +198,9 @@ pub fn handle_key_rebind_input(
                 }
                 KeyBindType::Minimap => {
                     keybinds.set_minimap_key(InputBinding::MouseBinding(mouse_button))
+                }
+                KeyBindType::QuickConsume(slot) => {
+                    keybinds.set_quick_consume_key(slot, InputBinding::MouseBinding(mouse_button))
                 }
             }
             keybinds.save();
@@ -238,6 +245,7 @@ pub fn update_keybind_text(
                 KeyBindType::ActiveSkill(slot) => keybinds.get_active_skill_key(slot),
                 KeyBindType::Inventory => keybinds.get_inventory_key(),
                 KeyBindType::Minimap => keybinds.get_minimap_key(),
+                KeyBindType::QuickConsume(slot) => keybinds.get_quick_consume_key(slot),
             };
             text.sections[0].value = crate::keybinds::get_key_display_name(key);
             text.sections[0].style.color = crate::colors::WHITE;
@@ -286,7 +294,7 @@ pub fn setup_options_ui(
             text_anchor: bevy::sprite::Anchor::Center,
             transform: Transform::from_translation(Vec3::new(
                 0.,
-                resolution.game_height / 2. - 20.,
+                resolution.game_height / 2. - 40.,
                 11.,
             )),
             ..Default::default()
@@ -310,7 +318,7 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(left_side_x, 70., 11.)),
+            transform: Transform::from_translation(Vec3::new(left_side_x, 50., 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -318,7 +326,7 @@ pub fn setup_options_ui(
         Name::new("Keybind Section Title"),
     ));
 
-    let start_y = 46.5;
+    let start_y = 26.5;
     let row_spacing = -16.0;
 
     // Skill slot keybinds (slots 0-3)
@@ -381,8 +389,47 @@ pub fn setup_options_ui(
         &keybinds,
     );
 
+    // Quick consume section
+    let quick_consume_section_y = minimap_y + row_spacing * 1.5;
+    commands.spawn((
+        Text2dBundle {
+            text: Text::from_section(
+                "Quick Use Keybinds",
+                TextStyle {
+                    font: asset_server.load("fonts/alagard.ttf"),
+                    font_size: 15.0,
+                    color: crate::colors::DARK_WOOD_BROWN,
+                },
+            )
+            .with_alignment(TextAlignment::Left),
+            text_anchor: bevy::sprite::Anchor::CenterLeft,
+            transform: Transform::from_translation(Vec3::new(
+                left_side_x,
+                quick_consume_section_y,
+                11.,
+            )),
+            ..Default::default()
+        },
+        RenderLayers::from_layers(&[3]),
+        OptionsUI,
+        Name::new("Quick Use Keybind Section Title"),
+    ));
+
+    for slot in 1..=2usize {
+        let y = quick_consume_section_y + row_spacing * (slot as f32);
+        spawn_keybind_row(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            KeyBindType::QuickConsume(slot),
+            Vec3::new(left_side_x + 2., y, 11.),
+            Vec3::new(left_side_x + 160., y - 3.5, 11.),
+            &keybinds,
+        );
+    }
+
     // Cheats section
-    let cheats_section_y = 70.;
+    let cheats_section_y = 50.;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -404,7 +451,7 @@ pub fn setup_options_ui(
     ));
 
     // Unlock all classes checkbox
-    let checkbox_y = 50.;
+    let checkbox_y = 30.;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -473,7 +520,7 @@ pub fn setup_options_ui(
 
         // Exit to Menu button
         let exit_button = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(-110., -108., 11.),
+            Vec3::new(140., -148., 11.),
             Vec3::new(-50., -1., 1.),
             "Exit to Menu",
             crate::ui::main_menu::MenuButton::OptionsExit,
@@ -488,7 +535,7 @@ pub fn setup_options_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(0., -108., 11.),
+        Vec3::new(100., -148., 11.),
         &mut commands,
         &graphics,
         &asset_server,
@@ -519,6 +566,14 @@ fn spawn_keybind_row(
         }
         KeyBindType::Inventory => ("Inventory:", keybinds.get_inventory_key()),
         KeyBindType::Minimap => ("Map:", keybinds.get_minimap_key()),
+        KeyBindType::QuickConsume(slot) => {
+            let label = match slot {
+                1 => "Quick Use Slot 2:",
+                2 => "Quick Use Slot 3:",
+                _ => "Quick Use:",
+            };
+            (label, keybinds.get_quick_consume_key(slot))
+        }
     };
 
     commands.spawn((

@@ -36,24 +36,23 @@ impl ClassRank {
 
     /// Calculate rank based on total experience
     /// Every 5 ranks = 1 rarity tier upgrade
-    /// Rank formula: rank = (total_experience / 1000) + 1
+    /// Rank formula: rank = (total_experience / 1200) + 1 (~20% more XP per rank than before)
     fn update_rank(&mut self) {
-        self.rank = (self.total_experience / 1000) + 1;
+        self.rank = (self.total_experience / 1200) + 1;
     }
 
     /// Get the rarity tier for this class rank
-    /// Every 5 ranks = 1 rarity tier (0-4 = Common, 5-9 = Uncommon, 10-14 = Rare, 15+ = Legendary)
+    /// Every 5 ranks = 1 rarity tier (0-4 = Common, 5-9 = Uncommon, 10-14 = Rare; capped at Rare for starting weapons)
     pub fn get_rarity_tier(&self) -> u32 {
         self.rank / 5
     }
 
-    /// Get the ItemRarity for this class rank
+    /// Get the ItemRarity for this class rank (capped at Rare for starting weapons)
     pub fn get_starting_weapon_rarity(&self) -> ItemRarity {
-        match self.get_rarity_tier() {
+        match self.get_rarity_tier().min(2) {
             0 => ItemRarity::Common,
             1 => ItemRarity::Uncommon,
-            2 => ItemRarity::Rare,
-            _ => ItemRarity::Legendary,
+            _ => ItemRarity::Rare,
         }
     }
 }

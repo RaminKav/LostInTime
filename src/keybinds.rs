@@ -5,6 +5,13 @@ use std::io::BufReader;
 
 use crate::datafiles;
 
+fn default_quick_consume_slot_1() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::Z)
+}
+fn default_quick_consume_slot_2() -> InputBinding {
+    InputBinding::KeyBinding(KeyCode::X)
+}
+
 #[derive(Resource, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct InputMappings {
     pub active_skill_slot_0: InputBinding,
@@ -14,6 +21,10 @@ pub struct InputMappings {
     pub active_skill_slot_4: InputBinding, // Bonus slot from blessings
     pub inventory: InputBinding,
     pub minimap: InputBinding,
+    #[serde(default = "default_quick_consume_slot_1")]
+    pub quick_consume_slot_1: InputBinding,
+    #[serde(default = "default_quick_consume_slot_2")]
+    pub quick_consume_slot_2: InputBinding,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 
@@ -32,6 +43,8 @@ impl Default for InputMappings {
             active_skill_slot_4: InputBinding::KeyBinding(KeyCode::E), // Bonus slot
             inventory: InputBinding::KeyBinding(KeyCode::Tab),
             minimap: InputBinding::KeyBinding(KeyCode::M),
+            quick_consume_slot_1: InputBinding::KeyBinding(KeyCode::Z),
+            quick_consume_slot_2: InputBinding::KeyBinding(KeyCode::X),
         }
     }
 }
@@ -105,6 +118,35 @@ impl InputMappings {
 
     pub fn set_minimap_key(&mut self, key: InputBinding) {
         self.minimap = key;
+    }
+
+    pub fn get_quick_consume_key(&self, slot: usize) -> InputBinding {
+        match slot {
+            1 => self.quick_consume_slot_1,
+            2 => self.quick_consume_slot_2,
+            _ => InputBinding::KeyBinding(KeyCode::Z),
+        }
+    }
+
+    pub fn set_quick_consume_key(&mut self, slot: usize, key: InputBinding) {
+        match slot {
+            1 => self.quick_consume_slot_1 = key,
+            2 => self.quick_consume_slot_2 = key,
+            _ => {}
+        }
+    }
+
+    pub fn check_quick_consume_input(
+        &self,
+        slot: usize,
+        keys: &Res<Input<KeyCode>>,
+        mouse: &Res<Input<MouseButton>>,
+    ) -> bool {
+        let input = self.get_quick_consume_key(slot);
+        match input {
+            InputBinding::KeyBinding(key) => keys.just_pressed(key),
+            InputBinding::MouseBinding(button) => mouse.just_pressed(button),
+        }
     }
 
     pub fn load() -> Self {

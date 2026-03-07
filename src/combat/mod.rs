@@ -667,8 +667,12 @@ pub fn handle_hits(
                 }
             }
 
-            if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
-                hit_e.insert(JustGotHit).insert(BounceOnHit::new());
+            // Only insert hit reaction when we applied the hit and the entity is still alive
+            // (avoids queuing commands for entities that will be despawned by cleanup this frame)
+            if hit_health.0 > 0 {
+                if let Some(mut hit_e) = commands.get_entity(hit.hit_entity) {
+                    hit_e.insert(JustGotHit).insert(BounceOnHit::new());
+                }
             }
         }
     }

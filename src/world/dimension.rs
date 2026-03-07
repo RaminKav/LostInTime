@@ -115,8 +115,8 @@ impl Era {
     pub fn get_chaos_modifier(&self) -> f32 {
         match self {
             Era::Main => 0.,
-            Era::Second => 13.0,  // era2: slightly harder (+3 over previous 10)
-            Era::Third => 30.0,   // era3: +10 over previous 20
+            Era::Second => 13.0, // era2: slightly harder (+3 over previous 10)
+            Era::Third => 30.0,  // era3: +10 over previous 20
             Era::DungeonMain => 1.0,
         }
     }
@@ -253,6 +253,8 @@ impl DimensionPlugin {
                     }
                 }
                 if !curr_era.is_dungeon() && !new_era.is_dungeon() {
+                    commands.insert_resource(crate::ui::EssenceShopCache::default());
+
                     let old_era_chaos = curr_era.get_chaos_modifier();
                     let new_era_chaos = new_era.get_chaos_modifier();
                     // Update chaos tracker: remove old era's chaos, add new era's chaos

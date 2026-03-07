@@ -112,6 +112,7 @@ impl Plugin for InputsPlugin {
                     handle_open_essence_ui,
                     diagnostics,
                     handle_quick_hotbar_consume.before(handle_hotbar_key_input),
+                    handle_mapped_quick_consume.run_if(is_not_paused),
                     handle_interact_objects.run_if(is_not_paused),
                 )
                     .in_set(OnUpdate(GameState::Main)),
@@ -941,6 +942,37 @@ pub fn handle_quick_hotbar_consume(
         }
     }
 }
+pub fn handle_mapped_quick_consume(
+    key_input: Res<Input<KeyCode>>,
+    mouse_input: Res<Input<MouseButton>>,
+    keybinds: Res<InputMappings>,
+    mut game: GameParam,
+    proto_param: ProtoParam,
+    mut commands: Commands,
+    inv: Query<&Inventory>,
+    mut item_action_param: ItemActionParam,
+) {
+    // Hotbar slots are 0-indexed; "slot 2" and "slot 3" in UI are indices 1 and 2
+    for slot in 1..=2usize {
+        if keybinds.check_quick_consume_input(slot, &key_input, &mouse_input) {
+            let held_item_option = inv.single().items.items[slot].clone();
+            if let Some(held_item) = held_item_option {
+                let held_obj = *held_item.get_obj();
+                if let Some(item_actions) = proto_param.get_component::<ItemActions, _>(held_obj) {
+                    item_actions.run_action(
+                        held_obj,
+                        held_item.slot,
+                        &mut item_action_param,
+                        &mut game,
+                        &proto_param,
+                        &mut commands,
+                    );
+                }
+            }
+        }
+    }
+}
+
 // Converts the cursor position into a world position, taking into account any transforms applied
 // the camera.
 pub fn cursor_pos_in_world(

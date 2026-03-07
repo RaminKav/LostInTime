@@ -42,6 +42,7 @@ use crate::{
 };
 
 use super::{
+    essence_ui::EssenceShopCache,
     minimap::{FogOfWarData, MinimapTileCache},
     scrapper_ui::ScrapperEvent,
     Interactable, UIElement,
@@ -721,6 +722,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
     commands.insert_resource(DamageTracker::default());
+    commands.insert_resource(EssenceShopCache::default());
 
     // Reset Rapier physics world to free accumulated internal arena allocations
     commands.insert_resource(RapierContext::default());
