@@ -710,6 +710,7 @@ pub enum Heirloom {
 
     AntFarm,    // ant terrarium
     StoneTooth, // orbiting stone
+    SummonRing, // piercing ring that travels and bounces
     Reaper,     // soul harvest
 
     // Chaos
@@ -735,6 +736,7 @@ pub enum Heirloom {
 
     // New scalable heirlooms
     MaxHPHunt,      // Every 3 kills grants +1 max hp
+    SkillPowerHunt, // 3% chance on skill use to gain +1 skill power
     MaxHPDamage,    // +10% dmg per 100 max hp
     GoldIntoDamage, // +1% damage per 10 coins
     DeathDefiance,  // Survive death, freeze all enemies
@@ -789,10 +791,12 @@ impl Heirloom {
             Heirloom::IceStaffFloor => 3,
             Heirloom::ViralVenum => 5,
             Heirloom::HealEcho => 5,
+            Heirloom::HealSummons => 15,
             Heirloom::SkillEcho => 5,
             Heirloom::WaveAttack => 5,
-            Heirloom::AntFarm => 4,
-            Heirloom::StoneTooth => 4,
+            Heirloom::AntFarm => 2,
+            Heirloom::StoneTooth => 5,
+            Heirloom::SummonRing => 7,
             Heirloom::Reaper => 5,
             Heirloom::CoinLightning => 5,
             Heirloom::KillLightning => 5,
@@ -823,6 +827,7 @@ impl Heirloom {
             Heirloom::SlowStacks => "Sea Shell".to_string(),
             Heirloom::AntFarm => "Ant Farm".to_string(),
             Heirloom::StoneTooth => "Boulder".to_string(),
+            Heirloom::SummonRing => "Piercing Ring".to_string(),
             Heirloom::Reaper => "Reaper".to_string(),
             Heirloom::PoisonStacks => "Grandma's Recipe".to_string(),
             Heirloom::LethalBlow => "Deadly Mushroom".to_string(),
@@ -879,6 +884,7 @@ impl Heirloom {
 
             // New heirlooms
             Heirloom::MaxHPHunt => "Ripe Tomato".to_string(),
+            Heirloom::SkillPowerHunt => "Arcane Dust".to_string(),
             Heirloom::MaxHPDamage => "Crusader Shield".to_string(),
             Heirloom::GoldIntoDamage => "Red Envelope".to_string(),
             Heirloom::DeathDefiance => "Cooked Cross".to_string(),
@@ -981,24 +987,33 @@ impl Heirloom {
             ],
             Heirloom::SlowStacks => vec![
                 "Your Attacks have".to_string(),
-                "a chance to apply".to_string(),
-                "a Slow stack to".to_string(),
+                "+25% chance to apply".to_string(),
+                "a Freeze stack to".to_string(),
                 "enemies, reducing".to_string(),
-                "speed by 15%.".to_string(),
+                "speed by 15% per".to_string(),
+                "stack.".to_string(),
             ],
             Heirloom::AntFarm => vec![
-                "Spawn ants that".to_string(),
+                "Summon ants that".to_string(),
                 "rush towards".to_string(),
                 "enemies, dealing".to_string(),
                 "damage.".to_string(),
                 format!("Costs {} mana.", Heirloom::AntFarm.get_mana_cost()),
             ],
             Heirloom::StoneTooth => vec![
-                "Spawn rocks that".to_string(),
+                "Summon rocks that".to_string(),
                 "orbit you and deal".to_string(),
                 "damage to enemies".to_string(),
                 "they hit.".to_string(),
                 format!("Costs {} mana.", Heirloom::StoneTooth.get_mana_cost()),
+            ],
+            Heirloom::SummonRing => vec![
+                "Summon a ring that".to_string(),
+                "flies in a random".to_string(),
+                "direction, piercing".to_string(),
+                "enemies and bouncing".to_string(),
+                "off objects.".to_string(),
+                format!("Costs {} mana.", Heirloom::SummonRing.get_mana_cost()),
             ],
             Heirloom::Reaper => vec![
                 "Soul fragments".to_string(),
@@ -1266,7 +1281,9 @@ impl Heirloom {
                 "Healing has a 20%".to_string(),
                 "chance to trigger".to_string(),
                 "all summons once".to_string(),
-                "(Ant Farm, Boulder".to_string(),
+                "(Ant Farm, Boulder,".to_string(),
+                "Piercing Ring).".to_string(),
+                format!("Costs {} mana.", Heirloom::HealSummons.get_mana_cost()),
             ],
             Heirloom::FullStomach => vec![
                 "You get hungry".to_string(),
@@ -1288,6 +1305,13 @@ impl Heirloom {
             // New heirlooms
             Heirloom::MaxHPHunt => {
                 vec!["Every 25 kills".to_string(), "gain +1 Max HP.".to_string()]
+            }
+            Heirloom::SkillPowerHunt => {
+                vec![
+                    "5% chance when using".to_string(),
+                    "a skill to gain +1".to_string(),
+                    "Skill Power.".to_string(),
+                ]
             }
             Heirloom::MaxHPDamage => vec![
                 "Gain +10% Damage".to_string(),
@@ -1508,6 +1532,11 @@ impl Heirloom {
                     .entity(entity)
                     .insert(crate::player::combat_heirlooms::StoneToothState::default());
             }
+            Heirloom::SummonRing => {
+                commands
+                    .entity(entity)
+                    .insert(crate::player::combat_heirlooms::SummonRingState::default());
+            }
             Heirloom::Reaper => {
                 commands
                     .entity(entity)
@@ -1520,6 +1549,13 @@ impl Heirloom {
                     commands
                         .entity(entity)
                         .insert(crate::player::combat_heirlooms::MaxHPHuntTracker::default());
+                }
+            }
+            Heirloom::SkillPowerHunt => {
+                if skills.get_count(Heirloom::SkillPowerHunt) == 1 {
+                    commands
+                        .entity(entity)
+                        .insert(crate::player::combat_heirlooms::SkillPowerHuntTracker::default());
                 }
             }
             Heirloom::StandStill => {
@@ -1744,7 +1780,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::DiscountMP, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::OnHitEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::HealEcho, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::HealSummons, HeirloomRarity::Rare),
+                HeirloomChoiceState::new(Heirloom::HealSummons, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::CritChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::CritDamage, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::FrailStacks, HeirloomRarity::Uncommon),
@@ -1761,7 +1797,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::LethalBlow, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::DodgeChance, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::SlowStacks, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::AntFarm, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::FrozenAoE, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::FrozenCrit, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::FrozenMPRegen, HeirloomRarity::Rare),
@@ -1778,6 +1814,7 @@ impl Default for HeirloomChoiceQueue {
                 // HeirloomChoiceState::new(Heirloom::ReinforcedArmor, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DaggerCombo, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::StoneTooth, HeirloomRarity::Uncommon),
+                HeirloomChoiceState::new(Heirloom::SummonRing, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::Reaper, HeirloomRarity::Legendary),
                 HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
@@ -1792,6 +1829,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::CreditCard, HeirloomRarity::Legendary),
                 // New heirlooms
                 HeirloomChoiceState::new(Heirloom::MaxHPHunt, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::SkillPowerHunt, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::MaxHPDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::GoldIntoDamage, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::DeathDefiance, HeirloomRarity::Legendary),

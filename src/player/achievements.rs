@@ -21,6 +21,8 @@ pub enum Achievement {
     Kill100FurDevils,
     SlimePet,
     FairyPet,
+    PorkipinePet,
+    GoldenPigPet,
     Bouncy,
     Bouncy2,
     Act1,
@@ -75,6 +77,8 @@ impl Achievement {
             Achievement::Kill100FurDevils => "Fur Devil Slayer".to_string(),
             Achievement::SlimePet => "Slimed".to_string(),
             Achievement::FairyPet => "Fairy Friend".to_string(),
+            Achievement::PorkipinePet => "Porkipine".to_string(),
+            Achievement::GoldenPigPet => "Golden Pig".to_string(),
             Achievement::Bouncy => "Bouncy".to_string(),
             Achievement::Bouncy2 => "Bouncy II".to_string(),
             Achievement::Act1 => "Act I".to_string(),
@@ -103,6 +107,8 @@ impl Achievement {
             Achievement::Kill100FurDevils => "Defeat 1000 Fur Devils.".to_string(),
             Achievement::SlimePet => "Find the Slime in Act 1.".to_string(),
             Achievement::FairyPet => "Find the Fairy in Act 2.".to_string(),
+            Achievement::PorkipinePet => "Find the Porkipine.".to_string(),
+            Achievement::GoldenPigPet => "Find the Golden Pig.".to_string(),
             Achievement::Bouncy => "Bounce on 100 pink petals.".to_string(),
             Achievement::Bouncy2 => "Chain three pink petal bounces.".to_string(),
             Achievement::Act1 => "Defeat the Act 1 boss.".to_string(),
@@ -133,6 +139,8 @@ impl Achievement {
             Achievement::Kill100FurDevils => 5,
             Achievement::SlimePet => 5,
             Achievement::FairyPet => 7,
+            Achievement::PorkipinePet => 5,
+            Achievement::GoldenPigPet => 5,
             Achievement::Bouncy => 5,
             Achievement::Bouncy2 => 3,
             Achievement::Act1 => 10,
@@ -540,6 +548,8 @@ impl Achievement {
         match self {
             Achievement::SlimePet => Some(crate::pets::state::Pet::Slime),
             Achievement::FairyPet => Some(crate::pets::state::Pet::Fairy),
+            Achievement::PorkipinePet => Some(crate::pets::state::Pet::Porkipine),
+            Achievement::GoldenPigPet => Some(crate::pets::state::Pet::GoldenPig),
             _ => None,
         }
     }
@@ -581,6 +591,13 @@ pub fn is_class_unlocked(
 
 /// Check if a pet is unlocked based on achievements
 pub fn is_pet_unlocked(pet: &crate::pets::state::Pet, achievements: &Achievements) -> bool {
+    // Porkipine and GoldenPig are available to anyone who has completed Act 2
+    if matches!(pet, crate::pets::state::Pet::Porkipine | crate::pets::state::Pet::GoldenPig)
+        && achievements.has(Achievement::Act2)
+    {
+        return true;
+    }
+
     // Check if any achievement unlocks this pet
     for achievement in &achievements.unlocked {
         if let Some(unlocked_pet) = achievement.unlocks_pet() {

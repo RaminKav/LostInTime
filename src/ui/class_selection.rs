@@ -1540,7 +1540,9 @@ fn spawn_pet_preview(
 ) -> Entity {
     let (aseprite_path, animation_tag) = match selected_pet {
         Pet::Fairy => (sprite_handles.fairy_pet.clone(), FairyPetSprite::tags::IDLE),
-        Pet::Slime => (sprite_handles.slime_pet.clone(), SlimePetSprite::tags::IDLE),
+        Pet::Slime | Pet::Porkipine | Pet::GoldenPig => {
+            (sprite_handles.slime_pet.clone(), SlimePetSprite::tags::IDLE)
+        }
     };
 
     let pet_data = graphics.get_pet_data(selected_pet.clone());

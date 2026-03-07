@@ -30,6 +30,8 @@ impl Plugin for PetsPlugin {
                     // Pet abilities
                     slime_shield_ability.run_if(is_not_paused),
                     fairy_heal_ability.run_if(is_not_paused),
+                    porkipine_damage_ability.run_if(is_not_paused),
+                    golden_pig_coin_ability.run_if(is_not_paused),
                     handle_pet_spawner_interaction,
                 )
                     .in_set(OnUpdate(GameState::Main)),

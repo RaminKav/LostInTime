@@ -28,7 +28,9 @@ use crate::{
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
-        combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker},
+        combat_heirlooms::{
+            CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker,
+        },
         levels::PlayerLevel,
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills,
@@ -1153,6 +1155,7 @@ pub fn handle_heirloom_hud_tooltip(
             Option<&crate::player::combat_heirlooms::MaxHPHuntTracker>,
             Option<&crate::player::combat_heirlooms::CrateBreakDamageTracker>,
             Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
+            Option<&crate::player::combat_heirlooms::SkillPowerHuntTracker>,
         ),
         With<Player>,
     >,
@@ -1200,7 +1203,7 @@ pub fn handle_heirloom_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((heirloom, icon_pos)) = currently_hovered {
-        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker)) =
+        let Ok((skills, max_health, hunt_tracker, crate_tracker, thorns_tracker, skill_power_hunt_tracker)) =
             player_query.get_single()
         else {
             return;
@@ -1223,6 +1226,7 @@ pub fn handle_heirloom_hud_tooltip(
             hunt_tracker,
             crate_tracker,
             thorns_tracker,
+            skill_power_hunt_tracker,
         );
 
         // Position tooltip below the hovered icon
@@ -1453,6 +1457,7 @@ fn get_heirloom_scaling_text(
     hunt_tracker: Option<&MaxHPHuntTracker>,
     crate_tracker: Option<&CrateBreakDamageTracker>,
     thorns_tracker: Option<&crate::player::combat_heirlooms::ThornsOnDamageTracker>,
+    skill_power_hunt_tracker: Option<&SkillPowerHuntTracker>,
 ) -> Option<String> {
     match heirloom {
         Heirloom::GoldIntoDamage => {
@@ -1498,6 +1503,17 @@ fn get_heirloom_scaling_text(
             if let Some(tracker) = thorns_tracker {
                 if tracker.thorns_gained > 0 {
                     Some(format!("(+{}% Thorns)", tracker.thorns_gained))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        Heirloom::SkillPowerHunt => {
+            if let Some(tracker) = skill_power_hunt_tracker {
+                if tracker.bonus_skill_power > 0 {
+                    Some(format!("(+{} Skill Power)", tracker.bonus_skill_power))
                 } else {
                     None
                 }

@@ -49,6 +49,8 @@ pub fn handle_pet_spawner_interaction(
                 let achievement = match pet_type {
                     Pet::Slime => Achievement::SlimePet,
                     Pet::Fairy => Achievement::FairyPet,
+                    Pet::Porkipine => Achievement::PorkipinePet,
+                    Pet::GoldenPig => Achievement::GoldenPigPet,
                 };
                 if achievements.has(achievement) {
                     continue; // Already unlocked, skip
@@ -59,6 +61,8 @@ pub fn handle_pet_spawner_interaction(
             let achievement = match pet_type {
                 Pet::Slime => Achievement::SlimePet,
                 Pet::Fairy => Achievement::FairyPet,
+                Pet::Porkipine => Achievement::PorkipinePet,
+                Pet::GoldenPig => Achievement::GoldenPigPet,
             };
 
             if let Some(achievements) = item_action_param.achievements.as_mut() {

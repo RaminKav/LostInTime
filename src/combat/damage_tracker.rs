@@ -79,6 +79,7 @@ pub enum DamageSource {
     Poison,
     AntFarm,
     StoneTooth,
+    SummonRing,
     ReaperSoul,
 }
 
@@ -121,6 +122,7 @@ impl DamageSource {
             | DamageSource::ManaOrb
             | DamageSource::Poison
             | DamageSource::AntFarm
+            | DamageSource::SummonRing
             | DamageSource::StoneTooth
             | DamageSource::Arc
             | DamageSource::ReaperSoul => DamageSourceCategory::Heirloom,
@@ -163,6 +165,7 @@ impl DamageSource {
             DamageSource::ManaOrb => "Mana Orb",
             DamageSource::Poison => "Poison",
             DamageSource::AntFarm => "Ant Farm",
+            DamageSource::SummonRing => "Piercing Ring",
             DamageSource::StoneTooth => "Stone Tooth",
             DamageSource::ReaperSoul => "Reaper Soul",
         }
@@ -189,6 +192,7 @@ impl DamageSource {
             | Heirloom::ViralVenum
             | Heirloom::ManaRegenPoison => Some(DamageSource::Poison),
             Heirloom::AntFarm => Some(DamageSource::AntFarm),
+            Heirloom::SummonRing => Some(DamageSource::SummonRing),
             Heirloom::StoneTooth => Some(DamageSource::StoneTooth),
             Heirloom::Reaper => Some(DamageSource::ReaperSoul),
             _ => None,

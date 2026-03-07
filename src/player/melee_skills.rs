@@ -180,9 +180,14 @@ pub fn handle_echo_after_heal(
                 }
             }
         }
-        // HealSummons: 20% chance to trigger all summons once (Ant Farm, Stone Orbit)
+        // HealSummons: 20% chance to trigger all summons once (Ant Farm, Boulder, Piercing Ring). Trigger costs mana; summons are free.
         let count = skills.get_count(Heirloom::HealSummons);
-        if count > 0 && rng.gen_bool((0.2 * count as f64).clamp(0.0, 1.0)) {
+        let heal_summons_mana_cost = Heirloom::HealSummons.get_mana_cost();
+        if count > 0
+            && rng.gen_bool((0.2 * count as f64).clamp(0.0, 1.0))
+            && current_mana.0 >= heal_summons_mana_cost
+        {
+            current_mana.0 -= heal_summons_mana_cost;
             trigger_summons_events.send(TriggerSummonsEvent(e));
         }
     }

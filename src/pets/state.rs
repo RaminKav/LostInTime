@@ -37,6 +37,8 @@ pub enum Pet {
     #[default]
     Slime,
     Fairy,
+    Porkipine,
+    GoldenPig,
 }
 
 /// Marker component for pet spawners (pets that can be collected by the player)
@@ -47,19 +49,19 @@ pub struct PetSpawner {
 impl Pet {
     pub fn get_idle_anim(&self) -> &str {
         match self {
-            Pet::Slime => SlimePetSprite::tags::IDLE,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::tags::IDLE,
             Pet::Fairy => FairyPetSprite::tags::IDLE,
         }
     }
     pub fn get_walk_anim(&self) -> &str {
         match self {
-            Pet::Slime => SlimePetSprite::tags::WALK,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::tags::WALK,
             Pet::Fairy => FairyPetSprite::tags::WALK,
         }
     }
     pub fn get_aseprite_path(&self) -> &str {
         match self {
-            Pet::Slime => SlimePetSprite::PATH,
+            Pet::Slime | Pet::Porkipine | Pet::GoldenPig => SlimePetSprite::PATH,
             Pet::Fairy => FairyPetSprite::PATH,
         }
     }
@@ -85,6 +87,15 @@ impl Pet {
             Pet::Fairy => {
                 // +1 Health Regen per level
                 stats.health_regen = AttributeValue::new(level * 1, quality, 1.);
+            }
+            Pet::Porkipine => {
+                // +1% Lifesteal per level
+                stats.lifesteal = AttributeValue::new(level * 1, quality, 1.);
+            }
+            Pet::GoldenPig => {
+                // +1.5% Pickup Range per level
+                stats.pickup_range =
+                    AttributeValue::new((level as f32 * 1.5).round() as i32, quality, 1.5);
             }
         }
         
@@ -303,6 +314,20 @@ pub fn configure_pet_on_spawn(
                     .entity(pet_entity)
                     .insert(crate::pets::pet_abilities::FairyHealTimer(
                         Timer::from_seconds(35.0, TimerMode::Repeating),
+                    ));
+            }
+            crate::pets::state::Pet::Porkipine => {
+                commands
+                    .entity(pet_entity)
+                    .insert(crate::pets::pet_abilities::PorkipineDamageTimer(
+                        Timer::from_seconds(1.5, TimerMode::Repeating),
+                    ));
+            }
+            crate::pets::state::Pet::GoldenPig => {
+                commands
+                    .entity(pet_entity)
+                    .insert(crate::pets::pet_abilities::GoldenPigCoinTimer(
+                        Timer::from_seconds(15.0, TimerMode::Repeating),
                     ));
             }
         }

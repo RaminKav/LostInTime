@@ -2,7 +2,7 @@ use std::{collections::HashSet, f32::consts::TAU};
 
 use bevy::prelude::*;
 use bevy_proto::prelude::ProtoCommands;
-use bevy_rapier2d::prelude::RapierContext;
+use bevy_rapier2d::prelude::{Collider, RapierContext, RigidBody, Sensor};
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
     enemy::{EliteMob, Mob},
     item::{
         projectile::{Projectile, RangedAttackEvent},
-        WorldObject,
+        ItemDrop, WorldObject,
     },
     player::{
         skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills},
@@ -36,12 +36,13 @@ const ANT_CONTACT_DISTANCE: f32 = 8.0;
 const ANT_LIFETIME: f32 = 4.0;
 const ANT_CHAIN_DELAY: f32 = 0.25;
 
-/// Time for one full orbit (rotation speed).
-const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.5;
-/// Delay between spawning the next batch: orbit (1.5s) + extra delay (~3s).
+/// Time for one full orbit (rotation speed); faster = snappier feel.
+const STONE_TOOTH_ORBIT_PERIOD: f32 = 1.2;
+/// Delay between spawning the next batch.
 const STONE_TOOTH_SPAWN_INTERVAL: f32 = 4.5;
 const STONE_TOOTH_ROCK_LIFETIME: f32 = 1.5;
-const STONE_TOOTH_RADIUS: f32 = 28.0;
+/// Distance rocks travel outward from the player over their lifetime.
+const STONE_TOOTH_TRAVEL_DISTANCE: f32 = 70.0;
 const STONE_CONTACT_DISTANCE: f32 = 20.0;
 
 const REAPER_SOUL_SPEED: f32 = 220.0;
@@ -51,6 +52,12 @@ const REAPER_CONTACT_DISTANCE: f32 = 12.0;
 const REAPER_SOUL_MAX_SPAWN_RANGE: f32 = 320.0;
 const REAPER_SOUL_DRIFT_STRENGTH: f32 = 0.75;
 const REAPER_SOUL_DRIFT_FREQ: f32 = 10.5;
+
+/// Summon Ring: piercing ring that travels in a line and bounces off solid objects.
+const SUMMON_RING_COOLDOWN: f32 = 3.5;
+const SUMMON_RING_SPEED: f32 = 160.0;
+const SUMMON_RING_LIFETIME: f32 = 2.2;
+const SUMMON_RING_COLLIDER_RADIUS: f32 = 10.0;
 
 #[derive(Clone)]
 struct MobSnapshot {
@@ -115,6 +122,50 @@ pub struct ReaperSoul {
     pub speed: f32,
     pub lifetime: Timer,
     pub drift_phase: f32,
+}
+
+#[derive(Component)]
+pub struct SummonRingState {
+    pub timer: Timer,
+}
+
+impl Default for SummonRingState {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(SUMMON_RING_COOLDOWN, TimerMode::Repeating),
+        }
+    }
+}
+
+/// Minimum time between bounces so direction doesn't flip every frame while overlapping.
+const SUMMON_RING_BOUNCE_COOLDOWN: f32 = 0.15;
+
+#[derive(Component)]
+pub struct SummonRingProjectile {
+    pub owner: Entity,
+    pub direction: Vec2,
+    pub lifetime: Timer,
+    pub hit_entities: HashSet<Entity>,
+    /// After the 2s outward duration, the ring returns to the player in a straight line.
+    pub returning: bool,
+    /// Cooldown before the ring can bounce again (starts at 0 so first bounce is immediate).
+    pub bounce_cooldown: Timer,
+}
+
+/// World objects that projectiles pass through (no bounce). Ring bounces off everything else that has a collider.
+fn summon_ring_pass_through(obj: WorldObject) -> bool {
+    matches!(
+        obj,
+        WorldObject::Grass
+            | WorldObject::Grass2
+            | WorldObject::Grass3
+            | WorldObject::RedFlower
+            | WorldObject::PinkFlower
+            | WorldObject::YellowFlower
+            | WorldObject::RedMushroom
+            | WorldObject::BrownMushroom
+            | WorldObject::Stick
+    )
 }
 
 fn gather_live_mobs(
@@ -275,7 +326,8 @@ pub fn spawn_stone_tooth_rocks(
         } else {
             0.0
         };
-        let offset = Vec2::from_angle(base_angle) * STONE_TOOTH_RADIUS;
+        // Rocks start at player and expand outward (offset applied in update_stone_tooth).
+        let offset = Vec2::ZERO;
         let mut sprite = graphics.get_heirloom_icon(Heirloom::StoneTooth);
         if sprite.custom_size.is_none() {
             sprite.custom_size = Some(Vec2::splat(16.0));
@@ -300,6 +352,65 @@ pub fn spawn_stone_tooth_rocks(
             },
             YSort(-0.1),
             Name::new("StoneToothRock"),
+        ));
+        spawned += 1;
+    }
+    spawned
+}
+
+/// Spawns up to `count` Summon Ring projectiles (piercing, 2s outward then returns to player). Deducts mana per ring if `mana_value` is `Some`.
+pub fn spawn_summon_ring_rings(
+    commands: &mut Commands,
+    texture_atlas: &Handle<TextureAtlas>,
+    graphics: &Graphics,
+    player_e: Entity,
+    player_pos: Vec3,
+    count: usize,
+    mana_value: &mut Option<&mut i32>,
+    mana_cost_per: i32,
+) -> usize {
+    let mut rng = rand::thread_rng();
+    let mut spawned = 0;
+    let count_float = count.max(1) as f32;
+    for index in 0..count {
+        if let Some(mana) = mana_value.as_mut() {
+            let current = **mana;
+            if current < mana_cost_per {
+                break;
+            }
+            **mana = current - mana_cost_per;
+        }
+        // Spread rings evenly around the circle so multiple copies don't share the same direction.
+        let segment = TAU / count_float;
+        let angle = index as f32 * segment + rng.gen_range(0.0..segment);
+        let direction = Vec2::from_angle(angle);
+        let mut sprite = graphics.get_heirloom_icon(Heirloom::SummonRing);
+        sprite.custom_size = Some(Vec2::splat(16.0));
+        let rotation = Quat::from_rotation_z(angle);
+        commands.spawn((
+            SpriteSheetBundle {
+                texture_atlas: texture_atlas.clone(),
+                sprite,
+                transform: Transform {
+                    translation: player_pos + Vec3::new(0., 0., 0.25),
+                    rotation,
+                    ..default()
+                },
+                ..default()
+            },
+            SummonRingProjectile {
+                owner: player_e,
+                direction,
+                lifetime: Timer::from_seconds(SUMMON_RING_LIFETIME, TimerMode::Once),
+                hit_entities: HashSet::new(),
+                returning: false,
+                bounce_cooldown: Timer::from_seconds(0.0, TimerMode::Once),
+            },
+            RigidBody::KinematicPositionBased,
+            Sensor,
+            Collider::ball(SUMMON_RING_COLLIDER_RADIUS),
+            YSort(-0.1),
+            Name::new("SummonRing"),
         ));
         spawned += 1;
     }
@@ -367,6 +478,249 @@ pub fn handle_ant_farm_state(
         &mut mana_opt,
         Heirloom::AntFarm.get_mana_cost(),
     );
+}
+
+pub fn handle_summon_ring_state(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut player_query: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &PlayerSkills,
+            Option<&mut SummonRingState>,
+            &mut CurrentMana,
+        ),
+        With<Player>,
+    >,
+    graphics: Res<Graphics>,
+) {
+    let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
+        player_query.get_single_mut()
+    else {
+        return;
+    };
+    let stacks = skills.get_count(Heirloom::SummonRing);
+    let player_pos = player_txfm.translation();
+    let had_state = state_option.is_some();
+    let mut spawn_count = None;
+
+    if stacks > 0 {
+        if let Some(state) = state_option.as_mut() {
+            state.timer.tick(time.delta());
+            if state.timer.just_finished() {
+                spawn_count = Some(stacks);
+            }
+        } else {
+            spawn_count = Some(stacks);
+        }
+    }
+
+    if stacks > 0 && !had_state {
+        commands.entity(player_e).insert(SummonRingState::default());
+    } else if stacks <= 0 && had_state {
+        commands.entity(player_e).remove::<SummonRingState>();
+    }
+
+    let Some(count_i32) = spawn_count else {
+        return;
+    };
+
+    let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
+        return;
+    };
+
+    let count_usize = count_i32.max(0) as usize;
+    let mut mana_opt = Some(&mut curr_mana.0);
+    spawn_summon_ring_rings(
+        &mut commands,
+        texture_atlas,
+        &graphics,
+        player_e,
+        player_pos,
+        count_usize,
+        &mut mana_opt,
+        Heirloom::SummonRing.get_mana_cost(),
+    );
+}
+
+const SUMMON_RING_RETURN_REACH_DISTANCE: f32 = 12.0;
+
+pub fn update_summon_ring(
+    mut commands: Commands,
+    time: Res<Time>,
+    rapier_context: Res<RapierContext>,
+    mut rings: Query<(Entity, &mut Transform, &mut SummonRingProjectile)>,
+    player_transforms: Query<&GlobalTransform, With<Player>>,
+    mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
+    world_objects: Query<(Entity, &GlobalTransform, &WorldObject), (Without<Mob>, Without<ItemDrop>)>,
+    player_entity: Query<Entity, With<Player>>,
+    frail_query: Query<&Frail>,
+    mut hit_events: EventWriter<HitEvent>,
+    game: GameParam,
+) {
+    let mob_snapshots = gather_live_mobs(&mobs);
+    let delta = time.delta_seconds();
+    let move_step = SUMMON_RING_SPEED * delta;
+
+    let mut to_despawn = Vec::new();
+    for (ring_entity, mut transform, mut ring) in rings.iter_mut() {
+        let ring_pos = transform.translation.truncate();
+
+        if ring.returning {
+            let Ok(player_txfm) = player_transforms.get(ring.owner) else {
+                to_despawn.push(ring_entity);
+                continue;
+            };
+            let player_pos = player_txfm.translation().truncate();
+            let to_player = player_pos - ring_pos;
+            let dist = to_player.length();
+            if dist <= SUMMON_RING_RETURN_REACH_DISTANCE {
+                to_despawn.push(ring_entity);
+                continue;
+            }
+            let direction = to_player.normalize_or_zero();
+            let step = move_step.min(dist);
+            let new_pos = ring_pos + direction * step;
+            transform.translation = new_pos.extend(transform.translation.z);
+            transform.rotation = Quat::from_rotation_z(direction.y.atan2(direction.x));
+
+            // Pierce and damage mobs on the way back too.
+            for (e1, e2, _) in rapier_context.intersections_with(ring_entity) {
+                let other = if e1 == ring_entity { e2 } else { e1 };
+                if other == ring_entity {
+                    continue;
+                }
+                if player_entity.get(other).is_ok() {
+                    continue;
+                }
+                if let Some(snapshot) = mob_snapshots.iter().find(|s| s.entity == other) {
+                    if ring.hit_entities.contains(&other) {
+                        continue;
+                    }
+                    ring.hit_entities.insert(other);
+                    let dir = (snapshot.position - new_pos).normalize_or_zero();
+                    let frail_stacks = frail_query.get(other).map(|f| f.num_stacks).unwrap_or(0);
+                    let (damage, was_crit, was_overcrit) =
+                        calculate_summon_damage(&mut commands, &game, other, frail_stacks);
+                    hit_events.send(HitEvent {
+                        hit_entity: other,
+                        damage,
+                        dir,
+                        hit_with_melee: None,
+                        hit_with_projectile: None,
+                        hit_by_mob: None,
+                        hit_by_pet: None,
+                        was_crit,
+                        was_overcrit,
+                        ignore_tool: true,
+                        from_heirloom_effect: Some(Heirloom::SummonRing),
+                    });
+                }
+            }
+            continue;
+        }
+
+        ring.lifetime.tick(time.delta());
+        ring.bounce_cooldown.tick(time.delta());
+        if ring.lifetime.finished() {
+            ring.returning = true;
+            continue;
+        }
+
+        let new_pos = ring_pos + ring.direction * move_step;
+        transform.translation = new_pos.extend(transform.translation.z);
+        transform.rotation = Quat::from_rotation_z(ring.direction.y.atan2(ring.direction.x));
+
+        for (e1, e2, _) in rapier_context.intersections_with(ring_entity) {
+            let other = if e1 == ring_entity { e2 } else { e1 };
+            if other == ring_entity {
+                continue;
+            }
+            if player_entity.get(other).is_ok() {
+                continue;
+            }
+
+            // Pierce mobs (never bounce off them).
+            if let Some(snapshot) = mob_snapshots.iter().find(|s| s.entity == other) {
+                if ring.hit_entities.contains(&other) {
+                    continue;
+                }
+                ring.hit_entities.insert(other);
+                let dir = (snapshot.position - new_pos).normalize_or_zero();
+                let frail_stacks = frail_query.get(other).map(|f| f.num_stacks).unwrap_or(0);
+                let (damage, was_crit, was_overcrit) =
+                    calculate_summon_damage(&mut commands, &game, other, frail_stacks);
+                hit_events.send(HitEvent {
+                    hit_entity: other,
+                    damage,
+                    dir,
+                    hit_with_melee: None,
+                    hit_with_projectile: None,
+                    hit_by_mob: None,
+                    hit_by_pet: None,
+                    was_crit,
+                    was_overcrit,
+                    ignore_tool: true,
+                    from_heirloom_effect: Some(Heirloom::SummonRing),
+                });
+                continue;
+            }
+
+            // Bounce off solid world objects only, and only when bounce cooldown has elapsed.
+            if mob_snapshots.iter().any(|s| s.entity == other) {
+                continue;
+            }
+            if let Ok((_, obj_txfm, obj)) = world_objects.get(other) {
+                if summon_ring_pass_through(*obj) {
+                    continue;
+                }
+                if !ring.bounce_cooldown.finished() {
+                    continue;
+                }
+                let obj_pos = obj_txfm.translation().truncate();
+                let delta = new_pos - obj_pos;
+
+                // Determine which axis we're hitting based on the ring's approach direction
+                // relative to the object. Use the axis where the ring is moving *into* the
+                // object most strongly, then flip that component for a clean reflection.
+                let dx = delta.x.abs();
+                let dy = delta.y.abs();
+
+                let mut bounced = false;
+                if dx > dy {
+                    // Approached from the side -> flip X
+                    if ring.direction.x.abs() > 0.01 {
+                        ring.direction.x = -ring.direction.x;
+                        bounced = true;
+                    }
+                } else {
+                    // Approached from top/bottom -> flip Y
+                    if ring.direction.y.abs() > 0.01 {
+                        ring.direction.y = -ring.direction.y;
+                        bounced = true;
+                    }
+                }
+
+                if bounced {
+                    ring.direction = ring.direction.normalize_or_zero();
+                    ring.bounce_cooldown =
+                        Timer::from_seconds(SUMMON_RING_BOUNCE_COOLDOWN, TimerMode::Once);
+                    // Push ring out of the object so it doesn't re-trigger
+                    let push_dir = if dx > dy {
+                        Vec2::new(delta.x.signum(), 0.0)
+                    } else {
+                        Vec2::new(0.0, delta.y.signum())
+                    };
+                    let nudge = SUMMON_RING_COLLIDER_RADIUS + 6.0;
+                    transform.translation += (push_dir * nudge).extend(0.0);
+                }
+            }
+        }
+    }
+    for e in to_despawn {
+        commands.entity(e).despawn_recursive();
+    }
 }
 
 pub fn update_ant_farm_ants(
@@ -536,7 +890,9 @@ pub fn update_stone_tooth(
         }
         let elapsed = lifetime.lifetime.elapsed().as_secs_f32();
         let angle = stone.base_angle + (elapsed / STONE_TOOTH_ORBIT_PERIOD) * TAU;
-        let offset = Vec2::from_angle(angle) * STONE_TOOTH_RADIUS;
+        // Expand outward from player over lifetime (0 -> STONE_TOOTH_TRAVEL_DISTANCE).
+        let radius = (elapsed / STONE_TOOTH_ROCK_LIFETIME) * STONE_TOOTH_TRAVEL_DISTANCE;
+        let offset = Vec2::from_angle(angle) * radius;
         transform.translation = Vec3::new(
             player_xy.x + offset.x,
             player_xy.y + offset.y,
@@ -600,7 +956,15 @@ pub fn handle_trigger_summons_on_heal(
     mut commands: Commands,
     mut trigger_events: EventReader<TriggerSummonsEvent>,
     mut player_query: Query<
-        (Entity, &GlobalTransform, &PlayerSkills, &mut CurrentMana),
+        (
+            Entity,
+            &GlobalTransform,
+            &PlayerSkills,
+            &mut CurrentMana,
+            Option<&mut AntFarmState>,
+            Option<&mut StoneToothState>,
+            Option<&mut SummonRingState>,
+        ),
         With<Player>,
     >,
     graphics: Res<Graphics>,
@@ -609,26 +973,40 @@ pub fn handle_trigger_summons_on_heal(
         return;
     };
     for event in trigger_events.iter() {
-        let Ok((player_e, player_txfm, skills, mut curr_mana)) = player_query.get_mut(event.0)
+        let Ok((
+            player_e,
+            player_txfm,
+            skills,
+            mut curr_mana,
+            mut ant_state,
+            mut stone_state,
+            mut ring_state,
+        )) = player_query.get_mut(event.0)
         else {
             continue;
         };
         let player_pos = player_txfm.translation();
 
-        // Spawn one of each summon type if player has at least one of the required heirloom
-        if skills.get_count(Heirloom::AntFarm) >= 1 {
+        // Finish the cooldown: trigger one "tick" of each summon (same count as timer would spawn), then reset timers.
+        let ant_stacks = skills.get_count(Heirloom::AntFarm).max(0) as usize;
+        if ant_stacks >= 1 {
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_ant_farm_ants(
                 &mut commands,
                 texture_atlas,
                 &graphics,
                 player_pos,
-                1,
+                ant_stacks,
                 &mut mana_opt,
                 0,
             );
+            if let Some(ref mut state) = ant_state {
+                state.timer.reset();
+            }
         }
-        if skills.get_count(Heirloom::StoneTooth) >= 1 {
+
+        let stone_stacks = skills.get_count(Heirloom::StoneTooth).max(0) as usize;
+        if stone_stacks >= 1 {
             let mut mana_opt = Some(&mut curr_mana.0);
             spawn_stone_tooth_rocks(
                 &mut commands,
@@ -636,10 +1014,32 @@ pub fn handle_trigger_summons_on_heal(
                 &graphics,
                 player_e,
                 player_pos,
-                1,
+                stone_stacks,
                 &mut mana_opt,
                 0,
             );
+            if let Some(ref mut state) = stone_state {
+                state.elapsed = 0.0;
+            }
+        }
+
+        let ring_stacks = skills.get_count(Heirloom::SummonRing).max(0) as usize;
+        if ring_stacks >= 1 {
+            let player_pos = player_txfm.translation();
+            let mut mana_opt = Some(&mut curr_mana.0);
+            spawn_summon_ring_rings(
+                &mut commands,
+                texture_atlas,
+                &graphics,
+                player_e,
+                player_pos,
+                ring_stacks,
+                &mut mana_opt,
+                0,
+            );
+            if let Some(ref mut state) = ring_state {
+                state.timer.reset();
+            }
         }
     }
 }
@@ -922,6 +1322,12 @@ pub struct MaxHPHuntTracker {
     pub total_hp_gained: i32, // Total max HP gained from this heirloom
 }
 
+/// Tracks bonus skill power for the SkillPowerHunt heirloom (3% on skill use to gain +1)
+#[derive(Component, Default)]
+pub struct SkillPowerHuntTracker {
+    pub bonus_skill_power: i32,
+}
+
 pub fn handle_max_hp_hunt(
     mut death_events: EventReader<EnemyDeathEvent>,
     mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills), With<Player>>,
@@ -954,6 +1360,36 @@ pub fn handle_max_hp_hunt(
     // This ensures the MaxHPHunt bonus is included in the max health calculation
     if hp_was_gained {
         attribute_events.send_default();
+    }
+}
+
+// ============================================================================
+// SkillPowerHunt - 3% chance when using a skill to gain +1 Skill Power
+// ============================================================================
+
+pub fn handle_skill_power_hunt(
+    mut skill_events: EventReader<ActiveSkillUsedEvent>,
+    mut player_query: Query<(&PlayerSkills, Option<&mut SkillPowerHuntTracker>), With<Player>>,
+    mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
+) {
+    let Ok((skills, state_option)) = player_query.get_single_mut() else {
+        return;
+    };
+    let count = skills.get_count(Heirloom::SkillPowerHunt);
+    if count <= 0 {
+        return;
+    }
+
+    let Some(mut tracker) = state_option else {
+        return;
+    };
+
+    let mut rng = rand::thread_rng();
+    for _ in skill_events.iter() {
+        if rng.gen_ratio((count * 5).min(100) as u32, 100) {
+            tracker.bonus_skill_power += 1;
+            attribute_events.send_default();
+        }
     }
 }
 

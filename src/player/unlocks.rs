@@ -117,8 +117,8 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::Reroll => 5,
             UnlockUpgradeKind::Banish => 20,
             UnlockUpgradeKind::StartFood => 8,
-            UnlockUpgradeKind::StartTome => 15,
-            UnlockUpgradeKind::StartOrb => 20,
+            UnlockUpgradeKind::StartTome => 25,
+            UnlockUpgradeKind::StartOrb => 30,
             UnlockUpgradeKind::StartingTools => 50, // Tier 1: WoodAxe, Tier 2: Pickaxe
         }
     }
@@ -163,13 +163,61 @@ impl UnlockUpgrades {
     }
 
     pub fn next_cost(&self, kind: UnlockUpgradeKind) -> u32 {
+        let tier = self.tier(kind) as i32;
         match kind {
             UnlockUpgradeKind::StartingTools => {
-                let tier = self.starting_tools_tier;
                 match tier {
-                    0 => 30,  // Tier 1: WoodAxe
+                    0 => 50,  // Tier 1: WoodAxe
                     1 => 100, // Tier 2: Pickaxe (70 more)
                     _ => 0,   // Max tier reached
+                }
+            }
+            UnlockUpgradeKind::Reroll => {
+                match tier {
+                    0 => 15,     // Tier 1: WoodAxe
+                    1 => 25,     // Tier 2: Pickaxe (70 more)
+                    3 => 50,     // Max tier reached
+                    4 => 100,    // Max tier reached
+                    5 => 200,    // Max tier reached
+                    6 => 400,    // Max tier reached
+                    7 => 500,    // Max tier reached
+                    _ => 999999, // max tier
+                }
+            }
+            UnlockUpgradeKind::Banish => {
+                match tier {
+                    0 => 20,  // Tier 1: WoodAxe
+                    1 => 50,  // Tier 2: Pickaxe (70 more)
+                    3 => 125, // Max tier reached
+                    4 => 275, // Max tier reached
+                    5 => 550, // Max tier reached
+                    // 6 => 400,   // Max tier reached
+                    // 7 => 500,   // Max tier reached
+                    _ => 999999, // max tier
+                }
+            }
+            UnlockUpgradeKind::StartTome => {
+                match tier {
+                    0 => 25,  // Tier 1: WoodAxe
+                    1 => 50,  // Tier 2: Pickaxe (70 more)
+                    3 => 100, // Max tier reached
+                    4 => 200, // Max tier reached
+                    5 => 400, // Max tier reached
+                    // 6 => 400,   // Max tier reached
+                    // 7 => 500,   // Max tier reached
+                    _ => 999999, // max tier
+                }
+            }
+            UnlockUpgradeKind::StartOrb => {
+                match tier {
+                    0 => 30,  // Tier 1: WoodAxe
+                    1 => 60,  // Tier 2: Pickaxe (70 more)
+                    3 => 120, // Max tier reached
+                    4 => 240, // Max tier reached
+                    5 => 480, // Max tier reached
+                    // 6 => 400,   // Max tier reached
+                    // 7 => 500,   // Max tier reached
+                    _ => 999999, // max tier
                 }
             }
 
@@ -206,6 +254,11 @@ impl UnlockUpgrades {
     pub fn is_maxed(&self, kind: UnlockUpgradeKind) -> bool {
         match kind {
             UnlockUpgradeKind::StartingTools => self.starting_tools_tier >= 3,
+            UnlockUpgradeKind::Reroll => self.reroll_tier >= 7,
+            UnlockUpgradeKind::Banish => self.banish_tier >= 5,
+            UnlockUpgradeKind::StartFood => self.food_tier >= 8,
+            UnlockUpgradeKind::StartTome => self.tome_tier >= 5,
+            UnlockUpgradeKind::StartOrb => self.orb_tier >= 5,
             _ => false, // Other unlocks have no max (infinite tiers)
         }
     }

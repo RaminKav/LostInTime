@@ -25,7 +25,8 @@ use crate::{
     juice::ShakeEffect,
     player::{
         combat_heirlooms::{
-            DodgeCritState, HallucinationStats, MaxHPHuntTracker, ThornsOnDamageTracker,
+            DodgeCritState, HallucinationStats, MaxHPHuntTracker, SkillPowerHuntTracker,
+            ThornsOnDamageTracker,
         },
         levels::{handle_level_up, PlayerLevel},
         skills::{Heirloom, PlayerClass, PlayerSkills},
@@ -479,8 +480,9 @@ impl ItemAttributes {
         blessings: &OwnedBlessings,
         dodge_crit_buff_active: bool,
         coins: u32,
-        max_hp_hunt_bonus: i32,      // Max HP gained from MaxHPHunt heirloom
-        thorns_on_damage_bonus: i32, // Thorns gained from ThornsOnDamage heirloom
+        max_hp_hunt_bonus: i32,         // Max HP gained from MaxHPHunt heirloom
+        thorns_on_damage_bonus: i32,    // Thorns gained from ThornsOnDamage heirloom
+        skill_power_hunt_bonus: i32,    // Skill Power gained from SkillPowerHunt heirloom
         bonus_attack_speed: Option<&BonusAttackSpeed>,
     ) {
         // ChaosStats: +10 to many stats per stack
@@ -657,7 +659,9 @@ impl ItemAttributes {
             self.pickup_range.value + skills.get_count(Heirloom::ItemPickupRadius) * 25,
         ));
         entity.insert(SkillPower(
-            self.skill_power.value + skills.get_count(Heirloom::SkillPower) * 15,
+            self.skill_power.value
+                + skills.get_count(Heirloom::SkillPower) * 15
+                + skill_power_hunt_bonus,
         ));
     }
     pub fn get_random_existing_bonus_attribute_string(
@@ -1486,6 +1490,7 @@ fn handle_player_item_attribute_change_events(
             Option<&HeirloomStatsBonuses>,
             Option<&MaxHPHuntTracker>,
             Option<&ThornsOnDamageTracker>,
+            Option<&SkillPowerHuntTracker>,
             Option<&BonusAttackSpeed>,
         ),
         With<Player>,
@@ -1510,6 +1515,7 @@ fn handle_player_item_attribute_change_events(
             heirloom_stats_bonuses,
             max_hp_hunt_tracker,
             thorns_on_damage_tracker,
+            skill_power_hunt_tracker,
             bonus_attack_speed,
         ) = player_atts.single();
         let mut new_att = att.clone();
@@ -1557,6 +1563,11 @@ fn handle_player_item_attribute_change_events(
             .map(|tracker| tracker.thorns_gained)
             .unwrap_or(0);
 
+        // Get SkillPowerHunt bonus
+        let skill_power_hunt_bonus = skill_power_hunt_tracker
+            .map(|tracker| tracker.bonus_skill_power)
+            .unwrap_or(0);
+
         new_att.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
@@ -1568,6 +1579,7 @@ fn handle_player_item_attribute_change_events(
             coins.coins,
             max_hp_hunt_bonus,
             thorns_on_damage_bonus,
+            skill_power_hunt_bonus,
             bonus_attack_speed,
         );
         if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
@@ -1957,6 +1969,22 @@ fn item_attributes_to_bonus_stat_lines(attrs: &ItemAttributes) -> Vec<crate::ite
             value: attrs.health_regen.value,
             quality: attrs.health_regen.quality,
             range_percentage: attrs.health_regen.range_percentage,
+        });
+    }
+    if attrs.lifesteal.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "lifesteal".to_string(),
+            value: attrs.lifesteal.value,
+            quality: attrs.lifesteal.quality,
+            range_percentage: attrs.lifesteal.range_percentage,
+        });
+    }
+    if attrs.pickup_range.value != 0 {
+        stat_lines.push(BonusStatLine {
+            attribute_name: "pickup_range".to_string(),
+            value: attrs.pickup_range.value,
+            quality: attrs.pickup_range.quality,
+            range_percentage: attrs.pickup_range.range_percentage,
         });
     }
 

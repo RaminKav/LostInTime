@@ -1266,6 +1266,11 @@
             size: (16., 16.),
             anchor: None,
         ),
+        SummonRing: WorldObjectData(
+            texture_pos: (9., 23.),
+            size: (16., 16.),
+            anchor: None,
+        ),
         FullStomach: WorldObjectData(
             texture_pos: (11., 19.),
             size: (16., 16.),
@@ -1313,6 +1318,11 @@
         ),
         SkillPower: WorldObjectData(
             texture_pos: (14., 20.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SkillPowerHunt: WorldObjectData(
+            texture_pos: (10., 23.),
             size: (16., 16.),
             anchor: None,
         ),

@@ -1,7 +1,12 @@
 use bevy::prelude::*;
+use bevy_proto::prelude::ProtoCommands;
+use rand::Rng;
 
 use crate::attributes::CurrentHealth;
+use crate::custom_commands::CommandsExt;
+use crate::item::WorldObject;
 use crate::player::Player;
+use crate::proto::proto_param::ProtoParam;
 
 use crate::attributes::modifiers::ModifyHealthEvent;
 
@@ -14,6 +19,14 @@ pub struct SlimeShieldTimer(pub Timer);
 /// Timer component for Fairy pet's heal ability
 #[derive(Component, Debug)]
 pub struct FairyHealTimer(pub Timer);
+
+/// Timer component for Porkipine pet's self-damage (if above 30% health)
+#[derive(Component, Debug)]
+pub struct PorkipineDamageTimer(pub Timer);
+
+/// Timer component for GoldenPig pet's coin drop ability
+#[derive(Component, Debug)]
+pub struct GoldenPigCoinTimer(pub Timer);
 
 /// Marker added to the player when we temporarily grant a 1-point shield from the Slime pet.
 #[derive(Component, Debug)]
@@ -78,6 +91,56 @@ pub fn fairy_heal_ability(
         if timer.0.finished() {
             if player_health.get_single().is_ok() {
                 heal_events.send(ModifyHealthEvent(15));
+            }
+        }
+    }
+}
+
+/// Porkipine pet ability: damages the player for 1 HP every 1.5s when above 30% health.
+pub fn porkipine_damage_ability(
+    time: Res<Time>,
+    mut porkipine_pets: Query<&mut PorkipineDamageTimer, With<Pet>>,
+    mut damage_events: EventWriter<ModifyHealthEvent>,
+    health_percent: Res<crate::PlayerHealthPercent>,
+) {
+    for mut timer in porkipine_pets.iter_mut() {
+        timer.0.tick(time.delta());
+
+        if timer.0.finished() && health_percent.percent > 0.30 {
+            damage_events.send(ModifyHealthEvent(-1));
+        }
+    }
+}
+
+/// GoldenPig pet ability: every 15s drops 1–5 coins near the player, 5% chance to drop 25 coins instead.
+pub fn golden_pig_coin_ability(
+    time: Res<Time>,
+    mut golden_pig_pets: Query<(&GlobalTransform, &mut GoldenPigCoinTimer), With<Pet>>,
+    mut proto_commands: ProtoCommands,
+    proto: ProtoParam,
+) {
+    for (pet_txfm, mut timer) in golden_pig_pets.iter_mut() {
+        timer.0.tick(time.delta());
+
+        if timer.0.finished() {
+            let mut rng = rand::thread_rng();
+            let count = if rng.gen_ratio(5, 100) {
+                25
+            } else {
+                rng.gen_range(1..=5)
+            };
+
+            let d = 32.0;
+            for _ in 0..count {
+                let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+
+                proto_commands.spawn_item_from_proto(
+                    WorldObject::Coin,
+                    &proto,
+                    pet_txfm.translation().truncate() + drop_offset,
+                    1,
+                    None,
+                );
             }
         }
     }
