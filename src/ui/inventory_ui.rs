@@ -8,9 +8,9 @@ use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
 use crate::item::ammo::Ammo;
 use crate::night::EraTimer;
+use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
-use crate::player::ModifyCurencyEvent;
 use crate::GameParam;
 use crate::{
     assets::Graphics,
@@ -980,7 +980,7 @@ pub fn handle_dev_button_clicks(
                             WorldObject::UpgradeTome,
                             &proto,
                             spawn_pos,
-                            1,
+                            3,
                             None,
                         );
                     }
@@ -989,7 +989,7 @@ pub fn handle_dev_button_clicks(
                             WorldObject::OrbOfTransformation,
                             &proto,
                             spawn_pos,
-                            1,
+                            3,
                             None,
                         );
                     }

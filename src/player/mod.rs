@@ -147,6 +147,7 @@ impl Plugin for PlayerPlugin {
         app.add_plugin(AchievementsPlugin)
             .init_resource::<CoinCurrency>()
             .init_resource::<TimeFragmentCurrency>()
+            .init_resource::<skills::HeirloomTriggerCounts>()
             .with_default_schedule(CoreSchedule::FixedUpdate, |app| {
                 app.add_event::<MovePlayerEvent>()
                     .add_event::<ModifyCurencyEvent>()

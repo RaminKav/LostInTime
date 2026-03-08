@@ -82,6 +82,7 @@ pub fn handle_modify_currency(
     mut attribute_change_event: EventWriter<AttributeChangeEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let skills = player_skills.get_single().ok();
     let mut rng = rand::thread_rng();
@@ -129,6 +130,7 @@ pub fn handle_modify_currency(
                             };
                             if heal_amount > 0 {
                                 modify_health_event.send(ModifyHealthEvent(heal_amount));
+                                trigger_counts.increment(Heirloom::CoinHeal);
                             }
                         }
                     }
@@ -168,6 +170,7 @@ pub fn handle_modify_currency(
                                         AudioSoundEffect::LightningStaffCast,
                                         0.4,
                                     ));
+                                    trigger_counts.increment(Heirloom::CoinLightning);
                                 }
                             }
                         }

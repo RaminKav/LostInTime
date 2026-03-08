@@ -132,6 +132,7 @@ pub fn handle_echo_after_heal(
     >,
     asset_server: Res<AssetServer>,
     mut trigger_summons_events: EventWriter<TriggerSummonsEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for (
         e,
@@ -170,6 +171,7 @@ pub fn handle_echo_after_heal(
                     attack.0,
                     projectile_size.get_multiplier(),
                 );
+                trigger_counts.increment(Heirloom::HealEcho);
                 if let Some(ref mut cooldowns) = cooldowns {
                     cooldowns.chalice_echo = Some(new_heirloom_trigger_timer());
                 } else {

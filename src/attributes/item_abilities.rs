@@ -40,6 +40,7 @@ pub fn handle_item_abilitiy_on_attack(
     mut player: Query<(&PlayerSkills, &Attack, &mut CurrentMana), With<Player>>,
     game: GameParam,
     mut commands: Commands,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let (skills, dmg, mut current_mana) = player.single_mut();
     let Some(_) = game.player().main_hand_slot else {
@@ -53,6 +54,7 @@ pub fn handle_item_abilitiy_on_attack(
             let mana_cost = Heirloom::WaveAttack.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                trigger_counts.increment(Heirloom::WaveAttack);
                 ranged_attack_event.send(RangedAttackEvent {
                     projectile: Projectile::Arc,
                     direction: attack.direction,

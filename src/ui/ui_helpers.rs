@@ -46,6 +46,42 @@ pub fn _get_player_chunk_tile_coords(game: &mut Game) -> (IVec2, TilePos) {
     (chunk_pos, tile_pos)
 }
 
+/// Format a number to condensed display format:
+/// 0-9999: no change
+/// 10000-99999: 12.4k, 88.2k, etc
+/// 100000-999999: 134k, 478k
+/// 1000000-999999999: 1.43M, 20.5M, 999M, etc
+/// 1000000000+: 1.43B, 20.5B, etc
+pub fn format_number(value: i64) -> String {
+    let abs = value.unsigned_abs();
+    let sign = if value < 0 { "-" } else { "" };
+    if abs < 10_000 {
+        format!("{}{}", sign, abs)
+    } else if abs < 100_000 {
+        format!("{}{:.1}k", sign, abs as f64 / 1_000.0)
+    } else if abs < 1_000_000 {
+        format!("{}{}k", sign, abs / 1_000)
+    } else if abs < 1_000_000_000 {
+        let millions = abs as f64 / 1_000_000.0;
+        let formatted = format!("{}{:.2}M", sign, millions);
+        let trimmed = formatted.trim_end_matches('0');
+        if trimmed.ends_with('.') {
+            trimmed.trim_end_matches('.').to_string()
+        } else {
+            trimmed.to_string()
+        }
+    } else {
+        let billions = abs as f64 / 1_000_000_000.0;
+        let formatted = format!("{}{:.2}B", sign, billions);
+        let trimmed = formatted.trim_end_matches('0');
+        if trimmed.ends_with('.') {
+            trimmed.trim_end_matches('.').to_string()
+        } else {
+            trimmed.to_string()
+        }
+    }
+}
+
 pub fn spawn_ui_overlay(commands: &mut Commands, size: Vec2, alpha: f32, depth: f32) -> Entity {
     commands
         .spawn(SpriteBundle {

@@ -1165,6 +1165,7 @@ pub fn handle_heirloom_hud_tooltip(
         With<Player>,
     >,
     coins: Res<CoinCurrency>,
+    trigger_counts: Res<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     use super::interactions::Interaction;
 
@@ -1240,6 +1241,17 @@ pub fn handle_heirloom_hud_tooltip(
             skill_power_hunt_tracker,
         );
 
+        // Get trigger count for this heirloom
+        let trigger_count = trigger_counts.get(&heirloom);
+        let trigger_count_text = if trigger_count > 0 {
+            Some(format!(
+                "Triggered: {}",
+                crate::ui::ui_helpers::format_number(trigger_count as i64)
+            ))
+        } else {
+            None
+        };
+
         // Position tooltip below the hovered icon
         let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 70., 25.);
 
@@ -1251,6 +1263,7 @@ pub fn handle_heirloom_hud_tooltip(
             rarity,
             tooltip_pos,
             scaling_text,
+            trigger_count_text,
         );
 
         commands

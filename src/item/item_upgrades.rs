@@ -213,6 +213,7 @@ pub fn handle_on_hit_upgrades(
         EventWriter<ModifyHealthEvent>,
     )>,
     mut throttle: Local<IceExplosionThrottle>, // Track explosions spawned this frame
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     // Reset counters at start of frame
     throttle.count = 0;
@@ -299,6 +300,7 @@ pub fn handle_on_hit_upgrades(
                 // Throttle explosions per frame to prevent lag when hitting many enemies
                 const MAX_ICE_EXPLOSIONS_PER_FRAME: u8 = 8;
                 if throttle.count < MAX_ICE_EXPLOSIONS_PER_FRAME {
+                    trigger_counts.increment(Heirloom::IceStaffAoE);
                     throttle.count += 1;
                     spawn_ice_explosion_hitbox(
                         &mut commands,
@@ -321,6 +323,7 @@ pub fn handle_on_hit_upgrades(
             let mana_cost = Heirloom::IceStaffFloor.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                trigger_counts.increment(Heirloom::IceStaffFloor);
                 let ice = spawn_one_time_aseprite_collider(
                     &mut commands,
                     Transform::from_translation(hit_entity_txfm.translation()),

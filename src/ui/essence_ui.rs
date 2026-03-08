@@ -135,6 +135,7 @@ pub fn handle_essence_heirloom_tooltip(
                     essence_option.get_rarity(),
                     Vec3::new(-130., 0., 15.), // Left side of the essence shop
                     None,                      // No scaling text for shop tooltips
+                    None,                      // No trigger count for shop tooltips
                 );
 
                 commands

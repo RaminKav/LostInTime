@@ -297,33 +297,8 @@ impl DamageTracker {
     }
 }
 
-/// Format a damage number using the same condensed format as leaderboard scores
 pub fn format_damage(damage: i64) -> String {
-    if damage < 10_000 {
-        damage.to_string()
-    } else if damage < 100_000 {
-        format!("{:.1}k", damage as f64 / 1000.0)
-    } else if damage < 1_000_000 {
-        format!("{}k", damage / 1000)
-    } else if damage < 1_000_000_000 {
-        let millions = damage as f64 / 1_000_000.0;
-        let formatted = format!("{:.2}M", millions);
-        let trimmed = formatted.trim_end_matches('0');
-        if trimmed.ends_with('.') {
-            trimmed.trim_end_matches('.').to_string()
-        } else {
-            trimmed.to_string()
-        }
-    } else {
-        let billions = damage as f64 / 1_000_000_000.0;
-        let formatted = format!("{:.2}B", billions);
-        let trimmed = formatted.trim_end_matches('0');
-        if trimmed.ends_with('.') {
-            trimmed.trim_end_matches('.').to_string()
-        } else {
-            trimmed.to_string()
-        }
-    }
+    crate::ui::ui_helpers::format_number(damage)
 }
 
 /// System that reads HitEvents and tracks all player-dealt damage

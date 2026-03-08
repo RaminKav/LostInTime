@@ -1045,6 +1045,7 @@ pub fn mouse_click_system(
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut item_action_param: ItemActionParam,
     ammo_query_any: Query<&Ammo>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     if ui_state.0 != UIState::Closed {
         return;
@@ -1129,6 +1130,7 @@ pub fn mouse_click_system(
                 let mana_cost = Heirloom::ChanceToProcExtraAttack.get_mana_cost();
                 if current_mana.0 >= mana_cost {
                     current_mana.0 -= mana_cost;
+                    trigger_counts.increment(Heirloom::ChanceToProcExtraAttack);
                     2
                 } else {
                     1

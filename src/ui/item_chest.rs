@@ -761,6 +761,7 @@ pub fn handle_heirloom_chest_final_item_hover(
                         heirloom_data.heirloom.rarity.clone(),
                         tooltip_pos,
                         None,
+                        None,
                     );
 
                     commands

@@ -22,7 +22,7 @@ use crate::{
         ItemDrop, WorldObject,
     },
     player::{
-        skills::{ActiveSkillUsedEvent, Heirloom, PlayerSkills},
+        skills::{ActiveSkillUsedEvent, Heirloom, HeirloomTriggerCounts, PlayerSkills},
         Player,
     },
     proto::proto_param::ProtoParam,
@@ -431,6 +431,7 @@ pub fn handle_ant_farm_state(
         With<Player>,
     >,
     graphics: Res<Graphics>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
@@ -469,7 +470,7 @@ pub fn handle_ant_farm_state(
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
-    spawn_ant_farm_ants(
+    let spawned = spawn_ant_farm_ants(
         &mut commands,
         texture_atlas,
         &graphics,
@@ -478,6 +479,9 @@ pub fn handle_ant_farm_state(
         &mut mana_opt,
         Heirloom::AntFarm.get_mana_cost(),
     );
+    if spawned > 0 {
+        trigger_counts.increment(Heirloom::AntFarm);
+    }
 }
 
 pub fn handle_summon_ring_state(
@@ -494,6 +498,7 @@ pub fn handle_summon_ring_state(
         With<Player>,
     >,
     graphics: Res<Graphics>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
@@ -532,7 +537,7 @@ pub fn handle_summon_ring_state(
 
     let count_usize = count_i32.max(0) as usize;
     let mut mana_opt = Some(&mut curr_mana.0);
-    spawn_summon_ring_rings(
+    let spawned = spawn_summon_ring_rings(
         &mut commands,
         texture_atlas,
         &graphics,
@@ -542,6 +547,9 @@ pub fn handle_summon_ring_state(
         &mut mana_opt,
         Heirloom::SummonRing.get_mana_cost(),
     );
+    if spawned > 0 {
+        trigger_counts.increment(Heirloom::SummonRing);
+    }
 }
 
 const SUMMON_RING_RETURN_REACH_DISTANCE: f32 = 12.0;
@@ -830,6 +838,7 @@ pub fn update_stone_tooth(
     mut hit_events: EventWriter<HitEvent>,
     graphics: Res<Graphics>,
     game: GameParam,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
@@ -943,7 +952,7 @@ pub fn update_stone_tooth(
         return;
     }
     let mut mana_opt = Some(&mut curr_mana.0);
-    spawn_stone_tooth_rocks(
+    let spawned = spawn_stone_tooth_rocks(
         &mut commands,
         texture_atlas,
         &graphics,
@@ -953,6 +962,9 @@ pub fn update_stone_tooth(
         &mut mana_opt,
         Heirloom::StoneTooth.get_mana_cost(),
     );
+    if spawned > 0 {
+        trigger_counts.increment(Heirloom::StoneTooth);
+    }
 }
 
 pub fn handle_trigger_summons_on_heal(
@@ -971,6 +983,7 @@ pub fn handle_trigger_summons_on_heal(
         With<Player>,
     >,
     graphics: Res<Graphics>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Some(texture_atlas) = graphics.texture_atlas.as_ref() else {
         return;
@@ -989,6 +1002,7 @@ pub fn handle_trigger_summons_on_heal(
             continue;
         };
         let player_pos = player_txfm.translation();
+        trigger_counts.increment(Heirloom::HealSummons);
 
         // Finish the cooldown: trigger one "tick" of each summon (same count as timer would spawn), then reset timers.
         let ant_stacks = skills.get_count(Heirloom::AntFarm).max(0) as usize;
@@ -1053,6 +1067,7 @@ pub fn handle_reaper_soul_spawns(
     mut player_query: Query<(&PlayerSkills, &mut CurrentMana), With<Player>>,
     graphics: Res<Graphics>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth, &MaxHealth, &Mob), With<Mob>>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, mut curr_mana)) = player_query.get_single_mut() else {
         return;
@@ -1087,6 +1102,7 @@ pub fn handle_reaper_soul_spawns(
         let Some(best_snapshot) = best_target else {
             continue;
         };
+        trigger_counts.increment(Heirloom::Reaper);
 
         for i in 0..spawn_count {
             let mana_cost = Heirloom::Reaper.get_mana_cost();
@@ -1126,6 +1142,7 @@ pub fn handle_mana_orb_drops(
     proto: ProtoParam,
     mut death_events: EventReader<EnemyDeathEvent>,
     heirlooms: Query<&PlayerSkills>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let mut rng = rand::thread_rng();
     for event in death_events.iter() {
@@ -1143,6 +1160,7 @@ pub fn handle_mana_orb_drops(
             1,
             None,
         );
+        trigger_counts.increment(Heirloom::ManaOrbs);
     }
 }
 
@@ -1153,6 +1171,7 @@ pub fn handle_boss_hit_mana_orb_drops(
     mut hit_events: EventReader<HitEvent>,
     mobs: Query<(&Mob, &GlobalTransform, Option<&EliteMob>)>,
     heirlooms: Query<&PlayerSkills>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -1187,6 +1206,7 @@ pub fn handle_boss_hit_mana_orb_drops(
             1,
             None,
         );
+        trigger_counts.increment(Heirloom::ManaOrbs);
     }
 }
 
@@ -1336,6 +1356,7 @@ pub fn handle_max_hp_hunt(
     mut death_events: EventReader<EnemyDeathEvent>,
     mut player_query: Query<(&mut MaxHPHuntTracker, &PlayerSkills), With<Player>>,
     mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
         return;
@@ -1357,6 +1378,7 @@ pub fn handle_max_hp_hunt(
             let hp_gained = stacks; // Each stack gives +1 hp per trigger
             tracker.total_hp_gained += hp_gained; // Track total HP gained
             hp_was_gained = true;
+            trigger_counts.increment(Heirloom::MaxHPHunt);
         }
     }
 
@@ -1375,6 +1397,7 @@ pub fn handle_skill_power_hunt(
     mut skill_events: EventReader<ActiveSkillUsedEvent>,
     mut player_query: Query<(&PlayerSkills, Option<&mut SkillPowerHuntTracker>), With<Player>>,
     mut attribute_events: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, state_option)) = player_query.get_single_mut() else {
         return;
@@ -1393,6 +1416,7 @@ pub fn handle_skill_power_hunt(
         if rng.gen_ratio((count * 5).min(100) as u32, 100) {
             tracker.bonus_skill_power += 1;
             attribute_events.send_default();
+            trigger_counts.increment(Heirloom::SkillPowerHunt);
         }
     }
 }
@@ -1508,6 +1532,7 @@ pub struct ThornsOnDamageTracker {
 pub fn handle_crate_break_damage(
     mut obj_break_events: EventReader<ObjBreakEvent>,
     mut player_query: Query<(&mut CrateBreakDamageTracker, &PlayerSkills), With<Player>>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((mut tracker, skills)) = player_query.get_single_mut() else {
         return;
@@ -1526,6 +1551,7 @@ pub fn handle_crate_break_damage(
         ) {
             // Each crate gives 1% damage per stack
             tracker.bonus_damage_percent += 1.0 * stacks as f32;
+            trigger_counts.increment(Heirloom::CrateBreakDamage);
         }
     }
 }
@@ -1556,6 +1582,7 @@ pub fn handle_dodge_crit_activation(
     mut dodge_events: EventReader<crate::ui::damage_numbers::DodgeEvent>,
     mut player_query: Query<(&mut DodgeCritState, &PlayerSkills), With<Player>>,
     mut attribute_event: EventWriter<crate::attributes::AttributeChangeEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((mut state, skills)) = player_query.get_single_mut() else {
         return;
@@ -1571,6 +1598,7 @@ pub fn handle_dodge_crit_activation(
         state.buff_timer.reset();
         state.next_hit_bonus = true;
         attribute_event.send(crate::attributes::AttributeChangeEvent);
+        trigger_counts.increment(Heirloom::DodgeCrit);
     }
 }
 
@@ -1863,6 +1891,7 @@ pub fn handle_mana_orb_attack(
     mut player_query: Query<(&PlayerSkills, &GlobalTransform), With<Player>>,
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, player_transform)) = player_query.get_single_mut() else {
         return;
@@ -1894,6 +1923,7 @@ pub fn handle_mana_orb_attack(
         if nearby_mobs.is_empty() {
             continue;
         }
+        trigger_counts.increment(Heirloom::ManaOrbAttack);
 
         // Spawn +1 orb per stack
         let orb_count = stacks as usize;
@@ -1957,6 +1987,7 @@ pub fn handle_mana_regen_poison(
     mut burning_enemies: Query<&mut Burning>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut status_event: EventWriter<StatusEffectEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, state_option)) = player_query.get_single_mut() else {
         return;
@@ -1984,6 +2015,7 @@ pub fn handle_mana_regen_poison(
             let poison_count = tracker.add_mana(event.0);
 
             for _ in 0..poison_count {
+                trigger_counts.increment(Heirloom::ManaRegenPoison);
                 for enemy_entity in enemies.iter() {
                     if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
                         burning.stacks += heirloom_count as u8;
@@ -2022,6 +2054,7 @@ pub fn handle_skill_mana_regen(
     mut skill_events: EventReader<ActiveSkillUsedEvent>,
     mut player_query: Query<(&PlayerSkills, &ManaRegen), With<Player>>,
     mut modify_mana_event: EventWriter<ModifyManaEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, mana_regen)) = player_query.get_single_mut() else {
         return;
@@ -2041,6 +2074,7 @@ pub fn handle_skill_mana_regen(
         if rng.gen_ratio(total_chance as u32, 100) {
             // Trigger mana regen (same amount as normal regen)
             modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+            trigger_counts.increment(Heirloom::SkillManaRegen);
         }
     }
 }
@@ -2055,6 +2089,7 @@ pub fn handle_mana_regen_lightning(
     mobs: Query<(Entity, &GlobalTransform, &CurrentHealth), With<Mob>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut commands: Commands,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, player_transform, attack, current_mana)) = player_query.get_single_mut() else {
         return;
@@ -2114,6 +2149,7 @@ pub fn handle_mana_regen_lightning(
                     spawn_delay: 0.0,
                 });
                 commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
+                trigger_counts.increment(Heirloom::ManaRegenLightning);
             }
         }
     }

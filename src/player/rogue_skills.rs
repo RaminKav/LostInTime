@@ -137,6 +137,7 @@ pub fn handle_lunge(
     keybinds: Res<InputMappings>,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for (
         e,
@@ -198,6 +199,7 @@ pub fn handle_lunge(
                             echo_dmg,
                             size_mult,
                         );
+                        trigger_counts.increment(Heirloom::SkillEcho);
                     }
                 }
 

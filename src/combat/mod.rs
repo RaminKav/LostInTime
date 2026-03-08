@@ -48,7 +48,7 @@ use crate::{
         combat_heirlooms::{HallucinationStatType, HallucinationStats},
         levels::PlayerLevel,
         mage_skills::spawn_ice_explosion_hitbox,
-        skills::{Heirloom, PlayerSkills},
+        skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_floating_text_with_shadow,
@@ -212,6 +212,7 @@ fn handle_enemy_death(
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
     player_query: Query<(&GlobalTransform, &Attack), With<Player>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
@@ -311,6 +312,7 @@ fn handle_enemy_death(
                     if let Some((_, target_pos)) = nearby_enemies.choose(&mut rng) {
                         if let Ok((_, attack)) = player_query.get_single() {
                             let lightning_damage = attack.0; // 100% damage
+                            trigger_counts.increment(Heirloom::KillLightning);
                             ranged_attack_event.send(RangedAttackEvent {
                                 projectile: crate::item::projectile::Projectile::Lightning,
                                 direction: Vec2::ZERO,
@@ -705,6 +707,7 @@ pub fn cleanup_marked_for_death_entities(
     spike_attack_states: Query<&SpikeAttackState>,
     aoe_attack_states: Query<&AoEAttackState>,
     spike_warnings: Query<(Entity, &SpikeWarning)>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     for (e, mob, slow_option, poison_option, mob_pos, killed_by_heirloom) in dead_query.iter() {
         if mob.is_boss() {
@@ -763,12 +766,14 @@ pub fn cleanup_marked_for_death_entities(
                                 attack.0 / 4,
                                 projectile_size.get_multiplier(),
                             );
+                            trigger_counts.increment(Heirloom::FrozenAoE);
                         }
                     }
                     let rng = &mut rand::thread_rng();
                     let mirror_count = skills.get_count(Heirloom::FrozenMPRegen);
                     if mirror_count > 0 && rng.gen_bool((0.2 * mirror_count as f64).min(1.0)) {
                         modify_mana_event.send(ModifyManaEvent(mana_regen.0));
+                        trigger_counts.increment(Heirloom::FrozenMPRegen);
                     }
                 }
                 if let Some(p) = poison_option {
@@ -776,6 +781,7 @@ pub fn cleanup_marked_for_death_entities(
                         let mana_cost = Heirloom::ViralVenum.get_mana_cost();
                         if current_mana.0 >= mana_cost {
                             current_mana.0 -= mana_cost;
+                            trigger_counts.increment(Heirloom::ViralVenum);
                             for (mob_e, txfm) in neaby_mobs.iter() {
                                 if mob_pos.translation().distance(txfm.translation())
                                     < 3. * TILE_SIZE.x
@@ -815,6 +821,7 @@ pub fn handle_lifesteal(
     mut modify_health_events: EventWriter<ModifyHealthEvent>,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((skills, lifesteal, player_txfm)) = player_query.get_single() else {
         return;
@@ -862,6 +869,7 @@ pub fn handle_lifesteal(
                         1,
                         None,
                     );
+                    trigger_counts.increment(Heirloom::LifestealCoins);
                 }
             }
         }
@@ -881,6 +889,7 @@ pub fn handle_thorns_on_damage_tracker(
     health: Query<(Entity, &CurrentHealth), With<Player>>,
     mut attribute_events: EventWriter<AttributeChangeEvent>,
     in_i_frame: Query<&InvincibilityTimer>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     let Ok((player_entity, _)) = health.get_single() else {
         return;
@@ -899,6 +908,7 @@ pub fn handle_thorns_on_damage_tracker(
                         if stacks > 0 {
                             tracker.thorns_gained += stacks;
                             attribute_events.send(AttributeChangeEvent);
+                            trigger_counts.increment(Heirloom::ThornsOnDamage);
                         }
                     }
                 }

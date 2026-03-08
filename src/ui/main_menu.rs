@@ -722,6 +722,7 @@ pub fn cleanup_run_state(
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
     commands.insert_resource(DamageTracker::default());
+    commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
     commands.insert_resource(EssenceShopCache::default());
 
     // Reset Rapier physics world to free accumulated internal arena allocations

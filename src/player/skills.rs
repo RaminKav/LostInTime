@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use bevy::prelude::*;
@@ -2273,5 +2274,20 @@ impl PlayerSkills {
             4 => self.active_skill_slot_4 = Some(skill),
             _ => {}
         }
+    }
+}
+
+/// Tracks how many times each heirloom effect has successfully triggered during a run.
+#[derive(Resource, Default, Clone, Debug)]
+pub struct HeirloomTriggerCounts {
+    pub counts: HashMap<Heirloom, u32>,
+}
+
+impl HeirloomTriggerCounts {
+    pub fn increment(&mut self, heirloom: Heirloom) {
+        *self.counts.entry(heirloom).or_insert(0) += 1;
+    }
+    pub fn get(&self, heirloom: &Heirloom) -> u32 {
+        self.counts.get(heirloom).copied().unwrap_or(0)
     }
 }

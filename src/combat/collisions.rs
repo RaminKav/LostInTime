@@ -199,6 +199,7 @@ fn check_projectile_hit_mob_collisions(
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut lifesteal_events: EventWriter<LifestealEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
@@ -303,6 +304,7 @@ fn check_projectile_hit_mob_collisions(
                 if let Ok(skills) = player_skills.get_single() {
                     let thorns_lifesteal_stacks = skills.get_count(Heirloom::ThornsLifesteal);
                     if thorns_lifesteal_stacks > 0 {
+                        trigger_counts.increment(Heirloom::ThornsLifesteal);
                         lifesteal_events.send(LifestealEvent {
                             thorns_lifesteal_stacks,
                         });
@@ -864,6 +866,7 @@ fn check_mob_to_player_collisions(
     mut parry_events: EventWriter<ParrySuccessEvent>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut lifesteal_events: EventWriter<LifestealEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let (
         player_e,
@@ -973,6 +976,7 @@ fn check_mob_to_player_collisions(
                 // ThornsLifesteal: thorns damage has +25% chance to lifesteal per stack
                 let thorns_lifesteal_stacks = player_skills.get_count(Heirloom::ThornsLifesteal);
                 if thorns_lifesteal_stacks > 0 {
+                    trigger_counts.increment(Heirloom::ThornsLifesteal);
                     lifesteal_events.send(LifestealEvent {
                         thorns_lifesteal_stacks,
                     });
@@ -997,6 +1001,7 @@ fn check_mob_to_player_collisions(
             let thorns_spikes_stacks = player_skills.get_count(Heirloom::ThornsSpikes);
 
             if thorns_spikes_stacks > 0 && in_i_frame.get(e1).is_err() {
+                trigger_counts.increment(Heirloom::ThornsSpikes);
                 let spike_damage =
                     f32::ceil(player_attack.0 as f32 * thorns.0 as f32 / 100.) as i32;
                 let num_spikes = thorns_spikes_stacks * 2;

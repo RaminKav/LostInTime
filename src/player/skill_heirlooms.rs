@@ -2147,6 +2147,7 @@ pub fn handle_crit_heal(
     mut hit_events: EventReader<crate::combat::HitEvent>,
     player_query: Query<&PlayerSkills, With<crate::player::Player>>,
     mut modify_health_event: EventWriter<crate::attributes::modifiers::ModifyHealthEvent>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let Ok(skills) = player_query.get_single() else {
         return;
@@ -2185,6 +2186,7 @@ pub fn handle_crit_heal(
         };
 
         if heal_amount > 0 {
+            trigger_counts.increment(Heirloom::CritHeal);
             modify_health_event.send(crate::attributes::modifiers::ModifyHealthEvent(heal_amount));
         }
     }
