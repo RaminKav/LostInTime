@@ -311,10 +311,12 @@ pub fn aseprite_follow(
             continue;
         }
 
-        let target_translation = transforms.get(follow.target).unwrap().translation;
-        let follow_translation = transforms.get(entity).unwrap().translation;
-        let delta =
-            (target_translation.truncate() - follow_translation.truncate()).normalize_or_zero();
+        let Ok(target_translation) = transforms.get(follow.target) else {
+            continue;
+        };
+        let enemy_translation = transforms.get(entity).unwrap().translation;
+        let delta = (target_translation.translation.truncate() - enemy_translation.truncate())
+            .normalize_or_zero();
 
         let mut mover = mover.get_mut(entity).unwrap();
         mover.filter_groups = Some(CollisionGroups::new(Group::NONE, Group::NONE));
@@ -341,7 +343,7 @@ pub fn aseprite_follow(
             .insert(FacingDirection::from_translation(delta));
 
         // Fixed tag names: WalkUp, WalkDown, WalkSide
-        let to_target = target_translation.truncate() - follow_translation.truncate();
+        let to_target = target_translation.translation.truncate() - enemy_translation.truncate();
         if to_target.length_squared() >= 4.0 {
             let abs_x = to_target.x.abs();
             let abs_y = to_target.y.abs();
