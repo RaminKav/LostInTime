@@ -460,6 +460,15 @@ impl Plugin for UIPlugin {
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_system(
+                handle_heirloom_hud_tooltip.in_set(OnUpdate(GameState::GameOver)),
+            )
+            .add_system(
+                player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(
+                player_hud::hide_xp_bar_in_game_over.in_set(OnUpdate(GameState::GameOver)),
+            )
+            .add_system(
                 update_active_skill_keybind_text
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -534,6 +543,9 @@ impl Plugin for UIPlugin {
                     tick_skill_cooldown_overlays.run_if(is_not_paused),
                     handle_active_skill_event.run_if(is_not_paused),
                     tick_game_start_overlay,
+                    player_hud::tick_xp_bar_fade_in
+                        .after(handle_flash_bars)
+                        .after(player_hud::drain_pending_xp),
                     handle_clamp_screen_locked_icons_worldpos,
                     spawn_shrine_interact_key_guide,
                     add_guide_to_unique_objs,

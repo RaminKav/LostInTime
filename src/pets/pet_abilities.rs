@@ -3,6 +3,7 @@ use bevy_proto::prelude::ProtoCommands;
 use rand::Rng;
 
 use crate::attributes::CurrentHealth;
+use crate::combat::damage_tracker::PetAbilityStats;
 use crate::custom_commands::CommandsExt;
 use crate::item::WorldObject;
 use crate::player::Player;
@@ -42,6 +43,7 @@ pub fn slime_shield_ability(
     mut player_query: Query<(Entity, Option<&SlimeTempShield>), With<Player>>,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut pet_stats: ResMut<PetAbilityStats>,
 ) {
     // Tick all slime pet timers and grant shield when ready
     for mut timer in slime_pets.iter_mut() {
@@ -52,6 +54,7 @@ pub fn slime_shield_ability(
             if let Ok((player_e, temp_shield_opt)) = player_query.get_single_mut() {
                 // Grant a temporary 1-point shield only if player currently has none
                 if temp_shield_opt.is_none() {
+                    pet_stats.shields_generated += 1;
                     commands.entity(player_e).insert(SlimeTempShield);
 
                     commands
@@ -82,7 +85,9 @@ pub fn fairy_heal_ability(
     mut fairy_pets: Query<&mut FairyHealTimer, With<Pet>>,
     mut heal_events: EventWriter<ModifyHealthEvent>,
     player_health: Query<&CurrentHealth, With<Player>>,
+    mut pet_stats: ResMut<PetAbilityStats>,
 ) {
+    const HEAL_AMOUNT: i32 = 15;
     // Tick all fairy pet timers and heal when ready
     for mut timer in fairy_pets.iter_mut() {
         timer.0.tick(time.delta());
@@ -90,7 +95,8 @@ pub fn fairy_heal_ability(
         // When timer finishes, heal the player
         if timer.0.finished() {
             if player_health.get_single().is_ok() {
-                heal_events.send(ModifyHealthEvent(15));
+                pet_stats.healing += HEAL_AMOUNT as i64;
+                heal_events.send(ModifyHealthEvent(HEAL_AMOUNT));
             }
         }
     }
@@ -102,11 +108,13 @@ pub fn porkipine_damage_ability(
     mut porkipine_pets: Query<&mut PorkipineDamageTimer, With<Pet>>,
     mut damage_events: EventWriter<ModifyHealthEvent>,
     health_percent: Res<crate::PlayerHealthPercent>,
+    mut pet_stats: ResMut<PetAbilityStats>,
 ) {
     for mut timer in porkipine_pets.iter_mut() {
         timer.0.tick(time.delta());
 
         if timer.0.finished() && health_percent.percent > 0.30 {
+            pet_stats.self_damage += 1;
             damage_events.send(ModifyHealthEvent(-1));
         }
     }
@@ -118,6 +126,7 @@ pub fn golden_pig_coin_ability(
     mut golden_pig_pets: Query<(&GlobalTransform, &mut GoldenPigCoinTimer), With<Pet>>,
     mut proto_commands: ProtoCommands,
     proto: ProtoParam,
+    mut pet_stats: ResMut<PetAbilityStats>,
 ) {
     for (pet_txfm, mut timer) in golden_pig_pets.iter_mut() {
         timer.0.tick(time.delta());
@@ -129,6 +138,8 @@ pub fn golden_pig_coin_ability(
             } else {
                 rng.gen_range(1..=5)
             };
+
+            pet_stats.coins += count;
 
             let d = 32.0;
             for _ in 0..count {

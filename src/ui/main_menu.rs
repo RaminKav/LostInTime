@@ -15,7 +15,7 @@ use crate::{
     chaos::ChaosTracker,
     client::analytics::{connect_server, AnalyticsData},
     colors::{overwrite_alpha, WHITE},
-    combat::damage_tracker::DamageTracker,
+    combat::damage_tracker::{DamageTracker, PetAbilityStats},
     container::ContainerRegistry,
     datafiles,
     item::CraftingTracker,
@@ -42,9 +42,7 @@ use crate::{
 };
 
 use super::{
-    essence_ui::EssenceShopCache,
-    minimap::{FogOfWarData, MinimapTileCache},
-    scrapper_ui::ScrapperEvent,
+    essence_ui::EssenceShopCache, player_hud::XpBarFadeIn, scrapper_ui::ScrapperEvent,
     Interactable, UIElement,
 };
 
@@ -564,6 +562,7 @@ pub fn tick_game_start_overlay(
     for (e, mut timer, mut sprite) in query.iter_mut() {
         timer.0.tick(time.delta());
         if timer.0.finished() {
+            commands.insert_resource(XpBarFadeIn(Timer::from_seconds(2.0, TimerMode::Once)));
             commands.entity(e).despawn();
         } else {
             let alpha = f32::max(0., 1. - timer.0.percent());
@@ -722,6 +721,8 @@ pub fn cleanup_run_state(
     commands.insert_resource(EraManager::default());
     commands.remove_resource::<WorldObjectCache>();
     commands.insert_resource(DamageTracker::default());
+    commands.insert_resource(PetAbilityStats::default());
+    commands.remove_resource::<XpBarFadeIn>();
     commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
     commands.insert_resource(EssenceShopCache::default());
 

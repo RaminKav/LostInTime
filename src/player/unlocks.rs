@@ -174,49 +174,46 @@ impl UnlockUpgrades {
             }
             UnlockUpgradeKind::Reroll => {
                 match tier {
-                    0 => 15,     // Tier 1: WoodAxe
-                    1 => 25,     // Tier 2: Pickaxe (70 more)
-                    3 => 50,     // Max tier reached
-                    4 => 100,    // Max tier reached
-                    5 => 200,    // Max tier reached
-                    6 => 400,    // Max tier reached
-                    7 => 500,    // Max tier reached
+                    0 => 15,
+                    1 => 25,
+                    2 => 50,
+                    3 => 100,
+                    4 => 200,
+                    5 => 400,
+                    6 => 500,
                     _ => 999999, // max tier
                 }
             }
             UnlockUpgradeKind::Banish => {
                 match tier {
-                    0 => 20,  // Tier 1: WoodAxe
-                    1 => 50,  // Tier 2: Pickaxe (70 more)
-                    3 => 125, // Max tier reached
-                    4 => 275, // Max tier reached
-                    5 => 550, // Max tier reached
-                    // 6 => 400,   // Max tier reached
-                    // 7 => 500,   // Max tier reached
+                    0 => 20,
+                    1 => 50,
+                    2 => 85,
+                    3 => 125,
+                    4 => 275,
+                    5 => 550,
                     _ => 999999, // max tier
                 }
             }
             UnlockUpgradeKind::StartTome => {
                 match tier {
-                    0 => 25,  // Tier 1: WoodAxe
-                    1 => 50,  // Tier 2: Pickaxe (70 more)
-                    3 => 100, // Max tier reached
-                    4 => 200, // Max tier reached
-                    5 => 400, // Max tier reached
-                    // 6 => 400,   // Max tier reached
-                    // 7 => 500,   // Max tier reached
+                    0 => 25,
+                    1 => 50,
+                    2 => 75,
+                    3 => 100,
+                    4 => 200,
+                    5 => 400,
                     _ => 999999, // max tier
                 }
             }
             UnlockUpgradeKind::StartOrb => {
                 match tier {
-                    0 => 30,  // Tier 1: WoodAxe
-                    1 => 60,  // Tier 2: Pickaxe (70 more)
-                    3 => 120, // Max tier reached
-                    4 => 240, // Max tier reached
-                    5 => 480, // Max tier reached
-                    // 6 => 400,   // Max tier reached
-                    // 7 => 500,   // Max tier reached
+                    0 => 30,
+                    1 => 60,
+                    2 => 90,
+                    3 => 120,
+                    4 => 240,
+                    5 => 480,
                     _ => 999999, // max tier
                 }
             }
@@ -259,7 +256,6 @@ impl UnlockUpgrades {
             UnlockUpgradeKind::StartFood => self.food_tier >= 8,
             UnlockUpgradeKind::StartTome => self.tome_tier >= 5,
             UnlockUpgradeKind::StartOrb => self.orb_tier >= 5,
-            _ => false, // Other unlocks have no max (infinite tiers)
         }
     }
 }

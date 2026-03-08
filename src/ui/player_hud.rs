@@ -19,8 +19,8 @@ use crate::{
     chaos::ChaosTracker,
     client::GameOverEvent,
     colors::{
-        BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN, LIGHT_GREY, ORANGE,
-        RED, SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
+        overwrite_alpha, BLACK, BLUE, DARK_WOOD_BROWN, LEVEL_BLUE, LEVEL_DARK_BLUE, LIGHT_GREEN,
+        LIGHT_GREY, ORANGE, RED, SHIELD_BLUE, TOOLTIP_BLACK, WHITE, YELLOW,
     },
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
@@ -54,6 +54,17 @@ pub struct ManaBar;
 pub struct XPBar;
 #[derive(Component)]
 pub struct XPBarText;
+/// Marker for the XP bar background (hidden with the rest of the bar in game over).
+#[derive(Component)]
+pub struct XPBarBg;
+
+/// Resource: when present, the XP bar is fading in over 2s (inserted when game-start overlay ends).
+#[derive(Resource)]
+pub struct XpBarFadeIn(pub Timer);
+
+/// Marker for the level frame sprite (child of XP bar text) so we can fade it with the bar.
+#[derive(Component)]
+pub struct XPBarLevelFrame;
 
 /// Component to store pending XP that will be drained over time
 #[derive(Component, Default)]
@@ -308,7 +319,7 @@ pub fn setup_xp_bar_ui(
     let _inner_xp_prog = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: LEVEL_BLUE,
+                color: overwrite_alpha(LEVEL_BLUE, 0.),
                 custom_size: Some(Vec2::new(0., 6.)), // Initialize to 0 width (0 XP at start)
                 anchor: Anchor::CenterLeft,
                 ..default()
@@ -333,7 +344,7 @@ pub fn setup_xp_bar_ui(
     let _inner_xp_bg = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: *LEVEL_DARK_BLUE.clone().set_a(0.85),
+                color: overwrite_alpha(*LEVEL_DARK_BLUE.clone().set_a(0.85), 0.),
                 custom_size: Some(Vec2::new(res.game_width, 6.)), // Initialize to 0 width (0 XP at start)
                 anchor: Anchor::CenterLeft,
                 ..default()
@@ -346,6 +357,7 @@ pub fn setup_xp_bar_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(XPBarBg)
         .insert(Name::new("inner xp bar"))
         .id();
     // let xp_bar_frame = commands
@@ -369,7 +381,7 @@ pub fn setup_xp_bar_ui(
     let level_frame = commands
         .spawn(SpriteBundle {
             sprite: Sprite {
-                color: Color::rgba(0.1, 0.1, 0.1, 0.7),
+                color: overwrite_alpha(Color::rgba(0.1, 0.1, 0.1, 0.7), 0.),
                 custom_size: Some(Vec2::new(46., 11.)),
                 ..default()
             },
@@ -383,6 +395,7 @@ pub fn setup_xp_bar_ui(
             ..default()
         })
         .insert(RenderLayers::from_layers(&[3]))
+        .insert(XPBarLevelFrame)
         .id();
     let _text = commands
         .spawn((
@@ -392,7 +405,7 @@ pub fn setup_xp_bar_ui(
                     TextStyle {
                         font: asset_server.load("fonts/slkscr.ttf"),
                         font_size: 8.4,
-                        color: WHITE,
+                        color: overwrite_alpha(WHITE, 0.),
                     },
                 ),
                 text_anchor: Anchor::CenterLeft,
@@ -823,6 +836,71 @@ pub fn update_shieldbar(
 
     // flash.timer.tick(Duration::from_nanos(1));
 }
+/// Hide the XP bar (progress, background, level text) when in GameOver; show it again in Main.
+pub fn hide_xp_bar_in_game_over(
+    game_state: Res<State<GameState>>,
+    mut commands: Commands,
+    xp_bar_parts: Query<Entity, Or<(With<XPBar>, With<XPBarText>, With<XPBarBg>)>>,
+) {
+    let visibility = if game_state.0 == GameState::GameOver {
+        Visibility::Hidden
+    } else {
+        Visibility::Inherited
+    };
+    for entity in xp_bar_parts.iter() {
+        commands.entity(entity).insert(visibility);
+    }
+}
+
+/// Fade in the XP bar over 2s; runs when XpBarFadeIn resource is present (inserted when game-start overlay ends).
+pub fn tick_xp_bar_fade_in(
+    time: Res<Time>,
+    mut commands: Commands,
+    fade: Option<ResMut<XpBarFadeIn>>,
+    mut xp_bar: Query<&mut Sprite, (With<XPBar>, Without<XPBarBg>, Without<XPBarLevelFrame>)>,
+    mut xp_bar_bg: Query<&mut Sprite, (With<XPBarBg>, Without<XPBar>, Without<XPBarLevelFrame>)>,
+    mut xp_bar_text: Query<&mut Text, With<XPBarText>>,
+    mut xp_bar_frame: Query<&mut Sprite, (With<XPBarLevelFrame>, Without<XPBar>, Without<XPBarBg>)>,
+) {
+    let Some(mut fade) = fade else {
+        return;
+    };
+    fade.0.tick(time.delta());
+    let t = fade.0.percent();
+    if fade.0.finished() {
+        for mut sprite in xp_bar.iter_mut() {
+            sprite.color = overwrite_alpha(sprite.color, 1.);
+        }
+        for mut sprite in xp_bar_bg.iter_mut() {
+            sprite.color = overwrite_alpha(sprite.color, 0.85);
+        }
+        for mut text in xp_bar_text.iter_mut() {
+            for section in text.sections.iter_mut() {
+                section.style.color = overwrite_alpha(section.style.color, 1.);
+            }
+        }
+        for mut sprite in xp_bar_frame.iter_mut() {
+            sprite.color = overwrite_alpha(sprite.color, 0.7);
+        }
+        commands.remove_resource::<XpBarFadeIn>();
+        return;
+    }
+    for mut sprite in xp_bar.iter_mut() {
+        sprite.color = overwrite_alpha(sprite.color, t);
+    }
+    for mut sprite in xp_bar_bg.iter_mut() {
+        sprite.color = overwrite_alpha(sprite.color, 0.85 * t);
+    }
+    for mut text in xp_bar_text.iter_mut() {
+        for section in text.sections.iter_mut() {
+            section.style.color = overwrite_alpha(section.style.color, t);
+        }
+    }
+    for mut sprite in xp_bar_frame.iter_mut() {
+        sprite.color = overwrite_alpha(sprite.color, 0.7 * t);
+    }
+}
+
 pub fn update_xp_bar(
     player_xp_query: Query<&PlayerLevel, With<Player>>,
     mut xp_bar_query: Query<(&mut PendingXP, &mut BarFlashTimer), With<XPBar>>,

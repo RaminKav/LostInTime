@@ -260,6 +260,24 @@ pub struct DamageTracker {
     pub totals: HashMap<DamageSource, i64>,
 }
 
+/// Stats from pet active abilities (shields, healing, coins, self-damage) for the damage tracker UI.
+#[derive(Resource, Default, Debug, Clone)]
+pub struct PetAbilityStats {
+    pub shields_generated: u32,
+    pub healing: i64,
+    pub coins: u32,
+    pub self_damage: i64,
+}
+
+impl PetAbilityStats {
+    pub fn has_any(&self) -> bool {
+        self.shields_generated > 0
+            || self.healing > 0
+            || self.coins > 0
+            || self.self_damage > 0
+    }
+}
+
 impl DamageTracker {
     pub fn record(&mut self, source: DamageSource, amount: i32) {
         if amount > 0 {
@@ -354,6 +372,7 @@ pub fn track_player_damage(
 ///
 /// `width` specifies the horizontal distance between the left-aligned text and right-aligned text.
 /// `base_alpha` is used for fading (0.0 for fading in on game over, 1.0 for inventory).
+/// `pet_stats` when provided adds Shields/Healing/Coins/Self damage lines under the Pet category.
 pub fn spawn_damage_tracker_ui(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -361,8 +380,15 @@ pub fn spawn_damage_tracker_ui(
     parent_transform: Transform,
     base_alpha: f32,
     width: f32,
+    pet_stats: Option<&PetAbilityStats>,
 ) -> Option<Vec<Entity>> {
-    let groups = tracker.grouped_entries();
+    let mut groups = tracker.grouped_entries();
+    if let Some(ps) = pet_stats {
+        if ps.has_any() && !groups.iter().any(|(c, _)| *c == DamageSourceCategory::Pet) {
+            groups.push((DamageSourceCategory::Pet, vec![]));
+            groups.sort_by_key(|(cat, _)| *cat);
+        }
+    }
     if groups.is_empty() {
         return None;
     }
@@ -484,6 +510,192 @@ pub fn spawn_damage_tracker_ui(
             spawned_entities.push(value);
 
             cursor_y -= row_spacing;
+        }
+
+        // Pet category: add ability stats (shields, healing, coins, self damage) when provided
+        if *category == DamageSourceCategory::Pet {
+            if let Some(ps) = pet_stats {
+                if ps.shields_generated > 0 {
+                    let name = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    " Shields",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Left),
+                                text_anchor: Anchor::CenterLeft,
+                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(name);
+                    spawned_entities.push(name);
+                    let value = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    format_damage(ps.shields_generated as i64),
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Right),
+                                text_anchor: Anchor::CenterRight,
+                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(value);
+                    spawned_entities.push(value);
+                    cursor_y -= row_spacing;
+                }
+                if ps.healing > 0 {
+                    let name = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    " Healing",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Left),
+                                text_anchor: Anchor::CenterLeft,
+                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(name);
+                    spawned_entities.push(name);
+                    let value = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    format_damage(ps.healing),
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Right),
+                                text_anchor: Anchor::CenterRight,
+                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(value);
+                    spawned_entities.push(value);
+                    cursor_y -= row_spacing;
+                }
+                if ps.coins > 0 {
+                    let name = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    " Coins",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Left),
+                                text_anchor: Anchor::CenterLeft,
+                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(name);
+                    spawned_entities.push(name);
+                    let value = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    format_damage(ps.coins as i64),
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Right),
+                                text_anchor: Anchor::CenterRight,
+                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(value);
+                    spawned_entities.push(value);
+                    cursor_y -= row_spacing;
+                }
+                if ps.self_damage > 0 {
+                    let name = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    " Self damage",
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Left),
+                                text_anchor: Anchor::CenterLeft,
+                                transform: Transform::from_translation(Vec3::new(-hw, cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(name);
+                    spawned_entities.push(name);
+                    let value = commands
+                        .spawn((
+                            Text2dBundle {
+                                text: Text::from_section(
+                                    format_damage(ps.self_damage),
+                                    TextStyle {
+                                        font: asset_server.load("fonts/4x5.ttf"),
+                                        font_size: 5.0,
+                                        color: WHITE.with_a(base_alpha),
+                                    },
+                                )
+                                .with_alignment(TextAlignment::Right),
+                                text_anchor: Anchor::CenterRight,
+                                transform: Transform::from_translation(Vec3::new(hw + 10., cursor_y, 1.)),
+                                ..default()
+                            },
+                            RenderLayers::from_layers(&[3]),
+                        ))
+                        .id();
+                    commands.entity(panel).add_child(value);
+                    spawned_entities.push(value);
+                    cursor_y -= row_spacing;
+                }
+            }
         }
 
         cursor_y -= category_gap;

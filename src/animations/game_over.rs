@@ -6,23 +6,36 @@ use rand::seq::IteratorRandom;
 
 use crate::{
     assets::Graphics,
+    attributes::{
+        Attack, AttackSpeed, AttributeQuality, AttributeValue, BonusDamage, CritChance, CritDamage,
+        CurrentHealth, CurrentMana, Defence, Dodge, Healing, ItemAttributes, Lifesteal,
+        LootRateBonus, ManaRegen, MaxHealth, MaxMana, PickupRange, ProjectileSize, SkillPower,
+        Speed, Thorns, XpRateBonus,
+    },
+    chaos::ChaosTracker,
     client::{leaderboard::LastSubmittedScore, GameData, GameOverEvent},
     colors::{overwrite_alpha, GREY, WHITE, YELLOW_2},
-    combat::damage_tracker::{format_damage, DamageTracker, spawn_damage_tracker_ui},
+    combat::damage_tracker::{
+        format_damage, spawn_damage_tracker_ui, DamageTracker, PetAbilityStats,
+    },
     datafiles,
     inputs::FacingDirection,
     inventory::ItemStack,
     item::WorldObject,
+    night::InfiniteMode,
     player::{score::RunScore, Player, TimeFragmentCurrency},
     proto::proto_param::ProtoParam,
     ui::{
         boss_health_bar::{BossHealthBar, BossHealthBarFrame, BossNameText},
         damage_numbers::spawn_text,
         key_input_guide::InteractGuide,
-        spawn_item_stack_icon, CurrencyText, Interactable, MenuButton, TimeFragmentIcon, UIElement,
-        UIState,
+        spawn_item_stack_icon, spawn_stats_tooltip_at, ui_helpers, CurrencyText, Interactable,
+        Interaction, MenuButton, TimeFragmentIcon, UIElement, UIState,
     },
-    world::y_sort::YSort,
+    world::{
+        dimension::{Era, EraManager},
+        y_sort::YSort,
+    },
     GameState, RawPosition, ScreenResolution, GAME_HEIGHT,
 };
 
@@ -30,6 +43,15 @@ use super::ui_animaitons::{MoveUIAnimation, UIIconMover};
 
 #[derive(Component)]
 pub struct GameOverFadeout(Timer);
+
+/// Era reached as display number (1, 2, or 3; dungeon counts as its associated era).
+fn era_display_number(era: &Era) -> u8 {
+    match era {
+        Era::Main | Era::DungeonMain => 1,
+        Era::Second => 2,
+        Era::Third => 3,
+    }
+}
 
 /// Helper function to format rank with ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
 fn format_rank(rank: i64) -> String {
@@ -62,7 +84,13 @@ pub fn handle_game_over_fadeout(
     resolution: Res<ScreenResolution>,
     run_score: Res<RunScore>,
     last_submitted: Res<LastSubmittedScore>,
-    damage_tracker: Res<DamageTracker>,
+    mut trackers: ParamSet<(
+        Res<DamageTracker>,
+        Res<EraManager>,
+        Res<ChaosTracker>,
+        Option<Res<InfiniteMode>>,
+    )>,
+    pet_stats: Res<PetAbilityStats>,
     // Cleanup queries
     boss_health_bars: Query<
         Entity,
@@ -154,7 +182,17 @@ pub fn handle_game_over_fadeout(
             Name::new("Rank Text"),
         ));
 
-        // SCORE TEXT - always show current run's score
+        // Left panel position (same as damage tracker) for run stats
+        let panel_x = -resolution.game_width / 2. + 10.;
+        let stats_left_x = panel_x;
+        let damage_font = asset_server.load("fonts/4x5.ttf");
+        let stat_text_style = TextStyle {
+            font: damage_font.clone(),
+            font_size: 5.0,
+            color: WHITE.with_a(0.),
+        };
+
+        // SCORE TEXT - same style and alignment as damage display
         commands.spawn((
             Text2dBundle {
                 text: Text::from_section(
@@ -176,11 +214,12 @@ pub fn handle_game_over_fadeout(
             RenderLayers::from_layers(&[3]),
             Name::new("Score Text"),
         ));
-
         // DAMAGE BREAKDOWN - left side list with category headers
         let panel_x = -resolution.game_width / 2. + 10.;
         let start_y = resolution.game_height / 2. - 60.;
-        
+
+        let damage_tracker = trackers.p0();
+
         if let Some(entities) = spawn_damage_tracker_ui(
             &mut commands,
             &asset_server,
@@ -188,11 +227,126 @@ pub fn handle_game_over_fadeout(
             Transform::from_translation(Vec3::new(panel_x + 42.0, start_y, 21.0)),
             0.0,
             84.0,
+            Some(&pet_stats),
         ) {
             for e in entities {
                 commands.entity(e).insert(GameOverText);
             }
         }
+
+        // ERA REACHED
+        let y_offset = -100.;
+        let era_manager = trackers.p1();
+        let era_num = era_display_number(&era_manager.current_era);
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Era Reached: {}", era_num),
+                    stat_text_style.clone(),
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(stats_left_x, y_offset + 16., 21.)),
+                ..default()
+            },
+            GameOverText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Era Text"),
+        ));
+
+        // TIME IN ENDLESS (only if they made it to endless)
+        let infinite_mode = trackers.p3();
+
+        if let Some(ref inf) = infinite_mode {
+            if inf.active && inf.elapsed_seconds > 0.0 {
+                commands.spawn((
+                    Text2dBundle {
+                        text: Text::from_section(
+                            format!("Time in Endless: {}", inf.get_elapsed_display_string()),
+                            stat_text_style.clone(),
+                        )
+                        .with_alignment(TextAlignment::Left),
+                        text_anchor: Anchor::CenterLeft,
+                        transform: Transform::from_translation(Vec3::new(
+                            stats_left_x,
+                            y_offset,
+                            21.,
+                        )),
+                        ..default()
+                    },
+                    GameOverText,
+                    RenderLayers::from_layers(&[3]),
+                    Name::new("Endless Time Text"),
+                ));
+            }
+        }
+
+        // CHAOS LEVEL
+        let chaos_tracker = trackers.p2();
+        commands.spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    format!("Chaos Level: {:.1}", chaos_tracker.get_chaos()),
+                    stat_text_style.clone(),
+                )
+                .with_alignment(TextAlignment::Left),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(
+                    stats_left_x,
+                    y_offset + 32.,
+                    21.,
+                )),
+                ..default()
+            },
+            GameOverText,
+            RenderLayers::from_layers(&[3]),
+            Name::new("Chaos Text"),
+        ));
+
+        // FINAL STATS - hoverable text that shows player stats tooltip (grey box, no sprite texture)
+        let final_stats_hit = commands
+            .spawn((
+                SpriteBundle {
+                    sprite: Sprite {
+                        color: Color::rgba(0.35, 0.35, 0.35, 0.),
+                        custom_size: Some(Vec2::new(80., 14.)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(
+                        panel_x + 42.,
+                        y_offset + 48.,
+                        22.,
+                    )),
+                    ..default()
+                },
+                Interactable::default(),
+                GameOverFinalStatsHitbox,
+                GameOverText,
+                RenderLayers::from_layers(&[3]),
+                Name::new("Game Over Final Stats Hitbox"),
+            ))
+            .id();
+        commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        "View Final Stats",
+                        TextStyle {
+                            font: asset_server.load("fonts/4x5.ttf"),
+                            font_size: 5.0,
+                            color: YELLOW_2.with_a(0.),
+                        },
+                    )
+                    .with_alignment(TextAlignment::Left),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-36., 0., 1.)),
+                    ..default()
+                },
+                GameOverText,
+                RenderLayers::from_layers(&[3]),
+                Name::new("Game Over Final Stats Text"),
+            ))
+            .set_parent(final_stats_hit);
 
         // OK BUTTON - spawn like main menu buttons
         let button_entity = commands
@@ -272,6 +426,14 @@ pub fn maintain_player_red_tint(
         }
     }
 }
+/// Hitbox for "Final Stats" on game over; hover shows player stats tooltip.
+#[derive(Component)]
+pub struct GameOverFinalStatsHitbox;
+
+/// Marks the stats tooltip spawned on game over (hover "Final Stats") so we can despawn it when hover ends.
+#[derive(Component)]
+pub struct GameOverStatsTooltip;
+
 #[derive(Component)]
 pub struct GameOverText;
 
@@ -480,6 +642,140 @@ pub fn update_game_over_rank_text(
         if let Some(rank) = last_submitted.rank {
             // Update the text to show the actual rank
             text.sections[0].value = format_rank(rank);
+        }
+    }
+}
+
+/// Handle hover on "Final Stats" and show/hide the player stats tooltip.
+pub fn handle_game_over_final_stats_tooltip(
+    mut commands: Commands,
+    cursor_pos: Res<crate::cursor::CursorPos>,
+    hit_sprites: Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,
+    mut hitbox_query: Query<(Entity, &mut Interactable), With<GameOverFinalStatsHitbox>>,
+    existing_tooltips: Query<Entity, With<GameOverStatsTooltip>>,
+    player_stats: Query<
+        (
+            (
+                &Attack,
+                &MaxHealth,
+                &CurrentHealth,
+                &MaxMana,
+                &CurrentMana,
+                &Defence,
+                &CritChance,
+                &CritDamage,
+                &BonusDamage,
+                &ManaRegen,
+                &Healing,
+                &Thorns,
+                &Dodge,
+                &Speed,
+                &XpRateBonus,
+            ),
+            &LootRateBonus,
+            &ProjectileSize,
+            &SkillPower,
+            &Lifesteal,
+            &PickupRange,
+            &AttackSpeed,
+        ),
+        With<Player>,
+    >,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+) {
+    let hit_entity = ui_helpers::pointcast_2d(&cursor_pos, &hit_sprites, None);
+    let mut panel_e = None;
+    for (entity, mut interactable) in hitbox_query.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _sprite, _transform)| *e == entity)
+            .unwrap_or(false);
+
+        if is_hit {
+            panel_e = Some(entity);
+            if !matches!(interactable.current(), Interaction::Hovering) {
+                interactable.change(Interaction::Hovering);
+            }
+        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+            panel_e = None;
+        }
+    }
+
+    let is_hovering = hitbox_query
+        .iter()
+        .any(|(_, i)| matches!(i.current(), Interaction::Hovering));
+
+    if is_hovering && panel_e.is_some() {
+        if existing_tooltips.is_empty() {
+            let Ok((
+                (
+                    attack,
+                    max_health,
+                    curr_health,
+                    max_mana,
+                    curr_mana,
+                    defence,
+                    crit_chance,
+                    crit_damage,
+                    bonus_damage,
+                    mana_regen,
+                    healing,
+                    thorns,
+                    dodge,
+                    speed,
+                    xp_rate_bonus,
+                ),
+                loot_rate_bonus,
+                size,
+                skill_power,
+                lifesteal,
+                pickup_range,
+                attack_speed,
+            )) = player_stats.get_single()
+            else {
+                return;
+            };
+
+            let attributes = ItemAttributes {
+                attack: AttributeValue::new(attack.0, AttributeQuality::Low, 0.),
+                health: AttributeValue::new(max_health.0, AttributeQuality::Low, 0.),
+                mana: AttributeValue::new(max_mana.0, AttributeQuality::Low, 0.),
+                defence: AttributeValue::new(defence.0, AttributeQuality::Low, 0.),
+                crit_chance: AttributeValue::new(crit_chance.0, AttributeQuality::Low, 0.),
+                crit_damage: AttributeValue::new(crit_damage.0, AttributeQuality::Low, 0.),
+                bonus_damage: AttributeValue::new(bonus_damage.0, AttributeQuality::Low, 0.),
+                mana_regen: AttributeValue::new(mana_regen.0, AttributeQuality::Low, 0.),
+                healing: AttributeValue::new(healing.0, AttributeQuality::Low, 0.),
+                thorns: AttributeValue::new(thorns.0, AttributeQuality::Low, 0.),
+                dodge: AttributeValue::new(dodge.0, AttributeQuality::Low, 0.),
+                speed: AttributeValue::new(speed.0, AttributeQuality::Low, 0.),
+                xp_rate: AttributeValue::new(xp_rate_bonus.0, AttributeQuality::Low, 0.),
+                loot_rate: AttributeValue::new(loot_rate_bonus.0, AttributeQuality::Low, 0.),
+                size: AttributeValue::new(size.0, AttributeQuality::Low, 0.),
+                skill_power: AttributeValue::new(skill_power.0, AttributeQuality::Low, 0.),
+                lifesteal: AttributeValue::new(lifesteal.0, AttributeQuality::Low, 0.),
+                pickup_range: AttributeValue::new(pickup_range.0, AttributeQuality::Low, 0.),
+                attack_speed: AttributeValue::new(attack_speed.0, AttributeQuality::Low, 0.),
+                ..Default::default()
+            }
+            .get_stats_summary(curr_health.0, curr_mana.0);
+
+            let tooltip_pos = Vec3::new(120., -16., 2.);
+            let tooltip_e = spawn_stats_tooltip_at(
+                &mut commands,
+                &graphics,
+                &asset_server,
+                panel_e.unwrap(),
+                tooltip_pos,
+                &attributes,
+            );
+            commands.entity(tooltip_e).insert(GameOverStatsTooltip);
+        }
+    } else {
+        for e in existing_tooltips.iter() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }

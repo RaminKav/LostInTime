@@ -13,7 +13,7 @@ use crate::{
     colors::{
         BLACK, GREY, LIGHT_GREY, LIGHT_RED, ORANGE, TOOLTIP_BLACK, TOOLTIP_BLACK_2, WHITE, YELLOW_2,
     },
-    combat::damage_tracker::{DamageTracker, spawn_damage_tracker_ui},
+    combat::damage_tracker::{DamageTracker, PetAbilityStats, spawn_damage_tracker_ui},
     inventory::{Inventory, ItemStack},
     item::{item_actions::ItemActions, EquipmentType, Recipes, WorldObject},
     juice::bounce::BounceOnHit,
@@ -887,117 +887,126 @@ pub fn handle_spawn_inv_player_stats(
         }
         .get_stats_summary(curr_health.0, curr_mana.0);
 
-        let tooltip = commands
+        let _ = spawn_stats_tooltip_at(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            parent_e,
+            translation,
+            &attributes,
+        );
+    }
+}
+
+/// Single helper for spawning the player stats tooltip (inventory "Final Stats" hover and game over "Final Stats" hover).
+/// Spawns the tooltip at `translation`, parents it to `parent`, and adds a "Stats" header plus each (name, value) row.
+/// `attributes` should be the (name, value) pairs from `ItemAttributes::get_stats_summary`.
+pub fn spawn_stats_tooltip_at(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    parent: Entity,
+    translation: Vec3,
+    attributes: &[(String, String)],
+) -> Entity {
+    let mut tooltip_text: Vec<((String, String), f32)> = vec![];
+    tooltip_text.push((("Stats".to_string(), "".to_string()), 0.));
+    for a in attributes {
+        tooltip_text.push(((a.0.clone(), a.1.clone()), 0.));
+    }
+
+    let tooltip = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics.get_ui_element_texture(UIElement::StatTooltip),
+                transform: Transform {
+                    translation,
+                    scale: Vec3::new(1., 1., 1.),
+                    ..Default::default()
+                },
+                sprite: Sprite {
+                    custom_size: Some(TOOLTIP_UI_SIZE),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            RenderLayers::from_layers(&[3]),
+            UIElement::StatTooltip,
+            PlayerStatsTooltip,
+            Name::new("TOOLTIP"),
+        ))
+        .id();
+
+    for (i, (text, d)) in tooltip_text.iter().enumerate() {
+        let text_pos = if i == 0 {
+            Vec3::new(
+                -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
+                TOOLTIP_UI_SIZE.y / 2. - 12.,
+                1.,
+            )
+        } else {
+            Vec3::new(
+                -TOOLTIP_UI_SIZE.x / 2. + 8.,
+                TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
+                1.,
+            )
+        };
+
+        let _text_att_name = commands
             .spawn((
-                SpriteBundle {
-                    texture: graphics.get_ui_element_texture(UIElement::StatTooltip),
+                Text2dBundle {
+                    text: Text::from_section(
+                        text.0.to_string(),
+                        TextStyle {
+                            font: if i == 0 {
+                                asset_server.load("fonts/slkscrbold.ttf")
+                            } else {
+                                asset_server.load("fonts/slkscr.ttf")
+                            },
+                            font_size: 8.4,
+                            color: if i == 0 { BLACK } else { GREY },
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
                     transform: Transform {
-                        translation,
+                        translation: text_pos,
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()
                     },
-                    sprite: Sprite {
-                        custom_size: Some(TOOLTIP_UI_SIZE),
-                        ..Default::default()
-                    },
-                    ..Default::default()
+                    ..default()
                 },
+                Name::new("TOOLTIP TEXT"),
                 RenderLayers::from_layers(&[3]),
-                UIElement::StatTooltip,
-                PlayerStatsTooltip,
-                Name::new("TOOLTIP"),
             ))
             .id();
-
-        let mut tooltip_text: Vec<((String, String), f32)> = vec![];
-        tooltip_text.push((("Stats".to_string(), "".to_string()), 0.));
-        for (_i, a) in attributes.iter().enumerate().clone() {
-            tooltip_text.push(((a.0.clone(), a.1.clone()), 0.));
-        }
-        for (i, (text, d)) in tooltip_text.iter().enumerate() {
-            let text_pos = if i == 0 {
-                Vec3::new(
-                    -(f32::ceil((text.0.chars().count() * 6 - 1) as f32 / 2.)) + 0.5,
-                    TOOLTIP_UI_SIZE.y / 2. - 12.,
-                    1.,
-                )
-            }
-            // else if i == total_tooltips - 1 {
-            //     Vec3::new(
-            //         -TOOLTIP_UI_SIZE.x / 2. + 46.,
-            //         TOOLTIP_UI_SIZE.y / 2. - 12. - ((i as f32 - 1.) * 8.) - d - 2.,
-            //         1.,
-            //     )
-            // } else if i == total_tooltips - 2 {
-            //     Vec3::new(
-            //         -TOOLTIP_UI_SIZE.x / 2. + 8.,
-            //         TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
-            //         1.,
-            //     )
-            // }
-            else {
-                Vec3::new(
-                    -TOOLTIP_UI_SIZE.x / 2. + 8.,
-                    TOOLTIP_UI_SIZE.y / 2. - 12. - (i as f32 * 8.) - d - 2.,
-                    1.,
-                )
-            };
-
-            let text_att_name = commands
-                .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            text.0.to_string(),
-                            TextStyle {
-                                font: if i == 0 {
-                                    asset_server.load("fonts/slkscrbold.ttf")
-                                } else {
-                                    asset_server.load("fonts/slkscr.ttf")
-                                },
-                                font_size: 8.4,
-                                color: if i == 0 { BLACK } else { GREY },
-                            },
-                        ),
-                        text_anchor: Anchor::CenterLeft,
-                        transform: Transform {
-                            translation: text_pos,
-                            scale: Vec3::new(1., 1., 1.),
-                            ..Default::default()
+        commands.entity(tooltip).add_child(_text_att_name);
+        let _text_att_value = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        text.1.to_string(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 8.4,
+                            color: LIGHT_RED,
                         },
-                        ..default()
+                    ),
+                    text_anchor: Anchor::CenterRight,
+                    transform: Transform {
+                        translation: text_pos + Vec3::new(TOOLTIP_UI_SIZE.x - 16., 0., 0.),
+                        scale: Vec3::new(1., 1., 1.),
+                        ..Default::default()
                     },
-                    Name::new("TOOLTIP TEXT"),
-                    RenderLayers::from_layers(&[3]),
-                ))
-                .id();
-            commands.entity(tooltip).add_child(text_att_name);
-            let text_att_value = commands
-                .spawn((
-                    Text2dBundle {
-                        text: Text::from_section(
-                            text.1.to_string(),
-                            TextStyle {
-                                font: asset_server.load("fonts/slkscr.ttf"),
-                                font_size: 8.4,
-                                color: LIGHT_RED,
-                            },
-                        ),
-                        text_anchor: Anchor::CenterRight,
-                        transform: Transform {
-                            translation: text_pos + Vec3::new(TOOLTIP_UI_SIZE.x - 16., 0., 0.),
-                            scale: Vec3::new(1., 1., 1.),
-                            ..Default::default()
-                        },
-                        ..default()
-                    },
-                    Name::new("TOOLTIP TEXT"),
-                    RenderLayers::from_layers(&[3]),
-                ))
-                .id();
-            commands.entity(tooltip).add_child(text_att_value);
-        }
-        commands.entity(parent_e).add_child(tooltip);
+                    ..default()
+                },
+                Name::new("TOOLTIP TEXT"),
+                RenderLayers::from_layers(&[3]),
+            ))
+            .id();
+        commands.entity(tooltip).add_child(_text_att_value);
     }
+    commands.entity(parent).add_child(tooltip);
+    tooltip
 }
 
 #[derive(Component)]
@@ -1011,6 +1020,7 @@ pub fn spawn_damage_tracker_in_inventory(
     ui_state: Res<State<UIState>>,
     old_panels: Query<Entity, With<DamageTrackerPanel>>,
     tracker: Res<DamageTracker>,
+    pet_stats: Option<Res<PetAbilityStats>>,
 ) {
     if ui_state.0 != UIState::Inventory {
         return;
@@ -1037,6 +1047,7 @@ pub fn spawn_damage_tracker_in_inventory(
         Transform::from_translation(Vec3::new(panel_x, start_y, 2.)),
         1.0,
         80.0,
+        pet_stats.as_deref(),
     ) {
         if let Some(panel) = entities.first() {
             commands.entity(*panel).insert(DamageTrackerPanel);

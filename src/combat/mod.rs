@@ -132,6 +132,7 @@ impl Plugin for CombatPlugin {
         })
         .add_event::<ObjBreakEvent>()
         .init_resource::<damage_tracker::DamageTracker>()
+        .init_resource::<damage_tracker::PetAbilityStats>()
         .add_plugin(CollisionPlugion)
         .add_systems(
             (

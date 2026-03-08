@@ -14,8 +14,9 @@ use bevy_aseprite::anim::AsepriteAnimation;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 use bevy_rapier2d::prelude::KinematicCharacterController;
 use game_over::{
-    handle_game_over_fadeout, handle_spawn_collected_time_fragments, maintain_player_red_tint,
-    tick_game_over_overlay, update_game_over_rank_text,
+    handle_game_over_fadeout, handle_game_over_final_stats_tooltip,
+    handle_spawn_collected_time_fragments, maintain_player_red_tint, tick_game_over_overlay,
+    update_game_over_rank_text,
 };
 use player_sprite::{
     change_player_class_visuals, cleanup_one_time_animations,
@@ -115,7 +116,12 @@ impl Plugin for AnimationsPlugin {
                     animate_hit,
                     animate_spritesheet_animations.after(mouse_click_system),
                     animate_foliage_opacity,
-                    handle_game_over_fadeout,
+                )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_system(handle_game_over_fadeout.in_set(OnUpdate(GameState::Main)))
+            .add_systems(
+                (
                     handle_anim_change_when_player_dir_changes,
                     handle_player_animation_change,
                     cleanup_one_time_animations,
@@ -128,6 +134,7 @@ impl Plugin for AnimationsPlugin {
                 tick_game_over_overlay,
                 handle_spawn_collected_time_fragments,
                 update_game_over_rank_text,
+                handle_game_over_final_stats_tooltip,
                 handle_move_animations,
                 handle_ui_time_fragments,
             ))
@@ -174,11 +181,9 @@ fn animate_enemies(
         }
 
         if let Some(mat) = materials.get_mut(enemy_handle) {
-            mat.source_texture = Some(asset_server.load(format!(
-                "textures/slime/{}-move-{}.png",
-                "slime",
-                tracker.0
-            )));
+            mat.source_texture = Some(
+                asset_server.load(format!("textures/slime/{}-move-{}.png", "slime", tracker.0)),
+            );
             mat.is_attacking = new_attacking;
         }
     }
@@ -430,7 +435,12 @@ pub enum FoliageOpacityState {
 fn animate_foliage_opacity(
     mut commands: Commands,
     tree_query: Query<
-        (Entity, &GlobalTransform, &WorldObject, Option<&FoliageOpacityState>),
+        (
+            Entity,
+            &GlobalTransform,
+            &WorldObject,
+            Option<&FoliageOpacityState>,
+        ),
         (With<FadeOpacity>, Without<Sapling>),
     >,
     player: Query<&GlobalTransform, With<Player>>,
@@ -441,18 +451,17 @@ fn animate_foliage_opacity(
         Ok(t) => t,
         Err(_) => return,
     };
-    let cache = graphics.foliage_textures.get_or_insert_with(HashMap::default);
+    let cache = graphics
+        .foliage_textures
+        .get_or_insert_with(HashMap::default);
     for (e, txfm, obj, current_state) in tree_query.iter() {
         let delta_t = p_txfm.translation().truncate() - txfm.translation().truncate();
-        let desired = if delta_t.x <= 65.
-            && delta_t.x >= -65.
-            && delta_t.y <= 80.
-            && delta_t.y >= -26.
-        {
-            FoliageOpacityState::Faded
-        } else {
-            FoliageOpacityState::Normal
-        };
+        let desired =
+            if delta_t.x <= 65. && delta_t.x >= -65. && delta_t.y <= 80. && delta_t.y >= -26. {
+                FoliageOpacityState::Faded
+            } else {
+                FoliageOpacityState::Normal
+            };
         if current_state.map_or(true, |s| *s != desired) {
             let (normal, fade) = cache.entry(*obj).or_insert_with(|| {
                 let stem = obj.to_string().to_lowercase();
@@ -465,10 +474,7 @@ fn animate_foliage_opacity(
                 FoliageOpacityState::Faded => fade.clone(),
                 FoliageOpacityState::Normal => normal.clone(),
             };
-            commands
-                .entity(e)
-                .insert(handle)
-                .insert(desired);
+            commands.entity(e).insert(handle).insert(desired);
         }
     }
 }
