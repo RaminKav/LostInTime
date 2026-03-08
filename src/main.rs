@@ -113,7 +113,7 @@ use world::{
 };
 use world::{dimension::EraManager, WorldGeneration};
 
-use crate::player::{skill_heirlooms::Stealthed, ClassUnlockConfig};
+use crate::player::{skill_heirlooms::Stealthed, skills::HeirloomTriggerCounts, ClassUnlockConfig};
 use crate::{
     assets::{ClassPetData, SpriteAnchor},
     blessings::OwnedBlessings,
@@ -437,6 +437,8 @@ pub struct GameParam<'w, 's> {
     pub equipment: Query<'w, 's, (Entity, &'static Equipment)>,
     pub inv_slot_query: Query<'w, 's, &'static mut InventorySlotState>,
     pub coins: ResMut<'w, crate::player::currency::CoinCurrency>,
+    pub heirloom_trigger_counts: ResMut<'w, HeirloomTriggerCounts>,
+
     pub time_fragments: ResMut<'w, crate::player::currency::TimeFragmentCurrency>,
     pub player_health_percent: Res<'w, PlayerHealthPercent>,
     pub stand_still_query: Query<

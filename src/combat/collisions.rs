@@ -194,12 +194,11 @@ fn check_projectile_hit_mob_collisions(
     mut children: Query<&Parent>,
     mut status_check: Query<(Option<&Burning>, Option<&mut Slow>, Option<&Frail>)>,
     nearby_mobs: Query<(Entity, &GlobalTransform), With<Mob>>,
-    game: GameParam,
+    mut game: GameParam,
     mut status_event: EventWriter<StatusEffectEvent>,
     pet_check: Query<Entity, With<PetProjectileMarker>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut lifesteal_events: EventWriter<LifestealEvent>,
-    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for evt in collisions.iter() {
         let CollisionEvent::Started(e1, e2, _) = evt else {
@@ -304,7 +303,8 @@ fn check_projectile_hit_mob_collisions(
                 if let Ok(skills) = player_skills.get_single() {
                     let thorns_lifesteal_stacks = skills.get_count(Heirloom::ThornsLifesteal);
                     if thorns_lifesteal_stacks > 0 {
-                        trigger_counts.increment(Heirloom::ThornsLifesteal);
+                        game.heirloom_trigger_counts
+                            .increment(Heirloom::ThornsLifesteal);
                         lifesteal_events.send(LifestealEvent {
                             thorns_lifesteal_stacks,
                         });

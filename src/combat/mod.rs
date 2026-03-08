@@ -570,6 +570,7 @@ pub fn handle_hits(
                             let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
                             if current_mana.0 >= mana_cost {
                                 current_mana.0 -= mana_cost;
+                                game.heirloom_trigger_counts.increment(Heirloom::OnHitEcho);
                                 spawn_echo_hitbox(
                                     &mut commands,
                                     &asset_server,

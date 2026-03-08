@@ -354,6 +354,7 @@ pub fn setup_unlocks_ui(
             Vec3::new(-140., y, 11.),
             Vec3::new(110.5, y - 6.5, 11.),
             upgrades.as_ref(),
+            currency.as_ref(),
         );
     }
 
@@ -375,6 +376,7 @@ fn spawn_unlock_row(
     info_pos: Vec3,
     button_pos: Vec3,
     upgrades: &UnlockUpgrades,
+    currency: &TimeFragmentCurrency,
 ) {
     let title_name = format!("Unlock Row Title {}", kind.display_name());
     commands.spawn((
@@ -446,6 +448,18 @@ fn spawn_unlock_row(
 
     // Only show purchase button if unlock is not maxed
     let is_maxed = upgrades.is_maxed(kind);
+    let cost = upgrades.next_cost(kind);
+    let affordable = currency.time_fragments.max(0) as u32 >= cost;
+    let button_color = if affordable {
+        Color::WHITE
+    } else {
+        Color::rgb(0.55, 0.55, 0.55)
+    };
+    let label_color = if affordable {
+        crate::colors::WHITE
+    } else {
+        Color::rgb(0.7, 0.7, 0.7)
+    };
     let button_entity = commands
         .spawn(SpriteBundle {
             texture: graphics
@@ -453,6 +467,7 @@ fn spawn_unlock_row(
                 .clone(),
             sprite: Sprite {
                 custom_size: Some(Vec2::new(53., 18.)),
+                color: button_color,
                 ..Default::default()
             },
             transform: Transform::from_translation(button_pos),
@@ -483,7 +498,7 @@ fn spawn_unlock_row(
                     TextStyle {
                         font: asset_server.load("fonts/4x5.ttf"),
                         font_size: 5.0,
-                        color: crate::colors::WHITE,
+                        color: label_color,
                     },
                 )
                 .with_alignment(TextAlignment::Center),

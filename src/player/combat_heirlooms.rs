@@ -837,8 +837,7 @@ pub fn update_stone_tooth(
     frail_query: Query<&Frail>,
     mut hit_events: EventWriter<HitEvent>,
     graphics: Res<Graphics>,
-    game: GameParam,
-    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    mut game: GameParam,
 ) {
     let Ok((player_e, player_txfm, skills, mut state_option, mut curr_mana)) =
         player_query.get_single_mut()
@@ -963,7 +962,7 @@ pub fn update_stone_tooth(
         Heirloom::StoneTooth.get_mana_cost(),
     );
     if spawned > 0 {
-        trigger_counts.increment(Heirloom::StoneTooth);
+        game.heirloom_trigger_counts.increment(Heirloom::StoneTooth);
     }
 }
 

@@ -2,7 +2,7 @@ use crate::{
     colors::BLUE,
     player::{
         melee_skills::spawn_echo_hitbox,
-        skills::{Heirloom, PlayerSkills},
+        skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
         Player,
     },
     ui::{
@@ -33,6 +33,7 @@ pub fn handle_modify_health_event(
     >,
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut trigger_counts: ResMut<HeirloomTriggerCounts>,
 ) {
     for event in event.iter() {
         let (
@@ -59,6 +60,8 @@ pub fn handle_modify_health_event(
             let mana_cost = Heirloom::OnHitEcho.get_mana_cost();
             if current_mana.0 >= mana_cost {
                 current_mana.0 -= mana_cost;
+                trigger_counts.increment(Heirloom::OnHitEcho);
+
                 spawn_echo_hitbox(
                     &mut commands,
                     &asset_server,
