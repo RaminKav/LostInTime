@@ -19,7 +19,7 @@ use bevy::{prelude::*, sprite::Anchor};
 use bevy_aseprite::{anim::AsepriteAnimation, aseprite, AsepriteBundle};
 use bevy_rapier2d::prelude::{Collider, CollisionGroups, Group, KinematicCharacterController};
 
-use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 
 aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 
@@ -119,6 +119,7 @@ pub fn handle_sprint_timer(
 }
 pub fn handle_lunge(
     time: Res<Time>,
+    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
     mut query: Query<(
         Entity,
         &mut LungeState,
@@ -131,14 +132,13 @@ pub fn handle_lunge(
         &mut CurrentMana,
         &SkillPower,
     )>,
-    key_inputs: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
-    keybinds: Res<InputMappings>,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
+    let activated_slots: Vec<usize> = active_skill_events.iter().map(|ev| ev.slot).collect();
+
     for (
         e,
         mut lunge_state,
@@ -152,86 +152,84 @@ pub fn handle_lunge(
         skill_power,
     ) in query.iter_mut()
     {
-        if let Some(lunge_slot) = skills.has_active_skill(ActiveSkill::SprintLunge) {
-            if keybinds.check_skill_input(lunge_slot, &key_inputs, &mouse_input)
-                && lunge_state.lunge_cooldown_timer.finished()
-            {
-                lunge_state.lunge_cooldown_timer.reset();
+        let lunge_slot = skills.has_active_skill(ActiveSkill::SprintLunge);
+        let should_activate = lunge_slot
+            .map(|slot| activated_slots.contains(&slot))
+            .unwrap_or(false);
 
-                // LUNGE
-                commands.entity(e).insert(PlayerAnimation::Lunge);
-                commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.2));
+        if should_activate {
+            // Cooldown and gating are handled by dispatch_active_skill_events.
+            // Execute lunge mechanics without directly resetting the cooldown timer.
+            commands.entity(e).insert(PlayerAnimation::Lunge);
+            commands.spawn(SoundSpawner::new(AudioSoundEffect::Lunge, 0.2));
 
-                let angle = match dir {
-                    FacingDirection::Up => 0.,
-                    FacingDirection::Down => 0.,
-                    FacingDirection::Left => PI / 2.,
-                    FacingDirection::Right => PI / 2.,
-                };
-                let skill_power_mult =
-                    skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
-                let lunge_e = spawn_temp_collider(
-                    &mut commands,
-                    Transform::from_translation(Vec3::new(0., 0., 0.))
-                        .with_rotation(Quat::from_rotation_z(angle)),
-                    0.5,
-                    (dmg.0 as f32 * skill_power_mult * 0.85) as i32,
-                    Collider::cuboid(9., 1.5 * TILE_SIZE.x),
-                    Projectile::None,
-                );
-                commands.entity(lunge_e).set_parent(e);
+            let angle = match dir {
+                FacingDirection::Up => 0.,
+                FacingDirection::Down => 0.,
+                FacingDirection::Left => PI / 2.,
+                FacingDirection::Right => PI / 2.,
+            };
+            let skill_power_mult =
+                skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
+            let lunge_e = spawn_temp_collider(
+                &mut commands,
+                Transform::from_translation(Vec3::new(0., 0., 0.))
+                    .with_rotation(Quat::from_rotation_z(angle)),
+                0.5,
+                (dmg.0 as f32 * skill_power_mult * 0.85) as i32,
+                Collider::cuboid(9., 1.5 * TILE_SIZE.x),
+                Projectile::None,
+            );
+            commands.entity(lunge_e).set_parent(e);
 
-                // Skill Echo trigger: spawn an echo AoE at player position when using SprintLunge
-                if skills.has(Heirloom::SkillEcho) {
-                    let mana_cost = Heirloom::SkillEcho.get_mana_cost();
-                    if current_mana.0 >= mana_cost {
-                        current_mana.0 -= mana_cost;
+            if skills.has(Heirloom::SkillEcho) {
+                let mana_cost = Heirloom::SkillEcho.get_mana_cost();
+                if current_mana.0 >= mana_cost {
+                    current_mana.0 -= mana_cost;
 
-                        let echo_dmg = (dmg.0 as f32 * 1.) as i32;
-                        let size_mult = projectile_size
-                            .get_single()
-                            .map(|s| s.get_multiplier())
-                            .unwrap_or(1.0);
-                        crate::player::melee_skills::spawn_echo_hitbox(
-                            &mut commands,
-                            &asset_server,
-                            e,
-                            echo_dmg,
-                            size_mult,
-                        );
-                        trigger_counts.increment(Heirloom::SkillEcho);
-                    }
+                    let echo_dmg = (dmg.0 as f32 * 1.) as i32;
+                    let size_mult = projectile_size
+                        .get_single()
+                        .map(|s| s.get_multiplier())
+                        .unwrap_or(1.0);
+                    crate::player::melee_skills::spawn_echo_hitbox(
+                        &mut commands,
+                        &asset_server,
+                        e,
+                        echo_dmg,
+                        size_mult,
+                    );
+                    trigger_counts.increment(Heirloom::SkillEcho);
                 }
-
-                lunge_state.lunge_duration.tick(time.delta());
-                lunge_state.lunge_cooldown_timer.tick(time.delta());
-                mv.0 = mv.0 * 0.;
-            } else if lunge_state.lunge_duration.percent() != 0. {
-                lunge_state.lunge_duration.tick(time.delta());
-                if lunge_state.lunge_duration.percent() >= 0.20
-                    && lunge_state.lunge_duration.percent() <= 0.45
-                {
-                    commands
-                        .entity(e)
-                        .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-                    kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-                    mv.0 = mv.0 * lunge_state.lunge_speed;
-                } else if lunge_state.lunge_duration.percent() < 0.20 {
-                    mv.0 = mv.0 * 0.;
-                } else {
-                    commands
-                        .entity(e)
-                        .insert(CollisionGroups::new(Group::ALL, Group::ALL));
-                    kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
-                }
-
-                if lunge_state.lunge_duration.finished() {
-                    lunge_state.lunge_duration.reset();
-                    commands.entity(e).insert(PlayerAnimation::Walk);
-                }
-
-                kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
             }
+
+            lunge_state.lunge_duration.tick(time.delta());
+            mv.0 = mv.0 * 0.;
+        } else if lunge_state.lunge_duration.percent() != 0. {
+            lunge_state.lunge_duration.tick(time.delta());
+            if lunge_state.lunge_duration.percent() >= 0.20
+                && lunge_state.lunge_duration.percent() <= 0.45
+            {
+                commands
+                    .entity(e)
+                    .insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+                kcc.filter_groups = Some(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+                mv.0 = mv.0 * lunge_state.lunge_speed;
+            } else if lunge_state.lunge_duration.percent() < 0.20 {
+                mv.0 = mv.0 * 0.;
+            } else {
+                commands
+                    .entity(e)
+                    .insert(CollisionGroups::new(Group::ALL, Group::ALL));
+                kcc.filter_groups = Some(CollisionGroups::new(Group::ALL, Group::ALL));
+            }
+
+            if lunge_state.lunge_duration.finished() {
+                lunge_state.lunge_duration.reset();
+                commands.entity(e).insert(PlayerAnimation::Walk);
+            }
+
+            kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
         }
     }
 }

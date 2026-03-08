@@ -1904,18 +1904,22 @@ pub fn handle_update_player_skills(
                 .iter()
                 .find(|(idx, _, _)| *idx == *slot_index)
             {
-                // Skill didn't change - preserve cooldown state
-                // Apply cooldown multiplier to get the new remaining time
+                // Skill didn't change - preserve cooldown state.
+                // Use the skill's base cooldown multiplied by the CURRENT total multiplier
+                // to avoid compounding reductions when PlayerSkills changes multiple times.
                 let multiplier = new_skills.skill_cooldown_multiplier();
-                // Calculate what percentage of the original cooldown was elapsed
+                let base_cd = active_skill_option
+                    .as_ref()
+                    .map(|a| a.active_skill.get_base_cooldown())
+                    .unwrap_or(*original_duration);
+                let new_duration = base_cd * multiplier;
+
+                // Preserve the same fractional progress through the cooldown
                 let progress_percent = if *original_duration > 0.0 {
-                    *elapsed / *original_duration
+                    (*elapsed / *original_duration).clamp(0.0, 1.0)
                 } else {
                     0.0
                 };
-                // Calculate the new duration and elapsed time based on the multiplier
-                // The multiplier reduces the total cooldown, so we scale both duration and elapsed proportionally
-                let new_duration = *original_duration * multiplier;
                 let new_elapsed = new_duration * progress_percent;
 
                 spawn_skill_cooldown_overlay_with_elapsed(

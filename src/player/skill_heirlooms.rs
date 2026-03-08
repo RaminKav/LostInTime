@@ -232,15 +232,7 @@ pub fn handle_active_skill_event(
                     skill_power_multiplier(skill_power, blessings.get_skill_power_bonus());
                 match active.active_skill {
                     ActiveSkill::Stealth => {
-                        // respect cooldown if state exists and we're not using a charge
-                        if should_start_cooldown {
-                            if let Some(s) = stealth_state {
-                                if !s.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if stealth_state.is_some() {
                                 commands.entity(player_e).remove::<StealthState>();
                             }
@@ -278,14 +270,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Rapidfire => {
-                        if should_start_cooldown {
-                            if let Some(r) = rapid_state {
-                                if !r.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if rapid_state.is_some() {
                                 commands.entity(player_e).remove::<RapidfireState>();
                             }
@@ -321,14 +306,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::FirePillar => {
-                        if should_start_cooldown {
-                            if let Some(p) = pillar_state {
-                                if !p.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if pillar_state.is_some() {
                                 commands.entity(player_e).remove::<FirePillarState>();
                             }
@@ -361,13 +339,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::LaserBeam => {
-                        if should_start_cooldown {
-                            if let Some(l) = laser_beam_state {
-                                if !l.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if laser_beam_state.is_some() {
                                 commands.entity(player_e).remove::<LaserBeamState>();
                             }
@@ -400,14 +372,7 @@ pub fn handle_active_skill_event(
                             .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
                     }
                     ActiveSkill::Heal => {
-                        if should_start_cooldown {
-                            if let Some(h) = heal_state {
-                                if !h.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if heal_state.is_some() {
                                 commands.entity(player_e).remove::<HealSkillState>();
                             }
@@ -441,14 +406,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Buckshot => {
-                        if should_start_cooldown {
-                            if let Some(b) = buckshot_state {
-                                if !b.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if buckshot_state.is_some() {
                                 commands.entity(player_e).remove::<BuckshotSkillState>();
                             }
@@ -526,14 +484,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::Bow, 0.4));
                     }
                     ActiveSkill::IceWall => {
-                        if should_start_cooldown {
-                            if let Some(i) = icewall_state {
-                                if !i.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if icewall_state.is_some() {
                                 commands.entity(player_e).remove::<IceWallSkillState>();
                             }
@@ -566,14 +517,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                     ActiveSkill::DruidTree => {
-                        if should_start_cooldown {
-                            if let Some(d) = druidtree_state {
-                                if !d.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if druidtree_state.is_some() {
                                 commands.entity(player_e).remove::<DruidTreeSkillState>();
                             }
@@ -607,14 +551,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::Shout => {
-                        if should_start_cooldown {
-                            if let Some(s) = shout_state {
-                                if !s.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if shout_state.is_some() {
                                 commands.entity(player_e).remove::<ShoutSkillState>();
                             }
@@ -647,14 +584,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.12));
                     }
                     ActiveSkill::PiercingStar => {
-                        if should_start_cooldown {
-                            if let Ok(p) = skill_states.piercing_star_states.get(player_e) {
-                                if !p.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if skill_states.piercing_star_states.get(player_e).is_ok() {
                                 commands.entity(player_e).remove::<PiercingStarSkillState>();
                             }
@@ -699,14 +629,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::Claw, 0.2));
                     }
                     ActiveSkill::Sprint => {
-                        if should_start_cooldown {
-                            if let Some(s) = sprint_state {
-                                if !s.sprint_cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
-                            // If using a charge, remove any existing skill state to prevent blocking
+                        if !should_start_cooldown {
                             if sprint_state.is_some() {
                                 commands.entity(player_e).remove::<SprintState>();
                             }
@@ -746,13 +669,7 @@ pub fn handle_active_skill_event(
                         }
                     }
                     ActiveSkill::ParrySpear => {
-                        if should_start_cooldown {
-                            if let Some(s) = spear_state {
-                                if !s.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if spear_state.is_some() {
                                 commands.entity(player_e).remove::<SpearState>();
                             }
@@ -772,13 +689,7 @@ pub fn handle_active_skill_event(
                         });
                     }
                     ActiveSkill::SprintLunge => {
-                        if should_start_cooldown {
-                            if let Some(l) = lunge_state {
-                                if !l.lunge_cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if lunge_state.is_some() {
                                 commands.entity(player_e).remove::<LungeState>();
                             }
@@ -799,13 +710,7 @@ pub fn handle_active_skill_event(
                         });
                     }
                     ActiveSkill::Lightning => {
-                        if should_start_cooldown {
-                            if let Some(l) = lightning_state {
-                                if !l.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if lightning_state.is_some() {
                                 commands.entity(player_e).remove::<LightningState>();
                             }
@@ -851,13 +756,7 @@ pub fn handle_active_skill_event(
                             .spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.4));
                     }
                     ActiveSkill::DaggerThrow => {
-                        if should_start_cooldown {
-                            if let Some(d) = daggerthrow_state {
-                                if !d.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if daggerthrow_state.is_some() {
                                 commands.entity(player_e).remove::<DaggerThrowState>();
                             }
@@ -920,13 +819,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                     ActiveSkill::DaggerSlash => {
-                        if should_start_cooldown {
-                            if let Some(s) = slash_state {
-                                if !s.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if slash_state.is_some() {
                                 commands.entity(player_e).remove::<SlashState>();
                             }
@@ -961,13 +854,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::SwordSwing, 0.3));
                     }
                     ActiveSkill::TripleThrow => {
-                        if should_start_cooldown {
-                            if let Some(t) = triplethrow_state {
-                                if !t.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if triplethrow_state.is_some() {
                                 commands.entity(player_e).remove::<TripleThrowState>();
                             }
@@ -1009,13 +896,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
                     }
                     ActiveSkill::Fury => {
-                        if should_start_cooldown {
-                            if let Some(f) = fury_state {
-                                if !f.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if fury_state.is_some() {
                                 commands.entity(player_e).remove::<FuryState>();
                             }
@@ -1032,13 +913,7 @@ pub fn handle_active_skill_event(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.2));
                     }
                     ActiveSkill::Bomb => {
-                        if should_start_cooldown {
-                            if let Some(b) = bomb_state {
-                                if !b.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if bomb_state.is_some() {
                                 commands.entity(player_e).remove::<BombState>();
                             }
@@ -1079,13 +954,7 @@ pub fn handle_active_skill_event(
                         });
                     }
                     ActiveSkill::SpinAttack => {
-                        if should_start_cooldown {
-                            if let Some(s) = spinattack_state {
-                                if !s.cooldown_timer.finished() {
-                                    continue;
-                                }
-                            }
-                        } else {
+                        if !should_start_cooldown {
                             if spinattack_state.is_some() {
                                 commands.entity(player_e).remove::<SpinAttackState>();
                             }
@@ -1940,6 +1809,7 @@ pub fn reduce_skill_cooldown_on_crit(
     mut teleport_states: Query<&mut TeleportState, With<Player>>,
     mut laser_beam_states: Query<&mut LaserBeamState, With<Player>>,
     mut spinattack_states: Query<&mut SpinAttackState, With<Player>>,
+    mut cooldown_overlays: Query<&mut crate::ui::SkillCooldownOverlay>,
 ) {
     for hit in hit_events.iter() {
         // Only process crits from player attacks (not from mobs hitting player)
@@ -2124,6 +1994,16 @@ pub fn reduce_skill_cooldown_on_crit(
                             .cooldown_timer
                             .tick(Duration::from_secs_f32(reduction));
                     }
+                }
+            }
+
+            // Also tick SkillCooldownOverlay timers for non-charge-tracked slots (slot 4+).
+            // Slots 0-3 use charge trackers (already ticked above); slot 4 overlays have
+            // their own independent timer that drives the HUD display and must be kept in sync.
+            for mut overlay in cooldown_overlays.iter_mut() {
+                // Only tick overlays that are not backed by a charge tracker (index >= 4)
+                if overlay.index >= 4 && !overlay.timer.finished() {
+                    overlay.timer.tick(Duration::from_secs_f32(reduction));
                 }
             }
 

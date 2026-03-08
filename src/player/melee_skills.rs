@@ -27,7 +27,7 @@ use crate::{
 };
 
 use super::combat_heirlooms::TriggerSummonsEvent;
-use super::{ActiveSkill, Heirloom, Player, PlayerSkills};
+use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, Player, PlayerSkills};
 aseprite!(pub Echo, "textures/effects/OnHitAoE.aseprite");
 
 #[derive(Component)]
@@ -268,6 +268,7 @@ pub fn handle_parry(
     }
 }
 pub fn handle_spear(
+    mut active_skill_events: EventReader<ActiveSkillUsedEvent>,
     mut player: Query<
         (
             Entity,
@@ -278,58 +279,54 @@ pub fn handle_spear(
             &mut KinematicCharacterController,
             &mut MovementVector,
         ),
-        (With<Player>,),
+        With<Player>,
     >,
-    key_input: Res<Input<KeyCode>>,
-    mouse_input: Res<Input<MouseButton>>,
     mut commands: Commands,
     time: Res<Time>,
     cursor_pos: Res<CursorPos>,
-    keybinds: Res<crate::keybinds::InputMappings>,
     mut ranged_attack_events: EventWriter<RangedAttackEvent>,
 ) {
-    let Ok((e, player_pos, skills, dmg, mut spear_state, mut kcc, mut mv)) =
+    let Ok((e, player_pos, skills, _dmg, mut spear_state, mut kcc, mut mv)) =
         player.get_single_mut()
     else {
         return;
     };
 
-    if let Some(spear_slot) = skills.has_active_skill(ActiveSkill::ParrySpear) {
-        if keybinds.check_skill_input(spear_slot, &key_input, &mouse_input)
-            && spear_state.cooldown_timer.finished()
-        {
-            spear_state.cooldown_timer.reset();
-            spear_state.spear_timer.tick(time.delta());
-            commands.entity(e).insert(PlayerAnimation::Spear);
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.2));
-            commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.3).with_delay(0.32));
+    // Collect activated slots from events this frame (event-driven, no direct input check)
+    let spear_slot = skills.has_active_skill(ActiveSkill::ParrySpear);
+    let should_activate = spear_slot
+        .map(|slot| active_skill_events.iter().any(|ev| ev.slot == slot))
+        .unwrap_or(false);
 
-            // Calculate epicenter position in front of player
-            let player_pos_2d = player_pos.translation().truncate();
-            let direction =
-                (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
-            let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
+    if should_activate {
+        // Cooldown and gating are fully handled by dispatch_active_skill_events.
+        // Fire spear mechanics here without resetting the cooldown timer.
+        spear_state.spear_timer.tick(time.delta());
+        commands.entity(e).insert(PlayerAnimation::Spear);
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::Spear, 0.2));
+        commands.spawn(SoundSpawner::new(AudioSoundEffect::SpearPull, 0.3).with_delay(0.32));
 
-            // Add delay component to time with animation (brief delay before pull)
-            commands.entity(e).insert(SpearPullDelay {
-                delay_timer: Timer::from_seconds(0.45, TimerMode::Once), // Delay to sync with animation
-                epicenter,
-            });
-            ranged_attack_events.send(RangedAttackEvent {
-                projectile: Projectile::SpearGravity,
-                direction: Vec2::ZERO,
-                mana_cost: None,
-                from_enemy: false,
-                from_entity: None,
-                is_followup_proj: false,
-                dmg_override: None,
-                pos_override: Some(epicenter),
-                spawn_delay: 0.2,
-            });
+        let player_pos_2d = player_pos.translation().truncate();
+        let direction = (cursor_pos.world_coords.truncate() - player_pos_2d).normalize_or_zero();
+        let epicenter = player_pos_2d + direction * 1.7 * TILE_SIZE.x;
 
-            // ActiveSkillUsedEvent dispatched centrally
-        }
+        commands.entity(e).insert(SpearPullDelay {
+            delay_timer: Timer::from_seconds(0.45, TimerMode::Once),
+            epicenter,
+        });
+        ranged_attack_events.send(RangedAttackEvent {
+            projectile: Projectile::SpearGravity,
+            direction: Vec2::ZERO,
+            mana_cost: None,
+            from_enemy: false,
+            from_entity: None,
+            is_followup_proj: false,
+            dmg_override: None,
+            pos_override: Some(epicenter),
+            spawn_delay: 0.2,
+        });
     }
+
     if spear_state.spear_timer.percent() != 0. {
         spear_state.spear_timer.tick(time.delta());
         if spear_state.spear_timer.just_finished() {
@@ -339,6 +336,7 @@ pub fn handle_spear(
         mv.0 = mv.0 * 0.;
         kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
     }
+    // Tick cooldown timer so dispatch_active_skill_events can gate correctly for slot 4
     spear_state.cooldown_timer.tick(time.delta());
 }
 

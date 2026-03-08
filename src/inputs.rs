@@ -532,38 +532,40 @@ pub fn dispatch_active_skill_events(
             let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
 
             // Check charges — slot index maps to tracker: 0→Slot1, 1→Slot2, 2→Slot3, 3→Slot4
-            let has_charge = match slot {
+            // For charge-tracked slots, the tracker is the single source of truth:
+            // if the tracker exists, only fire when charges > 0 (never fall through to state checks).
+            let tracker_result = match slot {
                 0 => slot1_trackers
                     .get_single()
                     .ok()
-                    .map(|t| t.0.current_charges > 0)
-                    .unwrap_or(false),
+                    .map(|t| t.0.current_charges > 0),
                 1 => slot2_trackers
                     .get_single()
                     .ok()
-                    .map(|t| t.0.current_charges > 0)
-                    .unwrap_or(false),
+                    .map(|t| t.0.current_charges > 0),
                 2 => slot3_trackers
                     .get_single()
                     .ok()
-                    .map(|t| t.0.current_charges > 0)
-                    .unwrap_or(false),
+                    .map(|t| t.0.current_charges > 0),
                 3 => slot4_trackers
                     .get_single()
                     .ok()
-                    .map(|t| t.0.current_charges > 0)
-                    .unwrap_or(false),
-                _ => false,
+                    .map(|t| t.0.current_charges > 0),
+                _ => None,
             };
-            if has_charge {
-                ev.send(ActiveSkillUsedEvent {
-                    slot,
-                    cooldown: effective_cd,
-                });
+            if let Some(has_charge) = tracker_result {
+                // Tracker exists for this slot — it is the sole gatekeeper
+                if has_charge {
+                    ev.send(ActiveSkillUsedEvent {
+                        slot,
+                        cooldown: effective_cd,
+                    });
+                }
+                // Whether charges are available or not, do not fall through to state checks
                 return;
             }
 
-            // Otherwise, check cooldown as normal
+            // No charge tracker for this slot — check cooldown state as normal
             let on_cooldown = match skill {
                 ActiveSkill::Roll => true, // Handled entirely in player_move_inputs
                 ActiveSkill::Sprint => sprint_state
