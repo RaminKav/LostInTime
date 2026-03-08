@@ -8,6 +8,7 @@ use crate::{
         modifiers::ModifyManaEvent, Attack, CurrentMana, ManaRegen, MaxMana, ProjectileSize,
     },
     audio::{AudioSoundEffect, SoundSpawner},
+    client::is_not_paused,
     combat::AttackTimer,
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -196,7 +197,7 @@ impl Plugin for RangedAttackPlugin {
         app.add_event::<RangedAttackEvent>().add_systems(
             (
                 handle_ranged_attack_event,
-                handle_translate_projectiles,
+                handle_translate_projectiles.run_if(is_not_paused),
                 handle_spawn_projectiles_after_delay,
             )
                 .in_set(OnUpdate(GameState::Main)),

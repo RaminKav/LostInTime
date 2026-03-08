@@ -148,6 +148,7 @@ impl Plugin for UIPlugin {
             .add_event::<SubmitEssenceChoice>()
             .add_event::<DropInWorldEvent>()
             .add_event::<MenuButtonClickEvent>()
+            .add_event::<GrantHeirloomDevEvent>()
             .add_plugin(Material2dPlugin::<ScreenEffectMaterial>::default())
             .register_type::<InventorySlotState>()
             .add_plugin(MinimapPlugin)
@@ -553,6 +554,7 @@ impl Plugin for UIPlugin {
                     update_skill_choice_count_text.run_if(in_state(UIState::Skills)),
                     handle_cursor_inventory_upgrade_button.run_if(in_state(UIState::Inventory)),
                     handle_dev_button_clicks.run_if(in_state(UIState::Inventory)),
+                    apply_grant_heirloom_dev.run_if(in_state(UIState::Inventory)),
                     setup_furnace_slots_ui.run_if(in_state(UIState::Furnace)),
                 )
                     .in_set(OnUpdate(GameState::Main)),

@@ -8,10 +8,13 @@ use crate::cursor::CursorPos;
 use crate::custom_commands::CommandsExt;
 use crate::item::ammo::Ammo;
 use crate::night::EraTimer;
+use crate::player::skills::{Heirloom, HeirloomRarity, HeirloomWithRarity, PlayerSkills};
+use crate::player::unlocks::RunUnlockState;
 use crate::player::ModifyCurencyEvent;
 use crate::proto::proto_param::ProtoParam;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
 use crate::GameParam;
+use crate::Player;
 use crate::{
     assets::Graphics,
     attributes::{add_item_glows, AttributeChangeEvent},
@@ -64,6 +67,9 @@ impl UIState {
     }
 }
 
+/// Event to grant an heirloom from dev mode (handled in a separate system to avoid query conflicts).
+pub struct GrantHeirloomDevEvent(pub Heirloom);
+
 #[derive(Component, Default, Clone)]
 pub struct InventoryUI;
 
@@ -81,6 +87,8 @@ pub enum DevButtonAction {
     AddChaos,
     AddGold,
     DropDungeonKey,
+    AddBanishCount,
+    AddLoadedDice,
 }
 #[derive(Component, FromReflect, Reflect, Clone, Debug)]
 pub struct InventorySlotState {
@@ -266,7 +274,7 @@ pub fn setup_inv_ui(
         // Left of inventory panel in local space (inv center is 22, 0.5 in world; panel half-width 109)
         let dev_x = -INVENTORY_UI_SIZE.x / 2. - DEV_BUTTON_WIDTH / 2. - 130.;
         let start_y = 48.0f32;
-        let labels: [(DevButtonAction, &str); 11] = [
+        let labels: [(DevButtonAction, &str); 13] = [
             (DevButtonAction::GrantXp, "+250 xp"),
             (DevButtonAction::GrantMoreXp, "+1000 xp"),
             (DevButtonAction::SpawnChest, "chest"),
@@ -278,6 +286,8 @@ pub fn setup_inv_ui(
             (DevButtonAction::AddChaos, "+chaos"),
             (DevButtonAction::AddGold, "+50 gold"),
             (DevButtonAction::DropDungeonKey, "key"),
+            (DevButtonAction::AddBanishCount, "+banish"),
+            (DevButtonAction::AddLoadedDice, "Loaded Dice"),
         ];
         for (i, (action, label)) in labels.iter().enumerate() {
             let y = start_y - i as f32 * DEV_BUTTON_SPACING;
@@ -930,6 +940,8 @@ pub fn handle_dev_button_clicks(
     mut era_timer: ResMut<EraTimer>,
     mut chaos_tracker: ResMut<ChaosTracker>,
     mut currency_event: EventWriter<ModifyCurencyEvent>,
+    mut run_unlock_state: ResMut<RunUnlockState>,
+    mut grant_heirloom_dev: EventWriter<GrantHeirloomDevEvent>,
 ) {
     let hit_test = super::ui_helpers::pointcast_2d(&cursor_pos, &ui_sprites, None);
     let left_mouse_pressed = mouse_input.just_pressed(MouseButton::Left);
@@ -1026,6 +1038,15 @@ pub fn handle_dev_button_clicks(
                             None,
                         );
                     }
+                    DevButtonAction::AddBanishCount => {
+                        run_unlock_state.banishes_remaining =
+                            run_unlock_state.banishes_remaining.saturating_add(1);
+                        run_unlock_state.banishes_total =
+                            run_unlock_state.banishes_total.saturating_add(1);
+                    }
+                    DevButtonAction::AddLoadedDice => {
+                        grant_heirloom_dev.send(GrantHeirloomDevEvent(Heirloom::LoadedDice));
+                    }
                 }
                 commands.spawn(crate::audio::SoundSpawner::new(
                     crate::audio::AudioSoundEffect::ButtonClick,
@@ -1034,6 +1055,25 @@ pub fn handle_dev_button_clicks(
             }
         } else if matches!(interactable.current(), Interaction::Hovering) {
             interactable.change(Interaction::None);
+        }
+    }
+}
+
+/// Applies dev-mode heirloom grants (separate system to avoid GameParam query conflict).
+pub fn apply_grant_heirloom_dev(
+    mut grant_events: EventReader<GrantHeirloomDevEvent>,
+    mut player_query: Query<(Entity, &mut PlayerSkills), With<Player>>,
+    mut commands: Commands,
+    mut att_event: EventWriter<AttributeChangeEvent>,
+) {
+    for GrantHeirloomDevEvent(heirloom) in grant_events.iter() {
+        if let Ok((player_entity, mut skills)) = player_query.get_single_mut() {
+            skills.heirlooms.push(HeirloomWithRarity {
+                heirloom: heirloom.clone(),
+                rarity: HeirloomRarity::Uncommon,
+            });
+            heirloom.add_heirloom_components(player_entity, &mut commands, skills.clone());
+            att_event.send(AttributeChangeEvent);
         }
     }
 }

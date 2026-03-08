@@ -1413,7 +1413,7 @@ pub fn handle_skill_power_hunt(
 
     let mut rng = rand::thread_rng();
     for _ in skill_events.iter() {
-        if rng.gen_ratio((count * 5).min(100) as u32, 100) {
+        if rng.gen_ratio((count * 7).min(100) as u32, 100) {
             tracker.bonus_skill_power += 1;
             attribute_events.send_default();
             trigger_counts.increment(Heirloom::SkillPowerHunt);

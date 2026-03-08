@@ -1309,7 +1309,7 @@ impl Heirloom {
             }
             Heirloom::SkillPowerHunt => {
                 vec![
-                    "5% chance when using".to_string(),
+                    "7% chance when using".to_string(),
                     "a skill to gain +1".to_string(),
                     "Skill Power.".to_string(),
                 ]
