@@ -5,6 +5,7 @@ use crate::{
     assets::Graphics,
     attributes::{Attack, BonusDamage, CurrentHealth, MaxHealth},
     colors::{BLACK, DMG_NUM_GREEN, DMG_NUM_ORANGE, DMG_NUM_PURPLE, DMG_NUM_RED, DMG_NUM_YELLOW},
+    enemy::Mob,
     inventory::ItemStack,
     item::WorldObject,
     ui::CheatSettings,
@@ -105,6 +106,7 @@ pub fn handle_add_damage_numbers_after_hit(
             Option<&MaxHealth>,
             Option<&WasHitWithCrit>,
             Option<&WasHitWithOvercrit>,
+            Option<&Mob>,
         ),
         Changed<CurrentHealth>,
     >,
@@ -114,10 +116,20 @@ pub fn handle_add_damage_numbers_after_hit(
     game: Res<Game>,
     cheat_settings: Option<Res<CheatSettings>>,
 ) {
-    for (e, changed_health, mut prev_health, max_health, crit_option, overcrit_option) in
-        changed_health.iter_mut()
+    for (
+        e,
+        changed_health,
+        mut prev_health,
+        max_health,
+        crit_option,
+        overcrit_option,
+        mob_option,
+    ) in changed_health.iter_mut()
     {
         let delta = changed_health.0 - prev_health.0;
+        if mob_option.is_some() && delta > 0 {
+            continue;
+        }
         let was_over_max = prev_health.0 > max_health.map_or(i32::MAX, |mh| mh.0);
 
         prev_health.0 = changed_health.0;

@@ -29,7 +29,7 @@ pub struct InfiniteMode {
 }
 
 /// Maximum difficulty level in infinite mode (Tier 1: 1-5, Tier 2: 6-10)
-pub const MAX_DIFFICULTY_LEVEL: u8 = 10;
+pub const MAX_DIFFICULTY_LEVEL: u8 = 15;
 /// Seconds between difficulty increases
 pub const DIFFICULTY_INCREASE_INTERVAL: f32 = 90.0; // 1.5 minutes
 /// Endless chaos: smooth power-law chaos(elapsed) = COEFFICIENT * elapsed_seconds^EXPONENT.
@@ -128,10 +128,24 @@ impl InfiniteMode {
     /// Get the chaos bonus multiplier for the current tier
     /// Tier 1: 1x (default), Tier 2: 3x (triple)
     pub fn get_chaos_multiplier(&self) -> f32 {
-        if self.difficulty_level <= 5 {
-            1.0
-        } else {
-            1.25
+        match self.difficulty_level {
+            0 => 1.,
+            1 => 1.,
+            2 => 1.03,
+            3 => 1.08,
+            4 => 1.13,
+            5 => 1.2, // 7.5min
+            6 => 1.3,
+            7 => 1.42,
+            8 => 1.55,
+            9 => 1.7,
+            10 => 1.87,
+            11 => 2.05,
+            12 => 2.22,
+            13 => 2.4,
+            14 => 2.6,
+            15 => 3.0,
+            _ => 3.0,
         }
     }
 }
