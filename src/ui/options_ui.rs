@@ -318,7 +318,7 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(left_side_x, 50., 11.)),
+            transform: Transform::from_translation(Vec3::new(left_side_x, 90., 11.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -326,7 +326,7 @@ pub fn setup_options_ui(
         Name::new("Keybind Section Title"),
     ));
 
-    let start_y = 26.5;
+    let start_y = 66.5;
     let row_spacing = -16.0;
 
     // Skill slot keybinds (slots 0-3)
@@ -429,7 +429,7 @@ pub fn setup_options_ui(
     }
 
     // Cheats section
-    let cheats_section_y = 50.;
+    let cheats_section_y = 90.;
     commands.spawn((
         Text2dBundle {
             text: Text::from_section(
@@ -451,7 +451,7 @@ pub fn setup_options_ui(
     ));
 
     // Unlock all classes checkbox
-    let checkbox_y = 30.;
+    let checkbox_y = 70.;
     spawn_options_checkbox(
         &mut commands,
         &graphics,
@@ -535,7 +535,7 @@ pub fn setup_options_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(100., -148., 11.),
+        Vec3::new(240., -148., 11.),
         &mut commands,
         &graphics,
         &asset_server,
