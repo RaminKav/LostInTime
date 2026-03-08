@@ -1347,6 +1347,7 @@ impl Heirloom {
             ],
             Heirloom::LifestealCoins => vec![
                 "Lifesteal triggers".to_string(),
+                "have a 20% chance to".to_string(),
                 "give you a coin.".to_string(),
                 "Gain +5% Lifesteal.".to_string(),
             ],

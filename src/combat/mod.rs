@@ -859,7 +859,8 @@ pub fn handle_lifesteal(
                 modify_health_events.send(ModifyHealthEvent(heal_amount));
 
                 // LifestealCoins: Spawn a coin for each lifesteal proc
-                if skills.has(Heirloom::LifestealCoins) {
+                let count = skills.get_count(Heirloom::LifestealCoins) as f64;
+                if count > 0. && rng.gen_bool((count * 0.2).min(1.)) {
                     let d = 32.0;
                     let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
                     proto_commands.spawn_item_from_proto(
