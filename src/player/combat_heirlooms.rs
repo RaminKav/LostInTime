@@ -54,8 +54,8 @@ const REAPER_SOUL_DRIFT_STRENGTH: f32 = 0.75;
 const REAPER_SOUL_DRIFT_FREQ: f32 = 10.5;
 
 /// Summon Ring: piercing ring that travels in a line and bounces off solid objects.
-const SUMMON_RING_COOLDOWN: f32 = 3.5;
-const SUMMON_RING_SPEED: f32 = 160.0;
+const SUMMON_RING_COOLDOWN: f32 = 3.;
+const SUMMON_RING_SPEED: f32 = 230.0;
 const SUMMON_RING_LIFETIME: f32 = 2.2;
 const SUMMON_RING_COLLIDER_RADIUS: f32 = 10.0;
 
@@ -723,8 +723,11 @@ pub fn update_summon_ring(
                     } else {
                         Vec2::new(0.0, delta.y.signum())
                     };
-                    let nudge = SUMMON_RING_COLLIDER_RADIUS + 6.0;
+                    let nudge = SUMMON_RING_COLLIDER_RADIUS - 4.0;
                     transform.translation += (push_dir * nudge).extend(0.0);
+                    // Only one bounce per frame to avoid double-reflection from multiple
+                    // intersections (e.g. same wall reported twice or corner with two colliders).
+                    break;
                 }
             }
         }
