@@ -639,15 +639,15 @@ pub fn handle_spawn_inv_item_tooltip(
                             } else {
                                 break;
                             }
+                        } else if attr_name.contains("Attacks / sec") {
+                            // Hits/s is always a base attribute (attack_cooldown); check before " Attack" so we don't break (no range text)
+                            count += 1;
                         } else if attr_name.contains(" Attack") && !attr_name.contains("Speed") {
                             if has_range {
                                 count += 1;
                             } else {
                                 break;
                             }
-                        } else if attr_name.contains("Attacks / sec") {
-                            // Hits/s is always a base attribute (attack_cooldown), no range text but it's base
-                            count += 1;
                         } else {
                             // We've hit a bonus stat line (different pattern, no range text)
                             break;
@@ -694,8 +694,7 @@ pub fn handle_spawn_inv_item_tooltip(
                     filtered_index
                 };
 
-                // Tooltip index = 1 (name) + num_base_attrs + filtered_buff_line_index
-                let tooltip_index = 1 + num_base_attrs + filtered_buff_line_index;
+                let tooltip_index = num_base_attrs + filtered_buff_line_index;
                 if i == tooltip_index && i > 0 {
                     let box_x = 0.0;
                     let box_y = size.y / 2. - 99. - (i as f32 * 9.) - props.offset;

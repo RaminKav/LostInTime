@@ -287,50 +287,75 @@ fn handle_enemy_death(
             );
         }
 
-        // KillLightning: Killing an enemy has a 1% chance per stack to spawn a lightning strike on a random nearby enemy
+        // KillLightning: 20% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
         let kill_lightning_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
         if kill_lightning_stacks > 0 {
             let mut rng = rand::thread_rng();
-            if rng.gen_ratio(kill_lightning_stacks as u32 * 5, 100) {
-                // Find nearby enemies (within 200 units)
-                let death_pos = death_event.enemy_pos;
-                let nearby_enemies: Vec<(Entity, Vec2)> = enemies
-                    .iter()
-                    .filter_map(|(e, txfm)| {
-                        let enemy_pos = txfm.translation().truncate();
-                        let distance = death_pos.distance(enemy_pos);
-                        if distance <= 200.0 && distance > 0.0 {
-                            Some((e, enemy_pos))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                if !nearby_enemies.is_empty() {
-                    // Pick a random nearby enemy
-                    if let Some((_, target_pos)) = nearby_enemies.choose(&mut rng) {
-                        if let Ok((_, attack)) = player_query.get_single() {
-                            let lightning_damage = attack.0; // 100% damage
-                            trigger_counts.increment(Heirloom::KillLightning);
-                            ranged_attack_event.send(RangedAttackEvent {
-                                projectile: crate::item::projectile::Projectile::Lightning,
-                                direction: Vec2::ZERO,
-                                mana_cost: Some(5),
-                                from_enemy: false,
-                                from_entity: None,
-                                is_followup_proj: false,
-                                dmg_override: Some(lightning_damage),
-                                pos_override: Some(*target_pos + Vec2::new(0., 48.)),
-                                spawn_delay: 0.0,
-                            });
-                            commands.spawn(SoundSpawner::new(
-                                AudioSoundEffect::LightningStaffCast,
-                                0.2,
-                            ));
-                        }
+            let chance_pct = (kill_lightning_stacks as u32 * 20).min(200); // cap at 200% (1 guaranteed + 100% second)
+            let death_pos = death_event.enemy_pos;
+            let nearby_enemies: Vec<(Entity, Vec2)> = enemies
+                .iter()
+                .filter_map(|(e, txfm)| {
+                    let enemy_pos = txfm.translation().truncate();
+                    let distance = death_pos.distance(enemy_pos);
+                    if distance <= 200.0 && distance > 0.0 {
+                        Some((e, enemy_pos))
+                    } else {
+                        None
                     }
+                })
+                .collect();
+
+            if nearby_enemies.is_empty() {
+                continue;
+            }
+
+            let mut num_procs = 0u32;
+            if chance_pct >= 100 {
+                num_procs = 1;
+                if chance_pct > 100 {
+                    let extra_pct = (chance_pct - 100).min(100);
+                    if rng.gen_ratio(extra_pct, 100) {
+                        num_procs = 2;
+                    }
+                }
+            } else if rng.gen_ratio(chance_pct, 100) {
+                num_procs = 1;
+            }
+
+            if let Ok((_, attack)) = player_query.get_single() {
+                let lightning_damage = attack.0;
+                let mut chosen: Vec<usize> = Vec::new();
+                for _ in 0..num_procs {
+                    // Prefer a different enemy for subsequent procs
+                    let candidates: Vec<usize> = (0..nearby_enemies.len())
+                        .filter(|&i| !chosen.contains(&i))
+                        .collect();
+                    let idx = if candidates.is_empty() {
+                        (0..nearby_enemies.len())
+                            .collect::<Vec<_>>()
+                            .choose(&mut rng)
+                            .copied()
+                            .unwrap_or(0)
+                    } else {
+                        *candidates.choose(&mut rng).unwrap_or(&0)
+                    };
+                    chosen.push(idx);
+                    let target_pos = nearby_enemies[idx].1;
+                    trigger_counts.increment(Heirloom::KillLightning);
+                    ranged_attack_event.send(RangedAttackEvent {
+                        projectile: crate::item::projectile::Projectile::Lightning,
+                        direction: Vec2::ZERO,
+                        mana_cost: Some(5),
+                        from_enemy: false,
+                        from_entity: None,
+                        is_followup_proj: false,
+                        dmg_override: Some(lightning_damage),
+                        pos_override: Some(target_pos + Vec2::new(0., 48.)),
+                        spawn_delay: 0.0,
+                    });
+                    commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
                 }
             }
         }

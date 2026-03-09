@@ -5,8 +5,8 @@ use strum_macros::{Display, EnumIter};
 
 use crate::assets::Graphics;
 use crate::attributes::{BonusDamage, CritChance, CritDamage};
-use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::enemy::red_mushking::DeathState;
+use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::Player;
 use rand::Rng;
 
@@ -216,10 +216,7 @@ pub fn handle_burning_ticks(
     mut commands: Commands,
     mut status_event: EventWriter<StatusEffectEvent>,
     mut hit_event: EventWriter<HitEvent>,
-    player_skills: Query<
-        (&PlayerSkills, &BonusDamage, &CritChance, &CritDamage),
-        With<Player>,
-    >,
+    player_skills: Query<(&PlayerSkills, &BonusDamage, &CritChance, &CritDamage), With<Player>>,
 ) {
     // Get poison strength and crit from player (if player exists)
     let Ok((skills, bonus_damage, crit_chance, crit_damage)) = player_skills.get_single() else {
@@ -233,8 +230,7 @@ pub fn handle_burning_ticks(
     let total_crit_chance_raw = crit_chance.0.try_into().unwrap_or(0_u32);
     let effective_crit_chance = total_crit_chance_raw.min(200);
     let overflow_crit_damage = total_crit_chance_raw.saturating_sub(200) as i32;
-    let crit_multiplier =
-        f32::abs((crit_damage.0 + overflow_crit_damage) as f32) / 100.0;
+    let crit_multiplier = f32::abs((crit_damage.0 + overflow_crit_damage) as f32) / 100.0;
 
     let mut rng = rand::thread_rng();
 
@@ -245,7 +241,7 @@ pub fn handle_burning_ticks(
             if burning.tick_timer.just_finished() {
                 // Damage = stacks + bonus damage from PoisonStrength heirloom
                 let base_damage = burning.stacks as i32;
-                let mut damage = base_damage + poison_strength_bonus.round() as i32;
+                let mut damage = base_damage * poison_strength_bonus.round() as i32;
 
                 // Frail multiplier: 1.1x per stack (same as other damage)
                 let frail_stacks = frail_option.map(|f| f.num_stacks).unwrap_or(0);

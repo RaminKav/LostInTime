@@ -1372,7 +1372,7 @@ pub fn spawn_skill_tooltip_content(
     const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
     const BODY_FONT_SIZE: f32 = 8.4;
     // Cooldown text: top right, same y as title (TEXT_Y_OFFSET + 6)
-    const COOLDOWN_TEXT_X: f32 = 187.;
+    const COOLDOWN_TEXT_X: f32 = 181.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
 
     let active_skill_icon = graphics.get_active_skill_icon(active_skill.clone());
@@ -2537,9 +2537,11 @@ pub fn update_skill_tooltip_cooldown(
         };
         let slot_index = tooltip_skill.0;
 
-        let remaining = if Some(slot_index) == roll_slot {
+        let (remaining, max_cooldown) = if Some(slot_index) == roll_slot {
             let dash = &game.player_state.player_dash_cooldown;
-            (dash.duration().as_secs_f32() - dash.elapsed().as_secs_f32()).max(0.0)
+            let max = dash.duration().as_secs_f32();
+            let remaining = (max - dash.elapsed().as_secs_f32()).max(0.0);
+            (remaining, max)
         } else {
             let tracker_opt = match slot_index {
                 0 => slot1_trackers.get_single().ok().map(|t| &t.0),
@@ -2549,28 +2551,30 @@ pub fn update_skill_tooltip_cooldown(
                 _ => None,
             };
             if let Some(tracker) = tracker_opt {
-                if tracker.current_charges < tracker.max_charges {
-                    let d = tracker.cooldown_timer.duration().as_secs_f32();
-                    let e = tracker.cooldown_timer.elapsed().as_secs_f32();
-                    (d - e).max(0.0)
+                let max = tracker.cooldown_timer.duration().as_secs_f32();
+                let remaining = if tracker.current_charges < tracker.max_charges {
+                    (max - tracker.cooldown_timer.elapsed().as_secs_f32()).max(0.0)
                 } else {
                     0.0
-                }
+                };
+                (remaining, max)
             } else {
                 overlays
                     .iter()
                     .find(|o| o.index == slot_index)
                     .map(|o| {
-                        let d = o.timer.duration().as_secs_f32();
-                        let e = o.timer.elapsed().as_secs_f32();
-                        (d - e).max(0.0)
+                        let max = o.timer.duration().as_secs_f32();
+                        let remaining = (max - o.timer.elapsed().as_secs_f32()).max(0.0);
+                        (remaining, max)
                     })
-                    .unwrap_or(0.0)
+                    .unwrap_or((0.0, 0.0))
             }
         };
 
         text.sections[0].value = if remaining > 0.05 {
             format!("{:.1}s", remaining)
+        } else if max_cooldown > 0.0 {
+            format!("{:.1}s", max_cooldown)
         } else {
             String::new()
         };

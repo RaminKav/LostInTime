@@ -1549,7 +1549,7 @@ pub fn handle_crate_break_damage(
             crate::item::WorldObject::Crate | crate::item::WorldObject::Crate2
         ) {
             // Each crate gives 1% damage per stack
-            tracker.bonus_damage_percent += 1.0 * stacks as f32;
+            tracker.bonus_damage_percent += 1.5 * stacks as f32;
             trigger_counts.increment(Heirloom::CrateBreakDamage);
         }
     }

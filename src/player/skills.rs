@@ -398,7 +398,7 @@ impl ActiveSkill {
             ActiveSkill::FirePillar => {
                 vec![
                     "Scorch the earth at target area,".to_string(),
-                    format!("dealing {:.1}% damage continuously.", skill_power * 55.0),
+                    format!("dealing {:.1}% damage continuously.", skill_power * 95.0),
                 ]
             }
             ActiveSkill::IceWall => {
@@ -1361,7 +1361,7 @@ impl Heirloom {
             Heirloom::CrateBreakDamage => vec![
                 "Breaking crates".to_string(),
                 "permanently gives".to_string(),
-                "+1% damage.".to_string(),
+                "+1.5% damage.".to_string(),
             ],
             Heirloom::TomeDoubleUpgrade => vec![
                 "Upgrade Tomes".to_string(),
@@ -1437,7 +1437,7 @@ impl Heirloom {
             ],
             Heirloom::KillLightning => vec![
                 "Killing an enemy".to_string(),
-                "has a 5% chance".to_string(),
+                "has a 20% chance".to_string(),
                 "to spawn a lightning".to_string(),
                 "strike on a random".to_string(),
                 "nearby enemy.".to_string(),
