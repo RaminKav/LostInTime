@@ -545,6 +545,59 @@ pub enum WorldObject {
     SnowBerries,
     SnowCrate,
     SnowDeadSapling,
+
+    // Desert
+    MedCactus1,
+    MedCactus2,
+    MedCactus3,
+    MedCactus4,
+    MedCactus5,
+    SmlCactus1,
+    SmlCactus2,
+    SmlCactus3,
+    FlowerCactus1,
+    FlowerCactus2,
+    FlowerCactus3,
+    FlowerCactus4,
+    MedFruitCactus1,
+    MedFruitCactus2,
+    SmlFruitCactus1,
+    SmlFruitCactus2,
+    SmlFruitCactus3,
+    SmlFruitCactus4,
+
+    DesertGrass1,
+    DesertGrass2,
+    DesertGrass3,
+    DesertGrass4,
+    DesertMedBoulder1,
+    DesertMedBoulder2,
+    DesertMedBoulder3,
+    DesertSmlBoulder1,
+    DesertSmlBoulder2,
+    DesertSmlBoulder3,
+    DesertSmlBoulder4,
+    DesertSmlBoulder5,
+    DesertSmlBoulder6,
+
+    DesertDriftWood1,
+    DesertDriftWood2,
+    DesertDriftWood3,
+    DesertFence1,
+    DesertFence2,
+    DesertFence3,
+
+    DesertSkull1,
+    DesertSkull2,
+    DesertSkull3,
+    DesertSkull4,
+    DesertBones1,
+    DesertBones2,
+    DesertBones3,
+    Tumbleweed1,
+    Tumbleweed2,
+    Tumbleweed3,
+    Tumbleweed4,
 }
 
 #[derive(
@@ -745,6 +798,41 @@ impl WorldObject {
             WorldObject::Era2Pebble => true,
             WorldObject::XPJug => true,
 
+            WorldObject::DesertSkull1 => true,
+            WorldObject::DesertSkull2 => true,
+            WorldObject::DesertSkull3 => true,
+            WorldObject::DesertSkull4 => true,
+            WorldObject::Tumbleweed1 => true,
+            WorldObject::Tumbleweed2 => true,
+            WorldObject::Tumbleweed3 => true,
+            WorldObject::Tumbleweed4 => true,
+            WorldObject::DesertBones1 => true,
+            WorldObject::DesertBones2 => true,
+            WorldObject::DesertBones3 => true,
+            WorldObject::DesertDriftWood1 => true,
+            WorldObject::DesertDriftWood2 => true,
+            WorldObject::DesertDriftWood3 => true,
+            WorldObject::DesertFence1 => true,
+            WorldObject::DesertFence2 => true,
+            WorldObject::DesertFence3 => true,
+            WorldObject::DesertSmlBoulder1 => true,
+            WorldObject::DesertSmlBoulder2 => true,
+            WorldObject::DesertSmlBoulder3 => true,
+            WorldObject::DesertSmlBoulder4 => true,
+            WorldObject::DesertSmlBoulder5 => true,
+            WorldObject::DesertSmlBoulder6 => true,
+            WorldObject::SmlCactus1 => true,
+            WorldObject::SmlCactus2 => true,
+            WorldObject::SmlCactus3 => true,
+            WorldObject::FlowerCactus1 => true,
+            WorldObject::FlowerCactus2 => true,
+            WorldObject::FlowerCactus3 => true,
+            WorldObject::FlowerCactus4 => true,
+            WorldObject::SmlFruitCactus1 => true,
+            WorldObject::SmlFruitCactus2 => true,
+            WorldObject::SmlFruitCactus3 => true,
+            WorldObject::SmlFruitCactus4 => true,
+
             _ => false,
         }
     }
@@ -811,6 +899,30 @@ impl WorldObject {
             WorldObject::RedBeaconBlock => true,
             WorldObject::PinkBeacon => true,
             WorldObject::PinkBeaconBlock => true,
+            _ => false,
+        }
+    }
+    /// Desert biome cactuses that deal contact damage to the player.
+    pub fn is_desert_cactus(&self) -> bool {
+        match self {
+            WorldObject::MedCactus1
+            | WorldObject::MedCactus2
+            | WorldObject::MedCactus3
+            | WorldObject::MedCactus4
+            | WorldObject::MedCactus5
+            | WorldObject::SmlCactus1
+            | WorldObject::SmlCactus2
+            | WorldObject::SmlCactus3
+            | WorldObject::FlowerCactus1
+            | WorldObject::FlowerCactus2
+            | WorldObject::FlowerCactus3
+            | WorldObject::FlowerCactus4
+            | WorldObject::MedFruitCactus1
+            | WorldObject::MedFruitCactus2
+            | WorldObject::SmlFruitCactus1
+            | WorldObject::SmlFruitCactus2
+            | WorldObject::SmlFruitCactus3
+            | WorldObject::SmlFruitCactus4 => true,
             _ => false,
         }
     }

@@ -50,6 +50,7 @@ impl Plugin for CollisionPlugion {
     fn build(&self, app: &mut App) {
         app.add_systems(
             (
+                add_contact_damage_to_cactuses.in_set(OnUpdate(GameState::Main)),
                 check_melee_hit_collisions.run_if(is_not_paused),
                 check_boss_to_objects_collisions.run_if(is_not_paused),
                 check_mob_to_player_collisions.run_if(is_not_paused),
@@ -59,6 +60,7 @@ impl Plugin for CollisionPlugion {
                     .after(handle_fire_pillar_hit_clear)
                     .after(handle_laser_beam_hit_clear),
                 check_projectile_hit_player_collisions.run_if(is_not_paused),
+                check_contact_damage_collisions.run_if(is_not_paused),
                 check_object_trigger_collisions
                     .run_if(is_not_paused)
                     .after(CustomFlush)
@@ -78,6 +80,62 @@ impl Plugin for CollisionPlugion {
 pub struct DamagesWorldObjects;
 #[derive(Component)]
 pub struct PlayerAttackCollider;
+
+/// Deals this much damage to the player when they collide with the entity (e.g. desert cactuses).
+#[derive(Component)]
+pub struct ContactDamage(pub i32);
+
+fn add_contact_damage_to_cactuses(
+    mut commands: Commands,
+    cactuses: Query<(Entity, &WorldObject), (With<WorldObject>, Without<ContactDamage>)>,
+) {
+    for (entity, obj) in cactuses.iter() {
+        if obj.is_desert_cactus() {
+            commands.entity(entity).insert(ContactDamage(5));
+        }
+    }
+}
+
+fn check_contact_damage_collisions(
+    player: Query<(Entity, &GlobalTransform, &Defence), With<Player>>,
+    hazards: Query<(&ContactDamage, &GlobalTransform)>,
+    rapier_context: Res<RapierContext>,
+    mut hit_event: EventWriter<HitEvent>,
+    in_i_frame: Query<&InvincibilityTimer>,
+) {
+    let Ok((player_e, player_txfm, defence)) = player.get_single() else {
+        return;
+    };
+    for (e1, e2, _) in rapier_context.intersections_with(player_e) {
+        if e1 != player_e {
+            continue;
+        }
+        let Ok((contact_damage, hazard_txfm)) = hazards.get(e2) else {
+            continue;
+        };
+        if in_i_frame.get(player_e).is_ok() {
+            continue;
+        }
+        let player_pos = player_txfm.translation().truncate();
+        let hazard_pos = hazard_txfm.translation().truncate();
+        let dir = (player_pos - hazard_pos).normalize_or_zero();
+        let damage = f32::round(contact_damage.0 as f32 * (0.997_f32.powi(defence.0))) as i32;
+        hit_event.send(HitEvent {
+            hit_entity: player_e,
+            damage,
+            dir,
+            hit_with_melee: None,
+            hit_with_projectile: None,
+            hit_by_mob: None,
+            hit_by_pet: None,
+            was_crit: false,
+            was_overcrit: false,
+            ignore_tool: false,
+            from_heirloom_effect: None,
+        });
+        break;
+    }
+}
 
 fn check_melee_hit_collisions(
     mut commands: Commands,

@@ -982,6 +982,248 @@
             size: (32., 32.),
             anchor: None,
         ),
+        DesertBones1: WorldObjectData(
+            texture_pos: (0., 24.), // START
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertBones2: WorldObjectData(
+            texture_pos: (0., 25.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertBones3: WorldObjectData(
+            texture_pos: (0., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertFence1: WorldObjectData(
+            texture_pos: (1., 24.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        DesertFence2: WorldObjectData(
+            texture_pos: (5., 26.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        DesertFence3: WorldObjectData(
+            texture_pos: (4., 25.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertDriftWood1: WorldObjectData(
+            texture_pos: (3., 24.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        DesertDriftWood2: WorldObjectData(
+            texture_pos: (3., 26.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        DesertDriftWood3: WorldObjectData(
+            texture_pos: (3., 25.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        
+        DesertSkull1: WorldObjectData(
+            texture_pos: (1., 25.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSkull2: WorldObjectData(
+            texture_pos: (2., 25.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSkull3: WorldObjectData(
+            texture_pos: (1., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSkull4: WorldObjectData(
+            texture_pos: (2., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MedCactus1: WorldObjectData(
+            texture_pos: (5., 24.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        MedCactus2: WorldObjectData(
+            texture_pos: (6., 24.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        MedCactus3: WorldObjectData(
+            texture_pos: (7., 24.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        MedCactus4: WorldObjectData(
+            texture_pos: (8., 24.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        MedCactus5: WorldObjectData(
+            texture_pos: (9., 24.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        SmlCactus1: WorldObjectData(
+            texture_pos: (7., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmlCactus2: WorldObjectData(
+            texture_pos: (8., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmlCactus3: WorldObjectData(
+            texture_pos: (9., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FlowerCactus1: WorldObjectData(
+            texture_pos: (6., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FlowerCactus2: WorldObjectData(
+            texture_pos: (7., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FlowerCactus3: WorldObjectData(
+            texture_pos: (6., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        FlowerCactus4: WorldObjectData(
+            texture_pos: (7., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        MedFruitCactus1: WorldObjectData(
+            texture_pos: (8., 27.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        MedFruitCactus2: WorldObjectData(
+            texture_pos: (9., 27.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        SmlFruitCactus1: WorldObjectData(
+            texture_pos: (10., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmlFruitCactus2: WorldObjectData(
+            texture_pos: (11., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmlFruitCactus3: WorldObjectData(
+            texture_pos: (10., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SmlFruitCactus4: WorldObjectData(
+            texture_pos: (11., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertGrass1: WorldObjectData(
+            texture_pos: (12., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertGrass2: WorldObjectData(
+            texture_pos: (13., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertGrass3: WorldObjectData(
+            texture_pos: (12., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertGrass4: WorldObjectData(
+            texture_pos: (13., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        
+        Tumbleweed1: WorldObjectData(
+            texture_pos: (14., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Tumbleweed2: WorldObjectData(
+            texture_pos: (15., 27.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Tumbleweed3: WorldObjectData(
+            texture_pos: (14., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        Tumbleweed4: WorldObjectData(
+            texture_pos: (15., 28.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder1: WorldObjectData(
+            texture_pos: (10., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder2: WorldObjectData(
+            texture_pos: (11., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder3: WorldObjectData(
+            texture_pos: (12., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder4: WorldObjectData(
+            texture_pos: (13., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder5: WorldObjectData(
+            texture_pos: (14., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertSmlBoulder6: WorldObjectData(
+            texture_pos: (15., 26.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        DesertMedBoulder1: WorldObjectData(
+            texture_pos: (10., 24.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        DesertMedBoulder2: WorldObjectData(
+            texture_pos: (12., 24.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        DesertMedBoulder3: WorldObjectData(
+            texture_pos: (14., 24.),
+            size: (32., 32.),
+            anchor: None,
+        ),
         
 
     },

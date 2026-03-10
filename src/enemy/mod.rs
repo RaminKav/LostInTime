@@ -152,15 +152,15 @@ impl Mob {
         match self {
             Mob::None => 0.,
             Mob::Slime => 0.,
-            Mob::SpikeSlime => 40.,
-            Mob::Bushling => 25.,
-            Mob::StingFly => 50.,
+            Mob::SpikeSlime => 80.,
+            Mob::Bushling => 65.,
+            Mob::StingFly => 100.,
             Mob::Fairy => 50.,
-            Mob::FurDevil => 50.,
-            Mob::Crow => 50.,
+            Mob::FurDevil => 80.,
+            Mob::Crow => 100.,
             Mob::RedMushling => 0.,
             Mob::RedMushking => 0.,
-            Mob::StoneGolem => 10.,
+            Mob::StoneGolem => 20.,
             Mob::Hog => 50.,
         }
     }

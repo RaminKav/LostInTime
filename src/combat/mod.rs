@@ -618,7 +618,7 @@ pub fn handle_hits(
                 let mob_kb = if let Some(mob) = mob_option {
                     mob.get_base_kb()
                         + if game.has_skill(Heirloom::Knockback) {
-                            100.
+                            200.
                         } else {
                             0.
                         }
@@ -643,7 +643,7 @@ pub fn handle_hits(
                         0.
                     } else {
                         if is_player {
-                            400.
+                            200.
                         } else {
                             mob_kb + shout_knockback_bonus
                         }

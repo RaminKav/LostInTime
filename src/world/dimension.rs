@@ -79,7 +79,7 @@ impl Era {
         match self {
             Era::Main => 0,
             Era::DungeonMain => 1 * 16,
-            Era::Second => 2 * 16,
+            Era::Second => 4 * 16,
             Era::Third => 3 * 16,
         }
     }

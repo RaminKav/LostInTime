@@ -7,7 +7,7 @@ use std::f32::consts::PI;
 use std::time::Duration;
 
 use crate::animations::player_sprite::PlayerAnimation;
-use crate::animations::AttackEvent;
+use crate::animations::{AttackEvent, HitAnimationTracker};
 use crate::assets::SpriteAnchor;
 use crate::attributes::hunger::Hunger;
 use crate::audio::{AudioSoundEffect, SoundSpawner};
@@ -252,6 +252,7 @@ pub fn player_move_inputs(
             Option<&BounceEffect>,
             Option<&MovementSpeedBuff>,
             &OwnedBlessings,
+            Option<&HitAnimationTracker>,
         ),
         (
             With<Player>,
@@ -287,6 +288,7 @@ pub fn player_move_inputs(
         bounce_option,
         movement_speed_buff,
         blessings,
+        hit_tracker_option,
     ) = player_query.single_mut();
     if bounce_option.is_some() {
         return;
@@ -391,7 +393,8 @@ pub fn player_move_inputs(
         };
     }
     mv.0 = d;
-    if d.x != 0. || d.y != 0. {
+    // Don't overwrite KCC translation while knockback is active (set by animate_hit)
+    if hit_tracker_option.is_none() && (d.x != 0. || d.y != 0.) {
         player_kcc.translation = Some(Vec2::new(d.x, d.y));
 
         if curr_anim == &PlayerAnimation::Idle {

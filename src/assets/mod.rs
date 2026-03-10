@@ -445,7 +445,7 @@ impl GameAssetsPlugin {
         } else {
             commands.insert_resource(ClassUnlockData::default());
         }
-        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 384.));
+        let mut atlas = TextureAtlas::new_empty(image_handle.clone(), Vec2::new(256., 544.));
         let wall_atlas = TextureAtlas::from_grid(
             wall_image_handle.clone(),
             Vec2::new(16., 32.),
