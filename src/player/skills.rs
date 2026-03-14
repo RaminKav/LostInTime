@@ -789,7 +789,7 @@ impl Heirloom {
             // Heirloom::IncreaseProjectileCount => 5,
             Heirloom::IceStaffAoE => 5,
             Heirloom::FrozenAoE => 5,
-            Heirloom::IceStaffFloor => 3,
+            Heirloom::IceStaffFloor => 5,
             Heirloom::ViralVenum => 5,
             Heirloom::HealEcho => 5,
             Heirloom::HealSummons => 15,
@@ -1213,11 +1213,10 @@ impl Heirloom {
                 format!("Costs {} mana.", Heirloom::FrozenAoE.get_mana_cost()),
             ],
             Heirloom::IceStaffFloor => vec![
-                "Your Attacks have".to_string(),
-                "a chance to leave".to_string(),
+                "Killing an enemy has".to_string(),
+                "a 10% chance to leave".to_string(),
                 "a trail of ice that".to_string(),
                 "damages enemies. ".to_string(),
-                "+25% freeze chance.".to_string(),
                 format!("Costs {} mana.", Heirloom::IceStaffFloor.get_mana_cost()),
             ],
             Heirloom::FrozenCrit => vec![
@@ -2158,7 +2157,7 @@ impl PlayerSkills {
         let mut chance = 0.0;
         let freeze_skills = vec![
             Heirloom::FrozenAoE,
-            Heirloom::IceStaffFloor,
+            // Heirloom::IceStaffFloor,
             Heirloom::FrozenCrit,
             Heirloom::FrozenMPRegen,
             Heirloom::SlowStacks,

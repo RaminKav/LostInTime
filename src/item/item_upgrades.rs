@@ -8,17 +8,15 @@ use crate::attributes::{
 };
 use crate::audio::{AudioSoundEffect, SoundSpawner};
 use crate::blessings::OwnedBlessings;
-use crate::combat_helpers::spawn_one_time_aseprite_collider;
 use crate::custom_commands::CommandsExt;
 use crate::enemy::Mob;
 use crate::item::ammo::Ammo;
 use crate::item::WorldObject;
-use crate::player::mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor};
+use crate::player::mage_skills::spawn_ice_explosion_hitbox;
 use crate::player::skills::{Heirloom, PlayerSkills};
 use crate::status_effects::{
     try_add_slow_stacks, Burning, Frail, Poisoned, Slow, StatusEffect, StatusEffectEvent,
 };
-use crate::world::y_sort::YSort;
 use crate::Game;
 use crate::{
     combat::{AttackTimer, HitEvent, LifestealEvent},
@@ -28,10 +26,7 @@ use crate::{
     GameParam,
 };
 use bevy::prelude::*;
-use bevy_aseprite::anim::AsepriteAnimation;
-use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
-use bevy_rapier2d::prelude::Collider;
 
 use super::{
     projectile::{Projectile, RangedAttack, RangedAttackEvent},
@@ -315,30 +310,6 @@ pub fn handle_on_hit_upgrades(
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::IceExplosion, 0.2));
                     }
                 }
-            }
-        }
-        if skills.has(Heirloom::IceStaffFloor)
-            && rng.gen_bool((skills.get_count(Heirloom::IceStaffFloor) as f64 * 0.1).clamp(0., 1.))
-        {
-            let mana_cost = Heirloom::IceStaffFloor.get_mana_cost();
-            if current_mana.0 >= mana_cost {
-                current_mana.0 -= mana_cost;
-                trigger_counts.increment(Heirloom::IceStaffFloor);
-                let ice = spawn_one_time_aseprite_collider(
-                    &mut commands,
-                    Transform::from_translation(hit_entity_txfm.translation()),
-                    6.5,
-                    hit.damage / 5,
-                    Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
-                    asset_server.load::<Aseprite, _>(IceFloor::PATH),
-                    AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
-                    true,
-                    Projectile::IceFloor,
-                );
-                commands
-                    .entity(ice)
-                    .insert(YSort(-0.1))
-                    .insert(IceExplosionDmg);
             }
         }
         let Ok((burning_option, _poisoned_option, frailed_option, mut slowed_option)) =

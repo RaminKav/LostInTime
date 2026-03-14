@@ -1,7 +1,12 @@
 use bevy::prelude::*;
 
+use bevy_aseprite::anim::AsepriteAnimation;
+use bevy_aseprite::Aseprite;
 use bevy_proto::prelude::ProtoCommands;
-use combat_helpers::{handle_deferred_aseprite_spawns, tick_despawn_timer};
+use bevy_rapier2d::prelude::Collider;
+use combat_helpers::{
+    handle_deferred_aseprite_spawns, spawn_one_time_aseprite_collider, tick_despawn_timer,
+};
 use rand::{seq::SliceRandom, Rng};
 pub mod status_effects;
 use status_effects::*;
@@ -47,12 +52,12 @@ use crate::{
     player::{
         combat_heirlooms::{HallucinationStatType, HallucinationStats},
         levels::PlayerLevel,
-        mage_skills::spawn_ice_explosion_hitbox,
+        mage_skills::{spawn_ice_explosion_hitbox, IceExplosionDmg, IceFloor},
         skills::{Heirloom, HeirloomTriggerCounts, PlayerSkills},
     },
     proto::proto_param::ProtoParam,
     ui::damage_numbers::spawn_floating_text_with_shadow,
-    world::{world_helpers::world_pos_to_tile_pos, TileMapPosition, TILE_SIZE},
+    world::{world_helpers::world_pos_to_tile_pos, y_sort::YSort, TileMapPosition, TILE_SIZE},
     AppExt, CustomFlush, GameParam, GameState, Player, SlimeTempShield, SlimeTempShieldSprite,
     DEBUG,
 };
@@ -211,9 +216,10 @@ fn handle_enemy_death(
     graphics: Res<Graphics>,
     infinite_mode: Res<InfiniteMode>,
     enemies: Query<(Entity, &GlobalTransform), (With<Mob>, Without<Player>)>,
-    player_query: Query<(&GlobalTransform, &Attack), With<Player>>,
+    mut player_query: Query<(&GlobalTransform, &Attack, &mut CurrentMana), With<Player>>,
     mut ranged_attack_event: EventWriter<RangedAttackEvent>,
     mut trigger_counts: ResMut<HeirloomTriggerCounts>,
+    asset_server: Res<AssetServer>,
 ) {
     for death_event in death_events.iter() {
         let Ok((mob, mob_lvl, elite_option)) = mob_data.get(death_event.entity) else {
@@ -287,6 +293,8 @@ fn handle_enemy_death(
             );
         }
 
+        // On-kill heirloom effects (skip when kill was from another heirloom to prevent chaining)
+        let (_, attack, mut current_mana) = player_query.single_mut();
         // KillLightning: 20% chance per stack to spawn lightning on a random nearby enemy; over 100% = guaranteed 1 + (chance-100)% for a second strike on a different enemy
         let kill_lightning_stacks =
             player_skills.get_count(crate::player::skills::Heirloom::KillLightning);
@@ -307,24 +315,20 @@ fn handle_enemy_death(
                 })
                 .collect();
 
-            if nearby_enemies.is_empty() {
-                continue;
-            }
-
-            let mut num_procs = 0u32;
-            if chance_pct >= 100 {
-                num_procs = 1;
-                if chance_pct > 100 {
-                    let extra_pct = (chance_pct - 100).min(100);
-                    if rng.gen_ratio(extra_pct, 100) {
-                        num_procs = 2;
+            if !nearby_enemies.is_empty() {
+                let mut num_procs = 0u32;
+                if chance_pct >= 100 {
+                    num_procs = 1;
+                    if chance_pct > 100 {
+                        let extra_pct = (chance_pct - 100).min(100);
+                        if rng.gen_ratio(extra_pct, 100) {
+                            num_procs = 2;
+                        }
                     }
+                } else if rng.gen_ratio(chance_pct, 100) {
+                    num_procs = 1;
                 }
-            } else if rng.gen_ratio(chance_pct, 100) {
-                num_procs = 1;
-            }
 
-            if let Ok((_, attack)) = player_query.get_single() {
                 let lightning_damage = attack.0;
                 let mut chosen: Vec<usize> = Vec::new();
                 for _ in 0..num_procs {
@@ -356,6 +360,36 @@ fn handle_enemy_death(
                         spawn_delay: 0.0,
                     });
                     commands.spawn(SoundSpawner::new(AudioSoundEffect::LightningStaffCast, 0.2));
+                }
+            }
+        }
+
+        // IceStaffFloor: 20% chance per stack on kill to spawn ice floor at death position
+        let ice_floor_stacks = player_skills.get_count(Heirloom::IceStaffFloor);
+        if ice_floor_stacks > 0 {
+            let mut rng = rand::thread_rng();
+            let chance = (ice_floor_stacks as f64 * 0.2).min(1.0);
+            if rng.gen_bool(chance) {
+                let mana_cost = Heirloom::IceStaffFloor.get_mana_cost();
+                if current_mana.0 >= mana_cost {
+                    current_mana.0 -= mana_cost;
+                    trigger_counts.increment(Heirloom::IceStaffFloor);
+                    let pos = death_event.enemy_pos.extend(0.0);
+                    let ice = spawn_one_time_aseprite_collider(
+                        &mut commands,
+                        Transform::from_translation(pos),
+                        6.5,
+                        attack.0,
+                        Collider::capsule(Vec2::ZERO, Vec2::ZERO, 14.),
+                        asset_server.load::<Aseprite, _>(IceFloor::PATH),
+                        AsepriteAnimation::from(IceFloor::tags::ICE_FLOOR),
+                        true,
+                        Projectile::IceFloor,
+                    );
+                    commands
+                        .entity(ice)
+                        .insert(YSort(-0.1))
+                        .insert(IceExplosionDmg);
                 }
             }
         }
