@@ -1822,7 +1822,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
-                HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),
                 HeirloomChoiceState::new(
                     Heirloom::CritSkillCooldownReduction,

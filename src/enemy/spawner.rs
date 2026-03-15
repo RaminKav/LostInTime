@@ -29,15 +29,31 @@ pub struct MobSpawningPaused {
     pub paused: bool,
 }
 
+/// Global timer for despawning distant mobs when at cap. When mob count >= max, every 7s we despawn the 5 furthest mobs.
+#[derive(Resource)]
+pub struct EnemyDespawnTimer {
+    pub timer: Timer,
+}
+
+impl Default for EnemyDespawnTimer {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(5.0, TimerMode::Repeating),
+        }
+    }
+}
+
 pub struct SpawnerPlugin;
 impl Plugin for SpawnerPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<MobSpawnEvent>()
             .init_resource::<MobSpawningPaused>()
+            .init_resource::<EnemyDespawnTimer>()
             .add_systems(
                 (
                     handle_spawn_mobs,
                     tick_spawner_timers.run_if(is_not_paused),
+                    tick_enemy_despawn_timer.run_if(is_not_paused),
                     // handle_add_fairy_spawners,
                     test_mob_count,
                     spawn_stone_golem_timer.run_if(is_not_paused),
@@ -424,5 +440,51 @@ fn tick_spawner_timers(
                 });
             }
         }
+    }
+}
+
+/// When at or over the mob cap, every 7s despawn the 5 mobs furthest from the player.
+fn tick_enemy_despawn_timer(
+    time: Res<Time>,
+    mut despawn_timer: ResMut<EnemyDespawnTimer>,
+    mut commands: Commands,
+    mobs: Query<(Entity, &GlobalTransform, &Mob)>,
+    player_t: Query<&GlobalTransform, With<Player>>,
+    night_tracker: Res<NightTracker>,
+    infinite_mode: Res<InfiniteMode>,
+    maybe_dungeon: Query<&Dungeon, With<ActiveDimension>>,
+) {
+    const NUM_TO_DESPAWN: usize = 10;
+    if maybe_dungeon.get_single().is_ok() {
+        return;
+    }
+    despawn_timer.timer.tick(time.delta());
+    if !despawn_timer.timer.just_finished() {
+        return;
+    }
+    let max_mobs = if infinite_mode.active {
+        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+    } else {
+        BASE_MAX_MOBS_TOTAL + night_tracker.days as i32 * 10
+    };
+    let player_pos = match player_t.get_single() {
+        Ok(t) => t.translation().truncate(),
+        Err(_) => return,
+    };
+    let mut eligible: Vec<(Entity, f32)> = mobs
+        .iter()
+        .filter(|(_, _, m)| m != &&Mob::RedMushling && m != &&Mob::Hog && m != &&Mob::Fairy)
+        .map(|(e, t, _)| {
+            let dist = t.translation().truncate().distance(player_pos);
+            (e, dist)
+        })
+        .collect();
+    let count = eligible.len() as i32;
+    if count < max_mobs {
+        return;
+    }
+    eligible.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    for (entity, _) in eligible.into_iter().take(NUM_TO_DESPAWN) {
+        commands.entity(entity).despawn_recursive();
     }
 }

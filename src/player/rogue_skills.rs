@@ -135,7 +135,6 @@ pub fn handle_lunge(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     projectile_size: Query<&crate::attributes::ProjectileSize, With<Player>>,
-    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     let activated_slots: Vec<usize> = active_skill_events.iter().map(|ev| ev.slot).collect();
 
@@ -199,7 +198,6 @@ pub fn handle_lunge(
                         echo_dmg,
                         size_mult,
                     );
-                    trigger_counts.increment(Heirloom::SkillEcho);
                 }
             }
 

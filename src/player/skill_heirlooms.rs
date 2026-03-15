@@ -110,6 +110,7 @@ pub fn handle_active_skill_event(
     proto_param: ProtoParam,
     prototypes: Prototypes,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
+    mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
 ) {
     for ev in events.iter() {
         for (
@@ -1016,6 +1017,7 @@ pub fn handle_active_skill_event(
                             echo_dmg,
                             size_mult,
                         );
+                        trigger_counts.increment(Heirloom::SkillEcho);
                     }
                 }
             }
