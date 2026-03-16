@@ -241,10 +241,13 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        let mut dur = Timer::from_seconds(2.0 * power_mult, TimerMode::Once);
+                        let mut dur =
+                            Timer::from_seconds((2.0 * power_mult).max(0.0), TimerMode::Once);
                         dur.tick(time.delta());
                         commands
                             .entity(player_e)
@@ -279,7 +282,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         let dur = Timer::from_seconds(3.0, TimerMode::Once);
@@ -315,7 +320,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands.entity(player_e).insert(FirePillarState {
@@ -347,7 +354,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands.entity(player_e).insert(LaserBeamState {
                             cooldown_timer: cd,
@@ -381,7 +390,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -415,7 +426,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -493,7 +506,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -526,7 +541,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -560,7 +577,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -606,7 +625,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands
@@ -640,7 +661,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         // Update or create sprint state cooldown
@@ -678,7 +701,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         if spear_state.is_some() {
@@ -698,7 +723,9 @@ pub fn handle_active_skill_event(
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
                             // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         // Don't tick the timer here - let tick_skill_cooldowns handle it
                         if lunge_state.is_some() {
@@ -718,7 +745,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -764,7 +793,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -827,7 +858,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -862,7 +895,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -904,7 +939,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands.entity(player_e).insert(FuryState {
                             cooldown_timer: cd,
@@ -921,7 +958,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -962,7 +1001,9 @@ pub fn handle_active_skill_event(
                         }
                         let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
                         if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(cd.duration().as_secs_f32()));
+                            cd.tick(Duration::from_secs_f32(
+                                cd.duration().as_secs_f32().max(0.0),
+                            ));
                         }
                         commands
                             .entity(player_e)
@@ -1402,7 +1443,7 @@ pub fn regenerate_skill_charges(
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
                 tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
@@ -1412,7 +1453,7 @@ pub fn regenerate_skill_charges(
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
                 tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
@@ -1422,7 +1463,7 @@ pub fn regenerate_skill_charges(
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
                 tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
@@ -1432,7 +1473,7 @@ pub fn regenerate_skill_charges(
             tracker.0.cooldown_timer.tick(time.delta());
             if tracker.0.cooldown_timer.finished() {
                 tracker.0.current_charges += 1;
-                let effective = tracker.0.base_cooldown * cd_mult * blessing_mult;
+                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
                 tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
             }
         }
@@ -1474,8 +1515,9 @@ pub fn initialize_skill_charge_tracker(
 
                     if skill_changed {
                         // Skill changed - reset tracker completely with new skill
-                        let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                        let base_cd = base_cooldown.max(0.0);
+                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                        init_timer.tick(Duration::from_secs_f32(base_cd));
                         tracker.0.current_charges = max_charges;
                         tracker.0.max_charges = max_charges;
                         tracker.0.base_cooldown = base_cooldown;
@@ -1502,15 +1544,17 @@ pub fn initialize_skill_charge_tracker(
                             > 0.01
                         {
                             let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                            let base_cd = base_cooldown.max(0.0);
+                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
                             new_timer.tick(elapsed);
                             tracker.0.cooldown_timer = new_timer;
                         }
                     }
                 } else {
                     // Create new tracker with max charges
-                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    let base_cd = base_cooldown.max(0.0);
+                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cd));
                     commands.entity(player_e).insert(Slot1ChargeTracker(
                         crate::player::skills::SkillChargeTracker {
                             current_charges: max_charges,
@@ -1547,8 +1591,9 @@ pub fn initialize_skill_charge_tracker(
 
                     if skill_changed {
                         // Skill changed - reset tracker completely with new skill
-                        let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                        let base_cd = base_cooldown.max(0.0);
+                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                        init_timer.tick(Duration::from_secs_f32(base_cd));
                         tracker.0.current_charges = max_charges;
                         tracker.0.max_charges = max_charges;
                         tracker.0.base_cooldown = base_cooldown;
@@ -1575,15 +1620,17 @@ pub fn initialize_skill_charge_tracker(
                             > 0.01
                         {
                             let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                            let base_cd = base_cooldown.max(0.0);
+                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
                             new_timer.tick(elapsed);
                             tracker.0.cooldown_timer = new_timer;
                         }
                     }
                 } else {
                     // Create new tracker with max charges
-                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cooldown)); // Start finished
+                    let base_cd = base_cooldown.max(0.0);
+                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cd)); // Start finished
                     commands.entity(player_e).insert(Slot2ChargeTracker(
                         crate::player::skills::SkillChargeTracker {
                             current_charges: max_charges,
@@ -1620,8 +1667,9 @@ pub fn initialize_skill_charge_tracker(
 
                     if skill_changed {
                         // Skill changed - reset tracker completely with new skill
-                        let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                        let base_cd = base_cooldown.max(0.0);
+                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                        init_timer.tick(Duration::from_secs_f32(base_cd));
                         tracker.0.current_charges = max_charges;
                         tracker.0.max_charges = max_charges;
                         tracker.0.base_cooldown = base_cooldown;
@@ -1648,15 +1696,17 @@ pub fn initialize_skill_charge_tracker(
                             > 0.01
                         {
                             let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                            let base_cd = base_cooldown.max(0.0);
+                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
                             new_timer.tick(elapsed);
                             tracker.0.cooldown_timer = new_timer;
                         }
                     }
                 } else {
                     // Create new tracker with max charges
-                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    let base_cd = base_cooldown.max(0.0);
+                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cd));
                     commands.entity(player_e).insert(Slot3ChargeTracker(
                         crate::player::skills::SkillChargeTracker {
                             current_charges: max_charges,
@@ -1693,8 +1743,9 @@ pub fn initialize_skill_charge_tracker(
 
                     if skill_changed {
                         // Skill changed - reset tracker completely with new skill
-                        let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                        let base_cd = base_cooldown.max(0.0);
+                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                        init_timer.tick(Duration::from_secs_f32(base_cd));
                         tracker.0.current_charges = max_charges;
                         tracker.0.max_charges = max_charges;
                         tracker.0.base_cooldown = base_cooldown;
@@ -1721,15 +1772,17 @@ pub fn initialize_skill_charge_tracker(
                             > 0.01
                         {
                             let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let mut new_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
+                            let base_cd = base_cooldown.max(0.0);
+                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
                             new_timer.tick(elapsed);
                             tracker.0.cooldown_timer = new_timer;
                         }
                     }
                 } else {
                     // Create new tracker with max charges
-                    let mut init_timer = Timer::from_seconds(base_cooldown, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cooldown));
+                    let base_cd = base_cooldown.max(0.0);
+                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                    init_timer.tick(Duration::from_secs_f32(base_cd));
                     commands.entity(player_e).insert(Slot4ChargeTracker(
                         crate::player::skills::SkillChargeTracker {
                             current_charges: max_charges,
@@ -1847,7 +1900,7 @@ pub fn reduce_skill_cooldown_on_crit(
                 }
             }
 
-            let reduction = 0.1 * heirloom_count as f32;
+            let reduction = (0.1 * heirloom_count as f32).max(0.0);
 
             // Reduce cooldown for skill state components
             // Instead of creating a new timer, tick the existing timer forward by the reduction amount
