@@ -67,6 +67,8 @@ pub struct EssenceTooltipCard;
 pub struct EssenceOption {
     pub heirloom: Heirloom,
     pub rarity: HeirloomRarity,
+    /// Cost before purchase_multiplier; used so cached shops can re-apply current multiplier
+    pub base_coin_cost: f32,
     pub time_fragment_cost: u32,
     pub coin_cost: u32,
 }
@@ -471,14 +473,22 @@ pub fn handle_populate_essence_shop_on_new_spawn(
 
         let purchase_multiplier = purchase_tracker.get_price_multiplier();
 
-        // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms
+        // Start from cache: keep non-banished items, reroll slots that contained banished heirlooms.
+        // Re-apply current purchase_multiplier to cached options so prices scale after purchases.
         let mut shop_choices: Vec<EssenceOption> =
             if let Some(cached) = shop_cache.shops.get(&tile_pos) {
-                cached
+                let mut opts: Vec<EssenceOption> = cached
                     .iter()
                     .filter(|opt| !heirloom_queue.banned.contains(&opt.heirloom))
                     .cloned()
-                    .collect()
+                    .collect();
+                let mult = purchase_tracker.get_price_multiplier();
+                for opt in opts.iter_mut() {
+                    if opt.base_coin_cost > 0.0 {
+                        opt.coin_cost = (opt.base_coin_cost * mult).trunc() as u32;
+                    }
+                }
+                opts
             } else {
                 vec![]
             };
@@ -515,12 +525,13 @@ pub fn handle_populate_essence_shop_on_new_spawn(
 
             let base_cost = 7.;
             let random_adjustment = rand::thread_rng().gen_range(2.0..7.0) * rarity_cost_inc * 2.;
-            let final_cost =
-                (base_cost * rarity_cost_inc + random_adjustment) * purchase_multiplier;
+            let base_coin_cost = base_cost * rarity_cost_inc + random_adjustment;
+            let final_cost = base_coin_cost * purchase_multiplier;
 
             shop_choices.push(EssenceOption {
                 heirloom: heirloom_choice.heirloom,
                 rarity: heirloom_choice.rarity,
+                base_coin_cost,
                 coin_cost: final_cost.trunc() as u32,
                 time_fragment_cost: time_frag_cost,
             });

@@ -903,7 +903,9 @@ pub fn handle_update_inv_item_entities(
                         && (slot_state.r#type.is_inventory() || slot_state.r#type.is_hotbar())
                     {
                         if let Some(item_e) = slot_state.item {
-                            commands.entity(item_e).insert(item.clone());
+                            if let Some(mut entity_commands) = commands.get_entity(item_e) {
+                                entity_commands.insert(item.clone());
+                            }
                         }
                     }
                 }

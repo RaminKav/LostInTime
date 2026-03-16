@@ -943,7 +943,7 @@ impl Heirloom {
             Heirloom::Mana => vec!["Gain +25 Mana,".to_string(), "permanently.".to_string()],
             Heirloom::Shield => vec!["Gain +10 Shield,".to_string(), "permanently.".to_string()],
             Heirloom::Speed => vec!["Gain +10 Speed,".to_string(), "permanently.".to_string()],
-            Heirloom::Thorns => vec!["Gain +15 Thorns, ".to_string(), "permanently.".to_string()],
+            Heirloom::Thorns => vec!["Gain +25 Thorns, ".to_string(), "permanently.".to_string()],
             Heirloom::Lifesteal => {
                 vec![
                     "Gain +4% Lifesteal,".to_string(),
@@ -1416,6 +1416,7 @@ impl Heirloom {
                 "out 2 spikes. Damage".to_string(),
                 "scales with thorns".to_string(),
                 "stat.".to_string(),
+                "+15 Thorns.".to_string(),
             ],
             Heirloom::ThornsOnDamage => vec![
                 "Gain +1 Thorns each".to_string(),
@@ -1424,6 +1425,7 @@ impl Heirloom {
             Heirloom::ThornsLifesteal => vec![
                 "Your thorns damage".to_string(),
                 "has +25% lifesteal.".to_string(),
+                "+15 Thorns.".to_string(),
             ],
 
             // Lightning strikes archetype

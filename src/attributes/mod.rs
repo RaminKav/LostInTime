@@ -480,9 +480,9 @@ impl ItemAttributes {
         blessings: &OwnedBlessings,
         dodge_crit_buff_active: bool,
         coins: u32,
-        max_hp_hunt_bonus: i32,         // Max HP gained from MaxHPHunt heirloom
-        thorns_on_damage_bonus: i32,    // Thorns gained from ThornsOnDamage heirloom
-        skill_power_hunt_bonus: i32,    // Skill Power gained from SkillPowerHunt heirloom
+        max_hp_hunt_bonus: i32,      // Max HP gained from MaxHPHunt heirloom
+        thorns_on_damage_bonus: i32, // Thorns gained from ThornsOnDamage heirloom
+        skill_power_hunt_bonus: i32, // Skill Power gained from SkillPowerHunt heirloom
         bonus_attack_speed: Option<&BonusAttackSpeed>,
     ) {
         // ChaosStats: +10 to many stats per stack
@@ -600,8 +600,11 @@ impl ItemAttributes {
         // ThornArmor: +10 defence per stack, +20% thorns per 10 defence per stack
         // Thorns now work as a percentage of player damage reflected back
         let thorn_armor_stacks = skills.get_count(Heirloom::ThornArmor);
-        let base_thorns =
-            self.thorns.value + skills.get_count(Heirloom::Thorns) * 15 + thorns_on_damage_bonus;
+        let base_thorns = self.thorns.value
+            + skills.get_count(Heirloom::Thorns) * 25
+            + skills.get_count(Heirloom::ThornsLifesteal) * 15
+            + skills.get_count(Heirloom::ThornsSpikes) * 15
+            + thorns_on_damage_bonus;
         // Calculate defence first (including ThornArmor bonus) to compute thorn bonus
         let total_defence = self.defence.value
             + skills.get_count(Heirloom::Defence) * 10
