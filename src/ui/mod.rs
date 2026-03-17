@@ -541,7 +541,6 @@ impl Plugin for UIPlugin {
             .add_systems(
                 (
                     tick_skill_cooldown_overlays.run_if(is_not_paused),
-                    handle_active_skill_event.run_if(is_not_paused),
                     tick_game_start_overlay,
                     player_hud::tick_xp_bar_fade_in
                         .after(handle_flash_bars)

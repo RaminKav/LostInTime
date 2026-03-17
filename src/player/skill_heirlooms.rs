@@ -733,7 +733,9 @@ pub fn handle_active_skill_event(
                         }
                         commands.entity(player_e).insert(LungeState {
                             lunge_cooldown_timer: cd,
-                            lunge_duration: Timer::from_seconds(0.42, TimerMode::Once),
+                            lunge_duration: Timer::from_seconds(0.42, TimerMode::Once)
+                                .tick(Duration::from_secs_f32(0.1))
+                                .clone(),
                             lunge_speed: 9.5,
                         });
                     }
