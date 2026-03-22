@@ -426,6 +426,7 @@ impl ObjectAction {
                 let active_skills: Vec<ActiveSkill> = ActiveSkill::iter()
                     .filter(|skill| {
                         *skill != ActiveSkill::Parry
+                            && *skill != ActiveSkill::Sprint
                             && *skill != ActiveSkill::LaserBeam
                             && !player_current_skills.contains(skill)
                     })
