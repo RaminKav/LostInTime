@@ -36,6 +36,7 @@ pub mod achievements;
 pub mod class_rank;
 pub mod combat_heirlooms;
 pub mod currency;
+pub mod ice_slide;
 pub mod levels;
 pub mod mage_skills;
 pub mod melee_skills;
@@ -107,6 +108,13 @@ pub struct PlayerState {
     pub player_dash_cooldown: Timer,
     pub player_dash_duration: Timer,
     pub next_hit_crit: bool,
+    /// Era 3 ice patches: normalized slide direction while locked; cleared when off ice.
+    pub ice_slide_direction: Option<Vec2>,
+    /// Seconds of post-ice momentum; input cannot steer until this hits zero.
+    pub ice_momentum_remaining: f32,
+    pub ice_momentum_direction: Option<Vec2>,
+    /// Multiplier on base move delta while sliding; starts at 1.0 and ramps up (see inputs ice constants).
+    pub ice_slide_speed_factor: f32,
 }
 
 impl Default for PlayerState {
@@ -121,6 +129,10 @@ impl Default for PlayerState {
             player_dash_cooldown: Timer::from_seconds(0.75, TimerMode::Once),
             player_dash_duration: Timer::from_seconds(0.28, TimerMode::Once),
             next_hit_crit: false,
+            ice_slide_direction: None,
+            ice_momentum_remaining: 0.0,
+            ice_momentum_direction: None,
+            ice_slide_speed_factor: 1.0,
         }
     }
 }

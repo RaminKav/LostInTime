@@ -31,7 +31,10 @@ use bevy::window::PrimaryWindow;
 use bevy_hanabi::EffectSpawner;
 use bevy_proto::prelude::{ProtoCommands, ReflectSchematic, Schematic};
 
-use bevy_rapier2d::prelude::{CollisionGroups, Group, KinematicCharacterController, PhysicsSet};
+use bevy_rapier2d::prelude::{
+    CollisionGroups, Group, KinematicCharacterController, KinematicCharacterControllerOutput,
+    PhysicsSet,
+};
 use interpolation::Lerp;
 use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
@@ -59,6 +62,7 @@ use crate::world::world_helpers::world_pos_to_tile_pos;
 
 use crate::player::mage_skills::TeleportState;
 use crate::player::melee_skills::SpearState;
+use crate::player::ice_slide::{clear_ice_slide_when_stuck, tick_ice_slide_movement};
 use crate::player::rogue_skills::{LungeState, SprintState};
 use crate::player::skills::{
     FirePillarState, PiercingStarSkillState, RapidfireState, ShoutSkillState, StealthState,
@@ -253,6 +257,7 @@ pub fn player_move_inputs(
             Option<&MovementSpeedBuff>,
             &OwnedBlessings,
             Option<&HitAnimationTracker>,
+            Option<&KinematicCharacterControllerOutput>,
         ),
         (
             With<Player>,
@@ -272,6 +277,7 @@ pub fn player_move_inputs(
     mut active_skill_event: EventWriter<ActiveSkillUsedEvent>,
     mut ammo_query: Query<&mut Ammo>,
     keybinds: Res<crate::keybinds::InputMappings>,
+    proto_param: ProtoParam,
 ) {
     if audio_timer.duration() == Duration::ZERO {
         *audio_timer = Timer::from_seconds(0.2, TimerMode::Once);
@@ -289,12 +295,20 @@ pub fn player_move_inputs(
         movement_speed_buff,
         blessings,
         hit_tracker_option,
+        kcc_output,
     ) = player_query.single_mut();
     if bounce_option.is_some() {
         return;
     }
-    let player = game.player_mut();
-    let mut d = Vec2::ZERO;
+    let player_world_pos = game.player().position.truncate();
+    let player_tile = world_pos_to_tile_pos(player_world_pos);
+    let on_ice = game
+        .get_obj_entity_at_tile(player_tile, &proto_param)
+        .map(|(_, obj)| obj == WorldObject::IcePatch)
+        .unwrap_or(false);
+
+    let mut player = game.player_mut();
+    let mut d_raw = Vec2::ZERO;
     let movement_speed_multiplier = movement_speed_buff
         .map(|buff| buff.speed_multiplier)
         .unwrap_or(1.0);
@@ -307,19 +321,19 @@ pub fn player_move_inputs(
         * curr_anim.action_movement_restriction(player.main_hand_slot.clone().map(|s| s.get_obj()));
 
     if key_input.pressed(KeyCode::A) || key_input.pressed(KeyCode::Left) {
-        d.x -= 1.;
+        d_raw.x -= 1.;
         player.is_moving = true;
     }
     if key_input.pressed(KeyCode::D) || key_input.pressed(KeyCode::Right) {
-        d.x += 1.;
+        d_raw.x += 1.;
         player.is_moving = true;
     }
     if key_input.pressed(KeyCode::W) || key_input.pressed(KeyCode::Up) {
-        d.y += 1.;
+        d_raw.y += 1.;
         player.is_moving = true;
     }
     if key_input.pressed(KeyCode::S) || key_input.pressed(KeyCode::Down) {
-        d.y -= 1.;
+        d_raw.y -= 1.;
         player.is_moving = true;
     }
     //TODO: move this tick to animations.rs
@@ -328,6 +342,10 @@ pub fn player_move_inputs(
             && keybinds.check_skill_input(roll_slot, &key_input, &mouse_input)
         {
             player.is_dashing = true;
+            player.ice_slide_direction = None;
+            player.ice_momentum_remaining = 0.0;
+            player.ice_momentum_direction = None;
+            player.ice_slide_speed_factor = 1.0;
             let effective_cd = skills.effective_skill_cooldown(&ActiveSkill::Roll, blessings);
             let effective_cd = effective_cd.max(0.0); // avoid negative Duration panic
             active_skill_event.send(ActiveSkillUsedEvent {
@@ -344,11 +362,30 @@ pub fn player_move_inputs(
             commands.spawn(SoundSpawner::new(AudioSoundEffect::Roll, 0.25));
         }
     }
+    clear_ice_slide_when_stuck(&mut player, on_ice, d_raw, kcc_output);
+
+    let is_dashing = player.is_dashing;
+    let hit_active = hit_tracker_option.is_some();
+    let mut d = tick_ice_slide_movement(
+        &mut player,
+        on_ice,
+        d_raw,
+        s,
+        time.delta_seconds(),
+        is_dashing,
+        hit_active,
+    );
+
     if (key_input.any_just_released([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W])
         && !key_input.any_pressed([KeyCode::A, KeyCode::D, KeyCode::S, KeyCode::W]))
-        || (d.x == 0. && d.y == 0.)
+        || (d_raw.x == 0. && d_raw.y == 0.)
     {
-        player.is_moving = false;
+        let sliding_ice = on_ice && player.ice_slide_direction.is_some();
+        let sliding_momentum =
+            player.ice_momentum_remaining > 0.0 && player.ice_momentum_direction.is_some();
+        if !(sliding_ice || sliding_momentum) {
+            player.is_moving = false;
+        }
     }
 
     // Manual reload on R key for current ranged weapon
@@ -360,9 +397,6 @@ pub fn player_move_inputs(
                 }
             }
         }
-    }
-    if d.x != 0. || d.y != 0. {
-        d = d.normalize() * s;
     }
     let is_speeding_up = player.player_dash_duration.percent() < 0.5;
     if player.is_dashing {

@@ -25,7 +25,7 @@ use crate::{DEBUG, NO_GEN};
 
 use bevy::prelude::*;
 use bevy::sprite::MaterialMesh2dBundle;
-use bevy::utils::HashMap;
+use bevy::utils::{HashMap, HashSet};
 use bevy_ecs_tilemap::prelude::*;
 use bevy_rapier2d::prelude::Collider;
 
@@ -747,6 +747,9 @@ impl GenerationPlugin {
                         }
                     }
                 }
+                if dungeon_check_result.is_err() && game.era.current_era == Era::Third {
+                    extend_ice_patches_from_seeds(&mut objs, &game);
+                }
                 // For non-dungeon chunks, we don't need distance checks since chunks are generated dynamically
                 // and we already check if chunk_entity exists and chunk is generated
                 // Distance check is only needed for dungeon chunks
@@ -864,6 +867,91 @@ impl GenerationPlugin {
                 .insert(Name::new("debug chunk border x"));
         }
     }
+}
+
+/// After normal object placement, grow each seed `IcePatch` by 5–14 extra tiles (cardinal-only flood),
+/// replacing snow grass where needed. Era 3 overworld only.
+fn extend_ice_patches_from_seeds(
+    objs: &mut HashMap<TileMapPosition, WorldObject>,
+    game: &GameParam,
+) {
+    let seeds: Vec<TileMapPosition> = objs
+        .iter()
+        .filter(|(_, o)| **o == WorldObject::IcePatch)
+        .map(|(p, _)| *p)
+        .collect();
+    if seeds.is_empty() {
+        return;
+    }
+
+    const NEIGHBORS: [(i8, i8); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
+    let mut rng = rand::thread_rng();
+
+    for seed in seeds {
+        let extra = rng.gen_range(5..=14);
+        let mut patch: HashSet<TileMapPosition> = HashSet::new();
+        patch.insert(seed);
+        for _ in 0..extra {
+            let mut candidate_set: HashSet<TileMapPosition> = HashSet::default();
+            for p in &patch {
+                for &(dx, dy) in &NEIGHBORS {
+                    let n = get_neighbour_tile(*p, (dx, dy));
+                    if patch.contains(&n) {
+                        continue;
+                    }
+                    if !tile_allows_ice_patch_placement(game, n) {
+                        continue;
+                    }
+                    match objs.get(&n) {
+                        None => {
+                            candidate_set.insert(n);
+                        }
+                        Some(
+                            WorldObject::SnowGrass1
+                            | WorldObject::SnowGrass2
+                            | WorldObject::SnowGrass3
+                            | WorldObject::SnowGrass4,
+                        ) => {
+                            candidate_set.insert(n);
+                        }
+                        Some(WorldObject::IcePatch) => {}
+                        _ => {}
+                    }
+                }
+            }
+            if candidate_set.is_empty() {
+                break;
+            }
+            let candidates: Vec<TileMapPosition> = candidate_set.into_iter().collect();
+            let choice = *candidates.choose(&mut rng).unwrap();
+            objs.insert(choice, WorldObject::IcePatch);
+            patch.insert(choice);
+        }
+    }
+}
+
+fn tile_allows_ice_patch_placement(game: &GameParam, pos: TileMapPosition) -> bool {
+    let tile = if let Some(tile_data) = game.get_tile_data(pos) {
+        tile_data.block_type
+    } else {
+        return false;
+    };
+    if tile.iter().any(|t| *t == WorldObject::WaterTile) {
+        return false;
+    }
+    let filter = game
+        .world_generation_params
+        .obj_allowed_tiles_map
+        .get(&WorldObject::IcePatch)
+        .unwrap_or(&vec![WorldObject::GrassTile])
+        .clone();
+    for allowed_tile in filter.iter() {
+        if tile.iter().filter(|t| *t == allowed_tile).count() == 4 {
+            return true;
+        }
+    }
+    false
 }
 
 pub fn get_radial_tile_positions(origin: TileMapPosition, radius: i8) -> Vec<TileMapPosition> {

@@ -35,6 +35,14 @@ pub const LEVEL_DARK_BLUE: Color = Color::rgba(67. / 255., 86. / 255., 122. / 25
 pub const TOOLTIP_BLACK: Color = Color::rgba(39. / 255., 39. / 255., 39. / 255., 1.);
 pub const TOOLTIP_BLACK_2: Color = Color::rgba(68. / 255., 68. / 255., 68. / 255., 1.);
 
+pub const DESERT_TILE: Color = Color::rgba(255. / 255., 228. / 255., 136. / 255., 1.);
+pub const DESERT_WATER: Color = Color::rgba(255. / 255., 187. / 255., 85. / 255., 1.);
+pub const SNOW_TILE: Color = Color::rgba(147. / 255., 198. / 255., 202. / 255., 1.);
+pub const SNOW_WATER: Color = Color::rgba(19. / 255., 67. / 255., 127. / 255., 1.);
+pub const SNOW_DARK: Color = Color::rgba(73. / 255., 105. / 255., 117. / 255., 1.);
+pub const SNOW_BLUE: Color = Color::rgba(81. / 255., 176. / 255., 213. / 255., 1.);
+pub const SNOW_GREEN: Color = Color::rgba(86. / 255., 128. / 255., 66. / 255., 1.);
+
 pub fn overwrite_alpha(color: Color, alpha: f32) -> Color {
     Color::rgba(color.r(), color.g(), color.b(), alpha)
 }

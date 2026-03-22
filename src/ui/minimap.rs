@@ -1,7 +1,8 @@
 use crate::assets::Graphics;
 use crate::client::GameOverEvent;
+use crate::colors::{DESERT_TILE, DESERT_WATER, SNOW_TILE, SNOW_WATER};
 use crate::item::WorldObject;
-use crate::world::dimension::{ActiveDimension, SpawnDimension};
+use crate::world::dimension::{ActiveDimension, Era, SpawnDimension};
 use crate::world::dungeon::Dungeon;
 use crate::world::world_helpers::{camera_pos_to_chunk_pos, camera_pos_to_tile_pos};
 use crate::world::{TileMapPosition, CHUNK_SIZE, ISLAND_SIZE};
@@ -113,6 +114,38 @@ pub struct MinimapTileCache {
     pub cache: HashMap<TileMapPosition, WorldObject>,
     // Fog of war: stores explored terrain data that persists when chunks despawn
     pub explored_terrain: HashMap<TileMapPosition, [WorldObject; 4]>,
+}
+
+fn minimap_base_terrain_color_for_era(obj: WorldObject, era: &Era) -> Color {
+    match era {
+        Era::Main | Era::DungeonMain => obj.get_obj_color(),
+        Era::Second => match obj {
+            WorldObject::GrassTile => DESERT_TILE,
+            WorldObject::WaterTile => DESERT_WATER,
+            _ => obj.get_obj_color(),
+        },
+        Era::Third => match obj {
+            WorldObject::GrassTile => SNOW_TILE,
+            WorldObject::WaterTile => SNOW_WATER,
+            _ => obj.get_obj_color(),
+        },
+    }
+}
+fn is_grass_obj(obj: &WorldObject) -> bool {
+    [
+        WorldObject::Grass,
+        WorldObject::Grass2,
+        WorldObject::Grass3,
+        WorldObject::DesertGrass1,
+        WorldObject::DesertGrass2,
+        WorldObject::DesertGrass3,
+        WorldObject::DesertGrass4,
+        WorldObject::SnowGrass1,
+        WorldObject::SnowGrass2,
+        WorldObject::SnowGrass3,
+        WorldObject::SnowGrass4,
+    ]
+    .contains(obj)
 }
 
 fn toggle_island_map(
@@ -412,15 +445,20 @@ fn setup_island_map(
                 }
 
                 if let Some(cached_tile) = minimap_cache.cache.get(&map_pos) {
-                    let c = cached_tile.get_obj_color();
-                    data.push((c.r() * 255.) as u8);
-                    data.push((c.g() * 255.) as u8);
-                    data.push((c.b() * 255.) as u8);
-                    data.push(255);
-                    continue;
+                    if !is_grass_obj(cached_tile) {
+                        let c = cached_tile.get_obj_color();
+                        data.push((c.r() * 255.) as u8);
+                        data.push((c.g() * 255.) as u8);
+                        data.push((c.b() * 255.) as u8);
+                        data.push(255);
+                        continue;
+                    }
                 }
 
-                let c = explored_tile[quadrant].get_obj_color();
+                let c = minimap_base_terrain_color_for_era(
+                    explored_tile[quadrant],
+                    &game.era.current_era,
+                );
                 data.push((c.r() * 255.) as u8);
                 data.push((c.g() * 255.) as u8);
                 data.push((c.b() * 255.) as u8);

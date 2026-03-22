@@ -80,7 +80,7 @@ impl Era {
             Era::Main => 0,
             Era::DungeonMain => 1 * 16,
             Era::Second => 4 * 16,
-            Era::Third => 3 * 16,
+            Era::Third => 5 * 16,
         }
     }
     pub fn index(&self) -> usize {
