@@ -1,0 +1,11 @@
+(
+  name: "SnowMedBoulder1",
+  templates: ["world_object.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SnowMedBoulder1,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::attributes::MaxHealth": (1),
+  "survival_rogue_like::proto::ColliderProto": (x: 10.0, y: 10.0),
+  "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: StoneChunk, min: 2, max: 5, rate: 1.0)]),
+  }
+)

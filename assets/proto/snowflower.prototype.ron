@@ -1,18 +1,18 @@
 (
-  name: "SnowBerryBush",
+  name: "SnowFlower",
   templates: ["world_object.prototype.ron"],
   schematics: {
-  "survival_rogue_like::item::WorldObject": SnowBerryBush,
+  "survival_rogue_like::item::WorldObject": SnowFlower,
   "survival_rogue_like::attributes::MaxHealth": (1),
-  "survival_rogue_like::player::levels::ExperienceReward": (8),
-  "survival_rogue_like::proto::ColliderProto": (x: 6., y: 6.),
+  "survival_rogue_like::player::levels::ExperienceReward": (5),
+  "survival_rogue_like::world::y_sort::YSort": (-0.01),
   "survival_rogue_like::item::loot_table::LootTable": (
         drops: [(
-                item: SnowBerries,
+                item: SnowFlowerBlock,
                 min: 1,
                 max: 1,
                 rate: 1.
             ),]
         ),
-  },
+  }
 )

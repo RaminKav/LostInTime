@@ -149,7 +149,7 @@
       "chance to trigger an",
       "echo that damages",
       "enemies around you.",
-      "+20 Health regen.",
+      "+5 Health regen.",
       "Costs 5 mana."
     ],
     "id": "HealEcho",
@@ -161,10 +161,12 @@
       "Healing has a 20%",
       "chance to trigger",
       "all summons once",
-      "(Ant Farm, Boulder"
+      "(Ant Farm, Boulder,",
+      "Piercing Ring).",
+      "Costs 15 mana."
     ],
     "id": "HealSummons",
-    "rarity": "Rare",
+    "rarity": "Legendary",
     "title": "Summoning Wand"
   },
   {
@@ -227,7 +229,7 @@
   },
   {
     "description_lines": [
-      "Gain +2% Lifesteal,",
+      "Gain +4% Lifesteal,",
       "permanently."
     ],
     "id": "Lifesteal",
@@ -236,7 +238,7 @@
   },
   {
     "description_lines": [
-      "Gain +15 Thorns, ",
+      "Gain +25 Thorns, ",
       "permanently."
     ],
     "id": "Thorns",
@@ -287,19 +289,6 @@
   },
   {
     "description_lines": [
-      "0.5% chance to",
-      "execute enemies.",
-      "Executes cause",
-      "hallucinations,",
-      "granting random",
-      "stat buffs."
-    ],
-    "id": "LethalBlow",
-    "rarity": "Legendary",
-    "title": "Deadly Mushroom"
-  },
-  {
-    "description_lines": [
       "Gain +7% Dodge",
       "Chance,",
       "permanently."
@@ -311,10 +300,11 @@
   {
     "description_lines": [
       "Your Attacks have",
-      "a chance to apply",
-      "a Slow stack to",
+      "+25% chance to apply",
+      "a Freeze stack to",
       "enemies, reducing",
-      "speed by 15%."
+      "speed by 15% per",
+      "stack."
     ],
     "id": "SlowStacks",
     "rarity": "Uncommon",
@@ -322,14 +312,14 @@
   },
   {
     "description_lines": [
-      "Spawn ants that",
+      "Summon ants that",
       "rush towards",
       "enemies, dealing",
       "damage.",
-      "Costs 4 mana."
+      "Costs 2 mana."
     ],
     "id": "AntFarm",
-    "rarity": "Uncommon",
+    "rarity": "Common",
     "title": "Ant Farm"
   },
   {
@@ -371,12 +361,11 @@
   },
   {
     "description_lines": [
-      "Your Attacks have",
-      "a chance to leave",
+      "Killing an enemy has",
+      "a 10% chance to leave",
       "a trail of ice that",
       "damages enemies. ",
-      "+25% freeze chance.",
-      "Costs 3 mana."
+      "Costs 5 mana."
     ],
     "id": "IceStaffFloor",
     "rarity": "Legendary",
@@ -483,15 +472,28 @@
   },
   {
     "description_lines": [
-      "Spawn rocks that",
+      "Summon rocks that",
       "orbit you and deal",
       "damage to enemies",
       "they hit.",
-      "Costs 4 mana."
+      "Costs 5 mana."
     ],
     "id": "StoneTooth",
     "rarity": "Uncommon",
     "title": "Boulder"
+  },
+  {
+    "description_lines": [
+      "Summon a ring that",
+      "flies in a random",
+      "direction, piercing",
+      "enemies and bouncing",
+      "off objects.",
+      "Costs 7 mana."
+    ],
+    "id": "SummonRing",
+    "rarity": "Rare",
+    "title": "Piercing Ring"
   },
   {
     "description_lines": [
@@ -552,7 +554,7 @@
       "Costs 5 mana."
     ],
     "id": "SkillEcho",
-    "rarity": "Legendary",
+    "rarity": "Rare",
     "title": "Dragon Eye"
   },
   {
@@ -587,12 +589,22 @@
   },
   {
     "description_lines": [
-      "Every 5 kills",
+      "Every 25 kills",
       "gain +1 Max HP."
     ],
     "id": "MaxHPHunt",
     "rarity": "Legendary",
     "title": "Ripe Tomato"
+  },
+  {
+    "description_lines": [
+      "7% chance when using",
+      "a skill to gain +1",
+      "Skill Power."
+    ],
+    "id": "SkillPowerHunt",
+    "rarity": "Rare",
+    "title": "Arcane Tome"
   },
   {
     "description_lines": [
@@ -627,8 +639,8 @@
   },
   {
     "description_lines": [
-      "Lose 5 HP Regen,",
-      "gain 5% Lifesteal."
+      "Lose 10 HP Regen,",
+      "gain 10% Lifesteal."
     ],
     "id": "RegenLifesteal",
     "rarity": "Uncommon",
@@ -658,6 +670,7 @@
   {
     "description_lines": [
       "Lifesteal triggers",
+      "have a 20% chance to",
       "give you a coin.",
       "Gain +5% Lifesteal."
     ],
@@ -679,7 +692,7 @@
     "description_lines": [
       "Breaking crates",
       "permanently gives",
-      "+1% damage."
+      "+1.5% damage."
     ],
     "id": "CrateBreakDamage",
     "rarity": "Legendary",
@@ -754,7 +767,8 @@
       "Taking damage shoots",
       "out 2 spikes. Damage",
       "scales with thorns",
-      "stat."
+      "stat.",
+      "+15 Thorns."
     ],
     "id": "ThornsSpikes",
     "rarity": "Uncommon",
@@ -772,7 +786,8 @@
   {
     "description_lines": [
       "Your thorns damage",
-      "has +25% lifesteal."
+      "has +25% lifesteal.",
+      "+15 Thorns."
     ],
     "id": "ThornsLifesteal",
     "rarity": "Uncommon",
@@ -793,7 +808,7 @@
   {
     "description_lines": [
       "Killing an enemy",
-      "has a 5% chance",
+      "has a 20% chance",
       "to spawn a lightning",
       "strike on a random",
       "nearby enemy.",

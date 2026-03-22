@@ -815,51 +815,6 @@
             size: (16., 16.),
             anchor: None,
         ),
-        SnowGrass1: WorldObjectData(
-            texture_pos: (3., 14.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowGrass2: WorldObjectData(
-            texture_pos: (4., 14.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowGrass3: WorldObjectData(
-            texture_pos: (5., 14.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowCrate: WorldObjectData(
-            texture_pos: (6., 14.),
-            size: (16., 22.),
-            anchor: None,
-        ),
-        SnowDeadSapling: WorldObjectData(
-            texture_pos: (3., 15.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowMushroom: WorldObjectData(
-            texture_pos: (4., 15.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowMushroomBlock: WorldObjectData(
-            texture_pos: (4., 15.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowBerries: WorldObjectData(
-            texture_pos: (5., 15.),
-            size: (16., 16.),
-            anchor: None,
-        ),
-        SnowBerryBush: WorldObjectData(
-            texture_pos: (5., 15.),
-            size: (16., 16.),
-            anchor: None,
-        ),
         Coin: WorldObjectData(
             texture_pos: (8., 14.),
             size: (16., 16.),
@@ -1222,6 +1177,253 @@
         DesertMedBoulder3: WorldObjectData(
             texture_pos: (14., 24.),
             size: (32., 32.),
+            anchor: None,
+        ),
+
+        //snow
+        SnowSmlBoulder1: WorldObjectData(
+            texture_pos: (0., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowSmlBoulder2: WorldObjectData(
+            texture_pos: (1., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowSmlBoulder3: WorldObjectData(
+            texture_pos: (2., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowSmlBoulder4: WorldObjectData(
+            texture_pos: (3., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowSmlBoulder5: WorldObjectData(
+            texture_pos: (4., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowSmlBoulder6: WorldObjectData(
+            texture_pos: (5., 29.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowMedBoulder1: WorldObjectData(
+            texture_pos: (0., 30.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        SnowMedBoulder2: WorldObjectData(
+            texture_pos: (2., 30.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        SnowMedBoulder3: WorldObjectData(
+            texture_pos: (4., 30.),
+            size: (32., 32.),
+            anchor: None,
+        ),
+        SnowBerryBushSml1: WorldObjectData(
+            texture_pos: (4., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBerryBushSml2: WorldObjectData(
+            texture_pos: (5., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBerryBushSml3: WorldObjectData(
+            texture_pos: (4., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBerryBushSml4: WorldObjectData(
+            texture_pos: (5., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBerryBushMed1: WorldObjectData(
+            texture_pos: (6., 32.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowBerryBushMed2: WorldObjectData(
+            texture_pos: (6., 33.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowBushSnow1: WorldObjectData(
+            texture_pos: (8., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBushSnow2: WorldObjectData(
+            texture_pos: (9., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBushSnow3: WorldObjectData(
+            texture_pos: (8., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBushSnow4: WorldObjectData(
+            texture_pos: (9., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBush1: WorldObjectData(
+            texture_pos: (10., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBush2: WorldObjectData(
+            texture_pos: (11., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBush3: WorldObjectData(
+            texture_pos: (10., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBush4: WorldObjectData(
+            texture_pos: (11., 33.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowBushMed1: WorldObjectData(
+            texture_pos: (12., 32.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowBushMed2: WorldObjectData(
+            texture_pos: (12., 33.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowBushSnowMed1: WorldObjectData(
+            texture_pos: (14., 32.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowBushSnowMed2: WorldObjectData(
+            texture_pos: (14., 33.),
+            size: (32., 16.),
+            anchor: None,
+        ),
+        SnowCrystalSml1: WorldObjectData(
+            texture_pos: (4., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrystalSml2: WorldObjectData(
+            texture_pos: (5., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrystalSml3: WorldObjectData(
+            texture_pos: (10., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrystalSml4: WorldObjectData(
+            texture_pos: (11., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrate1: WorldObjectData(
+            texture_pos: (12., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrate2: WorldObjectData(
+            texture_pos: (13., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrate3: WorldObjectData(
+            texture_pos: (14., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrate4: WorldObjectData(
+            texture_pos: (15., 34.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowCrystalMed1: WorldObjectData(
+            texture_pos: (4., 35.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        SnowCrystalMed2: WorldObjectData(
+            texture_pos: (9., 35.),
+            size: (16., 32.),
+            anchor: None,
+        ),
+        IcePatch: WorldObjectData(
+            texture_pos: (0., 32.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowGrass1: WorldObjectData(
+            texture_pos: (11., 35.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowGrass2: WorldObjectData(
+            texture_pos: (12., 35.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowGrass3: WorldObjectData(
+            texture_pos: (11., 36.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowGrass4: WorldObjectData(
+            texture_pos: (12., 36.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowFlower: WorldObjectData(
+            texture_pos: (11., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowFlowerBlock: WorldObjectData(
+            texture_pos: (11., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowFlower2: WorldObjectData(
+            texture_pos: (10., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowFlower2Block: WorldObjectData(
+            texture_pos: (10., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowDeadSapling: WorldObjectData(
+            texture_pos: (9., 37.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowMushroom1: WorldObjectData(
+            texture_pos: (14., 35.),
+            size: (16., 16.),
+            anchor: None,
+        ),
+        SnowMushroom2: WorldObjectData(
+            texture_pos: (15., 36.),
+            size: (16., 16.),
             anchor: None,
         ),
         

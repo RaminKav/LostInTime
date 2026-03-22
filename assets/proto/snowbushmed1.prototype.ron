@@ -1,0 +1,11 @@
+(
+  name: "SnowBushMed1",
+  templates: ["world_object.prototype.ron"],
+  schematics: {
+  "survival_rogue_like::item::WorldObject": SnowBushMed1,
+  "survival_rogue_like::assets::SpriteSize": Medium,
+  "survival_rogue_like::attributes::MaxHealth": (1),
+  "survival_rogue_like::proto::ColliderProto": (x: 9., y: 9.),
+  "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: Stick, min: 1, max: 3, rate: 0.75), (item: PlantFibre, min: 1, max: 2, rate: 0.25)]),
+  }
+)

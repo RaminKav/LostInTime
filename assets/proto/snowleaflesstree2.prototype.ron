@@ -1,8 +1,8 @@
 (
-  name: "SnowTree3",
+  name: "SnowLeaflessTree2",
   templates: [],
   schematics: {
-  "survival_rogue_like::item::WorldObject": SnowTree3,
+  "survival_rogue_like::item::WorldObject": SnowLeaflessTree2,
   "survival_rogue_like::assets::SpriteSize": Small,
   "survival_rogue_like::animations::FadeOpacity": (),
   "survival_rogue_like::assets::SpriteAnchor": ((x: 0., y: 32.)),
@@ -13,7 +13,7 @@
   "survival_rogue_like::player::levels::ExperienceReward": (15),
   "bevy_proto::custom::VisibilityBundle": (),
   "bevy_proto::custom::SpriteBundle": (
-      texture: AssetPath("SnowTree3.png")
+      texture: AssetPath("SnowLeaflessTree2.png")
    ),
   "survival_rogue_like::item::loot_table::LootTable": (drops: [(item: Stick, min: 1, max: 2, rate: 0.5)]),
   }
