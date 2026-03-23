@@ -32,7 +32,7 @@ use crate::{
         levels::PlayerLevel,
         skills::{
             ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills,
-            Slot1ChargeTracker, Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker,
+            ClassSkillSlots,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
@@ -2046,23 +2046,15 @@ pub fn handle_update_player_skills(
 
 /// Updates skill charge text display for slots 1-4
 pub fn update_skill_charge_text(
-    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
-    slot3_trackers: Query<&crate::player::skills::Slot3ChargeTracker, With<Player>>,
-    slot4_trackers: Query<&crate::player::skills::Slot4ChargeTracker, With<Player>>,
+    class_slots: Query<&ClassSkillSlots, With<Player>>,
     mut charge_texts: Query<(&SkillChargeText, &mut Text)>,
 ) {
+    let Ok(slots) = class_slots.get_single() else {
+        return;
+    };
     for (charge_text, mut text) in charge_texts.iter_mut() {
-        // Get the tracker for this text's slot
-        let tracker_opt = match charge_text.slot {
-            0 => slot1_trackers.get_single().ok().map(|t| &t.0),
-            1 => slot2_trackers.get_single().ok().map(|t| &t.0),
-            2 => slot3_trackers.get_single().ok().map(|t| &t.0),
-            3 => slot4_trackers.get_single().ok().map(|t| &t.0),
-            _ => None,
-        };
-
-        if let Some(tracker) = tracker_opt {
+        if charge_text.slot < 4 {
+            let tracker = &slots.0[charge_text.slot];
             // Only show text if max charges > 1
             if tracker.max_charges > 1 {
                 text.sections[0].value = format!("{}", tracker.current_charges);
@@ -2403,22 +2395,21 @@ pub fn spawn_skill_cooldown_overlay_with_elapsed(
 
 pub fn tick_skill_cooldown_overlays(
     mut overlays: Query<(&mut Sprite, &mut SkillCooldownOverlay), With<SkillCooldownOverlay>>,
-    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
-    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
-    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    class_slots: Query<&ClassSkillSlots, With<Player>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
     game: Res<crate::Game>,
     time: Res<Time>,
 ) {
-    // Check which slot has Roll (if any)
     let roll_slot = player_skills
         .get_single()
         .ok()
         .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
 
+    let Ok(slots) = class_slots.get_single() else {
+        return;
+    };
+
     for (mut sprite, mut timer) in overlays.iter_mut() {
-        // Special handling for Roll: use actual player_dash_cooldown timer
         if Some(timer.index) == roll_slot {
             let dash_cooldown = &game.player_state.player_dash_cooldown;
             let elapsed = dash_cooldown.elapsed().as_secs_f32();
@@ -2432,19 +2423,9 @@ pub fn tick_skill_cooldown_overlays(
             continue;
         }
 
-        // Each slot uses its own independent charge tracker
-        let tracker_opt = match timer.index {
-            0 => slot1_trackers.get_single().ok().map(|t| &t.0),
-            1 => slot2_trackers.get_single().ok().map(|t| &t.0),
-            2 => slot3_trackers.get_single().ok().map(|t| &t.0),
-            3 => slot4_trackers.get_single().ok().map(|t| &t.0),
-            _ => None,
-        };
-
-        if let Some(tracker) = tracker_opt {
-            // This slot uses charge-based cooldown
-            if tracker.current_charges < tracker.max_charges {
-                // Show charge regeneration timer
+        if timer.index < 4 {
+            let tracker = &slots.0[timer.index];
+            if tracker.max_charges > 0 && tracker.current_charges < tracker.max_charges {
                 let elapsed = tracker.cooldown_timer.elapsed().as_secs_f32();
                 let duration = tracker.cooldown_timer.duration().as_secs_f32();
                 let percent = if duration > 0.0 {
@@ -2454,11 +2435,9 @@ pub fn tick_skill_cooldown_overlays(
                 };
                 sprite.custom_size = Some(Vec2::new(16., 16. * (1.0 - percent)));
             } else {
-                // Have max charges, hide overlay
                 sprite.custom_size = Some(Vec2::new(16., 0.));
             }
         } else {
-            // Use overlay's own independent timer (no charge system for this slot)
             timer.timer.tick(time.delta());
             sprite.custom_size = Some(Vec2::new(16., 16. * (1. - timer.timer.percent())));
         }
@@ -2468,44 +2447,33 @@ pub fn tick_skill_cooldown_overlays(
 pub fn handle_active_skill_event(
     mut active_skill_used: EventReader<ActiveSkillUsedEvent>,
     mut overlays: Query<&mut SkillCooldownOverlay>,
-    slot1_trackers: Query<&crate::player::skills::Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&crate::player::skills::Slot2ChargeTracker, With<Player>>,
-    slot3_trackers: Query<&crate::player::skills::Slot3ChargeTracker, With<Player>>,
-    slot4_trackers: Query<&crate::player::skills::Slot4ChargeTracker, With<Player>>,
+    class_slots: Query<&ClassSkillSlots, With<Player>>,
     player_skills: Query<&PlayerSkills, With<Player>>,
 ) {
-    // Check which slot has Roll (if any)
     let roll_slot = player_skills
         .get_single()
         .ok()
         .and_then(|skills| skills.has_active_skill(ActiveSkill::Roll));
 
+    let Ok(slots) = class_slots.get_single() else {
+        return;
+    };
+
     for e in active_skill_used.iter() {
-        // Skip overlay update for Roll - it uses the actual player_dash_cooldown timer
         if Some(e.slot) == roll_slot {
             continue;
         }
 
-        // Check if this slot has a charge tracker
-        let has_tracker = match e.slot {
-            0 => slot1_trackers.get_single().is_ok(),
-            1 => slot2_trackers.get_single().is_ok(),
-            2 => slot3_trackers.get_single().is_ok(),
-            3 => slot4_trackers.get_single().is_ok(),
-            _ => false,
-        };
+        let has_class_slot = e.slot < 4 && slots.0[e.slot].max_charges > 0;
 
         for mut overlay in overlays.iter_mut() {
             if overlay.index == e.slot {
-                if has_tracker {
-                    // Charge tracker handles the cooldown, don't update overlay timer
-                    // The charge regeneration timer is shown by tick_skill_cooldown_overlays
+                if has_class_slot {
                     continue;
                 }
 
-                // Standard cooldown behavior for slots without charge trackers
                 overlay.timer.reset();
-                let cooldown_secs = e.cooldown.max(0.0); // avoid negative Duration panic
+                let cooldown_secs = e.cooldown.max(0.0);
                 overlay
                     .timer
                     .set_duration(Duration::from_secs_f32(cooldown_secs));
@@ -2520,16 +2488,17 @@ pub fn update_skill_tooltip_cooldown(
     tooltip_containers: Query<&ActiveSkillHudTooltipSkill>,
     game: Res<crate::Game>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
-    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
-    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    class_slots: Query<&ClassSkillSlots, With<Player>>,
     overlays: Query<&SkillCooldownOverlay>,
 ) {
     let roll_slot = player_skills
         .get_single()
         .ok()
         .and_then(|s| s.has_active_skill(ActiveSkill::Roll));
+
+    let Ok(slots) = class_slots.get_single() else {
+        return;
+    };
 
     for (parent, mut text) in cooldown_texts.iter_mut() {
         let Ok(tooltip_skill) = tooltip_containers.get(parent.get()) else {
@@ -2542,15 +2511,9 @@ pub fn update_skill_tooltip_cooldown(
             let max = dash.duration().as_secs_f32();
             let remaining = (max - dash.elapsed().as_secs_f32()).max(0.0);
             (remaining, max)
-        } else {
-            let tracker_opt = match slot_index {
-                0 => slot1_trackers.get_single().ok().map(|t| &t.0),
-                1 => slot2_trackers.get_single().ok().map(|t| &t.0),
-                2 => slot3_trackers.get_single().ok().map(|t| &t.0),
-                3 => slot4_trackers.get_single().ok().map(|t| &t.0),
-                _ => None,
-            };
-            if let Some(tracker) = tracker_opt {
+        } else if slot_index < 4 {
+            let tracker = &slots.0[slot_index];
+            if tracker.max_charges > 0 {
                 let max = tracker.cooldown_timer.duration().as_secs_f32();
                 let remaining = if tracker.current_charges < tracker.max_charges {
                     (max - tracker.cooldown_timer.elapsed().as_secs_f32()).max(0.0)
@@ -2569,6 +2532,16 @@ pub fn update_skill_tooltip_cooldown(
                     })
                     .unwrap_or((0.0, 0.0))
             }
+        } else {
+            overlays
+                .iter()
+                .find(|o| o.index == slot_index)
+                .map(|o| {
+                    let max = o.timer.duration().as_secs_f32();
+                    let remaining = (max - o.timer.elapsed().as_secs_f32()).max(0.0);
+                    (remaining, max)
+                })
+                .unwrap_or((0.0, 0.0))
         };
 
         text.sections[0].value = if remaining > 0.05 {

@@ -18,7 +18,10 @@ use crate::{
     GameParam,
 };
 
-use super::{ActiveSkill, ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills};
+use super::{
+    skills::ActiveSkill,
+    ActiveSkillUsedEvent, Heirloom, MovePlayerEvent, Player, PlayerSkills,
+};
 
 aseprite!(pub IceExplosion, "textures/effects/IceExplosion.aseprite");
 aseprite!(pub Electricity, "textures/effects/Electricity.aseprite");
@@ -28,7 +31,6 @@ pub struct JustTeleported;
 #[derive(Component)]
 pub struct TeleportState {
     pub just_teleported_timer: Timer,
-    pub cooldown_timer: Timer,
     pub timer: Timer,
 }
 
@@ -169,13 +171,6 @@ pub fn tick_just_teleported(
     }
 }
 
-// Teleport now uses SkillChargeTracker instead of count/max_count
-// This function is kept for compatibility but no longer regenerates charges
-pub fn tick_teleport_timer(time: Res<Time>, mut player_q: Query<&mut TeleportState, With<Player>>) {
-    for mut teleport_state in player_q.iter_mut() {
-        teleport_state.cooldown_timer.tick(time.delta());
-    }
-}
 
 pub fn spawn_ice_explosion_hitbox(
     commands: &mut Commands,

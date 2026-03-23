@@ -16,10 +16,8 @@ use crate::enemy::spawn_helpers::can_spawn_mob_here;
 use crate::enemy::spawner::GlobalSpawners;
 use crate::juice::{DustParticles, RunDustTimer};
 use crate::player::skills::{
-    ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState, DaggerThrowState,
-    DruidTreeSkillState, FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-    LightningState, PhasingThroughEnemies, PlayerSkills, SlashState, Slot1ChargeTracker,
-    Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState, TripleThrowState,
+    ActiveSkill, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, PhasingThroughEnemies,
+    PlayerSkills,
 };
 use crate::ui::key_input_guide::InteractionGuideTrigger;
 use crate::world::dimension::{DimensionSpawnEvent, Era};
@@ -60,13 +58,7 @@ use crate::world::chunk::Chunk;
 
 use crate::world::world_helpers::world_pos_to_tile_pos;
 
-use crate::player::mage_skills::TeleportState;
-use crate::player::melee_skills::SpearState;
 use crate::player::ice_slide::{clear_ice_slide_when_stuck, tick_ice_slide_movement};
-use crate::player::rogue_skills::{LungeState, SprintState};
-use crate::player::skills::{
-    FirePillarState, PiercingStarSkillState, RapidfireState, ShoutSkillState, StealthState,
-};
 use crate::{
     bounce_player, update_bounce_effect, update_shadow, BounceEffect, BounceEvent, Game,
     GameUpscale, InputMappings, Player, ScreenResolution, UpdatePetWeaponEvent, DEBUG,
@@ -469,90 +461,23 @@ pub fn dispatch_active_skill_events(
     mut ev: EventWriter<ActiveSkillUsedEvent>,
     key_input: Res<Input<KeyCode>>,
     mouse_input: Res<Input<MouseButton>>,
-    player_q: Query<
-        (
-            &PlayerSkills,
-            Option<&SprintState>,
-            Option<&LungeState>,
-            Option<&TeleportState>,
-            Option<&SpearState>,
-            Option<&StealthState>,
-            Option<&RapidfireState>,
-            Option<&FirePillarState>,
-            Option<&HealSkillState>,
-            Option<&BuckshotSkillState>,
-            Option<&IceWallSkillState>,
-            Option<&DruidTreeSkillState>,
-            Option<&ShoutSkillState>,
-            Option<&PiercingStarSkillState>,
-            Option<&LaserBeamState>,
-        ),
-        With<Player>,
-    >,
-    player_q2: Query<
-        (
-            Option<&LightningState>,
-            Option<&DaggerThrowState>,
-            Option<&SlashState>,
-            Option<&TripleThrowState>,
-            Option<&FuryState>,
-            Option<&BombState>,
-            Option<&SpinAttackState>,
-        ),
-        With<Player>,
-    >,
-    slot1_trackers: Query<&Slot1ChargeTracker, With<Player>>,
-    slot2_trackers: Query<&Slot2ChargeTracker, With<Player>>,
-    slot3_trackers: Query<&Slot3ChargeTracker, With<Player>>,
-    slot4_trackers: Query<&Slot4ChargeTracker, With<Player>>,
+    player_q: Query<(&PlayerSkills, &ClassSkillSlots), With<Player>>,
     blessings_q: Query<&OwnedBlessings, With<Player>>,
     keybinds: Res<crate::keybinds::InputMappings>,
 ) {
-    let Ok((
-        skills,
-        sprint_state,
-        lunge_state,
-        teleport_state,
-        spear_state,
-        stealth_state,
-        rapid_state,
-        pillar_state,
-        heal_state,
-        buckshot_state,
-        icewall_state,
-        druidtree_state,
-        shout_state,
-        piercing_star_state,
-        laser_beam_state,
-    )) = player_q.get_single()
-    else {
-        return;
-    };
-    let Ok((
-        lightning_state,
-        dagger_throw_state,
-        slash_state,
-        triple_throw_state,
-        fury_state,
-        bomb_state,
-        spin_attack_state,
-    )) = player_q2.get_single()
-    else {
+    let Ok((skills, class_slots)) = player_q.get_single() else {
         return;
     };
     let Ok(blessings) = blessings_q.get_single() else {
         return;
     };
 
-    let slot_4_pressed = keybinds.check_skill_input(4, &key_input, &mouse_input);
     let slot_3_pressed = keybinds.check_skill_input(3, &key_input, &mouse_input);
     let slot_2_pressed = keybinds.check_skill_input(2, &key_input, &mouse_input);
     let slot_1_pressed = keybinds.check_skill_input(1, &key_input, &mouse_input);
     let slot_0_pressed = keybinds.check_skill_input(0, &key_input, &mouse_input);
 
-    let pressed_slot = if slot_4_pressed {
-        Some(4)
-    } else if slot_3_pressed {
+    let pressed_slot = if slot_3_pressed {
         Some(3)
     } else if slot_2_pressed {
         Some(2)
@@ -567,114 +492,14 @@ pub fn dispatch_active_skill_events(
     if let Some(slot) = pressed_slot {
         if let Some(skill) = skills.get_active_skill_in_slot(slot) {
             let effective_cd = skills.effective_skill_cooldown(&skill, blessings);
-
-            // Check charges — slot index maps to tracker: 0→Slot1, 1→Slot2, 2→Slot3, 3→Slot4
-            // For charge-tracked slots, the tracker is the single source of truth:
-            // if the tracker exists, only fire when charges > 0 (never fall through to state checks).
-            let tracker_result = match slot {
-                0 => slot1_trackers
-                    .get_single()
-                    .ok()
-                    .map(|t| t.0.current_charges > 0),
-                1 => slot2_trackers
-                    .get_single()
-                    .ok()
-                    .map(|t| t.0.current_charges > 0),
-                2 => slot3_trackers
-                    .get_single()
-                    .ok()
-                    .map(|t| t.0.current_charges > 0),
-                3 => slot4_trackers
-                    .get_single()
-                    .ok()
-                    .map(|t| t.0.current_charges > 0),
-                _ => None,
-            };
-            if let Some(has_charge) = tracker_result {
-                // Tracker exists for this slot — it is the sole gatekeeper
-                if has_charge {
+            let s = &class_slots.0[slot];
+            if s.max_charges > 0 {
+                if s.current_charges > 0 {
                     ev.send(ActiveSkillUsedEvent {
                         slot,
                         cooldown: effective_cd,
                     });
                 }
-                // Whether charges are available or not, do not fall through to state checks
-                return;
-            }
-
-            // No charge tracker for this slot — check cooldown state as normal
-            let on_cooldown = match skill {
-                ActiveSkill::Roll => true, // Handled entirely in player_move_inputs
-                ActiveSkill::Sprint => sprint_state
-                    .map(|s| !s.sprint_cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::SprintLunge => lunge_state
-                    .map(|s| !s.lunge_cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Teleport => teleport_state
-                    .map(|t| !t.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Parry => false, //--- IGNORE ---
-                ActiveSkill::ParrySpear => spear_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Stealth => stealth_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Rapidfire => rapid_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::FirePillar => pillar_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Heal => heal_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Buckshot => buckshot_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::IceWall => icewall_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::DruidTree => druidtree_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Shout => shout_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::PiercingStar => piercing_star_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::LaserBeam => laser_beam_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Lightning => lightning_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::DaggerThrow => dagger_throw_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::DaggerSlash => slash_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::TripleThrow => triple_throw_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Fury => fury_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::Bomb => bomb_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-                ActiveSkill::SpinAttack => spin_attack_state
-                    .map(|s| !s.cooldown_timer.finished())
-                    .unwrap_or(false),
-            };
-            if !on_cooldown && effective_cd > 0.0 {
-                ev.send(ActiveSkillUsedEvent {
-                    slot,
-                    cooldown: effective_cd,
-                });
             }
         }
     }

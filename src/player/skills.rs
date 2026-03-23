@@ -137,7 +137,9 @@ impl SkillClass {
     }
 }
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default)]
+#[derive(
+    Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, EnumIter, Display, Deserialize, Default,
+)]
 pub enum ActiveSkill {
     #[default]
     Roll,
@@ -176,7 +178,7 @@ impl ActiveSkill {
             ActiveSkill::Sprint => 8.0,
             ActiveSkill::SprintLunge => 1.2,
             ActiveSkill::Teleport => 1.2,
-            ActiveSkill::Stealth => 11.0,
+            ActiveSkill::Stealth => 13.0,
             ActiveSkill::Rapidfire => 12.0,
             ActiveSkill::FirePillar => 12.0,
             ActiveSkill::Heal => 45.0,
@@ -201,56 +203,36 @@ impl ActiveSkill {
 #[derive(Component, Clone)]
 pub struct StealthState {
     pub duration: Timer,
-    pub cooldown_timer: Timer,
 }
 #[derive(Component, Clone)]
 pub struct RapidfireState {
     pub duration: Timer,
-    pub cooldown_timer: Timer,
     pub attack_speed_bonus: f32,
 }
 #[derive(Component, Clone)]
 pub struct FirePillarState {
-    pub cooldown_timer: Timer,
     pub hit_clear_timer: Timer,
 }
 #[derive(Component, Clone)]
 pub struct LaserBeamState {
-    pub cooldown_timer: Timer,
     pub hit_clear_timer: Timer,
 }
 #[derive(Component, Clone)]
-pub struct HealSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct HealSkillState;
 #[derive(Component, Clone)]
-pub struct BuckshotSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct BuckshotSkillState;
 #[derive(Component, Clone)]
-pub struct IceWallSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct IceWallSkillState;
 #[derive(Component, Clone)]
-pub struct DruidTreeSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct DruidTreeSkillState;
 #[derive(Component, Clone)]
-pub struct ShoutSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct ShoutSkillState;
 #[derive(Component, Clone)]
-pub struct PiercingStarSkillState {
-    pub cooldown_timer: Timer,
-}
+pub struct PiercingStarSkillState;
 #[derive(Component, Clone)]
-pub struct LightningState {
-    pub cooldown_timer: Timer,
-}
+pub struct LightningState;
 #[derive(Component, Clone)]
-pub struct DaggerThrowState {
-    pub cooldown_timer: Timer,
-}
+pub struct DaggerThrowState;
 
 /// Tracks kills since last dagger throw cast (max 10)
 /// Kills from dagger throw projectiles themselves don't count
@@ -265,27 +247,18 @@ pub struct LastHitProjectile {
     pub projectile: Option<Projectile>,
 }
 #[derive(Component, Clone)]
-pub struct SlashState {
-    pub cooldown_timer: Timer,
-}
+pub struct SlashState;
 #[derive(Component, Clone)]
-pub struct TripleThrowState {
-    pub cooldown_timer: Timer,
-}
+pub struct TripleThrowState;
 #[derive(Component, Clone)]
 pub struct FuryState {
-    pub cooldown_timer: Timer,
     pub duration: Timer,
     pub throw_timer: Timer,
 }
 #[derive(Component, Clone)]
-pub struct BombState {
-    pub cooldown_timer: Timer,
-}
+pub struct BombState;
 #[derive(Component, Clone)]
-pub struct SpinAttackState {
-    pub cooldown_timer: Timer,
-}
+pub struct SpinAttackState;
 
 #[derive(Component, Clone)]
 pub struct PhasingThroughEnemies {
@@ -381,7 +354,8 @@ impl ActiveSkill {
             ActiveSkill::Stealth => vec![
                 "Dissapear for a short duration,".to_string(),
                 "ignoring all damage. Attacks used".to_string(),
-                "during Stealth will always crit.".to_string(),
+                "during Stealth will always crit. Attacks".to_string(),
+                "or other skills end Stealth early.".to_string(),
             ],
             ActiveSkill::Teleport => vec![
                 format!("Teleport forwards, dealing {:.1}%", skill_power * 33.0),
@@ -463,12 +437,6 @@ impl ActiveSkill {
                     .insert(crate::player::rogue_skills::SprintState {
                         startup_timer: Timer::from_seconds(0.0, TimerMode::Once),
                         sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
-                        sprint_cooldown_timer: Timer::from_seconds(
-                            ActiveSkill::Sprint.get_base_cooldown(),
-                            TimerMode::Once,
-                        )
-                        .tick(Duration::from_secs(99))
-                        .clone(),
                         speed_bonus: 1.6,
                     });
             }
@@ -476,12 +444,6 @@ impl ActiveSkill {
                 commands
                     .entity(entity)
                     .insert(crate::player::rogue_skills::LungeState {
-                        lunge_cooldown_timer: Timer::from_seconds(
-                            ActiveSkill::SprintLunge.get_base_cooldown(),
-                            TimerMode::Once,
-                        )
-                        .tick(Duration::from_secs(99))
-                        .clone(),
                         lunge_duration: Timer::from_seconds(0.42, TimerMode::Once),
                         lunge_speed: 9.5,
                     });
@@ -491,9 +453,6 @@ impl ActiveSkill {
                     .entity(entity)
                     .insert(crate::player::mage_skills::TeleportState {
                         just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                        cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once)
-                            .tick(Duration::from_secs(99))
-                            .clone(),
                         timer: Timer::from_seconds(0.06, TimerMode::Once),
                     });
             }
@@ -513,19 +472,12 @@ impl ActiveSkill {
                 commands
                     .entity(entity)
                     .insert(crate::player::melee_skills::SpearState {
-                        cooldown_timer: Timer::from_seconds(5.2, TimerMode::Once)
-                            .tick(Duration::from_secs(99))
-                            .clone(),
                         spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
                     });
             }
             ActiveSkill::Stealth => {
-                let cooldown = ActiveSkill::Stealth.get_base_cooldown();
                 commands.entity(entity).insert(StealthState {
                     duration: Timer::from_seconds(2.0, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
                 });
             }
             ActiveSkill::Rapidfire => {
@@ -542,68 +494,30 @@ impl ActiveSkill {
                 // });
             }
             ActiveSkill::FirePillar => {
-                let cooldown = ActiveSkill::FirePillar.get_base_cooldown();
                 commands.entity(entity).insert(FirePillarState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
                     hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
                 });
             }
             ActiveSkill::Heal => {
-                let cooldown = ActiveSkill::Heal.get_base_cooldown();
-                commands.entity(entity).insert(HealSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(HealSkillState);
             }
             ActiveSkill::Buckshot => {
-                let cooldown = ActiveSkill::Buckshot.get_base_cooldown();
-                commands.entity(entity).insert(BuckshotSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(BuckshotSkillState);
             }
             ActiveSkill::IceWall => {
-                let cooldown = ActiveSkill::IceWall.get_base_cooldown();
-                commands.entity(entity).insert(IceWallSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(IceWallSkillState);
             }
             ActiveSkill::DruidTree => {
-                let cooldown = ActiveSkill::DruidTree.get_base_cooldown();
-                commands.entity(entity).insert(DruidTreeSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(DruidTreeSkillState);
             }
             ActiveSkill::Shout => {
-                let cooldown = ActiveSkill::Shout.get_base_cooldown();
-                commands.entity(entity).insert(ShoutSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(ShoutSkillState);
             }
             ActiveSkill::PiercingStar => {
-                let cooldown = ActiveSkill::PiercingStar.get_base_cooldown();
-                commands.entity(entity).insert(PiercingStarSkillState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
-                });
+                commands.entity(entity).insert(PiercingStarSkillState);
             }
             ActiveSkill::LaserBeam => {
-                let cooldown = ActiveSkill::LaserBeam.get_base_cooldown();
                 commands.entity(entity).insert(LaserBeamState {
-                    cooldown_timer: Timer::from_seconds(cooldown, TimerMode::Once)
-                        .tick(Duration::from_secs(99))
-                        .clone(),
                     hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                 });
             }
@@ -1500,10 +1414,8 @@ impl Heirloom {
             }
             &Heirloom::TeleportCount => {
                 // TeleportCount heirloom is deprecated - use SkillChargeIncrease instead
-                // This is kept for compatibility but TeleportState now uses SkillChargeTracker
                 commands.entity(entity).insert(TeleportState {
                     just_teleported_timer: Timer::from_seconds(0.7, TimerMode::Once),
-                    cooldown_timer: Timer::from_seconds(1.5, TimerMode::Once),
                     timer: Timer::from_seconds(0.06, TimerMode::Once),
                 });
             }
@@ -1649,33 +1561,61 @@ pub struct ActiveSkillUsedEvent {
     pub cooldown: f32,
 }
 
-/// Tracks skill charges for slot 1 (class skill, not Roll)
-/// Charges allow immediate skill activation without waiting for cooldown
-/// This is the shared data structure used by both slot trackers
+/// Single source of truth for per-slot charges and cooldown (hotkey slots 0–3).
 #[derive(Clone, Debug)]
-pub struct SkillChargeTracker {
+pub struct SlotSkillRuntime {
     pub current_charges: u32,
     pub max_charges: u32,
     pub cooldown_timer: Timer,
     pub base_cooldown: f32,
-    pub tracked_skill: ActiveSkill, // Track which skill this tracker is for
+    pub tracked_skill: ActiveSkill,
 }
 
-/// Charge tracker for slot 1 (active_skill_slot_1)
-#[derive(Component, Clone, Debug)]
-pub struct Slot1ChargeTracker(pub SkillChargeTracker);
+impl SlotSkillRuntime {
+    pub fn start_cooldown_seconds(&mut self, seconds: f32, should_run: bool) {
+        let secs = seconds.max(0.0);
+        let mut t = Timer::from_seconds(secs.max(0.0001), TimerMode::Once);
+        if !should_run {
+            t.tick(Duration::from_secs_f32(secs.max(0.0)));
+        }
+        self.cooldown_timer = t;
+    }
+}
 
-/// Charge tracker for slot 2 (active_skill_slot_2)
-#[derive(Component, Clone, Debug)]
-pub struct Slot2ChargeTracker(pub SkillChargeTracker);
+impl Default for ClassSkillSlots {
+    fn default() -> Self {
+        let finished = || {
+            let mut t = Timer::from_seconds(1.0, TimerMode::Once);
+            t.tick(Duration::from_secs_f32(999.0));
+            t
+        };
+        Self(std::array::from_fn(|_| SlotSkillRuntime {
+            current_charges: 1,
+            max_charges: 1,
+            cooldown_timer: finished(),
+            base_cooldown: 0.0,
+            tracked_skill: ActiveSkill::Roll,
+        }))
+    }
+}
 
-/// Charge tracker for slot 3 (active_skill_slot_3)
+/// Four class skill slots (`active_skill_slot_0` … `_3`). Cooldowns and charges live here only.
 #[derive(Component, Clone, Debug)]
-pub struct Slot3ChargeTracker(pub SkillChargeTracker);
+pub struct ClassSkillSlots(pub [SlotSkillRuntime; 4]);
 
-/// Charge tracker for slot 4 (active_skill_slot_4)
-#[derive(Component, Clone, Debug)]
-pub struct Slot4ChargeTracker(pub SkillChargeTracker);
+/// +1 charge on the slot that matches `skill`, capped at `max_charges`.
+pub fn grant_skill_charge_after_cooldown_complete(
+    _player: Entity,
+    skill: ActiveSkill,
+    slots: &mut ClassSkillSlots,
+) {
+    for slot in &mut slots.0 {
+        if slot.tracked_skill == skill && slot.current_charges < slot.max_charges {
+            slot.current_charges += 1;
+            break;
+        }
+    }
+}
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Default, Debug, Serialize, Deserialize)]
 pub enum HeirloomRarity {
@@ -1823,7 +1763,7 @@ impl Default for HeirloomChoiceQueue {
                 HeirloomChoiceState::new(Heirloom::ChaosBoost, HeirloomRarity::Uncommon),
                 HeirloomChoiceState::new(Heirloom::SkillCDReduction, HeirloomRarity::Common),
                 HeirloomChoiceState::new(Heirloom::LoadedDice, HeirloomRarity::Uncommon),
-                HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Legendary),
+                HeirloomChoiceState::new(Heirloom::SkillChargeIncrease, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::SkillEcho, HeirloomRarity::Rare),
                 HeirloomChoiceState::new(Heirloom::SkillPower, HeirloomRarity::Common),
                 HeirloomChoiceState::new(

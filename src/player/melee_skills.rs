@@ -209,7 +209,6 @@ pub struct ParryState {
 }
 #[derive(Component)]
 pub struct SpearState {
-    pub cooldown_timer: Timer,
     pub spear_timer: Timer,
 }
 
@@ -336,8 +335,6 @@ pub fn handle_spear(
         mv.0 = mv.0 * 0.;
         kcc.translation = Some(Vec2::new(mv.0.x, mv.0.y));
     }
-    // Tick cooldown timer so dispatch_active_skill_events can gate correctly for slot 4
-    spear_state.cooldown_timer.tick(time.delta());
 }
 
 pub fn handle_parry_success(

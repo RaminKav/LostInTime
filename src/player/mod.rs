@@ -15,9 +15,9 @@ use combat_heirlooms::{
     handle_mana_orb_attack, handle_mana_orb_drops, handle_mana_regen_lightning,
     handle_mana_regen_poison, handle_max_hp_hunt, handle_reaper_soul_spawns,
     handle_skill_mana_regen, handle_skill_power_hunt, handle_summon_ring_state,
-    handle_trigger_summons_on_heal,
-    tick_dodge_crit_buff, tick_stand_still_state, update_ant_farm_ants, update_reaper_souls,
-    update_stone_tooth, update_summon_ring, TriggerSummonsEvent,
+    handle_trigger_summons_on_heal, tick_dodge_crit_buff, tick_stand_still_state,
+    update_ant_farm_ants, update_reaper_souls, update_stone_tooth, update_summon_ring,
+    TriggerSummonsEvent,
 };
 use melee_skills::{
     handle_echo_after_heal, handle_parry, handle_parry_success, handle_second_split_attack,
@@ -48,7 +48,7 @@ pub mod unlocks;
 pub use achievements::*;
 pub use class_rank::*;
 pub use currency::*;
-use mage_skills::{handle_teleport, tick_just_teleported, tick_teleport_timer};
+use mage_skills::{handle_teleport, tick_just_teleported};
 pub use score::*;
 pub use unlocks::*;
 pub mod stats;
@@ -185,7 +185,6 @@ impl Plugin for PlayerPlugin {
                         .before(skill_heirlooms::handle_active_skill_event),
                     hide_particles_when_inv_open,
                     tick_just_teleported.run_if(is_not_paused),
-                    tick_teleport_timer.run_if(is_not_paused),
                     handle_second_split_attack.after(handle_add_damage_numbers_after_hit),
                     handle_dodge_crit,
                 )
@@ -243,20 +242,32 @@ impl Plugin for PlayerPlugin {
                     handle_lunge.after(player_move_inputs).run_if(is_not_paused),
                     tick_combo_counter.run_if(is_not_paused),
                     handle_add_combo_counter,
+                    skill_heirlooms::break_stealth_on_player_attack
+                        .run_if(is_not_paused)
+                        .after(crate::inputs::mouse_click_system)
+                        .after(handle_sprint_timer),
                     skill_heirlooms::handle_active_skill_event.run_if(is_not_paused),
                     skill_heirlooms::add_rapidfire_speed_to_bonus.run_if(is_not_paused),
                     skill_heirlooms::remove_rapidfire_speed_from_bonus.run_if(is_not_paused),
                     skill_heirlooms::tick_stealth_and_buffs.run_if(is_not_paused),
-                    skill_heirlooms::tick_skill_cooldowns.run_if(is_not_paused),
-                    skill_heirlooms::tick_new_skill_cooldowns.run_if(is_not_paused),
+                    skill_heirlooms::tick_class_skill_hit_clear_timers.run_if(is_not_paused),
+                    skill_heirlooms::tick_class_skill_slots.run_if(is_not_paused),
+                    skill_heirlooms::tick_fury_duration_and_throw.run_if(is_not_paused),
+                    skill_heirlooms::finalize_rapidfire_fury_charges.run_if(is_not_paused),
+                    skill_heirlooms::tick_druid_tree_dummy_timers.run_if(is_not_paused),
                     skill_heirlooms::handle_fire_pillar_hit_clear.run_if(is_not_paused),
                     skill_heirlooms::handle_laser_beam_hit_clear.run_if(is_not_paused),
-                    skill_heirlooms::update_stealth_color.run_if(is_not_paused),
-                    skill_heirlooms::regenerate_skill_charges.run_if(is_not_paused),
-                    skill_heirlooms::reduce_skill_cooldown_on_crit
-                        .after(handle_hits)
-                        .run_if(is_not_paused),
                 )
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (skill_heirlooms::update_stealth_color.run_if(is_not_paused),)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
+            .add_systems(
+                (skill_heirlooms::reduce_skill_cooldown_on_crit
+                    .after(handle_hits)
+                    .run_if(is_not_paused),)
                     .in_set(OnUpdate(GameState::Main)),
             )
             .add_systems(
@@ -283,7 +294,7 @@ impl Plugin for PlayerPlugin {
             )
             .add_system(handle_mob_death_out_of_run_currency.in_set(OnUpdate(GameState::Main)))
             .add_system(
-                skill_heirlooms::initialize_skill_charge_tracker
+                skill_heirlooms::initialize_class_skill_slots
                     .run_if(is_not_paused)
                     .in_set(OnUpdate(GameState::Main)),
             )
@@ -461,6 +472,7 @@ fn spawn_player(
         .insert(OwnedBlessings::default())
         .insert(HeirloomStatsBonuses::default())
         .insert(PlayerSkills::default())
+        .insert(skills::ClassSkillSlots::default())
         .insert(SkillPoints { count: 0 })
         .insert(BonusAttackSpeed::new())
         .insert(ClawUpgradeMultiThrow(

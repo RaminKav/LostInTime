@@ -7,7 +7,7 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     ai::FollowState,
-    animations::player_sprite::PlayerAnimation,
+    animations::{player_sprite::PlayerAnimation, AttackEvent},
     attributes::{
         attribute_helpers::skill_power_multiplier, Attack, AttackCooldown, BonusAttackSpeed,
         CurrentHealth, CurrentMana, MaxHealth, SkillPower,
@@ -26,18 +26,18 @@ use crate::{
         WorldObject,
     },
     player::{
-        mage_skills::TeleportState,
         melee_skills::{
-            spawn_echo_hitbox, HeirloomTriggerCooldowns, SpearState, HEIRLOOM_TRIGGER_COOLDOWN_SECS,
+            spawn_echo_hitbox, HeirloomTriggerCooldowns, ParryState, SpearState,
+            HEIRLOOM_TRIGGER_COOLDOWN_SECS,
         },
         rogue_skills::{LungeState, SprintState},
         skills::{
-            ActiveSkill, ActiveSkillUsedEvent, BombState, BuckshotSkillState,
+            grant_skill_charge_after_cooldown_complete, ActiveSkill,
+            ActiveSkillUsedEvent, BombState, BuckshotSkillState, ClassSkillSlots,
             DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
             FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
             LastHitProjectile, LightningState, PhasingThroughEnemies, PiercingStarSkillState,
-            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, Slot1ChargeTracker,
-            Slot2ChargeTracker, Slot3ChargeTracker, Slot4ChargeTracker, SpinAttackState,
+            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, SpinAttackState,
             StealthState, TripleThrowState,
         },
         Player,
@@ -48,13 +48,64 @@ use crate::{
     GameParam,
 };
 
+fn start_slot_cooldown_for_cast(
+    slots: &mut ClassSkillSlots,
+    slot: usize,
+    cd_secs: f32,
+    should_start: bool,
+) {
+    if slot < 4 {
+        slots.0[slot].start_cooldown_seconds(cd_secs, should_start);
+    }
+}
+
 // Temporary marker components for active effects
 #[derive(Component)]
 pub struct Stealthed;
 
+/// If Stealth still needs charges back (extra heirloom charges), start the next regen on the slot.
+fn try_queue_stealth_charge_regen_after_grant(
+    skills: &PlayerSkills,
+    blessings: &OwnedBlessings,
+    slots: &mut ClassSkillSlots,
+) {
+    for slot in &mut slots.0 {
+        if slot.tracked_skill == ActiveSkill::Stealth && slot.current_charges < slot.max_charges {
+            let cd = skills
+                .effective_skill_cooldown(&ActiveSkill::Stealth, blessings)
+                .max(0.0);
+            slot.start_cooldown_seconds(cd, true);
+            return;
+        }
+    }
+}
+
+/// Ends stealth visuals and starts the skill cooldown (call when attack/skill breaks stealth).
+pub fn break_stealth(commands: &mut Commands, player_e: Entity, _stealth: &mut StealthState) {
+    commands.entity(player_e).remove::<Stealthed>();
+    commands.entity(player_e).remove::<StealthState>();
+}
+
+pub fn break_stealth_on_player_attack(
+    mut attack_events: EventReader<AttackEvent>,
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut StealthState), (With<Stealthed>, With<Player>)>,
+) {
+    let mut any = false;
+    for _ in attack_events.iter() {
+        any = true;
+    }
+    if !any {
+        return;
+    }
+    for (e, mut stealth) in q.iter_mut() {
+        break_stealth(&mut commands, e, &mut stealth);
+    }
+}
+
 #[derive(SystemParam)]
 pub struct SkillStateQueries<'w, 's> {
-    pub stealth_states: Query<'w, 's, &'static StealthState, With<Player>>,
+    pub stealth_states: Query<'w, 's, &'static mut StealthState, With<Player>>,
     pub rapidfire_states: Query<'w, 's, &'static RapidfireState, With<Player>>,
     pub fire_pillar_states: Query<'w, 's, &'static FirePillarState, With<Player>>,
     pub laser_beam_states: Query<'w, 's, &'static LaserBeamState, With<Player>>,
@@ -67,11 +118,7 @@ pub struct SkillStateQueries<'w, 's> {
     pub sprint_states: Query<'w, 's, &'static SprintState, With<Player>>,
     pub spear_states: Query<'w, 's, &'static SpearState, With<Player>>,
     pub lunge_states: Query<'w, 's, &'static LungeState, With<Player>>,
-    pub teleport_states: Query<'w, 's, &'static mut TeleportState, With<Player>>,
-    pub slot1_trackers: Query<'w, 's, &'static mut Slot1ChargeTracker, With<Player>>,
-    pub slot2_trackers: Query<'w, 's, &'static mut Slot2ChargeTracker, With<Player>>,
-    pub slot3_trackers: Query<'w, 's, &'static mut Slot3ChargeTracker, With<Player>>,
-    pub slot4_trackers: Query<'w, 's, &'static mut Slot4ChargeTracker, With<Player>>,
+    pub class_skill_slots: Query<'w, 's, &'static mut ClassSkillSlots, With<Player>>,
     pub player_projectile_size:
         Query<'w, 's, &'static crate::attributes::ProjectileSize, With<Player>>,
     pub lightning_states: Query<'w, 's, &'static LightningState, With<Player>>,
@@ -97,6 +144,7 @@ pub fn handle_active_skill_event(
             &OwnedBlessings,
             &mut CurrentMana,
             &SkillPower,
+            Option<&Stealthed>,
         ),
         With<Player>,
     >,
@@ -123,10 +171,15 @@ pub fn handle_active_skill_event(
             blessings,
             mut current_mana,
             skill_power,
+            stealthed_option,
         ) in players.iter_mut()
         {
+            let Ok(mut class_slots) = skill_states.class_skill_slots.get_mut(player_e) else {
+                continue;
+            };
             // Get optional states from separate queries
-            let stealth_state = skill_states.stealth_states.get(player_e).ok();
+            let stealth_state = skill_states.stealth_states.get_mut(player_e).ok();
+            let has_stealth = stealth_state.is_some();
             let rapid_state = skill_states.rapidfire_states.get(player_e).ok();
             let pillar_state = skill_states.fire_pillar_states.get(player_e).ok();
             let laser_beam_state = skill_states.laser_beam_states.get(player_e).ok();
@@ -155,7 +208,6 @@ pub fn handle_active_skill_event(
             let sprint_state = skill_states.sprint_states.get(player_e).ok();
             let spear_state = skill_states.spear_states.get(player_e).ok();
             let lunge_state = skill_states.lunge_states.get(player_e).ok();
-            let teleport_state = skill_states.teleport_states.get_mut(player_e).ok();
             let lightning_state = skill_states.lightning_states.get(player_e).ok();
             let daggerthrow_state = skill_states.daggerthrow_states.get(player_e).ok();
             let slash_state = skill_states.slash_states.get(player_e).ok();
@@ -174,6 +226,13 @@ pub fn handle_active_skill_event(
             };
             if let Some(active) = slot_skill {
                 info!("USED SLOT {}: {:?}", ev.slot, active.active_skill);
+                if active.active_skill != ActiveSkill::Stealth {
+                    if stealthed_option.is_some() {
+                        if let Some(mut stealth_state) = stealth_state {
+                            break_stealth(&mut commands, player_e, &mut stealth_state);
+                        }
+                    }
+                }
                 if blessings.has_blessing(Blessing::SkillAttackSpeed) {
                     commands
                         .entity(player_e)
@@ -182,51 +241,13 @@ pub fn handle_active_skill_event(
                 // ev.cooldown is already the effective cooldown (base * heirloom reduction * blessing mult)
                 let skill_cd = ev.cooldown;
 
-                // For slots 1-4 (class skills), handle charge consumption from their independent trackers
+                // Slots 0–3: charge consumption lives on ClassSkillSlots only.
                 let mut should_start_cooldown = true;
-                if ev.slot == 0 {
-                    if let Ok(mut tracker) = skill_states.slot1_trackers.get_mut(player_e) {
-                        if tracker.0.current_charges > 0 {
-                            tracker.0.current_charges -= 1;
-                            should_start_cooldown = tracker.0.current_charges == 0;
-                            if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer =
-                                    Timer::from_seconds(skill_cd, TimerMode::Once);
-                            }
-                        }
-                    }
-                } else if ev.slot == 1 {
-                    if let Ok(mut tracker) = skill_states.slot2_trackers.get_mut(player_e) {
-                        if tracker.0.current_charges > 0 {
-                            tracker.0.current_charges -= 1;
-                            should_start_cooldown = tracker.0.current_charges == 0;
-                            if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer =
-                                    Timer::from_seconds(skill_cd, TimerMode::Once);
-                            }
-                        }
-                    }
-                } else if ev.slot == 2 {
-                    if let Ok(mut tracker) = skill_states.slot3_trackers.get_mut(player_e) {
-                        if tracker.0.current_charges > 0 {
-                            tracker.0.current_charges -= 1;
-                            should_start_cooldown = tracker.0.current_charges == 0;
-                            if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer =
-                                    Timer::from_seconds(skill_cd, TimerMode::Once);
-                            }
-                        }
-                    }
-                } else if ev.slot == 3 {
-                    if let Ok(mut tracker) = skill_states.slot4_trackers.get_mut(player_e) {
-                        if tracker.0.current_charges > 0 {
-                            tracker.0.current_charges -= 1;
-                            should_start_cooldown = tracker.0.current_charges == 0;
-                            if tracker.0.current_charges < tracker.0.max_charges {
-                                tracker.0.cooldown_timer =
-                                    Timer::from_seconds(skill_cd, TimerMode::Once);
-                            }
-                        }
+                if ev.slot < 4 {
+                    let s = &mut class_slots.0[ev.slot];
+                    if s.current_charges > 0 {
+                        s.current_charges -= 1;
+                        should_start_cooldown = s.current_charges < s.max_charges;
                     }
                 }
                 let power_mult =
@@ -234,18 +255,10 @@ pub fn handle_active_skill_event(
                 match active.active_skill {
                     ActiveSkill::Stealth => {
                         if !should_start_cooldown {
-                            if stealth_state.is_some() {
+                            if has_stealth {
                                 commands.entity(player_e).remove::<StealthState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
                         let mut dur =
                             Timer::from_seconds((2.0 * power_mult).max(0.0), TimerMode::Once);
                         dur.tick(time.delta());
@@ -253,9 +266,14 @@ pub fn handle_active_skill_event(
                             .entity(player_e)
                             .insert(StealthState {
                                 duration: dur,
-                                cooldown_timer: cd,
                             })
                             .insert(Stealthed);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Spawn cosmetic smoke effect on top of player
                         let _player_pos = player_txfm.translation().truncate();
@@ -279,21 +297,18 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<RapidfireState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
                         let dur = Timer::from_seconds(3.0, TimerMode::Once);
                         info!("dur: {:?}", dur);
                         commands.entity(player_e).insert(RapidfireState {
                             duration: dur,
-                            cooldown_timer: cd,
                             attack_speed_bonus: 0.8 * power_mult,
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Spawn cosmetic attack speed effect on top of player
                         let player_pos = player_txfm.translation().truncate();
@@ -317,18 +332,15 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<FirePillarState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
                         commands.entity(player_e).insert(FirePillarState {
-                            cooldown_timer: cd,
                             hit_clear_timer: Timer::from_seconds(0.75, TimerMode::Repeating),
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         // spawn fire ring projectile at cursor world position with player's attack as damage
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 0.95) as i32;
@@ -352,16 +364,15 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<LaserBeamState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
                         commands.entity(player_e).insert(LaserBeamState {
-                            cooldown_timer: cd,
                             hit_clear_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 0.6) as i32;
                         let player_pos = player_txfm.translation().truncate();
@@ -387,17 +398,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<HealSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(HealSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(HealSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         // Heal for 30% of max health (placeholder value), increased by skill power
                         let heal_amount = (max_health.0 as f32 * 0.3 * power_mult) as i32;
                         health.0 = (health.0 + heal_amount).min(max_health.0);
@@ -423,17 +430,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<BuckshotSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(BuckshotSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(BuckshotSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Calculate direction to cursor
                         let player_pos = player_txfm.translation().truncate();
@@ -503,17 +506,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<IceWallSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(IceWallSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(IceWallSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         // Placeholder: spawn ice explosion at cursor for now
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 3.) as i32; // ice wall does double base dmg
@@ -538,17 +537,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<DruidTreeSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(DruidTreeSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(DruidTreeSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Spawn a non-damageable dummy tree at cursor position
                         let dummy_pos = cursor.world_coords;
@@ -574,17 +569,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<ShoutSkillState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(ShoutSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(ShoutSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 1.6) as i32;
@@ -621,18 +612,13 @@ pub fn handle_active_skill_event(
                             continue;
                         }
 
-                        // Now set cooldown since we're about to spawn the projectile
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        commands
-                            .entity(player_e)
-                            .insert(PiercingStarSkillState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(PiercingStarSkillState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         let base_dmg: i32 = attack_opt.map(|a| a.0).unwrap_or(10);
                         let dmg = (base_dmg as f32 * power_mult * 1.5) as i32;
@@ -656,41 +642,31 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<SprintState>();
                             }
                         }
-                        // Sprint is activated by inserting Sprinting component, handled in rogue_skills.rs
-                        // Just update cooldown here
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
-                        // Update or create sprint state cooldown
                         if sprint_state.is_some() {
                             commands.entity(player_e).remove::<SprintState>();
                         }
                         commands.entity(player_e).insert(SprintState {
                             startup_timer: Timer::from_seconds(0.0, TimerMode::Once),
                             sprint_duration_timer: Timer::from_seconds(2.5, TimerMode::Once),
-                            sprint_cooldown_timer: cd,
                             speed_bonus: 1.6,
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         // Insert Sprinting component to activate sprint
                         use crate::player::rogue_skills::Sprinting;
                         commands.entity(player_e).insert(Sprinting);
                     }
                     ActiveSkill::Teleport => {
-                        // For teleport, we need to handle charge-based cooldown reset
-                        // The actual teleport activation happens in handle_teleport
-                        if let Some(mut teleport) = teleport_state {
-                            if should_start_cooldown {
-                                // No charges left, start full cooldown
-                                let cooldown = skill_cd;
-                                teleport.cooldown_timer =
-                                    Timer::from_seconds(cooldown, TimerMode::Once);
-                            }
-                        }
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                     }
                     ActiveSkill::ParrySpear => {
                         if !should_start_cooldown {
@@ -698,21 +674,18 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<SpearState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
                         if spear_state.is_some() {
                             commands.entity(player_e).remove::<SpearState>();
                         }
                         commands.entity(player_e).insert(SpearState {
-                            cooldown_timer: cd,
                             spear_timer: Timer::from_seconds(0.5, TimerMode::Once),
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                     }
                     ActiveSkill::SprintLunge => {
                         if !should_start_cooldown {
@@ -720,24 +693,21 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<LungeState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            // If using a charge, don't start cooldown yet - set timer to finished
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        // Don't tick the timer here - let tick_skill_cooldowns handle it
                         if lunge_state.is_some() {
                             commands.entity(player_e).remove::<LungeState>();
                         }
                         commands.entity(player_e).insert(LungeState {
-                            lunge_cooldown_timer: cd,
                             lunge_duration: Timer::from_seconds(0.42, TimerMode::Once)
                                 .tick(Duration::from_secs_f32(0.1))
                                 .clone(),
                             lunge_speed: 9.5,
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                     }
                     ActiveSkill::Lightning => {
                         if !should_start_cooldown {
@@ -745,15 +715,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<LightningState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(LightningState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(LightningState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Find 3 nearest enemies
                         let player_pos = player_txfm.translation().truncate();
@@ -793,15 +761,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<DaggerThrowState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(DaggerThrowState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(DaggerThrowState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Get kill tracker and reset it after use
                         let kill_count = if let Ok(mut tracker) = kill_trackers.get_mut(player_e) {
@@ -858,15 +824,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<SlashState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(SlashState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(SlashState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Calculate direction to cursor (like dagger attack)
                         let player_pos = player_txfm.translation().truncate();
@@ -895,15 +859,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<TripleThrowState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(TripleThrowState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(TripleThrowState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         let player_pos = player_txfm.translation().truncate();
                         let cursor_pos = cursor.world_coords.truncate();
@@ -939,17 +901,16 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<FuryState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
                         commands.entity(player_e).insert(FuryState {
-                            cooldown_timer: cd,
                             duration: Timer::from_seconds(2.5, TimerMode::Once),
                             throw_timer: Timer::from_seconds(0.3, TimerMode::Repeating),
                         });
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::GainExp, 0.2));
                     }
                     ActiveSkill::Bomb => {
@@ -958,15 +919,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<BombState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(BombState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(BombState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         // Calculate direction to cursor position
                         let player_pos = player_txfm.translation().truncate();
@@ -1001,15 +960,13 @@ pub fn handle_active_skill_event(
                                 commands.entity(player_e).remove::<SpinAttackState>();
                             }
                         }
-                        let mut cd = Timer::from_seconds(skill_cd, TimerMode::Once);
-                        if !should_start_cooldown {
-                            cd.tick(Duration::from_secs_f32(
-                                cd.duration().as_secs_f32().max(0.0),
-                            ));
-                        }
-                        commands
-                            .entity(player_e)
-                            .insert(SpinAttackState { cooldown_timer: cd });
+                        commands.entity(player_e).insert(SpinAttackState);
+                        start_slot_cooldown_for_cast(
+                            &mut class_slots,
+                            ev.slot,
+                            skill_cd,
+                            should_start_cooldown,
+                        );
 
                         commands
                             .entity(player_e)
@@ -1080,6 +1037,7 @@ pub fn tick_stealth_and_buffs(
         s.duration.tick(time.delta());
         if s.duration.finished() {
             commands.entity(e).remove::<Stealthed>();
+            commands.entity(e).remove::<StealthState>();
         }
     }
     for (_e, mut r) in rapid.iter_mut() {
@@ -1132,172 +1090,173 @@ pub struct DruidTreeDummy {
     pub timer: Timer,
 }
 
-pub fn tick_skill_cooldowns(
+
+fn remove_skill_state_after_slot_cooldown(commands: &mut Commands, entity: Entity, skill: ActiveSkill) {
+    match skill {
+        ActiveSkill::Stealth => {
+            commands.entity(entity).remove::<StealthState>();
+        }
+        ActiveSkill::FirePillar => {
+            commands.entity(entity).remove::<FirePillarState>();
+        }
+        ActiveSkill::LaserBeam => {
+            commands.entity(entity).remove::<LaserBeamState>();
+        }
+        ActiveSkill::Heal => {
+            commands.entity(entity).remove::<HealSkillState>();
+        }
+        ActiveSkill::Buckshot => {
+            commands.entity(entity).remove::<BuckshotSkillState>();
+        }
+        ActiveSkill::IceWall => {
+            commands.entity(entity).remove::<IceWallSkillState>();
+        }
+        ActiveSkill::DruidTree => {
+            commands.entity(entity).remove::<DruidTreeSkillState>();
+        }
+        ActiveSkill::Shout => {
+            commands.entity(entity).remove::<ShoutSkillState>();
+        }
+        ActiveSkill::PiercingStar => {
+            commands.entity(entity).remove::<PiercingStarSkillState>();
+        }
+        ActiveSkill::Lightning => {
+            commands.entity(entity).remove::<LightningState>();
+        }
+        ActiveSkill::DaggerThrow => {
+            commands.entity(entity).remove::<DaggerThrowState>();
+        }
+        ActiveSkill::DaggerSlash => {
+            commands.entity(entity).remove::<SlashState>();
+        }
+        ActiveSkill::TripleThrow => {
+            commands.entity(entity).remove::<TripleThrowState>();
+        }
+        ActiveSkill::Bomb => {
+            commands.entity(entity).remove::<BombState>();
+        }
+        ActiveSkill::SpinAttack => {
+            commands.entity(entity).remove::<SpinAttackState>();
+        }
+        ActiveSkill::Rapidfire | ActiveSkill::Fury => {}
+        ActiveSkill::Teleport
+        | ActiveSkill::Sprint
+        | ActiveSkill::SprintLunge
+        | ActiveSkill::ParrySpear
+        | ActiveSkill::Roll
+        | ActiveSkill::Parry => {}
+    }
+}
+
+pub fn tick_class_skill_slots(
     mut commands: Commands,
     time: Res<Time>,
-    mut stealth_cd: Query<(Entity, &mut StealthState)>,
-    mut rapid_cd: Query<(Entity, &mut RapidfireState)>,
-    mut pillar_cd: Query<(Entity, &mut FirePillarState)>,
-    mut laser_beam_cd: Query<(Entity, &mut LaserBeamState)>,
-    mut heal_cd: Query<(Entity, &mut HealSkillState)>,
-    mut buckshot_cd: Query<(Entity, &mut BuckshotSkillState)>,
-    mut icewall_cd: Query<(Entity, &mut IceWallSkillState)>,
-    mut druidtree_cd: Query<(Entity, &mut DruidTreeSkillState)>,
-    mut shout_cd: Query<(Entity, &mut ShoutSkillState)>,
-    mut piercing_star_cd: Query<(Entity, &mut PiercingStarSkillState)>,
-    mut sprint_cd: Query<(Entity, &mut SprintState)>,
-    mut dummy_query: Query<(Entity, &mut DruidTreeDummy)>,
+    player_skills: Query<&PlayerSkills, With<Player>>,
+    blessings: Query<&OwnedBlessings, With<Player>>,
+    mut q: Query<(Entity, &mut ClassSkillSlots, Option<&Stealthed>), With<Player>>,
 ) {
-    for (e, mut s) in stealth_cd.iter_mut() {
-        s.cooldown_timer.tick(time.delta());
-        if s.cooldown_timer.finished() && s.duration.percent() == 0.0 {
-            commands.entity(e).remove::<StealthState>();
-        }
-    }
-    for (e, mut r) in rapid_cd.iter_mut() {
-        r.cooldown_timer.tick(time.delta());
-        // Remove RapidfireState when both cooldown is finished AND duration has expired
-        if r.cooldown_timer.finished() && r.duration.finished() {
-            commands.entity(e).remove::<RapidfireState>();
-        }
-    }
-    for (e, mut p) in pillar_cd.iter_mut() {
-        p.cooldown_timer.tick(time.delta());
-        p.hit_clear_timer.tick(time.delta());
-        if p.cooldown_timer.finished() {
-            commands.entity(e).remove::<FirePillarState>();
-        }
-    }
-    for (e, mut l) in laser_beam_cd.iter_mut() {
-        l.cooldown_timer.tick(time.delta());
-        l.hit_clear_timer.tick(time.delta());
-        if l.cooldown_timer.finished() {
-            commands.entity(e).remove::<LaserBeamState>();
-        }
-    }
-    for (e, mut h) in heal_cd.iter_mut() {
-        h.cooldown_timer.tick(time.delta());
-        if h.cooldown_timer.finished() {
-            commands.entity(e).remove::<HealSkillState>();
-        }
-    }
-    for (e, mut b) in buckshot_cd.iter_mut() {
-        b.cooldown_timer.tick(time.delta());
-        if b.cooldown_timer.finished() {
-            commands.entity(e).remove::<BuckshotSkillState>();
-        }
-    }
-    for (e, mut i) in icewall_cd.iter_mut() {
-        i.cooldown_timer.tick(time.delta());
-        if i.cooldown_timer.finished() {
-            commands.entity(e).remove::<IceWallSkillState>();
-        }
-    }
-    for (e, mut d) in druidtree_cd.iter_mut() {
-        d.cooldown_timer.tick(time.delta());
-        if d.cooldown_timer.finished() {
-            commands.entity(e).remove::<DruidTreeSkillState>();
-        }
-    }
-    for (e, mut s) in shout_cd.iter_mut() {
-        s.cooldown_timer.tick(time.delta());
-        if s.cooldown_timer.finished() {
-            commands.entity(e).remove::<ShoutSkillState>();
-        }
-    }
-    for (e, mut p) in piercing_star_cd.iter_mut() {
-        p.cooldown_timer.tick(time.delta());
-        if p.cooldown_timer.finished() {
-            commands.entity(e).remove::<PiercingStarSkillState>();
-        }
-    }
-    // Tick Sprint cooldown - this ensures it ticks even while sprinting
-    for (_e, mut sprint) in sprint_cd.iter_mut() {
-        sprint.sprint_cooldown_timer.tick(time.delta());
-    }
-    // Despawn druid tree dummy after duration
-    for (e, mut dummy) in dummy_query.iter_mut() {
-        dummy.timer.tick(time.delta());
-        if dummy.timer.finished() {
-            commands.entity(e).despawn_recursive();
+    for (entity, mut slots, stealthed) in q.iter_mut() {
+        for i in 0..4 {
+            let skill = slots.0[i].tracked_skill;
+            if skill == ActiveSkill::Stealth && stealthed.is_some() {
+                continue;
+            }
+            slots.0[i].cooldown_timer.tick(time.delta());
+            if !slots.0[i].cooldown_timer.just_finished() {
+                continue;
+            }
+            if skill == ActiveSkill::Rapidfire || skill == ActiveSkill::Fury {
+                continue;
+            }
+            grant_skill_charge_after_cooldown_complete(entity, skill, slots.as_mut());
+            remove_skill_state_after_slot_cooldown(&mut commands, entity, skill);
+            if skill == ActiveSkill::Stealth {
+                if let (Ok(sk), Ok(bl)) = (player_skills.get_single(), blessings.get_single()) {
+                    try_queue_stealth_charge_regen_after_grant(sk, bl, slots.as_mut());
+                }
+            }
         }
     }
 }
 
-pub fn tick_new_skill_cooldowns(
-    mut commands: Commands,
+pub fn tick_class_skill_hit_clear_timers(
     time: Res<Time>,
-    mut lightning_cd: Query<(Entity, &mut LightningState)>,
-    mut daggerthrow_cd: Query<(Entity, &mut DaggerThrowState)>,
-    mut slash_cd: Query<(Entity, &mut SlashState)>,
-    mut triplethrow_cd: Query<(Entity, &mut TripleThrowState)>,
-    mut fury_cd: Query<(Entity, &mut FuryState), With<Player>>,
-    mut bomb_cd: Query<(Entity, &mut BombState)>,
-    mut spinattack_cd: Query<(Entity, &mut SpinAttackState)>,
+    mut pillar: Query<&mut FirePillarState, With<Player>>,
+    mut laser: Query<&mut LaserBeamState, With<Player>>,
+) {
+    for mut p in pillar.iter_mut() {
+        p.hit_clear_timer.tick(time.delta());
+    }
+    for mut l in laser.iter_mut() {
+        l.hit_clear_timer.tick(time.delta());
+    }
+}
+
+pub fn tick_fury_duration_and_throw(
+    time: Res<Time>,
+    mut fury: Query<&mut FuryState, With<Player>>,
     attack_cooldown: Query<&AttackCooldown, With<Player>>,
 ) {
-    for (e, mut l) in lightning_cd.iter_mut() {
-        l.cooldown_timer.tick(time.delta());
-        if l.cooldown_timer.finished() {
-            commands.entity(e).remove::<LightningState>();
-        }
-    }
-    for (e, mut d) in daggerthrow_cd.iter_mut() {
-        d.cooldown_timer.tick(time.delta());
-        if d.cooldown_timer.finished() {
-            commands.entity(e).remove::<DaggerThrowState>();
-        }
-    }
-    for (e, mut s) in slash_cd.iter_mut() {
-        s.cooldown_timer.tick(time.delta());
-        if s.cooldown_timer.finished() {
-            commands.entity(e).remove::<SlashState>();
-        }
-    }
-    for (e, mut t) in triplethrow_cd.iter_mut() {
-        t.cooldown_timer.tick(time.delta());
-        if t.cooldown_timer.finished() {
-            commands.entity(e).remove::<TripleThrowState>();
-        }
-    }
-    for (e, mut f) in fury_cd.iter_mut() {
-        f.cooldown_timer.tick(time.delta());
+    for mut f in fury.iter_mut() {
         f.duration.tick(time.delta());
-
-        // Scale throw timer based on attack speed
         let attack_speed_mult = if let Ok(cooldown) = attack_cooldown.get_single() {
             let reference_base_cooldown = 0.6;
             let denom = 2. * cooldown.0 - reference_base_cooldown;
             let raw = if denom > 0.001 {
                 reference_base_cooldown / denom
             } else {
-                // Denominator near zero or negative means very fast attack speed;
-                // cap the multiplier to avoid infinity/NaN
                 10.0
             };
             raw.clamp(0.1, 10.0)
         } else {
             1.0
         };
-
-        // Higher attack speed = faster throws = timer ticks faster
         let scaled_delta = time.delta().mul_f32(attack_speed_mult);
         f.throw_timer.tick(scaled_delta);
+    }
+}
 
-        if f.cooldown_timer.finished() && f.duration.finished() {
-            commands.entity(e).remove::<FuryState>();
+pub fn finalize_rapidfire_fury_charges(
+    mut commands: Commands,
+    mut q: Query<(Entity, &mut ClassSkillSlots, Option<&RapidfireState>, Option<&FuryState>), With<Player>>,
+) {
+    for (e, mut slots, rapid, fury) in q.iter_mut() {
+        if let Some(r) = rapid {
+            if r.duration.finished() {
+                if let Some(si) = slots
+                    .0
+                    .iter()
+                    .position(|s| s.tracked_skill == ActiveSkill::Rapidfire)
+                {
+                    if slots.0[si].cooldown_timer.finished() {
+                        grant_skill_charge_after_cooldown_complete(e, ActiveSkill::Rapidfire, slots.as_mut());
+                        commands.entity(e).remove::<RapidfireState>();
+                    }
+                }
+            }
+        }
+        if let Some(f) = fury {
+            if f.duration.finished() {
+                if let Some(si) = slots.0.iter().position(|s| s.tracked_skill == ActiveSkill::Fury) {
+                    if slots.0[si].cooldown_timer.finished() {
+                        grant_skill_charge_after_cooldown_complete(e, ActiveSkill::Fury, slots.as_mut());
+                        commands.entity(e).remove::<FuryState>();
+                    }
+                }
+            }
         }
     }
-    for (e, mut b) in bomb_cd.iter_mut() {
-        b.cooldown_timer.tick(time.delta());
-        if b.cooldown_timer.finished() {
-            commands.entity(e).remove::<BombState>();
-        }
-    }
-    for (e, mut s) in spinattack_cd.iter_mut() {
-        s.cooldown_timer.tick(time.delta());
-        if s.cooldown_timer.finished() {
-            commands.entity(e).remove::<SpinAttackState>();
+}
+
+pub fn tick_druid_tree_dummy_timers(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut dummy_query: Query<(Entity, &mut DruidTreeDummy)>,
+) {
+    for (e, mut dummy) in dummy_query.iter_mut() {
+        dummy.timer.tick(time.delta());
+        if dummy.timer.finished() {
+            commands.entity(e).despawn_recursive();
         }
     }
 }
@@ -1310,7 +1269,6 @@ pub fn handle_fire_pillar_hit_clear(
     for mut pillar_state in fire_pillar_states.iter_mut() {
         if pillar_state.hit_clear_timer.just_finished() {
             info!("Clearing hit_entities for FireRing projectiles due to FirePillar effect");
-            // Clear hit_entities for all FireRing projectiles
             for (mut proj_state, proj) in fire_ring_projectiles.iter_mut() {
                 if matches!(proj, Projectile::FireRing) {
                     info!("Clearing hit_entities for FireRing projectile");
@@ -1329,7 +1287,6 @@ pub fn handle_laser_beam_hit_clear(
 ) {
     for mut laser_state in laser_beam_states.iter_mut() {
         if laser_state.hit_clear_timer.just_finished() {
-            // Clear hit_entities for all LaserBeam projectiles
             for (mut proj_state, proj) in laser_beam_projectiles.iter_mut() {
                 if matches!(proj, Projectile::LaserBeam) {
                     proj_state.hit_entities.clear();
@@ -1349,35 +1306,28 @@ pub fn handle_druid_tree_taunt(
     transforms: Query<&GlobalTransform>,
     dummy_timers: Query<&DruidTreeDummy>,
 ) {
-    // Collect all active dummy entities
     let active_dummy_entities: std::collections::HashSet<Entity> =
         dummies.iter().map(|(e, _)| e).collect();
 
-    // Find all active dummies and taunt nearby enemies
     for (dummy_entity, dummy_txfm) in dummies.iter() {
         let dummy_pos = dummy_txfm.translation().truncate();
-        let taunt_range = 200.0; // placeholder: 200 pixel taunt range
+        let taunt_range = 200.0;
 
-        // Check if dummy is about to despawn (timer finished)
         let is_about_to_despawn = dummy_timers
             .get(dummy_entity)
             .map(|d| d.timer.finished())
             .unwrap_or(false);
 
-        // Find all enemies within taunt range
         for (enemy_txfm, mut follow_state) in enemies.iter_mut() {
             let enemy_pos = enemy_txfm.translation().truncate();
             let distance = (dummy_pos - enemy_pos).length();
 
-            // If enemy is targeting this dummy and it's about to despawn, redirect immediately
             if follow_state.target == dummy_entity && is_about_to_despawn {
                 follow_state.target = game.game.player;
                 continue;
             }
 
-            // If enemy is within range and not already targeting this dummy, redirect them
             if distance <= taunt_range {
-                // Only update if they're currently targeting the player
                 if follow_state.target == game.game.player {
                     follow_state.target = dummy_entity;
                 }
@@ -1385,19 +1335,14 @@ pub fn handle_druid_tree_taunt(
         }
     }
 
-    // For enemies that were targeting a dummy that no longer exists, redirect back to player
     for (_enemy_txfm, mut follow_state) in enemies.iter_mut() {
-        // Check if the target entity still exists
         if let Ok(_) = transforms.get(follow_state.target) {
-            // If target exists, check if it's still a valid dummy
             if !active_dummy_entities.contains(&follow_state.target)
                 && follow_state.target != game.game.player
             {
-                // Target is not an active dummy and not the player, redirect to player
                 follow_state.target = game.game.player;
             }
         } else {
-            // Target entity doesn't exist, redirect to player immediately
             follow_state.target = game.game.player;
         }
     }
@@ -1409,398 +1354,102 @@ pub fn update_stealth_color(
 ) {
     for (mut sprite, stealth) in sprites.iter_mut() {
         if stealth.is_some() {
-            // Darken but keep visible
             sprite.color = Color::rgba(0.2, 0.2, 0.2, 0.3);
         } else {
-            // Restore default
             sprite.color = Color::WHITE;
         }
     }
 }
 
-/// Regenerates skill charges when cooldown finishes
-/// Only regenerates if charges are below max
-pub fn regenerate_skill_charges(
-    time: Res<Time>,
-    mut slot1_trackers: Query<&mut Slot1ChargeTracker, With<Player>>,
-    mut slot2_trackers: Query<&mut Slot2ChargeTracker, With<Player>>,
-    mut slot3_trackers: Query<&mut Slot3ChargeTracker, With<Player>>,
-    mut slot4_trackers: Query<&mut Slot4ChargeTracker, With<Player>>,
-    player_skills: Query<&PlayerSkills, With<Player>>,
-    blessings_q: Query<&crate::blessings::OwnedBlessings, With<Player>>,
-) {
-    let cd_mult = player_skills
-        .get_single()
-        .ok()
-        .map(|s| s.skill_cooldown_multiplier())
-        .unwrap_or(1.0);
-    let blessing_mult = blessings_q
-        .get_single()
-        .ok()
-        .map(|b| b.get_skill_cooldown_increase())
-        .unwrap_or(1.0);
+fn finished_timer_init() -> Timer {
+    let mut t = Timer::from_seconds(1.0, TimerMode::Once);
+    t.tick(Duration::from_secs_f32(999.0));
+    t
+}
 
-    for mut tracker in slot1_trackers.iter_mut() {
-        if tracker.0.current_charges < tracker.0.max_charges {
-            tracker.0.cooldown_timer.tick(time.delta());
-            if tracker.0.cooldown_timer.finished() {
-                tracker.0.current_charges += 1;
-                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
-                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
-            }
+fn update_one_slot_runtime(
+    slot: &mut crate::player::skills::SlotSkillRuntime,
+    slot_skill: Option<&crate::player::skills::ActiveSkillChoiceState>,
+    max_charges: u32,
+) {
+    use crate::player::skills::{ActiveSkill, SlotSkillRuntime};
+    let empty_roll = || SlotSkillRuntime {
+        current_charges: 0,
+        max_charges: 0,
+        cooldown_timer: finished_timer_init(),
+        base_cooldown: 0.0,
+        tracked_skill: ActiveSkill::Roll,
+    };
+    match slot_skill {
+        None => {
+            *slot = empty_roll();
         }
-    }
-    for mut tracker in slot2_trackers.iter_mut() {
-        if tracker.0.current_charges < tracker.0.max_charges {
-            tracker.0.cooldown_timer.tick(time.delta());
-            if tracker.0.cooldown_timer.finished() {
-                tracker.0.current_charges += 1;
-                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
-                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
+        Some(choice) => {
+            if choice.active_skill == ActiveSkill::Roll {
+                *slot = empty_roll();
+                return;
             }
-        }
-    }
-    for mut tracker in slot3_trackers.iter_mut() {
-        if tracker.0.current_charges < tracker.0.max_charges {
-            tracker.0.cooldown_timer.tick(time.delta());
-            if tracker.0.cooldown_timer.finished() {
-                tracker.0.current_charges += 1;
-                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
-                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
-            }
-        }
-    }
-    for mut tracker in slot4_trackers.iter_mut() {
-        if tracker.0.current_charges < tracker.0.max_charges {
-            tracker.0.cooldown_timer.tick(time.delta());
-            if tracker.0.cooldown_timer.finished() {
-                tracker.0.current_charges += 1;
-                let effective = (tracker.0.base_cooldown * cd_mult * blessing_mult).max(0.0);
-                tracker.0.cooldown_timer = Timer::from_seconds(effective, TimerMode::Once);
+            let base_cooldown = choice.active_skill.get_base_cooldown();
+            let current_skill = choice.active_skill;
+            let skill_changed = slot.tracked_skill != current_skill;
+            if skill_changed {
+                let base_cd = base_cooldown.max(0.0);
+                let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                init_timer.tick(Duration::from_secs_f32(base_cd));
+                slot.current_charges = max_charges;
+                slot.max_charges = max_charges;
+                slot.base_cooldown = base_cooldown;
+                slot.cooldown_timer = init_timer;
+                slot.tracked_skill = current_skill;
+            } else {
+                let old_max = slot.max_charges;
+                slot.max_charges = max_charges;
+                if max_charges > old_max {
+                    let extra_charges = max_charges - old_max;
+                    slot.current_charges = (slot.current_charges + extra_charges).min(max_charges);
+                } else {
+                    slot.current_charges = slot.current_charges.min(max_charges);
+                }
+                slot.base_cooldown = base_cooldown;
+                if (slot.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs() > 0.01 {
+                    let elapsed = slot.cooldown_timer.elapsed();
+                    let base_cd = base_cooldown.max(0.0);
+                    let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
+                    new_timer.tick(elapsed);
+                    slot.cooldown_timer = new_timer;
+                }
             }
         }
     }
 }
 
-/// Initializes or updates the skill charge trackers when PlayerSkills changes
-/// Creates separate trackers for slots 1-4 class skills
-pub fn initialize_skill_charge_tracker(
+pub fn initialize_class_skill_slots(
     mut commands: Commands,
-    players: Query<Entity, (With<Player>, Changed<PlayerSkills>)>,
+    players: Query<Entity, (With<Player>, Or<(Changed<PlayerSkills>, Without<ClassSkillSlots>)>)>,
     player_skills: Query<&PlayerSkills, With<Player>>,
-    mut slot1_trackers: Query<&mut Slot1ChargeTracker>,
-    mut slot2_trackers: Query<&mut Slot2ChargeTracker>,
-    mut slot3_trackers: Query<&mut Slot3ChargeTracker>,
-    mut slot4_trackers: Query<&mut Slot4ChargeTracker>,
+    mut slots_q: Query<&mut ClassSkillSlots, With<Player>>,
 ) {
     for player_e in players.iter() {
         let Ok(skills) = player_skills.get(player_e) else {
             continue;
         };
         let max_charges = 1 + skills.skill_extra_charges();
-
-        // Manage tracker for slot 1 (active_skill_slot_1)
-        if let Some(slot_1_skill) = &skills.active_skill_slot_0 {
-            // Roll uses its own cooldown system (player_dash_cooldown), skip charge tracker
-            if slot_1_skill.active_skill == crate::player::skills::ActiveSkill::Roll {
-                // Remove any existing tracker for this slot
-                if slot1_trackers.get(player_e).is_ok() {
-                    commands.entity(player_e).remove::<Slot1ChargeTracker>();
-                }
-            } else {
-                let base_cooldown = slot_1_skill.active_skill.get_base_cooldown();
-                let current_skill = slot_1_skill.active_skill.clone();
-
-                if let Ok(mut tracker) = slot1_trackers.get_mut(player_e) {
-                    // Check if the skill changed
-                    let skill_changed = tracker.0.tracked_skill != current_skill;
-
-                    if skill_changed {
-                        // Skill changed - reset tracker completely with new skill
-                        let base_cd = base_cooldown.max(0.0);
-                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cd));
-                        tracker.0.current_charges = max_charges;
-                        tracker.0.max_charges = max_charges;
-                        tracker.0.base_cooldown = base_cooldown;
-                        tracker.0.cooldown_timer = init_timer;
-                        tracker.0.tracked_skill = current_skill;
-                    } else {
-                        // Same skill - update max_charges and grant extra charges if heirloom was acquired
-                        let old_max = tracker.0.max_charges;
-                        tracker.0.max_charges = max_charges;
-
-                        // If max_charges increased, grant the extra charges immediately
-                        if max_charges > old_max {
-                            let extra_charges = max_charges - old_max;
-                            tracker.0.current_charges =
-                                (tracker.0.current_charges + extra_charges).min(max_charges);
-                        } else {
-                            // Cap current charges at new max (in case max decreased)
-                            tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                        }
-
-                        tracker.0.base_cooldown = base_cooldown;
-                        // Only update duration if it changed (and skill didn't change)
-                        if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
-                            > 0.01
-                        {
-                            let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let base_cd = base_cooldown.max(0.0);
-                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                            new_timer.tick(elapsed);
-                            tracker.0.cooldown_timer = new_timer;
-                        }
-                    }
-                } else {
-                    // Create new tracker with max charges
-                    let base_cd = base_cooldown.max(0.0);
-                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cd));
-                    commands.entity(player_e).insert(Slot1ChargeTracker(
-                        crate::player::skills::SkillChargeTracker {
-                            current_charges: max_charges,
-                            max_charges,
-                            cooldown_timer: init_timer,
-                            base_cooldown,
-                            tracked_skill: current_skill,
-                        },
-                    ));
-                }
-            } // Close the else block for non-Roll skills
-        } else {
-            // Remove tracker if skill no longer exists
-            if slot1_trackers.get(player_e).is_ok() {
-                commands.entity(player_e).remove::<Slot1ChargeTracker>();
+        let slot_refs = [
+            skills.active_skill_slot_0.as_ref(),
+            skills.active_skill_slot_1.as_ref(),
+            skills.active_skill_slot_2.as_ref(),
+            skills.active_skill_slot_3.as_ref(),
+        ];
+        if let Ok(mut slots) = slots_q.get_mut(player_e) {
+            for i in 0..4 {
+                update_one_slot_runtime(&mut slots.0[i], slot_refs[i], max_charges);
             }
-        }
-
-        // Manage tracker for slot 2 (active_skill_slot_2)
-        if let Some(slot_2_skill) = &skills.active_skill_slot_1 {
-            // Roll uses its own cooldown system (player_dash_cooldown), skip charge tracker
-            if slot_2_skill.active_skill == crate::player::skills::ActiveSkill::Roll {
-                // Remove any existing tracker for this slot
-                if slot2_trackers.get(player_e).is_ok() {
-                    commands.entity(player_e).remove::<Slot2ChargeTracker>();
-                }
-            } else {
-                let base_cooldown = slot_2_skill.active_skill.get_base_cooldown();
-                let current_skill = slot_2_skill.active_skill.clone();
-
-                if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
-                    // Check if the skill changed
-                    let skill_changed = tracker.0.tracked_skill != current_skill;
-
-                    if skill_changed {
-                        // Skill changed - reset tracker completely with new skill
-                        let base_cd = base_cooldown.max(0.0);
-                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cd));
-                        tracker.0.current_charges = max_charges;
-                        tracker.0.max_charges = max_charges;
-                        tracker.0.base_cooldown = base_cooldown;
-                        tracker.0.cooldown_timer = init_timer;
-                        tracker.0.tracked_skill = current_skill;
-                    } else {
-                        // Same skill - update max_charges and grant extra charges if heirloom was acquired
-                        let old_max = tracker.0.max_charges;
-                        tracker.0.max_charges = max_charges;
-
-                        // If max_charges increased, grant the extra charges immediately
-                        if max_charges > old_max {
-                            let extra_charges = max_charges - old_max;
-                            tracker.0.current_charges =
-                                (tracker.0.current_charges + extra_charges).min(max_charges);
-                        } else {
-                            // Cap current charges at new max (in case max decreased)
-                            tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                        }
-
-                        tracker.0.base_cooldown = base_cooldown;
-                        // Only update duration if it changed (and skill didn't change)
-                        if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
-                            > 0.01
-                        {
-                            let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let base_cd = base_cooldown.max(0.0);
-                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                            new_timer.tick(elapsed);
-                            tracker.0.cooldown_timer = new_timer;
-                        }
-                    }
-                } else {
-                    // Create new tracker with max charges
-                    let base_cd = base_cooldown.max(0.0);
-                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cd)); // Start finished
-                    commands.entity(player_e).insert(Slot2ChargeTracker(
-                        crate::player::skills::SkillChargeTracker {
-                            current_charges: max_charges,
-                            max_charges,
-                            cooldown_timer: init_timer,
-                            base_cooldown,
-                            tracked_skill: current_skill,
-                        },
-                    ));
-                }
-            } // Close the else block for non-Roll skills
         } else {
-            // Remove tracker if skill no longer exists
-            if slot2_trackers.get(player_e).is_ok() {
-                commands.entity(player_e).remove::<Slot2ChargeTracker>();
+            let mut slots = ClassSkillSlots::default();
+            for i in 0..4 {
+                update_one_slot_runtime(&mut slots.0[i], slot_refs[i], max_charges);
             }
-        }
-
-        // Manage tracker for slot 3 (active_skill_slot_3)
-        if let Some(slot_3_skill) = &skills.active_skill_slot_2 {
-            // Roll uses its own cooldown system (player_dash_cooldown), skip charge tracker
-            if slot_3_skill.active_skill == crate::player::skills::ActiveSkill::Roll {
-                // Remove any existing tracker for this slot
-                if slot3_trackers.get(player_e).is_ok() {
-                    commands.entity(player_e).remove::<Slot3ChargeTracker>();
-                }
-            } else {
-                let base_cooldown = slot_3_skill.active_skill.get_base_cooldown();
-                let current_skill = slot_3_skill.active_skill.clone();
-
-                if let Ok(mut tracker) = slot3_trackers.get_mut(player_e) {
-                    // Check if the skill changed
-                    let skill_changed = tracker.0.tracked_skill != current_skill;
-
-                    if skill_changed {
-                        // Skill changed - reset tracker completely with new skill
-                        let base_cd = base_cooldown.max(0.0);
-                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cd));
-                        tracker.0.current_charges = max_charges;
-                        tracker.0.max_charges = max_charges;
-                        tracker.0.base_cooldown = base_cooldown;
-                        tracker.0.cooldown_timer = init_timer;
-                        tracker.0.tracked_skill = current_skill;
-                    } else {
-                        // Same skill - update max_charges and grant extra charges if heirloom was acquired
-                        let old_max = tracker.0.max_charges;
-                        tracker.0.max_charges = max_charges;
-
-                        // If max_charges increased, grant the extra charges immediately
-                        if max_charges > old_max {
-                            let extra_charges = max_charges - old_max;
-                            tracker.0.current_charges =
-                                (tracker.0.current_charges + extra_charges).min(max_charges);
-                        } else {
-                            // Cap current charges at new max (in case max decreased)
-                            tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                        }
-
-                        tracker.0.base_cooldown = base_cooldown;
-                        // Only update duration if it changed (and skill didn't change)
-                        if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
-                            > 0.01
-                        {
-                            let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let base_cd = base_cooldown.max(0.0);
-                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                            new_timer.tick(elapsed);
-                            tracker.0.cooldown_timer = new_timer;
-                        }
-                    }
-                } else {
-                    // Create new tracker with max charges
-                    let base_cd = base_cooldown.max(0.0);
-                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cd));
-                    commands.entity(player_e).insert(Slot3ChargeTracker(
-                        crate::player::skills::SkillChargeTracker {
-                            current_charges: max_charges,
-                            max_charges,
-                            cooldown_timer: init_timer,
-                            base_cooldown,
-                            tracked_skill: current_skill,
-                        },
-                    ));
-                }
-            } // Close the else block for non-Roll skills
-        } else {
-            // Remove tracker if skill no longer exists
-            if slot3_trackers.get(player_e).is_ok() {
-                commands.entity(player_e).remove::<Slot3ChargeTracker>();
-            }
-        }
-
-        // Manage tracker for slot 4 (active_skill_slot_4)
-        if let Some(slot_4_skill) = &skills.active_skill_slot_3 {
-            // Roll uses its own cooldown system (player_dash_cooldown), skip charge tracker
-            if slot_4_skill.active_skill == crate::player::skills::ActiveSkill::Roll {
-                // Remove any existing tracker for this slot
-                if slot4_trackers.get(player_e).is_ok() {
-                    commands.entity(player_e).remove::<Slot4ChargeTracker>();
-                }
-            } else {
-                let base_cooldown = slot_4_skill.active_skill.get_base_cooldown();
-                let current_skill = slot_4_skill.active_skill.clone();
-
-                if let Ok(mut tracker) = slot4_trackers.get_mut(player_e) {
-                    // Check if the skill changed
-                    let skill_changed = tracker.0.tracked_skill != current_skill;
-
-                    if skill_changed {
-                        // Skill changed - reset tracker completely with new skill
-                        let base_cd = base_cooldown.max(0.0);
-                        let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                        init_timer.tick(Duration::from_secs_f32(base_cd));
-                        tracker.0.current_charges = max_charges;
-                        tracker.0.max_charges = max_charges;
-                        tracker.0.base_cooldown = base_cooldown;
-                        tracker.0.cooldown_timer = init_timer;
-                        tracker.0.tracked_skill = current_skill;
-                    } else {
-                        // Same skill - update max_charges and grant extra charges if heirloom was acquired
-                        let old_max = tracker.0.max_charges;
-                        tracker.0.max_charges = max_charges;
-
-                        // If max_charges increased, grant the extra charges immediately
-                        if max_charges > old_max {
-                            let extra_charges = max_charges - old_max;
-                            tracker.0.current_charges =
-                                (tracker.0.current_charges + extra_charges).min(max_charges);
-                        } else {
-                            // Cap current charges at new max (in case max decreased)
-                            tracker.0.current_charges = tracker.0.current_charges.min(max_charges);
-                        }
-
-                        tracker.0.base_cooldown = base_cooldown;
-                        // Only update duration if it changed (and skill didn't change)
-                        if (tracker.0.cooldown_timer.duration().as_secs_f32() - base_cooldown).abs()
-                            > 0.01
-                        {
-                            let elapsed = tracker.0.cooldown_timer.elapsed();
-                            let base_cd = base_cooldown.max(0.0);
-                            let mut new_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                            new_timer.tick(elapsed);
-                            tracker.0.cooldown_timer = new_timer;
-                        }
-                    }
-                } else {
-                    // Create new tracker with max charges
-                    let base_cd = base_cooldown.max(0.0);
-                    let mut init_timer = Timer::from_seconds(base_cd, TimerMode::Once);
-                    init_timer.tick(Duration::from_secs_f32(base_cd));
-                    commands.entity(player_e).insert(Slot4ChargeTracker(
-                        crate::player::skills::SkillChargeTracker {
-                            current_charges: max_charges,
-                            max_charges,
-                            cooldown_timer: init_timer,
-                            base_cooldown,
-                            tracked_skill: current_skill,
-                        },
-                    ));
-                }
-            } // Close the else block for non-Roll skills
-        } else {
-            // Remove tracker if skill no longer exists
-            if slot4_trackers.get(player_e).is_ok() {
-                commands.entity(player_e).remove::<Slot4ChargeTracker>();
-            }
+            commands.entity(player_e).insert(slots);
         }
     }
 }
@@ -1841,53 +1490,17 @@ pub fn reduce_skill_cooldown_on_crit(
     mut hit_events: EventReader<HitEvent>,
     mut commands: Commands,
     mut players: Query<
-        (
-            Entity,
-            &PlayerSkills,
-            Option<&mut HeirloomTriggerCooldowns>,
-            Option<&mut StealthState>,
-            Option<&mut RapidfireState>,
-            Option<&mut FirePillarState>,
-            Option<&mut HealSkillState>,
-            Option<&mut BuckshotSkillState>,
-            Option<&mut IceWallSkillState>,
-            Option<&mut DruidTreeSkillState>,
-            Option<&mut ShoutSkillState>,
-        ),
+        (Entity, &PlayerSkills, Option<&mut HeirloomTriggerCooldowns>),
         With<Player>,
     >,
-    mut slot1_trackers: Query<&mut Slot1ChargeTracker>,
-    mut slot2_trackers: Query<&mut Slot2ChargeTracker>,
-    mut slot3_trackers: Query<&mut Slot3ChargeTracker>,
-    mut slot4_trackers: Query<&mut Slot4ChargeTracker>,
-    mut sprint_states: Query<&mut SprintState, With<Player>>,
-    mut spear_states: Query<&mut SpearState, With<Player>>,
-    mut lunge_states: Query<&mut LungeState, With<Player>>,
-    mut teleport_states: Query<&mut TeleportState, With<Player>>,
-    mut laser_beam_states: Query<&mut LaserBeamState, With<Player>>,
-    mut spinattack_states: Query<&mut SpinAttackState, With<Player>>,
-    mut cooldown_overlays: Query<&mut crate::ui::SkillCooldownOverlay>,
+    mut class_slots: Query<&mut ClassSkillSlots, With<Player>>,
 ) {
     for hit in hit_events.iter() {
-        // Only process crits from player attacks (not from mobs hitting player)
         if !hit.was_crit || hit.hit_by_mob.is_some() {
             continue;
         }
 
-        for (
-            player_e,
-            skills,
-            mut heirloom_cooldowns,
-            stealth_state,
-            rapid_state,
-            pillar_state,
-            heal_state,
-            buckshot_state,
-            icewall_state,
-            druidtree_state,
-            shout_state,
-        ) in players.iter_mut()
-        {
+        for (player_e, skills, mut heirloom_cooldowns) in players.iter_mut() {
             let heirloom_count = skills.get_count(Heirloom::CritSkillCooldownReduction);
             if heirloom_count == 0 {
                 continue;
@@ -1904,167 +1517,15 @@ pub fn reduce_skill_cooldown_on_crit(
 
             let reduction = (0.1 * heirloom_count as f32).max(0.0);
 
-            // Reduce cooldown for skill state components
-            // Instead of creating a new timer, tick the existing timer forward by the reduction amount
-            // This preserves the original duration for the HUD UI
-            if let Some(mut state) = stealth_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = rapid_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = pillar_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = heal_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = buckshot_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = icewall_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = druidtree_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Some(mut state) = shout_state {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-
-            // Reduce cooldown for legacy skills
-            if let Ok(mut state) = sprint_states.get_single_mut() {
-                if !state.sprint_cooldown_timer.finished() {
-                    state
-                        .sprint_cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Ok(mut state) = spear_states.get_single_mut() {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Ok(mut state) = lunge_states.get_single_mut() {
-                if !state.lunge_cooldown_timer.finished() {
-                    state
-                        .lunge_cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Ok(mut state) = teleport_states.get_single_mut() {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Ok(mut state) = laser_beam_states.get_single_mut() {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-            if let Ok(mut state) = spinattack_states.get_single_mut() {
-                if !state.cooldown_timer.finished() {
-                    state
-                        .cooldown_timer
-                        .tick(Duration::from_secs_f32(reduction));
-                }
-            }
-
-            // Reduce cooldown for SkillChargeTracker (slot 1)
-            // Reduce charge regeneration cooldown for slot 1
-            if let Ok(mut tracker) = slot1_trackers.get_mut(player_e) {
-                if tracker.0.current_charges < tracker.0.max_charges {
-                    if !tracker.0.cooldown_timer.finished() {
-                        tracker
-                            .0
-                            .cooldown_timer
-                            .tick(Duration::from_secs_f32(reduction));
-                    }
-                }
-            }
-            // Reduce charge regeneration cooldown for slot 2
-            if let Ok(mut tracker) = slot2_trackers.get_mut(player_e) {
-                if tracker.0.current_charges < tracker.0.max_charges {
-                    if !tracker.0.cooldown_timer.finished() {
-                        tracker
-                            .0
-                            .cooldown_timer
-                            .tick(Duration::from_secs_f32(reduction));
-                    }
-                }
-            }
-            // Reduce charge regeneration cooldown for slot 3
-            if let Ok(mut tracker) = slot3_trackers.get_mut(player_e) {
-                if tracker.0.current_charges < tracker.0.max_charges {
-                    if !tracker.0.cooldown_timer.finished() {
-                        tracker
-                            .0
-                            .cooldown_timer
-                            .tick(Duration::from_secs_f32(reduction));
-                    }
-                }
-            }
-            // Reduce charge regeneration cooldown for slot 4
-            if let Ok(mut tracker) = slot4_trackers.get_mut(player_e) {
-                if tracker.0.current_charges < tracker.0.max_charges {
-                    if !tracker.0.cooldown_timer.finished() {
-                        tracker
-                            .0
-                            .cooldown_timer
+            if let Ok(mut slots) = class_slots.get_mut(player_e) {
+                for slot in &mut slots.0 {
+                    if !slot.cooldown_timer.finished() {
+                        slot.cooldown_timer
                             .tick(Duration::from_secs_f32(reduction));
                     }
                 }
             }
 
-            // Also tick SkillCooldownOverlay timers for non-charge-tracked slots (slot 4+).
-            // Slots 0-3 use charge trackers (already ticked above); slot 4 overlays have
-            // their own independent timer that drives the HUD display and must be kept in sync.
-            for mut overlay in cooldown_overlays.iter_mut() {
-                // Only tick overlays that are not backed by a charge tracker (index >= 4)
-                if overlay.index >= 4 && !overlay.timer.finished() {
-                    overlay.timer.tick(Duration::from_secs_f32(reduction));
-                }
-            }
-
-            // Set Bob's Bell trigger cooldown so it can only apply once per 0.1s
             let bobs_bell_timer =
                 Timer::from_seconds(HEIRLOOM_TRIGGER_COOLDOWN_SECS, TimerMode::Once);
             if let Some(ref mut cooldowns) = heirloom_cooldowns {
@@ -2079,7 +1540,6 @@ pub fn reduce_skill_cooldown_on_crit(
     }
 }
 
-/// Handle CritHeal - crits have a chance to heal
 pub fn handle_crit_heal(
     mut hit_events: EventReader<crate::combat::HitEvent>,
     player_query: Query<&PlayerSkills, With<crate::player::Player>>,

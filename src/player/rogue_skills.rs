@@ -27,12 +27,10 @@ aseprite!(pub Combo, "textures/effects/Combo.aseprite");
 pub struct SprintState {
     pub startup_timer: Timer,
     pub sprint_duration_timer: Timer,
-    pub sprint_cooldown_timer: Timer,
     pub speed_bonus: f32,
 }
 #[derive(Debug, Component)]
 pub struct LungeState {
-    pub lunge_cooldown_timer: Timer,
     pub lunge_duration: Timer,
     pub lunge_speed: f32,
 }
@@ -248,7 +246,6 @@ pub fn handle_sprinting_cooldown(
 }
 
 pub fn handle_lunge_cooldown(
-    time: Res<Time>,
     mut query: Query<(
         Entity,
         &mut LungeState,
@@ -258,7 +255,6 @@ pub fn handle_lunge_cooldown(
     mut commands: Commands,
 ) {
     for (e, mut lunge_state, anim, aseprite_anim) in query.iter_mut() {
-        lunge_state.lunge_cooldown_timer.tick(time.delta());
         if anim.is_lunging() && aseprite_anim.just_finished() {
             lunge_state.lunge_duration.reset();
             commands.entity(e).insert(PlayerAnimation::Walk);
@@ -268,15 +264,19 @@ pub fn handle_lunge_cooldown(
 
 pub fn handle_enemy_death_sprint_reset(
     mut enemy_death_events: EventReader<EnemyDeathEvent>,
-    mut lunge_query: Query<&mut LungeState>,
+    mut class_slots: Query<&mut crate::player::skills::ClassSkillSlots, With<Player>>,
     skills: Query<&PlayerSkills>,
 ) {
     for _ in enemy_death_events.iter() {
-        if skills.single().has(Heirloom::SprintKillReset) {
-            if let Some(_lunge_slot) = skills.single().has_active_skill(ActiveSkill::SprintLunge) {
-                for mut sprint in lunge_query.iter_mut() {
-                    // Central dispatcher now sends events; here we simply reset local cooldowns
-                    sprint.lunge_cooldown_timer.tick(Duration::from_secs(99));
+        let skillz = skills.single();
+        if skillz.has(Heirloom::SprintKillReset) {
+            if let Some(lunge_slot) = skillz.has_active_skill(ActiveSkill::SprintLunge) {
+                if lunge_slot < 4 {
+                    if let Ok(mut slots) = class_slots.get_single_mut() {
+                        slots.0[lunge_slot]
+                            .cooldown_timer
+                            .tick(Duration::from_secs_f32(99.0));
+                    }
                 }
             }
         }
