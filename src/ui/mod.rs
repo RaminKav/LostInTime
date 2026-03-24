@@ -453,7 +453,10 @@ impl Plugin for UIPlugin {
             )
             .add_systems(
                 (
+                    player_hud::sync_consumable_buff_hud,
+                    player_hud::tick_consumable_buff_hud_overlays.run_if(is_not_paused),
                     handle_heirloom_hud_tooltip,
+                    player_hud::handle_consumable_buff_hud_tooltip,
                     player_hud::handle_active_skill_hud_tooltip,
                     player_hud::update_skill_tooltip_cooldown.after(player_hud::handle_active_skill_hud_tooltip),
                 )

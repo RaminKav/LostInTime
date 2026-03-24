@@ -35,6 +35,10 @@ pub struct PlayerStatsTooltip;
 #[derive(Component)]
 pub struct ItemOrRecipeTooltip;
 
+/// Marks a tooltip spawned next to the consumable-buff HUD (despawned independently of inventory).
+#[derive(Component)]
+pub struct ConsumableBuffHudTooltip;
+
 #[derive(Component)]
 pub struct RecipeIngredientTooltipIcon;
 
@@ -1053,6 +1057,146 @@ pub fn spawn_damage_tracker_in_inventory(
             commands.entity(inv_entity).add_child(*panel);
         }
     }
+}
+
+/// World-space item card for HUD buff hover (inventory UI closed).
+pub fn spawn_world_item_tooltip_for_stack(
+    commands: &mut Commands,
+    graphics: &Graphics,
+    asset_server: &AssetServer,
+    proto: &ProtoParam,
+    item_stack: &ItemStack,
+    anchor_translation: Vec3,
+) -> Entity {
+    let obj_type = item_stack.obj_type;
+    let item_rarity = item_stack.rarity.clone();
+    let size = Vec2::new(130., 120.);
+    let item_actions = proto.get_component::<ItemActions, _>(obj_type);
+
+    let tooltip = commands
+        .spawn((
+            SpriteBundle {
+                texture: graphics
+                    .get_ui_element_texture(item_rarity.clone().get_tooltip_ui_element()),
+                transform: Transform::from_translation(anchor_translation + Vec3::new(-65., 55., 20.)),
+                sprite: Sprite {
+                    custom_size: Some(size),
+                    ..default()
+                },
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            item_rarity.get_tooltip_ui_element(),
+            Name::new("HUD_ITEM_TOOLTIP"),
+            ConsumableBuffHudTooltip,
+        ))
+        .id();
+
+    let icon_e = spawn_item_stack_icon(
+        commands,
+        graphics,
+        &ItemStack {
+            obj_type,
+            count: 1,
+            ..item_stack.clone()
+        },
+        asset_server,
+        Vec2::ZERO,
+        Vec2::ZERO,
+        3,
+    );
+    commands.entity(icon_e).insert(Transform {
+        translation: Vec3::new(-38., 40., 2.),
+        scale: Vec3::new(1.2, 1.2, 1.),
+        ..default()
+    });
+    commands.entity(tooltip).add_child(icon_e);
+
+    if let Some(glow_e) = add_item_glows(commands, graphics, icon_e, item_rarity.clone()) {
+        commands
+            .entity(glow_e)
+            .insert(Name::new("Item Glow Effect"))
+            .insert(RenderLayers::from_layers(&[3]));
+    }
+
+    let _name = commands
+        .spawn((
+            Text2dBundle {
+                text: Text::from_section(
+                    item_stack.metadata.name.clone(),
+                    TextStyle {
+                        font: asset_server.load("fonts/alagard.ttf"),
+                        font_size: 15.,
+                        color: item_stack.rarity.get_color(),
+                    },
+                ),
+                text_anchor: Anchor::CenterLeft,
+                transform: Transform::from_translation(Vec3::new(-55., 52., 1.)),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+        ))
+        .set_parent(tooltip)
+        .id();
+
+    let action_or_level = if let Some(ia) = item_actions {
+        let texts: Vec<String> = ia.actions.iter().filter_map(|a| a.get_tooltip()).collect();
+        if texts.is_empty() {
+            String::new()
+        } else {
+            texts.join(" ")
+        }
+    } else {
+        String::new()
+    };
+
+    if !action_or_level.is_empty() {
+        let _t = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        action_or_level,
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 5.,
+                            color: ORANGE,
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-55., 38., 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+    }
+
+    let mut y = 22.;
+    for line in &item_stack.metadata.desc {
+        let _d = commands
+            .spawn((
+                Text2dBundle {
+                    text: Text::from_section(
+                        line.clone(),
+                        TextStyle {
+                            font: asset_server.load("fonts/slkscr.ttf"),
+                            font_size: 5.,
+                            color: TOOLTIP_BLACK_2,
+                        },
+                    ),
+                    text_anchor: Anchor::CenterLeft,
+                    transform: Transform::from_translation(Vec3::new(-55., y, 1.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+            ))
+            .set_parent(tooltip)
+            .id();
+        y -= 6.;
+    }
+
+    tooltip
 }
 
 pub fn get_num_stars(

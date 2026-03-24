@@ -5,14 +5,15 @@ use std::collections::HashMap;
 
 use super::{
     damage_numbers::spawn_text, interactions::Interaction, spawn_heirloom_tooltip_card,
-    spawn_inv_slot, spawn_item_stack_icon, InventorySlotType, InventoryState, InventoryUI,
-    UIElement, UIState,
+    spawn_inv_slot, spawn_item_stack_icon, tooltips::spawn_world_item_tooltip_for_stack,
+    tooltips::ConsumableBuffHudTooltip, InventorySlotType, InventoryState, InventoryUI, UIElement,
+    UIState,
 };
 use crate::{
     assets::Graphics,
     attributes::{
-        attribute_helpers::skill_power_multiplier, hunger::Hunger, CurrentHealth, CurrentMana,
-        CurrentShield, MaxHealth, MaxMana, MaxShield, SkillPower,
+        attribute_helpers::skill_power_multiplier, hunger::Hunger, ActiveConsumableBuffs,
+        CurrentHealth, CurrentMana, CurrentShield, MaxHealth, MaxMana, MaxShield, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
     blessings::OwnedBlessings,
@@ -25,6 +26,7 @@ use crate::{
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
+    proto::proto_param::ProtoParam,
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
@@ -2601,5 +2603,221 @@ pub fn update_inventory_keybind_text(
         let (key_element, key_width) = get_key_size_and_element(inventory_key);
         *texture = graphics.get_ui_element_texture(key_element);
         sprite.custom_size = Some(Vec2::new(key_width, 10.));
+    }
+}
+
+pub const CONSUMABLE_BUFF_HUD_ICON_PX: f32 = 14.;
+
+#[derive(Component, Clone)]
+pub struct ConsumableBuffHudMarker {
+    pub item_stack: ItemStack,
+}
+
+#[derive(Component)]
+pub struct ConsumableBuffHudDurationOverlay {
+    pub hud_slot: usize,
+}
+
+fn consumable_buff_hud_layout_keys(buffs: &ActiveConsumableBuffs) -> Vec<(usize, WorldObject)> {
+    buffs
+        .entries
+        .iter()
+        .enumerate()
+        .filter_map(|(i, e)| e.item_stack.as_ref().map(|s| (i, s.obj_type)))
+        .collect()
+}
+
+/// Rebuilds consumable-buff HUD icons when the set of buffs (indices + item types) changes.
+pub fn sync_consumable_buff_hud(
+    mut commands: Commands,
+    player: Query<&ActiveConsumableBuffs, With<Player>>,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    mut last_keys: Local<Option<Vec<(usize, WorldObject)>>>,
+    existing: Query<Entity, With<ConsumableBuffHudMarker>>,
+) {
+    let Ok(buffs) = player.get_single() else {
+        return;
+    };
+    let keys = consumable_buff_hud_layout_keys(buffs);
+    if last_keys.as_ref() == Some(&keys) {
+        return;
+    }
+    *last_keys = Some(keys);
+
+    for e in existing.iter() {
+        commands.entity(e).despawn_recursive();
+    }
+
+    let visible: Vec<(usize, &crate::attributes::ConsumableBuffEntry)> = buffs
+        .entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| e.item_stack.is_some())
+        .collect();
+
+    for (hud_slot, (_entry_index, entry)) in visible.iter().enumerate() {
+        let stack = entry.item_stack.as_ref().unwrap().clone();
+        let i = hud_slot as f32;
+        let x = -50. - 2. - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.) - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
+        let y = -GAME_HEIGHT / 2. + 14.;
+
+        let icon_root = commands
+            .spawn((
+                SpriteBundle {
+                    texture: graphics.get_ui_element_texture(UIElement::InventorySlotHotbar),
+                    sprite: Sprite {
+                        custom_size: Some(Vec2::splat(CONSUMABLE_BUFF_HUD_ICON_PX)),
+                        ..default()
+                    },
+                    transform: Transform::from_translation(Vec3::new(x, y, 2.)),
+                    ..default()
+                },
+                RenderLayers::from_layers(&[3]),
+                Name::new("consumable_buff_hud"),
+                Interactable::default(),
+                ConsumableBuffHudMarker {
+                    item_stack: stack.clone(),
+                },
+            ))
+            .id();
+
+        let icon_e = spawn_item_stack_icon(
+            &mut commands,
+            &graphics,
+            &stack,
+            &asset_server,
+            Vec2::ZERO,
+            Vec2::ZERO,
+            3,
+        );
+        commands.entity(icon_e).insert(Transform::from_translation(Vec3::new(0., 0., 1.)));
+        commands.entity(icon_root).add_child(icon_e);
+
+        let _ = spawn_consumable_buff_duration_overlay(icon_root, &mut commands, hud_slot);
+    }
+}
+
+fn spawn_consumable_buff_duration_overlay(
+    parent: Entity,
+    commands: &mut Commands,
+    hud_slot: usize,
+) -> Entity {
+    commands
+        .spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    color: Color::rgba(1., 1., 1., 0.45),
+                    custom_size: Some(Vec2::new(
+                        CONSUMABLE_BUFF_HUD_ICON_PX,
+                        CONSUMABLE_BUFF_HUD_ICON_PX,
+                    )),
+                    anchor: Anchor::BottomCenter,
+                    ..default()
+                },
+                transform: Transform::from_translation(Vec3::new(
+                    0.,
+                    -CONSUMABLE_BUFF_HUD_ICON_PX / 2.,
+                    4.,
+                )),
+                ..default()
+            },
+            RenderLayers::from_layers(&[3]),
+            ConsumableBuffHudDurationOverlay { hud_slot },
+            Name::new("consumable_buff_duration"),
+        ))
+        .set_parent(parent)
+        .id()
+}
+
+fn nth_visible_consumable_buff<'a>(
+    buffs: &'a ActiveConsumableBuffs,
+    hud_slot: usize,
+) -> Option<&'a crate::attributes::ConsumableBuffEntry> {
+    buffs
+        .entries
+        .iter()
+        .filter(|e| e.item_stack.is_some())
+        .nth(hud_slot)
+}
+
+pub fn tick_consumable_buff_hud_overlays(
+    buffs: Query<&ActiveConsumableBuffs, With<Player>>,
+    mut overlays: Query<(&ConsumableBuffHudDurationOverlay, &mut Sprite)>,
+) {
+    let Ok(b) = buffs.get_single() else {
+        return;
+    };
+    for (ov, mut sprite) in overlays.iter_mut() {
+        if let Some(entry) = nth_visible_consumable_buff(b, ov.hud_slot) {
+            let p = entry.display_timer.percent();
+            sprite.custom_size = Some(Vec2::new(
+                CONSUMABLE_BUFF_HUD_ICON_PX,
+                CONSUMABLE_BUFF_HUD_ICON_PX * (1.0 - p),
+            ));
+        }
+    }
+}
+
+pub fn handle_consumable_buff_hud_tooltip(
+    mut commands: Commands,
+    graphics: Res<Graphics>,
+    asset_server: Res<AssetServer>,
+    proto: ProtoParam,
+    cursor_pos: Res<CursorPos>,
+    hit_detection_sprites: Query<
+        (Entity, &Sprite, &GlobalTransform),
+        With<super::interactions::Interactable>,
+    >,
+    mut hud_icons: Query<(
+        Entity,
+        &GlobalTransform,
+        &mut super::interactions::Interactable,
+        &ConsumableBuffHudMarker,
+    )>,
+    existing_tooltips: Query<Entity, With<ConsumableBuffHudTooltip>>,
+    mut last_hovered: Local<Option<ItemStack>>,
+) {
+    use super::interactions::Interaction;
+
+    let hit_entity = super::ui_helpers::pointcast_2d(&cursor_pos, &hit_detection_sprites, None);
+
+    for (entity, _, mut interactable, _) in hud_icons.iter_mut() {
+        let is_hit = hit_entity
+            .as_ref()
+            .map(|(e, _s, _t)| *e == entity)
+            .unwrap_or(false);
+        if is_hit && !matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::Hovering);
+        } else if !is_hit && matches!(interactable.current(), Interaction::Hovering) {
+            interactable.change(Interaction::None);
+        }
+    }
+
+    let currently_hovered = hud_icons
+        .iter()
+        .find(|(_, _, interactable, _)| matches!(interactable.current(), Interaction::Hovering))
+        .map(|(_, transform, _, m)| (m.item_stack.clone(), transform.translation()));
+
+    let hovered_stack = currently_hovered.as_ref().map(|(s, _)| s.clone());
+
+    if *last_hovered == hovered_stack {
+        return;
+    }
+    *last_hovered = hovered_stack.clone();
+
+    for tooltip_e in existing_tooltips.iter() {
+        commands.entity(tooltip_e).despawn_recursive();
+    }
+
+    if let Some((stack, icon_pos)) = currently_hovered {
+        let _ = spawn_world_item_tooltip_for_stack(
+            &mut commands,
+            &graphics,
+            &asset_server,
+            &proto,
+            &stack,
+            Vec3::new(icon_pos.x - 4., icon_pos.y + 8., 15.),
+        );
     }
 }

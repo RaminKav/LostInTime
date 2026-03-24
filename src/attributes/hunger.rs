@@ -95,12 +95,12 @@ pub fn tick_hunger(
         });
 
         if tracker.timer.finished() {
-            if hunger.current == 0 {
-                health.0 -= 1;
-            } else {
-                hunger.current -= 1;
-            }
-            tracker.timer.reset();
+            // if hunger.current == 0 {
+            //     health.0 -= 1;
+            // } else {
+            //     hunger.current -= 1;
+            // }
+            // tracker.timer.reset();
         }
     }
 }

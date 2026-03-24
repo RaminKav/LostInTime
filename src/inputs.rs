@@ -1,7 +1,7 @@
 use crate::blessings::OwnedBlessings;
 use crate::chaos::ChaosTracker;
 use crate::cursor::CursorPos;
-use crate::item::potion_buffs::MovementSpeedBuff;
+use crate::attributes::ActiveConsumableBuffs;
 use crate::ui::tips::SeenTips;
 use std::f32::consts::PI;
 use std::time::Duration;
@@ -246,7 +246,7 @@ pub fn player_move_inputs(
             &mut RunDustTimer,
             &PlayerSkills,
             Option<&BounceEffect>,
-            Option<&MovementSpeedBuff>,
+            &ActiveConsumableBuffs,
             &OwnedBlessings,
             Option<&HitAnimationTracker>,
             Option<&KinematicCharacterControllerOutput>,
@@ -284,7 +284,7 @@ pub fn player_move_inputs(
         mut run_dust_timer,
         skills,
         bounce_option,
-        movement_speed_buff,
+        consumable_buffs,
         blessings,
         hit_tracker_option,
         kcc_output,
@@ -301,9 +301,7 @@ pub fn player_move_inputs(
 
     let mut player = game.player_mut();
     let mut d_raw = Vec2::ZERO;
-    let movement_speed_multiplier = movement_speed_buff
-        .map(|buff| buff.speed_multiplier)
-        .unwrap_or(1.0);
+    let movement_speed_multiplier = consumable_buffs.movement_multiplier_product();
 
     let s = PLAYER_MOVE_SPEED
         * time.delta_seconds()
@@ -797,6 +795,7 @@ pub fn handle_quick_hotbar_consume(
                 item_actions.run_action(
                     held_obj,
                     held_item.slot,
+                    Some(&held_item.item_stack),
                     &mut item_action_param,
                     &mut game,
                     &proto_param,
@@ -826,6 +825,7 @@ pub fn handle_mapped_quick_consume(
                     item_actions.run_action(
                         held_obj,
                         held_item.slot,
+                        Some(&held_item.item_stack),
                         &mut item_action_param,
                         &mut game,
                         &proto_param,
@@ -928,6 +928,7 @@ pub fn mouse_click_system(
                 item_actions.run_action(
                     held_obj,
                     held_item.slot,
+                    Some(&held_item.item_stack),
                     &mut item_action_param,
                     &mut game,
                     &proto_param,

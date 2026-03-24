@@ -71,7 +71,6 @@ pub mod dungeon_shrine;
 pub mod gamble_shrine;
 pub mod heirloom_shrine;
 pub mod microwave_shrine;
-pub mod potion_buffs;
 use boss_shrine::*;
 pub mod item_upgrades;
 mod loot_table;
@@ -93,7 +92,6 @@ use self::item_actions::handle_item_action_success;
 use self::item_upgrades::{
     handle_delayed_ranged_attack, handle_on_hit_upgrades, handle_spread_arrows_attack,
 };
-use self::potion_buffs::{add_attack_speed_buff_to_bonus, tick_potion_buffs};
 use self::projectile::RangedAttackPlugin;
 
 #[derive(Component, Reflect, FromReflect, Schematic)]
@@ -1370,8 +1368,6 @@ impl Plugin for ItemsPlugin {
                     add_microwave_shrine_visuals_on_spawn,
                     handle_microwave_shrine_completion,
                     handle_microwave_shrine_esc,
-                    tick_potion_buffs.run_if(is_not_paused),
-                    add_attack_speed_buff_to_bonus,
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )

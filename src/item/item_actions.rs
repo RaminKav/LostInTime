@@ -4,11 +4,12 @@ use crate::{
     attributes::{
         hunger::Hunger,
         modifiers::{ModifyHealthEvent, ModifyManaEvent},
+        ActiveConsumableBuffs, AttributeChangeEvent, ConsumableBuffEffect, ConsumableBuffEntry,
     },
     chaos::IncreaseChaosEvent,
     client::analytics::{AnalyticsTrigger, AnalyticsUpdateEvent},
     cursor::CursorPos,
-    inventory::Inventory,
+    inventory::{Inventory, ItemStack},
     juice::UseItemEvent,
     night::NightTracker,
     player::{stats::SkillPoints, ModifyCurencyEvent, MovePlayerEvent},
@@ -32,10 +33,32 @@ use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_ecs_tilemap::tiles::TilePos;
 use bevy_proto::prelude::{ReflectSchematic, Schematic};
 
-use super::{
-    potion_buffs::{AttackSpeedBuff, MovementSpeedBuff},
-    CraftingTracker, PlaceItemEvent, Recipes, WorldObject,
-};
+use super::{CraftingTracker, PlaceItemEvent, Recipes, WorldObject};
+
+fn push_player_consumable_buff(
+    item_action_param: &mut ItemActionParam,
+    consumed: Option<&ItemStack>,
+    duration_secs: f32,
+    effect: ConsumableBuffEffect,
+) {
+    let Ok(mut buffs) = item_action_param.consumable_buffs.get_single_mut() else {
+        return;
+    };
+    let needs_attr = matches!(
+        &effect,
+        ConsumableBuffEffect::AttackSpeedAdd(_)
+            | ConsumableBuffEffect::FlatThorns(_)
+            | ConsumableBuffEffect::FlatSpeed(_)
+    );
+    buffs.entries.push(ConsumableBuffEntry {
+        display_timer: Timer::from_seconds(duration_secs.max(0.001), TimerMode::Once),
+        item_stack: consumed.cloned(),
+        effect,
+    });
+    if needs_attr {
+        item_action_param.attribute_change_event.send_default();
+    }
+}
 
 #[derive(Component, Reflect, FromReflect, Clone, Schematic, Default, PartialEq)]
 #[reflect(Component, Schematic)]
@@ -55,6 +78,12 @@ pub enum ItemAction {
     BeaconPortal,
     BeaconDungeonEntrance,
     BeaconBossShrine,
+    /// Flat thorns from food/potions for `duration` seconds.
+    ApplyTemporaryThorns(i32, f32),
+    /// Flat speed stat for `duration` seconds.
+    ApplyTemporarySpeed(i32, f32),
+    /// Heal `i32` every `f32` seconds for `f32` total seconds.
+    ApplyPeriodicHeal(i32, f32, f32),
 }
 impl ItemAction {
     pub fn get_tooltip(&self) -> Option<String> {
@@ -82,6 +111,18 @@ impl ItemAction {
                 if delta > &0 { "+" } else { "" },
                 delta
             )),
+            ItemAction::ApplyTemporaryThorns(amount, duration) => Some(format!(
+                "+{} Thorns for {:.0}s",
+                amount, duration
+            )),
+            ItemAction::ApplyTemporarySpeed(amount, duration) => Some(format!(
+                "+{} Speed for {:.0}s",
+                amount, duration
+            )),
+            ItemAction::ApplyPeriodicHeal(heal, interval, total) => Some(format!(
+                "+{} HP every {:.1}s for {:.0}s",
+                heal, interval, total
+            )),
             _ => None,
         }
     }
@@ -107,6 +148,9 @@ impl ItemActions {
                 ItemAction::ModifyMana(_) => has_consumable = true,
                 ItemAction::ApplyAttackSpeedBuff(_, _) => has_consumable = true,
                 ItemAction::ApplyMovementSpeedBuff(_, _) => has_consumable = true,
+                ItemAction::ApplyTemporaryThorns(_, _) => has_consumable = true,
+                ItemAction::ApplyTemporarySpeed(_, _) => has_consumable = true,
+                ItemAction::ApplyPeriodicHeal(_, _, _) => has_consumable = true,
                 _ => {}
             }
         }
@@ -170,6 +214,8 @@ pub struct ItemActionParam<'w, 's> {
     pub infinite_mode: Res<'w, crate::night::InfiniteMode>,
     pub tip_event: EventWriter<'w, TipEvent>,
     pub seen_tips: Option<Res<'w, SeenTips>>,
+    pub attribute_change_event: EventWriter<'w, AttributeChangeEvent>,
+    pub consumable_buffs: Query<'w, 's, &'static mut ActiveConsumableBuffs, With<crate::player::Player>>,
 
     #[system_param(ignore)]
     marker: PhantomData<&'s ()>,
@@ -180,6 +226,7 @@ impl ItemActions {
         &self,
         obj: WorldObject,
         item_slot: usize,
+        consumed_item_stack: Option<&ItemStack>,
         item_action_param: &mut ItemActionParam,
         game: &mut GameParam,
         proto_param: &ProtoParam,
@@ -200,21 +247,51 @@ impl ItemActions {
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ApplyAttackSpeedBuff(duration, multiplier) => {
-                    // Apply attack speed buff to player
-                    if let Ok((player_entity, _, _)) = game.player_query.get_single() {
-                        commands
-                            .entity(player_entity)
-                            .insert(AttackSpeedBuff::new(*duration, *multiplier));
-                    }
+                    push_player_consumable_buff(
+                        item_action_param,
+                        consumed_item_stack,
+                        *duration,
+                        ConsumableBuffEffect::AttackSpeedAdd(*multiplier),
+                    );
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::ApplyMovementSpeedBuff(duration, multiplier) => {
-                    // Apply movement speed buff to player
-                    if let Ok((player_entity, _, _)) = game.player_query.get_single() {
-                        commands
-                            .entity(player_entity)
-                            .insert(MovementSpeedBuff::new(*duration, *multiplier));
-                    }
+                    push_player_consumable_buff(
+                        item_action_param,
+                        consumed_item_stack,
+                        *duration,
+                        ConsumableBuffEffect::MovementSpeedMult(*multiplier),
+                    );
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ApplyTemporaryThorns(amount, duration) => {
+                    push_player_consumable_buff(
+                        item_action_param,
+                        consumed_item_stack,
+                        *duration,
+                        ConsumableBuffEffect::FlatThorns(*amount),
+                    );
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ApplyTemporarySpeed(amount, duration) => {
+                    push_player_consumable_buff(
+                        item_action_param,
+                        consumed_item_stack,
+                        *duration,
+                        ConsumableBuffEffect::FlatSpeed(*amount),
+                    );
+                    item_action_param.use_item_event.send(UseItemEvent(obj));
+                }
+                ItemAction::ApplyPeriodicHeal(heal, interval, total_duration) => {
+                    push_player_consumable_buff(
+                        item_action_param,
+                        consumed_item_stack,
+                        *total_duration,
+                        ConsumableBuffEffect::PeriodicHeal {
+                            heal_per_tick: *heal,
+                            interval: Timer::from_seconds(interval.max(0.001), TimerMode::Repeating),
+                        },
+                    );
                     item_action_param.use_item_event.send(UseItemEvent(obj));
                 }
                 ItemAction::TeleportHome => {

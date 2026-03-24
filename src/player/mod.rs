@@ -59,7 +59,8 @@ use crate::{
         health_regen::{HealthRegenTimer, ManaRegenTimer},
         hunger::{Hunger, HungerTracker},
         modifiers::handle_modify_health_event,
-        Attack, AttackCooldown, AttributeQuality, AttributeValue, BonusAttackSpeed, CritChance,
+        ActiveConsumableBuffs, Attack, AttackCooldown, AttributeQuality, AttributeValue,
+        BonusAttackSpeed, CritChance,
         CritDamage, CurrentMana, HealthRegen, InvincibilityCooldown, ItemAttributes, ManaRegen,
         MaxHealth, MaxMana, PlayerAttributeBundle, ShieldRegen,
     },
@@ -475,6 +476,7 @@ fn spawn_player(
         .insert(skills::ClassSkillSlots::default())
         .insert(SkillPoints { count: 0 })
         .insert(BonusAttackSpeed::new())
+        .insert(ActiveConsumableBuffs::default())
         .insert(ClawUpgradeMultiThrow(
             Timer::from_seconds(0.12, TimerMode::Once),
             0,

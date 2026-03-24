@@ -44,7 +44,13 @@ use crate::{
 };
 use modifiers::*;
 pub mod attribute_helpers;
+pub mod consumable_buffs;
 pub mod hunger;
+pub use consumable_buffs::{
+    merge_intrinsic_stats_with_consumable_buff_layer, summarize_active_consumable_buffs,
+    tick_active_consumable_buffs, ActiveConsumableBuffs, ConsumableBuffAttributeSummary,
+    ConsumableBuffEffect, ConsumableBuffEntry,
+};
 use hunger::*;
 pub mod item_abilities;
 
@@ -484,6 +490,7 @@ impl ItemAttributes {
         thorns_on_damage_bonus: i32, // Thorns gained from ThornsOnDamage heirloom
         skill_power_hunt_bonus: i32, // Skill Power gained from SkillPowerHunt heirloom
         bonus_attack_speed: Option<&BonusAttackSpeed>,
+        consumable_attack_speed_add: f32,
     ) {
         // ChaosStats: +10 to many stats per stack
         let chaos_stats_stacks = skills.get_count(Heirloom::ChaosStats);
@@ -545,7 +552,8 @@ impl ItemAttributes {
             let dodge_crit_attack_speed_mod = if dodge_crit_buff_active { 1.3 } else { 1.0 };
             let bonus_attack_speed_multiplier = bonus_attack_speed
                 .map(|b| b.get_multiplier())
-                .unwrap_or(1.0);
+                .unwrap_or(1.0)
+                + consumable_attack_speed_add;
             let bonus_tiny_attack_speed = if has_tiny_blessing { 1.5 } else { 1.0 };
             let attack_speed_mod = (1.0 + total_attack_speed as f32 / 100.0)
                 / dodge_crit_attack_speed_mod
@@ -1285,6 +1293,12 @@ impl Plugin for AttributesPlugin {
                 )
                     .in_set(OnUpdate(GameState::Main)),
             )
+            .add_system(
+                tick_active_consumable_buffs
+                    .run_if(is_not_paused)
+                    .before(handle_player_item_attribute_change_events)
+                    .in_set(OnUpdate(GameState::Main)),
+            )
             .add_systems(
                 (trigger_attribute_update_on_bonus_speed_change
                     .before(handle_player_item_attribute_change_events),)
@@ -1500,10 +1514,10 @@ fn handle_player_item_attribute_change_events(
     >,
     stat_button: Query<(&UIElement, &StatsButtonState)>,
     ui_state: Res<State<UIState>>,
-    game: Res<Game>,
 
     coins: Res<CoinCurrency>,
     proto: crate::proto::proto_param::ProtoParam,
+    consumable_buffs_q: Query<&ActiveConsumableBuffs, With<Player>>,
 ) {
     for _event in att_events.iter() {
         let (
@@ -1571,7 +1585,11 @@ fn handle_player_item_attribute_change_events(
             .map(|tracker| tracker.bonus_skill_power)
             .unwrap_or(0);
 
-        new_att.add_attribute_components(
+        let consumable_summary = summarize_active_consumable_buffs(consumable_buffs_q.single());
+        let consumable_attack_add = consumable_summary.attack_speed_add;
+        let merged_stats =
+            merge_intrinsic_stats_with_consumable_buff_layer(new_att, &consumable_summary);
+        merged_stats.add_attribute_components(
             &mut commands.entity(player),
             old_health.0,
             old_mana.0,
@@ -1584,12 +1602,8 @@ fn handle_player_item_attribute_change_events(
             thorns_on_damage_bonus,
             skill_power_hunt_bonus,
             bonus_attack_speed,
+            consumable_attack_add,
         );
-        if let Some(main_hand) = game.player_state.main_hand_slot.clone() {
-            if !main_hand.get_obj().is_weapon() {
-                new_att.attack = AttributeValue::new(1, AttributeQuality::Low, 0.);
-            }
-        }
         let stat = if let Some((_, stat_state)) = stat_button
             .iter()
             .find(|(ui, _)| ui == &&UIElement::StatsButtonHover)

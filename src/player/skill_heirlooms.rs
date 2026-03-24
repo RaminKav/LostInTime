@@ -9,7 +9,8 @@ use crate::{
     ai::FollowState,
     animations::{player_sprite::PlayerAnimation, AttackEvent},
     attributes::{
-        attribute_helpers::skill_power_multiplier, Attack, AttackCooldown, BonusAttackSpeed,
+        attribute_helpers::skill_power_multiplier, ActiveConsumableBuffs, Attack, AttackCooldown,
+        AttributeChangeEvent, BonusAttackSpeed, ConsumableBuffEffect, ConsumableBuffEntry,
         CurrentHealth, CurrentMana, MaxHealth, SkillPower,
     },
     audio::{AudioSoundEffect, SoundSpawner},
@@ -159,6 +160,8 @@ pub fn handle_active_skill_event(
     prototypes: Prototypes,
     enemies: Query<(Entity, &GlobalTransform), With<Mob>>,
     mut trigger_counts: ResMut<crate::player::skills::HeirloomTriggerCounts>,
+    mut attribute_change: EventWriter<AttributeChangeEvent>,
+    mut consumable_buffs_q: Query<&mut ActiveConsumableBuffs, With<Player>>,
 ) {
     for ev in events.iter() {
         for (
@@ -234,9 +237,14 @@ pub fn handle_active_skill_event(
                     }
                 }
                 if blessings.has_blessing(Blessing::SkillAttackSpeed) {
-                    commands
-                        .entity(player_e)
-                        .insert(crate::item::potion_buffs::AttackSpeedBuff::new(2.0, 0.3));
+                    if let Ok(mut buffs) = consumable_buffs_q.get_mut(player_e) {
+                        buffs.entries.push(ConsumableBuffEntry {
+                            display_timer: Timer::from_seconds(2.0, TimerMode::Once),
+                            item_stack: None,
+                            effect: ConsumableBuffEffect::AttackSpeedAdd(0.3),
+                        });
+                        attribute_change.send_default();
+                    }
                 }
                 // ev.cooldown is already the effective cooldown (base * heirloom reduction * blessing mult)
                 let skill_cd = ev.cooldown;
@@ -968,9 +976,13 @@ pub fn handle_active_skill_event(
                             should_start_cooldown,
                         );
 
-                        commands
-                            .entity(player_e)
-                            .insert(crate::item::potion_buffs::MovementSpeedBuff::new(0.45, 2.6));
+                        if let Ok(mut buffs) = consumable_buffs_q.get_mut(player_e) {
+                            buffs.entries.push(ConsumableBuffEntry {
+                                display_timer: Timer::from_seconds(0.45, TimerMode::Once),
+                                item_stack: None,
+                                effect: ConsumableBuffEffect::MovementSpeedMult(2.6),
+                            });
+                        }
                         commands
                             .entity(player_e)
                             .insert(PhasingThroughEnemies::new(0.45));
