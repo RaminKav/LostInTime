@@ -65,6 +65,8 @@ pub struct InitializationTimer {
     done_chunk_event_received: bool,
     /// When we're waiting for chunks after timer finished; after STUCK_FALLBACK_SECS we force transition.
     stuck_fallback_timer: Option<Timer>,
+    /// Avoid `info!` every frame while the init timer runs (with trace_tracy, each line formats span context).
+    last_logged_timer_pct: Option<u32>,
 }
 
 pub fn check_initialization_complete(
@@ -84,6 +86,7 @@ pub fn check_initialization_complete(
             timer: Timer::from_seconds(2.0, TimerMode::Once), // Wait 2 seconds after chunks start generating to allow objects to spawn
             done_chunk_event_received: false,
             stuck_fallback_timer: None,
+            last_logged_timer_pct: None,
         });
         info!("Initialization timer started");
     }
@@ -140,10 +143,12 @@ pub fn check_initialization_complete(
         );
     }
     if timer.done_chunk_event_received && !timer.timer.finished() {
-        info!(
-            "Waiting for timer to finish ({}%)...",
-            (timer.timer.elapsed_secs() / timer.timer.duration().as_secs_f32() * 100.0) as u32
-        );
+        let pct =
+            (timer.timer.elapsed_secs() / timer.timer.duration().as_secs_f32() * 100.0) as u32;
+        if timer.last_logged_timer_pct != Some(pct) {
+            timer.last_logged_timer_pct = Some(pct);
+            info!("Waiting for timer to finish ({}%)...", pct);
+        }
     }
 
     // Force transition if we've been stuck with 0 chunks for too long (safety fallback)

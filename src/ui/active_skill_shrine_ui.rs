@@ -12,7 +12,9 @@ use crate::{
 
 use super::{
     interactions::Interaction, main_menu::spawn_back_button,
-    player_hud::spawn_skill_tooltip_content, ui_helpers::spawn_ui_overlay, Interactable, UIElement,
+    player_hud::spawn_skill_tooltip_content,
+    ui_helpers::spawn_ui_overlay,
+    Interactable, UIElement,
     UIState,
 };
 

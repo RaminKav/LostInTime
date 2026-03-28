@@ -41,6 +41,9 @@ bevy_hanabi = { version = "0.6", default-features = false, features = ["2d"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 logs-wheel = "0.3.1"
 tracing-subscriber = "0.3.18"
+# `ondemand` = TRACY_ON_DEMAND: no trace buffering until Tracy Profiler connects. Without it,
+# trace_tracy emits huge event volume and the client queues it all in RAM (tens of GB) if no viewer drains it.
+tracing-tracy = { version = "0.10.0", optional = true, features = ["ondemand"] }
 tracing = "0.1.40"
 native-dialog = "0.7.0"
 tracing-panic = "0.1.2"
@@ -55,6 +58,8 @@ bevy = { version = "0.10.1", features = ["wayland", "dynamic_linking"] }
 
 [features]
 release-bundle = []
+# Enables Bevy's trace_tracy instrumentation and registers TracyLayer (required because LogPlugin is disabled).
+tracy = ["bevy/trace_tracy", "dep:tracing-tracy"]
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

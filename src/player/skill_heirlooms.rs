@@ -33,13 +33,12 @@ use crate::{
         },
         rogue_skills::{LungeState, SprintState},
         skills::{
-            grant_skill_charge_after_cooldown_complete, ActiveSkill,
-            ActiveSkillUsedEvent, BombState, BuckshotSkillState, ClassSkillSlots,
-            DaggerThrowKillTracker, DaggerThrowState, DruidTreeSkillState, FirePillarState,
-            FuryState, HealSkillState, Heirloom, IceWallSkillState, LaserBeamState,
-            LastHitProjectile, LightningState, PhasingThroughEnemies, PiercingStarSkillState,
-            PlayerSkills, RapidfireState, ShoutSkillState, SlashState, SpinAttackState,
-            StealthState, TripleThrowState,
+            grant_skill_charge_after_cooldown_complete, ActiveSkill, ActiveSkillUsedEvent,
+            BombState, BuckshotSkillState, ClassSkillSlots, DaggerThrowKillTracker,
+            DaggerThrowState, DruidTreeSkillState, FirePillarState, FuryState, HealSkillState,
+            Heirloom, IceWallSkillState, LaserBeamState, LastHitProjectile, LightningState,
+            PhasingThroughEnemies, PiercingStarSkillState, PlayerSkills, RapidfireState,
+            ShoutSkillState, SlashState, SpinAttackState, StealthState, TripleThrowState,
         },
         Player,
     },
@@ -272,9 +271,7 @@ pub fn handle_active_skill_event(
                         dur.tick(time.delta());
                         commands
                             .entity(player_e)
-                            .insert(StealthState {
-                                duration: dur,
-                            })
+                            .insert(StealthState { duration: dur })
                             .insert(Stealthed);
                         start_slot_cooldown_for_cast(
                             &mut class_slots,
@@ -1102,8 +1099,11 @@ pub struct DruidTreeDummy {
     pub timer: Timer,
 }
 
-
-fn remove_skill_state_after_slot_cooldown(commands: &mut Commands, entity: Entity, skill: ActiveSkill) {
+fn remove_skill_state_after_slot_cooldown(
+    commands: &mut Commands,
+    entity: Entity,
+    skill: ActiveSkill,
+) {
     match skill {
         ActiveSkill::Stealth => {
             commands.entity(entity).remove::<StealthState>();
@@ -1230,7 +1230,15 @@ pub fn tick_fury_duration_and_throw(
 
 pub fn finalize_rapidfire_fury_charges(
     mut commands: Commands,
-    mut q: Query<(Entity, &mut ClassSkillSlots, Option<&RapidfireState>, Option<&FuryState>), With<Player>>,
+    mut q: Query<
+        (
+            Entity,
+            &mut ClassSkillSlots,
+            Option<&RapidfireState>,
+            Option<&FuryState>,
+        ),
+        With<Player>,
+    >,
 ) {
     for (e, mut slots, rapid, fury) in q.iter_mut() {
         if let Some(r) = rapid {
@@ -1241,7 +1249,11 @@ pub fn finalize_rapidfire_fury_charges(
                     .position(|s| s.tracked_skill == ActiveSkill::Rapidfire)
                 {
                     if slots.0[si].cooldown_timer.finished() {
-                        grant_skill_charge_after_cooldown_complete(e, ActiveSkill::Rapidfire, slots.as_mut());
+                        grant_skill_charge_after_cooldown_complete(
+                            e,
+                            ActiveSkill::Rapidfire,
+                            slots.as_mut(),
+                        );
                         commands.entity(e).remove::<RapidfireState>();
                     }
                 }
@@ -1249,9 +1261,17 @@ pub fn finalize_rapidfire_fury_charges(
         }
         if let Some(f) = fury {
             if f.duration.finished() {
-                if let Some(si) = slots.0.iter().position(|s| s.tracked_skill == ActiveSkill::Fury) {
+                if let Some(si) = slots
+                    .0
+                    .iter()
+                    .position(|s| s.tracked_skill == ActiveSkill::Fury)
+                {
                     if slots.0[si].cooldown_timer.finished() {
-                        grant_skill_charge_after_cooldown_complete(e, ActiveSkill::Fury, slots.as_mut());
+                        grant_skill_charge_after_cooldown_complete(
+                            e,
+                            ActiveSkill::Fury,
+                            slots.as_mut(),
+                        );
                         commands.entity(e).remove::<FuryState>();
                     }
                 }
@@ -1437,7 +1457,13 @@ fn update_one_slot_runtime(
 
 pub fn initialize_class_skill_slots(
     mut commands: Commands,
-    players: Query<Entity, (With<Player>, Or<(Changed<PlayerSkills>, Without<ClassSkillSlots>)>)>,
+    players: Query<
+        Entity,
+        (
+            With<Player>,
+            Or<(Changed<PlayerSkills>, Without<ClassSkillSlots>)>,
+        ),
+    >,
     player_skills: Query<&PlayerSkills, With<Player>>,
     mut slots_q: Query<&mut ClassSkillSlots, With<Player>>,
 ) {
@@ -1505,6 +1531,7 @@ pub fn reduce_skill_cooldown_on_crit(
         (Entity, &PlayerSkills, Option<&mut HeirloomTriggerCooldowns>),
         With<Player>,
     >,
+    blessings: Query<&OwnedBlessings, With<Player>>,
     mut class_slots: Query<&mut ClassSkillSlots, With<Player>>,
 ) {
     for hit in hit_events.iter() {
@@ -1530,10 +1557,25 @@ pub fn reduce_skill_cooldown_on_crit(
             let reduction = (0.1 * heirloom_count as f32).max(0.0);
 
             if let Ok(mut slots) = class_slots.get_mut(player_e) {
-                for slot in &mut slots.0 {
-                    if !slot.cooldown_timer.finished() {
-                        slot.cooldown_timer
+                for i in 0..4 {
+                    if !slots.0[i].cooldown_timer.finished() {
+                        slots.0[i]
+                            .cooldown_timer
                             .tick(Duration::from_secs_f32(reduction));
+                    }
+                    let skill = slots.0[i].tracked_skill;
+                    if !slots.0[i].cooldown_timer.just_finished() {
+                        continue;
+                    }
+                    if skill == ActiveSkill::Rapidfire || skill == ActiveSkill::Fury {
+                        continue;
+                    }
+                    grant_skill_charge_after_cooldown_complete(player_e, skill, slots.as_mut());
+                    remove_skill_state_after_slot_cooldown(&mut commands, player_e, skill);
+                    if skill == ActiveSkill::Stealth {
+                        if let Ok(bl) = blessings.get(player_e) {
+                            try_queue_stealth_charge_regen_after_grant(skills, bl, slots.as_mut());
+                        }
                     }
                 }
             }

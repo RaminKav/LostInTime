@@ -302,7 +302,7 @@ fn handle_ranged_attack_event(
                 continue;
             }
             modify_mana_event.send(ModifyManaEvent(
-                (mana_cost as f32
+                -(mana_cost as f32
                     * if skills.has(Heirloom::DiscountMP) {
                         0.75
                     } else {

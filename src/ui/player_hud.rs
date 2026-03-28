@@ -1357,6 +1357,7 @@ pub fn handle_heirloom_hud_tooltip(
 
 /// Helper function to spawn skill tooltip content (icon, title, description)
 /// Extracted from class selection UI for reuse.
+/// Coordinates match [`UIElement::SkillTooltip`] / shrine banners.
 /// If `slot_index` is `Some`, also spawns a cooldown text placeholder (updated by system when in HUD).
 pub fn spawn_skill_tooltip_content(
     commands: &mut Commands,
@@ -1373,7 +1374,6 @@ pub fn spawn_skill_tooltip_content(
     const BODY_FONT: &str = "fonts/slkscr.ttf";
     const TITLE_FONT: &str = "fonts/slkscrbold.ttf";
     const BODY_FONT_SIZE: f32 = 8.4;
-    // Cooldown text: top right, same y as title (TEXT_Y_OFFSET + 6)
     const COOLDOWN_TEXT_X: f32 = 181.;
     const TITLE_Y: f32 = TEXT_Y_OFFSET + 6.;
 
@@ -1381,7 +1381,6 @@ pub fn spawn_skill_tooltip_content(
     let active_skill_desc = active_skill.get_desc(skill_power).join("\n");
     let active_skill_name = active_skill.get_title();
 
-    // Spawn skill icon
     let _active_skill_icon = commands
         .spawn(SpriteBundle {
             texture: active_skill_icon,
@@ -1391,7 +1390,7 @@ pub fn spawn_skill_tooltip_content(
             },
             transform: Transform {
                 translation: Vec3::new(ICONS_X_OFFSET, 0., 2.),
-                scale: Vec3::new(1., 1., 1.),
+                scale: Vec3::ONE,
                 ..Default::default()
             },
             ..default()
@@ -1401,7 +1400,6 @@ pub fn spawn_skill_tooltip_content(
         .set_parent(parent_entity)
         .id();
 
-    // Spawn skill name text
     let _active_skill_name_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
@@ -1426,7 +1424,6 @@ pub fn spawn_skill_tooltip_content(
         .set_parent(parent_entity)
         .id();
 
-    // Spawn cooldown remaining text (top right, same y as title); only for HUD tooltips with a slot
     if slot_index.is_some() {
         let _ = commands
             .spawn(Text2dBundle {
@@ -1454,7 +1451,6 @@ pub fn spawn_skill_tooltip_content(
             .id();
     }
 
-    // Spawn skill description text
     let _active_skill_description_text = commands
         .spawn(Text2dBundle {
             text: Text::from_section(
@@ -1546,7 +1542,6 @@ pub fn handle_active_skill_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
-        // Position tooltip above the hovered icon
         let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., 15.);
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))
@@ -1558,7 +1553,7 @@ pub fn handle_active_skill_hud_tooltip(
                 ..Default::default()
             }))
             .id();
-        // Spawn tooltip background using SkillTooltip asset
+
         let _tooltip_bg = commands
             .spawn(SpriteBundle {
                 texture: graphics.get_ui_element_texture(UIElement::SkillTooltip),
@@ -1570,13 +1565,11 @@ pub fn handle_active_skill_hud_tooltip(
                 ..Default::default()
             })
             .insert(RenderLayers::from_layers(&[3]))
-            .insert(ActiveSkillHudTooltip)
             .insert(Name::new("ACTIVE SKILL TOOLTIP"))
             .set_parent(container)
             .id();
 
         let (skill_power, blessings) = skill_power.single();
-        // Spawn skill tooltip content (icon, title, description, cooldown placeholder)
         spawn_skill_tooltip_content(
             &mut commands,
             &graphics,

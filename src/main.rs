@@ -99,7 +99,12 @@ use proto::{proto_param::ProtoParam, ProtoPlugin};
 
 use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
-use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, EnvFilter};
+#[cfg(feature = "tracy")]
+use tracing_subscriber::filter::FilterFn;
+#[cfg(feature = "tracy")]
+use tracing_subscriber::Layer;
+use tracing_subscriber::fmt::format::{self, FmtSpan};
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
     InventorySlotState, UIPlugin,
@@ -290,6 +295,39 @@ fn init_global_logger() {
 
     let file_writer = Mutex::new(log_file);
 
+    #[cfg(feature = "tracy")]
+    fn skip_tracy_frame_mark(meta: &tracing::Metadata<'_>) -> bool {
+        meta.fields().field("tracy.frame_mark").is_none()
+    }
+
+    // With trace_tracy, Bevy opens/closes spans for every schedule/system. FmtSpan::CLOSE on the
+    // file layer writes one line per close — huge disk I/O and formatting cost; Tracy already records spans.
+    #[cfg(feature = "tracy")]
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(file_writer)
+        .with_ansi(false)
+        .event_format(format::format().compact())
+        .with_filter(FilterFn::new(skip_tracy_frame_mark));
+    #[cfg(not(feature = "tracy"))]
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(file_writer)
+        .with_ansi(false)
+        .with_span_events(FmtSpan::CLOSE);
+
+    // No FmtSpan on stdout: with trace_tracy, Bevy emits huge span trees; span CLOSE lines
+    // flood the terminal and cost a lot to format (lag), while Tracy captures spans itself.
+    // Compact format avoids walking/printing the full span stack on every log line (very costly with trace_tracy).
+    #[cfg(feature = "tracy")]
+    let stdout_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stdout)
+        .with_ansi(true)
+        .event_format(format::format().compact())
+        .with_filter(FilterFn::new(skip_tracy_frame_mark));
+    #[cfg(not(feature = "tracy"))]
+    let stdout_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stdout)
+        .with_ansi(true);
+
     let subscriber = tracing_subscriber::registry()
         .with(
             EnvFilter::from_default_env()
@@ -304,18 +342,11 @@ fn init_global_logger() {
                     .into(),
                 ),
         )
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(file_writer)
-                .with_ansi(false)
-                .with_span_events(FmtSpan::CLOSE),
-        )
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_writer(std::io::stdout)
-                .with_ansi(true)
-                .with_span_events(FmtSpan::CLOSE),
-        );
+        .with(file_layer)
+        .with(stdout_layer);
+
+    #[cfg(feature = "tracy")]
+    let subscriber = subscriber.with(tracing_tracy::TracyLayer::new());
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("unable to set global logs subscriber");
