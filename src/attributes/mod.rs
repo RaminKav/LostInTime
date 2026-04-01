@@ -994,6 +994,7 @@ pub enum ItemRarity {
 #[derive(EnumIter, Display, Eq, PartialEq, Clone, Hash)]
 pub enum ItemGlow {
     Green,
+    Purple,
     Blue,
     Red,
 }

@@ -1630,8 +1630,8 @@ impl HeirloomRarity {
     pub fn get_item_glow(&self) -> Option<ItemGlow> {
         match self {
             HeirloomRarity::Common => None,
-            HeirloomRarity::Uncommon => Some(ItemGlow::Green),
-            HeirloomRarity::Rare => Some(ItemGlow::Blue),
+            HeirloomRarity::Uncommon => Some(ItemGlow::Blue),
+            HeirloomRarity::Rare => Some(ItemGlow::Purple),
             HeirloomRarity::Legendary => Some(ItemGlow::Red),
         }
     }
