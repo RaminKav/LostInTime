@@ -15,7 +15,7 @@ use crate::{
         dungeon::Dungeon,
         TILE_SIZE,
     },
-    GameParam, GameState, DEBUG,
+    GameParam, GameState, DEBUG, NO_SPAWN,
 };
 
 use super::{spawn_helpers::can_spawn_mob_here, CombatAlignment, EliteMob, Mob};
@@ -194,6 +194,9 @@ fn handle_spawn_mobs(
     infinite_mode: Res<InfiniteMode>,
     mob_spawning_paused: Res<MobSpawningPaused>,
 ) {
+    if *NO_SPAWN {
+        return;
+    }
     if maybe_dungeon.get_single().is_ok() {
         return;
     }
@@ -289,6 +292,9 @@ fn spawn_stone_golem_timer(
     game: GameParam,
     existing_golems: Query<&Mob>,
 ) {
+    if *NO_SPAWN {
+        return;
+    }
     // Check if in dungeon - don't spawn in dungeons
     if maybe_dungeon.get_single().is_ok() {
         return;
@@ -363,6 +369,9 @@ fn tick_spawner_timers(
     mob_spawning_paused: Res<MobSpawningPaused>,
     transition_state: Res<EraTransitionState>,
 ) {
+    if *NO_SPAWN {
+        return;
+    }
     if !spawners.initial_spawn_delay.finished() {
         spawners.initial_spawn_delay.tick(time.delta());
         return;

@@ -1142,7 +1142,7 @@ pub fn handle_cursor_skills_buttons(
                 let Interaction::Hovering = interactable.current() else {
                     continue;
                 };
-                let ui_element = state
+                let (ui_element, _) = state
                     .skill_choice
                     .heirloom
                     .get_ui_element(state.skill_choice.rarity.clone());

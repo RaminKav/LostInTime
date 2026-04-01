@@ -42,7 +42,10 @@ use crate::{
 };
 
 use super::{
-    essence_ui::EssenceShopCache, player_hud::XpBarFadeIn, scrapper_ui::ScrapperEvent,
+    essence_ui::EssenceShopCache,
+    minimap::{FogOfWarData, MinimapTileCache},
+    player_hud::XpBarFadeIn,
+    scrapper_ui::ScrapperEvent,
     Interactable, UIElement,
 };
 
@@ -725,6 +728,8 @@ pub fn cleanup_run_state(
     commands.remove_resource::<XpBarFadeIn>();
     commands.insert_resource(crate::player::skills::HeirloomTriggerCounts::default());
     commands.insert_resource(EssenceShopCache::default());
+    commands.insert_resource(FogOfWarData::default());
+    commands.insert_resource(MinimapTileCache::default());
 
     // Reset Rapier physics world to free accumulated internal arena allocations
     commands.insert_resource(RapierContext::default());

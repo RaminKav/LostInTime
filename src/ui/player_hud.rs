@@ -26,18 +26,18 @@ use crate::{
     cursor::CursorPos,
     inventory::{Inventory, ItemStack},
     item::WorldObject,
-    proto::proto_param::ProtoParam,
     juice::bounce::BounceOnHit,
     night::{InfiniteMode, NightTracker},
     player::{
         combat_heirlooms::{CrateBreakDamageTracker, MaxHPHuntTracker, SkillPowerHuntTracker},
         levels::PlayerLevel,
         skills::{
-            ActiveSkill, ActiveSkillUsedEvent, Heirloom, HeirloomRarity, PlayerSkills,
-            ClassSkillSlots,
+            ActiveSkill, ActiveSkillUsedEvent, ClassSkillSlots, Heirloom, HeirloomRarity,
+            PlayerSkills,
         },
         CoinCurrency, Player, RunScore, TimeFragmentCurrency,
     },
+    proto::proto_param::ProtoParam,
     ui::Interactable,
     GameState, InputBinding, InputMappings, ScreenResolution, GAME_HEIGHT,
 };
@@ -1333,7 +1333,7 @@ pub fn handle_heirloom_hud_tooltip(
         };
 
         // Position tooltip below the hovered icon
-        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 70., 25.);
+        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., 25.);
 
         let tooltip_e = spawn_heirloom_tooltip_card(
             &graphics,
@@ -2652,7 +2652,8 @@ pub fn sync_consumable_buff_hud(
     for (hud_slot, (_entry_index, entry)) in visible.iter().enumerate() {
         let stack = entry.item_stack.as_ref().unwrap().clone();
         let i = hud_slot as f32;
-        let x = -50. - 2. - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.) - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
+        let x =
+            -50. - 2. - (CONSUMABLE_BUFF_HUD_ICON_PX / 2.) - i * (CONSUMABLE_BUFF_HUD_ICON_PX + 2.);
         let y = -GAME_HEIGHT / 2. + 14.;
 
         let icon_root = commands
@@ -2684,7 +2685,9 @@ pub fn sync_consumable_buff_hud(
             Vec2::ZERO,
             3,
         );
-        commands.entity(icon_e).insert(Transform::from_translation(Vec3::new(0., 0., 1.)));
+        commands
+            .entity(icon_e)
+            .insert(Transform::from_translation(Vec3::new(0., 0., 1.)));
         commands.entity(icon_root).add_child(icon_e);
 
         let _ = spawn_consumable_buff_duration_overlay(icon_root, &mut commands, hud_slot);

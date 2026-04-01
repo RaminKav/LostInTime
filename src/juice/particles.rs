@@ -48,8 +48,16 @@ pub fn setup_particles(
     mut commands: Commands,
     mut effects: ResMut<Assets<EffectAsset>>,
     player: Query<Entity, Added<Player>>,
+    old_particles: Option<Res<Particles>>,
 ) {
     for player_e in player.iter() {
+        if let Some(ref old) = old_particles {
+            effects.remove(&old.obj_hit_particle);
+            effects.remove(&old.enemy_death_particle);
+            effects.remove(&old.use_item_particle);
+            effects.remove(&old.enemy_hit_particles);
+            effects.remove(&old.xp_particles);
+        }
         // Note: same as gradient2, will yield shared render shader between effects #2
         let mut gradient = Gradient::new();
         gradient.add_key(0.0, Vec4::new(208. / 255., 165. / 255., 106. / 255., 0.8));

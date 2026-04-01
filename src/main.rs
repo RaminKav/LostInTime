@@ -64,10 +64,12 @@ mod attributes;
 mod blessings;
 mod chaos;
 mod client;
+mod collider_load_test;
 mod colors;
 mod combat;
 mod custom_commands;
 mod enemy;
+mod gameplay_load_tests;
 mod inputs;
 mod inventory;
 mod item;
@@ -101,9 +103,9 @@ use schematic::SchematicPlugin;
 use tracing::level_filters::LevelFilter;
 #[cfg(feature = "tracy")]
 use tracing_subscriber::filter::FilterFn;
+use tracing_subscriber::fmt::format::{self, FmtSpan};
 #[cfg(feature = "tracy")]
 use tracing_subscriber::Layer;
-use tracing_subscriber::fmt::format::{self, FmtSpan};
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter};
 use ui::{
     display_main_menu, handle_menu_button_click_events, remove_main_menu, spawn_menu_text_buttons,
@@ -153,6 +155,28 @@ lazy_static! {
 }
 lazy_static! {
     pub static ref DEBUG_AI: bool = env::var("DEBUG_AI").is_ok();
+}
+lazy_static! {
+    /// Spawns/despawns 100 mobs + 200 item drops in a tight loop to stress Rapier (see `collider_load_test`).
+    pub static ref COLLIDER_LOAD_TEST: bool = env::var("COLLIDER_LOAD_TEST").is_ok();
+}
+lazy_static! {
+    /// Disables overworld mob spawning from `enemy::spawner` (timers, events, Stone Golem timer).
+    pub static ref NO_SPAWN: bool = env::var("NO_SPAWN").is_ok();
+}
+lazy_static! {
+    pub static ref HEIRLOOM_LOAD_TEST: bool = env::var("HEIRLOOM_LOAD_TEST").is_ok();
+}
+lazy_static! {
+    pub static ref PARTICLE_LOAD_TEST: bool = env::var("PARTICLE_LOAD_TEST").is_ok();
+}
+lazy_static! {
+    /// Logs entity/heirloom-sim counts every 5s while in `GameState::Main` (see `gameplay_load_tests`).
+    pub static ref HEIRLOOM_LOAD_TEST_DIAG: bool = env::var("HEIRLOOM_LOAD_TEST_DIAG").is_ok();
+}
+lazy_static! {
+    /// Disables all audio systems (SoundSpawner, hit/break/use audio, BGM).
+    pub static ref NO_AUDIO: bool = env::var("NO_AUDIO").is_ok();
 }
 
 fn main() {
@@ -206,7 +230,7 @@ fn main() {
                         resolution: WindowResolution::new(WIDTH, HEIGHT)
                             .with_scale_factor_override(1.0),
                         title: "Lost in Time".to_string(),
-                        present_mode: PresentMode::Fifo,
+                        present_mode: PresentMode::Immediate,
                         resizable: true,
                         transparent: true,
                         mode: WindowMode::BorderlessFullscreen,
@@ -275,8 +299,27 @@ fn main() {
         .add_system(handle_menu_button_click_events.run_if(not(in_state(GameState::Loading))))
         .add_system(remove_main_menu.in_schedule(OnExit(GameState::MainMenu)));
 
+    if *COLLIDER_LOAD_TEST {
+        app.add_plugin(collider_load_test::ColliderLoadTestPlugin);
+    }
+    if *HEIRLOOM_LOAD_TEST {
+        app.add_plugin(gameplay_load_tests::HeirloomLoadTestPlugin);
+    }
+    if *PARTICLE_LOAD_TEST {
+        app.add_plugin(gameplay_load_tests::ParticleLoadTestPlugin);
+    }
+    if *COLLIDER_LOAD_TEST || *HEIRLOOM_LOAD_TEST || *PARTICLE_LOAD_TEST {
+        app.add_system(
+            gameplay_load_tests::unified_load_tests_f9_toggle.in_set(OnUpdate(GameState::Main)),
+        );
+    }
+
     if *COLLIDERS {
         app.add_plugin(RapierDebugRenderPlugin::default());
+    }
+
+    if *DEBUG {
+        app.add_system(log_entity_count);
     }
 
     app.run();
@@ -1265,6 +1308,27 @@ impl AppExt for App {
 
 pub fn should_show_inspector() -> bool {
     *DEBUG
+}
+
+fn log_entity_count(
+    entities: Query<Entity>,
+    fog: Option<Res<crate::ui::minimap::FogOfWarData>>,
+    cache: Option<Res<crate::ui::minimap::MinimapTileCache>>,
+    mut timer: Local<Option<Timer>>,
+    time: Res<Time>,
+) {
+    let timer = timer.get_or_insert_with(|| Timer::from_seconds(5.0, TimerMode::Repeating));
+    timer.tick(time.delta());
+    if !timer.just_finished() {
+        return;
+    }
+    let count = entities.iter().count();
+    let fog_tiles = fog.map_or(0, |f| f.explored_tiles.len());
+    let cache_terrain = cache.map_or(0, |c| c.explored_terrain.len());
+    info!(
+        "[PERF] entities: {}, fog_tiles: {}, cache_terrain: {}",
+        count, fog_tiles, cache_terrain
+    );
 }
 
 #[derive(Resource)]

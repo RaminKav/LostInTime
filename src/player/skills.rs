@@ -1529,12 +1529,12 @@ impl Heirloom {
             _ => {}
         }
     }
-    pub fn get_ui_element(&self, rarity: HeirloomRarity) -> UIElement {
+    pub fn get_ui_element(&self, rarity: HeirloomRarity) -> (UIElement, Vec2) {
         match rarity {
-            HeirloomRarity::Common => UIElement::SkillChoice,
-            HeirloomRarity::Uncommon => UIElement::SkillChoiceRogue,
-            HeirloomRarity::Rare => UIElement::SkillChoiceMagic,
-            HeirloomRarity::Legendary => UIElement::SkillChoiceMelee,
+            HeirloomRarity::Common => (UIElement::SkillChoice, Vec2::new(164., 191.)),
+            HeirloomRarity::Uncommon => (UIElement::SkillChoiceRogue, Vec2::new(164., 191.)),
+            HeirloomRarity::Rare => (UIElement::SkillChoiceMagic, Vec2::new(164., 191.)),
+            HeirloomRarity::Legendary => (UIElement::SkillChoiceMelee, Vec2::new(164., 191.)),
         }
     }
     pub fn get_ui_element_hover(&self, rarity: HeirloomRarity) -> UIElement {

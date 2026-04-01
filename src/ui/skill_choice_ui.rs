@@ -28,11 +28,6 @@ pub struct SkillChoiceUI {
 }
 
 #[derive(Component)]
-pub struct SkillDescText;
-#[derive(Component)]
-pub struct SkillTitleText;
-
-#[derive(Component)]
 pub struct RerollDice(pub usize);
 
 #[derive(Component)]
@@ -74,7 +69,7 @@ pub fn setup_skill_choice_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 80., 10.),
+                translation: Vec3::new(0., 100., 10.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -131,7 +126,7 @@ pub fn setup_skill_choice_ui(
     for i in -1i32..2 {
         let slot_index = (i + 1) as usize;
         let enabled = run_unlocks.rerolls_remaining > 0;
-        let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5, -70., 10.);
+        let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5, -110., 10.);
         let mut reroll_entity = commands.spawn(SpriteBundle {
             texture: graphics
                 .get_ui_element_texture(UIElement::RerollDice)
@@ -168,7 +163,7 @@ pub fn setup_skill_choice_ui(
         for i in -1i32..2 {
             let slot_index = (i + 1) as usize;
             let translation =
-                Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -96.5, 10.);
+                Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -136., 10.);
             let mut banish_button = commands.spawn(SpriteBundle {
                 texture: graphics
                     .get_ui_element_texture(UIElement::BackButton)
@@ -240,7 +235,7 @@ pub fn setup_skill_choice_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(-80.5, -110., 15.)),
+            transform: Transform::from_translation(Vec3::new(-80.5, -140., 15.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -261,7 +256,7 @@ pub fn setup_skill_choice_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(80., -110., 15.)),
+            transform: Transform::from_translation(Vec3::new(80., -140., 15.)),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -282,8 +277,9 @@ pub fn tick_skill_choice_interaction_lock_timers(
         skill_ui.interaction_lock_timer.tick(time.delta());
     }
 }
-/// Helper function to spawn a single heirloom tooltip card
-/// Returns the entity ID of the card
+/// Spawns a single heirloom card with shared layout (icon, title, description, optional scaling / trigger lines).
+/// Returns the root card entity. Callers that need skill-choice interaction should add [`SkillChoiceUI`],
+/// [`Interactable`], and [`UIState::Skills`] on that entity (replacing [`UIState::Essence`]).
 /// scaling_text: Optional text showing current scaling value (e.g., "(+25% damage)")
 /// trigger_count_text: Optional text showing how many times this heirloom has triggered
 pub fn spawn_heirloom_tooltip_card(
@@ -296,8 +292,8 @@ pub fn spawn_heirloom_tooltip_card(
     scaling_text: Option<String>,
     trigger_count_text: Option<String>,
 ) -> Entity {
-    let size = SKILLS_CHOICE_UI_SIZE;
-    let ui_element = heirloom.get_ui_element(rarity.clone());
+    let (ui_element, size) = heirloom.get_ui_element(rarity.clone());
+    // let size = SKILLS_CHOICE_UI_SIZE;
     let card_e = commands
         .spawn(SpriteBundle {
             texture: graphics.get_ui_element_texture(ui_element.clone()),
@@ -324,7 +320,7 @@ pub fn spawn_heirloom_tooltip_card(
             sprite: graphics.get_heirloom_icon(heirloom.clone()),
             texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
             transform: Transform {
-                translation: Vec2::new(0., 25.).extend(4.),
+                translation: Vec2::new(2., 52.).extend(4.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -368,7 +364,7 @@ pub fn spawn_heirloom_tooltip_card(
             ),
             text_anchor: Anchor::Center,
             transform: Transform {
-                translation: Vec3::new(0.5, 50.5, 1.),
+                translation: Vec3::new(0., 20., 1.),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -393,7 +389,7 @@ pub fn spawn_heirloom_tooltip_card(
                 ),
                 text_anchor: Anchor::Center,
                 transform: Transform {
-                    translation: Vec3::new(0.5, -(j as f32 * 9.) + 0.5, 1.),
+                    translation: Vec3::new(0., -(j as f32 * 9.) - 4., 1.),
                     scale: Vec3::new(1., 1., 1.),
                     ..Default::default()
                 },
@@ -471,136 +467,39 @@ pub fn spawn_skill_choice_entities(
     choices: Vec<HeirloomChoiceState>,
     t_offset: Vec2,
 ) {
-    let size = SKILLS_CHOICE_UI_SIZE;
     let COUNT: usize = 3;
     for i in -1i32..(COUNT as i32 - 1) {
+        let choice = choices[(i + 1) as usize].clone();
+        let (_, size) = choice.heirloom.get_ui_element(choice.rarity.clone());
         let translation = Vec2::new(
-            i as f32 * (size.x + 16.) + if COUNT == 2 { size.x / 2. } else { 0. } + 0.1,
+            i as f32 * (size.x + 8.) + if COUNT == 2 { size.x / 2. } else { 0. } + 0.1,
             0.,
         );
-        let choice = choices[(i + 1) as usize].clone();
         if choice.heirloom == crate::player::skills::Heirloom::None {
             continue;
         }
-        let ui_element = choice.heirloom.get_ui_element(choice.rarity.clone());
-        let skills_e = commands
-            .spawn(SpriteBundle {
-                texture: graphics.get_ui_element_texture(ui_element.clone()),
-                sprite: Sprite {
-                    custom_size: Some(size),
-                    ..Default::default()
-                },
-                transform: Transform {
-                    translation: Vec3::new(
-                        translation.x + t_offset.x,
-                        translation.y + t_offset.y,
-                        10.,
-                    ),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
+        let index = (i + 1) as usize;
+        let position = Vec3::new(translation.x + t_offset.x, translation.y + t_offset.y, 10.);
+        let card_e = spawn_heirloom_tooltip_card(
+            graphics,
+            commands,
+            asset_server,
+            choice.heirloom.clone(),
+            choice.rarity.clone(),
+            position,
+            None,
+            None,
+        );
+        commands
+            .entity(card_e)
+            .insert(UIState::Skills)
             .insert(SkillChoiceUI {
-                index: (i + 1) as usize,
-                skill_choice: choice.clone(),
+                index,
+                skill_choice: choice,
                 interaction_lock_timer: Timer::from_seconds(0.75, TimerMode::Once),
             })
-            .insert(ui_element)
-            .insert(UIState::Skills)
             .insert(Interactable::default())
-            .insert(Name::new("SKILLS UI"))
-            .insert(RenderLayers::from_layers(&[3]))
-            .id();
-        // icon - all heirlooms use the heirloom icon (active skills are now separate)
-        let skill_icon = commands
-            .spawn(SpriteSheetBundle {
-                sprite: graphics.get_heirloom_icon(choice.heirloom.clone()),
-                texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
-                transform: Transform {
-                    translation: Vec2::new(0., 25.).extend(4.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .insert(RenderLayers::from_layers(&[3]))
-            .insert(Name::new("SKILL ICON!!"))
-            .set_parent(skills_e)
-            .id();
-
-        // Add rarity-based background if not common
-        if let Some(glow) = choice.rarity.get_item_glow() {
-            commands
-                .spawn(SpriteBundle {
-                    texture: graphics.get_item_glow(glow),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(32., 32.)),
-                        ..Default::default()
-                    },
-                    transform: Transform {
-                        translation: Vec2::new(0., 0.).extend(-1.),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                })
-                .insert(RenderLayers::from_layers(&[3]))
-                .set_parent(skill_icon);
-        }
-
-        let mut text_title = commands.spawn((
-            Text2dBundle {
-                text: Text::from_section(
-                    choice.heirloom.get_title(),
-                    TextStyle {
-                        font: asset_server.load("fonts/4x5.ttf"),
-                        font_size: 5.0,
-                        color: WHITE,
-                    },
-                ),
-                text_anchor: Anchor::Center,
-                transform: Transform {
-                    translation: Vec3::new(0.5, 50.5, 1.),
-                    scale: Vec3::new(1., 1., 1.),
-                    ..Default::default()
-                },
-                ..default()
-            },
-            SkillTitleText,
-            Name::new("Skill Title TEXT"),
-            RenderLayers::from_layers(&[3]),
-        ));
-        text_title.set_parent(skills_e);
-        for (j, desc) in choice.heirloom.get_desc().iter().enumerate() {
-            let mut text_desc = commands.spawn((
-                Text2dBundle {
-                    text: Text::from_section(
-                        desc,
-                        TextStyle {
-                            font: asset_server.load("fonts/4x5.ttf"),
-                            font_size: 5.0,
-                            color: WHITE,
-                        },
-                    ),
-                    text_anchor: Anchor::Center,
-                    transform: Transform {
-                        translation: Vec3::new(
-                            if i == 0 { 0. } else { 0.5 },
-                            -(j as f32 * 9.) + 0.5,
-                            1.,
-                        ),
-                        scale: Vec3::new(1., 1., 1.),
-                        ..Default::default()
-                    },
-                    ..default()
-                },
-                SkillDescText,
-                Name::new("Skill Desc TEXT"),
-                RenderLayers::from_layers(&[3]),
-            ));
-            text_desc.set_parent(skills_e);
-        }
+            .insert(Name::new("SKILLS UI"));
     }
 }
 
