@@ -637,6 +637,7 @@ pub fn handle_new_ui_state(
     furnace_option: Option<Res<FurnaceContainer>>,
     mut hotbar_slots: Query<(&mut Visibility, &mut InventorySlotState), Without<Interactable>>,
     tip_boxes: Query<Entity, With<tips::TipBox>>,
+    minimap_open: Res<minimap::IslandMapOpen>,
 ) {
     if next_ui_state.0.is_none() {
         return;
@@ -707,8 +708,12 @@ pub fn handle_new_ui_state(
     }
     info!("{:?}", next_ui);
     let has_tip_boxes = !tip_boxes.is_empty();
-    
-    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed || has_tip_boxes {
+    let minimap_is_open = minimap_open.0;
+
+    if next_ui_state.0.as_ref().unwrap() != &UIState::Closed
+        || has_tip_boxes
+        || minimap_is_open
+    {
         next_client_state.set(ClientState::Paused);
     } else {
         next_client_state.set(ClientState::Unpaused);

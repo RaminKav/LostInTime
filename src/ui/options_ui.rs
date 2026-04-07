@@ -24,6 +24,8 @@ pub struct CheatSettings {
     pub dev_mode: bool,
     /// When true, damage numbers are shown when enemies take damage (player damage numbers always show)
     pub show_enemy_damage_numbers: bool,
+    /// When true, the tile under the cursor is highlighted during gameplay
+    pub show_tile_hover: bool,
 }
 
 impl Default for CheatSettings {
@@ -33,6 +35,7 @@ impl Default for CheatSettings {
             color_blind_mode: false,
             dev_mode: false,
             show_enemy_damage_numbers: true,
+            show_tile_hover: true,
         }
     }
 }
@@ -44,6 +47,7 @@ pub enum OptionsCheckboxType {
     ColorBlindMode,
     DevMode,
     ShowEnemyDamageNumbers,
+    ShowTileHover,
 }
 
 #[derive(Component)]
@@ -272,7 +276,7 @@ pub fn setup_options_ui(
         &mut commands,
         Vec2::new(resolution.game_width, resolution.game_height),
         1.,
-        10.,
+        ui_helpers::Z_DEPTH_OPTIONS_OVERLAY,
     );
     commands
         .entity(overlay)
@@ -295,7 +299,7 @@ pub fn setup_options_ui(
             transform: Transform::from_translation(Vec3::new(
                 0.,
                 resolution.game_height / 2. - 40.,
-                11.,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
             )),
             ..Default::default()
         },
@@ -318,7 +322,11 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(left_side_x, 90., 11.)),
+            transform: Transform::from_translation(Vec3::new(
+                left_side_x,
+                90.,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -337,8 +345,12 @@ pub fn setup_options_ui(
             &graphics,
             &asset_server,
             KeyBindType::ActiveSkill(slot),
-            Vec3::new(left_side_x + 2., y, 11.),
-            Vec3::new(left_side_x + 160., y - 3.5, 11.),
+            Vec3::new(left_side_x + 2., y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(
+                left_side_x + 160.,
+                y - 3.5,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            ),
             &keybinds,
         );
     }
@@ -357,7 +369,11 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(left_side_x, ui_section_y, 11.)),
+            transform: Transform::from_translation(Vec3::new(
+                left_side_x,
+                ui_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -372,8 +388,16 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         KeyBindType::Inventory,
-        Vec3::new(left_side_x + 2., inventory_y, 11.),
-        Vec3::new(left_side_x + 160., inventory_y - 3.5, 11.),
+        Vec3::new(
+            left_side_x + 2.,
+            inventory_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 160.,
+            inventory_y - 3.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         &keybinds,
     );
 
@@ -384,8 +408,16 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         KeyBindType::Minimap,
-        Vec3::new(left_side_x + 2., minimap_y, 11.),
-        Vec3::new(left_side_x + 160., minimap_y - 3.5, 11.),
+        Vec3::new(
+            left_side_x + 2.,
+            minimap_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            left_side_x + 160.,
+            minimap_y - 3.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         &keybinds,
     );
 
@@ -406,7 +438,7 @@ pub fn setup_options_ui(
             transform: Transform::from_translation(Vec3::new(
                 left_side_x,
                 quick_consume_section_y,
-                11.,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
             )),
             ..Default::default()
         },
@@ -422,8 +454,12 @@ pub fn setup_options_ui(
             &graphics,
             &asset_server,
             KeyBindType::QuickConsume(slot),
-            Vec3::new(left_side_x + 2., y, 11.),
-            Vec3::new(left_side_x + 160., y - 3.5, 11.),
+            Vec3::new(left_side_x + 2., y, ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
+            Vec3::new(
+                left_side_x + 160.,
+                y - 3.5,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            ),
             &keybinds,
         );
     }
@@ -442,7 +478,11 @@ pub fn setup_options_ui(
             )
             .with_alignment(TextAlignment::Left),
             text_anchor: bevy::sprite::Anchor::CenterLeft,
-            transform: Transform::from_translation(Vec3::new(right_side_x, cheats_section_y, 11.)),
+            transform: Transform::from_translation(Vec3::new(
+                right_side_x,
+                cheats_section_y,
+                ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -457,8 +497,16 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         "Unlock All Classes:",
-        Vec3::new(right_side_x, checkbox_y, 11.),
-        Vec3::new(right_side_x + 100.5, checkbox_y + 0.5, 11.),
+        Vec3::new(
+            right_side_x,
+            checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         OptionsCheckboxType::UnlockAllClasses,
         cheat_settings.bypass_class_unlocks,
     );
@@ -470,8 +518,16 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         "Color Blind Mode:",
-        Vec3::new(right_side_x, color_blind_checkbox_y, 11.),
-        Vec3::new(right_side_x + 100.5, color_blind_checkbox_y + 0.5, 11.),
+        Vec3::new(
+            right_side_x,
+            color_blind_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            color_blind_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         OptionsCheckboxType::ColorBlindMode,
         cheat_settings.color_blind_mode,
     );
@@ -483,8 +539,16 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         "Dev Mode:",
-        Vec3::new(right_side_x, dev_mode_checkbox_y, 11.),
-        Vec3::new(right_side_x + 100.5, dev_mode_checkbox_y + 0.5, 11.),
+        Vec3::new(
+            right_side_x,
+            dev_mode_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            dev_mode_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         OptionsCheckboxType::DevMode,
         cheat_settings.dev_mode,
     );
@@ -496,10 +560,38 @@ pub fn setup_options_ui(
         &graphics,
         &asset_server,
         "Damage Numbers:",
-        Vec3::new(right_side_x, enemy_damage_checkbox_y, 11.),
-        Vec3::new(right_side_x + 100.5, enemy_damage_checkbox_y + 0.5, 11.),
+        Vec3::new(
+            right_side_x,
+            enemy_damage_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            enemy_damage_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
         OptionsCheckboxType::ShowEnemyDamageNumbers,
         cheat_settings.show_enemy_damage_numbers,
+    );
+
+    let tile_hover_checkbox_y = enemy_damage_checkbox_y - 16.;
+    spawn_options_checkbox(
+        &mut commands,
+        &graphics,
+        &asset_server,
+        "Tile Hover:",
+        Vec3::new(
+            right_side_x,
+            tile_hover_checkbox_y,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        Vec3::new(
+            right_side_x + 100.5,
+            tile_hover_checkbox_y + 0.5,
+            ui_helpers::Z_DEPTH_OPTIONS_CONTENT,
+        ),
+        OptionsCheckboxType::ShowTileHover,
+        cheat_settings.show_tile_hover,
     );
 
     //TODO: fix restart button
@@ -520,7 +612,7 @@ pub fn setup_options_ui(
 
         // Exit to Menu button
         let exit_button = crate::ui::main_menu::spawn_menu_button(
-            Vec3::new(140., -148., 11.),
+            Vec3::new(140., -148., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
             Vec3::new(-50., -1., 1.),
             "Exit to Menu",
             crate::ui::main_menu::MenuButton::OptionsExit,
@@ -535,7 +627,7 @@ pub fn setup_options_ui(
 
     // Back Button
     let back_button = spawn_back_button(
-        Vec3::new(240., -148., 11.),
+        Vec3::new(240., -148., ui_helpers::Z_DEPTH_OPTIONS_CONTENT),
         &mut commands,
         &graphics,
         &asset_server,
@@ -556,10 +648,10 @@ fn spawn_keybind_row(
     let (label, current_key) = match bind_type {
         KeyBindType::ActiveSkill(slot) => {
             let label = match slot {
-                0 => "Roll:",
-                1 => "Skill Slot 1:",
-                2 => "Skill Slot 2:",
-                3 => "Blessing Skill Slot:",
+                0 => "Skill Slot 1",
+                1 => "Skill Slot 2:",
+                2 => "Skill Slot 3:",
+                3 => "Skill Slot 4:",
                 _ => "Unknown Slot",
             };
             (label, keybinds.get_active_skill_key(slot))
@@ -797,6 +889,17 @@ pub fn handle_cheat_checkbox_click(
                                     },
                                 )
                             }
+                            OptionsCheckboxType::ShowTileHover => {
+                                cheat_settings.show_tile_hover = !cheat_settings.show_tile_hover;
+                                (
+                                    cheat_settings.show_tile_hover,
+                                    if cheat_settings.show_tile_hover {
+                                        UIElement::CheckBoxSelected
+                                    } else {
+                                        UIElement::CheckBox
+                                    },
+                                )
+                            }
                         };
                         *texture = graphics.get_ui_element_texture(checkbox_ui).clone();
                         commands.spawn(SoundSpawner::new(AudioSoundEffect::ButtonClick, 0.2));
@@ -849,6 +952,13 @@ pub fn update_cheat_checkbox_visual(
             }
             OptionsCheckboxType::ShowEnemyDamageNumbers => {
                 if cheat_settings.show_enemy_damage_numbers {
+                    UIElement::CheckBoxSelected
+                } else {
+                    UIElement::CheckBox
+                }
+            }
+            OptionsCheckboxType::ShowTileHover => {
+                if cheat_settings.show_tile_hover {
                     UIElement::CheckBoxSelected
                 } else {
                     UIElement::CheckBox

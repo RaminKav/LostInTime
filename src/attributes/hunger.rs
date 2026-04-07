@@ -14,6 +14,9 @@ use crate::{
 
 use super::CurrentHealth;
 
+/// When false, passive hunger timer ticks and action/attack fatigue hunger drain are skipped.
+pub const HUNGER_DRAIN_ENABLED: bool = false;
+
 #[derive(Component, Default)]
 pub struct Hunger {
     pub max: u8,
@@ -74,7 +77,10 @@ pub fn tick_hunger(
     game: Res<Game>,
     time: Res<Time>,
 ) {
-    for (mut hunger, mut tracker, mut health, skills) in hunger_query.iter_mut() {
+    if !HUNGER_DRAIN_ENABLED {
+        return;
+    }
+    for (_hunger, mut tracker, _health, skills) in hunger_query.iter_mut() {
         let is_moving = game.player_state.is_moving;
         let skill_mod = if skills.has(Heirloom::FullStomach) {
             0.7
@@ -107,19 +113,31 @@ pub fn tick_hunger(
 
 pub fn handle_actions_drain_hunger(
     mut hunger_query: Query<(&mut Hunger, &mut HungerTracker, &mut CurrentHealth), With<Hunger>>,
-    action_events: EventReader<ActionSuccessEvent>,
-    attack_event: EventReader<AttackEvent>,
+    mut action_events: EventReader<ActionSuccessEvent>,
+    mut attack_event: EventReader<AttackEvent>,
 ) {
-    if !action_events.is_empty() || !attack_event.is_empty() {
-        for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
-            tracker.action_fatigue += 1;
-            if tracker.is_fatigued() {
-                tracker.action_fatigue = 0;
-                if hunger.current == 0 {
-                    health.0 -= 1;
-                } else {
-                    hunger.current -= 1;
-                }
+    if !HUNGER_DRAIN_ENABLED {
+        action_events.clear();
+        attack_event.clear();
+        return;
+    }
+
+    if action_events.is_empty() && attack_event.is_empty() {
+        return;
+    }
+
+    // Advance our readers so the same events don't re-trigger every frame (see EventReader::is_empty docs).
+    action_events.clear();
+    attack_event.clear();
+
+    for (mut hunger, mut tracker, mut health) in hunger_query.iter_mut() {
+        tracker.action_fatigue += 1;
+        if tracker.is_fatigued() {
+            tracker.action_fatigue = 0;
+            if hunger.current == 0 {
+                health.0 -= 1;
+            } else {
+                hunger.current -= 1;
             }
         }
     }

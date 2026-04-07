@@ -194,6 +194,10 @@ lazy_static! {
     /// Spawns lingering loot drops that pile up and are collected via real pickup systems.
     pub static ref LOOT_CYCLE_LOAD_TEST: bool = env::var("LOOT_CYCLE_LOAD_TEST").is_ok();
 }
+lazy_static! {
+    /// Logs entity/component counts every 5s to find accumulation leaks.
+    pub static ref DIAGNOSTICS: bool = env::var("DIAGNOSTICS").is_ok();
+}
 
 fn main() {
     init_global_logger();
@@ -342,6 +346,12 @@ fn main() {
     {
         app.add_system(
             gameplay_load_tests::unified_load_tests_f9_toggle.in_set(OnUpdate(GameState::Main)),
+        );
+    }
+
+    if *DIAGNOSTICS {
+        app.add_system(
+            gameplay_load_tests::diagnostics_tick.in_set(OnUpdate(GameState::Main)),
         );
     }
 

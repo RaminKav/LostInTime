@@ -5,7 +5,10 @@ use crate::{
     colors::{DARK_WOOD_BROWN, WHITE},
     cursor::CursorPos,
     datafiles,
-    ui::{interactions::Interaction, ui_helpers, Interactable, UIElement, UIState},
+    ui::{
+        interactions::Interaction, minimap::IslandMapOpen, ui_helpers, Interactable, UIElement,
+        UIState,
+    },
     GameState,
 };
 
@@ -318,16 +321,17 @@ pub fn test_tip(mut events: EventWriter<TipEvent>, mut done: Local<bool>) {
     // }
 }
 
-/// Sync pause when tips appear or are dismissed without a UI state transition.
+/// Sync pause when tips or the island minimap appear or go away without a `UIState` transition.
 ///
 /// `handle_new_ui_state` only runs when `NextState<UIState>` is set, so closing the last tip
-/// never reaches that path and would otherwise leave `ClientState::Paused` stuck.
+/// or toggling only the minimap never reaches that path and would otherwise leave pause wrong.
 pub fn handle_tip_box_pause_state(
     tip_boxes: Query<Entity, With<TipBox>>,
     mut next_client_state: ResMut<NextState<ClientState>>,
     curr_ui_state: Res<State<UIState>>,
     curr_client_state: Res<State<ClientState>>,
     next_ui_state: Res<NextState<UIState>>,
+    minimap_open: Res<IslandMapOpen>,
 ) {
     let has_tip_boxes = !tip_boxes.is_empty();
     let ui_is_closed = curr_ui_state.0 == UIState::Closed;
@@ -337,7 +341,7 @@ pub fn handle_tip_box_pause_state(
         .as_ref()
         .map_or(false, |s| *s != UIState::Closed);
 
-    if has_tip_boxes {
+    if has_tip_boxes || minimap_open.0 {
         if curr_client_state.0 != ClientState::Paused {
             next_client_state.set(ClientState::Paused);
         }

@@ -4,6 +4,22 @@ use bevy_ecs_tilemap::tiles::TilePos;
 
 use super::{Interactable, UIState};
 
+/// Typical full-screen UI overlays (inventory, shrines, class select, etc.) use z ≈ 9–15.
+/// Active skill hotbar: above those modals, below the heirloom pick screen.
+pub const Z_DEPTH_HUD_ACTIVE_SKILLS: f32 = 48.0;
+/// “Choose an Heirloom” screen only: backdrop above active skills, below HUD heirloom row.
+pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY: f32 = 52.0;
+/// Root depth for title bar, cards, reroll/banish buttons on that screen.
+pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT: f32 = 54.0;
+/// Reroll/banish count labels (slightly in front of sibling UI on the same screen).
+pub const Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND: f32 = 58.0;
+/// HUD heirloom icons (top-left): above heirloom selection UI, still below options menu.
+pub const Z_DEPTH_HUD_HEIRLOOM_ICONS: f32 = 62.0;
+/// Options menu backdrop + content sit above gameplay HUD (including skills/heirlooms).
+/// Kept below name-entry / loading overlays (z ≈ 100+).
+pub const Z_DEPTH_OPTIONS_OVERLAY: f32 = 85.0;
+pub const Z_DEPTH_OPTIONS_CONTENT: f32 = 86.0;
+
 pub fn pointcast_2d<'a>(
     cursor_pos: &Res<CursorPos>,
     ui_sprites: &'a Query<(Entity, &Sprite, &GlobalTransform), With<Interactable>>,

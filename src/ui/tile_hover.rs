@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::{
     assets::Graphics,
     cursor::CursorPos,
+    ui::CheatSettings,
     item::{
         item_actions::{ItemAction, ItemActions},
         EquipmentType, MainHand, RequiredEquipmentType, WorldObject,
@@ -27,12 +28,20 @@ pub fn spawn_tile_hover_on_cursor_move(
     mut commands: Commands,
     cursor: Res<CursorPos>,
     graphics: Res<Graphics>,
+    cheat_settings: Res<CheatSettings>,
     tile_hover_check: Query<(Entity, &TileHover)>,
     proto_param: ProtoParam,
     mut game: GameParam,
     main_hand: Query<&WorldObject, With<MainHand>>,
     tool_req_query: Query<&RequiredEquipmentType>,
 ) {
+    if !cheat_settings.show_tile_hover {
+        if let Ok((e, _)) = tile_hover_check.get_single() {
+            commands.entity(e).despawn();
+        }
+        return;
+    }
+
     let tile_pos = world_pos_to_tile_pos(cursor.world_coords.truncate());
     if let Ok((e, tile_hover)) = tile_hover_check.get_single() {
         if tile_hover.pos == tile_pos && !game.world_obj_cache.is_changed() {

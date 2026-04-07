@@ -6,8 +6,9 @@ use std::collections::HashMap;
 use super::{
     damage_numbers::spawn_text, interactions::Interaction, spawn_heirloom_tooltip_card,
     spawn_inv_slot, spawn_item_stack_icon, tooltips::spawn_world_item_tooltip_for_stack,
-    tooltips::ConsumableBuffHudTooltip, InventorySlotType, InventoryState, InventoryUI, UIElement,
-    UIState,
+    tooltips::ConsumableBuffHudTooltip,
+    ui_helpers::{Z_DEPTH_HUD_ACTIVE_SKILLS, Z_DEPTH_HUD_HEIRLOOM_ICONS},
+    InventorySlotType, InventoryState, InventoryUI, UIElement, UIState,
 };
 use crate::{
     assets::Graphics,
@@ -1333,7 +1334,7 @@ pub fn handle_heirloom_hud_tooltip(
         };
 
         // Position tooltip below the hovered icon
-        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., 25.);
+        let tooltip_pos = Vec3::new(icon_pos.x, icon_pos.y - 90., icon_pos.z + 10.);
 
         let tooltip_e = spawn_heirloom_tooltip_card(
             &graphics,
@@ -1542,7 +1543,7 @@ pub fn handle_active_skill_hud_tooltip(
 
     // Spawn new tooltip if hovering
     if let Some((skill, slot_index, icon_pos)) = currently_hovered {
-        let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., 15.);
+        let tooltip_pos = Vec3::new(icon_pos.x + 40., icon_pos.y + 50., icon_pos.z + 10.);
         let container = commands
             .spawn(RenderLayers::from_layers(&[3]))
             .insert(ActiveSkillHudTooltip)
@@ -1760,7 +1761,7 @@ pub fn handle_update_player_skills(
                         sprite: graphics.get_heirloom_icon(heirloom.clone()),
                         texture_atlas: graphics.texture_atlas.as_ref().unwrap().clone(),
                         transform: Transform {
-                            translation: offset.extend(11.),
+                            translation: offset.extend(Z_DEPTH_HUD_HEIRLOOM_ICONS),
                             scale: Vec3::new(1., 1., 1.),
                             ..Default::default()
                         },
@@ -1889,7 +1890,7 @@ pub fn handle_update_player_skills(
                             // -GAME_HEIGHT / 2. + 14.,
                             -6. + (i as f32 - 1.) * 31.,
                             -GAME_HEIGHT / 2. + 38.,
-                            1.,
+                            Z_DEPTH_HUD_ACTIVE_SKILLS,
                         ),
                         scale: Vec3::new(1., 1., 1.),
                         ..Default::default()

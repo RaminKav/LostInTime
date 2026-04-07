@@ -16,8 +16,12 @@ use crate::{
 };
 
 use super::{
-    damage_numbers::spawn_text, ui_helpers::spawn_ui_overlay, Interactable, UIElement, UIState,
-    SKILLS_CHOICE_UI_SIZE,
+    damage_numbers::spawn_text,
+    ui_helpers::{
+        spawn_ui_overlay, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND, Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
+    },
+    Interactable, UIElement, UIState, SKILLS_CHOICE_UI_SIZE,
 };
 
 #[derive(Component)]
@@ -69,7 +73,7 @@ pub fn setup_skill_choice_ui(
                 ..Default::default()
             },
             transform: Transform {
-                translation: Vec3::new(0., 100., 10.),
+                translation: Vec3::new(0., 115., Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT),
                 scale: Vec3::new(1., 1., 1.),
                 ..Default::default()
             },
@@ -112,7 +116,7 @@ pub fn setup_skill_choice_ui(
         &mut commands,
         Vec2::new(res.game_width + 10., GAME_HEIGHT + 100.),
         0.8,
-        9.,
+        Z_DEPTH_HEIRLOOM_SKILL_CHOICE_OVERLAY,
     );
 
     spawn_skill_choice_entities(
@@ -126,7 +130,11 @@ pub fn setup_skill_choice_ui(
     for i in -1i32..2 {
         let slot_index = (i + 1) as usize;
         let enabled = run_unlocks.rerolls_remaining > 0;
-        let translation = Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5, -110., 10.);
+        let translation = Vec3::new(
+            i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.5,
+            -110.,
+            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        );
         let mut reroll_entity = commands.spawn(SpriteBundle {
             texture: graphics
                 .get_ui_element_texture(UIElement::RerollDice)
@@ -162,8 +170,11 @@ pub fn setup_skill_choice_ui(
     if banish_enabled {
         for i in -1i32..2 {
             let slot_index = (i + 1) as usize;
-            let translation =
-                Vec3::new(i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4., -136., 10.);
+            let translation = Vec3::new(
+                i as f32 * (SKILLS_CHOICE_UI_SIZE.x + 16.) + 4.,
+                -136.,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+            );
             let mut banish_button = commands.spawn(SpriteBundle {
                 texture: graphics
                     .get_ui_element_texture(UIElement::BackButton)
@@ -235,7 +246,11 @@ pub fn setup_skill_choice_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(-80.5, -140., 15.)),
+            transform: Transform::from_translation(Vec3::new(
+                -80.5,
+                -140.,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -256,7 +271,11 @@ pub fn setup_skill_choice_ui(
             )
             .with_alignment(TextAlignment::Center),
             text_anchor: Anchor::Center,
-            transform: Transform::from_translation(Vec3::new(80., -140., 15.)),
+            transform: Transform::from_translation(Vec3::new(
+                80.,
+                -140.,
+                Z_DEPTH_HEIRLOOM_SKILL_CHOICE_FOREGROUND,
+            )),
             ..Default::default()
         },
         RenderLayers::from_layers(&[3]),
@@ -479,7 +498,11 @@ pub fn spawn_skill_choice_entities(
             continue;
         }
         let index = (i + 1) as usize;
-        let position = Vec3::new(translation.x + t_offset.x, translation.y + t_offset.y, 10.);
+        let position = Vec3::new(
+            translation.x + t_offset.x,
+            translation.y + t_offset.y,
+            Z_DEPTH_HEIRLOOM_SKILL_CHOICE_CONTENT,
+        );
         let card_e = spawn_heirloom_tooltip_card(
             graphics,
             commands,
