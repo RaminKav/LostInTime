@@ -318,25 +318,32 @@ pub fn test_tip(mut events: EventWriter<TipEvent>, mut done: Local<bool>) {
     // }
 }
 
-/// System to pause the game when tip boxes are visible
+/// Sync pause when tips appear or are dismissed without a UI state transition.
+///
+/// `handle_new_ui_state` only runs when `NextState<UIState>` is set, so closing the last tip
+/// never reaches that path and would otherwise leave `ClientState::Paused` stuck.
 pub fn handle_tip_box_pause_state(
     tip_boxes: Query<Entity, With<TipBox>>,
     mut next_client_state: ResMut<NextState<ClientState>>,
     curr_ui_state: Res<State<UIState>>,
     curr_client_state: Res<State<ClientState>>,
+    next_ui_state: Res<NextState<UIState>>,
 ) {
-    // let has_tip_boxes = !tip_boxes.is_empty();
-    // let ui_is_closed = curr_ui_state.0 == UIState::Closed;
+    let has_tip_boxes = !tip_boxes.is_empty();
+    let ui_is_closed = curr_ui_state.0 == UIState::Closed;
+    // `State<UIState>` may still be Closed this frame while input already queued a menu open.
+    let pending_opens_ui = next_ui_state
+        .0
+        .as_ref()
+        .map_or(false, |s| *s != UIState::Closed);
 
-    // // Pause if tip boxes are visible
-    // if has_tip_boxes {
-    //     if curr_client_state.0 != ClientState::Paused {
-    //         next_client_state.set(ClientState::Paused);
-    //     }
-    // } else if ui_is_closed {
-    //     // Unpause only if UI is also closed (don't override UI pause state)
-    //     if curr_client_state.0 != ClientState::Unpaused {
-    //         next_client_state.set(ClientState::Unpaused);
-    //     }
-    // }
+    if has_tip_boxes {
+        if curr_client_state.0 != ClientState::Paused {
+            next_client_state.set(ClientState::Paused);
+        }
+    } else if ui_is_closed && !pending_opens_ui {
+        if curr_client_state.0 != ClientState::Unpaused {
+            next_client_state.set(ClientState::Unpaused);
+        }
+    }
 }

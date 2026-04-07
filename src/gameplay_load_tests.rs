@@ -26,15 +26,19 @@ use rand::Rng;
 
 use crate::{
     assets::Graphics,
+    attributes::add_item_glows,
     client::is_not_paused,
     collider_load_test::WAVE_INTERVAL_SECS as COLLIDER_WAVE_INTERVAL_SECS,
     collider_load_test::{ColliderLoadTestActive, ColliderLoadTestState},
-    combat::combat_helpers::SpawnAsepriteAnimationCollider,
+    combat::{
+        combat_helpers::SpawnAsepriteAnimationCollider,
+        status_effects::{Burning, StatusEffect, StatusEffectEvent},
+    },
     custom_commands::CommandsExt,
     enemy::Mob,
     item::{
         projectile::{Projectile, RangedAttackEvent},
-        ItemDrop, ItemDropDespawnTimer, WorldObject,
+        ItemDrop, ItemDropDespawnTimer, Loot, LootTable, LootTablePlugin, WorldObject,
     },
     player::{
         combat_heirlooms::{spawn_ant_farm_ants, AntFarmAnt},
@@ -52,14 +56,24 @@ use crate::juice::{ObjectHitParticles, Particles};
 /// Shorter than production (300s) so the load test does not simulate infinite mana-orb hoarding.
 const HEIRLOOM_TEST_MANA_ORB_LIFETIME_SECS: f32 = 12.0;
 
-const HEIRLOOM_WAVE_INTERVAL_SECS: f32 = 0.12;
-const PARTICLE_WAVE_INTERVAL_SECS: f32 = 0.08;
+const HEIRLOOM_WAVE_INTERVAL_SECS: f32 = 0.32;
+const PARTICLE_WAVE_INTERVAL_SECS: f32 = 1.08;
 const HEIRLOOM_EFFECTS_PER_WAVE_MIN: u32 = 40;
-const HEIRLOOM_EFFECTS_PER_WAVE_MAX: u32 = 100;
-const PARTICLE_HIT_BURST_MIN: u32 = 30;
-const PARTICLE_HIT_BURST_MAX: u32 = 70;
-const PARTICLE_DEATH_BURST_MIN: u32 = 20;
-const PARTICLE_DEATH_BURST_MAX: u32 = 40;
+const HEIRLOOM_EFFECTS_PER_WAVE_MAX: u32 = 45;
+const PARTICLE_HIT_BURST_MIN: u32 = 0;
+const PARTICLE_HIT_BURST_MAX: u32 = 1;
+const PARTICLE_DEATH_BURST_MIN: u32 = 0;
+const PARTICLE_DEATH_BURST_MAX: u32 = 1;
+
+const POISON_WAVE_INTERVAL_SECS: f32 = 0.25;
+const WEAPON_WAVE_INTERVAL_SECS: f32 = 0.3;
+const WEAPON_SWORD_PER_WAVE: u32 = 5;
+const WEAPON_SHOUT_PER_WAVE: u32 = 2;
+
+const LOOT_CYCLE_WAVE_INTERVAL_SECS: f32 = 0.3;
+const LOOT_CYCLE_DROPS_PER_WAVE: u32 = 20;
+/// Items linger long enough to pile up, but not 300s like production.
+const LOOT_CYCLE_DESPAWN_SECS: f32 = 40.0;
 
 #[derive(Resource, Default)]
 pub struct HeirloomLoadTestActive {
@@ -96,6 +110,72 @@ impl Default for ParticleLoadTestState {
     fn default() -> Self {
         Self {
             wave_timer: Timer::from_seconds(PARTICLE_WAVE_INTERVAL_SECS, TimerMode::Repeating),
+            pending_first_wave: true,
+        }
+    }
+}
+
+// --- Poison load test ---
+
+#[derive(Resource, Default)]
+pub struct PoisonLoadTestActive {
+    pub active: bool,
+}
+
+#[derive(Resource)]
+pub struct PoisonLoadTestState {
+    pub wave_timer: Timer,
+    pub pending_first_wave: bool,
+}
+
+impl Default for PoisonLoadTestState {
+    fn default() -> Self {
+        Self {
+            wave_timer: Timer::from_seconds(POISON_WAVE_INTERVAL_SECS, TimerMode::Repeating),
+            pending_first_wave: true,
+        }
+    }
+}
+
+// --- Weapon/skill load test ---
+
+#[derive(Resource, Default)]
+pub struct WeaponLoadTestActive {
+    pub active: bool,
+}
+
+#[derive(Resource)]
+pub struct WeaponLoadTestState {
+    pub wave_timer: Timer,
+    pub pending_first_wave: bool,
+}
+
+impl Default for WeaponLoadTestState {
+    fn default() -> Self {
+        Self {
+            wave_timer: Timer::from_seconds(WEAPON_WAVE_INTERVAL_SECS, TimerMode::Repeating),
+            pending_first_wave: true,
+        }
+    }
+}
+
+// --- Loot cycle load test ---
+
+#[derive(Resource, Default)]
+pub struct LootCycleLoadTestActive {
+    pub active: bool,
+}
+
+#[derive(Resource)]
+pub struct LootCycleLoadTestState {
+    pub wave_timer: Timer,
+    pub pending_first_wave: bool,
+}
+
+impl Default for LootCycleLoadTestState {
+    fn default() -> Self {
+        Self {
+            wave_timer: Timer::from_seconds(LOOT_CYCLE_WAVE_INTERVAL_SECS, TimerMode::Repeating),
             pending_first_wave: true,
         }
     }
@@ -148,6 +228,60 @@ impl Plugin for ParticleLoadTestPlugin {
     }
 }
 
+pub struct PoisonLoadTestPlugin;
+
+impl Plugin for PoisonLoadTestPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<PoisonLoadTestActive>()
+            .init_resource::<PoisonLoadTestState>()
+            .add_system(
+                poison_load_test_tick
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(is_not_paused),
+            );
+        info!(
+            "Poison load test plugin: F9 toggles. Applies 1 poison stack to all enemies every {:.2}s",
+            POISON_WAVE_INTERVAL_SECS
+        );
+    }
+}
+
+pub struct WeaponLoadTestPlugin;
+
+impl Plugin for WeaponLoadTestPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<WeaponLoadTestActive>()
+            .init_resource::<WeaponLoadTestState>()
+            .add_system(
+                weapon_load_test_burst
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(is_not_paused),
+            );
+        info!(
+            "Weapon load test plugin: F9 toggles. {} sword + {} shout per wave every {:.2}s",
+            WEAPON_SWORD_PER_WAVE, WEAPON_SHOUT_PER_WAVE, WEAPON_WAVE_INTERVAL_SECS
+        );
+    }
+}
+
+pub struct LootCycleLoadTestPlugin;
+
+impl Plugin for LootCycleLoadTestPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<LootCycleLoadTestActive>()
+            .init_resource::<LootCycleLoadTestState>()
+            .add_system(
+                loot_cycle_load_test_burst
+                    .in_set(OnUpdate(GameState::Main))
+                    .run_if(is_not_paused),
+            );
+        info!(
+            "Loot cycle load test plugin: F9 toggles. {} drops/wave every {:.2}s, {}s linger time",
+            LOOT_CYCLE_DROPS_PER_WAVE, LOOT_CYCLE_WAVE_INTERVAL_SECS, LOOT_CYCLE_DESPAWN_SECS
+        );
+    }
+}
+
 #[derive(Clone, Copy)]
 enum HeirloomSimKind {
     Echo,
@@ -165,6 +299,12 @@ pub fn unified_load_tests_f9_toggle(
     mut heirloom_state: Option<ResMut<HeirloomLoadTestState>>,
     mut particle_active: Option<ResMut<ParticleLoadTestActive>>,
     mut particle_state: Option<ResMut<ParticleLoadTestState>>,
+    mut poison_active: Option<ResMut<PoisonLoadTestActive>>,
+    mut poison_state: Option<ResMut<PoisonLoadTestState>>,
+    mut weapon_active: Option<ResMut<WeaponLoadTestActive>>,
+    mut weapon_state: Option<ResMut<WeaponLoadTestState>>,
+    mut loot_active: Option<ResMut<LootCycleLoadTestActive>>,
+    mut loot_state: Option<ResMut<LootCycleLoadTestState>>,
 ) {
     if !keys.just_pressed(KeyCode::F9) {
         return;
@@ -202,6 +342,40 @@ pub fn unified_load_tests_f9_toggle(
             }
         }
         info!("Particle load test {}", if a.active { "ON" } else { "OFF" });
+    }
+    if let Some(mut a) = poison_active {
+        a.active = !a.active;
+        if a.active {
+            if let Some(mut s) = poison_state {
+                s.pending_first_wave = true;
+                s.wave_timer = Timer::from_seconds(POISON_WAVE_INTERVAL_SECS, TimerMode::Repeating);
+            }
+        }
+        info!("Poison load test {}", if a.active { "ON" } else { "OFF" });
+    }
+    if let Some(mut a) = weapon_active {
+        a.active = !a.active;
+        if a.active {
+            if let Some(mut s) = weapon_state {
+                s.pending_first_wave = true;
+                s.wave_timer = Timer::from_seconds(WEAPON_WAVE_INTERVAL_SECS, TimerMode::Repeating);
+            }
+        }
+        info!("Weapon load test {}", if a.active { "ON" } else { "OFF" });
+    }
+    if let Some(mut a) = loot_active {
+        a.active = !a.active;
+        if a.active {
+            if let Some(mut s) = loot_state {
+                s.pending_first_wave = true;
+                s.wave_timer =
+                    Timer::from_seconds(LOOT_CYCLE_WAVE_INTERVAL_SECS, TimerMode::Repeating);
+            }
+        }
+        info!(
+            "Loot cycle load test {}",
+            if a.active { "ON" } else { "OFF" }
+        );
     }
 }
 
@@ -310,7 +484,7 @@ fn heirloom_load_test_burst(
                     &mut commands,
                     &asset_server,
                     player_e,
-                    12,
+                    1000,
                     rng.gen_range(0.85..1.15),
                 );
             }
@@ -323,7 +497,7 @@ fn heirloom_load_test_burst(
                     from_enemy: false,
                     from_entity: None,
                     is_followup_proj: false,
-                    dmg_override: Some(8),
+                    dmg_override: Some(1000),
                     pos_override: Some(strike),
                     spawn_delay: 0.0,
                 });
@@ -334,7 +508,7 @@ fn heirloom_load_test_burst(
                         &mut commands,
                         &graphics,
                         world,
-                        10,
+                        1000,
                         rng.gen_range(0.9..1.2),
                     );
                 }
@@ -457,5 +631,199 @@ fn particle_load_test_burst(
                 velocity: Vec3::new(0., 8000., 0.),
             },
         ));
+    }
+}
+
+// =============================================================================
+// Poison load test
+// =============================================================================
+
+fn poison_load_test_tick(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut state: ResMut<PoisonLoadTestState>,
+    active: Res<PoisonLoadTestActive>,
+    enemies: Query<Entity, (With<Mob>, Without<Player>)>,
+    mut burning_enemies: Query<&mut Burning>,
+    mut status_event: EventWriter<StatusEffectEvent>,
+) {
+    if !active.active {
+        return;
+    }
+
+    if state.pending_first_wave {
+        state.pending_first_wave = false;
+    } else {
+        state.wave_timer.tick(time.delta());
+        if !state.wave_timer.just_finished() {
+            return;
+        }
+    }
+
+    for enemy_entity in enemies.iter() {
+        if let Ok(mut burning) = burning_enemies.get_mut(enemy_entity) {
+            burning.stacks = burning.stacks.saturating_add(1);
+            burning.duration_timer.reset();
+            status_event.send(StatusEffectEvent {
+                entity: enemy_entity,
+                effect: StatusEffect::Poison,
+                num_stacks: burning.stacks as i32,
+            });
+        } else {
+            commands.entity(enemy_entity).insert(Burning {
+                tick_timer: Timer::from_seconds(0.5, TimerMode::Repeating),
+                duration_timer: Timer::from_seconds(3.0, TimerMode::Once),
+                stacks: 1,
+            });
+            status_event.send(StatusEffectEvent {
+                entity: enemy_entity,
+                effect: StatusEffect::Poison,
+                num_stacks: 1,
+            });
+        }
+    }
+}
+
+// =============================================================================
+// Weapon / skill effects load test
+// =============================================================================
+
+fn weapon_load_test_burst(
+    time: Res<Time>,
+    mut state: ResMut<WeaponLoadTestState>,
+    active: Res<WeaponLoadTestActive>,
+    player: Query<(Entity, &GlobalTransform), With<Player>>,
+    mut ranged_attack: EventWriter<RangedAttackEvent>,
+    dungeon: Query<&Dungeon, With<ActiveDimension>>,
+) {
+    if !active.active {
+        return;
+    }
+    if dungeon.get_single().is_ok() {
+        return;
+    }
+    let Ok((player_e, player_txfm)) = player.get_single() else {
+        return;
+    };
+    let player_pos = player_txfm.translation().truncate();
+
+    if state.pending_first_wave {
+        state.pending_first_wave = false;
+    } else {
+        state.wave_timer.tick(time.delta());
+        if !state.wave_timer.just_finished() {
+            return;
+        }
+    }
+
+    let mut rng = rand::thread_rng();
+
+    for _ in 0..WEAPON_SWORD_PER_WAVE {
+        let angle = rng.gen_range(0.0..TAU);
+        let dir = Vec2::new(angle.cos(), angle.sin());
+        ranged_attack.send(RangedAttackEvent {
+            projectile: Projectile::SwordProjectile,
+            direction: dir,
+            mana_cost: None,
+            from_enemy: false,
+            from_entity: Some(player_e),
+            is_followup_proj: false,
+            dmg_override: Some(25),
+            pos_override: Some(player_pos),
+            spawn_delay: 0.0,
+        });
+    }
+
+    for _ in 0..WEAPON_SHOUT_PER_WAVE {
+        let offset = random_offset(&mut rng, 60.0);
+        ranged_attack.send(RangedAttackEvent {
+            projectile: Projectile::Shout,
+            direction: Vec2::ZERO,
+            mana_cost: None,
+            from_enemy: false,
+            from_entity: Some(player_e),
+            is_followup_proj: false,
+            dmg_override: Some(25),
+            pos_override: Some(player_pos + offset),
+            spawn_delay: 0.0,
+        });
+    }
+}
+
+// =============================================================================
+// Loot cycle load test
+// =============================================================================
+
+/// Synthetic loot table matching a typical mob: coins, XP shards, small potion.
+fn make_test_loot_table() -> LootTable {
+    LootTable {
+        drops: vec![
+            Loot::new(WorldObject::Coin, 1, 3, 0.6),
+            Loot::new(WorldObject::XPShard, 1, 1, 0.8),
+            Loot::new(WorldObject::SmallPotion, 1, 1, 0.06),
+        ],
+    }
+}
+
+fn loot_cycle_load_test_burst(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut state: ResMut<LootCycleLoadTestState>,
+    active: Res<LootCycleLoadTestActive>,
+    player: Query<&GlobalTransform, With<Player>>,
+    mut proto_commands: ProtoCommands,
+    proto_param: ProtoParam,
+    graphics: Res<Graphics>,
+    dungeon: Query<&Dungeon, With<ActiveDimension>>,
+) {
+    if !active.active {
+        return;
+    }
+    if dungeon.get_single().is_ok() {
+        return;
+    }
+    let Ok(player_txfm) = player.get_single() else {
+        return;
+    };
+    let player_pos = player_txfm.translation().truncate();
+
+    if state.pending_first_wave {
+        state.pending_first_wave = false;
+    } else {
+        state.wave_timer.tick(time.delta());
+        if !state.wave_timer.just_finished() {
+            return;
+        }
+    }
+
+    let mut rng = rand::thread_rng();
+    let loot_table = make_test_loot_table();
+
+    for _ in 0..LOOT_CYCLE_DROPS_PER_WAVE {
+        let drops = LootTablePlugin::get_drops(&loot_table, &proto_param, 0, Some(1), false);
+
+        for drop in drops.iter() {
+            let drop_offset = Vec2::new(rng.gen_range(-10.0..10.0), rng.gen_range(-10.0..10.0));
+            let offset = random_offset(&mut rng, 80.0);
+            let drop_pos = player_pos + offset + drop_offset;
+
+            let drop_e = proto_commands.spawn_item_from_proto(
+                drop.obj_type,
+                &proto_param,
+                drop_pos,
+                drop.count,
+                Some(1),
+            );
+
+            if let Some(drop_e) = drop_e {
+                add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
+                commands
+                    .entity(drop_e)
+                    .insert(ItemDropDespawnTimer(Timer::from_seconds(
+                        LOOT_CYCLE_DESPAWN_SECS,
+                        TimerMode::Once,
+                    )));
+            }
+        }
     }
 }

@@ -15,6 +15,7 @@ pub mod collisions;
 pub mod damage_tracker;
 pub mod pickup_radius;
 use crate::attributes::{add_item_glows, CurrentMana, Lifesteal, ProjectileSize};
+use crate::NO_DROPS;
 
 pub mod combat_helpers;
 use crate::blessings::OwnedBlessings;
@@ -231,50 +232,52 @@ fn handle_enemy_death(
         let has_double_gold = blessings.has_double_gold_drops();
 
         // drop loot
-        if let Ok(loot_table) = loot_tables.get(death_event.entity) {
-            for drop in LootTablePlugin::get_drops(
-                loot_table,
-                &proto_param,
-                // loot_bonus.single().0,
-                0,
-                Some(mob_lvl.0),
-                is_infinite_mode,
-            )
-            .iter()
-            .filter(|d| {
-                if elite_option.is_some() && d.obj_type == WorldObject::XPShard {
-                    false
-                } else {
-                    true
-                }
-            })
-            .collect::<Vec<_>>()
-            {
-                let count = if drop.obj_type == WorldObject::Coin && has_double_gold {
-                    2
-                } else {
-                    1
-                };
-                for _ in 0..count {
-                    let mut rng = rand::thread_rng();
-                    let d = if mob.is_boss() { 30. } else { 10. };
-                    let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
-                    let drop_e = proto_commands.spawn_item_from_proto(
-                        drop.obj_type,
-                        &proto_param,
-                        death_event.enemy_pos + drop_offset,
-                        drop.count,
-                        Some(player_level.level),
-                    );
+        if !*NO_DROPS {
+            if let Ok(loot_table) = loot_tables.get(death_event.entity) {
+                for drop in LootTablePlugin::get_drops(
+                    loot_table,
+                    &proto_param,
+                    // loot_bonus.single().0,
+                    0,
+                    Some(mob_lvl.0),
+                    is_infinite_mode,
+                )
+                .iter()
+                .filter(|d| {
+                    if elite_option.is_some() && d.obj_type == WorldObject::XPShard {
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .collect::<Vec<_>>()
+                {
+                    let count = if drop.obj_type == WorldObject::Coin && has_double_gold {
+                        2
+                    } else {
+                        1
+                    };
+                    for _ in 0..count {
+                        let mut rng = rand::thread_rng();
+                        let d = if mob.is_boss() { 30. } else { 10. };
+                        let drop_offset = Vec2::new(rng.gen_range(-d..d), rng.gen_range(-d..d));
+                        let drop_e = proto_commands.spawn_item_from_proto(
+                            drop.obj_type,
+                            &proto_param,
+                            death_event.enemy_pos + drop_offset,
+                            drop.count,
+                            Some(player_level.level),
+                        );
 
-                    if let Some(drop_e) = drop_e {
-                        add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
-                        commands
-                            .entity(drop_e)
-                            .insert(crate::item::ItemDropDespawnTimer(Timer::from_seconds(
-                                300.0,
-                                TimerMode::Once,
-                            )));
+                        if let Some(drop_e) = drop_e {
+                            add_item_glows(&mut commands, &graphics, drop_e, drop.rarity.clone());
+                            commands
+                                .entity(drop_e)
+                                .insert(crate::item::ItemDropDespawnTimer(Timer::from_seconds(
+                                    300.0,
+                                    TimerMode::Once,
+                                )));
+                        }
                     }
                 }
             }

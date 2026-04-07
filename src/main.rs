@@ -161,6 +161,10 @@ lazy_static! {
     pub static ref COLLIDER_LOAD_TEST: bool = env::var("COLLIDER_LOAD_TEST").is_ok();
 }
 lazy_static! {
+    /// Spawns/despawns 100 mobs + 200 item drops in a tight loop to stress Rapier (see `collider_load_test`).
+    pub static ref NO_DROPS: bool = env::var("NO_DROPS").is_ok();
+}
+lazy_static! {
     /// Disables overworld mob spawning from `enemy::spawner` (timers, events, Stone Golem timer).
     pub static ref NO_SPAWN: bool = env::var("NO_SPAWN").is_ok();
 }
@@ -177,6 +181,18 @@ lazy_static! {
 lazy_static! {
     /// Disables all audio systems (SoundSpawner, hit/break/use audio, BGM).
     pub static ref NO_AUDIO: bool = env::var("NO_AUDIO").is_ok();
+}
+lazy_static! {
+    /// Applies poison stacks to all spawned enemies every 0.25s (see `gameplay_load_tests`).
+    pub static ref POISON_LOAD_TEST: bool = env::var("POISON_LOAD_TEST").is_ok();
+}
+lazy_static! {
+    /// Spams sword projectile + shout skill around the player (see `gameplay_load_tests`).
+    pub static ref WEAPON_LOAD_TEST: bool = env::var("WEAPON_LOAD_TEST").is_ok();
+}
+lazy_static! {
+    /// Spawns lingering loot drops that pile up and are collected via real pickup systems.
+    pub static ref LOOT_CYCLE_LOAD_TEST: bool = env::var("LOOT_CYCLE_LOAD_TEST").is_ok();
 }
 
 fn main() {
@@ -308,7 +324,22 @@ fn main() {
     if *PARTICLE_LOAD_TEST {
         app.add_plugin(gameplay_load_tests::ParticleLoadTestPlugin);
     }
-    if *COLLIDER_LOAD_TEST || *HEIRLOOM_LOAD_TEST || *PARTICLE_LOAD_TEST {
+    if *POISON_LOAD_TEST {
+        app.add_plugin(gameplay_load_tests::PoisonLoadTestPlugin);
+    }
+    if *WEAPON_LOAD_TEST {
+        app.add_plugin(gameplay_load_tests::WeaponLoadTestPlugin);
+    }
+    if *LOOT_CYCLE_LOAD_TEST {
+        app.add_plugin(gameplay_load_tests::LootCycleLoadTestPlugin);
+    }
+    if *COLLIDER_LOAD_TEST
+        || *HEIRLOOM_LOAD_TEST
+        || *PARTICLE_LOAD_TEST
+        || *POISON_LOAD_TEST
+        || *WEAPON_LOAD_TEST
+        || *LOOT_CYCLE_LOAD_TEST
+    {
         app.add_system(
             gameplay_load_tests::unified_load_tests_f9_toggle.in_set(OnUpdate(GameState::Main)),
         );

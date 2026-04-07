@@ -27,7 +27,7 @@ use bevy_rapier2d::prelude::{Collider, Sensor};
 use serde::{Deserialize, Serialize};
 
 pub const INVENTORY_SIZE: usize = 6 * 4;
-pub const MAX_STACK_SIZE: usize = 64;
+pub const MAX_STACK_SIZE: usize = 999;
 
 #[derive(Component, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Inventory {

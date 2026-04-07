@@ -1,9 +1,10 @@
-//! Stress test for Rapier / collider churn. Enable with `COLLIDER_LOAD_TEST=1 cargo run`.
+//! Stress test for enemy spawn → kill → loot cycle. Enable with `COLLIDER_LOAD_TEST=1 cargo run`.
 //!
-//! Spawns 100 mobs (0.2s lifetime), 100 XP shards and 100 coins (0.1s lifetime) on a timer
-//! while active. **F9** toggles this and any other enabled load tests (starts off).
+//! Spawns mobs around the player, then kills them via real `HitEvent` damage so they go through
+//! the full death pipeline: `handle_hits` → `MarkedForDeath` → `EnemyDeathEvent` →
+//! `handle_enemy_death` (loot drops, on-kill heirlooms) → `cleanup_marked_for_death_entities`.
 //!
-//! Watch FPS and entity counts over several minutes.
+//! **F9** toggles this and any other enabled load tests (starts off).
 
 use bevy::prelude::*;
 use bevy_proto::prelude::{ProtoCommands, Prototypes};
@@ -11,26 +12,24 @@ use rand::Rng;
 
 use crate::{
     client::is_not_paused,
+    combat::HitEvent,
     custom_commands::CommandsExt,
     enemy::Mob,
     item::WorldObject,
-    player::Player,
+    player::{skills::Heirloom, Player},
     proto::proto_param::ProtoParam,
-    world::{
-        dimension::ActiveDimension,
-        dungeon::Dungeon,
-    },
+    world::{dimension::ActiveDimension, dungeon::Dungeon},
     GameState,
 };
 
-const MOB_COUNT: usize = 100;
-const ITEM_COUNT: usize = 100;
-const MOB_LIFETIME_SECS: f32 = 0.2;
+const MOB_COUNT: usize = 20;
+const ITEM_COUNT: usize = 0;
+/// Delay before mobs are hit with lethal damage, giving them time to fully initialize.
+const MOB_KILL_DELAY_SECS: f32 = 0.5;
 const ITEM_LIFETIME_SECS: f32 = 0.1;
 /// Public for unified F9 toggle reset (`gameplay_load_tests`).
 pub const WAVE_INTERVAL_SECS: f32 = 0.25;
 
-/// When false, no waves spawn (F9 toggles). Only used if `COLLIDER_LOAD_TEST` env is set.
 #[derive(Resource, Default)]
 pub struct ColliderLoadTestActive {
     pub active: bool,
@@ -39,6 +38,13 @@ pub struct ColliderLoadTestActive {
 #[derive(Component)]
 pub struct ColliderLoadTestMarker;
 
+/// Mobs with this component will be killed via HitEvent after the timer expires.
+#[derive(Component)]
+pub struct ColliderLoadTestKillTimer {
+    pub timer: Timer,
+}
+
+/// Items (not mobs) still use forced despawn since they're not part of the death pipeline.
 #[derive(Component)]
 pub struct ColliderLoadTestDespawn {
     pub timer: Timer,
@@ -71,18 +77,18 @@ impl Plugin for ColliderLoadTestPlugin {
                     .run_if(is_not_paused),
             )
             .add_system(
+                tick_collider_load_test_kill
+                    .in_set(OnUpdate(GameState::Main))
+                    .after(collider_load_test_spawn_wave),
+            )
+            .add_system(
                 tick_collider_load_test_despawn
                     .in_set(OnUpdate(GameState::Main))
                     .after(collider_load_test_spawn_wave),
             );
         info!(
-            "Collider load test plugin (F9 toggles with other load tests): when on, {} mobs @ {}s, {} shards + {} coins @ {}s, wave every {}s",
-            MOB_COUNT,
-            MOB_LIFETIME_SECS,
-            ITEM_COUNT,
-            ITEM_COUNT,
-            ITEM_LIFETIME_SECS,
-            WAVE_INTERVAL_SECS
+            "Collider load test plugin: {} mobs killed via HitEvent after {}s, {} items force-despawned @ {}s, wave every {}s",
+            MOB_COUNT, MOB_KILL_DELAY_SECS, ITEM_COUNT, ITEM_LIFETIME_SECS, WAVE_INTERVAL_SECS
         );
     }
 }
@@ -119,6 +125,17 @@ fn collider_load_test_spawn_wave(
     }
 
     let mut rng = rand::thread_rng();
+    let non_boss_mobs = [
+        // Mob::Slime,
+        Mob::SpikeSlime,
+        Mob::FurDevil,
+        // Mob::Hog,
+        Mob::StingFly,
+        Mob::Bushling,
+        // Mob::Fairy,
+        Mob::RedMushling,
+        // Mob::Crow,
+    ];
 
     for i in 0..MOB_COUNT {
         let angle = (i as f32) * 0.0628 + rng.gen_range(-0.02..0.02);
@@ -127,11 +144,12 @@ fn collider_load_test_spawn_wave(
             + Vec2::from_angle(angle) * r
             + Vec2::new(rng.gen_range(-6.0..6.0), rng.gen_range(-6.0..6.0));
 
-        if let Some(e) = proto_commands.spawn_from_proto(Mob::FurDevil, &prototypes, pos) {
+        let mob = non_boss_mobs[rng.gen_range(0..non_boss_mobs.len())].clone();
+        if let Some(e) = proto_commands.spawn_from_proto(mob, &prototypes, pos) {
             commands.entity(e).insert((
                 ColliderLoadTestMarker,
-                ColliderLoadTestDespawn {
-                    timer: Timer::from_seconds(MOB_LIFETIME_SECS, TimerMode::Once),
+                ColliderLoadTestKillTimer {
+                    timer: Timer::from_seconds(MOB_KILL_DELAY_SECS, TimerMode::Once),
                 },
             ));
         }
@@ -144,13 +162,9 @@ fn collider_load_test_spawn_wave(
             + Vec2::from_angle(angle) * r
             + Vec2::new(rng.gen_range(-6.0..6.0), rng.gen_range(-6.0..6.0));
 
-        if let Some(e) = proto_commands.spawn_item_from_proto(
-            WorldObject::XPShard,
-            &proto_param,
-            pos,
-            1,
-            None,
-        ) {
+        if let Some(e) =
+            proto_commands.spawn_item_from_proto(WorldObject::XPShard, &proto_param, pos, 1, None)
+        {
             commands.entity(e).insert((
                 ColliderLoadTestMarker,
                 ColliderLoadTestDespawn {
@@ -159,27 +173,34 @@ fn collider_load_test_spawn_wave(
             ));
         }
     }
+}
 
-    for i in 0..ITEM_COUNT {
-        let angle = (i as f32) * 0.0628 + 0.62 + rng.gen_range(-0.02..0.02);
-        let r = 56. + (i % 25) as f32 * 5.5;
-        let pos = player_pos
-            + Vec2::from_angle(angle) * r
-            + Vec2::new(rng.gen_range(-6.0..6.0), rng.gen_range(-6.0..6.0));
-
-        if let Some(e) = proto_commands.spawn_item_from_proto(
-            WorldObject::Coin,
-            &proto_param,
-            pos,
-            1,
-            None,
-        ) {
-            commands.entity(e).insert((
-                ColliderLoadTestMarker,
-                ColliderLoadTestDespawn {
-                    timer: Timer::from_seconds(ITEM_LIFETIME_SECS, TimerMode::Once),
-                },
-            ));
+/// Ticks kill timers and sends HitEvent with 999 damage to route mobs through the real death pipeline.
+fn tick_collider_load_test_kill(
+    time: Res<Time>,
+    mut q: Query<(Entity, &mut ColliderLoadTestKillTimer)>,
+    mut hit_events: EventWriter<HitEvent>,
+    mut commands: Commands,
+) {
+    for (entity, mut kill) in q.iter_mut() {
+        kill.timer.tick(time.delta());
+        if kill.timer.finished() {
+            hit_events.send(HitEvent {
+                hit_entity: entity,
+                damage: 999,
+                dir: Vec2::X,
+                hit_with_melee: None,
+                hit_with_projectile: None,
+                hit_by_mob: None,
+                hit_by_pet: None,
+                was_crit: false,
+                was_overcrit: false,
+                ignore_tool: false,
+                from_heirloom_effect: Some(Heirloom::PoisonStacks),
+            });
+            commands
+                .entity(entity)
+                .remove::<ColliderLoadTestKillTimer>();
         }
     }
 }
