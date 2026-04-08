@@ -22,17 +22,22 @@ use std::f32::consts::TAU;
 use bevy::prelude::*;
 use bevy_hanabi::prelude::{graph, ParticleEffect, ParticleEffectBundle};
 use bevy_proto::prelude::ProtoCommands;
+use bevy_rapier2d::prelude::{Collider, RapierContext};
 use rand::Rng;
 
 use crate::{
+    animations::ui_animaitons::MoveUIAnimation,
     assets::Graphics,
     attributes::add_item_glows,
+    audio::SoundSpawner,
     client::is_not_paused,
     collider_load_test::WAVE_INTERVAL_SECS as COLLIDER_WAVE_INTERVAL_SECS,
     collider_load_test::{ColliderLoadTestActive, ColliderLoadTestState},
     combat::{
         combat_helpers::SpawnAsepriteAnimationCollider,
+        pickup_radius::BeingPulledToPlayer,
         status_effects::{Burning, StatusEffect, StatusEffectEvent},
+        MarkedForDeath,
     },
     custom_commands::CommandsExt,
     enemy::Mob,
@@ -47,6 +52,7 @@ use crate::{
         Player,
     },
     proto::proto_param::ProtoParam,
+    ui::damage_numbers::{DamageNumber, QueueFloatingText},
     world::{dimension::ActiveDimension, dungeon::Dungeon, y_sort::YSort},
     GameState,
 };
@@ -826,4 +832,56 @@ fn loot_cycle_load_test_burst(
             }
         }
     }
+}
+
+// =============================================================================
+// Diagnostics — entity/component/rapier counters every 5s (DIAGNOSTICS=1)
+// =============================================================================
+
+pub fn diagnostics_tick(
+    time: Res<Time>,
+    mut elapsed: Local<f32>,
+    mut prev_total: Local<usize>,
+    all_entities: Query<Entity>,
+    mobs: Query<(), With<Mob>>,
+    item_drops: Query<(), With<ItemDrop>>,
+    colliders: Query<(), With<Collider>>,
+    damage_numbers: Query<(), With<DamageNumber>>,
+    move_ui_anims: Query<(), With<MoveUIAnimation>>,
+    sound_spawners: Query<(), With<SoundSpawner>>,
+    particle_effects: Query<(), With<ParticleEffect>>,
+    marked_for_death: Query<(), With<MarkedForDeath>>,
+    burning_and_pulled: Query<(), Or<(With<Burning>, With<BeingPulledToPlayer>)>>,
+    queued_texts: Query<(), With<QueueFloatingText>>,
+    rapier: Res<RapierContext>,
+) {
+    *elapsed += time.delta_seconds();
+    if *elapsed < 5.0 {
+        return;
+    }
+    *elapsed = 0.0;
+
+    let total = all_entities.iter().count();
+    let delta: i64 = total as i64 - *prev_total as i64;
+    *prev_total = total;
+
+    let rapier_bodies = rapier.bodies.len();
+    let rapier_colliders = rapier.colliders.len();
+
+    info!(
+        "\n[DIAG] === Entity / Component Snapshot ===\n\
+         [DIAG] total_entities={:<6} (delta {:+})\n\
+         [DIAG] mobs={:<4} item_drops={:<4} colliders_bevy={:<4}\n\
+         [DIAG] dmg_numbers={:<4} ui_movers={:<4} sound_spawners={:<4}\n\
+         [DIAG] particles={:<4} marked_death={:<4} burning_or_pulled={:<4}\n\
+         [DIAG] queued_texts={:<4}\n\
+         [DIAG] rapier_bodies={:<5} rapier_colliders={:<5}\n\
+         [DIAG] ==========================================",
+        total, delta,
+        mobs.iter().count(), item_drops.iter().count(), colliders.iter().count(),
+        damage_numbers.iter().count(), move_ui_anims.iter().count(), sound_spawners.iter().count(),
+        particle_effects.iter().count(), marked_for_death.iter().count(), burning_and_pulled.iter().count(),
+        queued_texts.iter().count(),
+        rapier_bodies, rapier_colliders,
+    );
 }
